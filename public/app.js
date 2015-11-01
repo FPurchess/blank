@@ -20506,7 +20506,7 @@
 
 
 	// module
-	exports.push([module.id, "* {\n  margin: 0;\n  padding: 0; }\n\nhtml {\n  height: 100%; }\n\nbody {\n  font-family: Arial, sans-serif;\n  width: 100%;\n  height: 100%; }\n\n#root {\n  background: #333;\n  width: 100%;\n  height: 100%; }\n\n.editor {\n  color: #eee;\n  font-size: 16px;\n  line-height: 1.5em;\n  height: 100%;\n  max-width: 600px;\n  padding: 20px;\n  margin: 0 auto;\n  box-sizing: border-box;\n  outline: 0; }\n", ""]);
+	exports.push([module.id, "* {\n  margin: 0;\n  padding: 0; }\n\nhtml {\n  height: 100%; }\n\nbody {\n  font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace;\n  width: 100%;\n  height: 100%; }\n\n#root {\n  background: #111;\n  width: 100%;\n  height: 100%; }\n\n.editor {\n  color: #ddd;\n  font-size: 16px;\n  line-height: 1.8em;\n  height: 100%;\n  max-width: 900px;\n  padding: 30px 20px;\n  margin: 0 auto;\n  box-sizing: border-box;\n  outline: 0; }\n", ""]);
 
 	// exports
 

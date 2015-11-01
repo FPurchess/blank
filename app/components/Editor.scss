@@ -16,14 +16,14 @@ html {
 
 // FIXME better place: global
 body {
-    font-family: Arial, sans-serif;
+    font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace;
     width: 100%;
     height: 100%;
 }
 
 // FIXME better place: global
 #root {
-    background: #333;
+    background: #111;
     width: 100%;
     height: 100%;
 }
@@ -32,14 +32,14 @@ body {
 
 
 .editor {
-    color: #eee;
+    color: #ddd;
     font-size: 16px;
-    line-height: 1.5em;
+    line-height: 1.8em;
 
     height: 100%;
-    max-width: 600px;
+    max-width: 900px;
 
-    padding: 20px;
+    padding: 30px 20px;
     margin: 0 auto;
 
     box-sizing: border-box;
