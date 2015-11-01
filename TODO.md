@@ -1,5 +1,5 @@
-  - [ ] headless
-  - [ ] config
+  - [x] headless
+  - [x] config
   - [ ] save
   - [ ] open
   - [ ] close
