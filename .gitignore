@@ -2,5 +2,6 @@
 /vendor/pkg/
 bin/
 build/
+public/
 
 node_modules/
