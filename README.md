@@ -21,9 +21,9 @@ npm install
 ```
 Hint: To start blank in headless mode, execute ```./run.sh false```.
 
-Blank can also be run directly to pass custom flags.
+Blank can also be run directly to pass custom flags. A full list is available under
 ```bash
-go run src/cmd/blank/*.go
+go run src/cmd/blank/*.go --help
 ```
 
 ## Custom Configuration | Custom Keyboard Shortcuts
