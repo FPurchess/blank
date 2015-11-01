@@ -1,0 +1,16 @@
+keymap:
+
+    editor:
+        save: "ctrl+s"
+        open: "ctrl+o"
+        exit: "ctrl+q"
+
+        # formatting
+        format-h1: "ctrl+1"
+        format-h2: "ctrl+2"
+        format-h3: "ctrl+3"
+        format-h4: "ctrl+4"
+        format-h5: "ctrl+5"
+        format-bold: "ctrl+b"
+        format-underline: "ctrl+u"
+        format-italic: "ctrl+i"

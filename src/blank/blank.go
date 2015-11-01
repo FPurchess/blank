@@ -1,7 +1,6 @@
 package blank
 
 import (
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -17,18 +16,44 @@ import (
 
 // Editor main entity
 type Editor struct {
-	httpAddr string
+	addr       string
+	headless   bool
+	configFile string
+	config     *config
 }
 
 // NewEditor initializes a new BlankEditor
-func NewEditor(addr string) *Editor {
-	return &Editor{httpAddr: addr}
+func NewEditor(addr string, headless bool, configFile string) *Editor {
+	return &Editor{addr: addr, headless: headless, configFile: configFile}
 }
 
 // Start initializes thrust and starts the http server
 func (b *Editor) Start() error {
-	b.initThrust()
+	// load config
+	f, err := os.Open(b.configFile)
+	if err != nil {
+		return err
+	}
+
+	b.config, err = newConfig(f)
+	if err != nil {
+		return err
+	}
+
+	// setup thrust window if not running headless
+	if b.headless == false {
+		b.initThrust()
+	}
+
+	// finally, fire http
 	return b.startHTTP()
+}
+
+// Stop gracefully stops editor
+func (b *Editor) Stop() {
+	// TODO proper shutdown (teardown http + thrust, then exit)
+	log.Println("bye bye...")
+	os.Exit(0)
 }
 
 func (b *Editor) initThrust() {
@@ -37,7 +62,7 @@ func (b *Editor) initThrust() {
 	thrust.Start()
 
 	thrustWindow := thrust.NewWindow(thrust.WindowOptions{
-		RootUrl: fmt.Sprintf("http://%s", b.httpAddr),
+		RootUrl: fmt.Sprintf("http://%s", b.addr),
 	})
 
 	thrustWindow.Show()
@@ -46,7 +71,7 @@ func (b *Editor) initThrust() {
 
 	// FIXME perform a graceful shutdown here -- ATTENTION: does not execute deferred funcs
 	thrust.NewEventHandler("closed", func(cr commands.EventResult) {
-		os.Exit(0)
+		b.Stop()
 	})
 }
 
@@ -55,9 +80,9 @@ func (b *Editor) startHTTP() error {
 	r.HandleFunc("/", b.serveHome)
 	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
 
-	log.Printf("Starting blank editor at http://%s/", b.httpAddr)
+	log.Printf("Starting blank editor at http://%s/", b.addr)
 
-	return http.ListenAndServe(b.httpAddr, r)
+	return http.ListenAndServe(b.addr, r)
 }
 
 func (b *Editor) serveHome(w http.ResponseWriter, r *http.Request) {
@@ -68,12 +93,5 @@ func (b *Editor) serveHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO pass a configuration
-	c, err := json.Marshal(struct{}{})
-	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	template.Must(t, t.Execute(w, string(c)))
+	template.Must(t, t.Execute(w, b.config))
 }
