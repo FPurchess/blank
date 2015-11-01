@@ -26,7 +26,7 @@ Blank can also be run directly to pass custom flags. A full list is available un
 go run src/cmd/blank/*.go --help
 ```
 
-## Custom Configuration | Custom Keyboard Shortcuts
+## Custom Configuration and Keyboard Shortcuts
 If not specified otherwise, Blank is looking for a configuration file under ```~/.blank/config,yaml```. Add custom keyboard shortcuts by copying the default configuration to this folder or via the ```--config``` flag.
 
 ```bash
