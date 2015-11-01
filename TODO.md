@@ -1,0 +1,10 @@
+  - [ ] headless
+  - [ ] config
+  - [ ] save
+  - [ ] open
+  - [ ] close
+  - [ ] exit
+  - [ ] formats
+  - [ ] workspace
+  - [ ] version control
+  - [ ] auto-dimm
