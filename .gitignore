@@ -1,0 +1,6 @@
+/pkg/
+/vendor/pkg/
+bin/
+build/
+
+node_modules/

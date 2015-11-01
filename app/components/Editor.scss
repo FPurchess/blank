@@ -1,0 +1,47 @@
+
+// -----------------------------------------------------------------------------
+
+// FIXME better place: global
+// FIXME better reset
+* {
+    margin: 0;
+    padding: 0;
+}
+
+
+// FIXME better place: global
+html {
+    height: 100%;
+}
+
+// FIXME better place: global
+body {
+    font-family: Arial, sans-serif;
+    width: 100%;
+    height: 100%;
+}
+
+// FIXME better place: global
+#root {
+    background: #333;
+    width: 100%;
+    height: 100%;
+}
+
+// -----------------------------------------------------------------------------
+
+
+.editor {
+    color: #eee;
+    font-size: 16px;
+    line-height: 1.5em;
+
+    height: 100%;
+    max-width: 600px;
+
+    padding: 20px;
+    margin: 0 auto;
+
+    box-sizing: border-box;
+    outline: 0;
+}

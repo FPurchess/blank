@@ -1,0 +1,53 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/cheggaaa/pb",
+			"repository": "https://github.com/cheggaaa/pb",
+			"revision": "da1f27ad1d9509b16f65f52fd9d8138b0f2dc7b2",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/codegangsta/cli",
+			"repository": "https://github.com/codegangsta/cli",
+			"revision": "70e3fa51ebed95df8c0fbe1519c1c1f9bc16bb13",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/gorilla/context",
+			"repository": "https://github.com/gorilla/context",
+			"revision": "1c83b3eabd45b6d76072b66b746c20815fb2872d",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/gorilla/mux",
+			"repository": "https://github.com/gorilla/mux",
+			"revision": "ad4d7a5882b961e07e2626045eb995c022ac6664",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/gorilla/websocket",
+			"repository": "https://github.com/gorilla/websocket",
+			"revision": "527637c0f38a8035d7856bb758e56f7ee2c704a9",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/miketheprogrammer/go-thrust",
+			"repository": "https://github.com/miketheprogrammer/go-thrust",
+			"revision": "2f2cfec510b030fd4749970f1d5f6c41b896ff02",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/tv42/birpc",
+			"repository": "https://github.com/tv42/birpc",
+			"revision": "22dcbfff0024e83a23cb42c800c1523a3ba08a4c",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/tv42/topic",
+			"repository": "https://github.com/tv42/topic",
+			"revision": "aa72cbe81b4823f349da47a4d749cdda61677c09",
+			"branch": "master"
+		}
+	]
+}
