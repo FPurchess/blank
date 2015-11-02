@@ -8,9 +8,7 @@ import (
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
 )
 
-type commandHandler interface {
-	handle(c *command) error
-}
+type handlerFunc func(*command) error
 
 type command struct {
 	Topic string      `json:"topic"`
@@ -18,13 +16,12 @@ type command struct {
 }
 
 type tunnel struct {
-	receiver chan *command
 	window   *window.Window
-	registry map[commandHandler]string
+	registry map[string][]handlerFunc
 }
 
 func newTunnel(w *window.Window) *tunnel {
-	return &tunnel{window: w}
+	return &tunnel{window: w, registry: make(map[string][]handlerFunc)}
 }
 
 func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
@@ -37,16 +34,16 @@ func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
 		return
 	}
 
-	// broadcast command to commandHandlers
-	for handler, topic := range t.registry {
-		if topic == c.Topic {
-			handler.handle(c)
+	// broadcast command
+	if handlers, ok := t.registry[c.Topic]; ok {
+		for _, handler := range handlers {
+			handler(c)
 		}
 	}
 }
 
-func (t *tunnel) registerHandler(h commandHandler, topic string) {
-	t.registry[h] = topic
+func (t *tunnel) registerHandler(topic string, h handlerFunc) {
+	t.registry[topic] = append(t.registry[topic], h)
 }
 
 func (t *tunnel) sendCommand(c *command) error {
