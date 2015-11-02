@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ -n "$1" ]] && HEADLESS="$1" || HEADLESS="false"
+[[ -n "$1" ]] && DEBUG="$1" || DEBUG="false"
 
 export GOPATH=$HOME/gotools:`pwd`:`pwd`/vendor
 export PATH=$PATH:$HOME/gotools/bin
@@ -10,7 +10,7 @@ webpack
 
 # lock and load...
 
-go run src/cmd/blank/*.go --config="./default.config.yaml" --headless=$HEADLESS
+go run src/cmd/blank/*.go --config="./default.config.yaml" --debug=$DEBUG
 
 # FIXME proper thrust shutdown
 killall thrust_shell

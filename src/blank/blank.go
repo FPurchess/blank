@@ -17,14 +17,15 @@ import (
 // Editor main entity
 type Editor struct {
 	addr       string
-	headless   bool
+	debug      bool
 	configFile string
 	config     *config
+	tunnel     *tunnel
 }
 
 // NewEditor initializes a new BlankEditor
-func NewEditor(addr string, headless bool, configFile string) *Editor {
-	return &Editor{addr: addr, headless: headless, configFile: configFile}
+func NewEditor(addr string, debug bool, configFile string) *Editor {
+	return &Editor{addr: addr, debug: debug, configFile: configFile}
 }
 
 // Start initializes thrust and starts the http server
@@ -40,9 +41,8 @@ func (b *Editor) Start() error {
 		return err
 	}
 
-	// setup thrust window if not running headless
-	if b.headless == false {
-		b.initThrust()
+	if err := b.initThrust(); err != nil {
+		return err
 	}
 
 	// finally, fire http
@@ -51,16 +51,18 @@ func (b *Editor) Start() error {
 
 // Stop gracefully stops editor
 func (b *Editor) Stop() {
-	// TODO proper shutdown (teardown http + thrust, then exit)
+	// TODO graceful shutdown (teardown http, then exit)
 	log.Println("bye bye...")
+	thrust.Exit()
 	os.Exit(0)
 }
 
-func (b *Editor) initThrust() {
+func (b *Editor) initThrust() error {
 	thrust.InitLogger()
 	thrust.SetProvisioner(provisioner.NewDefaultProvisioner())
 	thrust.Start()
 
+	// init window
 	thrustWindow := thrust.NewWindow(thrust.WindowOptions{
 		RootUrl: fmt.Sprintf("http://%s", b.addr),
 	})
@@ -69,10 +71,24 @@ func (b *Editor) initThrust() {
 	thrustWindow.Maximize()
 	thrustWindow.Focus()
 
-	// FIXME perform a graceful shutdown here -- ATTENTION: does not execute deferred funcs
+	// debug mode
+	if b.debug {
+		thrustWindow.OpenDevtools()
+	}
+
+	// register tunnel
+	b.tunnel = newTunnel(thrustWindow)
+	_, err := thrustWindow.HandleRemote(b.tunnel.onRemote)
+	if err != nil {
+		return err
+	}
+
+	// bind close event
 	thrust.NewEventHandler("closed", func(cr commands.EventResult) {
 		b.Stop()
 	})
+
+	return nil
 }
 
 func (b *Editor) startHTTP() error {

@@ -1,5 +1,5 @@
-  - [x] headless
   - [x] config
+  - [x] debug
   - [ ] save
   - [ ] open
   - [ ] close

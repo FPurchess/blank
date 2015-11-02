@@ -1,55 +1,79 @@
-import React from 'react'
-import ReactDOM from 'react-dom'
+import React from "react"
+import ReactDOM from "react-dom"
+import execute from "../backend.js"
 
-import {HotKeys} from 'react-hotkeys';
-import ContentEditable from './ContentEditable.js'
+import {HotKeys} from "react-hotkeys";
+import ContentEditable from "./ContentEditable.js"
 
-require('./Editor.scss')
+require("./Editor.scss")
 
 
 const Editor = React.createClass({
+
   getHandlers() {
     return {
-      'save': this.save,
-      'open': this.open,
-      'exit': this.exit,
-      'format-h1': this.format('h1'),
-      'format-h2': this.format('h2'),
-      'format-h3': this.format('h3'),
-      'format-h4': this.format('h4'),
-      'format-h5': this.format('h5'),
-      'format-bold': this.format('strong'),
-      'format-underline': this.format('underline'),
-      'format-italic': this.format('i')
+      "save": this.save,
+      "open": this.open,
+      "exit": this.exit,
+
+      "format-h1": this.formatting("h1"),
+      "format-h2": this.formatting("h2"),
+      "format-h3": this.formatting("h3"),
+      "format-h4": this.formatting("h4"),
+      "format-h5": this.formatting("h5"),
+      "format-bold": this.formatting("strong"),
+      "format-underline": this.formatting("underline"),
+      "format-italic": this.formatting("i")
     }
+  },
+
+  getInitialState() {
+    return {
+      file: null,
+      html: ""
+    }
+  },
+
+  componentDidMount() {
+    ReactDOM.findDOMNode(this.refs.editor).focus()
   },
 
   save(e) {
     e.preventDefault()
-    // TODO save
+    execute("save", {
+      file: this.state.file,
+      html: this.state.html
+    })
+    // TODO loading spinner
     return false
   },
 
   open(e) {
     e.preventDefault()
-    // TODO open
+    ReactDOM.findDOMNode(this.refs.fileDialog).click()
     return false
   },
 
-  format(formatting) {
+  exit(e) {
+    e.preventDefault()
+    // TODO exit
+    return false
+  },
+
+  formatting(tag) {
     return function(e) {
       e.preventDefault()
-      // TODO format
+      // TODO formatting
       return false
     }
   },
 
-  componentDidMount() {
-    ReactDOM.findDOMNode(this).getElementsByClassName('editor')[0].focus()
-  },
-
-  getInitialState() {
-    return {html: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industrys standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'}
+  handleFileDialog(e) {
+    console.log(e)
+    execute("open", {
+      file: e.target.value
+    })
+    // TODO loading spinner
   },
 
   handleChange(e) {
@@ -60,8 +84,9 @@ const Editor = React.createClass({
     const handlers = this.getHandlers()
 
     return (
-      <HotKeys keyMap={this.props.keymap} handlers={handlers}>
-        <ContentEditable className="editor" html={this.state.html} onChange={this.handleChange} />
+      <HotKeys className="hotkeys" keyMap={this.props.keymap} handlers={handlers}>
+        <input ref="fileDialog" type="file" className="file-dialog" value={this.state.file} onChange={this.handleFileDialog} />
+        <ContentEditable ref="editor" className="editor" html={this.state.html} onChange={this.handleChange} />
       </HotKeys>
     )
   }

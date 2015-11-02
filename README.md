@@ -19,7 +19,7 @@ npm install
 ```bash
 ./run.sh
 ```
-Hint: To start blank in headless mode, execute ```./run.sh false```.
+Hint: To start blank in debug mode, execute ```./run.sh true```.
 
 Blank can also be run directly to pass custom flags. A full list is available under
 ```bash
