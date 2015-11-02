@@ -12,6 +12,7 @@ func NewEditor() Editor {
 	return Editor{}
 }
 
+// Init sets up the plugin and registers all commands
 func (e Editor) Init(b *blank.Blank) {
 	e.blank = b
 
@@ -21,10 +22,12 @@ func (e Editor) Init(b *blank.Blank) {
 }
 
 func (e Editor) onSave(c *blank.Command) error {
+	// TODO implement
 	return nil
 }
 
 func (e Editor) onOpen(c *blank.Command) error {
+	// TODO implement
 	return nil
 }
 

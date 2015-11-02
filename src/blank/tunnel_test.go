@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegisterHandler(t *testing.T) {
-	tun := newTunnel(nil)
+	tun := NewTunnel(nil)
 
 	ensure.DeepEqual(t, len(tun.registry), 0)
 	tun.RegisterHandler("a-topic", func(c *Command) error {
@@ -22,7 +22,7 @@ func TestRegisterHandler(t *testing.T) {
 
 func TestOnRemotePassesCommands(t *testing.T) {
 	calls := 0
-	tun := newTunnel(nil)
+	tun := NewTunnel(nil)
 
 	tun.RegisterHandler("a-topic", func(c *Command) error {
 		calls++

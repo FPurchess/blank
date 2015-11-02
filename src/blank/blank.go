@@ -25,7 +25,7 @@ type Blank struct {
 	debug      bool
 	configFile string
 	config     *config
-	Tunnel     *tunnel
+	Tunnel     *Tunnel
 	plugins    []Plugin
 }
 
@@ -92,7 +92,7 @@ func (b *Blank) initThrust() error {
 	}
 
 	// register tunnel
-	b.Tunnel = newTunnel(thrustWindow)
+	b.Tunnel = NewTunnel(thrustWindow)
 	_, err := thrustWindow.HandleRemote(b.Tunnel.onRemote)
 	if err != nil {
 		return err

@@ -17,16 +17,18 @@ type Command struct {
 	Data  interface{} `json:"data"`
 }
 
-type tunnel struct {
+// Tunnel acts as the communication pipeline between backend and frontend
+type Tunnel struct {
 	window   *window.Window
 	registry map[string][]HandlerFunc
 }
 
-func newTunnel(w *window.Window) *tunnel {
-	return &tunnel{window: w, registry: make(map[string][]HandlerFunc)}
+// NewTunnel initializes a new communication tunnel
+func NewTunnel(w *window.Window) *Tunnel {
+	return &Tunnel{window: w, registry: make(map[string][]HandlerFunc)}
 }
 
-func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
+func (t *Tunnel) onRemote(e commands.EventResult, this *window.Window) {
 	c := &Command{}
 
 	// extract command from payload
@@ -44,11 +46,11 @@ func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
 	}
 }
 
-func (t *tunnel) RegisterHandler(topic string, h HandlerFunc) {
+func (t *Tunnel) RegisterHandler(topic string, h HandlerFunc) {
 	t.registry[topic] = append(t.registry[topic], h)
 }
 
-func (t *tunnel) SendCommand(c *Command) error {
+func (t *Tunnel) SendCommand(c *Command) error {
 	buf, err := json.Marshal(c)
 	if err != nil {
 		return err
