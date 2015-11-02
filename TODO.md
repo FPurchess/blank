@@ -3,7 +3,7 @@
   - [ ] save
   - [ ] open
   - [ ] close
-  - [ ] exit
+  - [x] exit
   - [ ] formats
   - [ ] workspace
   - [ ] version control
