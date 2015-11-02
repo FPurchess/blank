@@ -14,8 +14,8 @@ import (
 	"github.com/miketheprogrammer/go-thrust/thrust"
 )
 
-// Editor main entity
-type Editor struct {
+// Blank is the main entity
+type Blank struct {
 	addr       string
 	debug      bool
 	configFile string
@@ -23,13 +23,13 @@ type Editor struct {
 	tunnel     *tunnel
 }
 
-// NewEditor initializes a new BlankEditor
-func NewEditor(addr string, debug bool, configFile string) *Editor {
-	return &Editor{addr: addr, debug: debug, configFile: configFile}
+// NewBlank initializes a new BlankEditor
+func NewBlank(addr string, debug bool, configFile string) *Blank {
+	return &Blank{addr: addr, debug: debug, configFile: configFile}
 }
 
 // Start initializes thrust and starts the http server
-func (b *Editor) Start() error {
+func (b *Blank) Start() error {
 	// load config
 	f, err := os.Open(b.configFile)
 	if err != nil {
@@ -50,14 +50,14 @@ func (b *Editor) Start() error {
 }
 
 // Stop gracefully stops editor
-func (b *Editor) Stop() {
+func (b *Blank) Stop() {
 	// TODO graceful shutdown (teardown http, then exit)
 	log.Println("bye bye...")
 	thrust.Exit()
 	os.Exit(0)
 }
 
-func (b *Editor) initThrust() error {
+func (b *Blank) initThrust() error {
 	thrust.InitLogger()
 	thrust.SetProvisioner(provisioner.NewDefaultProvisioner())
 	thrust.Start()
@@ -91,7 +91,7 @@ func (b *Editor) initThrust() error {
 	return nil
 }
 
-func (b *Editor) startHTTP() error {
+func (b *Blank) startHTTP() error {
 	r := mux.NewRouter()
 	r.HandleFunc("/", b.serveHome)
 	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
@@ -101,7 +101,7 @@ func (b *Editor) startHTTP() error {
 	return http.ListenAndServe(b.addr, r)
 }
 
-func (b *Editor) serveHome(w http.ResponseWriter, r *http.Request) {
+func (b *Blank) serveHome(w http.ResponseWriter, r *http.Request) {
 	t := template.New("index.html")
 	t, err := t.ParseFiles("tmpl/index.html")
 	if err != nil {

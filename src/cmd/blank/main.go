@@ -13,7 +13,7 @@ func main() {
 
 	flag.Parse()
 
-	editor := blank.NewEditor(*addr, *debug, *configFile)
+	editor := blank.NewBlank(*addr, *debug, *configFile)
 	if err := editor.Start(); err != nil {
 		log.Fatal(err)
 	}
