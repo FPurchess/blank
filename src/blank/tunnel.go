@@ -46,10 +46,12 @@ func (t *Tunnel) onRemote(e commands.EventResult, this *window.Window) {
 	}
 }
 
+// RegisterHandler subscribes a command handler on a specific topic
 func (t *Tunnel) RegisterHandler(topic string, h HandlerFunc) {
 	t.registry[topic] = append(t.registry[topic], h)
 }
 
+// SendCommand sends a command to the frontend
 func (t *Tunnel) SendCommand(c *Command) error {
 	buf, err := json.Marshal(c)
 	if err != nil {
