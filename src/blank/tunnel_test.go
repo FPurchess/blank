@@ -11,10 +11,10 @@ func TestRegisterHandler(t *testing.T) {
 	tun := newTunnel(nil)
 
 	ensure.DeepEqual(t, len(tun.registry), 0)
-	tun.registerHandler("a-topic", func(c *command) error {
+	tun.RegisterHandler("a-topic", func(c *Command) error {
 		return nil
 	})
-	tun.registerHandler("another-topic", func(c *command) error {
+	tun.RegisterHandler("another-topic", func(c *Command) error {
 		return nil
 	})
 	ensure.DeepEqual(t, len(tun.registry), 2)
@@ -24,11 +24,11 @@ func TestOnRemotePassesCommands(t *testing.T) {
 	calls := 0
 	tun := newTunnel(nil)
 
-	tun.registerHandler("a-topic", func(c *command) error {
+	tun.RegisterHandler("a-topic", func(c *Command) error {
 		calls++
 		return nil
 	})
-	tun.registerHandler("another-topic", func(c *command) error {
+	tun.RegisterHandler("another-topic", func(c *Command) error {
 		calls++
 		return nil
 	})

@@ -8,24 +8,26 @@ import (
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
 )
 
-type handlerFunc func(*command) error
+// HandlerFunc describes a command handler for Thrust communication
+type HandlerFunc func(*Command) error
 
-type command struct {
+// Command is the container through which backend and frontend communicate
+type Command struct {
 	Topic string      `json:"topic"`
 	Data  interface{} `json:"data"`
 }
 
 type tunnel struct {
 	window   *window.Window
-	registry map[string][]handlerFunc
+	registry map[string][]HandlerFunc
 }
 
 func newTunnel(w *window.Window) *tunnel {
-	return &tunnel{window: w, registry: make(map[string][]handlerFunc)}
+	return &tunnel{window: w, registry: make(map[string][]HandlerFunc)}
 }
 
 func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
-	c := &command{}
+	c := &Command{}
 
 	// extract command from payload
 	err := json.Unmarshal([]byte(e.Message.Payload), c)
@@ -42,11 +44,11 @@ func (t *tunnel) onRemote(e commands.EventResult, this *window.Window) {
 	}
 }
 
-func (t *tunnel) registerHandler(topic string, h handlerFunc) {
+func (t *tunnel) RegisterHandler(topic string, h HandlerFunc) {
 	t.registry[topic] = append(t.registry[topic], h)
 }
 
-func (t *tunnel) sendCommand(c *command) error {
+func (t *tunnel) SendCommand(c *Command) error {
 	buf, err := json.Marshal(c)
 	if err != nil {
 		return err

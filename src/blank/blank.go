@@ -14,18 +14,29 @@ import (
 	"github.com/miketheprogrammer/go-thrust/thrust"
 )
 
+// Plugin implements a Blank Plugin
+type Plugin interface {
+	Init(b *Blank)
+}
+
 // Blank is the main entity
 type Blank struct {
 	addr       string
 	debug      bool
 	configFile string
 	config     *config
-	tunnel     *tunnel
+	Tunnel     *tunnel
+	plugins    []Plugin
 }
 
 // NewBlank initializes a new BlankEditor
-func NewBlank(addr string, debug bool, configFile string) *Blank {
-	return &Blank{addr: addr, debug: debug, configFile: configFile}
+func NewBlank(addr string, debug bool, configFile string, plugins []Plugin) *Blank {
+	return &Blank{
+		addr:       addr,
+		debug:      debug,
+		configFile: configFile,
+		plugins:    plugins,
+	}
 }
 
 // Start initializes thrust and starts the http server
@@ -43,6 +54,10 @@ func (b *Blank) Start() error {
 
 	if err := b.initThrust(); err != nil {
 		return err
+	}
+
+	for _, plugin := range b.plugins {
+		plugin.Init(b)
 	}
 
 	// finally, fire http
@@ -77,8 +92,8 @@ func (b *Blank) initThrust() error {
 	}
 
 	// register tunnel
-	b.tunnel = newTunnel(thrustWindow)
-	_, err := thrustWindow.HandleRemote(b.tunnel.onRemote)
+	b.Tunnel = newTunnel(thrustWindow)
+	_, err := thrustWindow.HandleRemote(b.Tunnel.onRemote)
 	if err != nil {
 		return err
 	}
@@ -97,7 +112,6 @@ func (b *Blank) startHTTP() error {
 	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
 
 	log.Printf("Starting blank editor at http://%s/", b.addr)
-
 	return http.ListenAndServe(b.addr, r)
 }
 

@@ -61,7 +61,8 @@ const Editor = React.createClass({
 
   exit(e) {
     e.preventDefault()
-    // TODO exit
+    // TODO safe before exit?
+    execute("exit", {})
     return false
   },
 
