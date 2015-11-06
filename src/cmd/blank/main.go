@@ -5,6 +5,8 @@ import (
 	"blank/plugins/editor"
 	"flag"
 	"log"
+	"os"
+	"strings"
 )
 
 func main() {
@@ -14,12 +16,24 @@ func main() {
 
 	flag.Parse()
 
+	// load config
+	conf, err := os.Open(strings.Replace(*configFile, "~", os.Getenv("HOME"), -1))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// prepare plugins
 	// TODO find a more generic solution
 	plugins := []blank.Plugin{
 		editor.NewEditor(),
 	}
 
-	editor := blank.NewBlank(*addr, *debug, *configFile, plugins)
+	// start editor
+	editor, err := blank.NewBlank(*addr, *debug, conf, plugins)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if err := editor.Start(); err != nil {
 		log.Fatal(err)
 	}

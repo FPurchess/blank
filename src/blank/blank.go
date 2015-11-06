@@ -3,6 +3,7 @@ package blank
 import (
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,35 +24,30 @@ type Plugin interface {
 type Blank struct {
 	addr       string
 	debug      bool
-	configFile string
+	configFile io.Reader
 	config     *config
 	Tunnel     *Tunnel
 	plugins    []Plugin
 }
 
 // NewBlank initializes a new BlankEditor
-func NewBlank(addr string, debug bool, configFile string, plugins []Plugin) *Blank {
-	return &Blank{
-		addr:       addr,
-		debug:      debug,
-		configFile: configFile,
-		plugins:    plugins,
+func NewBlank(addr string, debug bool, configFile io.Reader, plugins []Plugin) (*Blank, error) {
+	c, err := newConfig(configFile)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Blank{
+		addr:    addr,
+		debug:   debug,
+		config:  c,
+		plugins: plugins,
+	}, nil
 }
 
 // Start initializes thrust and starts the http server
 func (b *Blank) Start() error {
 	// load config
-	f, err := os.Open(b.configFile)
-	if err != nil {
-		return err
-	}
-
-	b.config, err = newConfig(f)
-	if err != nil {
-		return err
-	}
-
 	if err := b.initThrust(); err != nil {
 		return err
 	}
