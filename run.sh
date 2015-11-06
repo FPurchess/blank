@@ -8,8 +8,10 @@ export PATH=$PATH:$HOME/gotools/bin
 # precompile app
 webpack
 
-# lock and load...
+# compile assets to binary
+go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
 
+# lock and load...
 go run src/cmd/blank/*.go --config="./default.config.yaml" --debug=$DEBUG
 
 # FIXME proper thrust shutdown

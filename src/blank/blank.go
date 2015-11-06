@@ -109,16 +109,31 @@ func (b *Blank) initThrust() error {
 func (b *Blank) startHTTP() error {
 	r := mux.NewRouter()
 	r.HandleFunc("/", b.serveHome)
-	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
+	r.HandleFunc("/public/app.js", func(w http.ResponseWriter, r *http.Request) {
+		data, err := Asset("public/app.js")
+		if err != nil {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/javascript")
+		w.Write(data)
+	})
 
 	log.Printf("Starting blank editor at http://%s/", b.addr)
 	return http.ListenAndServe(b.addr, r)
 }
 
 func (b *Blank) serveHome(w http.ResponseWriter, r *http.Request) {
-	t := template.New("index.html")
-	t, err := t.ParseFiles("tmpl/index.html")
+	data, err := Asset("tmpl/index.html")
 	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	t, err := template.New("index.html").Parse(string(data))
+	if err != nil {
+		log.Println(err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
