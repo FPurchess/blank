@@ -11,6 +11,9 @@ cd blank
 # install npm packages
 npm install
 
+# install go-bindata (if not already present)
+go get -u github.com/jteeuwen/go-bindata/...
+
 # copy config
 mkdir -p ~/.blank
 cp default.config.yaml ~/.blank/config.yaml

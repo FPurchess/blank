@@ -5,3 +5,5 @@ build/
 public/
 
 node_modules/
+
+src/blank/assets.go
