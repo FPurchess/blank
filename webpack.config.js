@@ -14,7 +14,19 @@ module.exports = {
       {
         test: /\.js$/,
         exclude: /node_modules/,
-        loaders: ["babel-loader"],
+        loaders: ["babel-loader"]
+      },
+
+      {
+        test: /\.js?$/,
+        include: [/prosemirror/, /react-prosemirror/],
+        loaders: ["babel-loader?optional=runtime"]
+      },
+
+      {
+        test: /\.json$/,
+        include: /entities/,
+        loader: "json-loader"
       },
 
       // SASS

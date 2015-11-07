@@ -23,38 +23,55 @@ body {
 
 // FIXME better place: global
 #root {
+    color: #ddd;
     background: #1a1a1a;
     width: 100%;
     height: 100%;
+}
+
+.fullscreen {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
 }
 
 // -----------------------------------------------------------------------------
 
 
 .hotkeys {
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    margin: 0;
+    @extend .fullscreen;
 
-    .editor {
-        color: #ddd;
-        font-size: 16px;
-        line-height: 1.8em;
-
-        height: 100%;
-        max-width: 900px;
-
-        padding: 30px 20px;
-        margin: 0 auto;
-
-        box-sizing: border-box;
-        outline: 0;
-    }
-
-    .file-dialog {
+    > .file-dialog {
         position: absolute;
         left: -99999em;
     }
 
+    > .editor {
+        @extend .fullscreen;
+
+        > .ProseMirror {
+            font-size: 16px;
+            line-height: 1.8em;
+
+            height: 100%;
+            max-width: 900px;
+
+            padding: 30px 20px;
+            margin: 0 auto;
+
+            box-sizing: border-box;
+            outline: 0;
+            border: 0;
+
+            > .ProseMirror-content {
+                border: 0;
+                outline: 0;
+                padding: 0;
+                line-height: 1.8em;
+                width: 100%;
+                height: 100%;
+            }
+        }
+    }
 }

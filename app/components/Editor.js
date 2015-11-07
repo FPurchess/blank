@@ -1,28 +1,31 @@
 import React from "react"
 import ReactDOM from "react-dom"
 
-import rangy from "rangy"
-import rangyClassApplier from "rangy/lib/rangy-classapplier"
+import ProseMirror from 'react-prosemirror'
+import 'prosemirror/src/parse/markdown'
+import 'prosemirror/src/serialize/markdown'
+import 'prosemirror/src/inputrules/autoinput'
+
 import {HotKeys} from "react-hotkeys";
 
 import execute from "../backend.js"
-import ContentEditable from "./ContentEditable.js"
 
 require("./Editor.scss")
 
 
-const Editor = React.createClass({
+const proseMirrorOptions = {docFormat: "markdown"}
+
+export default React.createClass({
+  handlers: {},
 
   getInitialState() {
     return {
       file: null,
-      html: ""
+      value: ""
     }
   },
 
   componentWillMount() {
-    rangy.init()
-
     this.handlers = {
       "save": this.save,
       "open": this.open,
@@ -30,26 +33,29 @@ const Editor = React.createClass({
       "fullscreen": this.fullscreen,
       "devtools": this.devtools,
 
-      "format-h1": this.formatting("h1"),
-      "format-h2": this.formatting("h2"),
-      "format-h3": this.formatting("h3"),
-      "format-h4": this.formatting("h4"),
-      "format-h5": this.formatting("h5"),
-      "format-bold": this.formatting("strong"),
-      "format-underline": this.formatting("u"),
-      "format-italic": this.formatting("em")
+      "format-h1": this.formatting("makeH1"),
+      "format-h2": this.formatting("makeH2"),
+      "format-h3": this.formatting("makeH3"),
+      "format-h4": this.formatting("makeH4"),
+      "format-h5": this.formatting("makeH5"),
+      "format-h6": this.formatting("makeH6"),
+      "format-paragraph": this.formatting("makeParagraph"),
+      "format-bold": this.formatting("toggleStrong"),
+      "format-italic": this.formatting("toggleEm"),
+      "format-bullet-list": this.formatting("wrapBulletList"),
+      "format-ordered-list": this.formatting("wrapOrderedList"),
     }
   },
 
   componentDidMount() {
-    ReactDOM.findDOMNode(this.refs.editor).focus()
+    this.refs.editor.pm.focus()
   },
 
   save(e) {
     e.preventDefault()
     execute("save", {
       file: this.state.file,
-      html: this.state.html
+      value: this.state.value
     })
     // TODO loading spinner
     return false
@@ -57,7 +63,7 @@ const Editor = React.createClass({
 
   open(e) {
     e.preventDefault()
-    ReactDOM.findDOMNode(this.refs.fileDialog).click()
+    this.refs.fileDialog.click()
     return false
   },
 
@@ -80,13 +86,10 @@ const Editor = React.createClass({
     return false
   },
 
-  formatting(tag) {
-    // TODO undo block formatting first
-    var applier = rangy.createClassApplier(tag, {elementTagName: tag})
-
-    return function(e) {
+  formatting(cmd) {
+    return (e) => {
       e.preventDefault()
-      applier.toggleSelection()
+      this.refs.editor.pm.execCommand(cmd)
       return false
     }
   },
@@ -98,19 +101,16 @@ const Editor = React.createClass({
     // TODO loading spinner
   },
 
-  handleChange(e) {
-    this.setState({html: e.target.value})
+  handleChange(value) {
+    this.setState({value: value})
   },
 
   render() {
     return (
       <HotKeys className="hotkeys" keyMap={this.props.keymap} handlers={this.handlers} attach={window.document.body}>
         <input ref="fileDialog" type="file" className="file-dialog" value={this.state.file} onChange={this.handleFileDialog} />
-        <ContentEditable ref="editor" className="editor" html={this.state.html} onChange={this.handleChange} />
+        <ProseMirror ref="editor" defaultValue="" options={proseMirrorOptions} className="editor" value={this.state.value} onChange={this.handleChange} />
       </HotKeys>
     )
   }
 })
-
-
-export default Editor
