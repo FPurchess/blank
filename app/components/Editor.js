@@ -104,7 +104,7 @@ const Editor = React.createClass({
 
   render() {
     return (
-      <HotKeys className="hotkeys" keyMap={this.props.keymap} handlers={this.handlers}>
+      <HotKeys className="hotkeys" keyMap={this.props.keymap} handlers={this.handlers} attach={window.document.body}>
         <input ref="fileDialog" type="file" className="file-dialog" value={this.state.file} onChange={this.handleFileDialog} />
         <ContentEditable ref="editor" className="editor" html={this.state.html} onChange={this.handleChange} />
       </HotKeys>
