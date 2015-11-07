@@ -4,6 +4,7 @@ keymap:
         save: "ctrl+s"
         open: "ctrl+o"
         exit: "ctrl+q"
+        fullscreen: "f11"
 
         # formatting
         format-h1: "ctrl+1"

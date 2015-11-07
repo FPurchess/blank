@@ -27,6 +27,7 @@ const Editor = React.createClass({
       "save": this.save,
       "open": this.open,
       "exit": this.exit,
+      "fullscreen": this.fullscreen,
 
       "format-h1": this.formatting("h1"),
       "format-h2": this.formatting("h2"),
@@ -63,6 +64,12 @@ const Editor = React.createClass({
     e.preventDefault()
     // TODO safe before exit?
     execute("exit", {})
+    return false
+  },
+
+  fullscreen(e) {
+    e.preventDefault()
+    execute("fullscreen", {})
     return false
   },
 
