@@ -2,6 +2,12 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/Sirupsen/logrus",
+			"repository": "https://github.com/Sirupsen/logrus",
+			"revision": "fe6f2b03125e4fcafb21406381010e363a072c80",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/cheggaaa/pb",
 			"repository": "https://github.com/cheggaaa/pb",
 			"revision": "da1f27ad1d9509b16f65f52fd9d8138b0f2dc7b2",
@@ -78,6 +84,18 @@
 			"importpath": "github.com/tv42/topic",
 			"repository": "https://github.com/tv42/topic",
 			"revision": "aa72cbe81b4823f349da47a4d749cdda61677c09",
+			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/airbrake/gobrake.v2",
+			"repository": "https://gopkg.in/airbrake/gobrake.v2",
+			"revision": "e5efbe565a5a63d8aafee7efa2f4fdd7f42b7bd3",
+			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"repository": "https://gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"revision": "31e6fd4bd5a98d8ee7673d24bc54ec73c31810dd",
 			"branch": "master"
 		}
 	]

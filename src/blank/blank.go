@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"net/http"
 	"os"
 
 	"provisioner"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
 	"github.com/miketheprogrammer/go-thrust/thrust"
@@ -69,7 +69,7 @@ func (b *Blank) Stop() {
 }
 
 func (b *Blank) initThrust() error {
-	thrust.InitLogger()
+	//thrust.InitLogger()
 	thrust.SetProvisioner(provisioner.NewDefaultProvisioner())
 	thrust.Start()
 

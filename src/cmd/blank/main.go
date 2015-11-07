@@ -1,12 +1,16 @@
 package main
 
 import (
-	"blank"
-	"blank/plugins/editor"
 	"flag"
-	"log"
+	_log "log"
 	"os"
 	"strings"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/miketheprogrammer/go-thrust/lib/common"
+
+	"blank"
+	"blank/plugins/editor"
 )
 
 func main() {
@@ -15,6 +19,14 @@ func main() {
 	configFile := flag.String("config", "~/.blank/config.yaml", "path to config file")
 
 	flag.Parse()
+
+	// setup logging
+	if *debug {
+		log.SetLevel(log.DebugLevel)
+	}
+	w := log.StandardLogger().Writer()
+	defer w.Close()
+	common.Log = _log.New(w, "", 0)
 
 	// load config
 	conf, err := os.Open(strings.Replace(*configFile, "~", os.Getenv("HOME"), -1))

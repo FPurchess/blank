@@ -49,6 +49,7 @@ func (t *Tunnel) onRemote(e commands.EventResult, this *window.Window) {
 // RegisterHandler subscribes a command handler on a specific topic
 func (t *Tunnel) RegisterHandler(topic string, h HandlerFunc) {
 	t.registry[topic] = append(t.registry[topic], h)
+	log.Debug("registered handler on topic: " + topic)
 }
 
 // SendCommand sends a command to the frontend
