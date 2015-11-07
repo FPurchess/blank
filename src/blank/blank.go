@@ -82,6 +82,10 @@ func (b *Blank) initThrust() error {
 	thrustWindow.Maximize()
 	thrustWindow.Focus()
 
+	if b.debug {
+		thrustWindow.OpenDevtools()
+	}
+
 	// register tunnel
 	b.Tunnel = NewTunnel(thrustWindow)
 	_, err := thrustWindow.HandleRemote(b.Tunnel.onRemote)
