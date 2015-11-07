@@ -11,11 +11,15 @@ import (
 type Editor struct {
 	blank        *blank.Blank
 	isFullscreen bool
+	isDevtools   bool
 }
 
 // NewEditor returns an Editor plugin
 func NewEditor() *Editor {
-	return &Editor{isFullscreen: false}
+	return &Editor{
+		isFullscreen: false,
+		isDevtools:   false,
+	}
 }
 
 // Init sets up the plugin and registers all commands
@@ -26,6 +30,7 @@ func (e *Editor) Init(b *blank.Blank) {
 	e.blank.Tunnel.RegisterHandler("open", e.onOpen)
 	e.blank.Tunnel.RegisterHandler("exit", e.onExit)
 	e.blank.Tunnel.RegisterHandler("fullscreen", e.onFullscreen)
+	e.blank.Tunnel.RegisterHandler("devtools", e.onDevtools)
 }
 
 func (e *Editor) onSave(this *window.Window, c *blank.Command) error {
@@ -60,6 +65,18 @@ func (e *Editor) onFullscreen(this *window.Window, c *blank.Command) error {
 
 		this.CallWhenDisplayed(&command)
 		this.Maximize()
+	}
+
+	return nil
+}
+
+func (e *Editor) onDevtools(this *window.Window, c *blank.Command) error {
+	e.isDevtools = !e.isDevtools
+
+	if e.isDevtools {
+		this.OpenDevtools()
+	} else {
+		this.CloseDevtools()
 	}
 
 	return nil

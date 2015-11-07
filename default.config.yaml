@@ -5,6 +5,7 @@ keymap:
         open: "ctrl+o"
         exit: "ctrl+q"
         fullscreen: "f11"
+        devtools: "f12"
 
         # formatting
         format-h1: "ctrl+1"

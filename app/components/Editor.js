@@ -28,6 +28,7 @@ const Editor = React.createClass({
       "open": this.open,
       "exit": this.exit,
       "fullscreen": this.fullscreen,
+      "devtools": this.devtools,
 
       "format-h1": this.formatting("h1"),
       "format-h2": this.formatting("h2"),
@@ -70,6 +71,12 @@ const Editor = React.createClass({
   fullscreen(e) {
     e.preventDefault()
     execute("fullscreen", {})
+    return false
+  },
+
+  devtools(e) {
+    e.preventDefault()
+    execute("devtools", {})
     return false
   },
 
