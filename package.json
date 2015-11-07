@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "./run.sh",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "gb test"
   },
   "author": "Florian Purchess",
   "license": "",
