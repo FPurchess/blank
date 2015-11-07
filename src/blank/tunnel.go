@@ -2,14 +2,14 @@ package blank
 
 import (
 	"encoding/json"
-	"log"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/miketheprogrammer/go-thrust/lib/bindings/window"
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
 )
 
 // HandlerFunc describes a command handler for Thrust communication
-type HandlerFunc func(*Command) error
+type HandlerFunc func(*window.Window, *Command) error
 
 // Command is the container through which backend and frontend communicate
 type Command struct {
@@ -41,7 +41,7 @@ func (t *Tunnel) onRemote(e commands.EventResult, this *window.Window) {
 	// broadcast command
 	if handlers, ok := t.registry[c.Topic]; ok {
 		for _, handler := range handlers {
-			handler(c)
+			handler(this, c)
 		}
 	}
 }

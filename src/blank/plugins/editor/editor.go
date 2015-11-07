@@ -1,6 +1,10 @@
 package editor
 
-import "blank"
+import (
+	"blank"
+
+	"github.com/miketheprogrammer/go-thrust/lib/bindings/window"
+)
 
 // Editor plugin
 type Editor struct {
@@ -21,17 +25,17 @@ func (e Editor) Init(b *blank.Blank) {
 	e.blank.Tunnel.RegisterHandler("exit", e.onExit)
 }
 
-func (e Editor) onSave(c *blank.Command) error {
+func (e Editor) onSave(this *window.Window, c *blank.Command) error {
 	// TODO implement
 	return nil
 }
 
-func (e Editor) onOpen(c *blank.Command) error {
+func (e Editor) onOpen(this *window.Window, c *blank.Command) error {
 	// TODO implement
 	return nil
 }
 
-func (e Editor) onExit(c *blank.Command) error {
+func (e Editor) onExit(this *window.Window, c *blank.Command) error {
 	e.blank.Stop()
 	return nil
 }
