@@ -13,7 +13,7 @@ keymap:
         format-h3: "ctrl+3"
         format-h4: "ctrl+4"
         format-h5: "ctrl+5"
-        format-h5: "ctrl+6"
+        format-h6: "ctrl+6"
         format-paragraph: "ctrl+0"
         format-bold: "ctrl+b"
         format-italic: "ctrl+i"
