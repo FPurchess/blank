@@ -18,4 +18,4 @@ keymap:
         format-bold: "ctrl+b"
         format-italic: "ctrl+i"
         format-bullet-list: "ctrl+l"
-        format-ordered-list: "ctrl+o"
+        format-ordered-list: "ctrl+k"
