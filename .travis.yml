@@ -4,7 +4,7 @@ go:
   - 1.6
   - tip
 path:
-  - "GOPATH="${TRAVIS_BUILD_DIR}/src:$GOPATH"
+  - "GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH"
 install:
   - go get github.com/constabulary/gb/...
   - go get github.com/golang/lint/golint
