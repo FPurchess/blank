@@ -9,6 +9,11 @@ install:
   - go get github.com/constabulary/gb/...
   - go get github.com/golang/lint/golint
   - go get golang.org/x/tools/cmd/vet
+
+  - npm -d install
+before_script:
+  - webpack
+  - go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
 script:
   - golint src/
   - go tool vet src/
