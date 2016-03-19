@@ -4,38 +4,38 @@
 		{
 			"importpath": "github.com/Sirupsen/logrus",
 			"repository": "https://github.com/Sirupsen/logrus",
-			"revision": "fe6f2b03125e4fcafb21406381010e363a072c80",
+			"revision": "4b6ea7319e214d98c938f12692336f7ca9348d6b",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/cheggaaa/pb",
 			"repository": "https://github.com/cheggaaa/pb",
-			"revision": "da1f27ad1d9509b16f65f52fd9d8138b0f2dc7b2",
+			"revision": "c089c0e183064d83038db7c2ae1b711fb2e747a4",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/codegangsta/cli",
 			"repository": "https://github.com/codegangsta/cli",
-			"revision": "70e3fa51ebed95df8c0fbe1519c1c1f9bc16bb13",
+			"revision": "aca5b047ed14d17224157c3434ea93bf6cdaadee",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/davecgh/go-spew/spew",
 			"repository": "https://github.com/davecgh/go-spew",
-			"revision": "2df174808ee097f90d259e432cc04442cf60be21",
+			"revision": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d",
 			"branch": "master",
 			"path": "/spew"
 		},
 		{
 			"importpath": "github.com/facebookgo/ensure",
 			"repository": "https://github.com/facebookgo/ensure",
-			"revision": "71188606beeac086a6089098de2dc387d26d7d92",
+			"revision": "b4ab57deab51ee655ae4bd85281f0715a068016d",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/facebookgo/stack",
 			"repository": "https://github.com/facebookgo/stack",
-			"revision": "3df46e3d0ab4255cd8a0a6bb79561f33d9910c24",
+			"revision": "751773369052141c013c6e827a71e8f35c07879c",
 			"branch": "master"
 		},
 		{
@@ -47,31 +47,31 @@
 		{
 			"importpath": "github.com/go-yaml/yaml",
 			"repository": "https://github.com/go-yaml/yaml",
-			"revision": "53feefa2559fb8dfa8d81baad31be332c97d6c77",
+			"revision": "a83829b6f1293c91addabc89d0571c246397bbf4",
 			"branch": "v2"
 		},
 		{
 			"importpath": "github.com/gorilla/context",
 			"repository": "https://github.com/gorilla/context",
-			"revision": "1c83b3eabd45b6d76072b66b746c20815fb2872d",
+			"revision": "1ea25387ff6f684839d82767c1733ff4d4d15d0a",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/gorilla/mux",
 			"repository": "https://github.com/gorilla/mux",
-			"revision": "ad4d7a5882b961e07e2626045eb995c022ac6664",
+			"revision": "0eeaf8392f5b04950925b8a69fe70f110fa7cbfc",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/gorilla/websocket",
 			"repository": "https://github.com/gorilla/websocket",
-			"revision": "527637c0f38a8035d7856bb758e56f7ee2c704a9",
+			"revision": "e2e3d8414d0fbae04004f151979f4e27c6747fe7",
 			"branch": "master"
 		},
 		{
 			"importpath": "github.com/miketheprogrammer/go-thrust",
 			"repository": "https://github.com/miketheprogrammer/go-thrust",
-			"revision": "2f2cfec510b030fd4749970f1d5f6c41b896ff02",
+			"revision": "09329d43f59059245c5658a78cbf979fe9af32e1",
 			"branch": "master"
 		},
 		{
@@ -89,7 +89,7 @@
 		{
 			"importpath": "gopkg.in/airbrake/gobrake.v2",
 			"repository": "https://gopkg.in/airbrake/gobrake.v2",
-			"revision": "e5efbe565a5a63d8aafee7efa2f4fdd7f42b7bd3",
+			"revision": "c9d51adc624b5cc4c1bf8de730a09af4878ffe2d",
 			"branch": "master"
 		},
 		{

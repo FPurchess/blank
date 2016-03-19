@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/miketheprogrammer/go-thrust/thrust"
 	"github.com/miketheprogrammer/go-thrust/tutorials/provisioner"
 )
@@ -24,9 +22,9 @@ func main() {
 
 	// Lets do a window timeout
 	go func() {
-		<-time.After(time.Second * 5)
-		thrustWindow.Close()
-		thrust.Exit()
+		// <-time.After(time.Second * 5)
+		// thrustWindow.Close()
+		// thrust.Exit()
 	}()
 
 	// In lieu of something like an http server, we need to lock this thread

@@ -5,6 +5,12 @@ This example uses https://github.com/nsf/bin2go to embed assets. To
 make sure it's installed, run
 
     go get github.com/nsf/bin2go
+    
+Other neccessary packages
+
+    go get -v github.com/gorilla/websocket
+    go get -v github.com/tv42/birpc
+    go get -v github.com/tv42/topic
 
 and put the resulting bin2go in `PATH`.
 

@@ -11,29 +11,17 @@ type Error struct {
 	Backtrace []StackFrame `json:"backtrace"`
 }
 
-type notifier struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	URL     string `json:"url"`
-}
-
 type Notice struct {
-	Notifier notifier               `json:"notifier"`
-	Errors   []Error                `json:"errors"`
-	Context  map[string]string      `json:"context"`
-	Env      map[string]interface{} `json:"environment"`
-	Session  map[string]interface{} `json:"session"`
-	Params   map[string]interface{} `json:"params"`
+	Errors  []Error                `json:"errors"`
+	Context map[string]interface{} `json:"context"`
+	Env     map[string]interface{} `json:"environment"`
+	Session map[string]interface{} `json:"session"`
+	Params  map[string]interface{} `json:"params"`
 }
 
 func NewNotice(e interface{}, req *http.Request, depth int) *Notice {
 	stack := stack(depth)
 	notice := &Notice{
-		Notifier: notifier{
-			Name:    "gobrake",
-			Version: "1.0",
-			URL:     "https://github.com/airbrake/gobrake",
-		},
 		Errors: []Error{
 			{
 				Type:      fmt.Sprintf("%T", e),
@@ -41,7 +29,13 @@ func NewNotice(e interface{}, req *http.Request, depth int) *Notice {
 				Backtrace: stack,
 			},
 		},
-		Context: map[string]string{},
+		Context: map[string]interface{}{
+			"notifier": map[string]interface{}{
+				"name":    "gobrake",
+				"version": "2.0.3",
+				"url":     "https://github.com/airbrake/gobrake",
+			},
+		},
 		Env:     map[string]interface{}{},
 		Session: map[string]interface{}{},
 		Params:  map[string]interface{}{},

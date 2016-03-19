@@ -48,7 +48,7 @@ func TestCallersMultiWithTwo(t *testing.T) {
 		"",
 		"",
 		`\(Stack 2\)$`,
-		"stack_test.go:46 +TestCallersMultiWithTwo$",
+		"stack_test.go:45 +TestCallersMultiWithTwo$",
 	}
 	match(t, m.String(), matches)
 }

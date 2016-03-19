@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,4 +37,10 @@ func (c *capture) Contains(t testing.TB, suffix string) {
 	if log && suffix != "" {
 		t.Log(equalPrefix, suffix)
 	}
+}
+
+func (c *capture) Matches(t testing.TB, pattern string) {
+	re := regexp.MustCompile(pattern)
+	s := c.String()
+	ensure.True(t, re.MatchString(s), s, "does not match pattern", pattern)
 }
