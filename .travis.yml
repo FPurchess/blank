@@ -3,7 +3,13 @@ language: go
 go:
   - 1.6
   - tip
+path:
+  - "GOPATH="${TRAVIS_BUILD_DIR}/src:$GOPATH"
 install:
-  - export GOPATH="${TRAVIS_BUILD_DIR}/src:$GOPATH"
+  - go get github.com/constabulary/gb/...
+  - go get github.com/golang/lint/golint
+  - go get golang.org/x/tools/cmd/vet
 script:
+  - golint src/
+  - go tool vet src/
   - gb test
