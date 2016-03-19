@@ -1,5 +1,8 @@
+
 # Blank
 Blank is an experimental editor to improve distraction-free writing.
+
+[![Build Status](https://travis-ci.org/FPurchess/blank.png?branch=master)](https://travis-ci.org/FPurchess/blank)
 
 ![Blank](https://raw.githubusercontent.com/FPurchess/blank/master/blank-preview.png "Blank - distraction-free writing")
 
