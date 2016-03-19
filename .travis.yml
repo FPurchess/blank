@@ -1,8 +1,8 @@
 language: go
 
 go:
+  - 1.5
   - 1.6
-  - tip
 path:
   - "GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH"
 install:
