@@ -4,7 +4,6 @@ import (
 	"blank"
 
 	"github.com/miketheprogrammer/go-thrust/lib/bindings/window"
-	"github.com/miketheprogrammer/go-thrust/lib/commands"
 )
 
 // Editor plugin
@@ -50,20 +49,9 @@ func (e *Editor) onExit(this *window.Window, c *blank.Command) error {
 
 func (e *Editor) onFullscreen(this *window.Window, c *blank.Command) error {
 	e.isFullscreen = !e.isFullscreen
+	this.Fullscreen(e.isFullscreen)
 
-	if e.isFullscreen {
-		this.Fullscreen()
-	} else {
-		// TODO workaround to leave fullscreen mode
-		// waiting for PR https://github.com/miketheprogrammer/go-thrust/pull/61
-		command := commands.Command{
-			Method: "set_fullscreen",
-			Args: commands.CommandArguments{
-				Fullscreen: false,
-			},
-		}
-
-		this.CallWhenDisplayed(&command)
+	if !e.isFullscreen {
 		this.Maximize()
 	}
 

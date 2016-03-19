@@ -5,16 +5,17 @@ import (
 
 	"github.com/facebookgo/ensure"
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
+	"github.com/miketheprogrammer/go-thrust/lib/bindings/window"
 )
 
 func TestRegisterHandler(t *testing.T) {
 	tun := NewTunnel(nil)
 
 	ensure.DeepEqual(t, len(tun.registry), 0)
-	tun.RegisterHandler("a-topic", func(c *Command) error {
+	tun.RegisterHandler("a-topic", func(w *window.Window, c *Command) error {
 		return nil
 	})
-	tun.RegisterHandler("another-topic", func(c *Command) error {
+	tun.RegisterHandler("another-topic", func(w *window.Window, c *Command) error {
 		return nil
 	})
 	ensure.DeepEqual(t, len(tun.registry), 2)
@@ -24,11 +25,11 @@ func TestOnRemotePassesCommands(t *testing.T) {
 	calls := 0
 	tun := NewTunnel(nil)
 
-	tun.RegisterHandler("a-topic", func(c *Command) error {
+	tun.RegisterHandler("a-topic", func(w *window.Window, c *Command) error {
 		calls++
 		return nil
 	})
-	tun.RegisterHandler("another-topic", func(c *Command) error {
+	tun.RegisterHandler("another-topic", func(w *window.Window, c *Command) error {
 		calls++
 		return nil
 	})
