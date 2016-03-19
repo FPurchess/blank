@@ -1,6 +1,8 @@
 # Blank
 Blank is an experimental editor to improve distraction-free writing.
 
+![Blank](https://raw.githubusercontent.com/FPurchess/blank/master/blank-preview.png "Blank - distraction-free writing")
+
 ## Installation
 
 ```bash
