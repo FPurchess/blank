@@ -3,5 +3,7 @@ language: go
 go:
   - 1.6
   - tip
+install:
+  - export GOPATH="${TRAVIS_BUILD_DIR}/src:$GOPATH"
 script:
   - gb test
