@@ -7,3 +7,6 @@ public/
 node_modules/
 
 src/blank/assets.go
+
+.idea/
+*.iml
