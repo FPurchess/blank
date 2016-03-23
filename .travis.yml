@@ -29,6 +29,11 @@ script:
   - gb test
   - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN || true'
 
+notifications:
+  email:
+    on_success: never
+    on_failure: change
+
 cache:
   directories:
     - node_modules
