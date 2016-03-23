@@ -1,10 +1,16 @@
 language: go
 
+branches:
+  only:
+    - master
+
 go:
   - 1.5
   - 1.6
+
 path:
   - "GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH"
+
 install:
   - go get github.com/constabulary/gb/...
   - go get github.com/golang/lint/golint
@@ -12,10 +18,17 @@ install:
   - go get -u github.com/jteeuwen/go-bindata/...
 
   - npm -d install
+
 before_script:
   - webpack
   - go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
+
 script:
   - golint src/
   - go tool vet src/
   - gb test
+  - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN || true'
+
+cache:
+  directories:
+    - node_modules
