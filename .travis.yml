@@ -19,9 +19,9 @@ deploy:
   api_key:
     secure: w6E7/qXbBK9uQZc5u4u9SONqETj7ME9l/qFK9OGDsO/f8jWAdPIDQBooFk4kpOWaWW4g7e3c5kjWAga03c5ixF6722WAuPS+2OlVWCDy47m/Ni/S38LpR0Fl+EctCuhCt2IwQA8bEMqcI6/lSvSLa/1Z067BA5o/v8MBxI3JfJ3NpptKhi0vXJAJ4w2dxUuEVA5qKMRMsG5EpRSVGLlE1nggdmbzqPlPaRy2fvIPJJxNnozH/CNlq2CYQL0AffBbF3K6CwhDaLbGQsmxsr4bD68CuipothLl5Aac4oGYAyyLrOhJZ9MXEsmnpokvOwCHj/8MuE91b4nggLuXowCx0wh8GC1kb1hPnztPPKzA5WwBBCCRXOjG9v6Db2ud28aewvHhzkIygc92B3boyXqyWhIsKOlulsM9fNh79b7of+lPdRZ6nUXZQss5MDD0XH3+glOY3Z23gtb+jWcHCNBqm7uOIqR1IZISekLuAens7Pc69jn3e9SRcHKQMehpWIHZXBDqoZy9vEBxwtNlzGHvxg1OjZHjKU8XGa773gOJKbalkU9gTnZ+Ol3T4rqw73Xj0kyP4zAJFwawMxVqv/4sdyY9S7P5zlxOg2dCN4gHl949yLUEvF4y7nKWRB/p05QLCbaphrxl0WjV+xzCCUZJQllCrchD2mkz6a7dNFS6nhw=
   file:
-    - bin/blank-linux-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
-    - bin/blank-darwin-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
-    - bin/blank-windows-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER.exe
+    - bin/blank-linux-amd64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
+    - bin/blank-darwin-amd64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
+    - bin/blank-windows-amd64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER.exe
   on:
     repo: FPurchess/blank
     branch: master
