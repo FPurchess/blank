@@ -16,6 +16,8 @@ install:
   - go get github.com/golang/lint/golint
   - go get golang.org/x/tools/cmd/vet
   - go get -u github.com/jteeuwen/go-bindata/...
+  - go get github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
 
   - npm -d install
 
@@ -26,7 +28,7 @@ before_script:
 script:
   - golint src/
   - go tool vet src/
-  - gb test
+  - 'cd src && go test -covermode=count -coverprofile=coverage.out'
   - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN || true'
 
 notifications:
