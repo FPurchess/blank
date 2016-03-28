@@ -4,7 +4,7 @@ set -ev
 
 
 # §1 prepare assets
-webpack
+webpack --bail
 go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
 
 # §2 lint / vet / test
