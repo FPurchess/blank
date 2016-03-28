@@ -2,9 +2,8 @@ import React from "react"
 import ReactDOM from "react-dom"
 
 import ProseMirror from 'react-prosemirror'
-import 'prosemirror/src/parse/markdown'
-import 'prosemirror/src/serialize/markdown'
-import 'prosemirror/src/inputrules/autoinput'
+import 'prosemirror/dist/markdown/index'
+import 'prosemirror/dist/inputrules/autoinput'
 
 import {HotKeys} from "react-hotkeys";
 
@@ -109,7 +108,9 @@ export default React.createClass({
     return (
       <HotKeys className="hotkeys" keyMap={this.props.keymap} handlers={this.handlers} attach={window.document.body}>
         <input ref="fileDialog" type="file" className="file-dialog" value={this.state.file} onChange={this.handleFileDialog} />
-        <ProseMirror ref="editor" defaultValue="" options={proseMirrorOptions} className="editor" value={this.state.value} onChange={this.handleChange} />
+        <div className="editor">
+          <ProseMirror ref="editor" defaultValue="" options={proseMirrorOptions} value={this.state.value} onChange={this.handleChange} />
+        </div>
       </HotKeys>
     )
   }
