@@ -20,6 +20,6 @@ if [ -z "$TRAVIS" ]; then
 fi
 
 # TODO(fpur) 'gb build' does not support the -o option...
-GOOS=linux GOARCH=amd64 gb build && mv $(pwd)/bin//blank-linux-amd64 $(pwd)/bin/blank-linux-amd64-${VERSION}
-GOOS=darwin GOARCH=amd64 gb build && mv $(pwd)/bin/blank-darwin-amd64 $(pwd)/bin/blank-darwin-amd64-${VERSION}
-GOOS=windows GOARCH=amd64 gb build && cp $(pwd)/bin/blank-windows-amd64 $(pwd)/bin/blank-windows-amd64-${VERSION}.exe
+GOOS=linux GOARCH=amd64 gb build   && mv $(pwd)/bin//blank-linux-amd64      $(pwd)/bin/blank-linux-amd64-${VERSION}
+GOOS=darwin GOARCH=amd64 gb build  && mv $(pwd)/bin/blank-darwin-amd64      $(pwd)/bin/blank-darwin-amd64-${VERSION}
+GOOS=windows GOARCH=amd64 gb build && cp $(pwd)/bin/blank-windows-amd64.exe $(pwd)/bin/blank-windows-amd64-${VERSION}.exe
