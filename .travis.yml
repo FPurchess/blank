@@ -19,7 +19,7 @@ install:
   - go get github.com/mattn/goveralls
   - go get golang.org/x/tools/cmd/cover
 
-  - npm -d install
+  - npm install
 
 before_script:
   - webpack
@@ -28,7 +28,7 @@ before_script:
 script:
   - golint src/
   - go tool vet src/
-  - 'cd src; go test -covermode=count -coverprofile=../coverage.out blank; cd ..'
+  - 'cd src && go test -covermode=count -coverprofile=../coverage.out blank && cd ..'
   - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN || true'
 
 notifications:
