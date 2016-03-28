@@ -3,7 +3,7 @@ go:
   - 1.5
   - 1.6
 path:
-  - GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH
+  - GOPATH=${TRAVIS_BUILD_DIR}/src:${TRAVIS_BUILD_DIR}/vendor/src:$GOPATH
 install: ./scripts/ci/install.sh
 script: ./scripts/ci/build.sh
 notifications:

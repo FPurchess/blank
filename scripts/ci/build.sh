@@ -3,26 +3,17 @@
 set -ev
 
 
-WORKDIR="src/"
-
-ASSETS_DEST="src/blank/assets.go"
-ASSETS_SRC="public/... tmpl/..."
-
-
-# prepare assets
+# §1 prepare assets
 webpack
-go-bindata -pkg="blank" -o ${ASSETS_DEST} ${ASSETS_SRC}
+go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
 
+# §2 lint / vet / test
+golint src/
+go tool vet src/
+# TODO(fpur) 'gb test' does not support coverage. see https://github.com/constabulary/gb/issues/367
+gb test
 
-# lint / vet
-golint ${WORKDIR}
-go tool vet ${WORKDIR}
-
-
-if [ "${TRAVIS_PULL_REQUEST}" == "false" ]; then
-    cd ${WORKDIR}/blank
-    goveralls -repotoken ${COVERALLS_TOKEN} .
-else
-    cd ${WORKDIR}
-    go test blank/
-fi
+# §3 build
+# TODO(fpur) 'gb build' does not support the -o option...
+GOOS=linux GOARCH=amd64 gb build && cp bin/blank bin/blank-linux-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
+GOOS=windows GOARCH=amd64 gb build && cp bin/blank bin/blank-windows-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER.exe
