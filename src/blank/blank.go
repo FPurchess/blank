@@ -7,18 +7,14 @@ import (
 	"net/http"
 	"os"
 
-	"provisioner"
+	"blank/transport"
+	"blank/components"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
-	"github.com/miketheprogrammer/go-thrust/lib/commands"
+	log "github.com/Sirupsen/logrus"
 	"github.com/miketheprogrammer/go-thrust/thrust"
+	"github.com/miketheprogrammer/go-thrust/lib/commands"
 )
-
-// Plugin implements a Blank Plugin
-type Plugin interface {
-	Init(b *Blank)
-}
 
 // Blank is the main entity
 type Blank struct {
@@ -26,23 +22,23 @@ type Blank struct {
 	debug      bool
 	configFile io.Reader
 	config     *config
-	Tunnel     *Tunnel
-	plugins    []Plugin
+	tunnel     *transport.Tunnel
 }
 
 // NewBlank initializes a new BlankEditor
-func NewBlank(addr string, debug bool, configFile io.Reader, plugins []Plugin) (*Blank, error) {
+func NewBlank(addr string, debug bool, configFile io.Reader) (*Blank, error) {
 	c, err := newConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Blank{
+	b := &Blank{
 		addr:    addr,
 		debug:   debug,
 		config:  c,
-		plugins: plugins,
-	}, nil
+	}
+
+	return b, nil
 }
 
 // Start initializes thrust and starts the http server
@@ -52,28 +48,30 @@ func (b *Blank) Start() error {
 		return err
 	}
 
-	for _, plugin := range b.plugins {
-		plugin.Init(b)
+	for _, c := range components.Components() {
+		c.Setup(b, b.tunnel)
 	}
 
-	// finally, fire http
 	return b.startHTTP()
 }
 
-// Stop gracefully stops editor
+// Stop tears down all components and finally stops thrust and webserver
 func (b *Blank) Stop() {
 	// TODO graceful shutdown (teardown http, then exit)
-	log.Println("bye bye...")
+	log.Println("shutting down...")
+
+	for _, c := range components.Components() {
+		c.Teardown()
+	}
+
 	thrust.Exit()
 	os.Exit(0)
 }
 
 func (b *Blank) initThrust() error {
-	//thrust.InitLogger()
-	thrust.SetProvisioner(provisioner.NewDefaultProvisioner())
+	thrust.SetProvisioner(NewDefaultProvisioner())
 	thrust.Start()
 
-	// init window
 	thrustWindow := thrust.NewWindow(thrust.WindowOptions{
 		RootUrl: fmt.Sprintf("http://%s", b.addr),
 	})
@@ -86,9 +84,8 @@ func (b *Blank) initThrust() error {
 		thrustWindow.OpenDevtools()
 	}
 
-	// register tunnel
-	b.Tunnel = NewTunnel(thrustWindow)
-	_, err := thrustWindow.HandleRemote(b.Tunnel.onRemote)
+	b.tunnel = transport.NewTunnel(thrustWindow)
+	_, err := thrustWindow.HandleRemote(b.tunnel.OnRemote)
 	if err != nil {
 		return err
 	}

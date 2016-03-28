@@ -1,4 +1,4 @@
-package blank
+package transport
 
 import (
 	"testing"
@@ -6,7 +6,15 @@ import (
 	"github.com/facebookgo/ensure"
 	"github.com/miketheprogrammer/go-thrust/lib/commands"
 	"github.com/miketheprogrammer/go-thrust/lib/bindings/window"
+	"reflect"
 )
+
+func TestNewTunnel(t *testing.T) {
+	got := reflect.TypeOf(NewTunnel(nil))
+	expected := reflect.TypeOf(new(Tunnel))
+
+	ensure.DeepEqual(t, got, expected)
+}
 
 func TestRegisterHandler(t *testing.T) {
 	tun := NewTunnel(nil)
@@ -21,7 +29,7 @@ func TestRegisterHandler(t *testing.T) {
 	ensure.DeepEqual(t, len(tun.registry), 2)
 }
 
-func TestOnRemotePassesCommands(t *testing.T) {
+func TestOnRemote(t *testing.T) {
 	calls := 0
 	tun := NewTunnel(nil)
 
@@ -39,7 +47,7 @@ func TestOnRemotePassesCommands(t *testing.T) {
 	// receive a command
 	er := commands.EventResult{}
 	er.Message.Payload = "{\"topic\":\"a-topic\"}"
-	tun.onRemote(er, nil)
+	tun.OnRemote(er, nil)
 
 	ensure.DeepEqual(t, calls, 1)
 }

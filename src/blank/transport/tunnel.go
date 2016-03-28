@@ -1,4 +1,4 @@
-package blank
+package transport
 
 import (
 	"encoding/json"
@@ -28,13 +28,19 @@ func NewTunnel(w *window.Window) *Tunnel {
 	return &Tunnel{window: w, registry: make(map[string][]HandlerFunc)}
 }
 
-func (t *Tunnel) onRemote(e commands.EventResult, this *window.Window) {
+// OnRemote is the handler function being called on new events
+// it parses the message into `Command` and broadcasts it to all handlers
+// that previously registered onto the `Command.Topic`
+func (t *Tunnel) OnRemote(e commands.EventResult, this *window.Window) {
 	c := &Command{}
 
 	// extract command from payload
 	err := json.Unmarshal([]byte(e.Message.Payload), c)
 	if err != nil {
-		log.Println("failed to handle remote command: ", e.Message.Payload)
+		log.WithFields(log.Fields{
+			"error":   err,
+			"payload": e.Message.Payload,
+		}).Error("failed to handle remote command")
 		return
 	}
 

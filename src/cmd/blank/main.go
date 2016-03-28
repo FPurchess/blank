@@ -1,16 +1,15 @@
 package main
 
 import (
-	"flag"
-	_log "log"
 	"os"
+	"flag"
 	"strings"
+	_log "log"
+
+	"blank"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/miketheprogrammer/go-thrust/lib/common"
-
-	"blank"
-	"blank/plugins/editor"
 )
 
 func main() {
@@ -34,14 +33,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// prepare plugins
-	// TODO find a more generic solution
-	plugins := []blank.Plugin{
-		editor.NewEditor(),
-	}
-
 	// start editor
-	editor, err := blank.NewBlank(*addr, *debug, conf, plugins)
+	editor, err := blank.NewBlank(*addr, *debug, conf)
 	if err != nil {
 		log.Fatal(err)
 	}

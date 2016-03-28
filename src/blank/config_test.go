@@ -10,11 +10,11 @@ import (
 func TestNewConfig(t *testing.T) {
 	var err error
 
-	// unmarshalling err
+	// CASE 1: unmarshalling err
 	_, err = newConfig(strings.NewReader("?????"))
 	ensure.NotNil(t, err)
 
-	// success!
+	// CASE 2: success!
 	_, err = newConfig(strings.NewReader(""))
 	ensure.Nil(t, err)
 }
