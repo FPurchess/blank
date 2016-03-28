@@ -1,21 +1,20 @@
 keymap:
+  editor:
+    save: "ctrl+s"
+    open: "ctrl+o"
+    exit: "ctrl+q"
+    fullscreen: "f11"
+    devtools: "ctrl+shift+i"
 
-    editor:
-        save: "ctrl+s"
-        open: "ctrl+o"
-        exit: "ctrl+q"
-        fullscreen: "f11"
-        devtools: "ctrl+shift+i"
-
-        # formatting
-        format-h1: "ctrl+1"
-        format-h2: "ctrl+2"
-        format-h3: "ctrl+3"
-        format-h4: "ctrl+4"
-        format-h5: "ctrl+5"
-        format-h6: "ctrl+6"
-        format-paragraph: "ctrl+0"
-        format-bold: "ctrl+b"
-        format-italic: "ctrl+i"
-        format-bullet-list: "ctrl+l"
-        format-ordered-list: "ctrl+k"
+    # formatting
+    format-h1: "ctrl+1"
+    format-h2: "ctrl+2"
+    format-h3: "ctrl+3"
+    format-h4: "ctrl+4"
+    format-h5: "ctrl+5"
+    format-h6: "ctrl+6"
+    format-paragraph: "ctrl+0"
+    format-bold: "ctrl+b"
+    format-italic: "ctrl+i"
+    format-bullet-list: "ctrl+l"
+    format-ordered-list: "ctrl+k"
