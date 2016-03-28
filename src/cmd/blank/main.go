@@ -28,18 +28,21 @@ func main() {
 	common.Log = _log.New(w, "", 0)
 
 	// load config
-	conf, err := os.Open(strings.Replace(*configFile, "~", os.Getenv("HOME"), -1))
+	cFile := strings.Replace(*configFile, "~", os.Getenv("HOME"), -1)
+	conf, err := os.Open(cFile)
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"file": cFile,
+		}).Fatalf("failed to open config: %v", err)
 	}
 
 	// start editor
 	editor, err := blank.NewBlank(*addr, *debug, conf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to initialize blank: %v", err)
 	}
 
 	if err := editor.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to start blank: %v", err)
 	}
 }
