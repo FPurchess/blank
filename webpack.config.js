@@ -18,12 +18,6 @@ module.exports = {
       },
 
       {
-        test: /\.js?$/,
-        include: [/prosemirror/, /react-prosemirror/],
-        loaders: ["babel-loader?optional=runtime"]
-      },
-
-      {
         test: /\.json$/,
         include: /entities/,
         loader: "json-loader"
