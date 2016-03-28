@@ -16,7 +16,7 @@ gb test
 # §3 build
 VERSION=dev
 if [ -z "$TRAVIS" ]; then
-    VERSION="${TRAVIS_BRANCH}-0.1.${TRAVIS_BUILD_NUMBER}"
+    VERSION="${TRAVIS_BRANCH}-v0.1-alpha.${TRAVIS_BUILD_NUMBER}"
 fi
 
 # TODO(fpur) 'gb build' does not support the -o option...
