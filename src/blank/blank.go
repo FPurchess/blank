@@ -1,11 +1,11 @@
 package blank
 
 import (
-	"fmt"
-	"html/template"
-	"io"
-	"net/http"
 	"os"
+	"fmt"
+	"bytes"
+	"net/http"
+	"html/template"
 
 	"blank/transport"
 	"blank/components"
@@ -20,14 +20,13 @@ import (
 type Blank struct {
 	addr       string
 	debug      bool
-	configFile io.Reader
 	config     *config
 	tunnel     *transport.Tunnel
 }
 
 // NewBlank initializes a new BlankEditor
-func NewBlank(addr string, debug bool, configFile io.Reader) (*Blank, error) {
-	c, err := newConfig(configFile)
+func NewBlank(addr string, debug bool, configFile string) (*Blank, error) {
+	c, err := newConfig(bytes.NewReader(loadConfig(configFile)))
 	if err != nil {
 		return nil, err
 	}

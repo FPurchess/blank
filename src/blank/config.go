@@ -1,8 +1,11 @@
 package blank
 
 import (
+	"os"
 	"io"
 	"io/ioutil"
+	"strings"
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/go-yaml/yaml"
 )
@@ -23,4 +26,20 @@ func newConfig(in io.Reader) (*config, error) {
 	}
 
 	return config, nil
+}
+
+func loadConfig(file string) []byte {
+	file = strings.Replace(file, "~", os.Getenv("HOME"), -1)
+
+	conf, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"file": file,
+			"error": err,
+		}).Warnf("failed to open config file: %v", err)
+
+		return MustAsset("default.config.yaml")
+	}
+
+	return conf
 }

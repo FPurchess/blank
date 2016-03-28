@@ -1,9 +1,7 @@
 package main
 
 import (
-	"os"
 	"flag"
-	"strings"
 	_log "log"
 
 	"blank"
@@ -16,7 +14,6 @@ func main() {
 	addr := flag.String("addr", "localhost:3007", "address of http server")
 	debug := flag.Bool("debug", false, "start in debug mode")
 	configFile := flag.String("config", "~/.blank/config.yaml", "path to config file")
-
 	flag.Parse()
 
 	// setup logging
@@ -27,17 +24,8 @@ func main() {
 	defer w.Close()
 	common.Log = _log.New(w, "", 0)
 
-	// load config
-	cFile := strings.Replace(*configFile, "~", os.Getenv("HOME"), -1)
-	conf, err := os.Open(cFile)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"file": cFile,
-		}).Fatalf("failed to open config: %v", err)
-	}
-
 	// start editor
-	editor, err := blank.NewBlank(*addr, *debug, conf)
+	editor, err := blank.NewBlank(*addr, *debug, *configFile)
 	if err != nil {
 		log.Fatalf("failed to initialize blank: %v", err)
 	}

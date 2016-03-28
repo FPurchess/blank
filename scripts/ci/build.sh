@@ -5,7 +5,7 @@ set -ev
 
 # §1 prepare assets
 webpack --bail
-go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
+go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/... default.config.yaml
 
 # §2 lint / vet / test
 golint src/

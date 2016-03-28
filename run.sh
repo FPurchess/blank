@@ -7,7 +7,7 @@ PATH=$PATH:$HOME/gotools/bin
 webpack
 
 # compile assets to binary
-go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
+go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/... default.config.yaml
 
 # compile blank
 gb build
