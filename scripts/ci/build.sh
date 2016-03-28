@@ -14,6 +14,12 @@ go tool vet src/
 gb test
 
 # §3 build
+VERSION=dev
+if [ -z "$TRAVIS" ]; then
+    VERSION="${TRAVIS_BRANCH}-0.1.${TRAVIS_BUILD_NUMBER}"
+fi
+
 # TODO(fpur) 'gb build' does not support the -o option...
-GOOS=linux GOARCH=amd64 gb build && cp bin/blank bin/blank-linux-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
-GOOS=windows GOARCH=amd64 gb build && cp bin/blank bin/blank-windows-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER.exe
+GOOS=linux GOARCH=amd64 gb build && mv $(pwd)/blank-linux-amd64 $(pwd)/bin/blank-linux-amd64-${VERSION}
+GOOS=darwin GOARCH=amd64 gb build && mv $(pwd)/blank-darwin-amd64 $(pwd)/bin/blank-darwin-amd64-${VERSION}
+GOOS=windows GOARCH=amd64 gb build && cp $(pwd)/bin/blank $(pwd)/bin/blank-windows-amd64-${VERSION}.exe
