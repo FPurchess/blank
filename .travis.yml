@@ -1,41 +1,26 @@
 language: go
-
-branches:
-  only:
-    - master
-
 go:
   - 1.5
   - 1.6
-
 path:
-  - "GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH"
-
-install:
-  - go get github.com/constabulary/gb/...
-  - go get github.com/golang/lint/golint
-  - go get golang.org/x/tools/cmd/vet
-  - go get -u github.com/jteeuwen/go-bindata/...
-  - go get github.com/mattn/goveralls
-  - go get golang.org/x/tools/cmd/cover
-
-  - npm install
-
-before_script:
-  - webpack
-  - go-bindata -pkg="blank" -o src/blank/assets.go public/... tmpl/...
-
-script:
-  - golint src/
-  - go tool vet src/
-  - 'cd src && go test -covermode=count -coverprofile=../coverage.out blank/ && cd ..'
-  - '[ "${TRAVIS_PULL_REQUEST}" = "false" ] && $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN || true'
-
+  - GOPATH=${TRAVIS_BUILD_DIR}/src:$GOPATH
+install: ./scripts/install.sh
+script: ./scripts/ci/build.sh
 notifications:
   email:
     on_success: never
     on_failure: change
-
 cache:
   directories:
     - node_modules
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key:
+    secure: w6E7/qXbBK9uQZc5u4u9SONqETj7ME9l/qFK9OGDsO/f8jWAdPIDQBooFk4kpOWaWW4g7e3c5kjWAga03c5ixF6722WAuPS+2OlVWCDy47m/Ni/S38LpR0Fl+EctCuhCt2IwQA8bEMqcI6/lSvSLa/1Z067BA5o/v8MBxI3JfJ3NpptKhi0vXJAJ4w2dxUuEVA5qKMRMsG5EpRSVGLlE1nggdmbzqPlPaRy2fvIPJJxNnozH/CNlq2CYQL0AffBbF3K6CwhDaLbGQsmxsr4bD68CuipothLl5Aac4oGYAyyLrOhJZ9MXEsmnpokvOwCHj/8MuE91b4nggLuXowCx0wh8GC1kb1hPnztPPKzA5WwBBCCRXOjG9v6Db2ud28aewvHhzkIygc92B3boyXqyWhIsKOlulsM9fNh79b7of+lPdRZ6nUXZQss5MDD0XH3+glOY3Z23gtb+jWcHCNBqm7uOIqR1IZISekLuAens7Pc69jn3e9SRcHKQMehpWIHZXBDqoZy9vEBxwtNlzGHvxg1OjZHjKU8XGa773gOJKbalkU9gTnZ+Ol3T4rqw73Xj0kyP4zAJFwawMxVqv/4sdyY9S7P5zlxOg2dCN4gHl949yLUEvF4y7nKWRB/p05QLCbaphrxl0WjV+xzCCUZJQllCrchD2mkz6a7dNFS6nhw=
+  file:
+    - bin/blank-linux-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER
+    - bin/blank-windows-x64-$TRAVIS_BRANCH-0.1.$TRAVIS_BUILD_NUMBER.exe
+  on:
+    repo: FPurchess/blank
+    branch: master
