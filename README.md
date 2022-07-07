@@ -69,6 +69,7 @@ Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 
 | Keyboard Shortcut | Action                       |
 | ----------------- | ---------------------------- |
+| Mod + N           | New File                     |
 | Mod + S           | Save File                    |
 | Mod + Shift + S   | Save as                      |
 | Mod + O           | Open File                    |
