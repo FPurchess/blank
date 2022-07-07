@@ -39,7 +39,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           curl --silent --show-error --location --max-redirs 2 --fail --retry 3 --output wkhtmltopdf-msvc2015-win64.exe https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox-0.12.6-1.msvc2015-win64.exe
-          ./wkhtmltox-0.12.6-1.msvc2015-win64.exe
+          wkhtmltox-0.12.6-1.msvc2015-win64.exe
       - name: install app dependencies and build it
         run: yarn && yarn build
       - uses: tauri-apps/tauri-action@v0
