@@ -57,11 +57,15 @@ Blank is a minimalistic, opinionated markdown editor made for writing - purely k
 
 ## Installation
 
-You can install blank from the provided
+You can download the latest version of Blank here:
+
+| Mac OS                                                                                                                                                                                       | Linux                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.0_x64.dmg.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.0/blank_0.1.0_x64.dmg) | [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.0_amd64.deb.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.0/blank_0.1.0_amd64.deb) [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.0_amd64.AppImage.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.0/blank_0.1.0_amd64.AppImage) |
 
 ## Keyboard Shortcuts
 
-Mod translates to Ctrl on Windows / Linux or Cmd on Mac.
+Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 
 | Keyboard Shortcut | Action                       |
 | ----------------- | ---------------------------- |
