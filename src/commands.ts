@@ -1,13 +1,28 @@
-import { Command } from 'prosemirror-state';
+import { Command } from "prosemirror-state";
 
-import { invoke } from '@tauri-apps/api';
-import { message, open, save } from '@tauri-apps/api/dialog';
+import { invoke } from "@tauri-apps/api";
+import { message, open, save } from "@tauri-apps/api/dialog";
 
-import { htmlSerializer, markdownParser, markdownSerializer } from './serializers';
-import { updateUIHeader } from './ui';
-import css from './main.scss';
+import {
+  htmlSerializer,
+  markdownParser,
+  markdownSerializer,
+} from "./serializers";
+import { updateUIHeader } from "./ui";
+import css from "./main.scss";
 
 let path: string | null = null;
+
+export const newFile = (): Command => (state, dispatch) => {
+  if (dispatch) {
+    dispatch(state.tr.delete(0, state.doc.content.size));
+    path = null;
+    updateUIHeader(path);
+    return true;
+  }
+
+  return false;
+};
 
 export const saveFile =
   (force = false): Command =>
@@ -15,9 +30,9 @@ export const saveFile =
     (async () => {
       if (force || path === null) {
         const newPath = await save({
-          filters: [{ name: 'Markdown', extensions: ['md'] }],
+          filters: [{ name: "Markdown", extensions: ["md"] }],
         });
-        if (typeof newPath === 'string') {
+        if (typeof newPath === "string") {
           path = newPath;
           updateUIHeader(path);
         } else {
@@ -26,7 +41,7 @@ export const saveFile =
       }
       const content = markdownSerializer.serialize(state.doc);
 
-      await invoke('save_file', { path, content });
+      await invoke("save_file", { path, content });
     })();
 
     return true;
@@ -35,13 +50,13 @@ export const saveFile =
 export const openFile = (): Command => (state, dispatch) => {
   (async () => {
     const newPath = await open({
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      filters: [{ name: "Markdown", extensions: ["md"] }],
     });
-    if (typeof newPath === 'string') {
+    if (typeof newPath === "string") {
       path = newPath;
       updateUIHeader(path);
 
-      const content = await invoke<string>('open_file', { path });
+      const content = await invoke<string>("open_file", { path });
 
       const doc = markdownParser.parse(content);
       if (dispatch && doc !== null) {
@@ -55,10 +70,13 @@ export const openFile = (): Command => (state, dispatch) => {
 
 export const exportAsPDF = (): Command => (state) => {
   const html = htmlSerializer(state.doc).trim();
-  const isEmpty = html.replaceAll(/<[^>]*>/, '').length === 0;
+  const isEmpty = html.replaceAll(/<[^>]*>/, "").length === 0;
 
   if (isEmpty) {
-    message('Your document is empty. There is nothing to export.', { title: 'PDF Export', type: 'error' });
+    message("Your document is empty. There is nothing to export.", {
+      title: "PDF Export",
+      type: "error",
+    });
     return false;
   }
 
@@ -66,24 +84,24 @@ export const exportAsPDF = (): Command => (state) => {
     const pdfPath = await save({
       filters: [
         {
-          name: 'PDF-File',
-          extensions: ['pdf'],
+          name: "PDF-File",
+          extensions: ["pdf"],
         },
       ],
     });
 
     const content = `<!DOCTYPE html><html><head><style>${css}</style></head><body data-theme="light">${html}</body></html>`;
-    await invoke('export_as_pdf', { path: pdfPath, content });
+    await invoke("export_as_pdf", { path: pdfPath, content });
   })();
 
   return true;
 };
 
 export const toggleTheme = (): Command => () => {
-  const body = document.querySelector('body');
+  const body = document.querySelector("body");
   if (body) {
     const theme = body.dataset.theme;
-    body.dataset.theme = theme === 'dark' ? 'light' : 'dark';
+    body.dataset.theme = theme === "dark" ? "light" : "dark";
   }
   return true;
 };
