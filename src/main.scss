@@ -1,0 +1,42 @@
+@import 'reset';
+@import 'themes/index';
+@import 'typography';
+@import 'prosemirror';
+
+body {
+  position: relative;
+}
+
+#ui-top,
+#ui-bottom {
+  padding: 12px 24px;
+  opacity: 0.3;
+  position: absolute;
+  font-size: 0.9rem;
+}
+
+#ui-top {
+  top: 0;
+  left: 0;
+  text-align: start;
+}
+
+#ui-bottom {
+  bottom: 0;
+  right: 0;
+  text-align: end;
+}
+
+#app {
+  padding: 48px calc(50% - 600px);
+  height: 100%;
+  width: 100%;
+  font-size: 1.3rem;
+  box-sizing: border-box;
+  overflow: scroll;
+}
+
+.ProseMirror {
+  height: 100%;
+  box-sizing: border-box;
+}

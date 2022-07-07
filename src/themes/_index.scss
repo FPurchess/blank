@@ -1,0 +1,8 @@
+@import 'light';
+@import 'dark';
+
+body {
+  color: var(--color);
+  background-color: var(--background-color);
+  font-family: var(--font-family);
+}
