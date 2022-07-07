@@ -16,7 +16,7 @@
   </a>
 
   <p align="center">
-    A minimalistic markdown editor made for writing
+    A minimalistic, opinionated markdown editor made for writing
     <br />
     <a href="https://github.com/FPurchess/blank/releases"><strong>Try it out »</strong></a>
     <br />
@@ -27,7 +27,17 @@
     ·
     <a href="https://github.com/FPurchess/blank/issues">Request Feature</a>
   </p>
+
+  <img src="images/screenshot.gif" alt="Blank Logo">
 </div>
+
+### Features
+
+- purely keyboard-based :keyboard:
+- minimalistic WYSIWYG for distraction-free writing :pear:
+- Export to PDF :page_with_curl:
+- Themes: :sun_with_face: Light & Dark-Mode :waxing_crescent_moon:
+- available for Linux, macOS and Windows
 
 <br />
 
@@ -37,25 +47,7 @@
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
 
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li><a href="#about-the-project">About The Project</a></li>
-    <li><a href="#installation">Installation</a></li>
-    <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
-  </ol>
-</details>
-
-## About The Project
-
-![Blank Screenshot][product-screenshot]
-
-Blank is a minimalistic, opinionated markdown editor made for writing - purely keyboard-based with PDF-Export, available for Linux, macOS and Windows.
-
-## Installation
+## Download & Installation
 
 You can download the latest version of Blank here:
 
