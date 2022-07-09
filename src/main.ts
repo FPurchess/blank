@@ -4,3 +4,4 @@ import { bootUI } from "./ui";
 import "./scss/main.scss";
 
 bootEditor();
+bootUI();
