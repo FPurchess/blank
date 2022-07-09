@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     strategy:
@@ -19,7 +19,5 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: "yarn"
-      - name: Execute Unit tests
-      - run: |
-          yarn test --run
-          yarn test:coverage
+      - run: yarn
+      - run: yarn test:coverage
