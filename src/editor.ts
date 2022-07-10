@@ -21,6 +21,7 @@ import {
   saveFile,
   exportAsPDF,
   toggleTheme,
+  insertNode,
 } from './commands';
 import { schema } from './schema';
 
@@ -49,6 +50,9 @@ export const bootEditor = () => {
           splitListItem(schema.nodes.list_item),
           baseKeymap.Enter,
         ),
+        'Mod-Enter': insertNode(schema.nodes.hard_break),
+        'Shift-Enter': insertNode(schema.nodes.hard_break),
+        'Mod-h': insertNode(schema.nodes.horizontal_rule),
         'Mod-[': liftListItem(schema.nodes.list_item),
         'Mod-]': sinkListItem(schema.nodes.list_item),
         'Mod-b': toggleMark(schema.marks.strong),
