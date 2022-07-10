@@ -38,7 +38,7 @@ export default (): Command => (state) => {
   })()
     .then((isExported: boolean) => {
       if (isExported) {
-        sendNotification('Your files has been exported');
+        sendNotification('Your file has been exported');
       }
     })
     .catch((err) => {

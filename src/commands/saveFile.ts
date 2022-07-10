@@ -27,7 +27,7 @@ export default (force = false): Command =>
     })()
       .then((isExported: boolean) => {
         if (isExported) {
-          sendNotification('Your files has been saved');
+          sendNotification('Your file has been saved');
         }
       })
       .catch((err) => {
