@@ -1,12 +1,12 @@
-import { assert, describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from 'vitest';
 import {
   debounce,
   DebouncedObservable,
   Observable,
-} from "../src/utils/observable";
+} from '../src/utils/observable';
 
-describe("debounce", () => {
-  it("triggers exactly once", () => {
+describe('debounce', () => {
+  it('triggers exactly once', () => {
     vi.useFakeTimers();
 
     let triggered = 0;
@@ -19,8 +19,8 @@ describe("debounce", () => {
   });
 });
 
-describe("Observable", () => {
-  it("sets and gets values correctly", () => {
+describe('Observable', () => {
+  it('sets and gets values correctly', () => {
     const observable = new Observable(5);
     assert.equal(observable.value, 5);
 
@@ -28,7 +28,7 @@ describe("Observable", () => {
     assert.equal(observable.value, 1);
   });
 
-  it("notifies correctly", () => {
+  it('notifies correctly', () => {
     let notifiedValue = 0;
     const observable = new Observable(0);
     observable.subscribe((value) => (notifiedValue = value));
@@ -37,7 +37,7 @@ describe("Observable", () => {
     assert.equal(notifiedValue, observable.value);
   });
 
-  it("unsubscribes correctly", () => {
+  it('unsubscribes correctly', () => {
     let notified = false;
     const observable = new Observable(0);
     const unsubscribe = observable.subscribe(() => (notified = true));
@@ -46,7 +46,7 @@ describe("Observable", () => {
     assert.equal(notified, false);
   });
 
-  it("supports arrays", () => {
+  it('supports arrays', () => {
     const observable = new Observable(new Array<int>());
     assert.equal(observable.value.length, 0);
 
@@ -112,8 +112,8 @@ describe("Observable", () => {
   });
 });
 
-describe("DebouncedObservable", () => {
-  it("notifies debounced", () => {
+describe('DebouncedObservable', () => {
+  it('notifies debounced', () => {
     vi.useFakeTimers();
 
     let notifiedValue = 0;

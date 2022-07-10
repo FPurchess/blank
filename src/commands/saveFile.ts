@@ -1,19 +1,19 @@
-import { Command } from "prosemirror-state";
+import { Command } from 'prosemirror-state';
 
-import { invoke } from "@tauri-apps/api";
-import { save } from "@tauri-apps/api/dialog";
+import { invoke } from '@tauri-apps/api';
+import { save } from '@tauri-apps/api/dialog';
 
-import { markdownSerializer } from "../serializers";
-import { path } from "../state";
+import { markdownSerializer } from '../serializers';
+import { path } from '../state';
 
 export default (force = false): Command =>
   (state) => {
     (async () => {
       if (force || path === null) {
         const newPath = await save({
-          filters: [{ name: "Markdown", extensions: ["md"] }],
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
         });
-        if (typeof newPath === "string") {
+        if (typeof newPath === 'string') {
           path.value = newPath;
         } else {
           return;
@@ -21,7 +21,7 @@ export default (force = false): Command =>
       }
       const content = markdownSerializer.serialize(state.doc);
 
-      await invoke("save_file", { path: path.value, content });
+      await invoke('save_file', { path: path.value, content });
     })();
 
     return true;

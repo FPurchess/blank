@@ -1,20 +1,23 @@
-export const debounce = (fn: Function, ms: number) => {
+export const debounce = (fn: Function, ms: number): Function => {
   let timeoutId: ReturnType<typeof setTimeout>;
   return function (this: any, ...args: any[]) {
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+    timeoutId = setTimeout((): any => fn.apply(this, args), ms);
   };
 };
 
-const patchArrayWithObservable = (array: Array, observable: Observable) => {
+const patchArrayWithObservable = <T extends any[]>(
+  array: T,
+  observable: Observable<T>
+): T => {
   if (array.__ob__ === undefined) {
     array.__ob__ = observable;
-    ["push", "pop", "shift", "unshift", "splice", "sort", "reverse"].forEach(
+    ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].forEach(
       (methodName) => {
         const method: Function = array[methodName];
-        array[methodName] = (...args) => {
+        array[methodName] = (...args: any[]) => {
           const result = method.call(array, ...args);
-          array.__ob__.notify(array);
+          observable.notify(array);
           return result;
         };
       }
@@ -24,7 +27,7 @@ const patchArrayWithObservable = (array: Array, observable: Observable) => {
 };
 
 export class Observable<T> {
-  protected observers: ((state: T) => void)[] = [];
+  protected observers: Array<(state: T) => void> = [];
   protected state: T;
 
   public constructor(state: T) {
@@ -78,6 +81,7 @@ export class Observable<T> {
 export class DebouncedObservable<T> extends Observable<T> {
   public constructor(state: T, milliseconds: number) {
     super(state);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     this.notify = debounce(this.notify, milliseconds);
   }
 }

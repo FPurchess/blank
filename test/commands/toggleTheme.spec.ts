@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { assert, describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from 'vitest';
 
-import { toggleTheme } from "../../src/commands";
+import { toggleTheme } from '../../src/commands';
 
-describe("command.toggleTheme", () => {
-  it("toggles", () => {
+describe('command.toggleTheme', () => {
+  it('toggles', () => {
     expect(window).toBeDefined();
 
     const theme = () => document.body.dataset.theme;
@@ -14,10 +14,10 @@ describe("command.toggleTheme", () => {
 
     toggleTheme()();
 
-    assert.equal(theme(), "dark");
+    assert.equal(theme(), 'dark');
 
     toggleTheme()();
 
-    assert.equal(theme(), "light");
+    assert.equal(theme(), 'light');
   });
 });
