@@ -8,7 +8,7 @@ export const debounce = (fn: Function, ms: number): Function => {
 
 const patchArrayWithObservable = <T extends any[]>(
   array: T,
-  observable: Observable<T>
+  observable: Observable<T>,
 ): T => {
   if (array.__ob__ === undefined) {
     array.__ob__ = observable;
@@ -20,7 +20,7 @@ const patchArrayWithObservable = <T extends any[]>(
           observable.notify(array);
           return result;
         };
-      }
+      },
     );
   }
   return array;
@@ -59,7 +59,7 @@ export class Observable<T> {
 
   public subscribe(
     observer: (state: T) => void,
-    options = { immediate: false }
+    options = { immediate: false },
   ): () => void {
     if (!this.observers.includes(observer)) {
       this.observers.push(observer);

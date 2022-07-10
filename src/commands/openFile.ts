@@ -5,6 +5,7 @@ import { open } from '@tauri-apps/api/dialog';
 
 import { markdownParser } from '../serializers';
 import { path } from '../state';
+import { sendNotification } from '@tauri-apps/api/notification';
 
 export default (): Command => (state, dispatch) => {
   (async () => {
@@ -19,7 +20,9 @@ export default (): Command => (state, dispatch) => {
         dispatch(state.tr.replaceWith(0, state.doc.content.size, doc));
       }
     }
-  })();
+  })().catch((err) => {
+    sendNotification(`Failed to open file: ${JSON.stringify(err)}`);
+  });
 
   return true;
 };

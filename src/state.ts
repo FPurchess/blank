@@ -5,7 +5,7 @@ export const path = new Observable<string | null>(null);
 
 export const transaction = new DebouncedObservable<Transaction | null>(
   null,
-  50
+  50,
 );
 
 export const textContent = new Observable('');
@@ -14,7 +14,8 @@ transaction.subscribe((transaction) => {
     let content = '';
     transaction.doc.descendants((node) => {
       if (node.marks.find((mark) => mark.type.name === 'deletion')) {
-        // @ts-expect-error
+        // eslint-disable-next-line no-useless-return
+        return;
       } else if (node.isBlock) {
         content += '\n';
       } else if (node.isText) {
