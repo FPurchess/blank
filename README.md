@@ -59,30 +59,32 @@ You can download the latest version of Blank here:
 
 Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 
-| Keyboard Shortcut | Action                       |
-| ----------------- | ---------------------------- |
-| Mod + N           | New File                     |
-| Mod + S           | Save File                    |
-| Mod + Shift + S   | Save as                      |
-| Mod + O           | Open File                    |
-| Mod + Alt + P     | Export as PDF                |
-| Mod + Alt + T     | Toggle Theme (Dark / Light)  |
-| Mod + Z           | Undo                         |
-| Mod + Shift + Z   | Redo                         |
-| Mod + 0           | Paragraph                    |
-| Mod + 1           | Heading Level 1              |
-| Mod + 2           | Heading Level 2              |
-| Mod + 3           | Heading Level 3              |
-| Mod + 4           | Heading Level 4              |
-| Mod + 5           | Heading Level 5              |
-| Mod + 6           | Heading Level 6              |
-| Mod + 8           | Bullet List                  |
-| Mod + 9           | Numbered List                |
-| Mod + [           | Increase indent of list item |
-| Mod + ]           | Decrease indent of list item |
-| Mod + B           | Toggle bold                  |
-| Mod + I           | Toggle italic                |
-| Mod + U           | Toggle underline             |
+| Keyboard Shortcut           | Action                       |
+| --------------------------- | ---------------------------- |
+| Mod + N                     | New File                     |
+| Mod + S                     | Save File                    |
+| Mod + Shift + S             | Save as                      |
+| Mod + O                     | Open File                    |
+| Mod + Alt + P               | Export as PDF                |
+| Mod + Alt + T               | Toggle Theme (Dark / Light)  |
+| Mod + Z                     | Undo                         |
+| Mod + Shift + Z             | Redo                         |
+| Mod + Enter / Shift + Enter | Insert line break            |
+| Mod + 0                     | Paragraph                    |
+| Mod + 1                     | Heading Level 1              |
+| Mod + 2                     | Heading Level 2              |
+| Mod + 3                     | Heading Level 3              |
+| Mod + 4                     | Heading Level 4              |
+| Mod + 5                     | Heading Level 5              |
+| Mod + 6                     | Heading Level 6              |
+| Mod + 8                     | Bullet List                  |
+| Mod + 9                     | Numbered List                |
+| Mod + [                     | Increase indent of list item |
+| Mod + ]                     | Decrease indent of list item |
+| Mod + H                     | Insert horizontal rule       |
+| Mod + B                     | Toggle bold                  |
+| Mod + I                     | Toggle italic                |
+| Mod + U                     | Toggle underline             |
 
 ## Contributing
 
