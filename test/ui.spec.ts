@@ -1,31 +1,31 @@
 /**
  * @vitest-environment jsdom
  */
-import { assert, describe, expect, it, vi, beforeEach } from 'vitest';
+import {
+  assert,
+  describe,
+  expect,
+  it,
+  vi,
+  beforeEach,
+  beforeAll,
+} from 'vitest';
 
 import { bootUI } from '../src/ui';
 import { path, textContent } from '../src/state';
 
-beforeEach(() => {
+beforeAll(() => {
   expect(window).toBeDefined();
-
-  document.body.innerHTML = '';
-
-  const uiTop = document.createElement('div');
-  uiTop.id = 'ui-top';
-  document.body.appendChild(uiTop);
-
-  const uiBottom = document.createElement('div');
-  uiBottom.id = 'ui-bottom';
-  document.body.appendChild(uiBottom);
+  window.Notification = {
+    permission: 'granted',
+  };
+  bootUI();
 });
 
 describe('ui', () => {
   it('updates the file path display', () => {
+    expect(window).toBeDefined();
     const uiTop = document.querySelector<HTMLElement>('#ui-top');
-    assert.isEmpty(uiTop.innerHTML);
-
-    bootUI();
 
     assert.equal(uiTop.innerHTML, '» Untitled');
 
@@ -35,10 +35,8 @@ describe('ui', () => {
   });
 
   it('updates the word and char count', () => {
+    expect(window).toBeDefined();
     const uiBottom = document.querySelector<HTMLElement>('#ui-bottom');
-    assert.isEmpty(uiBottom.innerHTML);
-
-    bootUI();
 
     assert.equal(uiBottom.innerHTML, '0 words 0 chars');
 
