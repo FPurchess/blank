@@ -1,11 +1,11 @@
 [package]
-name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
-default-run = "app"
+name = "blank"
+version = "0.1.1"
+description = "A minimalistic, opinionated markdown editor made for writing"
+authors = ["Florian Purchess"]
+license = "MIT"
+repository = "https://github.com/FPurchess/blank"
+default-run = "blank"
 edition = "2021"
 rust-version = "1.57"
 
