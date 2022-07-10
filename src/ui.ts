@@ -1,7 +1,9 @@
 import { path, textContent } from './state';
 
 export const bootUI = () => {
-  const uiTop = document.querySelector<HTMLDivElement>('#ui-top')!;
+  const uiTop = document.createElement('div');
+  uiTop.id = 'ui-top';
+  document.body.appendChild(uiTop);
   path.subscribe(
     (path) => {
       uiTop.innerHTML = '&raquo; ' + (path ?? 'Untitled');
@@ -9,7 +11,9 @@ export const bootUI = () => {
     { immediate: true },
   );
 
-  const uiBottom = document.querySelector<HTMLDivElement>('#ui-bottom')!;
+  const uiBottom = document.createElement('div');
+  uiBottom.id = 'ui-bottom';
+  document.body.appendChild(uiBottom);
   textContent.subscribe(
     (content) => {
       const charCount = content.length;
