@@ -46,7 +46,6 @@ module.exports = {
     '@typescript-eslint/prefer-ts-expect-error': 'off',
     '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/no-unsafe-return': 'off',
     '@typescript-eslint/return-await': 'off',
     'no-return-await': 'warn',
   },
