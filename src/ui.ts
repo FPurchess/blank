@@ -1,4 +1,16 @@
+import {
+  isPermissionGranted,
+  requestPermission,
+} from '@tauri-apps/api/notification';
+
 import { path, textContent } from './state';
+
+export const setupNotification = async () => {
+  const hasPermission = await isPermissionGranted();
+  if (!hasPermission) {
+    await requestPermission();
+  }
+};
 
 export const bootUI = () => {
   const uiTop = document.createElement('div');
@@ -22,4 +34,7 @@ export const bootUI = () => {
     },
     { immediate: true },
   );
+
+  // FIXME: better handling of permission errors
+  setupNotification().catch(console.error);
 };
