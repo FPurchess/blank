@@ -13,6 +13,7 @@ import {
 } from 'vitest';
 
 import { toggleTheme } from '../../src/commands';
+import { theme } from '../../src/state';
 
 describe('command.toggleTheme', () => {
   beforeEach(() => {
@@ -26,15 +27,18 @@ describe('command.toggleTheme', () => {
   it('toggles', () => {
     expect(window).toBeDefined();
 
-    const theme = () => document.body.dataset.theme;
-    assert.equal(theme(), undefined);
+    const bodyTheme = () => document.body.dataset.theme;
+    assert.equal(theme.value, 'dark');
+    assert.equal(bodyTheme(), undefined);
 
     toggleTheme()();
 
-    assert.equal(theme(), 'dark');
+    assert.equal(theme.value, 'light');
+    assert.equal(bodyTheme(), 'light');
 
     toggleTheme()();
 
-    assert.equal(theme(), 'light');
+    assert.equal(theme.value, 'dark');
+    assert.equal(bodyTheme(), 'dark');
   });
 });

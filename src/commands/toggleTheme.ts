@@ -1,10 +1,8 @@
 import { Command } from 'prosemirror-state';
 
+import { theme } from '../state';
+
 export default (): Command => () => {
-  const body = document.querySelector('body');
-  if (body) {
-    const theme = body.dataset.theme;
-    body.dataset.theme = theme === 'dark' ? 'light' : 'dark';
-  }
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
   return true;
 };

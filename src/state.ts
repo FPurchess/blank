@@ -26,3 +26,9 @@ transaction.subscribe(
     }
   }, 50),
 );
+
+export type themeType = 'light' | 'dark';
+export const theme = new Observable<themeType>('dark');
+theme.subscribe((value: themeType) => {
+  document.body.dataset.theme = value;
+});
