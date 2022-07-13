@@ -24,12 +24,15 @@ import {
   insertNode,
 } from './commands';
 import { schema } from './schema';
+import { transaction } from './state';
+import { restoreDocument } from './storage';
 
 import './scss/main.scss';
-import { transaction } from './state';
 
-export const bootEditor = () => {
+export const bootEditor = async () => {
+  const doc = await restoreDocument();
   const state = EditorState.create({
+    doc,
     schema,
     plugins: [
       history(),
