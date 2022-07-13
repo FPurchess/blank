@@ -27,7 +27,7 @@ const patchArrayWithObservable = <T extends any[]>(
 };
 
 export class Observable<T> {
-  protected observers: Array<(state: T) => void> = [];
+  protected observers: Array<(state: T) => any> = [];
   protected state: T;
 
   public constructor(state: T) {
@@ -58,7 +58,7 @@ export class Observable<T> {
   }
 
   public subscribe(
-    observer: (state: T) => void,
+    observer: (state: T) => any,
     options = { immediate: false },
   ): () => void {
     if (!this.observers.includes(observer)) {
@@ -70,7 +70,7 @@ export class Observable<T> {
     return () => this.unsubscribe(observer);
   }
 
-  public unsubscribe(observer: (state: T) => void) {
+  public unsubscribe(observer: (state: T) => any) {
     const observerIndex = this.observers.indexOf(observer);
     if (observerIndex > -1) {
       this.observers.splice(observerIndex, 1);
