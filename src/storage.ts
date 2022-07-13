@@ -4,6 +4,7 @@ import { Node } from 'prosemirror-model';
 
 import { debounce } from './utils/observable';
 import { path, transaction, theme } from './state';
+import { schema } from './schema';
 
 localforage.config({
   name: 'Blank',
