@@ -25,25 +25,25 @@ export const markdownParser = new MarkdownParser(
     list_item: { block: 'list_item' },
     bullet_list: {
       block: 'bullet_list',
-      getAttrs: (_, tokens, i) => ({ tight: listIsTight(tokens, i) })
+      getAttrs: (_, tokens, i) => ({ tight: listIsTight(tokens, i) }),
     },
     ordered_list: {
       block: 'ordered_list',
       getAttrs: (tok: Token, tokens, i) => ({
         order: +(tok.attrGet('start') ?? 1),
-        tight: listIsTight(tokens, i)
-      })
+        tight: listIsTight(tokens, i),
+      }),
     },
     heading: {
       block: 'heading',
-      getAttrs: (tok: Token) => ({ level: +tok.tag.slice(1) })
+      getAttrs: (tok: Token) => ({ level: +tok.tag.slice(1) }),
     },
     hr: { node: 'horizontal_rule' },
     hardbreak: { node: 'hard_break' },
     u: { mark: 'u' },
     em: { mark: 'em' },
-    strong: { mark: 'strong' }
-  }
+    strong: { mark: 'strong' },
+  },
 );
 
 export const markdownSerializer = new MarkdownSerializer(
@@ -61,7 +61,7 @@ export const markdownSerializer = new MarkdownSerializer(
       state.renderList(
         node,
         '  ',
-        () => `${(node.attrs.bullet as string | undefined) ?? '*'} `
+        () => `${(node.attrs.bullet as string | undefined) ?? '*'} `,
       );
     },
     ordered_list(state, node) {
@@ -89,7 +89,7 @@ export const markdownSerializer = new MarkdownSerializer(
     },
     text(state, node) {
       state.text(node.text!);
-    }
+    },
   },
   {
     u: { open: '*', close: '*', mixable: true, expelEnclosingWhitespace: true },
@@ -97,15 +97,15 @@ export const markdownSerializer = new MarkdownSerializer(
       open: '*',
       close: '*',
       mixable: true,
-      expelEnclosingWhitespace: true
+      expelEnclosingWhitespace: true,
     },
     strong: {
       open: '**',
       close: '**',
       mixable: true,
-      expelEnclosingWhitespace: true
-    }
-  }
+      expelEnclosingWhitespace: true,
+    },
+  },
 );
 
 const domSerializer = DOMSerializer.fromSchema(schema);
