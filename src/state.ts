@@ -1,28 +1,28 @@
 import { Transaction } from 'prosemirror-state';
-import { DebouncedObservable, Observable } from './utils/observable';
+import { Node } from 'prosemirror-model';
+
+import { debounce, Observable } from './utils/observable';
 
 export const path = new Observable<string | null>(null);
 
-export const transaction = new DebouncedObservable<Transaction | null>(
-  null,
-  50,
-);
+export const transaction = new Observable<Transaction | null>(null);
 
 export const textContent = new Observable('');
-transaction.subscribe((transaction) => {
-  if (transaction !== null) {
-    let content = '';
-    transaction.doc.descendants((node) => {
-      if (node.marks.find((mark) => mark.type.name === 'deletion')) {
-        // eslint-disable-next-line no-useless-return
-        return;
-      } else if (node.isBlock) {
-        content += '\n';
-      } else if (node.isText) {
-        content += node.text ?? '';
-      }
-    });
-    content = content.replaceAll(/[\n|\s]{2,}/g, ' ').trim();
-    textContent.value = content;
-  }
-});
+transaction.subscribe(
+  debounce((transaction: Transaction) => {
+    if (transaction !== null) {
+      let content = '';
+      transaction.doc.descendants((node: Node) => {
+        if (node.marks.find((mark) => mark.type.name === 'deletion')) {
+          //
+        } else if (node.isBlock) {
+          content += '\n';
+        } else if (node.isText) {
+          content += node.text ?? '';
+        }
+      });
+      content = content.replaceAll(/[\n|\s]{2,}/g, ' ').trim();
+      textContent.value = content;
+    }
+  }, 50),
+);
