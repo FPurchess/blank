@@ -60,7 +60,7 @@ export const bootEditor = () => {
         'Mod-u': toggleMark(schema.marks.u),
         'Mod-n': newFile(),
         'Mod-s': saveFile(),
-        'Mod-Shift-s': saveFile(true),
+        'Mod-Shift-s': saveFile({ force: true }),
         'Mod-Alt-p': exportAsPDF(),
         'Mod-o': openFile(),
         'Mod-Alt-t': toggleTheme(),

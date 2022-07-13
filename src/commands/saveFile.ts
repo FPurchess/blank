@@ -1,4 +1,4 @@
-import { Command } from 'prosemirror-state';
+import { Command, EditorState } from 'prosemirror-state';
 
 import { invoke } from '@tauri-apps/api';
 import { save } from '@tauri-apps/api/dialog';
@@ -7,32 +7,38 @@ import { sendNotification } from '@tauri-apps/api/notification';
 import { markdownSerializer } from '../serializers';
 import { path } from '../state';
 
-export default (force = false): Command =>
-  (state) => {
-    (async () => {
-      if (force || path.value === null) {
-        const newPath = await save({
-          filters: [{ name: 'Markdown', extensions: ['md'] }],
-        });
-        if (newPath === null) {
-          return false;
-        }
-        path.value = newPath;
-      }
+export interface Options {
+  force?: boolean;
+}
 
-      const content = markdownSerializer.serialize(state.doc) ?? '';
-      await invoke('save_file', { path: path.value, content });
-
-      return true;
-    })()
-      .then((isExported: boolean) => {
-        if (isExported) {
-          sendNotification('Your file has been saved');
-        }
-      })
-      .catch((err) => {
-        sendNotification(`Failed to save file: ${JSON.stringify(err)}`);
+export const _saveFile = async (state: EditorState, options: Options) => {
+  try {
+    if (options.force === true || path.value === null) {
+      const newPath = await save({
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
       });
+      if (newPath === null) {
+        return;
+      }
+      path.value = newPath;
+    }
 
+    const content = markdownSerializer.serialize(state.doc) ?? '';
+    await invoke('save_file', { path: path.value, content });
+
+    sendNotification('Your file has been saved');
+  } catch (err) {
+    if (err instanceof Error) {
+      sendNotification(`Failed to save file: ${err.message}`);
+    } else if (typeof err === 'string') {
+      sendNotification(`Failed to save file: ${err}`);
+    }
+  }
+};
+
+export default (options: Options = { force: false }): Command =>
+  (state) => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    _saveFile(state, Object.freeze(options));
     return true;
   };
