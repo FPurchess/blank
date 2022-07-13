@@ -5,6 +5,7 @@
   "description": "Blank is a minimalistic, opinionated markdown editor made for writing - purely keyboard-based with PDF-Export, available for Linux, macOS and Windows",
   "license": "MIT",
   "scripts": {
+    "prepare": "husky install",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -53,6 +54,7 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-security": "^1.5.0",
+    "husky": "^8.0.0",
     "jsdom": "^20.0.0",
     "prettier": "^2.7.1",
     "sass": "^1.53.0",
