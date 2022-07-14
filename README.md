@@ -16,6 +16,8 @@
 
 [macos-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_x64.dmg.svg
 [macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64.dmg
+[windows-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_x64_en-US.msi.svg
+[windows-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64_en-US.msi
 [linux-deb-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.deb.svg
 [linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.deb
 [linux-appimage-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.AppImage.svg
@@ -63,9 +65,9 @@
 
 You can download the latest version of Blank here:
 
-| Mac OS                                       | Linux                                                                                                               |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [![latest version][macos-shield]][macos-pkg] | [![latest version][linux-deb-shield]][linux-deb-pkg] [![latest version][linux-appimage-shield]][linux-appimage-pkg] |
+| Mac OS                                       | Windows                                          | Linux                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| [![latest version][macos-shield]][macos-pkg] | [![latest version][windows-shield]][windows-pkg] | [![latest version][linux-deb-shield]][linux-deb-pkg] [![latest version][linux-appimage-shield]][linux-appimage-pkg] |
 
 ## Keyboard Shortcuts
 
