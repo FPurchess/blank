@@ -1,6 +1,6 @@
 [package]
 name = "blank"
-version = "0.1.1"
+version = "0.1.2"
 description = "A minimalistic, opinionated markdown editor made for writing"
 authors = ["Florian Purchess"]
 license = "MIT"

@@ -14,12 +14,12 @@
 
 <!-- packages -->
 
-[macos-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_x64.dmg.svg
-[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_x64.dmg
-[linux-deb-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.deb.svg
-[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.deb
-[linux-appimage-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.AppImage.svg
-[linux-appimage-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.AppImage
+[macos-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_x64.dmg.svg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64.dmg
+[linux-deb-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.deb.svg
+[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.deb
+[linux-appimage-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.AppImage.svg
+[linux-appimage-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.AppImage
 
 <div align="center">
   <a href="https://github.com/FPurchess/blank">
