@@ -1,7 +1,9 @@
-[contributors-shield]: https://img.shields.io/github/contributors/FPurchess/blank.svg?style=flat-square
-[contributors-url]: https://github.com/FPurchess/blank/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/FPurchess/blank.svg?style=flat-square
-[forks-url]: https://github.com/FPurchess/blank/network/members
+[latest-version-shield]: https://badge.fury.io/gh/fpurchess%2Fblank.svg
+[latest-version-url]: https://github.com/FPurchess/blank/releases
+[downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total.svg
+[downloads-url]: https://github.com/FPurchess/blank/releases
+[ci-shield]: https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg
+[ci-url]: https://github.com/FPurchess/blank/actions/workflows/test.yml
 [stars-shield]: https://img.shields.io/github/stars/FPurchess/blank.svg?style=flat-square
 [stars-url]: https://github.com/FPurchess/blank/stargazers
 [issues-shield]: https://img.shields.io/github/issues/FPurchess/blank.svg?style=flat-square
@@ -9,6 +11,15 @@
 [license-shield]: https://img.shields.io/github/license/FPurchess/blank.svg?style=flat-square
 [license-url]: https://github.com/FPurchess/blank/blob/master/LICENSE
 [product-screenshot]: images/screenshot.gif
+
+<!-- packages -->
+
+[macos-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_x64.dmg.svg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_x64.dmg
+[linux-deb-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.deb.svg
+[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.deb
+[linux-appimage-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.AppImage.svg
+[linux-appimage-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.AppImage
 
 <div align="center">
   <a href="https://github.com/FPurchess/blank">
@@ -41,19 +52,20 @@
 
 <br />
 
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
+[![Latest Version][latest-version-shield]][latest-version-url]
+[![MIT License][license-shield]][license-url]
+[![Downloads Total][downloads-shield]][downloads-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
+[![CI Status][ci-shield]][ci-url]
 
 ## Download & Installation
 
 You can download the latest version of Blank here:
 
-| Mac OS                                                                                                                                                                                       | Linux                                                                                                                                                                                                                                                                                                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_x64.dmg.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_x64.dmg) | [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.deb.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.deb) [![latest version](https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.1_amd64.AppImage.svg)](https://github.com/FPurchess/blank/releases/download/v0.1.1/blank_0.1.1_amd64.AppImage) |
+| Mac OS                                       | Linux                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [![latest version][macos-shield]][macos-pkg] | [![latest version][linux-deb-shield]][linux-deb-pkg] [![latest version][linux-appimage-shield]][linux-appimage-pkg] |
 
 ## Keyboard Shortcuts
 
