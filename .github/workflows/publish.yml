@@ -42,7 +42,9 @@ jobs:
       - name: install dependencies (windows only)
         if: matrix.platform == 'windows-latest'
         run: |
-          choco install wkhtmltopdf
+          choco install -y --no-progress wkhtmltopdf
+          cp 'C:\Program Files\wkhtmltopdf\bin\wkhtmltox.dll' src-tauri\
+          cp 'C:\Program Files\wkhtmltopdf\lib\wkhtmltox.lib' src-tauri\
 
       - name: install app dependencies and build it
         run: yarn && yarn build
