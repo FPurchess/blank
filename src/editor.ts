@@ -70,8 +70,7 @@ export const bootEditor = async () => {
       }),
     ],
   });
-  const app = document.querySelector<HTMLDivElement>('#app')!;
-  const view = new EditorView(app, {
+  const view = new EditorView(document.body, {
     state,
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
