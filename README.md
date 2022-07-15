@@ -1,73 +1,68 @@
-[latest-version-shield]: https://badge.fury.io/gh/fpurchess%2Fblank.svg
-[latest-version-url]: https://github.com/FPurchess/blank/releases
-[downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total.svg
-[downloads-url]: https://github.com/FPurchess/blank/releases
-[ci-shield]: https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg
-[ci-url]: https://github.com/FPurchess/blank/actions/workflows/test.yml
-[stars-shield]: https://img.shields.io/github/stars/FPurchess/blank.svg?style=flat-square
-[stars-url]: https://github.com/FPurchess/blank/stargazers
-[issues-shield]: https://img.shields.io/github/issues/FPurchess/blank.svg?style=flat-square
-[issues-url]: https://github.com/FPurchess/blank/issues
-[license-shield]: https://img.shields.io/github/license/FPurchess/blank.svg?style=flat-square
-[license-url]: https://github.com/FPurchess/blank/blob/master/LICENSE
-[product-screenshot]: images/screenshot.gif
-
 <!-- packages -->
 
-[macos-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_x64.dmg.svg
+[downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total
+[macos-shield]: https://api.iconify.design/logos/macos.svg
 [macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64.dmg
-[windows-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_x64_en-US.msi.svg
+[windows-shield]: https://api.iconify.design/logos/microsoft-windows.svg
 [windows-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64_en-US.msi
-[linux-deb-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.deb.svg
+[linux-deb-shield]: https://api.iconify.design/logos/linux-tux.svg
 [linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.deb
-[linux-appimage-shield]: https://img.shields.io/github/downloads/FPurchess/blank/latest/blank_0.1.2_amd64.AppImage.svg
-[linux-appimage-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.AppImage
 
-<div align="center">
+<p align="center">
   <a href="https://github.com/FPurchess/blank">
-    <img src="images/logo.svg" alt="Blank Logo">
+    <img src="images/logo.svg" alt="Blank Logo" width="299">
   </a>
+</p>
+<p align="center">
+  A minimalistic, opinionated markdown editor made for writing
+</p>
+<p align="center">
+  <a href="https://github.com/FPurchess/blank/releases"><img src="https://badge.fury.io/gh/fpurchess%2Fblank.svg" alt="latest version"></a>
+  <a href="https://github.com/FPurchess/blank/blob/master/LICENSE"><img src="https://img.shields.io/github/license/FPurchess/blank.svg" alt="License"></a>
+  <a href="https://img.shields.io/github/downloads/FPurchess/blank/total"><img src="https://img.shields.io/github/downloads/FPurchess/blank/total.svg" alt="Downloads Total"></a>
+  <a href="https://github.com/FPurchess/blank/actions/workflows/test.yml"><img src="https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg?branch=dev" alt="CI"></a>
+</p>
 
-  <p align="center">
-    A minimalistic, opinionated markdown editor made for writing
-    <br />
-    <a href="https://github.com/FPurchess/blank/releases"><strong>Try it out »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/FPurchess/blank/releases">Download</a>
-    ·
-    <a href="https://github.com/FPurchess/blank/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/FPurchess/blank/issues">Request Feature</a>
-  </p>
-
+<p align="center">
   <img src="images/screenshot.gif" alt="Blank Logo">
-</div>
+</p>
 
-### Features
+# Blank :thought_balloon:
 
-- purely keyboard-based :keyboard:
-- minimalistic WYSIWYG for distraction-free writing :pear:
-- Export to PDF :page_with_curl:
-- Themes: :sun_with_face: Light & Dark-Mode :waxing_crescent_moon:
+> Next Generation Writing Experience
+
+- :keyboard: purely keyboard-based
+- :pear: minimalistic WYSIWYG for distraction-free writing
+- :page_with_curl: Export to PDF
+- :waxing_crescent_moon: Themes: Light & Dark-Mode
 - available for Linux, macOS and Windows
-
-<br />
-
-[![Latest Version][latest-version-shield]][latest-version-url]
-[![MIT License][license-shield]][license-url]
-[![Downloads Total][downloads-shield]][downloads-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![CI Status][ci-shield]][ci-url]
 
 ## Download & Installation
 
 You can download the latest version of Blank here:
 
-| Mac OS                                       | Windows                                          | Linux                                                                                                               |
-| -------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| [![latest version][macos-shield]][macos-pkg] | [![latest version][windows-shield]][windows-pkg] | [![latest version][linux-deb-shield]][linux-deb-pkg] [![latest version][linux-appimage-shield]][linux-appimage-pkg] |
+<table width="100%">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64.dmg">
+        Download blank.dmg<br/>
+        <img src="https://api.iconify.design/logos/macos.svg" alt="Donwload blank.dmg" height="100" width="120" /><br/>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_x64_en-US.msi">
+        Download blank.msi<br/>
+        <img src="https://api.iconify.design/logos/microsoft-windows.svg" alt="Donwloads blank.msi"  height="100" width="120" /><br/>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.2/blank_0.1.2_amd64.deb">
+        Download blank.deb<br/>
+        <img src="https://api.iconify.design/logos/linux-tux.svg" alt="Donwloads blank.deb" height="100" width="120" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 ## Keyboard Shortcuts
 
