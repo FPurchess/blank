@@ -2,5 +2,6 @@
 :root:not([data-theme='dark']) {
   --color: rgb(27, 40, 50);
   --background-color: #fff;
-  --font-family: system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Ubuntu', 'Cantarell', 'Noto Sans', sans-serif;
+  --font-family: 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', 'Roboto',
+    'Ubuntu', 'Cantarell', 'Noto Sans', sans-serif;
 }

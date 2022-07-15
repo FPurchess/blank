@@ -1,18 +1,27 @@
 @import 'reset';
 @import 'themes/index';
 @import 'typography';
-@import 'prosemirror';
+
+html {
+  overflow: auto;
+}
 
 body {
   position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  font-size: 1.1rem;
 }
 
 #ui-top,
 #ui-bottom {
-  padding: 12px 24px;
   opacity: 0.3;
-  position: absolute;
+  position: fixed;
+  padding: 12px 24px;
   font-size: 0.9rem;
+  user-select: none;
+  box-sizing: border-box;
 }
 
 #ui-top {
@@ -27,16 +36,11 @@ body {
   text-align: end;
 }
 
-#app {
-  padding: 48px calc(50% - 600px);
-  height: 100%;
-  width: 100%;
-  font-size: 1.3rem;
-  box-sizing: border-box;
-  overflow: scroll;
-}
-
 .ProseMirror {
-  height: 100%;
+  padding: 48px 24px;
+  margin: 0 auto;
+  width: 1200px;
   box-sizing: border-box;
+  line-height: 1.3;
+  outline: none;
 }

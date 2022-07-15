@@ -1,3 +1,17 @@
+@font-face {
+  font-family: 'DejaVu Sans';
+  src: url('../../assets/fonts/dejavu-sans.eot'); /* IE9*/
+  src: url('../../assets/fonts/dejavu-sans.eot?#iefix')
+      format('embedded-opentype'),
+    /* IE6-IE8 */ url('../../assets/fonts/dejavu-sans.woff2') format('woff2'),
+    /* chrome、firefox */ url('../../assets/fonts/dejavu-sans.woff')
+      format('woff'),
+    /* chrome、firefox */ url('../../assets/fonts/dejavu-sans.ttf')
+      format('truetype'),
+    /* chrome、firefox、opera、Safari, Android, iOS 4.2+*/
+      url('../../assets/fonts/dejavu-sans.svg#DejaVu Sans V1') format('svg'); /* iOS 4.1- */
+}
+
 $font-weight-thin: 100;
 $font-weight-light: 300;
 $font-weight-regular: 400;
@@ -5,7 +19,7 @@ $font-weight-medium: 500;
 $font-weight-bold: 700;
 $font-weight-black: 900;
 
-@mixin heading($size, $weight, $spacing) {
+@mixin heading($size, $weight) {
   font-size: #{$size}rem;
   font-weight: $weight;
   margin-top: 0.75em;
@@ -16,22 +30,22 @@ $font-weight-black: 900;
 }
 
 h1 {
-  @include heading(5, $font-weight-light, -1.5);
+  @include heading(5, $font-weight-light);
 }
 h2 {
-  @include heading(3.75, $font-weight-light, -0.5);
+  @include heading(3.75, $font-weight-light);
 }
 h3 {
-  @include heading(3, $font-weight-regular, 0);
+  @include heading(3, $font-weight-regular);
 }
 h4 {
-  @include heading(2.125, $font-weight-regular, 0.25);
+  @include heading(2.125, $font-weight-regular);
 }
 h5 {
-  @include heading(1.5, $font-weight-regular, 0);
+  @include heading(1.5, $font-weight-regular);
 }
 h6 {
-  @include heading(1.25, $font-weight-medium, 0.15);
+  @include heading(1.25, $font-weight-medium);
 }
 
 p {
@@ -53,13 +67,17 @@ ol {
 }
 
 li {
-  margin-left: 2rem;
-  padding-bottom: 0.25em;
+  margin: 1rem 0 1rem 3rem;
+  padding: 0 0 0 0.25rem;
+
+  & > * {
+    margin: 0;
+  }
 }
 
 strong,
 b {
-  font-weight: 500;
+  font-weight: $font-weight-medium;
 }
 
 em,
