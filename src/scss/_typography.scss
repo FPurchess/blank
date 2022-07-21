@@ -17,7 +17,7 @@ $font-weight-bold: 700;
 $font-weight-black: 900;
 
 @mixin heading($size, $weight) {
-  font-size: #{$size}rem;
+  font-size: #{$size}em;
   font-weight: $weight;
   margin-top: 0.75em;
   margin-bottom: 0.25em;
@@ -46,8 +46,8 @@ h6 {
 }
 
 p {
-  margin-top: 0.5em;
-  margin-bottom: 1.5em;
+  margin: 0 0 1em;
+  font-size: 1.1em;
 }
 
 ul,
