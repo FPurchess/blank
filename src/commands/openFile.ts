@@ -1,7 +1,7 @@
 import { Command } from 'prosemirror-state';
 
-import { invoke } from '@tauri-apps/api';
 import { open } from '@tauri-apps/api/dialog';
+import { readTextFile } from '@tauri-apps/api/fs';
 
 import { markdownParser } from '../serializers';
 import { path } from '../state';
@@ -14,7 +14,7 @@ export default (): Command => (state, dispatch) => {
     });
     if (typeof newPath === 'string') {
       path.value = newPath;
-      const content = await invoke<string>('open_file', { path: path.value });
+      const content = await readTextFile(path.value);
       const doc = markdownParser.parse(content);
       if (dispatch && doc !== null) {
         dispatch(state.tr.replaceWith(0, state.doc.content.size, doc));
