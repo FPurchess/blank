@@ -121,4 +121,3 @@ This project would not exist without the hard work of others, first and foremost
 - [Tauri](https://tauri.app/)
 - [ProseMirror](https://github.com/ProseMirror/) - thanks to [@marijnh](https://github.com/marijnh) and [@adrianheine](https://github.com/adrianheine)
 - [Vite](https://github.com/vitejs/vite)
-- [wkhtmltopdf](https://github.com/wkhtmltopdf/wkhtmltopdf)

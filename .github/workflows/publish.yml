@@ -25,26 +25,11 @@ jobs:
         with:
           toolchain: stable
 
-      - name: install dependencies (macos only)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          sudo curl --silent --show-error --location --max-redirs 2 --fail --retry 3 --output wkhtmltopdf-macos-cocoa.pkg https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-2/wkhtmltox-0.12.6-2.macos-cocoa.pkg
-          sudo installer -pkg wkhtmltopdf-macos-cocoa.pkg -target /
-
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf curl fontconfig libfreetype6 libjpeg-turbo8 libpng16-16 xfonts-75dpi xfonts-base
-          sudo curl --silent --show-error --location --max-redirs 2 --fail --retry 3 --output wkhtmltopdf-linux-amd64.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb
-          sudo dpkg -i wkhtmltopdf-linux-amd64.deb
-
-      - name: install dependencies (windows only)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          choco install -y --no-progress wkhtmltopdf
-          cp 'C:\Program Files\wkhtmltopdf\bin\wkhtmltox.dll' src-tauri\
-          cp 'C:\Program Files\wkhtmltopdf\lib\wkhtmltox.lib' src-tauri\
+          sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
 
       - name: install app dependencies and build it
         run: yarn && yarn build
