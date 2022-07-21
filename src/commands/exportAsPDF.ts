@@ -1,22 +1,11 @@
-import pdfmake from 'pdfmake';
 import { Command } from 'prosemirror-state';
+import { Node, Mark } from 'prosemirror-model';
 
 import { save } from '@tauri-apps/api/dialog';
 import { writeBinaryFile } from '@tauri-apps/api/fs';
 import { sendNotification } from '@tauri-apps/api/notification';
-import { Node, Mark } from 'prosemirror-model';
 
-const { protocol, host } = window.location;
-const font = `${protocol}//${host}/fonts/dejavu-sans.ttf`;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-pdfmake.addFonts({
-  'DejaVu Sans': {
-    normal: font,
-    bold: font,
-    italics: font,
-    bolditalics: font,
-  },
-});
+import pdfmake from 'pdfmake';
 
 const textStyleMixin = (
   fontSize,
@@ -129,7 +118,6 @@ export default (): Command => (state) => {
     const pdf = pdfmake.createPdf(docDefinition);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const buf = await pdf.getBuffer();
-
     await writeBinaryFile(pdfPath, buf);
 
     return true;
