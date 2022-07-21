@@ -1,15 +1,12 @@
 @font-face {
   font-family: 'DejaVu Sans';
-  src: url('../../assets/fonts/dejavu-sans.eot'); /* IE9*/
-  src: url('../../assets/fonts/dejavu-sans.eot?#iefix')
-      format('embedded-opentype'),
-    /* IE6-IE8 */ url('../../assets/fonts/dejavu-sans.woff2') format('woff2'),
-    /* chrome、firefox */ url('../../assets/fonts/dejavu-sans.woff')
-      format('woff'),
-    /* chrome、firefox */ url('../../assets/fonts/dejavu-sans.ttf')
-      format('truetype'),
+  src: url('/fonts/dejavu-sans.eot'); /* IE9*/
+  src: url('/fonts/dejavu-sans.eot?#iefix') format('embedded-opentype'),
+    /* IE6-IE8 */ url('/fonts/dejavu-sans.woff2') format('woff2'),
+    /* chrome、firefox */ url('/fonts/dejavu-sans.woff') format('woff'),
+    /* chrome、firefox */ url('/fonts/dejavu-sans.ttf') format('truetype'),
     /* chrome、firefox、opera、Safari, Android, iOS 4.2+*/
-      url('../../assets/fonts/dejavu-sans.svg#DejaVu Sans V1') format('svg'); /* iOS 4.1- */
+      url('/fonts/dejavu-sans.svg#DejaVu Sans V1') format('svg'); /* iOS 4.1- */
 }
 
 $font-weight-thin: 100;
