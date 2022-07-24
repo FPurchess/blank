@@ -28,6 +28,9 @@
     "type": "git",
     "url": "git://github.com/FPurchess/blank.git"
   },
+  "resolutions": {
+    "w3c-keyname": "^2.2.5"
+  },
   "dependencies": {
     "@tauri-apps/api": "^1.0.2",
     "localforage": "^1.10.0",
