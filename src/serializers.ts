@@ -106,14 +106,3 @@ export const markdownSerializer = new MarkdownSerializer(
     },
   },
 );
-
-const domSerializer = DOMSerializer.fromSchema(schema);
-export const htmlSerializer = (doc: Node) => {
-  const dom = domSerializer.serializeFragment(doc.content);
-  if (dom instanceof HTMLElement) {
-    return dom.innerHTML;
-  }
-  const tmp = document.createElement('div');
-  tmp.appendChild(dom);
-  return tmp.innerHTML;
-};
