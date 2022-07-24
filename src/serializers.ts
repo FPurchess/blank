@@ -1,8 +1,7 @@
 import markdownit from 'markdown-it';
-import { DOMSerializer, Node } from 'prosemirror-model';
 import { MarkdownParser, MarkdownSerializer } from 'prosemirror-markdown';
 
-import { schema } from './schema';
+import { schema } from './editor/schema';
 
 interface Token {
   type: string;

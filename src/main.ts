@@ -1,5 +1,5 @@
 import pdfmake from 'pdfmake';
-import vfs from './pdfmake-vfs';
+import vfs from './exporters/pdf/pdfmake-vfs';
 
 import { bootStorage } from './storage';
 import { bootEditor } from './editor';

@@ -1,4 +1,4 @@
-export { default as exportAsPDF } from './exportAsPDF';
+export { default as exportAs } from './exportAs';
 export { default as insertNode } from './insertNode';
 export { default as newFile } from './newFile';
 export { default as openFile } from './openFile';

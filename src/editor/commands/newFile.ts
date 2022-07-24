@@ -1,6 +1,6 @@
 import { Command } from 'prosemirror-state';
 
-import { path } from '../state';
+import { path } from '../../state';
 
 export default (): Command => (state, dispatch) => {
   if (dispatch) {

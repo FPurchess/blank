@@ -4,8 +4,8 @@ import { save } from '@tauri-apps/api/dialog';
 import { writeTextFile } from '@tauri-apps/api/fs';
 import { sendNotification } from '@tauri-apps/api/notification';
 
-import { markdownSerializer } from '../serializers';
-import { path } from '../state';
+import { markdownSerializer } from '../../serializers';
+import { path } from '../../state';
 
 export interface Options {
   force?: boolean;

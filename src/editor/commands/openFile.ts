@@ -2,10 +2,10 @@ import { Command } from 'prosemirror-state';
 
 import { open } from '@tauri-apps/api/dialog';
 import { readTextFile } from '@tauri-apps/api/fs';
-
-import { markdownParser } from '../serializers';
-import { path } from '../state';
 import { sendNotification } from '@tauri-apps/api/notification';
+
+import { markdownParser } from '../../serializers';
+import { path } from '../../state';
 
 export default (): Command => (state, dispatch) => {
   (async () => {
