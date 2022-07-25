@@ -2,19 +2,18 @@ import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history } from 'prosemirror-history';
 
-import { schema } from './schema';
 import { transaction } from '../state';
 import { restoreDocument } from '../storage';
 
-import { markdownAutocomplete } from './plugins';
-import keymap from './keymap';
+import { schema } from './schema';
+import { autocomplete, keymap } from './plugins';
 
 export const bootEditor = async () => {
   const doc = await restoreDocument();
   const state = EditorState.create({
     doc,
     schema,
-    plugins: [history(), keymap],
+    plugins: [history(), keymap, autocomplete()],
   });
   const view = new EditorView(document.body, {
     state,

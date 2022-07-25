@@ -20,10 +20,10 @@ import {
   exportAs,
   toggleTheme,
   insertNode,
-} from './commands';
-import { schema } from './schema';
+} from '../commands';
+import { schema } from '../schema';
 
-import * as exporters from '../exporters';
+import * as exporters from '../../exporters';
 
 export default keymap({
   ...baseKeymap,
