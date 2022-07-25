@@ -12,7 +12,7 @@ import {
   vi,
 } from 'vitest';
 
-import { toggleTheme } from '../../src/commands';
+import { toggleTheme } from '../../src/editor/commands';
 import { theme } from '../../src/state';
 
 describe('command.toggleTheme', () => {
