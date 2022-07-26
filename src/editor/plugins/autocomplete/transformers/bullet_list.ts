@@ -1,8 +1,8 @@
 import { TextSelection, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { wrapInList } from 'prosemirror-schema-list';
+import { schema } from 'prosemirror-markdown';
 
-import { schema } from '../../../schema';
 import { activator, transformer, Transformer } from '../types';
 
 const cmd = '-';

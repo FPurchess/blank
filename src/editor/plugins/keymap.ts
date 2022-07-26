@@ -12,6 +12,7 @@ import {
   wrapInList,
   splitListItem,
 } from 'prosemirror-schema-list';
+import { schema } from 'prosemirror-markdown';
 
 import {
   newFile,
@@ -21,7 +22,6 @@ import {
   toggleTheme,
   insertNode,
 } from '../commands';
-import { schema } from '../schema';
 
 import * as exporters from '../../exporters';
 

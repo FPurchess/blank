@@ -1,10 +1,10 @@
 import localforage from 'localforage';
 import { Transaction } from 'prosemirror-state';
 import { Node } from 'prosemirror-model';
+import { schema } from 'prosemirror-markdown';
 
 import { debounce } from './utils/observable';
 import { path, transaction, theme } from './state';
-import { schema } from './editor/schema';
 
 localforage.config({
   name: 'Blank',

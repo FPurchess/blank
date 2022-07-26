@@ -1,10 +1,10 @@
 import { Command, EditorState } from 'prosemirror-state';
+import { defaultMarkdownSerializer } from 'prosemirror-markdown';
 
 import { save } from '@tauri-apps/api/dialog';
 import { writeTextFile } from '@tauri-apps/api/fs';
 import { sendNotification } from '@tauri-apps/api/notification';
 
-import { markdownSerializer } from '../../serializers';
 import { path } from '../../state';
 
 export interface Options {
@@ -23,7 +23,7 @@ export const _saveFile = async (state: EditorState, options: Options) => {
       path.value = newPath;
     }
 
-    const content = markdownSerializer.serialize(state.doc) ?? '';
+    const content = defaultMarkdownSerializer.serialize(state.doc) ?? '';
     await writeTextFile(path.value, content);
 
     sendNotification('Your file has been saved');

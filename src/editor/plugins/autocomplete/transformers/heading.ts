@@ -1,7 +1,7 @@
 import { TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { schema } from 'prosemirror-markdown';
 
-import { schema } from '../../../schema';
 import { activator, transformer, Transformer } from '../types';
 
 const reHeading = /^#{1,6}$/g;
