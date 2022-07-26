@@ -88,8 +88,8 @@ Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 | Mod + 6                     | Heading Level 6              |
 | Mod + 8                     | Bullet List                  |
 | Mod + 9                     | Numbered List                |
-| Mod + [                     | Increase indent of list item |
-| Mod + ]                     | Decrease indent of list item |
+| Tab                         | Increase indent of list item |
+| Shift + Tab                 | Decrease indent of list item |
 | Mod + H                     | Insert horizontal rule       |
 | Mod + B                     | Toggle bold                  |
 | Mod + I                     | Toggle italic                |
