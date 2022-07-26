@@ -9,6 +9,7 @@ const replaceMap: { [key: string]: string } = {
   '==>': '⇒',
   '<==': '⇐',
   '<==>': '⇔',
+  '--': '—',
 };
 
 interface Props {
