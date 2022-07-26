@@ -30,5 +30,6 @@ export const bootEditor = async () => {
       view.updateState(view.state.apply(tx));
     },
   });
+  transaction.value = view.state.tr;
   window.setTimeout(() => view.focus(), 100);
 };
