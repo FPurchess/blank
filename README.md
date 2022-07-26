@@ -2,11 +2,11 @@
 
 [downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total
 [macos-shield]: https://api.iconify.design/logos/macos.svg
-[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_x64.dmg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_x64.dmg
 [windows-shield]: https://api.iconify.design/logos/microsoft-windows.svg
-[windows-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_x64_en-US.msi
+[windows-pkg]: https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_x64_en-US.msi
 [linux-deb-shield]: https://api.iconify.design/logos/linux-tux.svg
-[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_amd64.deb
+[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_amd64.deb
 
 <p align="center">
   <a href="https://github.com/FPurchess/blank">
@@ -44,19 +44,19 @@ You can download the latest version of Blank here:
 <table width="100%">
   <tr>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_x64.dmg">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_x64.dmg">
         Download blank.dmg<br/>
         <img src="https://api.iconify.design/logos/macos.svg" alt="Donwload blank.dmg" height="100" width="120" /><br/>
       </a>
     </td>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_x64_en-US.msi">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_x64_en-US.msi">
         Download blank.msi<br/>
         <img src="https://api.iconify.design/logos/microsoft-windows.svg" alt="Donwloads blank.msi"  height="100" width="120" /><br/>
       </a>
     </td>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v0.1.3/blank_0.1.3_amd64.deb">
+      <a href="https://github.com/FPurchess/blank/releases/download/v0.2.0/blank_0.2.0_amd64.deb">
         Download blank.deb<br/>
         <img src="https://api.iconify.design/logos/linux-tux.svg" alt="Donwloads blank.deb" height="100" width="120" />
       </a>

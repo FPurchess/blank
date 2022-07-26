@@ -1,7 +1,7 @@
 {
   "name": "blank",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Blank is a minimalistic, opinionated markdown editor made for writing - purely keyboard-based with PDF-Export, available for Linux, macOS and Windows",
   "license": "MIT",
   "scripts": {
