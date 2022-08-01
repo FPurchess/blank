@@ -1,7 +1,7 @@
 import { Transaction } from 'prosemirror-state';
 import { Node } from 'prosemirror-model';
 
-import { debounce, Observable } from './utils/observable';
+import { debounce, Observable } from 'observable.ts';
 
 export const path = new Observable<string | null>(null);
 

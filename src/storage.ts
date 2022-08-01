@@ -3,7 +3,7 @@ import { Transaction } from 'prosemirror-state';
 import { Node } from 'prosemirror-model';
 import { schema } from 'prosemirror-markdown';
 
-import { debounce } from './utils/observable';
+import { debounce } from 'observable.ts';
 import { path, transaction, theme } from './state';
 
 localforage.config({
