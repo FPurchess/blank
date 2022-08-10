@@ -5,6 +5,7 @@ import {
   setBlockType,
   toggleMark,
   chainCommands,
+  wrapIn,
 } from 'prosemirror-commands';
 import {
   liftListItem,
@@ -46,7 +47,8 @@ export default keymap({
   'Shift-Tab': liftListItem(schema.nodes.list_item),
   'Mod-b': toggleMark(schema.marks.strong),
   'Mod-i': toggleMark(schema.marks.em),
-  'Mod-u': toggleMark(schema.marks.u),
+  'Mod-g': toggleMark(schema.marks.code),
+  'Mod-h': wrapIn(schema.nodes.blockquote),
   'Mod-n': newFile(),
   'Mod-s': saveFile(),
   'Mod-Shift-s': saveFile({ force: true }),
