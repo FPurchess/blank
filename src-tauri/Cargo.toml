@@ -1,7 +1,7 @@
 [package]
 name = "blank"
 version = "0.2.0"
-description = "A minimalistic, opinionated markdown editor made for writing"
+description = "A minimalist, opinionated markdown editor made for writing"
 authors = ["Florian Purchess"]
 license = "MIT"
 repository = "https://github.com/FPurchess/blank"

@@ -14,7 +14,7 @@
   </a>
 </p>
 <p align="center">
-  A minimalistic, opinionated markdown editor made for writing
+  A minimalist, opinionated markdown editor made for writing
 </p>
 <p align="center">
   <a href="https://github.com/FPurchess/blank/releases"><img src="https://badge.fury.io/gh/fpurchess%2Fblank.svg" alt="latest version"></a>
@@ -32,7 +32,7 @@
 > Next Generation Writing Experience
 
 - :keyboard: purely keyboard-based
-- :pear: minimalistic WYSIWYG for distraction-free writing
+- :pear: minimalist WYSIWYG for distraction-free writing
 - :page_with_curl: Export to PDF
 - :waxing_crescent_moon: Themes: Light & Dark-Mode
 - available for Linux, macOS and Windows
