@@ -90,10 +90,10 @@ Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 | Mod + 9                     | Numbered List                |
 | Tab                         | Increase indent of list item |
 | Shift + Tab                 | Decrease indent of list item |
-| Mod + H                     | Insert horizontal rule       |
+| Mod + H                     | Blockquote                   |
+| Mod + H                     | Toggle code                  |
 | Mod + B                     | Toggle bold                  |
 | Mod + I                     | Toggle italic                |
-| Mod + U                     | Toggle underline             |
 
 ## Contributing
 
