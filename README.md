@@ -91,7 +91,7 @@ Mod translates to Ctrl under Windows / Linux or Cmd on Mac.
 | Tab                         | Increase indent of list item |
 | Shift + Tab                 | Decrease indent of list item |
 | Mod + H                     | Blockquote                   |
-| Mod + H                     | Toggle code                  |
+| Mod + G                     | Toggle code                  |
 | Mod + B                     | Toggle bold                  |
 | Mod + I                     | Toggle italic                |
 
