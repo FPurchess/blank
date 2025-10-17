@@ -1,5 +1,9 @@
 @use 'light';
 @use 'dark';
+@use 'black';
+@use 'red';
+@use 'green';
+@use 'blue';
 
 body {
   color: var(--color);

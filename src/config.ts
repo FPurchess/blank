@@ -26,7 +26,7 @@ export enum CommandIdentifier {
   FILE_SAVE_AS = "file.save_as",
   FILE_OPEN = "file.open",
   EXPORT_PDF = "export.pdf",
-  THEME_TOGGLE = "theme.toggle",
+  THEME_CYCLE = "theme.cycle",
 }
 
 export interface Config {
@@ -58,7 +58,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.FILE_SAVE_AS]: "Mod-Shift-s",
     [CommandIdentifier.FILE_OPEN]: "Mod-o",
     [CommandIdentifier.EXPORT_PDF]: "Mod-Alt-p",
-    [CommandIdentifier.THEME_TOGGLE]: "Mod-Alt-t",
+    [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",
   },
 };
 

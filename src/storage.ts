@@ -3,7 +3,7 @@ import { Transaction } from "prosemirror-state";
 import { Node } from "prosemirror-model";
 
 import { debounce } from "observable.ts";
-import { path, transaction, theme, themeType } from "./state";
+import { path, transaction, theme, themeType, themes } from "./state";
 import { schema } from "prosemirror-markdown";
 
 localforage.config({
@@ -19,7 +19,9 @@ export const bootStorage = async () => {
   });
 
   const _theme = await localforage.getItem("theme");
-  theme.value = _theme === "dark" ? "dark" : "light";
+  theme.value = themes.includes(_theme as string)
+    ? (_theme as themeType)
+    : themes[0];
 
   theme.subscribe((value: themeType) => {
     localforage.setItem("theme", value).catch(console.warn);

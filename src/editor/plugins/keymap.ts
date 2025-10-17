@@ -20,7 +20,7 @@ import {
   openFile,
   saveFile,
   exportAs,
-  toggleTheme,
+  cycleTheme,
   insertNode,
 } from "../commands";
 
@@ -72,7 +72,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EXPORT_PDF]: exportAs("PDF-Export", exporters.toPDF, [
     { name: "PDF-File", extensions: ["pdf"] },
   ]),
-  [CommandIdentifier.THEME_TOGGLE]: toggleTheme(),
+  [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
 };
 
 export const keymap = () =>

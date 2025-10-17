@@ -29,8 +29,17 @@ transaction.subscribe(
   }, 50),
 );
 
-export type themeType = "light" | "dark";
-export const theme = new Observable<themeType>("dark");
+export const themes: string[] = [
+  "light",
+  "dark",
+  "black",
+  "red",
+  "green",
+  "blue",
+];
+
+export type themeType = (typeof themes)[number];
+export const theme = new Observable<themeType>("light");
 theme.subscribe((value: themeType) => {
   document.body.dataset.theme = value;
 });

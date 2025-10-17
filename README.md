@@ -77,7 +77,7 @@ In order to change the keyboard bindings copy your modified version of the [defa
 | Save as                      | Mod + Shift + S             |
 | Open File                    | Mod + O                     |
 | Export as PDF                | Mod + Alt + P               |
-| Toggle Theme (Dark / Light)  | Mod + Alt + T               |
+| Cycle through themes         | Mod + Alt + T               |
 | Undo                         | Mod + Z                     |
 | Redo                         | Mod + Shift + Z             |
 | Insert line break            | Mod + Enter / Shift + Enter |

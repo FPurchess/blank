@@ -23,6 +23,6 @@
     "file.save_as": "Mod-Shift-s",
     "file.open": "Mod-o",
     "export.pdf": "Mod-Alt-p",
-    "theme.toggle": "Mod-Alt-t"
+    "theme.cycle": "Mod-Alt-t"
   }
 }
