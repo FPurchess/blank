@@ -21,7 +21,7 @@ You can find a full list of keyboard shortcuts here: https://github.com/FPurches
 
 ### Blank remembers your content
 
-You might be in a hurry closing Blank without saving your changes. That's no problem. Blank remembers what you wrote and restores the last content upon the next start. This way, you can just open & close Blank without worrying about loosing anything.
+You might be in a hurry closing Blank without saving your changes. That's no problem. Blank remembers what you wrote and restores the last content upon the next start. This way, you can just open & close Blank without worrying about losing anything.
 
 ### Unobtrusive Autocompletion
 
