@@ -66,13 +66,15 @@ You can download the latest version of Blank here:
 
 On Linux, Blank needs glibc 2.35 or newer and WebKitGTK 4.1 (e.g. Ubuntu 22.04+ or Debian 12+).
 
-### macOS: "Blank cannot be opened because the developer cannot be verified"
+### macOS: "blank is damaged" or "blank cannot be opened"
 
 Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
 
 - **macOS 15 (Sequoia) or newer:** try to open Blank once, then go to System Settings → Privacy & Security and click "Open Anyway".
-- **macOS 14 or older:** right-click Blank.app in Applications, choose Open, then confirm with Open.
-- **Terminal:** run `xattr -dr com.apple.quarantine /Applications/Blank.app`.
+- **macOS 14 or older:** right-click blank.app in Applications, choose Open, then confirm with Open.
+- **Terminal:** run `xattr -dr com.apple.quarantine /Applications/blank.app`.
+
+Blank v1.2.0 and older is not fully signed, so macOS reports it as "damaged and can't be opened" and does not offer "Open Anyway". For these versions only the Terminal command works.
 
 ## Keyboard Bindings
 
