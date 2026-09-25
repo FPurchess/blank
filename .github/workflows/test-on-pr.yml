@@ -1,5 +1,14 @@
 name: "test-on-pr"
-on: [pull_request]
+on:
+  pull_request:
+  # builds on main seed the Rust cache that pull requests restore from
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test-tauri:
@@ -10,12 +19,16 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          cache-workspaces: src-tauri -> target
+          # only main saves, so pull requests don't evict its cache with their own copies
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -34,8 +47,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: install app dependencies and build it
-        run: bun install && bun run build
+      # tauri-action builds the frontend through beforeBuildCommand
+      - name: install app dependencies
+        run: bun install
 
       - uses: tauri-apps/tauri-action@v0
         env:
