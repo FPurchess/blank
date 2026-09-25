@@ -43,7 +43,9 @@ body {
   max-width: 1200px;
   width: 100%;
   box-sizing: border-box;
-  line-height: 1.3;
+  font-size: 18px;
+  line-height: 1.55;
+  font-kerning: normal;
   outline: none;
   word-wrap: break-word;
   white-space: pre-wrap;
@@ -51,6 +53,10 @@ body {
   -webkit-font-variant-ligatures: none;
   font-variant-ligatures: none;
   font-feature-settings: 'liga' 0; /* the above doesn't seem to work in Edge */
+
+  & > :first-child {
+    margin-top: 0;
+  }
 
   code,
   pre {
