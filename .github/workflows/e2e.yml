@@ -14,8 +14,8 @@ permissions:
 
 jobs:
   e2e:
-    # pushes already cover branches of this repository, so pull requests only need to run for forks
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
+    # runs for every pull request, even though pushes run it too: `e2e` is a required check,
+    # and a skipped job would count as passed before the push run is done
     # tauri-driver supports Linux and Windows only (no WKWebView driver on macOS). Windows runners are
     # elevated, which makes WebView2 ignore the debugging port msedgedriver needs, see
     # https://github.com/actions/runner-images/issues/14738
