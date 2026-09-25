@@ -20,7 +20,9 @@ export default () => {
           return false;
         }
         const { $cursor } = view.state.selection as TextSelection;
-        if (!$cursor) {
+        // transformers edit the text right before the cursor, so they only
+        // apply when the cursor is at the end of its block
+        if (!$cursor || $cursor.parentOffset !== $cursor.parent.content.size) {
           return false;
         }
 
