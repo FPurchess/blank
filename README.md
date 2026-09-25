@@ -2,7 +2,7 @@
 
 [downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total
 [macos-shield]: https://api.iconify.design/logos/macos.svg
-[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg
 [windows-shield]: https://api.iconify.design/logos/microsoft-windows.svg
 [windows-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64_en-US.msi
 [linux-deb-shield]: https://api.iconify.design/logos/linux-tux.svg
@@ -44,10 +44,10 @@ You can download the latest version of Blank here:
 <table width="100%">
   <tr>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg">
-        Download blank.dmg<br/>
-        <img src="https://api.iconify.design/logos/macos.svg" alt="Donwload blank.dmg" height="100" width="120" /><br/>
-      </a>
+      <img src="https://api.iconify.design/logos/macos.svg" alt="macOS" height="100" width="120" /><br/>
+      Download blank.dmg for<br/>
+      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg">Apple Silicon</a> |
+      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg">Intel</a>
     </td>
     <td align="center">
       <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64_en-US.msi">

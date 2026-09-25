@@ -9,13 +9,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - platform: macos-latest # Apple Silicon
+            args: --target aarch64-apple-darwin
+            rust-target: aarch64-apple-darwin
+          - platform: macos-latest # Intel
+            args: --target x86_64-apple-darwin
+            rust-target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+            rust-target: ""
+          - platform: windows-latest
+            args: ""
+            rust-target: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v3
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.rust-target }}
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -49,6 +63,7 @@ jobs:
           releaseBody: "See the assets to download this version and install. On macOS, see https://github.com/FPurchess/blank#macos-blank-cannot-be-opened-because-the-developer-cannot-be-verified if the app is blocked."
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
 
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)
