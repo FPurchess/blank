@@ -1,0 +1,91 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    # pushes already cover branches of this repository, so pull requests only need to run for forks
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork
+    # tauri-driver supports Linux and Windows only (no WKWebView driver on macOS). Windows runners are
+    # elevated, which makes WebView2 ignore the debugging port msedgedriver needs, see
+    # https://github.com/actions/runner-images/issues/14738
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # `webkit2gtk-driver` provides WebKitWebDriver, `xvfb` a virtual display
+      - name: install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            webkit2gtk-driver \
+            xvfb
+          # the desktop portal is registered with D-Bus but never comes up on the runner, so WebKitGTK
+          # and tao wait for its timeouts (~30s) on every app start. Without the service file, the
+          # lookups fail immediately.
+          sudo rm -f /usr/share/dbus-1/services/org.freedesktop.portal.Desktop.service
+
+      - uses: oven-sh/setup-bun@v2
+
+      # WebdriverIO requires node >= 18.20
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          build-warnings: warn
+          cache-workspaces: src-tauri -> target
+
+      # ~/.cargo/bin is cached by the rust toolchain setup, hence this is a no-op on subsequent runs
+      - name: install tauri-driver
+        run: cargo install tauri-driver --locked --version 2.0.6
+
+      - name: install app dependencies
+        run: bun install
+
+      - name: install e2e dependencies
+        run: bun install --frozen-lockfile
+        working-directory: e2e
+
+      - name: typecheck e2e tests
+        run: bun run typecheck
+        working-directory: e2e
+
+      - name: build app
+        run: bun run tauri build --debug --no-bundle
+
+      - name: run e2e tests
+        run: xvfb-run --auto-servernum bun run test
+        working-directory: e2e
+        env:
+          E2E_SKIP_BUILD: 1
+
+      - name: upload screenshots of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots
+          if-no-files-found: ignore
