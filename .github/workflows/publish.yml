@@ -65,6 +65,15 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      # An arm64 bundle that is only linker-signed shows as "damaged" on macOS. See issue #17.
+      - name: verify bundle signature (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          app=src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos/blank.app
+          codesign -dv --verbose=2 "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          [ -d "$app/Contents/_CodeSignature" ]
+
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
