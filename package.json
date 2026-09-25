@@ -30,7 +30,7 @@
     "prepare": "husky"
   },
   "resolutions": {
-    "w3c-keyname": "^2.2.5"
+    "w3c-keyname": "2.2.8"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
