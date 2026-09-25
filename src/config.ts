@@ -102,7 +102,13 @@ const getUserConfig = async (): Promise<Partial<Config>> => {
  * bootConfig initializes the config
  */
 export const bootConfig = async () => {
-  config.value = { ...defaultConfig, ...(await getUserConfig()) };
+  const userConfig = await getUserConfig();
+  config.value = {
+    ...defaultConfig,
+    ...userConfig,
+    // merge keymaps so a partial user keymap keeps the remaining defaults
+    keymap: { ...defaultConfig.keymap, ...userConfig.keymap },
+  };
   configInitialized.value = true;
 };
 

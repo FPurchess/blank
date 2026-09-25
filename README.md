@@ -66,7 +66,7 @@ You can download the latest version of Blank here:
 
 ## Keyboard Bindings
 
-In order to change the keyboard bindings copy your modified version of the [default configuration file (`blank.json`)](https://github.com/FPurchess/blank/blob/release/blank.json) of this repository into the app config dir (default: `~/.config/com.github.fpurchess.blank/blank.json`).
+In order to change the keyboard bindings copy your modified version of the [default configuration file (`blank.json`)](https://github.com/FPurchess/blank/blob/release/blank.json) of this repository into the app config dir (default: `~/.config/com.github.fpurchess.blank/blank.json`). Only the bindings you want to change need to be listed; all others keep their defaults.
 
 `Mod` translates to `Ctrl` under Windows / Linux or `Cmd` on Mac.
 
