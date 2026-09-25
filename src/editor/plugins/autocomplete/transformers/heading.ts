@@ -4,7 +4,7 @@ import { schema } from "prosemirror-markdown";
 
 import type { activator, transformer, Transformer } from "../types";
 
-const reHeading = /^#{1,6}$/g;
+const reHeading = /^#{1,6}$/;
 
 interface Props {
   level: number;
