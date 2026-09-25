@@ -8,12 +8,8 @@ import { bootUI } from "./ui";
 
 import "./scss/main.scss";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 pdfmake.addVirtualFileSystem(vfs);
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 pdfmake.addFonts({
   "DejaVu Sans": {
     normal: "dejavu-sans.ttf",

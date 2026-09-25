@@ -42,7 +42,7 @@
     "localforage": "^1.10.0",
     "markdown-it": "^15.0.2",
     "observable.ts": "^1.0.1",
-    "pdfmake": "0.3.0-beta.2",
+    "pdfmake": "^0.3.11",
     "prosemirror-commands": "^1.7.2",
     "prosemirror-history": "^1.5.0",
     "prosemirror-keymap": "^1.2.3",
@@ -56,7 +56,7 @@
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@tauri-apps/cli": "^2.11.5",
-    "@types/pdfmake": "^0.2.10",
+    "@types/pdfmake": "^0.3.3",
     "@vitest/coverage-v8": "2.1.8",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
