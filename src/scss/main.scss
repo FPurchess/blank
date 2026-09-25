@@ -66,6 +66,10 @@ body {
     min-height: 1em;
   }
 
+  &.follow-links a {
+    cursor: pointer;
+  }
+
   code {
     display: inline-block;
     color: var(--color-inverted);

@@ -108,6 +108,7 @@ In order to change the keyboard bindings copy your modified version of the [defa
 | Blockquote                   | Mod + G                     |
 | Toggle code                  | Mod + E                     |
 | Insert / edit link           | Mod + K                     |
+| Open link in browser         | Mod + Click                 |
 | Toggle bold                  | Mod + B                     |
 | Toggle italic                | Mod + I                     |
 
