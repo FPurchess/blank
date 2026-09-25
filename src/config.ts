@@ -51,7 +51,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.FORMAT_UNINDENT]: "Shift-Tab",
     [CommandIdentifier.FORMAT_BOLD]: "Mod-b",
     [CommandIdentifier.FORMAT_ITALIC]: "Mod-i",
-    [CommandIdentifier.FORMAT_CODE]: "Mod-c",
+    [CommandIdentifier.FORMAT_CODE]: "Mod-e",
     [CommandIdentifier.FORMAT_BLOCKQUOTE]: "Mod-g",
     [CommandIdentifier.FILE_NEW]: "Mod-n",
     [CommandIdentifier.FILE_SAVE]: "Mod-s",

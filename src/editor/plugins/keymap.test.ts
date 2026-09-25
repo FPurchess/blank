@@ -74,7 +74,7 @@ describe("plugin.keymap", () => {
   it.each([
     ["Mod-b", "strong"],
     ["Mod-i", "em"],
-    ["Mod-c", "code"],
+    ["Mod-e", "code"],
   ])("%s marks the selection as %s", (combo, mark) => {
     const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
 

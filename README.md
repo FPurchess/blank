@@ -104,7 +104,7 @@ In order to change the keyboard bindings copy your modified version of the [defa
 | Decrease indent of list item | Shift + Tab                 |
 | Insert Horizontal Line       | Mod + H                     |
 | Blockquote                   | Mod + G                     |
-| Toggle code                  | Mod + C                     |
+| Toggle code                  | Mod + E                     |
 | Toggle bold                  | Mod + B                     |
 | Toggle italic                | Mod + I                     |
 
