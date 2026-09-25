@@ -1,58 +1,107 @@
-@font-face {
-  font-family: 'DejaVu Sans';
-  src: url('/fonts/dejavu-sans.eot'); /* IE9*/
-  src: url('/fonts/dejavu-sans.eot?#iefix') format('embedded-opentype'),
-    /* IE6-IE8 */ url('/fonts/dejavu-sans.woff2') format('woff2'),
-    /* chrome、firefox */ url('/fonts/dejavu-sans.woff') format('woff'),
-    /* chrome、firefox */ url('/fonts/dejavu-sans.ttf') format('truetype'),
-    /* chrome、firefox、opera、Safari, Android, iOS 4.2+*/
-      url('/fonts/dejavu-sans.svg#DejaVu Sans V1') format('svg'); /* iOS 4.1- */
-}
+@use 'sass:math';
 
-$font-weight-thin: 100;
-$font-weight-light: 300;
-$font-weight-regular: 400;
-$font-weight-medium: 500;
-$font-weight-bold: 700;
-$font-weight-black: 900;
-
-@mixin heading($size, $weight) {
-  font-size: #{$size}em;
-  font-weight: $weight;
-  margin-top: 0.75em;
-  margin-bottom: 0.25em;
-  & + & {
-    margin-top: 1em;
+@mixin font-face($family, $file, $weight, $style) {
+  @font-face {
+    font-family: $family;
+    src: url('/fonts/#{$file}.woff2') format('woff2');
+    font-weight: $weight;
+    font-style: $style;
+    font-display: block;
   }
 }
 
+// IBM's official files, shipped unmodified: "Plex" is a Reserved Font Name
+@include font-face('IBM Plex Sans', 'IBMPlexSans-Regular', 400, normal);
+@include font-face('IBM Plex Sans', 'IBMPlexSans-Italic', 400, italic);
+@include font-face('IBM Plex Sans', 'IBMPlexSans-Medium', 500, normal);
+@include font-face('IBM Plex Sans', 'IBMPlexSans-MediumItalic', 500, italic);
+@include font-face('IBM Plex Sans', 'IBMPlexSans-Bold', 700, normal);
+@include font-face('IBM Plex Sans', 'IBMPlexSans-BoldItalic', 700, italic);
+
+// fallback for characters IBM Plex Sans lacks, such as the ⇒ arrows
+@include font-face('DejaVu Sans', 'dejavu-sans', 400, normal);
+@include font-face('DejaVu Sans', 'dejavu-sans-bold', 700, normal);
+@include font-face('DejaVu Sans', 'dejavu-sans-oblique', 400, italic);
+@include font-face('DejaVu Sans', 'dejavu-sans-bold-oblique', 700, italic);
+
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-bold: 700;
+
+// Headings step up on a major third. The PDF export mirrors these values in
+// src/exporters/pdf/template.ts.
+$scale-ratio: 1.25;
+
+// Margins are given relative to the body size, so they stay the same whatever
+// the heading size. A heading sits closer to the text it introduces than to
+// the text above.
+$heading-space-above: 2.2;
+$heading-space-below: 0.4;
+$heading-space-after-heading: 0.8;
+
+@mixin heading(
+  $step,
+  $weight: $font-weight-bold,
+  $style: normal,
+  $line-height: 1.55,
+  $tracking: 0
+) {
+  $size: math.pow($scale-ratio, $step);
+
+  font-size: #{$size}em;
+  font-weight: $weight;
+  font-style: $style;
+  line-height: $line-height;
+  letter-spacing: #{$tracking}em;
+  margin-top: #{math.div($heading-space-above, $size)}em;
+  margin-bottom: #{math.div($heading-space-below, $size)}em;
+  text-wrap: balance;
+
+  :is(h1, h2, h3, h4, h5, h6) + & {
+    margin-top: #{math.div($heading-space-after-heading, $size)}em;
+  }
+}
+
+// h1-h3 are set in medium and stand out by size; bold is kept for the
+// body-sized headings
 h1 {
-  @include heading(5, $font-weight-light);
+  @include heading(
+    3,
+    $weight: $font-weight-medium,
+    $line-height: 1.2,
+    $tracking: -0.02
+  );
 }
 h2 {
-  @include heading(3.75, $font-weight-light);
+  @include heading(
+    2,
+    $weight: $font-weight-medium,
+    $line-height: 1.25,
+    $tracking: -0.01
+  );
 }
 h3 {
-  @include heading(3, $font-weight-regular);
+  @include heading(1, $weight: $font-weight-medium, $line-height: 1.3);
 }
 h4 {
-  @include heading(2.125, $font-weight-regular);
+  @include heading(0);
 }
 h5 {
-  @include heading(1.5, $font-weight-regular);
+  @include heading(0, $style: italic);
 }
 h6 {
-  @include heading(1.25, $font-weight-medium);
+  @include heading(0, $weight: $font-weight-regular, $style: italic);
 }
 
 p {
   margin: 0 0 1em;
-  font-size: 1.1em;
+  text-wrap: pretty;
 }
 
 ul,
 ol {
-  margin: 1.5rem 0;
+  margin: 0 0 1em;
+  padding-left: 1.5em;
 }
 
 ul {
@@ -64,8 +113,8 @@ ol {
 }
 
 li {
-  margin: 1rem 0 1rem 3rem;
-  padding: 0 0 0 0.25rem;
+  margin: 0.25em 0;
+  padding: 0 0 0 0.25em;
 
   & > * {
     margin: 0;

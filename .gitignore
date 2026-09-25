@@ -25,3 +25,6 @@ dist-ssr
 
 coverage/
 e2e/screenshots/
+
+# graphify knowledge graph
+graphify-out

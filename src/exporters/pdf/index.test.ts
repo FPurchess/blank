@@ -1,9 +1,7 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
-import pdfmake from "pdfmake";
+import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
-import vfs from "./pdfmake-vfs";
 import toPDF, { hasMark } from "./index";
 
 // vite resolves pdfmake to its browser build, so test against the same bundle
@@ -30,19 +28,6 @@ A paragraph with *emphasis* and **strong** text.
 `;
 
 const decode = (bytes: Uint8Array) => new TextDecoder("latin1").decode(bytes);
-
-beforeAll(() => {
-  pdfmake.addVirtualFileSystem(vfs);
-
-  pdfmake.addFonts({
-    "DejaVu Sans": {
-      normal: "dejavu-sans.ttf",
-      bold: "dejavu-sans.ttf",
-      italics: "dejavu-sans.ttf",
-      bolditalics: "dejavu-sans.ttf",
-    },
-  });
-});
 
 describe("exporters.pdf", () => {
   describe("hasMark", () => {
@@ -73,6 +58,27 @@ describe("exporters.pdf", () => {
       const text = decode(bytes);
       expect(text.startsWith("%PDF-")).toBe(true);
       expect(text.trimEnd().endsWith("%%EOF")).toBe(true);
+    });
+
+    it("embeds the medium, bold, italic and fallback faces", async () => {
+      const state = EditorState.create({
+        schema,
+        doc: defaultMarkdownParser.parse(SAMPLE + "\n***both*** ⇒\n"),
+      });
+
+      const text = decode((await toPDF(state)) as Uint8Array);
+
+      for (const face of [
+        "IBMPlexSans",
+        "IBMPlexSans-Medm",
+        "IBMPlexSans-Bold",
+        "IBMPlexSans-Italic",
+        "IBMPlexSans-BoldItalic",
+        // the fallback, for the ⇒ arrow
+        "DejaVuSans",
+      ]) {
+        expect(text).toMatch(new RegExp(`/FontName /[A-Z]{6}\\+${face}\\b`));
+      }
     });
   });
 });
