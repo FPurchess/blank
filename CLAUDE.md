@@ -11,6 +11,13 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - `bun run lint` runs eslint and `tsc`, so it is also the type-check.
 - `bunx vitest run src/config.test.ts` runs one test file, and `bunx vitest run -t "<name>"` runs one test. Run single tests while iterating.
 - Before calling work done, run `bun run lint`, `bun run format:check` and `bun run test`. The husky pre-commit hook runs the same three.
+- `bun run test:e2e` builds a debug binary and runs the E2E tests in `e2e/` (WebdriverIO + `tauri-driver`) against the real app. It works on Linux only and needs `webkit2gtk-driver`, `xvfb` and `cargo install tauri-driver --locked`. Run it with `xvfb-run -a` for headless, and set `E2E_SKIP_BUILD=1` to reuse an existing build. Run `bun install` in `e2e/` first, since that folder is its own package with its own `bun.lock`. `bunx wdio run ./wdio.conf.ts --spec specs/<name>.e2e.ts` in `e2e/` runs one spec. Run E2E after changing boot, editing, storage or file handling. The `E2E` workflow runs it on every push.
+
+## E2E tests
+
+- Every spec file gets a fresh app with a temporary profile: `wdio.conf.ts` sets `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` for `tauri-driver`. Specs start from the welcome document and the default keymap, and never touch the developer's real data. `restartApp()` in `e2e/helpers.ts` relaunches the app within the same profile, optionally with CLI args.
+- Type text with `type()` from `e2e/helpers.ts`, never `browser.keys("text")`: WebKitWebDriver drops repeated characters within one key action ("ll" becomes "l"). Use `pressMod()` for `Mod-` shortcuts.
+- Name specs `*.e2e.ts`, so vitest doesn't collect them. Native dialogs (open, save as, export) can't be automated, so test file IO by passing a path as a CLI arg, which makes Ctrl+S save without a dialog.
 
 ## Architecture
 

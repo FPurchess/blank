@@ -1,0 +1,20 @@
+{
+  "name": "blank-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests for Blank, driving the real app via tauri-driver + WebdriverIO",
+  "scripts": {
+    "test": "wdio run ./wdio.conf.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@wdio/cli": "^9.32.0",
+    "@wdio/globals": "^9.31.3",
+    "@wdio/local-runner": "^9.32.0",
+    "@wdio/mocha-framework": "^9.32.0",
+    "@wdio/spec-reporter": "^9.32.0",
+    "typescript": "^6.0.3",
+    "webdriverio": "^9.32.0"
+  }
+}
