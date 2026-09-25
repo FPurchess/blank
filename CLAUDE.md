@@ -7,6 +7,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 ## Commands
 
 - Use `bun`, not npm or yarn. The lockfile is `bun.lockb`.
+- `make` lists the common tasks from the `Makefile`, which wraps the `package.json` scripts: e.g. `make dev`, `make check` (lint, format check and unit tests), `make test-e2e-headless`. Keep the commands in `package.json` and only call them from the `Makefile`.
 - `bun run tauri dev` runs the app. `bun run dev` serves only the Vite frontend, and every Tauri API call (fs, dialog, notification, cli) fails in a plain browser.
 - `bun run lint` runs eslint and `tsc`, so it is also the type-check.
 - `bunx vitest run src/config.test.ts` runs one test file, and `bunx vitest run -t "<name>"` runs one test. Run single tests while iterating.
@@ -46,4 +47,5 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - Always work in a git worktree, never directly in the main checkout: `git worktree add ../blank-<topic> -b <branch> origin/main`. Run `bun install` in the new worktree, since `node_modules` isn't shared.
 - Commit messages are a single line (`<type>: <summary>`, e.g. `fix: ...`, `chore: ...`), with no body.
 - Never mention Claude, Claude Code or Anthropic in commit messages, PR titles or descriptions, code or comments. That means no `Co-Authored-By` trailers and no "Generated with" footers.
-- PRs target `main`. Pushing to `release` triggers `publish.yml`, which builds and publishes installers.
+- PRs target `main`. Pushing to `release` triggers `publish.yml`, which builds the installers and creates a draft GitHub release.
+- To release: `make bump VERSION=<x.y.z|patch|minor|major>` updates the version in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and the README download links. Commit that as `chore: bump version to <x.y.z>` and merge it via PR. Then `make release` checks `origin/main` (consistent, untagged version, fast-forward) and after confirmation pushes it to `release`. Publish the draft release on GitHub once all builds are done. Never push to `release` without the user asking.
