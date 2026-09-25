@@ -32,6 +32,8 @@ export const _saveFile = async (state: EditorState, options: Options) => {
       sendNotification(`Failed to save file: ${err.message}`);
     } else if (typeof err === "string") {
       sendNotification(`Failed to save file: ${err}`);
+    } else {
+      sendNotification(`Failed to save file: ${JSON.stringify(err)}`);
     }
   }
 };
