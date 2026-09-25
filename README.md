@@ -64,6 +64,8 @@ You can download the latest version of Blank here:
   </tr>
 </table>
 
+On Linux, Blank needs glibc 2.35 or newer and WebKitGTK 4.1 (e.g. Ubuntu 22.04+ or Debian 12+).
+
 ## Keyboard Bindings
 
 In order to change the keyboard bindings copy your modified version of the [default configuration file (`blank.json`)](https://github.com/FPurchess/blank/blob/release/blank.json) of this repository into the app config dir (default: `~/.config/com.github.fpurchess.blank/blank.json`). Only the bindings you want to change need to be listed; all others keep their defaults.
