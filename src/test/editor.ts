@@ -100,6 +100,27 @@ export const pressKey = (view: EditorView, plugin: Plugin, combo: string) =>
   plugin.props.handleKeyDown?.call(plugin, view, keyEvent(combo));
 
 /**
+ * typeText types `text` char by char into `view`: `plugin`'s text input
+ * handler gets each char first, and the char is inserted like the browser
+ * would if the handler doesn't handle it
+ */
+export const typeText = (view: EditorView, plugin: Plugin, text: string) => {
+  for (const char of text) {
+    const { from, to } = view.state.selection;
+    const deflt = () => view.state.tr.insertText(char, from, to);
+    const handled = plugin.props.handleTextInput?.call(
+      plugin,
+      view,
+      from,
+      to,
+      char,
+      deflt,
+    );
+    if (!handled) view.dispatch(deflt());
+  }
+};
+
+/**
  * setEditorDomText renders a `.ProseMirror` element with `content`, which is
  * what commands like `exportAs` read. Returns the element.
  */

@@ -28,10 +28,28 @@ export enum CommandIdentifier {
   FILE_OPEN = "file.open",
   EXPORT_PDF = "export.pdf",
   THEME_CYCLE = "theme.cycle",
+  LANGUAGE_CHOOSE = "language.choose",
+}
+
+// Replacements typed text → replacement, keyed by ISO 639-1 language code.
+// "*" holds the replacements for every language.
+export type Replacements = { [language: string]: { [key: string]: string } };
+
+export interface AutocorrectConfig {
+  arrows: boolean;
+  dashes: boolean;
+  symbols: boolean;
+  formatting: boolean;
+  links: boolean;
+  quotes: boolean;
+  capitalize: boolean;
+  blocks: boolean;
+  replace: Replacements;
 }
 
 export interface Config {
   keymap: { [key in CommandIdentifier]: string };
+  autocorrect: AutocorrectConfig;
 }
 
 const defaultConfig: Config = {
@@ -61,6 +79,18 @@ const defaultConfig: Config = {
     [CommandIdentifier.FILE_OPEN]: "Mod-o",
     [CommandIdentifier.EXPORT_PDF]: "Mod-Alt-p",
     [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",
+    [CommandIdentifier.LANGUAGE_CHOOSE]: "Mod-Alt-l",
+  },
+  autocorrect: {
+    arrows: true,
+    dashes: true,
+    symbols: true,
+    formatting: true,
+    links: true,
+    quotes: true,
+    capitalize: true,
+    blocks: true,
+    replace: { "*": {} },
   },
 };
 
@@ -79,11 +109,31 @@ const configName = "blank.json";
 const getConfigFile = async () =>
   await path.join(await path.appConfigDir(), configName);
 
+type UserConfig = Partial<{
+  keymap: Partial<Config["keymap"]>;
+  autocorrect: Partial<AutocorrectConfig>;
+}>;
+
+/**
+ * mergeReplacements merges the user's replacements into the defaults per
+ * language, so a user list for one language keeps the others
+ */
+const mergeReplacements = (
+  defaults: Replacements,
+  user: Replacements = {},
+): Replacements => {
+  const merged: Replacements = { ...defaults };
+  for (const [language, replacements] of Object.entries(user)) {
+    merged[language] = { ...merged[language], ...replacements };
+  }
+  return merged;
+};
+
 /**
  * getUserConfig reads the user config from the config file
  * @returns user config
  */
-const getUserConfig = async (): Promise<Partial<Config>> => {
+const getUserConfig = async (): Promise<UserConfig> => {
   const configFile = await getConfigFile();
   try {
     if (!(await exists(configFile))) return {};
@@ -110,6 +160,15 @@ export const bootConfig = async () => {
     ...userConfig,
     // merge keymaps so a partial user keymap keeps the remaining defaults
     keymap: { ...defaultConfig.keymap, ...userConfig.keymap },
+    // merge autocorrect so a partial user config keeps the remaining defaults
+    autocorrect: {
+      ...defaultConfig.autocorrect,
+      ...userConfig.autocorrect,
+      replace: mergeReplacements(
+        defaultConfig.autocorrect.replace,
+        userConfig.autocorrect?.replace,
+      ),
+    },
   };
   configInitialized.value = true;
 };

@@ -21,6 +21,7 @@ import {
   saveFile,
   exportAs,
   cycleTheme,
+  chooseLanguage,
   insertNode,
   editLink,
 } from "../commands";
@@ -75,6 +76,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     { name: "PDF-File", extensions: ["pdf"] },
   ]),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
+  [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
 };
 
 export const keymap = () =>

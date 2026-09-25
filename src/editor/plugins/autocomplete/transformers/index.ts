@@ -1,18 +1,20 @@
-import type { Transformer } from "../types";
+import type { BlockTransformer } from "../types";
 
-import arrows from "./arrows";
 import blockquote from "./blockquote";
-import heading from "./heading";
 import bullet_list from "./bullet_list";
-import link from "./link";
+import code_block from "./code_block";
+import heading from "./heading";
+import horizontal_rule from "./horizontal_rule";
+import ordered_list from "./ordered_list";
 
-const transformers: { [key: string]: Transformer<any> } = {
-  arrows,
+// block shortcuts; the first one that matches and applies wins
+const transformers: { [key: string]: BlockTransformer<any> } = {
   heading,
   blockquote,
   bullet_list,
-  link,
-  //
+  ordered_list,
+  horizontal_rule,
+  code_block,
 };
 
 export default transformers;

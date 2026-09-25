@@ -3,7 +3,11 @@ import { Transaction } from "prosemirror-state";
 import { Node } from "prosemirror-model";
 
 import { debounce } from "observable.ts";
-import { path, transaction, theme, themeType, themes } from "./state";
+import { language, path, transaction, theme, themeType, themes } from "./state";
+import {
+  detectLanguage,
+  isIsoCode,
+} from "./editor/plugins/autocomplete/languages/lookup";
 import { schema } from "prosemirror-markdown";
 
 localforage.config({
@@ -25,6 +29,17 @@ export const bootStorage = async () => {
 
   theme.subscribe((value: themeType) => {
     localforage.setItem("theme", value).catch(console.warn);
+  });
+
+  // the system language on first start, the chosen one afterwards
+  const _language = await localforage.getItem("language");
+  language.value = isIsoCode(_language) ? _language : detectLanguage();
+  if (_language !== language.value) {
+    await localforage.setItem("language", language.value).catch(console.warn);
+  }
+
+  language.subscribe((value: string) => {
+    localforage.setItem("language", value).catch(console.warn);
   });
 
   transaction.subscribe(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { schema } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 
 import {
@@ -11,11 +12,13 @@ import {
   p,
   ul,
 } from "../../../../test/editor";
-import arrows from "./arrows";
 import blockquote from "./blockquote";
 import bullet_list from "./bullet_list";
 import heading from "./heading";
-import type { Transformer } from "../types";
+import type { BlockTransformer } from "../types";
+import code_block from "./code_block";
+import horizontal_rule from "./horizontal_rule";
+import ordered_list from "./ordered_list";
 
 /**
  * runTransformer places the cursor at the end of top-level block `index`
@@ -23,7 +26,7 @@ import type { Transformer } from "../types";
  * `transformer` to `text` like the plugin does.
  */
 const runTransformer = <T>(
-  transformer: Transformer<T>,
+  transformer: BlockTransformer<T>,
   node: Node,
   index: number | "end",
   text: string,
@@ -112,8 +115,11 @@ describe("transformer.blockquote", () => {
 });
 
 describe("transformer.bullet_list", () => {
-  it("activates only for exactly '-'", () => {
-    expect(bullet_list.activate("-")).toBe(true);
+  it.each(["-", "*", "+"])("activates for exactly %j", (cmd) => {
+    expect(bullet_list.activate(cmd)).toBe(true);
+  });
+
+  it("ignores anything else", () => {
     expect(bullet_list.activate("--")).toBeUndefined();
     expect(bullet_list.activate("a -")).toBeUndefined();
   });
@@ -140,62 +146,42 @@ describe("transformer.bullet_list", () => {
   });
 });
 
-describe("transformer.arrows", () => {
-  const cases = [
-    ["-->", "→"],
-    ["<--", "←"],
-    ["==>", "⇒"],
-    ["<==", "⇐"],
-    ["<==>", "⇔"],
-    ["--", "—"],
-  ];
-
-  describe("activate", () => {
-    it.each(cases)("activates %j on its own", (key, value) => {
-      expect(arrows.activate(key)).toEqual({ key, value });
-    });
-
-    it.each(cases)("activates %j after a word", (key, value) => {
-      expect(arrows.activate(`word ${key}`)).toEqual({ key, value });
-    });
-
-    it("prefers the double arrow over its single halves", () => {
-      expect(arrows.activate("a <==>")).toEqual({ key: "<==>", value: "⇔" });
-    });
-
-    it.each(["x-->", "--> x", "->", ""])("ignores %j", (text) => {
-      expect(arrows.activate(text)).toBeUndefined();
-    });
-  });
-
-  it.each(cases)("replaces %j with %j followed by a space", (key, value) => {
-    const text = `a ${key}`;
-    const { view, result } = runTransformer(arrows, doc(p(text)), 0, text);
-
-    expect(result).toBe(true);
-    expect(view.state.doc.textContent).toBe(`a ${value} `);
-    expect(view.state.selection.from).toBe(endOfBlock(view.state.doc, 0));
-  });
-});
-
 // the transformers differ in their props type, the table only needs `unknown`
 const withoutCursor: {
   name: string;
-  transformer: Transformer<unknown>;
+  transformer: BlockTransformer<unknown>;
   text: string;
 }[] = [
-  { name: "heading", transformer: heading as Transformer<unknown>, text: "#" },
+  {
+    name: "heading",
+    transformer: heading as BlockTransformer<unknown>,
+    text: "#",
+  },
   {
     name: "blockquote",
-    transformer: blockquote as Transformer<unknown>,
+    transformer: blockquote as BlockTransformer<unknown>,
     text: ">",
   },
   {
     name: "bullet_list",
-    transformer: bullet_list as Transformer<unknown>,
+    transformer: bullet_list as BlockTransformer<unknown>,
     text: "-",
   },
-  { name: "arrows", transformer: arrows as Transformer<unknown>, text: "-->" },
+  {
+    name: "ordered_list",
+    transformer: ordered_list as BlockTransformer<unknown>,
+    text: "1.",
+  },
+  {
+    name: "horizontal_rule",
+    transformer: horizontal_rule as BlockTransformer<unknown>,
+    text: "---",
+  },
+  {
+    name: "code_block",
+    transformer: code_block as BlockTransformer<unknown>,
+    text: "```",
+  },
 ];
 
 describe.each(withoutCursor)(
@@ -218,3 +204,107 @@ describe.each(withoutCursor)(
     });
   },
 );
+
+describe("transformer.ordered_list", () => {
+  it.each([
+    ["1.", 1],
+    ["7.", 7],
+    ["123456789.", 123456789],
+  ])("activates %j with order %i", (text, order) => {
+    expect(ordered_list.activate(text)).toEqual({ order });
+  });
+
+  it.each(["1", "a.", "1)", "1234567890.", "a 1."])("ignores %j", (text) => {
+    expect(ordered_list.activate(text)).toBeUndefined();
+  });
+
+  it("turns the block into an ordered list starting at the number", () => {
+    const { view, result } = runTransformer(
+      ordered_list,
+      doc(p("7.")),
+      0,
+      "7.",
+    );
+
+    expect(result).toBe(true);
+    expect(view.state.doc.toJSON()).toEqual(
+      doc(schema.node("ordered_list", { order: 7 }, [li(p())])).toJSON(),
+    );
+  });
+});
+
+describe("transformer.horizontal_rule", () => {
+  it.each(["---", "***", "___"])("activates on Enter for %j", (text) => {
+    expect(horizontal_rule.trigger).toBe("enter");
+    expect(horizontal_rule.activate(text)).toBe(true);
+  });
+
+  it.each(["--", "----", "-*-", "a ---"])("ignores %j", (text) => {
+    expect(horizontal_rule.activate(text)).toBeUndefined();
+  });
+
+  it.each(positions(p("---")))(
+    "replaces the $position block with a rule and an empty paragraph",
+    ({ node, index }) => {
+      const { view, result } = runTransformer(
+        horizontal_rule,
+        node,
+        index,
+        "---",
+      );
+
+      expect(result).toBe(true);
+      expect(view.state.doc.child(index).type.name).toBe("horizontal_rule");
+      const next = view.state.doc.child(index + 1);
+      expect(next.type.name).toBe("paragraph");
+      expect(view.state.selection.$from.parent).toBe(next);
+      expect(view.state.doc.childCount).toBe(node.childCount + 1);
+    },
+  );
+
+  it("leaves a heading alone", () => {
+    const node = doc(h(1, "---"));
+    const { view, result } = runTransformer(horizontal_rule, node, 0, "---");
+
+    expect(result).toBe(false);
+    expect(view.state.doc).toBe(node);
+  });
+});
+
+describe("transformer.code_block", () => {
+  it.each([
+    ["```", ""],
+    ["```ts", "ts"],
+    ["```c++", "c++"],
+  ])("activates on Enter for %j", (text, params) => {
+    expect(code_block.trigger).toBe("enter");
+    expect(code_block.activate(text)).toEqual({ params });
+  });
+
+  it.each(["``", "```ts x", "````", "a ```"])("ignores %j", (text) => {
+    expect(code_block.activate(text)).toBeUndefined();
+  });
+
+  it("turns the paragraph into a code block with the language", () => {
+    const { view, result } = runTransformer(
+      code_block,
+      doc(p("before"), p("```ts")),
+      1,
+      "```ts",
+    );
+
+    expect(result).toBe(true);
+    expect(view.state.doc.toJSON()).toEqual(
+      doc(p("before"), schema.node("code_block", { params: "ts" })).toJSON(),
+    );
+    expect(view.state.selection.$from.parent.type.name).toBe("code_block");
+  });
+
+  it("leaves a heading alone", () => {
+    const node = doc(h(1, "```"));
+    const { view, result } = runTransformer(code_block, node, 0, "```");
+
+    expect(result).toBe(false);
+    expect(view.state.doc).toBe(node);
+  });
+});

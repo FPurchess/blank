@@ -92,4 +92,63 @@ describe("config", () => {
       expect(configInitialized.value).toBe(true);
     },
   );
+
+  describe("autocorrect", () => {
+    it("turns everything on by default", async () => {
+      vi.mocked(exists).mockResolvedValue(false);
+
+      await bootConfig();
+
+      expect(config.value.autocorrect).toEqual({
+        arrows: true,
+        dashes: true,
+        symbols: true,
+        formatting: true,
+        links: true,
+        quotes: true,
+        capitalize: true,
+        blocks: true,
+        replace: { "*": {} },
+      });
+    });
+
+    it("keeps defaults missing from a partial user config", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ autocorrect: { quotes: false } }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.autocorrect.quotes).toBe(false);
+      expect(config.value.autocorrect.arrows).toBe(true);
+      expect(config.value.autocorrect.replace).toEqual({ "*": {} });
+    });
+
+    it("merges the user's replacements per language", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({
+          autocorrect: {
+            replace: { de: { mfg: "Mit freundlichen Grüßen" } },
+          },
+        }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.autocorrect.replace).toEqual({
+        "*": {},
+        de: { mfg: "Mit freundlichen Grüßen" },
+      });
+    });
+  });
+
+  it("binds language.choose to Mod-Alt-l by default", async () => {
+    vi.mocked(exists).mockResolvedValue(false);
+
+    await bootConfig();
+
+    expect(getKeyBinding(CommandIdentifier.LANGUAGE_CHOOSE)).toBe("Mod-Alt-l");
+  });
 });

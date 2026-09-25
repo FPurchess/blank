@@ -3,7 +3,7 @@ import type { Node } from "prosemirror-model";
 import { history } from "prosemirror-history";
 
 import { CommandIdentifier, config } from "../../config";
-import { linkDialog, path, theme, themes } from "../../state";
+import { languagePicker, linkDialog, path, theme, themes } from "../../state";
 import {
   blockquote,
   codeBlock,
@@ -204,6 +204,14 @@ describe("plugin.keymap", () => {
       expect(press("Mod-Alt-t")).toBe(true);
 
       expect(theme.value).toBe(themes[1]);
+    });
+
+    it("Mod-Alt-l opens the language picker", () => {
+      const { press } = setup(doc(p()));
+
+      expect(press("Mod-Alt-l")).toBe(true);
+
+      expect(languagePicker.value.open).toBe(true);
     });
 
     it("Mod-n starts a new file", () => {

@@ -10,9 +10,10 @@ import {
   li,
   ol,
   p,
+  typeText,
   ul,
 } from "../../test/editor";
-import linkTransformer from "../../editor/plugins/autocomplete/transformers/link";
+import autocomplete from "../../editor/plugins/autocomplete";
 import toPDF from ".";
 import {
   BASE_DOCUMENT,
@@ -245,11 +246,11 @@ describe("exporter.pdf document definition", () => {
   });
 
   it("exports links typed as markdown as clickable text", async () => {
-    const typed = "[Blank](https://blank.app)";
-    const view = createTestView(createState(doc(p(typed))));
-    const props = linkTransformer.activate(typed);
-    if (!props) throw new Error("link did not activate");
-    linkTransformer.transform(view, typed, props);
+    const plugin = autocomplete();
+    const view = createTestView(
+      createState(doc(p("[Blank](https://blank.app)")), { plugins: [plugin] }),
+    );
+    typeText(view, plugin, " ");
 
     const { definition } = await exportDoc(view.state.doc);
 

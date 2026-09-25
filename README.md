@@ -35,6 +35,7 @@
 - :pear: minimalist WYSIWYG for distraction-free writing
 - :page_with_curl: Export to PDF
 - :waxing_crescent_moon: Themes: Light & Dark-Mode
+- :sparkles: Autocorrect as you type, modelled on Word and LibreOffice
 - available for Linux, macOS and Windows
 
 ## Download & Installation
@@ -90,6 +91,7 @@ In order to change the keyboard bindings copy your modified version of the [defa
 | Open File                    | Mod + O                     |
 | Export as PDF                | Mod + Alt + P               |
 | Cycle through themes         | Mod + Alt + T               |
+| Choose language              | Mod + Alt + L               |
 | Undo                         | Mod + Z                     |
 | Redo                         | Mod + Shift + Z             |
 | Insert line break            | Mod + Enter / Shift + Enter |
@@ -111,6 +113,64 @@ In order to change the keyboard bindings copy your modified version of the [defa
 | Open link in browser         | Mod + Click                 |
 | Toggle bold                  | Mod + B                     |
 | Toggle italic                | Mod + I                     |
+
+## Autocorrect
+
+Blank corrects what you type the way Word and LibreOffice do. A correction applies once the word is complete: when you type Space, Tab, Enter or one of `. , ; : ? !` after it. That works anywhere in the text, not only at the end of a line. Undo (`Mod + Z`) reverts the last correction and keeps what you typed. Nothing is corrected inside code blocks or inline code.
+
+| You type                                      | You get                                             |
+| --------------------------------------------- | --------------------------------------------------- |
+| `-->` `->` / `<--` `<-` / `<-->` `<->`        | → / ← / ↔                                           |
+| `==>` / `<==` / `<==>`                        | ⇒ / ⇐ / ⇔                                           |
+| `A - B`, `A -- B` / `A--B`                    | A – B (en dash) / A—B (em dash)                     |
+| `(c)` `(r)` `(tm)` `...`                      | © ® ™ …                                             |
+| `1/2` `1/4` `3/4` `+-` `!=` `<=` `>=`         | ½ ¼ ¾ ± ≠ ≤ ≥                                       |
+| `**bold**` `*italic*` `_italic_` `` `code` `` | **bold** _italic_ _italic_ `code`                   |
+| `[title](url)` / `![alt](src)`                | a link / an image                                   |
+| `https://…`, `www.…`, `name@example.com`      | a link                                              |
+| `"quotes"` and `'quotes'`                     | typographic quotes of the language, e.g. “…” or „…“ |
+| `hello. this`                                 | Hello. This (sentence starts)                       |
+| `THe`                                         | The                                                 |
+
+Dashes follow LibreOffice: typing `--` followed by Space no longer makes an em dash on its own. The dash is set once the word after it is complete.
+
+At the start of an empty line, these shortcuts turn the line into a block:
+
+| Type at the start of a line | Then  | You get         |
+| --------------------------- | ----- | --------------- |
+| `#` … `######`              | Space | Heading 1–6     |
+| `-` `*` `+`                 | Space | Bullet list     |
+| `1.` (any number)           | Space | Numbered list   |
+| `>`                         | Space | Blockquote      |
+| `---` `***` `___`           | Enter | Horizontal line |
+| ` ``` ` or ` ```lang `      | Enter | Code block      |
+
+### Language
+
+Quotes, sentence capitalization and dashes follow the language shown at the bottom right. Blank picks the system language on first start. Press `Mod + Alt + L` (or click the language) to choose another one: use ← / → and Enter, or type a two-letter ISO 639-1 code such as `de`. Esc cancels. Blank has rules for cs, da, de, en, es, fi, fr, it, nl, no, pl, pt, ru and sv. Other languages use the English rules and are marked with `*`.
+
+### Settings
+
+Every group can be turned off in `blank.json`, and `replace` adds your own replacements, for all languages (`*`) or for one:
+
+```json
+{
+  "autocorrect": {
+    "arrows": true,
+    "dashes": true,
+    "symbols": true,
+    "formatting": true,
+    "links": true,
+    "quotes": true,
+    "capitalize": true,
+    "blocks": true,
+    "replace": {
+      "*": { "btw": "by the way" },
+      "de": { "mfg": "Mit freundlichen Grüßen" }
+    }
+  }
+}
+```
 
 ## Contributing
 
@@ -142,7 +202,6 @@ Set `E2E_SKIP_BUILD=1` to reuse an existing debug build. Each spec file runs the
 ### Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
 
 ## License
 
