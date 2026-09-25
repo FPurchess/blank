@@ -16,7 +16,7 @@
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",
     "format.italic": "Mod-i",
-    "format.code": "Mod-c",
+    "format.code": "Mod-e",
     "format.blockquote": "Mod-g",
     "file.new": "Mod-n",
     "file.save": "Mod-s",
