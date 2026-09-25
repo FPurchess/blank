@@ -33,6 +33,14 @@ vi.mock("@tauri-apps/plugin-cli", () => ({
   getMatches: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  readText: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn(),
+}));
+
 afterEach(() => {
   // removes IPC handlers installed via `mockIPC` (see `src/test/tauri.ts`)
   clearMocks();

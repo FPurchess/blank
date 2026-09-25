@@ -28,3 +28,6 @@ e2e/screenshots/
 
 # graphify knowledge graph
 graphify-out
+
+# Git worktrees
+.claude/worktrees/

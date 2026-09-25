@@ -47,6 +47,7 @@ export const hasMark = (n: Node, name: string): boolean =>
 
 // TODO: support hard breaks and horizontal lines
 const transformNode = (n: Node) => {
+  const link = n.marks.find((mark: Mark) => mark.type.name === "link");
   const item = {
     style: `${n.type.name}${(n.attrs.level as number) ?? ""}`,
     stack: undefined,
@@ -57,7 +58,9 @@ const transformNode = (n: Node) => {
     // the bold of a heading
     italics: hasMark(n, "em") || undefined,
     bold: hasMark(n, "strong") || undefined,
-    decoration: hasMark(n, "u") ? "underline" : undefined,
+    decoration: hasMark(n, "u") || link ? "underline" : undefined,
+    // makes the text a clickable link in the PDF
+    ...(link ? { link: link.attrs.href as string } : {}),
     headlineLevel:
       n.type.name === "heading" ? (n.attrs.level as number) : undefined,
   };
@@ -70,6 +73,7 @@ const transformNode = (n: Node) => {
         italics: item.italics,
         bold: item.bold,
         decoration: item.decoration,
+        ...(link ? { link: link.attrs.href as string } : {}),
       });
       break;
 

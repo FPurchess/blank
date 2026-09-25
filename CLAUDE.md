@@ -47,7 +47,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 
 ## Git workflow
 
-- Always work in a git worktree, never directly in the main checkout: `git worktree add ../blank-<topic> -b <branch> origin/main`. Run `bun install` in the new worktree, since `node_modules` isn't shared.
+- Always work in a git worktree, never directly in the main checkout: `git worktree add .claude/worktrees/<topic> -b <branch> origin/main`, run from the main checkout. Worktrees always live in `.claude/worktrees/` (git-ignored), never as sibling directories. Run `bun install` in the new worktree, since `node_modules` isn't shared.
 - Commit messages are a single line (`<type>: <summary>`, e.g. `fix: ...`, `chore: ...`), with no body.
 - Never mention Claude, Claude Code or Anthropic in commit messages, PR titles or descriptions, code or comments. That means no `Co-Authored-By` trailers and no "Generated with" footers.
 - PRs target `main`. Pushing to `release` triggers `publish.yml`, which builds the installers and creates a draft GitHub release.

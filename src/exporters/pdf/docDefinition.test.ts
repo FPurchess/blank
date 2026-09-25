@@ -2,7 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import pdfmake from "pdfmake";
 import { schema } from "prosemirror-markdown";
 
-import { createState, doc, h, li, ol, p, ul } from "../../test/editor";
+import {
+  createState,
+  createTestView,
+  doc,
+  h,
+  li,
+  ol,
+  p,
+  ul,
+} from "../../test/editor";
+import linkTransformer from "../../editor/plugins/autocomplete/transformers/link";
 import toPDF from ".";
 import {
   BASE_DOCUMENT,
@@ -179,6 +189,72 @@ describe("exporter.pdf document definition", () => {
           },
         ],
       },
+    ]);
+  });
+
+  it("turns links into clickable, underlined text", async () => {
+    const node = doc(
+      schema.node("paragraph", null, [
+        schema.text("see "),
+        schema.text("Blank", [
+          schema.marks.link.create({ href: "https://blank.app" }),
+        ]),
+      ]),
+    );
+
+    const { definition } = await exportDoc(node);
+
+    const [paragraph] = definition.content as { text: object[] }[];
+    const [see, blank] = paragraph.text;
+    expect(blank).toEqual(
+      text("Blank", { decoration: "underline", link: "https://blank.app" }),
+    );
+    expect(see).not.toHaveProperty("link");
+    expect(see).toMatchObject({ decoration: undefined });
+  });
+
+  it("keeps links and marks on fallback runs", async () => {
+    const node = doc(
+      schema.node("paragraph", null, [
+        schema.text("go ⇒", [
+          schema.marks.em.create(),
+          schema.marks.link.create({ href: "https://blank.app" }),
+        ]),
+      ]),
+    );
+
+    const { definition } = await exportDoc(node);
+
+    const link = {
+      italics: true,
+      decoration: "underline",
+      link: "https://blank.app",
+    };
+    expect(definition.content).toMatchObject([
+      {
+        text: [
+          {
+            text: [
+              { text: "go ", ...link },
+              { text: "⇒", font: FALLBACK_FONT, ...link },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("exports links typed as markdown as clickable text", async () => {
+    const typed = "[Blank](https://blank.app)";
+    const view = createTestView(createState(doc(p(typed))));
+    const props = linkTransformer.activate(typed);
+    if (!props) throw new Error("link did not activate");
+    linkTransformer.transform(view, typed, props);
+
+    const { definition } = await exportDoc(view.state.doc);
+
+    expect(definition.content).toMatchObject([
+      { text: [{ text: "Blank", link: "https://blank.app" }, { text: " " }] },
     ]);
   });
 

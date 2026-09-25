@@ -80,5 +80,16 @@ describe("exporters.pdf", () => {
         expect(text).toMatch(new RegExp(`/FontName /[A-Z]{6}\\+${face}\\b`));
       }
     });
+
+    it("renders links as clickable link annotations", async () => {
+      const state = EditorState.create({
+        schema,
+        doc: defaultMarkdownParser.parse("see [Blank](https://blank.app)"),
+      });
+
+      const text = decode((await toPDF(state)) as Uint8Array);
+
+      expect(text).toContain("/URI (https://blank.app)");
+    });
   });
 });

@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { history } from "prosemirror-history";
 
 import { CommandIdentifier, config } from "../../config";
-import { path, theme, themes } from "../../state";
+import { linkDialog, path, theme, themes } from "../../state";
 import {
   blockquote,
+  codeBlock,
   createState,
   createTestView,
   doc,
@@ -17,6 +18,7 @@ import {
   type StateOptions,
   ul,
 } from "../../test/editor";
+import { flushPromises } from "../../test/async";
 import { keymap } from "./keymap";
 
 /**
@@ -107,6 +109,29 @@ describe("plugin.keymap", () => {
 
     expect(press("Shift-Tab")).toBe(true);
     expect(view.state.doc.toJSON()).toEqual(flat.toJSON());
+  });
+
+  describe("Mod-k", () => {
+    beforeEach(() => {
+      linkDialog.value = null;
+    });
+
+    it("opens the link dialog for the selection", async () => {
+      const { press } = setup(doc(p("text")), { cursor: [1, 5] });
+
+      expect(press("Mod-k")).toBe(true);
+
+      await vi.waitFor(() => expect(linkDialog.value?.text).toBe("text"));
+    });
+
+    it("is not handled in a code block", async () => {
+      const { press } = setup(doc(codeBlock("code")));
+
+      expect(press("Mod-k")).toBe(false);
+      await flushPromises();
+
+      expect(linkDialog.value).toBeNull();
+    });
   });
 
   it("Mod-g wraps the block in a blockquote", () => {
