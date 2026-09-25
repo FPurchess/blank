@@ -18,7 +18,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/FPurchess/blank/releases"><img src="https://badge.fury.io/gh/fpurchess%2Fblank.svg" alt="latest version"></a>
-  <a href="https://github.com/FPurchess/blank/blob/master/LICENSE"><img src="https://img.shields.io/github/license/FPurchess/blank.svg" alt="License"></a>
+  <a href="https://github.com/FPurchess/blank/blob/main/LICENSE"><img src="https://img.shields.io/github/license/FPurchess/blank.svg" alt="License"></a>
   <a href="https://img.shields.io/github/downloads/FPurchess/blank/total"><img src="https://img.shields.io/github/downloads/FPurchess/blank/total.svg" alt="Downloads Total"></a>
   <a href="https://github.com/FPurchess/blank/actions/workflows/test.yml"><img src="https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg?branch=main" alt="CI"></a>
 </p>
@@ -142,9 +142,7 @@ Set `E2E_SKIP_BUILD=1` to reuse an existing debug build. Each spec file runs the
 
 ## License
 
-Distributed under the [**MIT License**](LICENSE).
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FFPurchess%2Fblank.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FFPurchess%2Fblank?ref=badge_large)
+Distributed under the [**GNU Affero General Public License v3.0 only**](LICENSE).
 
 ## Acknowledgments
 
