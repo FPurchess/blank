@@ -46,7 +46,7 @@ jobs:
         with:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
           releaseName: "Blank v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: "See the assets to download this version and install. On macOS, see https://github.com/FPurchess/blank#macos-blank-cannot-be-opened-because-the-developer-cannot-be-verified if the app is blocked."
           releaseDraft: true
           prerelease: false
 
