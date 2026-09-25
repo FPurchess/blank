@@ -7,10 +7,18 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 ## Commands
 
 - Use `bun`, not npm or yarn. The lockfile is `bun.lockb`.
+- `make` lists the common tasks from the `Makefile`, which wraps the `package.json` scripts: e.g. `make dev`, `make check` (lint, format check and unit tests), `make test-e2e-headless`. Keep the commands in `package.json` and only call them from the `Makefile`.
 - `bun run tauri dev` runs the app. `bun run dev` serves only the Vite frontend, and every Tauri API call (fs, dialog, notification, cli) fails in a plain browser.
 - `bun run lint` runs eslint and `tsc`, so it is also the type-check.
 - `bunx vitest run src/config.test.ts` runs one test file, and `bunx vitest run -t "<name>"` runs one test. Run single tests while iterating.
 - Before calling work done, run `bun run lint`, `bun run format:check` and `bun run test`. The husky pre-commit hook runs the same three.
+- `bun run test:e2e` builds a debug binary and runs the E2E tests in `e2e/` (WebdriverIO + `tauri-driver`) against the real app. It works on Linux only and needs `webkit2gtk-driver`, `xvfb` and `cargo install tauri-driver --locked`. Run it with `xvfb-run -a` for headless, and set `E2E_SKIP_BUILD=1` to reuse an existing build. Run `bun install` in `e2e/` first, since that folder is its own package with its own `bun.lock`. `bunx wdio run ./wdio.conf.ts --spec specs/<name>.e2e.ts` in `e2e/` runs one spec. Run E2E after changing boot, editing, storage or file handling. The `E2E` workflow runs it on every push.
+
+## E2E tests
+
+- Every spec file gets a fresh app with a temporary profile: `wdio.conf.ts` sets `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` for `tauri-driver`. Specs start from the welcome document and the default keymap, and never touch the developer's real data. `restartApp()` in `e2e/helpers.ts` relaunches the app within the same profile, optionally with CLI args.
+- Type text with `type()` from `e2e/helpers.ts`, never `browser.keys("text")`: WebKitWebDriver drops repeated characters within one key action ("ll" becomes "l"). Use `pressMod()` for `Mod-` shortcuts.
+- Name specs `*.e2e.ts`, so vitest doesn't collect them. Native dialogs (open, save as, export) can't be automated, so test file IO by passing a path as a CLI arg, which makes Ctrl+S save without a dialog.
 
 ## Architecture
 
@@ -33,10 +41,12 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - Tests run in jsdom. `src/vitest.setup.ts` mocks the Tauri notification, fs, dialog and cli plugins for all tests. `mockReset: true` resets every mock to its original implementation before each test, so set per-test return values inside the test or its `beforeEach`. `path` from `@tauri-apps/api` can't be mocked with `vi.mock`; use `mockTauriPath()` from `src/test/tauri.ts` in `beforeEach`.
 - Reuse the shared test helpers in `src/test/`: node builders, `createState`, `createTestView` (a stub view, since a real `EditorView` can't scroll in jsdom), `pressKey`, `flushPromises` and `mockCliArgs`.
 - `bun run test:coverage` fails below 80% statements, branches, functions or lines.
+- Linux Tauri builds in `publish.yml` and `test-on-pr.yml` are pinned to `ubuntu-22.04` so the binary runs on glibc 2.35+ (Debian 12, Ubuntu 22.04), and a CI step fails if it needs anything newer. Do not switch them to `ubuntu-latest`. GitHub removes the `ubuntu-22.04` runner on 2027-04-17, so move these jobs into a container before then.
 
 ## Git workflow
 
 - Always work in a git worktree, never directly in the main checkout: `git worktree add ../blank-<topic> -b <branch> origin/main`. Run `bun install` in the new worktree, since `node_modules` isn't shared.
 - Commit messages are a single line (`<type>: <summary>`, e.g. `fix: ...`, `chore: ...`), with no body.
 - Never mention Claude, Claude Code or Anthropic in commit messages, PR titles or descriptions, code or comments. That means no `Co-Authored-By` trailers and no "Generated with" footers.
-- PRs target `main`. Pushing to `release` triggers `publish.yml`, which builds and publishes installers.
+- PRs target `main`. Pushing to `release` triggers `publish.yml`, which builds the installers and creates a draft GitHub release.
+- To release: `make bump VERSION=<x.y.z|patch|minor|major>` updates the version in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and the README download links. Commit that as `chore: bump version to <x.y.z>` and merge it via PR. Then `make release` checks `origin/main` (consistent, untagged version, fast-forward) and after confirmation pushes it to `release`. Publish the draft release on GitHub once all builds are done. Never push to `release` without the user asking.

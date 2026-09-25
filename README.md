@@ -64,6 +64,16 @@ You can download the latest version of Blank here:
   </tr>
 </table>
 
+On Linux, Blank needs glibc 2.35 or newer and WebKitGTK 4.1 (e.g. Ubuntu 22.04+ or Debian 12+).
+
+### macOS: "Blank cannot be opened because the developer cannot be verified"
+
+Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
+
+- **macOS 15 (Sequoia) or newer:** try to open Blank once, then go to System Settings → Privacy & Security and click "Open Anyway".
+- **macOS 14 or older:** right-click Blank.app in Applications, choose Open, then confirm with Open.
+- **Terminal:** run `xattr -dr com.apple.quarantine /Applications/Blank.app`.
+
 ## Keyboard Bindings
 
 In order to change the keyboard bindings copy your modified version of the [default configuration file (`blank.json`)](https://github.com/FPurchess/blank/blob/release/blank.json) of this repository into the app config dir (default: `~/.config/com.github.fpurchess.blank/blank.json`). Only the bindings you want to change need to be listed; all others keep their defaults.
@@ -110,6 +120,20 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+### Development
+
+Run `make` to list the common development and release tasks, e.g. `make dev` to run the app and `make check` to lint and test your changes. The targets wrap the scripts in `package.json`, so `bun run <script>` works just as well, e.g. on Windows without `make`.
+
+### End-to-end tests
+
+The end-to-end tests in [`e2e/`](e2e) drive the real app using [`tauri-driver`](https://tauri.app/develop/tests/webdriver/) and [WebdriverIO](https://webdriver.io/). They are supported on Linux only.
+
+1. Install the prerequisites: `sudo apt install webkit2gtk-driver xvfb` and `cargo install tauri-driver --locked`
+2. Install the test dependencies: `cd e2e && bun install`
+3. Build the app and run the tests: `bun run test:e2e` (use `xvfb-run -a bun run test:e2e` to run them headless)
+
+Set `E2E_SKIP_BUILD=1` to reuse an existing debug build. Each spec file runs the app with a fresh, temporary profile, so your own documents and settings are left untouched.
 
 ### Recommended IDE Setup
 

@@ -27,6 +27,7 @@
     "format:check": "prettier --check --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "cd e2e && bun run test",
     "prepare": "husky"
   },
   "resolutions": {

@@ -16,7 +16,7 @@ jobs:
           - platform: macos-latest # Intel
             args: --target x86_64-apple-darwin
             rust-target: x86_64-apple-darwin
-          - platform: ubuntu-latest
+          - platform: ubuntu-22.04
             args: ""
             rust-target: ""
           - platform: windows-latest
@@ -37,7 +37,7 @@ jobs:
           node-version: 24
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -60,7 +60,15 @@ jobs:
         with:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
           releaseName: "Blank v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: "See the assets to download this version and install. On macOS, see https://github.com/FPurchess/blank#macos-blank-cannot-be-opened-because-the-developer-cannot-be-verified if the app is blocked."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
+      - name: check glibc floor (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+          echo "highest required glibc symbol: $max"
+          [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
