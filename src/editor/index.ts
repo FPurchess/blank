@@ -3,7 +3,7 @@ import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 
-import { transaction } from "../state";
+import { linkDialog, transaction } from "../state";
 import { autocomplete, keymap } from "./plugins";
 import { applyInitialDocument } from "./document";
 
@@ -18,9 +18,13 @@ export const bootEditor = async () => {
     state,
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
+        // the link dialog takes the focus while it is open
+        if (linkDialog.value !== null) return false;
         e.preventDefault();
         e.stopPropagation();
-        window.setTimeout(() => view.focus(), 100);
+        window.setTimeout(() => {
+          if (linkDialog.value === null) view.focus();
+        }, 100);
         return true;
       },
     },
