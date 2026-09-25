@@ -1,138 +1,87 @@
-// @vitest-environment jsdom
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  type MockedFunction,
-} from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
-import { Node } from "prosemirror-model";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
-// import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { path as _path, transaction } from "../state";
+import * as storage from "../storage";
+import { doc, p } from "../test/editor";
+import { mockCliArgs, mockTauriPath } from "../test/tauri";
 import {
   applyDocument,
+  applyInitialDocument,
+  readDocumentFromCliArgs,
   readDocumentFromFile,
+  restoreDocument,
   setDefaultDocument,
 } from "./document";
 
 import welcomeMessage from "./welcome.md?raw";
-import { restoreDocument } from "./document";
-import * as storage from "../storage";
-import { mockIPC } from "@tauri-apps/api/mocks";
-import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+
+const emptyState = () => EditorState.create({ schema });
+const hello = doc(p("Hello, world!"));
+
+/**
+ * mockFile makes the fs plugin report a file with `content` at any path.
+ */
+const mockFile = (content: string) => {
+  vi.mocked(exists).mockResolvedValue(true);
+  vi.mocked(readTextFile).mockResolvedValue(content);
+};
 
 beforeEach(() => {
   _path.value = null;
   transaction.value = null;
+  mockTauriPath();
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 describe("applyDocument", () => {
   it("should apply the new document to the editor state", () => {
-    const initialState = EditorState.create({ schema });
-    const newDoc = Node.fromJSON(schema, {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Hello, world!" }],
-        },
-      ],
-    });
+    const newState = applyDocument(emptyState(), hello);
 
-    const newState = applyDocument(initialState, newDoc);
-
-    expect(newState.doc).toEqual(newDoc);
-    expect(transaction.value).toBeDefined();
+    expect(newState.doc).toEqual(hello);
+    expect(transaction.value?.doc).toEqual(hello);
+    expect(_path.value).toBeNull();
   });
 
   it("should update the path if provided", () => {
-    const initialState = EditorState.create({ schema });
-    const newDoc = Node.fromJSON(schema, {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Hello, world!" }],
-        },
-      ],
-    });
+    const newState = applyDocument(emptyState(), hello, "/path/to/document");
 
-    const path = "/path/to/document";
-    const newState = applyDocument(initialState, newDoc, path);
-
-    expect(newState.doc).toEqual(newDoc);
-    expect(transaction.value).toBeDefined();
-    expect(_path.value).toBe(path);
-  });
-
-  it("should not update the path if not provided", () => {
-    const initialState = EditorState.create({ schema });
-    const newDoc = Node.fromJSON(schema, {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Hello, world!" }],
-        },
-      ],
-    });
-
-    const newState = applyDocument(initialState, newDoc);
-
-    expect(newState.doc).toEqual(newDoc);
-    expect(transaction.value).toBeDefined();
-    expect(_path.value).toBeNull();
+    expect(newState.doc).toEqual(hello);
+    expect(_path.value).toBe("/path/to/document");
   });
 });
 
 describe("setDefaultDocument", () => {
   it("should set the welcome document to the editor state", () => {
-    const initialState = EditorState.create({ schema });
-    const newState = setDefaultDocument(initialState);
-    const expectedDoc = defaultMarkdownParser.parse(welcomeMessage);
+    const newState = setDefaultDocument(emptyState());
 
-    expect(newState.doc).toEqual(expectedDoc);
-    expect(transaction.value).toBeDefined();
+    expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+    expect(transaction.value).not.toBeNull();
     expect(_path.value).toBeNull();
   });
 });
 
 describe("restoreDocument", () => {
   it("should restore the document from storage if it exists", async () => {
-    const initialState = EditorState.create({ schema });
-    const storedDoc = Node.fromJSON(schema, {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Restored document!" }],
-        },
-      ],
-    });
-    const storedPath = "/path/to/stored/document";
-
+    const storedDoc = doc(p("Restored document!"));
     vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
-    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue(storedPath);
+    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue("/stored.md");
 
-    const newState = await restoreDocument(initialState);
+    const newState = await restoreDocument(emptyState());
 
     expect(newState?.doc).toEqual(storedDoc);
-    expect(transaction.value).toBeDefined();
-    expect(_path.value).toBe(storedPath);
+    expect(transaction.value).not.toBeNull();
+    expect(_path.value).toBe("/stored.md");
   });
 
   it("should return undefined if no document is found in storage", async () => {
-    const initialState = EditorState.create({ schema });
-
     vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(undefined);
 
-    const newState = await restoreDocument(initialState);
+    const newState = await restoreDocument(emptyState());
 
     expect(newState).toBeUndefined();
     expect(transaction.value).toBeNull();
@@ -141,73 +90,113 @@ describe("restoreDocument", () => {
 });
 
 describe("readDocumentFromFile", () => {
-  mockIPC(async (cmd, args) => {
-    if (cmd === "plugin:path|resolve")
-      return (args as unknown as { [key: string]: string[] })["paths"];
-    return Promise.resolve(undefined);
+  it("should read and apply the document from the given file path", async () => {
+    mockFile("# Hello, world!");
+
+    const newState = await readDocumentFromFile(emptyState(), "/doc.md");
+
+    expect(newState?.doc).toEqual(
+      defaultMarkdownParser.parse("# Hello, world!"),
+    );
+    expect(readTextFile).toHaveBeenCalledWith("/doc.md");
+    expect(transaction.value).not.toBeNull();
+    expect(_path.value).toBe("/doc.md");
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
-  it("should read and apply the document from the given file path", async () => {
-    const initialState = EditorState.create({ schema });
-    const filePath = "/path/to/document.md";
-    const fileContent = "# Hello, world!";
-    const expectedDoc = defaultMarkdownParser.parse(fileContent);
+  it("should return undefined for an empty path", async () => {
+    const newState = await readDocumentFromFile(emptyState(), "");
 
-    (exists as MockedFunction<typeof exists>).mockResolvedValue(true);
-    (readTextFile as MockedFunction<typeof readTextFile>).mockResolvedValue(
-      fileContent,
-    );
-    const newState = await readDocumentFromFile(initialState, filePath);
-
-    expect(newState?.doc).toEqual(expectedDoc);
-    expect(transaction.value).toBeDefined();
-    expect(_path.value).toBe(filePath);
+    expect(newState).toBeUndefined();
+    expect(exists).not.toHaveBeenCalled();
   });
 
   it("should return undefined if the file does not exist", async () => {
-    const initialState = EditorState.create({ schema });
-    const filePath = "/path/to/nonexistent.md";
+    vi.mocked(exists).mockResolvedValue(false);
 
-    (exists as MockedFunction<typeof exists>).mockResolvedValue(false);
-    const newState = await readDocumentFromFile(initialState, filePath);
+    const newState = await readDocumentFromFile(emptyState(), "/missing.md");
 
     expect(newState).toBeUndefined();
+    expect(readTextFile).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
-      `File not found: ${filePath}`,
+      "File not found: /missing.md",
     );
   });
 
   it("should handle errors when reading the file", async () => {
-    const initialState = EditorState.create({ schema });
-    const filePath = "/path/to/document.md";
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockRejectedValue("Read error");
 
-    (exists as MockedFunction<typeof exists>).mockResolvedValue(true);
-    (readTextFile as MockedFunction<typeof readTextFile>).mockRejectedValue(
-      "Read error",
-    );
-    const newState = await readDocumentFromFile(initialState, filePath);
+    const newState = await readDocumentFromFile(emptyState(), "/doc.md");
 
     expect(newState).toBeUndefined();
+    expect(_path.value).toBeNull();
     expect(sendNotification).toHaveBeenCalledWith(
       `Failed to read file: "Read error"`,
     );
   });
 
   it("should not send notifications if silent is true", async () => {
-    const initialState = EditorState.create({ schema });
-    const filePath = "/path/to/document.md";
-    const fileContent = "# Hello, world!";
-    const expectedDoc = defaultMarkdownParser.parse(fileContent);
+    vi.mocked(exists).mockResolvedValue(false);
+    await readDocumentFromFile(emptyState(), "/missing.md", true);
 
-    (exists as MockedFunction<typeof exists>).mockResolvedValue(true);
-    (readTextFile as MockedFunction<typeof readTextFile>).mockResolvedValue(
-      fileContent,
-    );
-    const newState = await readDocumentFromFile(initialState, filePath, true);
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(readTextFile).mockRejectedValue("Read error");
+    await readDocumentFromFile(emptyState(), "/doc.md", true);
 
-    expect(newState?.doc).toEqual(expectedDoc);
-    expect(transaction.value).toBeDefined();
-    expect(_path.value).toBe(filePath);
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("readDocumentFromCliArgs", () => {
+  it("should read the file passed as path argument", async () => {
+    mockCliArgs("/cli.md");
+    mockFile("from the cli");
+
+    const newState = await readDocumentFromCliArgs(emptyState());
+
+    expect(newState?.doc.textContent).toBe("from the cli");
+    expect(_path.value).toBe("/cli.md");
+  });
+
+  it("should return undefined without a path argument", async () => {
+    mockCliArgs();
+
+    expect(await readDocumentFromCliArgs(emptyState())).toBeUndefined();
+    expect(exists).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyInitialDocument", () => {
+  const storedDoc = doc(p("stored"));
+
+  it("should prefer the file passed on the command line", async () => {
+    mockCliArgs("/cli.md");
+    mockFile("from the cli");
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
+
+    const newState = await applyInitialDocument(emptyState());
+
+    expect(newState.doc.textContent).toBe("from the cli");
+  });
+
+  it("should fall back to the stored document", async () => {
+    mockCliArgs();
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
+    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue(null);
+
+    const newState = await applyInitialDocument(emptyState());
+
+    expect(newState.doc).toEqual(storedDoc);
+  });
+
+  it("should fall back to the welcome document", async () => {
+    mockCliArgs("/missing.md");
+    vi.mocked(exists).mockResolvedValue(false);
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(undefined);
+
+    const newState = await applyInitialDocument(emptyState());
+
+    expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
   });
 });
