@@ -1,0 +1,54 @@
+name: "aur"
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to package, e.g. v1.2.0"
+        required: true
+      pkgrel:
+        description: "pkgrel, bump for packaging-only changes"
+        required: false
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  publish-aur:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set version in PKGBUILD
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          PKGREL: ${{ inputs.pkgrel || '1' }}
+        run: |
+          version="${TAG#v}"
+          if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$TAG' is not a vX.Y.Z tag"
+            exit 1
+          fi
+          if ! [[ $PKGREL =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::'$PKGREL' is not a valid pkgrel"
+            exit 1
+          fi
+          curl -fsSIL --retry 5 --retry-all-errors -o /dev/null \
+            "https://github.com/FPurchess/blank/releases/download/v${version}/blank_${version}_amd64.deb"
+          sed -i -e "s/^pkgver=.*/pkgver=${version}/" -e "s/^pkgrel=.*/pkgrel=${PKGREL}/" packaging/aur/PKGBUILD
+          echo "full=${version}-${PKGREL}" >> "$GITHUB_OUTPUT"
+
+      - uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: blank-bin
+          pkgbuild: packaging/aur/PKGBUILD
+          updpkgsums: true
+          test: true
+          commit_username: Florian Purchess
+          commit_email: florian.purchess@googlemail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ steps.version.outputs.full }}"

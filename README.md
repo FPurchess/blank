@@ -2,7 +2,7 @@
 
 [downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total
 [macos-shield]: https://api.iconify.design/logos/macos.svg
-[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg
 [windows-shield]: https://api.iconify.design/logos/microsoft-windows.svg
 [windows-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64_en-US.msi
 [linux-deb-shield]: https://api.iconify.design/logos/linux-tux.svg
@@ -44,7 +44,7 @@ You can download the latest version of Blank here:
 <table width="100%">
   <tr>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg">
+      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg">
         Download blank.dmg<br/>
         <img src="https://api.iconify.design/logos/macos.svg" alt="Donwload blank.dmg" height="100" width="120" /><br/>
       </a>
@@ -61,8 +61,18 @@ You can download the latest version of Blank here:
         <img src="https://api.iconify.design/logos/linux-tux.svg" alt="Donwloads blank.deb" height="100" width="120" />
       </a>
     </td>
+    <td align="center">
+      <a href="https://aur.archlinux.org/packages/blank-bin">
+        Install blank-bin from AUR<br/>
+        <img src="https://api.iconify.design/logos/archlinux.svg" alt="blank-bin on AUR" height="100" width="120" />
+      </a>
+    </td>
   </tr>
 </table>
+
+On Arch Linux and derivatives (Manjaro, EndeavourOS, …) install [`blank-bin`](https://aur.archlinux.org/packages/blank-bin) from the AUR with any AUR helper, e.g. `yay -S blank-bin`.
+
+If the window stays blank on Linux (seen with some NVIDIA / Wayland setups), start Blank with `WEBKIT_DISABLE_DMABUF_RENDERER=1 blank`.
 
 ## Keyboard Bindings
 

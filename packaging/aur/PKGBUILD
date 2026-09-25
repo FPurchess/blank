@@ -1,0 +1,33 @@
+# Maintainer: Florian Purchess <florian dot purchess at googlemail dot com>
+
+# pkgver/pkgrel are rewritten and checksums refreshed by .github/workflows/aur.yml on every release
+pkgname=blank-bin
+_pkgname=blank
+pkgver=1.2.0
+pkgrel=1
+pkgdesc="Minimalist, opinionated, keyboard-only markdown editor with PDF export"
+arch=('x86_64')
+url="https://github.com/FPurchess/blank"
+license=('MIT')
+depends=('cairo' 'gcc-libs' 'gdk-pixbuf2' 'glib2' 'glibc' 'gtk3' 'hicolor-icon-theme'
+         'libsoup3' 'pango' 'webkit2gtk-4.1')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!strip' '!debug')
+source=("LICENSE-$pkgver::https://raw.githubusercontent.com/FPurchess/blank/v$pkgver/LICENSE")
+source_x86_64=("$_pkgname-$pkgver.deb::$url/releases/download/v$pkgver/${_pkgname}_${pkgver}_amd64.deb")
+sha256sums=('8666c080898f1d4163130aa709ae0e5680a9ea28137d89eaa6e1a58eb5c96da5')
+sha256sums_x86_64=('44b9e62312b748d7a38b037efce938919622b3ed391663c20242e9d89e9dbde4')
+
+package() {
+  bsdtar -xf data.tar.gz -C "$pkgdir"
+
+  # Tauri installs the 256px icon under "256x256@2", which icon themes ignore
+  local hidpi="$pkgdir/usr/share/icons/hicolor/256x256@2"
+  if [[ -d $hidpi ]]; then
+    install -Dm644 "$hidpi/apps/$_pkgname.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/$_pkgname.png"
+    rm -r "$hidpi"
+  fi
+
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

@@ -33,6 +33,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - Tests run in jsdom. `src/vitest.setup.ts` mocks the Tauri notification, fs, dialog and cli plugins for all tests. `mockReset: true` resets every mock to its original implementation before each test, so set per-test return values inside the test or its `beforeEach`. `path` from `@tauri-apps/api` can't be mocked with `vi.mock`; use `mockTauriPath()` from `src/test/tauri.ts` in `beforeEach`.
 - Reuse the shared test helpers in `src/test/`: node builders, `createState`, `createTestView` (a stub view, since a real `EditorView` can't scroll in jsdom), `pressKey`, `flushPromises` and `mockCliArgs`.
 - `bun run test:coverage` fails below 80% statements, branches, functions or lines.
+- Publishing a GitHub release runs `.github/workflows/aur.yml`, which pushes `packaging/aur/PKGBUILD` to the AUR package `blank-bin` (secret `AUR_SSH_PRIVATE_KEY`). It runs from the tagged `release` commit and downloads `blank_<version>_amd64.deb`, so keep `release` up to date with `main` and don't change `productName`. For existing tags or packaging-only fixes, run it manually with `tag` and `pkgrel`.
 
 ## Git workflow
 
