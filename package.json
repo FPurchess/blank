@@ -57,18 +57,18 @@
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.11.5",
     "@types/pdfmake": "^0.3.3",
-    "@vitest/coverage-v8": "2.1.8",
+    "@vitest/coverage-v8": "5.0.2",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "husky": "^9.1.7",
-    "jsdom": "^25.0.1",
+    "jsdom": "^29.1.1",
     "lint-staged": "^15.3.0",
     "prettier": "3.4.2",
     "sass-embedded": "^1.83.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
-    "vite": "^6.0.6",
-    "vitest": "^2.1.8"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   }
 }
