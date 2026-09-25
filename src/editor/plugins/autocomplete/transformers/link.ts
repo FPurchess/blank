@@ -4,7 +4,8 @@ import { schema } from "prosemirror-markdown";
 
 import type { activator, transformer, Transformer } from "../types";
 
-const reLink = /\[([^\]]+)\]\(([^)]+)\)/;
+// only a link that ends at the cursor, i.e. at the end of the text
+const reLink = /\[([^\]]+)\]\(([^)]+)\)$/;
 
 interface Props {
   title: string;

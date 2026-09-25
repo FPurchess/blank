@@ -1,10 +1,11 @@
-import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
+import { setBlockType } from "prosemirror-commands";
 import { schema } from "prosemirror-markdown";
 
 import type { activator, transformer, Transformer } from "../types";
+import { applyBlockCommand } from "./util";
 
-const reHeading = /^#{1,6}$/g;
+const reHeading = /^#{1,6}$/;
 
 interface Props {
   level: number;
@@ -21,26 +22,12 @@ const transform: transformer<Props> = (
   view: EditorView,
   text,
   { level }: Props,
-): boolean => {
-  const node = schema.nodes.heading.create({ level });
-
-  const { $cursor } = view.state.selection as TextSelection;
-  if (!$cursor) return false;
-  view.dispatch(
-    view.state.tr
-      .replaceRangeWith($cursor.pos - text.length, $cursor.pos, node)
-      .scrollIntoView(),
+): boolean =>
+  applyBlockCommand(
+    view,
+    setBlockType(schema.nodes.heading, { level }),
+    text.length,
   );
-
-  const sel = view.state.selection as TextSelection;
-  if (!sel.$cursor) return false;
-  const endPos = sel.$cursor?.before() - 1;
-  const selection = new TextSelection(view.state.doc.resolve(endPos));
-
-  view.dispatch(view.state.tr.setSelection(selection).scrollIntoView());
-
-  return true;
-};
 
 const _transformer: Transformer<Props> = {
   activate,
