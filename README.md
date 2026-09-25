@@ -111,6 +111,10 @@ Don't forget to give the project a star! Thanks again!
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+### Development
+
+Run `make` to list the common development and release tasks, e.g. `make dev` to run the app and `make check` to lint and test your changes. The targets wrap the scripts in `package.json`, so `bun run <script>` works just as well, e.g. on Windows without `make`.
+
 ### End-to-end tests
 
 The end-to-end tests in [`e2e/`](e2e) drive the real app using [`tauri-driver`](https://tauri.app/develop/tests/webdriver/) and [WebdriverIO](https://webdriver.io/). They are supported on Linux only.
