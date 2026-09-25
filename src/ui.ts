@@ -4,6 +4,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 
 import { path, textContent } from "./state";
+import { bootLinkDialog } from "./linkDialog";
 
 export const setupNotification = async () => {
   const hasPermission = await isPermissionGranted();
@@ -35,6 +36,8 @@ export const bootUI = () => {
     },
     { immediate: true },
   );
+
+  bootLinkDialog();
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);
