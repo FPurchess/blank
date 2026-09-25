@@ -2,11 +2,11 @@
 
 [downloads-shield]: https://img.shields.io/github/downloads/FPurchess/blank/total
 [macos-shield]: https://api.iconify.design/logos/macos.svg
-[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg
+[macos-pkg]: https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_aarch64.dmg
 [windows-shield]: https://api.iconify.design/logos/microsoft-windows.svg
-[windows-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64_en-US.msi
+[windows-pkg]: https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64_en-US.msi
 [linux-deb-shield]: https://api.iconify.design/logos/linux-tux.svg
-[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_amd64.deb
+[linux-deb-pkg]: https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.deb
 
 <p align="center">
   <a href="https://github.com/FPurchess/blank">
@@ -17,7 +17,7 @@
   A minimalist, opinionated markdown editor made for writing
 </p>
 <p align="center">
-  <a href="https://github.com/FPurchess/blank/releases"><img src="https://badge.fury.io/gh/fpurchess%2Fblank.svg" alt="latest version"></a>
+  <a href="https://github.com/FPurchess/blank/releases"><img src="https://img.shields.io/github/v/release/FPurchess/blank?label=version" alt="latest version"></a>
   <a href="https://github.com/FPurchess/blank/blob/main/LICENSE"><img src="https://img.shields.io/github/license/FPurchess/blank.svg" alt="License"></a>
   <a href="https://img.shields.io/github/downloads/FPurchess/blank/total"><img src="https://img.shields.io/github/downloads/FPurchess/blank/total.svg" alt="Downloads Total"></a>
   <a href="https://github.com/FPurchess/blank/actions/workflows/test.yml"><img src="https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg?branch=main" alt="CI"></a>
@@ -47,17 +47,17 @@ You can download the latest version of Blank here:
     <td align="center">
       <img src="https://api.iconify.design/logos/macos.svg" alt="macOS" height="100" width="120" /><br/>
       Download blank.dmg for<br/>
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_aarch64.dmg">Apple Silicon</a> |
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64.dmg">Intel</a>
+      <a href="https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_aarch64.dmg">Apple Silicon</a> |
+      <a href="https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64.dmg">Intel</a>
     </td>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_x64_en-US.msi">
+      <a href="https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64_en-US.msi">
         Download blank.msi<br/>
         <img src="https://api.iconify.design/logos/microsoft-windows.svg" alt="Donwloads blank.msi"  height="100" width="120" /><br/>
       </a>
     </td>
     <td align="center">
-      <a href="https://github.com/FPurchess/blank/releases/download/v1.2.0/blank_1.2.0_amd64.deb">
+      <a href="https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.deb">
         Download blank.deb<br/>
         <img src="https://api.iconify.design/logos/linux-tux.svg" alt="Donwloads blank.deb" height="100" width="120" />
       </a>
