@@ -20,7 +20,7 @@
   <a href="https://github.com/FPurchess/blank/releases"><img src="https://badge.fury.io/gh/fpurchess%2Fblank.svg" alt="latest version"></a>
   <a href="https://github.com/FPurchess/blank/blob/master/LICENSE"><img src="https://img.shields.io/github/license/FPurchess/blank.svg" alt="License"></a>
   <a href="https://img.shields.io/github/downloads/FPurchess/blank/total"><img src="https://img.shields.io/github/downloads/FPurchess/blank/total.svg" alt="Downloads Total"></a>
-  <a href="https://github.com/FPurchess/blank/actions/workflows/test.yml"><img src="https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg?branch=dev" alt="CI"></a>
+  <a href="https://github.com/FPurchess/blank/actions/workflows/test.yml"><img src="https://github.com/FPurchess/blank/actions/workflows/test.yml/badge.svg?branch=main" alt="CI"></a>
 </p>
 
 <p align="center">
