@@ -1,0 +1,71 @@
+// Quotes: Unicode CLDR delimiters (https://github.com/unicode-org/cldr/blob/main/common/main/ru.xml).
+// Abbreviations and two-capitals exceptions adapted from LibreOffice's autocorrect
+// lists (MPL-2.0):
+// https://github.com/LibreOffice/core/blob/master/extras/source/autocorr/lang/ru/SentenceExceptList.xml
+// https://github.com/LibreOffice/core/blob/master/extras/source/autocorr/lang/ru/WordExceptList.xml
+import type { LanguageRules } from "./types";
+
+const rules: LanguageRules = {
+  quotes: {
+    double: ["«", "»"],
+    single: ["„", "“"],
+  },
+  abbreviations: [
+    "в.",
+    "вв.",
+    "г.",
+    "гг.",
+    "гл.",
+    "др.",
+    "ед.",
+    "к.",
+    "кв.",
+    "кл.",
+    "коп.",
+    "куб.",
+    "л.",
+    "лл.",
+    "мл.",
+    "млн.",
+    "млрд.",
+    "наб.",
+    "нач.",
+    "обл.",
+    "обр.",
+    "ок.",
+    "пер.",
+    "пл.",
+    "пос.",
+    "пр.",
+    "р.",
+    "руб.",
+    "с.",
+    "сб.",
+    "св.",
+    "см.",
+    "соч.",
+    "ср.",
+    "ст.",
+    "стр.",
+    "т.",
+    "тт.",
+    "тыс.",
+    "ч.",
+    "шт.",
+    "экз.",
+  ],
+  twoCapitalsExceptions: [
+    "GHz",
+    "MHz",
+    "OOo",
+    "THz",
+    "МВт",
+    "МГц",
+    "ГГц",
+    "СНиП",
+    "МОм",
+  ],
+  spacedDash: "—",
+  wordDash: "—",
+};
+export default rules;

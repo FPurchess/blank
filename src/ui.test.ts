@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootUI, setupNotification } from "./ui";
-import { path, textContent } from "./state";
+import { language, languagePicker, path, textContent } from "./state";
+import { closePicker, move, openPicker, typeChar } from "./languagePicker";
 import { flushPromises } from "./test/async";
 
 /**
@@ -17,13 +18,16 @@ const stubNotification = (
 };
 
 const uiTop = () => document.querySelector<HTMLElement>("#ui-top");
-const uiBottom = () => document.querySelector<HTMLElement>("#ui-bottom");
+const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
+const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
 describe("ui", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     path.value = null;
     textContent.value = "";
+    language.value = "de";
+    closePicker();
     stubNotification("granted");
     bootUI();
   });
@@ -51,16 +55,94 @@ describe("ui", () => {
 
   describe("counter", () => {
     it("starts at zero", () => {
-      expect(uiBottom()?.textContent).toBe("0 words 0 chars");
+      expect(uiStats()?.textContent).toBe("0 words 0 chars");
     });
 
     it("counts the words and chars of the text content", () => {
       textContent.value = "one two three four";
-      expect(uiBottom()?.textContent).toBe("4 words 18 chars");
+      expect(uiStats()?.textContent).toBe("4 words 18 chars");
 
       textContent.value = "";
-      expect(uiBottom()?.textContent).toBe("0 words 0 chars");
+      expect(uiStats()?.textContent).toBe("0 words 0 chars");
     });
+  });
+});
+
+describe("ui language chooser", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    language.value = "de";
+    closePicker();
+    stubNotification("granted");
+    bootUI();
+  });
+
+  it("sits right of the counter in the footer", () => {
+    const footer = document.querySelector("#ui-bottom")!;
+
+    expect([...footer.children].map((child) => child.id)).toEqual([
+      "ui-stats",
+      "ui-language",
+    ]);
+  });
+
+  it("shows the current language", () => {
+    expect(uiLanguage()?.textContent).toBe("DE");
+
+    language.value = "fr";
+    expect(uiLanguage()?.textContent).toBe("FR");
+  });
+
+  it("marks a language that uses the English rules", () => {
+    language.value = "tr";
+
+    expect(uiLanguage()?.textContent).toBe("TR*");
+  });
+
+  it("shows the languages around the selected one while open", () => {
+    openPicker();
+
+    expect(uiLanguage()?.classList.contains("open")).toBe(true);
+    expect(uiLanguage()?.textContent).toBe("‹csdadeenes›");
+    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("de");
+
+    move(1);
+    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("en");
+  });
+
+  it("shows typed letters and rejected codes", () => {
+    openPicker();
+
+    typeChar("p");
+    expect(uiLanguage()?.querySelector(".buffer")?.textContent).toBe("p_");
+
+    typeChar("x");
+    expect(uiLanguage()?.classList.contains("invalid")).toBe(true);
+
+    typeChar("t");
+    typeChar("r");
+    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("tr*");
+  });
+
+  it("opens on click and chooses a clicked language", () => {
+    uiLanguage()!.click();
+    expect(languagePicker.value.open).toBe(true);
+
+    const option = [
+      ...uiLanguage()!.querySelectorAll<HTMLElement>(".option"),
+    ].find((element) => element.textContent === "en")!;
+    option.click();
+
+    expect(language.value).toBe("en");
+    expect(languagePicker.value.open).toBe(false);
+    expect(uiLanguage()?.textContent).toBe("EN");
+  });
+
+  it("keeps the focus in the editor when clicked", () => {
+    const event = new MouseEvent("mousedown", { cancelable: true });
+    uiLanguage()!.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 });
 

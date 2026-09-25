@@ -4,14 +4,15 @@ import { history } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 
 import { transaction } from "../state";
-import { autocomplete, keymap } from "./plugins";
+import { autocomplete, keymap, languagePicker } from "./plugins";
 import { applyInitialDocument } from "./document";
 
 export const bootEditor = async () => {
   const state = await applyInitialDocument(
     EditorState.create({
       schema,
-      plugins: [history(), keymap(), autocomplete()],
+      // the picker and autocorrect see Enter and Tab before the keymap does
+      plugins: [history(), languagePicker(), autocomplete(), keymap()],
     }),
   );
   const view = new EditorView(document.body, {

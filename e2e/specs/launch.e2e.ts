@@ -10,7 +10,7 @@ describe("launch", () => {
   });
 
   it("counts words and chars", async () => {
-    await expect($("#ui-bottom")).toHaveText(/^[1-9]\d* words \d+ chars$/);
+    await expect($("#ui-stats")).toHaveText(/^[1-9]\d* words \d+ chars$/);
   });
 
   it("uses the default theme", async () => {

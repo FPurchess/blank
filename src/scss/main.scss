@@ -31,8 +31,43 @@ body {
 
 #ui-bottom {
   bottom: 0;
+  left: 0;
   right: 0;
-  text-align: end;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  pointer-events: none;
+}
+
+#ui-language {
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+
+  &.open {
+    cursor: default;
+  }
+
+  &.invalid {
+    text-decoration: line-through;
+  }
+
+  .option {
+    padding: 0 0.25em;
+    cursor: pointer;
+  }
+
+  .selected {
+    font-weight: bold;
+    text-decoration: underline;
+  }
+
+  .more,
+  .buffer {
+    padding: 0 0.25em;
+  }
 }
 
 .ProseMirror {

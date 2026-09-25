@@ -3,11 +3,14 @@ import { browser, $, expect } from "@wdio/globals";
 import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
 
 describe("persistence", () => {
-  it("restores the document and theme after a restart", async () => {
+  it("restores the document, theme and language after a restart", async () => {
     await focusEditor();
     await pressMod("n");
     await type("Remember me 4711");
     await pressMod(Key.Alt, "t");
+    await pressMod(Key.Alt, "l");
+    await type("fr");
+    await type(Key.Enter);
 
     await expect($(".ProseMirror p")).toHaveText("Remember me 4711");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
@@ -19,5 +22,6 @@ describe("persistence", () => {
     await expect($(".ProseMirror p")).toHaveText("Remember me 4711");
     await expect($("#ui-top")).toHaveText("» Untitled");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
+    await expect($("#ui-language")).toHaveText("FR");
   });
 });

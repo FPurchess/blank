@@ -23,7 +23,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 ## Architecture
 
 - Start-up order is fixed (`src/main.ts`): `bootConfig` → `bootStorage` → `bootEditor` → `bootUI`. The keymap reads config when the plugin is created, and the editor restores its document from storage.
-- Modules talk through the Observables in `src/state.ts` (`path`, `transaction`, `textContent`, `theme`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
+- Modules talk through the Observables in `src/state.ts` (`path`, `transaction`, `textContent`, `theme`, `language`, `languagePicker`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
 - The theme is applied as `document.body.dataset.theme`, and the SCSS in `src/scss/themes/` keys off it. A new theme needs an entry in `themes` in `state.ts` and a partial registered in `themes/_index.scss`.
 - Markdown uses the stock `prosemirror-markdown` `schema`, `defaultMarkdownParser` and `defaultMarkdownSerializer`. There is no custom schema, so a new node or mark type also needs parser, serializer and PDF-export support.
 - The first document comes from the CLI `path` arg, then the doc saved in localforage, then `src/editor/welcome.md`.
@@ -32,7 +32,9 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 
 - **Bindable command:** update all four: the `CommandIdentifier` enum and `defaultConfig.keymap` in `src/config.ts`, `commandMap` in `src/editor/plugins/keymap.ts`, and the reference `blank.json`. Also add it to the README keybinding table.
 - **File/IO command** (`src/editor/commands/`): return `true` right away, do the Tauri work in an async block, and report success or failure with `sendNotification`. Follow `saveFile.ts` / `exportAs.ts`.
-- **Markdown shortcut triggered by Space:** add a `Transformer` (`activate` + `transform`) in `src/editor/plugins/autocomplete/transformers/` and register it in that folder's `index.ts`. The first transformer that matches and returns `true` wins, so order matters.
+- **Block shortcut** (a whole line like `#` or `---`): add a `BlockTransformer` (`trigger` `"space"` or `"enter"`, `activate` + `transform`) in `src/editor/plugins/autocomplete/transformers/` and register it in that folder's `index.ts`. The first one that matches and applies wins.
+- **Inline correction** (arrows, dashes, formatting, ...): add an `InlineTransformer` (`Context` → `Correction` or `undefined`) in `src/editor/plugins/autocomplete/inline/` and add it to `replacing` in that folder's `index.ts`, where order matters. A plain replacement belongs in the tables in `inline/replacements.ts` instead. Guard it with a toggle from `config.autocorrect` and document it in the README's Autocorrect section.
+- **Autocorrect language:** add a `LanguageRules` file in `src/editor/plugins/autocomplete/languages/` (quotes from CLDR, abbreviations from LibreOffice's `SentenceExceptList.xml`) and register it in that folder's `index.ts`.
 - **Exporter:** write an `exporterFunc` (`EditorState` → bytes) in `src/exporters/` and wire it up through `exportAs`.
 
 ## Gotchas

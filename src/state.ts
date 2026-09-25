@@ -43,3 +43,23 @@ export const theme = new Observable<themeType>("light");
 theme.subscribe((value: themeType) => {
   document.body.dataset.theme = value;
 });
+
+// language is the ISO 639-1 code of the language autocorrect follows
+export const language = new Observable<string>("en");
+
+export interface LanguagePickerState {
+  open: boolean;
+  // the language code that Enter would choose
+  selected: string;
+  // the letters typed so far to choose a language by its code
+  buffer: string;
+  // whether the last typed code was invalid
+  invalid: boolean;
+}
+
+export const languagePicker = new Observable<LanguagePickerState>({
+  open: false,
+  selected: "en",
+  buffer: "",
+  invalid: false,
+});

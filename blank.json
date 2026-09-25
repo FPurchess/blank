@@ -23,6 +23,20 @@
     "file.save_as": "Mod-Shift-s",
     "file.open": "Mod-o",
     "export.pdf": "Mod-Alt-p",
-    "theme.cycle": "Mod-Alt-t"
+    "theme.cycle": "Mod-Alt-t",
+    "language.choose": "Mod-Alt-l"
+  },
+  "autocorrect": {
+    "arrows": true,
+    "dashes": true,
+    "symbols": true,
+    "formatting": true,
+    "links": true,
+    "quotes": true,
+    "capitalize": true,
+    "blocks": true,
+    "replace": {
+      "*": {}
+    }
   }
 }

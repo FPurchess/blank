@@ -54,6 +54,51 @@ describe("storage", () => {
     });
   });
 
+  describe("language", () => {
+    it("restores a stored language", async () => {
+      await localforage.setItem("language", "pt");
+
+      const { language } = await bootFresh();
+
+      expect(language.value).toBe("pt");
+    });
+
+    it.each([
+      ["de-AT", "de"],
+      ["fr", "fr"],
+      ["xx-YY", "en"],
+      ["", "en"],
+    ])(
+      "detects and stores the system language %j on first start",
+      async (system, expected) => {
+        vi.spyOn(navigator, "language", "get").mockReturnValue(system);
+
+        const { language } = await bootFresh();
+
+        expect(language.value).toBe(expected);
+        expect(await localforage.getItem("language")).toBe(expected);
+      },
+    );
+
+    it("detects the system language when the stored one is invalid", async () => {
+      await localforage.setItem("language", "klingon");
+      vi.spyOn(navigator, "language", "get").mockReturnValue("sv-SE");
+
+      const { language } = await bootFresh();
+
+      expect(language.value).toBe("sv");
+    });
+
+    it("persists language changes", async () => {
+      const { language } = await bootFresh();
+
+      language.value = "it";
+      await flushPromises();
+
+      expect(await localforage.getItem("language")).toBe("it");
+    });
+  });
+
   describe("path", () => {
     it("persists path changes", async () => {
       const { path, getPathfromStorage } = await bootFresh();
