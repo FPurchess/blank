@@ -1,9 +1,9 @@
-import { TextSelection, Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { wrapInList } from "prosemirror-schema-list";
 import { schema } from "prosemirror-markdown";
 
 import type { activator, transformer, Transformer } from "../types";
+import { applyBlockCommand } from "./util";
 
 const cmd = "-";
 
@@ -13,28 +13,8 @@ const activate: activator<Props> = (text: string): Props | undefined => {
   return text === cmd || undefined;
 };
 
-const transform: transformer<Props> = (
-  view: EditorView,
-  _: string,
-): boolean => {
-  if (
-    wrapInList(schema.nodes.bullet_list)(
-      view.state,
-      (tr: Transaction) => view.dispatch(tr),
-      view,
-    )
-  ) {
-    const { $cursor } = view.state.selection as TextSelection;
-    if (!$cursor) return false;
-    view.dispatch(
-      view.state.tr
-        .delete($cursor.pos - cmd.length, $cursor.pos)
-        .scrollIntoView(),
-    );
-    return true;
-  }
-  return false;
-};
+const transform: transformer<Props> = (view: EditorView): boolean =>
+  applyBlockCommand(view, wrapInList(schema.nodes.bullet_list), cmd.length);
 
 const _transformer: Transformer<Props> = {
   activate,
