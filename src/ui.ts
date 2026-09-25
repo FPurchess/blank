@@ -18,7 +18,8 @@ export const bootUI = () => {
   document.body.appendChild(uiTop);
   path.subscribe(
     (path) => {
-      uiTop.innerHTML = "&raquo; " + (path ?? "Untitled");
+      // textContent: the path is user controlled and must not be parsed as HTML
+      uiTop.textContent = "» " + (path ?? "Untitled");
     },
     { immediate: true },
   );
@@ -30,7 +31,7 @@ export const bootUI = () => {
     (content) => {
       const charCount = content.length;
       const wordCount = content.length ? content.split(/\s/).length : 0;
-      uiBottom.innerHTML = `${wordCount} words ${charCount} chars`;
+      uiBottom.textContent = `${wordCount} words ${charCount} chars`;
     },
     { immediate: true },
   );
