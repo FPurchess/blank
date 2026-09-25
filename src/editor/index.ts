@@ -3,8 +3,8 @@ import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 
-import { transaction } from "../state";
-import { autocomplete, keymap, languagePicker } from "./plugins";
+import { linkDialog, transaction } from "../state";
+import { autocomplete, keymap, languagePicker, openLink } from "./plugins";
 import { applyInitialDocument } from "./document";
 
 export const bootEditor = async () => {
@@ -12,16 +12,26 @@ export const bootEditor = async () => {
     EditorState.create({
       schema,
       // the picker and autocorrect see Enter and Tab before the keymap does
-      plugins: [history(), languagePicker(), autocomplete(), keymap()],
+      plugins: [
+        history(),
+        languagePicker(),
+        autocomplete(),
+        keymap(),
+        openLink(),
+      ],
     }),
   );
   const view = new EditorView(document.body, {
     state,
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
+        // the link dialog takes the focus while it is open
+        if (linkDialog.value !== null) return false;
         e.preventDefault();
         e.stopPropagation();
-        window.setTimeout(() => view.focus(), 100);
+        window.setTimeout(() => {
+          if (linkDialog.value === null) view.focus();
+        }, 100);
         return true;
       },
     },

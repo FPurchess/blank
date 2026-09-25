@@ -11,6 +11,7 @@
     "notification:default",
     "dialog:default",
     "cli:default",
+    "clipboard-manager:allow-read-text",
     "fs:read-all",
     "fs:write-all",
     "fs:allow-rename",

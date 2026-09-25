@@ -74,5 +74,16 @@ describe("exporters.pdf", () => {
       expect(text.startsWith("%PDF-")).toBe(true);
       expect(text.trimEnd().endsWith("%%EOF")).toBe(true);
     });
+
+    it("renders links as clickable link annotations", async () => {
+      const state = EditorState.create({
+        schema,
+        doc: defaultMarkdownParser.parse("see [Blank](https://blank.app)"),
+      });
+
+      const text = decode((await toPDF(state)) as Uint8Array);
+
+      expect(text).toContain("/URI (https://blank.app)");
+    });
   });
 });

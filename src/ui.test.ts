@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootUI, setupNotification } from "./ui";
-import { language, languagePicker, path, textContent } from "./state";
+import {
+  language,
+  languagePicker,
+  linkDialog,
+  type LinkDialogRequest,
+  path,
+  textContent,
+} from "./state";
 import { closePicker, move, openPicker, typeChar } from "./languagePicker";
 import { flushPromises } from "./test/async";
 
@@ -30,6 +37,14 @@ describe("ui", () => {
     closePicker();
     stubNotification("granted");
     bootUI();
+  });
+
+  it("renders the link dialog", () => {
+    linkDialog.value = { url: "", text: "" } as LinkDialogRequest;
+    expect(document.querySelector("#link-dialog")).not.toBeNull();
+
+    linkDialog.value = null;
+    expect(document.querySelector("#link-dialog")).toBeNull();
   });
 
   describe("file path", () => {

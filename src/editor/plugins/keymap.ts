@@ -23,6 +23,7 @@ import {
   cycleTheme,
   chooseLanguage,
   insertNode,
+  editLink,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -65,6 +66,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
   [CommandIdentifier.FORMAT_ITALIC]: toggleMark(schema.marks.em),
   [CommandIdentifier.FORMAT_CODE]: toggleMark(schema.marks.code),
+  [CommandIdentifier.FORMAT_LINK]: editLink(),
   [CommandIdentifier.FORMAT_BLOCKQUOTE]: wrapIn(schema.nodes.blockquote),
   [CommandIdentifier.FILE_NEW]: newFile(),
   [CommandIdentifier.FILE_SAVE]: saveFile(),

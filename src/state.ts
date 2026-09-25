@@ -44,6 +44,19 @@ theme.subscribe((value: themeType) => {
   document.body.dataset.theme = value;
 });
 
+export interface LinkDialogRequest {
+  url: string;
+  text: string;
+  // the cursor or selection is in an existing link, which can be removed
+  isEdit: boolean;
+  submit(url: string, text: string): void;
+  convertToText(): void;
+  cancel(): void;
+}
+
+// linkDialog holds the request of the open link dialog, or null while it is closed
+export const linkDialog = new Observable<LinkDialogRequest | null>(null);
+
 // language is the ISO 639-1 code of the language autocorrect follows
 export const language = new Observable<string>("en");
 

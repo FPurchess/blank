@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 
-import { transaction } from "../state";
+import { linkDialog, type LinkDialogRequest, transaction } from "../state";
 import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
 
@@ -12,6 +12,7 @@ describe("bootEditor", () => {
     await localforage.clear();
     mockCliArgs();
     transaction.value = null;
+    linkDialog.value = null;
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     await bootEditor();
   });
@@ -41,6 +42,30 @@ describe("bootEditor", () => {
 
     vi.advanceTimersByTime(100);
     expect(document.activeElement).toBe(editor());
+  });
+
+  it("leaves the focus to the link dialog while it is open", () => {
+    vi.advanceTimersByTime(100);
+    linkDialog.value = {} as LinkDialogRequest;
+
+    editor()?.blur();
+    vi.advanceTimersByTime(100);
+    expect(document.activeElement).not.toBe(editor());
+
+    linkDialog.value = null;
+    editor()?.blur();
+    vi.advanceTimersByTime(100);
+    expect(document.activeElement).not.toBe(editor());
+  });
+
+  it("does not take the focus back once the link dialog opened", () => {
+    vi.advanceTimersByTime(100);
+
+    editor()?.blur();
+    linkDialog.value = {} as LinkDialogRequest;
+    vi.advanceTimersByTime(100);
+
+    expect(document.activeElement).not.toBe(editor());
   });
 
   it("publishes every transaction", () => {

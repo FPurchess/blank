@@ -17,6 +17,7 @@
     "format.bold": "Mod-b",
     "format.italic": "Mod-i",
     "format.code": "Mod-e",
+    "format.link": "Mod-k",
     "format.blockquote": "Mod-g",
     "file.new": "Mod-n",
     "file.save": "Mod-s",
