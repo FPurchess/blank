@@ -14,7 +14,7 @@
     "insert.horizontal_rule": "Mod-h",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
-    "format.bold": "Mod-d",
+    "format.bold": "Mod-b",
     "format.italic": "Mod-i",
     "format.code": "Mod-c",
     "format.blockquote": "Mod-g",
