@@ -141,8 +141,6 @@ describe("restoreDocument", () => {
 });
 
 describe("readDocumentFromFile", () => {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error
   mockIPC(async (cmd, args) => {
     if (cmd === "plugin:path|resolve")
       return (args as unknown as { [key: string]: string[] })["paths"];
