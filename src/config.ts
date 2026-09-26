@@ -1,5 +1,6 @@
 import { path } from "@tauri-apps/api";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import { Observable } from "observable.ts";
 
 export enum CommandIdentifier {
@@ -109,21 +110,42 @@ const configName = "blank.json";
 const getConfigFile = async () =>
   await path.join(await path.appConfigDir(), configName);
 
-type UserConfig = Partial<{
-  keymap: Partial<Config["keymap"]>;
-  autocorrect: Partial<AutocorrectConfig>;
-}>;
+/**
+ * isRecord tells whether `value` is a plain object, i.e. not null, an array or
+ * a primitive
+ */
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * isStringRecord tells whether `value` is an object with only string values
+ */
+const isStringRecord = (value: unknown): value is Record<string, string> =>
+  isRecord(value) && Object.values(value).every((v) => typeof v === "string");
 
 /**
  * mergeReplacements merges the user's replacements into the defaults per
- * language, so a user list for one language keeps the others
+ * language, so a user list for one language keeps the others. Invalid entries
+ * are skipped and reported in `problems`.
  */
 const mergeReplacements = (
   defaults: Replacements,
-  user: Replacements = {},
+  user: unknown,
+  problems: string[],
 ): Replacements => {
   const merged: Replacements = { ...defaults };
+  if (user === undefined) return merged;
+  if (!isRecord(user)) {
+    problems.push("autocorrect.replace");
+    return merged;
+  }
   for (const [language, replacements] of Object.entries(user)) {
+    // JSON.parse creates "__proto__" as an own key, which would replace the
+    // prototype of `merged` when assigned
+    if (language === "__proto__" || !isStringRecord(replacements)) {
+      problems.push(`autocorrect.replace.${language}`);
+      continue;
+    }
     merged[language] = { ...merged[language], ...replacements };
   }
   return merged;
@@ -131,9 +153,9 @@ const mergeReplacements = (
 
 /**
  * getUserConfig reads the user config from the config file
- * @returns user config
+ * @returns user config, or an empty object if there is none or it isn't one
  */
-const getUserConfig = async (): Promise<UserConfig> => {
+const getUserConfig = async (): Promise<Record<string, unknown>> => {
   const configFile = await getConfigFile();
   try {
     if (!(await exists(configFile))) return {};
@@ -143,7 +165,9 @@ const getUserConfig = async (): Promise<UserConfig> => {
   }
 
   try {
-    return JSON.parse(await readTextFile(configFile));
+    const parsed: unknown = JSON.parse(await readTextFile(configFile));
+    if (isRecord(parsed)) return parsed;
+    console.error("config file is not an object", parsed);
   } catch (error) {
     console.error("failed to read config file", error);
   }
@@ -151,25 +175,84 @@ const getUserConfig = async (): Promise<UserConfig> => {
 };
 
 /**
- * bootConfig initializes the config
+ * mergeKeymap takes the user's bindings that are strings and keeps the
+ * defaults for the rest
+ */
+const mergeKeymap = (user: unknown, problems: string[]): Config["keymap"] => {
+  const keymap = { ...defaultConfig.keymap };
+  if (user === undefined) return keymap;
+  if (!isRecord(user)) {
+    problems.push("keymap");
+    return keymap;
+  }
+  for (const [command, binding] of Object.entries(user)) {
+    if (typeof binding !== "string") {
+      problems.push(`keymap.${command}`);
+      continue;
+    }
+    keymap[command as CommandIdentifier] = binding;
+  }
+  return keymap;
+};
+
+/**
+ * mergeAutocorrect takes the user's autocorrect settings whose type matches
+ * the default and keeps the defaults for the rest
+ */
+const mergeAutocorrect = (
+  user: unknown,
+  problems: string[],
+): AutocorrectConfig => {
+  const defaults = defaultConfig.autocorrect;
+  const autocorrect = { ...defaults };
+  if (user !== undefined && !isRecord(user)) {
+    problems.push("autocorrect");
+    return autocorrect;
+  }
+  const settings = user ?? {};
+  for (const [key, value] of Object.entries(settings)) {
+    // unknown settings are unused, so they're simply skipped
+    if (
+      key === "replace" ||
+      !Object.prototype.hasOwnProperty.call(defaults, key)
+    )
+      continue;
+    const defaultValue = defaults[key as keyof AutocorrectConfig];
+    if (typeof value !== typeof defaultValue) {
+      problems.push(`autocorrect.${key}`);
+      continue;
+    }
+    (autocorrect as Record<string, unknown>)[key] = value;
+  }
+  autocorrect.replace = mergeReplacements(
+    defaults.replace,
+    settings.replace,
+    problems,
+  );
+  return autocorrect;
+};
+
+/**
+ * bootConfig initializes the config. Invalid settings are ignored with a
+ * notification, so Blank still starts with the defaults.
  */
 export const bootConfig = async () => {
   const userConfig = await getUserConfig();
+  const problems: string[] = [];
   config.value = {
     ...defaultConfig,
     ...userConfig,
     // merge keymaps so a partial user keymap keeps the remaining defaults
-    keymap: { ...defaultConfig.keymap, ...userConfig.keymap },
+    keymap: mergeKeymap(userConfig.keymap, problems),
     // merge autocorrect so a partial user config keeps the remaining defaults
-    autocorrect: {
-      ...defaultConfig.autocorrect,
-      ...userConfig.autocorrect,
-      replace: mergeReplacements(
-        defaultConfig.autocorrect.replace,
-        userConfig.autocorrect?.replace,
-      ),
-    },
+    autocorrect: mergeAutocorrect(userConfig.autocorrect, problems),
   };
+  if (problems.length > 0) {
+    console.warn("ignored invalid settings in blank.json", problems);
+    sendNotification(
+      `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
+    );
+  }
   configInitialized.value = true;
 };
 

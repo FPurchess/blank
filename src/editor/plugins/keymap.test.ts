@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { history } from "prosemirror-history";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { CommandIdentifier, config } from "../../config";
 import { languagePicker, linkDialog, path, theme, themes } from "../../state";
@@ -19,7 +20,7 @@ import {
   ul,
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
-import { keymap } from "./keymap";
+import { keymap, normalizeBinding } from "./keymap";
 
 /**
  * setup creates a view of `node` with the keymap (and history) plugin and
@@ -241,5 +242,82 @@ describe("plugin.keymap", () => {
     expect(view.state.doc.firstChild?.firstChild?.marks[0].type.name).toBe(
       "strong",
     );
+  });
+  it("doesn't notify for the default keymap", () => {
+    keymap();
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("accepts Option, Command and Super as modifiers", () => {
+    config.value = {
+      ...defaultConfig,
+      keymap: {
+        ...defaultConfig.keymap,
+        [CommandIdentifier.FORMAT_BOLD]: "Option-d",
+        [CommandIdentifier.FORMAT_ITALIC]: "Command-j",
+        [CommandIdentifier.FORMAT_CODE]: "super-u",
+      },
+    };
+    const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
+
+    expect(press("Alt-d")).toBe(true);
+    expect(press("Meta-j")).toBe(true);
+    expect(press("Meta-u")).toBe(true);
+    expect(view.state.doc.firstChild?.firstChild?.marks).toHaveLength(3);
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("skips bindings it can't use and notifies once", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    config.value = {
+      ...defaultConfig,
+      keymap: {
+        ...defaultConfig.keymap,
+        [CommandIdentifier.FORMAT_BOLD]: "Hyper-b",
+        [CommandIdentifier.FORMAT_ITALIC]: "",
+      },
+    };
+
+    const { press } = setup(doc(p("text")), { cursor: [1, 5] });
+
+    expect(press("Mod-s")).toBe(true);
+    expect(sendNotification).toHaveBeenCalledOnce();
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Ignored invalid key bindings in blank.json: format.bold: Hyper-b, format.italic: ",
+    );
+  });
+});
+
+describe("normalizeBinding", () => {
+  it.each([
+    ["Mod-b", "Mod-b"],
+    ["Mod-Shift-z", "Mod-Shift-z"],
+    ["Tab", "Tab"],
+    ["Shift-Tab", "Shift-Tab"],
+    ["Mod--", "Mod--"],
+    ["Mod-Space", "Mod-Space"],
+    ["Ctrl-Alt-s", "Ctrl-Alt-s"],
+    ["Control-Meta-s", "Control-Meta-s"],
+    ["c-a-s-m-x", "c-a-s-m-x"],
+    ["Cmd-p", "Meta-p"],
+    ["Option-p", "Alt-p"],
+    ["option-p", "Alt-p"],
+    ["Command-Shift-s", "Meta-Shift-s"],
+    ["COMMAND-s", "Meta-s"],
+    ["Super-e", "Meta-e"],
+  ])("normalizes %j to %j", (binding, expected) => {
+    expect(normalizeBinding(binding)).toBe(expected);
+  });
+
+  it.each(["", "Hyper-b", "Win-b", "Command--p", "Fn-F1"])(
+    "rejects %j",
+    (binding) => {
+      expect(normalizeBinding(binding)).toBeUndefined();
+    },
+  );
+
+  it("rejects a binding that isn't a string", () => {
+    expect(normalizeBinding(42 as unknown as string)).toBeUndefined();
   });
 });
