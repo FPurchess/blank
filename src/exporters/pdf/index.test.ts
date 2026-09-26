@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
+import { IMAGES, dataUrl } from "../../test/images";
 import toPDF, { hasMark } from "./index";
 
 // vite resolves pdfmake to its browser build, so test against the same bundle
@@ -43,17 +44,21 @@ describe("exporters.pdf", () => {
     });
   });
 
-  describe("toPDF", () => {
+  // the first export loads the embedded fonts, several megabytes, which can
+  // take longer than the default timeout while other tests run in parallel
+  describe("toPDF", { timeout: 20_000 }, () => {
     it("renders a markdown document to a valid PDF", async () => {
       const state = EditorState.create({
         schema,
         doc: defaultMarkdownParser.parse(SAMPLE),
       });
 
-      const pdf = await toPDF(state);
+      const { contents: bytes, warnings } = await toPDF(state, {
+        docPath: null,
+      });
 
-      expect(pdf).toBeInstanceOf(Uint8Array);
-      const bytes = pdf as Uint8Array;
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(warnings).toEqual([]);
       expect(bytes.length).toBeGreaterThan(1000);
       const text = decode(bytes);
       expect(text.startsWith("%PDF-")).toBe(true);
@@ -66,7 +71,7 @@ describe("exporters.pdf", () => {
         doc: defaultMarkdownParser.parse(SAMPLE + "\n***both*** ⇒\n"),
       });
 
-      const text = decode((await toPDF(state)) as Uint8Array);
+      const text = decode((await toPDF(state, { docPath: null })).contents);
 
       for (const face of [
         "IBMPlexSans",
@@ -87,9 +92,23 @@ describe("exporters.pdf", () => {
         doc: defaultMarkdownParser.parse("see [Blank](https://blank.app)"),
       });
 
-      const text = decode((await toPDF(state)) as Uint8Array);
+      const text = decode((await toPDF(state, { docPath: null })).contents);
 
       expect(text).toContain("/URI (https://blank.app)");
+    });
+
+    it("embeds images", async () => {
+      const state = EditorState.create({
+        schema,
+        doc: defaultMarkdownParser.parse(
+          `text ![pixel](${dataUrl("image/png", IMAGES.png)}) text`,
+        ),
+      });
+
+      const text = decode((await toPDF(state, { docPath: null })).contents);
+
+      expect(text).toMatch(/\/Subtype \/Image/);
+      expect(text).toMatch(/\/Width 3\b/);
     });
   });
 });

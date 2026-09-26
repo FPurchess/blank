@@ -21,6 +21,18 @@ Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
 
 Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` and plain URLs become formatting once you finish the word. See [Autocorrect](./autocorrect) for everything Blank corrects.
 
+## Images
+
+Type `![alt text](address)` and a space to add an image. The address can be:
+
+- a file next to your document, like `![Chart](images/chart.png)`: keep the images in a folder beside the markdown file and they travel with it,
+- any file on your computer, like `![Logo](/home/me/logo.png)`,
+- a web address, like `![Map](https://example.com/map.png)`.
+
+Images next to your document appear as soon as the document has been saved, since Blank needs to know its folder. Until then Blank shows the alt text in their place. Large images shrink to the width of the page.
+
+PDFs include every image at the size you see in Blank, including images from the web. If one can't be loaded, for example because you're offline, the PDF shows its alt text instead and Blank tells you which one.
+
 ## Blank remembers your document
 
 Blank keeps what you write as you go, at least once a second and once more when you close the window, and restores it on the next start, together with the open file, the theme and the language. So you can close the window mid-thought without saving, and pick up right where you left off.

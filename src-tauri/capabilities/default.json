@@ -13,6 +13,10 @@
     "dialog:default",
     "cli:default",
     "clipboard-manager:allow-read-text",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }]
+    },
     "fs:read-all",
     "fs:write-all",
     "fs:allow-rename",

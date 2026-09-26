@@ -4,6 +4,10 @@ import { Node, Mark } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 
 import { type exporterFunc } from "../../exporters";
+import { toDataUrl } from "../../images/dataUrl";
+import { fitBox } from "../../images/fit";
+import { failureWarning, prepareImages } from "../../images/prepare";
+import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
 import {
   BASE_DOCUMENT,
   HEADING_AFTER_HEADING_MARGIN_TOP,
@@ -45,8 +49,34 @@ const registerFonts = () =>
 export const hasMark = (n: Node, name: string): boolean =>
   n.marks.find((mark: Mark) => mark.type.name === name) !== undefined;
 
+// the embedded images by src: their key in the document's `images` and size
+type PdfImages = Map<string, { key: string; width: number; height: number }>;
+
+/**
+ * imageBlock renders an image node, or its alt text if it couldn't be loaded
+ */
+const imageBlock = (n: Node, images: PdfImages) => {
+  const image = images.get(n.attrs.src as string);
+  if (!image) {
+    return {
+      text: [
+        { text: (n.attrs.alt as string | null) || n.attrs.src, italics: true },
+      ],
+    };
+  }
+  return { image: image.key, width: image.width, height: image.height };
+};
+
+const hasImage = (n: Node) => {
+  let found = false;
+  n.forEach((child) => {
+    if (child.type.name === "image") found = true;
+  });
+  return found;
+};
+
 // TODO: support hard breaks and horizontal lines
-const transformNode = (n: Node) => {
+const transformNode = (n: Node, images: PdfImages) => {
   const link = n.marks.find((mark: Mark) => mark.type.name === "link");
   const item = {
     style: `${n.type.name}${(n.attrs.level as number) ?? ""}`,
@@ -84,7 +114,7 @@ const transformNode = (n: Node) => {
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.ul.push(transformNode(node));
+        item.ul.push(transformNode(node, images));
       });
       break;
 
@@ -95,7 +125,7 @@ const transformNode = (n: Node) => {
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.ol.push(transformNode(node));
+        item.ol.push(transformNode(node, images));
       });
       break;
 
@@ -109,20 +139,43 @@ const transformNode = (n: Node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         item.stack.push({
-          ...transformNode(node),
+          ...transformNode(node, images),
           margin: [0, index ? LIST_ITEM_BLOCK_MARGIN_TOP : 0, 0, 0],
         });
       });
       break;
 
     default:
+      if (n.isTextblock && hasImage(n)) {
+        // pdfmake can't place images inside text, so the text around each
+        // image becomes a block of its own
+        const stack: object[] = [];
+        let run: object[] = [];
+        const flush = () => {
+          if (run.length) stack.push({ text: run });
+          run = [];
+        };
+        n.forEach((node) => {
+          if (node.type.name === "image") {
+            flush();
+            stack.push(imageBlock(node, images));
+          } else {
+            run.push(transformNode(node, images));
+          }
+        });
+        flush();
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        item.stack = stack;
+        break;
+      }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       item.text = [];
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.text.push(transformNode(node));
+        item.text.push(transformNode(node, images));
       });
   }
 
@@ -141,19 +194,53 @@ const adjustMargins = (content: Block[]) =>
     return block;
   });
 
-const toPDF: exporterFunc = async (state: EditorState) => {
+/**
+ * embedImages loads the images of `state` as data URLs for pdfmake, which only
+ * takes PNG and JPEG, sized like in the editor and at most as large as a page
+ */
+const embedImages = async (state: EditorState, docPath: string | null) => {
+  const { images, failures } = await prepareImages(state.doc, docPath, [
+    "image/png",
+    "image/jpeg",
+  ]);
+  const byKey: Record<string, string> = {};
+  const bySrc: PdfImages = new Map();
+  for (const [src, image] of images) {
+    const key = `img${bySrc.size}`;
+    byKey[key] = await toDataUrl(image.bytes, image.mime);
+    const size = fitBox(
+      {
+        width: image.width * POINTS_PER_PIXEL,
+        height: image.height * POINTS_PER_PIXEL,
+      },
+      CONTENT_WIDTH,
+      CONTENT_HEIGHT,
+    );
+    bySrc.set(src, { key, ...size });
+  }
+  return { byKey, bySrc, failures };
+};
+
+const toPDF: exporterFunc = async (state: EditorState, { docPath }) => {
   await registerFonts();
+  const { byKey, bySrc, failures } = await embedImages(state, docPath);
 
   const content = adjustMargins(
-    transformNode(state.doc).text as unknown as Block[],
+    transformNode(state.doc, bySrc).text as unknown as Block[],
   );
-  const docDefinition = Object.assign({}, BASE_DOCUMENT, { content });
+  const docDefinition = Object.assign({}, BASE_DOCUMENT, {
+    content,
+    images: byKey,
+  });
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error
   const pdf = pdfmake.createPdf(docDefinition);
 
-  return pdf.getBuffer();
+  return {
+    contents: (await pdf.getBuffer()) as Uint8Array,
+    warnings: failureWarning(failures),
+  };
 };
 
 export default toPDF;

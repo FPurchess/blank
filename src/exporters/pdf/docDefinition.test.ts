@@ -21,6 +21,9 @@ import {
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
 import { FALLBACK_FONT } from "./fallback";
+import { CONTENT_HEIGHT, CONTENT_WIDTH, PAGE_MARGIN } from "../page";
+import { IMAGES, dataUrl } from "../../test/images";
+import { rasterize } from "../../images/codec";
 
 vi.mock("pdfmake", () => ({
   default: {
@@ -31,6 +34,11 @@ vi.mock("pdfmake", () => ({
 }));
 vi.mock("./pdfmake-vfs", () => ({
   default: { "IBMPlexSans-Regular.ttf": "font" },
+}));
+
+vi.mock("../../images/codec", () => ({
+  decodeSize: vi.fn(),
+  rasterize: vi.fn(),
 }));
 
 const createPdf = vi.mocked(pdfmake.createPdf);
@@ -46,7 +54,7 @@ const exportDoc = async (node: ReturnType<typeof doc>) => {
     typeof pdfmake.createPdf
   >);
 
-  const result = await toPDF(createState(node));
+  const result = await toPDF(createState(node), { docPath: null });
 
   const [definition] = createPdf.mock.calls[0];
   return { definition, result, buffer };
@@ -64,7 +72,7 @@ describe("exporter.pdf document definition", () => {
   it("returns the rendered PDF", async () => {
     const { result, buffer } = await exportDoc(doc(p("text")));
 
-    expect(result).toBe(buffer);
+    expect(result).toEqual({ contents: buffer, warnings: [] });
   });
 
   it("uses the base document styles", async () => {
@@ -72,6 +80,7 @@ describe("exporter.pdf document definition", () => {
 
     expect(definition).toMatchObject({
       pageSize: BASE_DOCUMENT.pageSize,
+      pageMargins: PAGE_MARGIN,
       defaultStyle: BASE_DOCUMENT.defaultStyle,
       styles: BASE_DOCUMENT.styles,
       pageBreakBefore: BASE_DOCUMENT.pageBreakBefore,
@@ -122,8 +131,8 @@ describe("exporter.pdf document definition", () => {
       getBuffer: vi.fn(),
     } as unknown as ReturnType<typeof pdfmake.createPdf>);
 
-    await freshToPDF(createState(doc(p("a"))));
-    await freshToPDF(createState(doc(p("b"))));
+    await freshToPDF(createState(doc(p("a"))), { docPath: null });
+    await freshToPDF(createState(doc(p("b"))), { docPath: null });
 
     expect(freshPdfmake.addVirtualFileSystem).toHaveBeenCalledTimes(1);
     expect(freshPdfmake.addFonts).toHaveBeenCalledTimes(1);
@@ -295,6 +304,89 @@ describe("exporter.pdf document definition", () => {
           },
         ],
       },
+    ]);
+  });
+});
+
+describe("exporter.pdf images", () => {
+  const PNG = dataUrl("image/png", IMAGES.png);
+  const image = (src: string, alt: string | null = null) =>
+    schema.node("image", { src, alt });
+  const paragraph = (...content: Parameters<typeof schema.node>[2][]) =>
+    schema.node("paragraph", null, content.flat() as never);
+
+  it("puts the images into the document, sized like in the editor", async () => {
+    const { definition, result } = await exportDoc(
+      doc(paragraph([image(PNG)])),
+    );
+
+    expect(definition.images).toEqual({ img0: PNG });
+    expect(definition.content).toMatchObject([
+      {
+        style: "paragraph",
+        stack: [{ image: "img0", width: 3 * 0.75, height: 2 * 0.75 }],
+      },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("splits text around images into blocks", async () => {
+    const { definition } = await exportDoc(
+      doc(
+        paragraph([schema.text("before "), image(PNG), schema.text(" after")]),
+      ),
+    );
+
+    const [block] = definition.content as { stack: object[] }[];
+    expect(block.stack).toMatchObject([
+      { text: [text("before ")] },
+      { image: "img0" },
+      { text: [text(" after")] },
+    ]);
+  });
+
+  it("keeps the heading level of a heading with an image", async () => {
+    const { definition } = await exportDoc(
+      doc(schema.node("heading", { level: 2 }, [image(PNG)])),
+    );
+
+    expect(definition.content).toMatchObject([
+      { style: "heading2", headlineLevel: 2, stack: [{ image: "img0" }] },
+    ]);
+  });
+
+  it("scales large images down to the page", async () => {
+    vi.mocked(rasterize).mockResolvedValue({
+      bytes: Uint8Array.from(atob(IMAGES.png), (c) => c.charCodeAt(0)),
+      mime: "image/png",
+      size: { width: 4000, height: 1000 },
+    });
+
+    const { definition } = await exportDoc(
+      doc(paragraph([image(dataUrl("image/webp", IMAGES.webpLossy))])),
+    );
+
+    const [{ stack }] = definition.content as { stack: object[] }[];
+    expect(stack[0]).toEqual({
+      image: "img0",
+      width: CONTENT_WIDTH,
+      height: CONTENT_WIDTH / 4,
+    });
+    expect(CONTENT_WIDTH / 4).toBeLessThan(CONTENT_HEIGHT);
+  });
+
+  it("writes the alt text of images that can't be loaded", async () => {
+    const { definition, result } = await exportDoc(
+      doc(paragraph([image("img/a.png", "Chart"), image("img/b.png")])),
+    );
+
+    const [{ stack }] = definition.content as { stack: object[] }[];
+    expect(stack).toEqual([
+      { text: [{ text: "Chart", italics: true }] },
+      { text: [{ text: "img/b.png", italics: true }] },
+    ]);
+    expect(result.warnings).toEqual([
+      "2 images could not be embedded: Chart, img/b.png",
     ]);
   });
 });
