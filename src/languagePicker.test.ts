@@ -53,6 +53,16 @@ describe("languagePicker", () => {
     expect(languagePicker.value.selected).toBe("sv");
   });
 
+  it("keeps a current language without rules of its own reachable", () => {
+    language.value = "tr";
+    openPicker();
+
+    move(-1);
+    expect(languagePicker.value.selected).toBe("sv");
+    move(1);
+    expect(languagePicker.value.selected).toBe("tr");
+  });
+
   it("selects a typed ISO code", () => {
     typeChar("P");
     expect(languagePicker.value).toMatchObject({ buffer: "p", invalid: false });
@@ -107,5 +117,13 @@ describe("languagePicker", () => {
 
     expect(language.value).toBe("de");
     expect(languagePicker.value.open).toBe(false);
+  });
+
+  it("forgets a rejected code when it closes", () => {
+    typeChar("x");
+    typeChar("x");
+    closePicker();
+
+    expect(languagePicker.value).toMatchObject({ buffer: "", invalid: false });
   });
 });

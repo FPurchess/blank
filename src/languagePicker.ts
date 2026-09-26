@@ -4,14 +4,16 @@ import { supportedLanguages } from "./editor/plugins/autocomplete/languages";
 
 /**
  * pickerLanguages returns the languages the picker steps through: all
- * languages with rules of their own plus the current one
+ * languages with rules of their own plus the current and the selected one
  */
-export const pickerLanguages = (): string[] => {
-  const current = languagePicker.value.selected;
-  return supportedLanguages.includes(current)
-    ? supportedLanguages
-    : [...supportedLanguages, current].sort();
-};
+export const pickerLanguages = (): string[] =>
+  [
+    ...new Set([
+      ...supportedLanguages,
+      language.value,
+      languagePicker.value.selected,
+    ]),
+  ].sort();
 
 /**
  * openPicker opens the language picker on the current language
@@ -29,7 +31,12 @@ export const openPicker = () => {
  * closePicker closes the language picker without choosing a language
  */
 export const closePicker = () => {
-  languagePicker.value = { ...languagePicker.value, open: false, buffer: "" };
+  languagePicker.value = {
+    ...languagePicker.value,
+    open: false,
+    buffer: "",
+    invalid: false,
+  };
 };
 
 /**
