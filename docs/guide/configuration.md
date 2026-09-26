@@ -8,7 +8,7 @@ Blank reads its settings from `blank.json` in the app config folder. The file is
 | macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json` |
 | Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                     |
 
-Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults.
+Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as a key it doesn't know or `"false"` in quotes instead of `false`, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored.
 
 ## Keyboard shortcuts
 
@@ -22,6 +22,8 @@ Map a command to a key under `keymap`. Keys are written like `Mod-Shift-s`, wher
   }
 }
 ```
+
+You can also write the modifiers the way your keyboard names them: `Option` works like `Alt`, and `Command`, `Cmd` and `Super` work like `Meta`. Case doesn't matter, so `option-p` is fine too.
 
 ::: details The default configuration, with every command and its key
 <<< @/../blank.json

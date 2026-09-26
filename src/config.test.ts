@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
   bootConfig,
@@ -7,6 +8,7 @@ import {
   config,
   configInitialized,
   getKeyBinding,
+  isRecord,
 } from "./config";
 import { mockTauriPath } from "./test/tauri";
 
@@ -142,6 +144,139 @@ describe("config", () => {
         de: { mfg: "Mit freundlichen Grüßen" },
       });
     });
+  });
+
+  describe("invalid settings", () => {
+    /**
+     * bootWith boots the config with `content` as blank.json
+     */
+    const bootWith = async (content: string) => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(content);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await bootConfig();
+    };
+
+    it.each(["null", "[]", '"text"', "42"])(
+      "uses the defaults for a config file of %s",
+      async (content) => {
+        await bootWith(content);
+
+        expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
+        expect(config.value.autocorrect.replace).toEqual({ "*": {} });
+        expect(configInitialized.value).toBe(true);
+      },
+    );
+
+    it("ignores a keymap and autocorrect that aren't objects", async () => {
+      await bootWith(JSON.stringify({ keymap: "Mod-b", autocorrect: [true] }));
+
+      expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
+      expect(config.value.autocorrect.arrows).toBe(true);
+      expect(sendNotification).toHaveBeenCalledOnce();
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: keymap, autocorrect",
+      );
+    });
+
+    it("only takes key bindings that are strings", async () => {
+      await bootWith(
+        JSON.stringify({
+          keymap: {
+            [CommandIdentifier.FORMAT_BOLD]: 42,
+            [CommandIdentifier.FORMAT_ITALIC]: "Mod-j",
+          },
+        }),
+      );
+
+      expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
+      expect(getKeyBinding(CommandIdentifier.FORMAT_ITALIC)).toBe("Mod-j");
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: keymap.format.bold",
+      );
+    });
+
+    it("keeps the default for autocorrect settings of the wrong type", async () => {
+      await bootWith(
+        JSON.stringify({
+          autocorrect: { quotes: "false", arrows: false, unknown: 1 },
+        }),
+      );
+
+      expect(config.value.autocorrect.quotes).toBe(true);
+      expect(config.value.autocorrect.arrows).toBe(false);
+      expect(config.value.autocorrect).not.toHaveProperty("unknown");
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: autocorrect.quotes",
+      );
+    });
+
+    it("ignores replacements that aren't an object", async () => {
+      await bootWith(JSON.stringify({ autocorrect: { replace: null } }));
+
+      expect(config.value.autocorrect.replace).toEqual({ "*": {} });
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: autocorrect.replace",
+      );
+    });
+
+    it("ignores languages whose replacements aren't all strings", async () => {
+      await bootWith(
+        JSON.stringify({
+          autocorrect: {
+            replace: {
+              de: { mfg: "Mit freundlichen Grüßen" },
+              fr: "nope",
+              it: { ok: "ok", bad: 1 },
+            },
+          },
+        }),
+      );
+
+      expect(config.value.autocorrect.replace).toEqual({
+        "*": {},
+        de: { mfg: "Mit freundlichen Grüßen" },
+      });
+      expect(sendNotification).toHaveBeenCalledOnce();
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: autocorrect.replace.fr, autocorrect.replace.it",
+      );
+    });
+
+    it("can't replace the prototype of the replacements", async () => {
+      await bootWith(
+        '{"autocorrect":{"replace":{"__proto__":{"polluted":"yes"}}}}',
+      );
+
+      const replace = config.value.autocorrect.replace;
+      expect(Object.getPrototypeOf(replace)).toBe(Object.prototype);
+      expect(replace).toEqual({ "*": {} });
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it("doesn't notify for a valid config", async () => {
+      await bootWith(
+        JSON.stringify({
+          keymap: { [CommandIdentifier.FORMAT_BOLD]: "Mod-d" },
+          autocorrect: { quotes: false, replace: { "*": { a: "b" } } },
+        }),
+      );
+
+      expect(sendNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    [{}, true],
+    [{ a: 1 }, true],
+    [null, false],
+    [[], false],
+    ["text", false],
+    [1, false],
+    [undefined, false],
+  ])("isRecord(%j) is %s", (value, expected) => {
+    expect(isRecord(value)).toBe(expected);
   });
 
   it("binds language.choose to Mod-Alt-l by default", async () => {

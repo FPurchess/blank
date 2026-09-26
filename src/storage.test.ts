@@ -5,6 +5,7 @@ import { schema } from "prosemirror-markdown";
 import { Node } from "prosemirror-model";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { doc, h, p } from "./test/editor";
 import { flushPromises } from "./test/async";
@@ -282,6 +283,28 @@ describe("storage", () => {
       const restored = await getDocumentFromStorage();
 
       expect(restored?.eq(stored)).toBe(true);
+    });
+  });
+
+  describe("unavailable storage", () => {
+    it("notifies and neither restores nor persists anything", async () => {
+      await localforage.setItem("doc", doc(p("stored")).toJSON());
+      await localforage.setItem("path", "/stored.md");
+      vi.spyOn(localforage, "ready").mockRejectedValue(new Error("no idb"));
+      const setItem = vi.spyOn(localforage, "setItem");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { path, getDocumentFromStorage, getPathfromStorage } =
+        await bootFresh();
+      path.value = "/other.md";
+      await flushPromises();
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining("no idb"),
+      );
+      expect(setItem).not.toHaveBeenCalled();
+      expect(await getDocumentFromStorage()).toBeUndefined();
+      expect(await getPathfromStorage()).toBeUndefined();
     });
   });
 

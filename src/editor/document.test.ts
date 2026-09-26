@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
 import { history, undo } from "prosemirror-history";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
+import { getMatches } from "@tauri-apps/plugin-cli";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -261,5 +263,86 @@ describe("applyInitialDocument", () => {
     const newState = await applyInitialDocument(emptyState());
 
     expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+  });
+  it("should notify and fall back when the command-line arguments are invalid", async () => {
+    vi.mocked(getMatches).mockRejectedValue(
+      "Found argument 'b.md' which wasn't expected",
+    );
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
+    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue(null);
+
+    const newState = await applyInitialDocument(emptyState());
+
+    expect(newState.doc).toEqual(storedDoc);
+    expect(sendNotification).toHaveBeenCalledOnce();
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^Blank opens one file at a time.*Found argument 'b\.md' which wasn't expected$/,
+      ),
+    );
+  });
+
+  it.each([
+    [{ code: 2 }, '{"code":2}'],
+    [undefined, "undefined"],
+    [BigInt(1), "1"],
+  ])(
+    "should describe a command-line error of %s as %j",
+    async (error, text) => {
+      vi.mocked(getMatches).mockRejectedValue(error);
+      vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(undefined);
+
+      await applyInitialDocument(emptyState());
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`: ${text}$`)),
+      );
+    },
+  );
+
+  it("should fall back when the file from the command line can't be checked", async () => {
+    mockCliArgs("/cli.md");
+    vi.mocked(exists).mockRejectedValue(new Error("forbidden"));
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
+    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue(null);
+
+    const newState = await applyInitialDocument(emptyState());
+
+    expect(newState.doc).toEqual(storedDoc);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Failed to open file: forbidden",
+    );
+  });
+
+  describe("with a stored document that can't be restored", () => {
+    const corrupt = { type: "doc", content: [{ type: "no_such_node" }] };
+
+    beforeEach(async () => {
+      await localforage.clear();
+      await localforage.setItem("doc", corrupt);
+      mockCliArgs();
+    });
+
+    it("should back it up and fall back to the welcome document", async () => {
+      const newState = await applyInitialDocument(emptyState());
+
+      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(await localforage.getItem("doc-backup")).toEqual(corrupt);
+      expect(sendNotification).toHaveBeenCalledOnce();
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining('A copy was kept as "doc-backup".'),
+      );
+    });
+
+    it("should still start when the backup fails", async () => {
+      vi.spyOn(localforage, "setItem").mockRejectedValue(new Error("full"));
+
+      const newState = await applyInitialDocument(emptyState());
+
+      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.not.stringContaining("doc-backup"),
+      );
+    });
   });
 });

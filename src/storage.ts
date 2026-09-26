@@ -9,6 +9,7 @@ import {
   isIsoCode,
 } from "./editor/plugins/autocomplete/languages/lookup";
 import { schema } from "prosemirror-markdown";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({
   name: "Blank",
@@ -62,8 +63,22 @@ export const flush = (): Promise<void> =>
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// false when the storage can't be used, so nothing is restored or persisted
+let storageAvailable = true;
+
 export const bootStorage = async () => {
-  await localforage.ready();
+  try {
+    await localforage.ready();
+    storageAvailable = true;
+  } catch (error) {
+    storageAvailable = false;
+    language.value = detectLanguage();
+    console.error("storage is unavailable", error);
+    sendNotification(
+      `Blank can't use its storage, so your text won't be restored on the next start: ${error}`,
+    );
+    return;
+  }
 
   path.subscribe((value: string | null) => {
     latestPath = value;
@@ -109,9 +124,12 @@ export const bootStorage = async () => {
 };
 
 export const getDocumentFromStorage = async (): Promise<Node | undefined> => {
+  if (!storageAvailable) return;
   const node = await localforage.getItem("doc");
   return node === null ? undefined : Node.fromJSON(schema, node);
 };
 
 export const getPathfromStorage = async () =>
-  await localforage.getItem<string | null>("path");
+  storageAvailable
+    ? await localforage.getItem<string | null>("path")
+    : undefined;

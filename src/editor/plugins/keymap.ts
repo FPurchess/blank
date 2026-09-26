@@ -14,6 +14,7 @@ import {
   splitListItem,
 } from "prosemirror-schema-list";
 import { schema } from "prosemirror-markdown";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
   newFile,
@@ -79,18 +80,71 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
 };
 
+// modifier names people know from their OS, mapped to the ones
+// prosemirror-keymap understands
+const modifierAliases: { [alias: string]: string } = {
+  option: "Alt",
+  command: "Meta",
+  cmd: "Meta",
+  super: "Meta",
+};
+
+// the modifiers prosemirror-keymap accepts, see normalizeKeyName there
+const knownModifier = /^(mod|s|shift|a|alt|c|ctrl|control|m|meta|cmd)$/i;
+
+/**
+ * normalizeBinding maps modifier aliases such as `Option` or `Command` to the
+ * names prosemirror-keymap understands
+ * @param binding key binding like "Command-Shift-s"
+ * @returns the normalized binding, or undefined if it can't be used
+ */
+export const normalizeBinding = (binding: string): string | undefined => {
+  if (typeof binding !== "string" || binding === "") return;
+  // split like prosemirror-keymap does, so "Mod--" binds the minus key
+  const parts = binding.split(/-(?!$)/);
+  const key = parts.pop() as string;
+  const modifiers: string[] = [];
+  for (const part of parts) {
+    const modifier = modifierAliases[part.toLowerCase()] ?? part;
+    if (!knownModifier.test(modifier)) return;
+    modifiers.push(modifier);
+  }
+  return [...modifiers, key].join("-");
+};
+
+/**
+ * bindCommands binds every command to its configured key. Bindings that
+ * can't be used are skipped and reported once.
+ */
+const bindCommands = () => {
+  const invalid: string[] = [];
+  const bindings = Object.keys(commandMap).reduce(
+    (acc: { [key: string]: Command }, key: string) => {
+      const binding = getKeyBinding(key as CommandIdentifier);
+      const normalized = normalizeBinding(binding);
+      if (normalized === undefined) {
+        invalid.push(`${key}: ${binding}`);
+        return acc;
+      }
+      acc[normalized] = commandMap[key as CommandIdentifier];
+      return acc;
+    },
+    {},
+  );
+  if (invalid.length > 0) {
+    console.warn("ignored invalid key bindings", invalid);
+    sendNotification(
+      `Ignored invalid key bindings in blank.json: ${invalid.join(", ")}`,
+    );
+  }
+  return bindings;
+};
+
 export const keymap = () =>
   _keymap({
     ...baseKeymap,
 
-    ...Object.keys(commandMap).reduce(
-      (acc: { [key: string]: Command }, key: string) => {
-        acc[getKeyBinding(key as CommandIdentifier)] =
-          commandMap[key as CommandIdentifier];
-        return acc;
-      },
-      {},
-    ),
+    ...bindCommands(),
 
     Enter: chainCommands(
       splitListItem(schema.nodes.list_item),
