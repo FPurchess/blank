@@ -15,6 +15,13 @@ import { type Misspelling, misspellingAt } from "./spellcheck";
 // event is ignored, which some webviews send for the same key press
 const KEYBOARD_EVENT_WINDOW = 500;
 
+// how long the menu waits for the suggestions before it shows them loading
+export const SUGGESTION_WAIT = 250;
+
+// the close function of the menu opened last, which stale suggestions mustn't
+// replace
+let latest: (() => void) | undefined;
+
 // when the keyboard last opened the menu of each editor
 const openedByKeyboardAt = new WeakMap<EditorView, number>();
 
@@ -91,19 +98,32 @@ export const openContextMenu = (
     keyboard,
     close,
   });
-  contextMenu.value = request(target);
+  latest = close;
 
   const { misspelling } = target;
   const checker = spellchecker.value;
-  if (misspelling && checker) {
-    const show = (suggestions: string[]) => {
-      // unless the menu was closed or replaced meanwhile
-      if (contextMenu.value?.close === close) {
-        contextMenu.value = request({ misspelling, suggestions });
-      }
-    };
-    checker.suggest(misspelling.word).then(show, () => show([]));
+  if (!misspelling || !checker) {
+    contextMenu.value = request(target);
+    return;
   }
+
+  // the menu waits a moment for the suggestions, so its items don't move
+  // while the user reaches for one
+  let shown = false;
+  const open = (suggestions?: string[]) => {
+    shown = true;
+    // unless another menu was opened meanwhile
+    if (latest === close) {
+      contextMenu.value = request({ misspelling, suggestions });
+    }
+  };
+  const timer = window.setTimeout(open, SUGGESTION_WAIT);
+  const show = (suggestions: string[]) => {
+    window.clearTimeout(timer);
+    // unless the menu was closed meanwhile
+    if (!shown || contextMenu.value?.close === close) open(suggestions);
+  };
+  checker.suggest(misspelling.word).then(show, () => show([]));
 };
 
 /**

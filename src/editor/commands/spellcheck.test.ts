@@ -89,6 +89,7 @@ describe("spell check commands", () => {
 
     expect(press("Mod-Alt-n")).toBe(true);
     expect(selected()).toBe("tset");
+    await vi.advanceTimersByTimeAsync(0);
     expect(contextMenu.value?.keyboard).toBe(true);
 
     press("Mod-Alt-n");
@@ -129,6 +130,7 @@ describe("spell check commands", () => {
     const press = await setup();
 
     expect(press("Shift-F10")).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
     expect(contextMenu.value).toMatchObject({
       keyboard: true,
       anchor: { left: 1, top: 2, bottom: 3 },

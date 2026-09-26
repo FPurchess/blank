@@ -15,7 +15,12 @@ import {
 } from "../../state";
 import type { Spellchecker } from "../../spellcheck/types";
 import { spellcheck as spellcheckPlugin } from "./spellcheck";
-import { contextMenuPlugin, openContextMenu, prefetch } from "./contextMenu";
+import {
+  contextMenuPlugin,
+  openContextMenu,
+  prefetch,
+  SUGGESTION_WAIT,
+} from "./contextMenu";
 
 const checker = (overrides: Partial<Spellchecker> = {}): Spellchecker => ({
   tag: "en",
@@ -100,12 +105,46 @@ describe("plugin.contextMenu", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(view.state.selection.from).toBe(8);
+    // waits for the suggestions, so the items don't move once it's open
+    expect(contextMenu.value).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(0);
     expect(contextMenu.value?.anchor).toEqual({ left: 8, top: 5, bottom: 5 });
     expect(contextMenu.value?.keyboard).toBe(false);
+    expect(ids()?.slice(0, 2)).toEqual(["suggestion:wrong", "change-all"]);
+  });
+
+  it("shows slow suggestions as loading until they arrive", async () => {
+    const suggestions = deferred<string[]>();
+    await setup(checker({ suggest: vi.fn(() => suggestions.promise) }));
+
+    rightClick(8);
+    await vi.advanceTimersByTimeAsync(SUGGESTION_WAIT);
     expect(ids()?.[0]).toBe("loading");
 
+    suggestions.resolve(["wrong"]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ids()?.[0]).toBe("suggestion:wrong");
+  });
+
+  it("drops the suggestions of a menu opened before another one", async () => {
+    const suggestions = deferred<string[]>();
+    await setup(
+      checker({
+        suggest: vi
+          .fn()
+          .mockReturnValueOnce(suggestions.promise)
+          .mockResolvedValue(["wrung"]),
+      }),
+    );
+
+    rightClick(8);
+    rightClick(9);
+    await vi.advanceTimersByTimeAsync(0);
+    suggestions.resolve(["wrong"]);
     await vi.runAllTimersAsync();
-    expect(ids()?.slice(0, 2)).toEqual(["suggestion:wrong", "change-all"]);
+
+    expect(ids()?.[0]).toBe("suggestion:wrung");
   });
 
   it("offers to remove a word of the personal dictionary", async () => {
@@ -175,6 +214,7 @@ describe("plugin.contextMenu", () => {
       cancelable: true,
     });
     view.dom.dispatchEvent(key);
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(key.defaultPrevented).toBe(true);
     expect(contextMenu.value?.keyboard).toBe(true);
@@ -230,6 +270,7 @@ describe("plugin.contextMenu", () => {
     const focus = vi.spyOn(view, "focus");
 
     rightClick(8);
+    await vi.advanceTimersByTimeAsync(SUGGESTION_WAIT);
     contextMenu.value!.close();
     suggestions.resolve(["wrong"]);
     await vi.runAllTimersAsync();

@@ -32,6 +32,8 @@ const rightClick = async (word: string) => {
   );
   await target.click({ button: "right" });
   await expect(menu()).toBeDisplayed();
+  // the items move once slow suggestions arrive
+  await $(`[data-id="loading"]`).waitForExist({ reverse: true });
 };
 
 /**
@@ -70,6 +72,7 @@ const contextMenuOn = async (word: string) => {
     throw new Error(`${word} isn't in the editor`);
   }, word);
   await expect(menu()).toBeDisplayed();
+  await $(`[data-id="loading"]`).waitForExist({ reverse: true });
 };
 
 describe("spell check", () => {
