@@ -52,6 +52,8 @@ Documents are plain markdown files, so any other editor can open them.
 
 `Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
 
+The PDF looks like your document in Blank: quotes keep their bar on the left and every paragraph, list and heading inside them, line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3.
+
 ### Open Word documents
 
 `Mod` `O` also opens Word documents (.docx), and so does starting Blank with one, e.g. `blank report.docx`. Blank turns it into a new, untitled markdown document and never changes the Word file. Press `Mod` `S` to keep it: Blank suggests the same name with `.md`, next to the original. The top of the window shows _report.docx (imported)_ until then.

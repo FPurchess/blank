@@ -10,6 +10,7 @@ import { failureWarning, prepareImages } from "../../images/prepare";
 import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
 import {
   BASE_DOCUMENT,
+  BLOCKQUOTE_LAYOUT,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
@@ -75,7 +76,7 @@ const hasImage = (n: Node) => {
   return found;
 };
 
-// TODO: support hard breaks and horizontal lines
+// TODO: support horizontal lines
 const transformNode = (n: Node, images: PdfImages) => {
   const link = n.marks.find((mark: Mark) => mark.type.name === "link");
   const item = {
@@ -83,6 +84,10 @@ const transformNode = (n: Node, images: PdfImages) => {
     stack: undefined,
     ul: undefined,
     ol: undefined,
+    // the number of the first item of an ordered list
+    start: undefined,
+    table: undefined,
+    layout: undefined,
     text: undefined,
     // only set when true: an explicit false would override the style, e.g.
     // the bold of a heading
@@ -118,7 +123,39 @@ const transformNode = (n: Node, images: PdfImages) => {
       });
       break;
 
+    case "hard_break":
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.text = "\n";
+      break;
+
+    case "blockquote": {
+      // a one-cell table, so the quote gets a bar on its left like in the
+      // editor. The quote's own margin separates it from its siblings, so its
+      // first block has no top and its last block no bottom margin.
+      const stack: object[] = [];
+      n.forEach((node, _, index) => {
+        stack.push({
+          ...transformNode(node, images),
+          ...(index === 0 ? { marginTop: 0 } : {}),
+          ...(index === n.childCount - 1 ? { marginBottom: 0 } : {}),
+        });
+      });
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.table = { widths: ["*"], body: [[{ stack }]] };
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.layout = BLOCKQUOTE_LAYOUT;
+      break;
+    }
+
     case "ordered_list":
+      if (n.attrs.order !== 1) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        item.start = n.attrs.order as number;
+      }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       item.ol = [];

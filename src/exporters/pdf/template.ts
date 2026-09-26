@@ -39,6 +39,18 @@ export const HEADING_AFTER_HEADING_MARGIN_TOP = 4;
 // space between blocks inside a list item, e.g. a nested list
 export const LIST_ITEM_BLOCK_MARGIN_TOP = 2;
 
+// blockquotes mirror the editor: a 3px bar on the left and 1em of space
+// between the bar and the text (src/scss/main.scss)
+const BLOCKQUOTE_BAR = 2.25;
+export const BLOCKQUOTE_LAYOUT = {
+  hLineWidth: () => 0,
+  vLineWidth: (index: number) => (index === 0 ? BLOCKQUOTE_BAR : 0),
+  paddingLeft: () => BODY_SIZE,
+  paddingRight: () => 0,
+  paddingTop: () => 0,
+  paddingBottom: () => 0,
+};
+
 type PageNode = { headlineLevel?: number };
 type PageNodes = {
   getFollowingNodesOnPage: () => PageNode[];
@@ -80,6 +92,7 @@ export const BASE_DOCUMENT = {
     list_item: textStyleMixin(BODY_SIZE, BODY_LINE_HEIGHT, [0, 2, 0, 2]),
     bullet_list: { margin: BLOCK_MARGIN },
     ordered_list: { margin: BLOCK_MARGIN },
+    blockquote: { margin: BLOCK_MARGIN },
   },
   // Keep headings with the text they introduce: move a heading to the next
   // page when only headings follow it on this page. Checking for "only

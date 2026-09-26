@@ -3,6 +3,7 @@ import pdfmake from "pdfmake";
 import { schema } from "prosemirror-markdown";
 
 import {
+  blockquote,
   createState,
   createTestView,
   doc,
@@ -17,6 +18,7 @@ import autocomplete from "../../editor/plugins/autocomplete";
 import toPDF from ".";
 import {
   BASE_DOCUMENT,
+  BLOCKQUOTE_LAYOUT,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
@@ -305,6 +307,122 @@ describe("exporter.pdf document definition", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("exporter.pdf blocks", () => {
+  // the parts of the exported blocks these tests look into
+  type Block = {
+    start?: number;
+    table: {
+      body: { stack: { marginTop?: number; marginBottom?: number }[] }[][];
+    };
+  };
+  const blocks = (definition: { content: unknown }) =>
+    definition.content as Block[];
+
+  it("keeps the paragraphs of a blockquote apart", async () => {
+    const { definition } = await exportDoc(
+      doc(blockquote(p("Alpha"), p("Beta"))),
+    );
+
+    expect(definition.content).toMatchObject([
+      {
+        style: "blockquote",
+        layout: BLOCKQUOTE_LAYOUT,
+        table: {
+          widths: ["*"],
+          body: [
+            [
+              {
+                stack: [
+                  {
+                    style: "paragraph",
+                    text: [text("Alpha")],
+                    marginTop: 0,
+                  },
+                  { style: "paragraph", text: [text("Beta")], marginBottom: 0 },
+                ],
+              },
+            ],
+          ],
+        },
+      },
+    ]);
+    const [cell] = blocks(definition)[0].table.body[0];
+    expect(cell.stack[0].marginBottom).toBeUndefined();
+    expect(cell.stack[1].marginTop).toBeUndefined();
+  });
+
+  it("keeps lists and headings inside a blockquote", async () => {
+    const { definition } = await exportDoc(
+      doc(blockquote(h(2, "Title"), ul(li(p("one")), li(p("two"))))),
+    );
+
+    const [cell] = blocks(definition)[0].table.body[0];
+    expect(cell.stack).toMatchObject([
+      { style: "heading2", text: [text("Title")], marginTop: 0 },
+      {
+        style: "bullet_list",
+        ul: [
+          { stack: [{ text: [text("one")] }] },
+          { stack: [{ text: [text("two")] }] },
+        ],
+        marginBottom: 0,
+      },
+    ]);
+  });
+
+  it("draws the blockquote bar on the left only", () => {
+    expect(BLOCKQUOTE_LAYOUT.vLineWidth(0)).toBeGreaterThan(0);
+    expect(BLOCKQUOTE_LAYOUT.vLineWidth(1)).toBe(0);
+    expect(BLOCKQUOTE_LAYOUT.hLineWidth()).toBe(0);
+    expect(BLOCKQUOTE_LAYOUT.paddingLeft()).toBeGreaterThan(0);
+    expect(BLOCKQUOTE_LAYOUT.paddingRight()).toBe(0);
+    expect(BLOCKQUOTE_LAYOUT.paddingTop()).toBe(0);
+    expect(BLOCKQUOTE_LAYOUT.paddingBottom()).toBe(0);
+  });
+
+  it("turns hard breaks into line breaks", async () => {
+    const { definition } = await exportDoc(
+      doc(
+        schema.node("paragraph", null, [
+          schema.text("Kind regards,"),
+          schema.nodes.hard_break.create(),
+          schema.text("Jane Doe"),
+        ]),
+      ),
+    );
+
+    expect(definition.content).toMatchObject([
+      {
+        style: "paragraph",
+        text: [
+          text("Kind regards,"),
+          { style: "hard_break", text: "\n" },
+          text("Jane Doe"),
+        ],
+      },
+    ]);
+  });
+
+  it("keeps the number an ordered list starts with", async () => {
+    const { definition } = await exportDoc(
+      doc(
+        schema.nodes.ordered_list.create({ order: 3 }, [
+          li(p("three")),
+          li(p("four")),
+        ]),
+        ol(li(p("one"))),
+      ),
+    );
+
+    expect(blocks(definition)[0]).toMatchObject({
+      style: "ordered_list",
+      start: 3,
+    });
+    const [, fromOne] = blocks(definition);
+    expect(fromOne.start).toBeUndefined();
   });
 });
 
