@@ -20,7 +20,21 @@ Download the `.msi` installer, or the `.exe` if you prefer a setup wizard. Both 
 
 ## Linux
 
-Blank needs glibc 2.35 or newer and WebKitGTK 4.1, e.g. Ubuntu 22.04+ or Debian 12+.
+The easiest way is the [Snap Store](https://snapcraft.io/blank-editor), which keeps Blank up to date by itself and works on Ubuntu and most other distributions:
+
+```sh
+sudo snap install blank-editor
+```
+
+::: details How the Snap differs
+Snaps run in a sandbox that only sees part of your computer:
+
+- `Mod` `O`, `Mod` `Shift` `S` and the exports reach every file you pick.
+- From the terminal, `blank-editor notes.md` opens files in your home folder, except in hidden folders like `~/.notes`. For USB drives and other disks, run `sudo snap connect blank-editor:removable-media` once.
+- Its settings and saved document are separate from a `.deb`, `.rpm` or AppImage install. The config file is `~/snap/blank-editor/current/.config/com.github.fpurchess.blank/blank.json`.
+  :::
+
+The packages below need glibc 2.35 or newer and WebKitGTK 4.1, e.g. Ubuntu 22.04+ or Debian 12+.
 
 - **Debian, Ubuntu:** `sudo apt install ./blank_*_amd64.deb`
 - **Fedora:** `sudo dnf install ./blank-*.x86_64.rpm`
@@ -37,6 +51,10 @@ Pass a path to open a markdown file directly:
 
 ```sh [Linux]
 blank ~/Documents/notes.md
+```
+
+```sh [Snap]
+blank-editor ~/Documents/notes.md
 ```
 
 ```sh [macOS]

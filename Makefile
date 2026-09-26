@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-e2e dev dev-web build build-debug lint lint-fix \
+.PHONY: help install install-e2e dev dev-web build snap build-debug lint lint-fix \
 	format format-check test test-coverage test-rust test-e2e test-e2e-headless check clean \
 	dictionaries \
 	install-docs docs-dev docs-build docs-screenshots bump release
@@ -30,6 +30,9 @@ dev-web: ## Serve only the frontend (Tauri APIs fail in the browser)
 
 build: ## Build the installers for the current platform
 	bun run tauri build
+
+snap: ## Build the .deb and pack it as a snap (needs snapcraft and LXD or Multipass)
+	bun run snap
 
 build-debug: ## Build the debug binary without installers, as used by the e2e tests
 	bun run tauri build --debug --no-bundle

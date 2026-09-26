@@ -2,11 +2,12 @@
 
 Blank reads its settings from `blank.json` in the app config folder. The file is optional: list only what you want to change, everything else keeps its default.
 
-| System  | Config file                                                           |
-| ------- | --------------------------------------------------------------------- |
-| Linux   | `~/.config/com.github.fpurchess.blank/blank.json`                     |
-| macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json` |
-| Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                     |
+| System  | Config file                                                                 |
+| ------- | --------------------------------------------------------------------------- |
+| Linux   | `~/.config/com.github.fpurchess.blank/blank.json`                           |
+| Snap    | `~/snap/blank-editor/current/.config/com.github.fpurchess.blank/blank.json` |
+| macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json`       |
+| Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                           |
 
 Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as a key it doesn't know or `"false"` in quotes instead of `false`, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored.
 

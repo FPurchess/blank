@@ -21,6 +21,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "snap": "tauri build --bundles deb && cp \"$(ls -t src-tauri/target/release/bundle/deb/blank_*_amd64.deb | head -1)\" blank.deb && snapcraft pack",
     "lint": "eslint src && tsc",
     "lint:fix": "eslint --fix src && tsc",
     "format": "prettier --write --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
