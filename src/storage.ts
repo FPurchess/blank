@@ -1,8 +1,8 @@
 import localforage from "localforage";
 import { Transaction } from "prosemirror-state";
 import { Node } from "prosemirror-model";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { debounce } from "observable.ts";
 import { language, path, transaction, theme, themeType, themes } from "./state";
 import {
   detectLanguage,
@@ -15,11 +15,59 @@ localforage.config({
   version: 1,
 });
 
+// the document is written at most this long after the first unsaved change
+const maxWait = 1000;
+
+let latestDoc: Node | null = null;
+let latestPath: string | null = null;
+let pending = false;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * write stores the latest path and document together, so the stored path
+ * never points at a file while the stored document belongs to another one
+ */
+const write = () => {
+  clearTimeout(timer);
+  timer = undefined;
+  // nothing to pair the path with yet: keep the stored pair as it is
+  if (latestDoc === null) return Promise.resolve();
+  pending = false;
+  return Promise.all([
+    localforage.setItem("path", latestPath),
+    localforage.setItem("doc", latestDoc.toJSON()),
+  ]).then(() => undefined);
+};
+
+/**
+ * schedule writes the pending changes at most `maxWait` after the first one,
+ * so continuous typing is still stored every second
+ */
+const schedule = () => {
+  pending = true;
+  if (timer === undefined) {
+    timer = setTimeout(() => {
+      write().catch(console.warn);
+    }, maxWait);
+  }
+};
+
+/**
+ * flush writes pending changes right away
+ * @returns a promise that settles once they are stored
+ */
+export const flush = (): Promise<void> =>
+  pending ? write() : Promise.resolve();
+
+const timeout = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export const bootStorage = async () => {
   await localforage.ready();
 
   path.subscribe((value: string | null) => {
-    localforage.setItem("path", value).catch(console.warn);
+    latestPath = value;
+    schedule();
   });
 
   const _theme = await localforage.getItem("theme");
@@ -42,13 +90,22 @@ export const bootStorage = async () => {
     localforage.setItem("language", value).catch(console.warn);
   });
 
-  transaction.subscribe(
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    debounce((tx: Transaction) => {
-      localforage.setItem("doc", tx.doc.toJSON()).catch(console.warn);
-    }, 1000),
-  );
+  transaction.subscribe((tx: Transaction | null) => {
+    if (tx === null) return;
+    latestDoc = tx.doc;
+    latestPath = path.value;
+    schedule();
+  });
+
+  // store the last edits before the window closes. A failing or hanging
+  // storage must never keep the window open
+  try {
+    await getCurrentWindow().onCloseRequested(async () => {
+      await Promise.race([flush(), timeout(maxWait)]).catch(console.warn);
+    });
+  } catch (err) {
+    console.warn(err);
+  }
 };
 
 export const getDocumentFromStorage = async (): Promise<Node | undefined> => {

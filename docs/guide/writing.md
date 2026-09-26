@@ -21,7 +21,7 @@ Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` 
 
 ## Blank remembers your document
 
-Blank keeps what you write as you go, a moment after you stop typing, and restores it on the next start, together with the open file, the theme and the language. So you can close the window mid-thought without saving.
+Blank keeps what you write as you go, at least once a second and once more when you close the window, and restores it on the next start, together with the open file, the theme and the language. So you can close the window mid-thought without saving, and pick up right where you left off.
 
 ## Save, open and export
 

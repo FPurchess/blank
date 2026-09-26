@@ -61,14 +61,17 @@ export const endOfBlock = (node: Node, index: number) => {
 
 /**
  * createTestView returns a minimal EditorView stand-in that only supports
- * `state` and `dispatch`. That is all commands, transformers and key handlers
- * use, and a real EditorView can't scroll into view in jsdom.
+ * `state`, `dispatch` and `updateState`. That is all commands, transformers
+ * and key handlers use, and a real EditorView can't scroll into view in jsdom.
  */
 export const createTestView = (state: EditorState): EditorView => {
   const view = {
     state,
     dispatch(tr: Transaction) {
       view.state = view.state.apply(tr);
+    },
+    updateState(next: EditorState) {
+      view.state = next;
     },
   };
   return view as unknown as EditorView;

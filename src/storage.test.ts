@@ -2,9 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
 import { schema } from "prosemirror-markdown";
+import { Node } from "prosemirror-model";
+
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { doc, h, p } from "./test/editor";
 import { flushPromises } from "./test/async";
+
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
+
+type CloseHandler = () => Promise<void>;
+let closeHandler: CloseHandler | undefined;
 
 /**
  * bootFresh boots storage against freshly imported state observables, so no
@@ -21,6 +29,13 @@ const bootFresh = async () => {
 describe("storage", () => {
   beforeEach(async () => {
     await localforage.clear();
+    closeHandler = undefined;
+    vi.mocked(getCurrentWindow).mockReturnValue({
+      onCloseRequested: vi.fn(async (handler: CloseHandler) => {
+        closeHandler = handler;
+        return () => {};
+      }),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
   });
 
   describe("theme", () => {
@@ -99,42 +114,158 @@ describe("storage", () => {
     });
   });
 
-  describe("path", () => {
-    it("persists path changes", async () => {
-      const { path, getPathfromStorage } = await bootFresh();
+  describe("document and path", () => {
+    const state = EditorState.create({ schema, doc: doc(p("draft")) });
+    const replace = (node: ReturnType<typeof doc>) =>
+      state.tr.replaceWith(0, state.doc.content.size, node);
 
-      path.value = "/notes.md";
-      await flushPromises();
-      expect(await getPathfromStorage()).toBe("/notes.md");
-
-      path.value = null;
-      await flushPromises();
-      expect(await getPathfromStorage()).toBeNull();
+    /**
+     * stored returns the stored path and the text of the stored document
+     */
+    const stored = async () => ({
+      path: await localforage.getItem("path"),
+      text: (await localforage.getItem("doc"))
+        ? Node.fromJSON(schema, await localforage.getItem("doc")).textContent
+        : undefined,
     });
-  });
 
-  describe("document", () => {
-    it("persists the latest document once edits pause for a second", async () => {
-      const { transaction, getDocumentFromStorage } = await bootFresh();
+    it("stores the latest document a second after the first change", async () => {
+      const { transaction } = await bootFresh();
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      const state = EditorState.create({ schema, doc: doc(p("draft")) });
-      const final = doc(h(1, "Final"), p("text"));
 
-      transaction.value = state.tr.insertText("!");
-      transaction.value = state.tr.replaceWith(
-        0,
-        state.doc.content.size,
-        final,
-      );
+      transaction.value = replace(doc(p("first")));
+      transaction.value = replace(doc(h(1, "Final"), p("text")));
       vi.advanceTimersByTime(999);
       await flushPromises();
-      expect(await getDocumentFromStorage()).toBeUndefined();
+      expect(await localforage.getItem("doc")).toBeNull();
 
       vi.advanceTimersByTime(1);
       await flushPromises();
-      expect((await getDocumentFromStorage())?.toJSON()).toEqual(
-        final.toJSON(),
-      );
+      expect((await stored()).text).toBe("Finaltext");
+    });
+
+    it("keeps storing while the user types without a pause", async () => {
+      const { transaction } = await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+      // a keystroke every 100ms for 3 seconds
+      for (let i = 1; i <= 30; i++) {
+        transaction.value = replace(doc(p(`typed ${i}`)));
+        vi.advanceTimersByTime(100);
+        await flushPromises();
+        if (i === 10) expect((await stored()).text).toBe("typed 10");
+        if (i === 20) expect((await stored()).text).toBe("typed 20");
+      }
+      expect((await stored()).text).toBe("typed 30");
+    });
+
+    it("always stores the path together with the document", async () => {
+      const { path, transaction } = await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const setItem = vi.spyOn(localforage, "setItem");
+
+      transaction.value = replace(doc(p("a")));
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+      path.value = "/b.md";
+      transaction.value = replace(doc(p("b")));
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+      path.value = null;
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+
+      expect(setItem.mock.calls.map(([key]) => key)).toEqual([
+        "path",
+        "doc",
+        "path",
+        "doc",
+        "path",
+        "doc",
+      ]);
+      expect(await stored()).toEqual({ path: null, text: "b" });
+    });
+
+    it("doesn't store a new path before its document is known", async () => {
+      await localforage.setItem("path", "/a.md");
+      await localforage.setItem("doc", doc(p("a")).toJSON());
+      const { path } = await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+      path.value = "/b.md";
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+
+      expect(await stored()).toEqual({ path: "/a.md", text: "a" });
+    });
+
+    it("flush stores pending changes right away", async () => {
+      const { path, transaction, flush } = await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+      path.value = "/b.md";
+      transaction.value = replace(doc(p("unsaved")));
+      await flush();
+
+      expect(await stored()).toEqual({ path: "/b.md", text: "unsaved" });
+    });
+
+    it("flush does nothing without pending changes", async () => {
+      const { flush } = await bootFresh();
+      const setItem = vi.spyOn(localforage, "setItem");
+
+      await flush();
+
+      expect(setItem).not.toHaveBeenCalled();
+    });
+
+    it("stores pending changes when the window closes", async () => {
+      const { transaction } = await bootFresh();
+
+      transaction.value = replace(doc(p("closing")));
+      await closeHandler?.();
+
+      expect((await stored()).text).toBe("closing");
+    });
+
+    it("lets the window close when storing fails", async () => {
+      const { transaction } = await bootFresh();
+      const error = new Error("quota exceeded");
+      vi.spyOn(localforage, "setItem").mockRejectedValue(error);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      transaction.value = replace(doc(p("closing")));
+      await closeHandler?.();
+
+      expect(warn).toHaveBeenCalledWith(error);
+    });
+
+    it("lets the window close when storing hangs", async () => {
+      const { transaction } = await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      vi.spyOn(localforage, "setItem").mockReturnValue(new Promise(() => {}));
+
+      transaction.value = replace(doc(p("closing")));
+      let closed = false;
+      const closing = closeHandler?.().then(() => (closed = true));
+      vi.advanceTimersByTime(999);
+      await flushPromises();
+      expect(closed).toBe(false);
+
+      vi.advanceTimersByTime(1);
+      await closing;
+      expect(closed).toBe(true);
+    });
+
+    it("boots without a window to listen to", async () => {
+      vi.mocked(getCurrentWindow).mockImplementation(() => {
+        throw new Error("no window");
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await bootFresh();
+
+      expect(warn).toHaveBeenCalled();
     });
 
     it("returns undefined when no document is stored", async () => {
@@ -155,12 +286,15 @@ describe("storage", () => {
   });
 
   it("warns instead of failing when a value can't be stored", async () => {
-    const { path } = await bootFresh();
+    const { transaction } = await bootFresh();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const error = new Error("quota exceeded");
     vi.spyOn(localforage, "setItem").mockRejectedValue(error);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    path.value = "/notes.md";
+    const state = EditorState.create({ schema, doc: doc(p("draft")) });
+    transaction.value = state.tr.insertText("!");
+    vi.advanceTimersByTime(1000);
     await flushPromises();
 
     expect(warn).toHaveBeenCalledWith(error);

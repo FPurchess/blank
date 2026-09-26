@@ -13,18 +13,20 @@ export interface Options {
 
 export const _saveFile = async (state: EditorState, options: Options) => {
   try {
-    if (options.force === true || path.value === null) {
-      const newPath = await save({
+    let target = path.value;
+    if (options.force === true || target === null) {
+      target = await save({
         filters: [{ name: "Markdown", extensions: ["md"] }],
       });
-      if (newPath === null) {
+      if (target === null) {
         return;
       }
-      path.value = newPath;
     }
 
     const content = defaultMarkdownSerializer.serialize(state.doc) ?? "";
-    await writeTextFile(path.value, content);
+    await writeTextFile(target, content);
+    // only a successful write moves the document to the new file
+    path.value = target;
 
     sendNotification("Your file has been saved");
   } catch (err) {
