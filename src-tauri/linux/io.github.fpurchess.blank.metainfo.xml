@@ -20,7 +20,7 @@
       <li>Your hands stay on the keyboard: headings, lists, links and emphasis are one shortcut, or one typed character, away</li>
       <li>Quotes curl, dashes find their length and sentences start with a capital, in 14 languages, as you type</li>
       <li>Close the window mid-thought and Blank keeps your words for the next time you open it</li>
-      <li>Plain markdown files, exported as carefully typeset PDFs</li>
+      <li>Plain markdown files, exported as carefully typeset PDFs or Word documents, and Word documents imported as markdown</li>
       <li>Light, dark and colored themes, and shortcuts you can rebind</li>
     </ul>
   </description>
@@ -44,6 +44,7 @@
   <provides>
     <binary>blank</binary>
     <mediatype>text/markdown</mediatype>
+    <mediatype>application/vnd.openxmlformats-officedocument.wordprocessingml.document</mediatype>
   </provides>
 
   <content_rating type="oars-1.1" />

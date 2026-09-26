@@ -8,5 +8,5 @@ StartupWMClass={{exec}}
 Icon={{icon}}
 Terminal=false
 Categories=Utility;TextEditor;
-MimeType=text/markdown;text/x-markdown;
-Keywords=markdown;writing;editor;text;pdf;
+MimeType=text/markdown;text/x-markdown;application/vnd.openxmlformats-officedocument.wordprocessingml.document;
+Keywords=markdown;writing;editor;text;pdf;word;docx;
