@@ -130,6 +130,24 @@ describe("storage", () => {
         : undefined,
     });
 
+    it("stores the Word document an untitled document was imported from with it", async () => {
+      const { transaction, importedFrom, getImportedFromStorage } =
+        await bootFresh();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+      transaction.value = replace(doc(p("imported")));
+      importedFrom.value = "/docs/report.docx";
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+      expect(await getImportedFromStorage()).toBe("/docs/report.docx");
+      expect((await stored()).text).toBe("imported");
+
+      importedFrom.value = null;
+      vi.advanceTimersByTime(1000);
+      await flushPromises();
+      expect(await getImportedFromStorage()).toBeNull();
+    });
+
     it("stores the latest document a second after the first change", async () => {
       const { transaction } = await bootFresh();
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -160,7 +178,7 @@ describe("storage", () => {
       expect((await stored()).text).toBe("typed 30");
     });
 
-    it("always stores the path together with the document", async () => {
+    it("always stores the path (and imported Word document) together with the document", async () => {
       const { path, transaction } = await bootFresh();
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const setItem = vi.spyOn(localforage, "setItem");
@@ -178,10 +196,13 @@ describe("storage", () => {
 
       expect(setItem.mock.calls.map(([key]) => key)).toEqual([
         "path",
+        "importedFrom",
         "doc",
         "path",
+        "importedFrom",
         "doc",
         "path",
+        "importedFrom",
         "doc",
       ]);
       expect(await stored()).toEqual({ path: null, text: "b" });
@@ -294,8 +315,12 @@ describe("storage", () => {
       const setItem = vi.spyOn(localforage, "setItem");
       vi.spyOn(console, "error").mockImplementation(() => {});
 
-      const { path, getDocumentFromStorage, getPathfromStorage } =
-        await bootFresh();
+      const {
+        path,
+        getDocumentFromStorage,
+        getPathfromStorage,
+        getImportedFromStorage,
+      } = await bootFresh();
       path.value = "/other.md";
       await flushPromises();
 
@@ -305,6 +330,7 @@ describe("storage", () => {
       expect(setItem).not.toHaveBeenCalled();
       expect(await getDocumentFromStorage()).toBeUndefined();
       expect(await getPathfromStorage()).toBeUndefined();
+      expect(await getImportedFromStorage()).toBeUndefined();
     });
   });
 

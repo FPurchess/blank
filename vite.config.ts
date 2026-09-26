@@ -47,6 +47,8 @@ export default defineConfig(async () => ({
         "src/exporters/pdf/pdfmake-vfs.ts",
         // decodes images with the webview and a canvas, which jsdom lacks
         "src/images/codec.ts",
+        // test documents
+        "**/__fixtures__/**",
         // nested git worktrees
         "**/.claude/**",
       ],

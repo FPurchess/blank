@@ -4,6 +4,10 @@ import { debounce, Observable } from "observable.ts";
 
 export const path = new Observable<string | null>(null);
 
+// the Word document the untitled document was imported from, which suggests
+// where to save it; null otherwise
+export const importedFrom = new Observable<string | null>(null);
+
 export const transaction = new Observable<Transaction | null>(null);
 
 export const textContent = new Observable("");

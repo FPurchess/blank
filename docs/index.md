@@ -36,7 +36,7 @@ features:
     linkText: How it works
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>'
     title: Plain markdown, fine PDFs
-    details: Your writing stays in portable .md files. When a piece is done, export it as a carefully typeset PDF, or as a Word document for anyone who asks for one.
+    details: Your writing stays in portable .md files. Open Word documents as markdown, and when a piece is done, export it as a carefully typeset PDF or as a Word document for anyone who asks for one.
     link: /guide/writing#save-open-and-export
     linkText: Files and export
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>'

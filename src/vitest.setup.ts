@@ -19,6 +19,7 @@ vi.mock("@tauri-apps/plugin-fs", async (importOriginal) => {
     ...actual,
     exists: vi.fn(),
     readFile: vi.fn(),
+    stat: vi.fn(),
     readTextFile: vi.fn(),
     writeFile: vi.fn(),
     writeTextFile: vi.fn(),

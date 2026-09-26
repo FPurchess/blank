@@ -4,6 +4,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 
 import {
+  importedFrom,
   language,
   languagePicker,
   path,
@@ -11,6 +12,7 @@ import {
   type LanguagePickerState,
 } from "./state";
 import { bootLinkDialog } from "./linkDialog";
+import { basename } from "./paths";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
 
@@ -80,13 +82,16 @@ export const bootUI = () => {
   const uiTop = document.createElement("div");
   uiTop.id = "ui-top";
   document.body.appendChild(uiTop);
-  path.subscribe(
-    (path) => {
-      // textContent: the path is user controlled and must not be parsed as HTML
-      uiTop.textContent = "» " + (path ?? "Untitled");
-    },
-    { immediate: true },
-  );
+  const renderTitle = () => {
+    const source = importedFrom.value;
+    // textContent: the path is user controlled and must not be parsed as HTML
+    uiTop.textContent =
+      "» " +
+      (path.value ??
+        (source === null ? "Untitled" : `${basename(source)} (imported)`));
+  };
+  path.subscribe(renderTitle, { immediate: true });
+  importedFrom.subscribe(renderTitle);
 
   const uiBottom = document.createElement("div");
   uiBottom.id = "ui-bottom";

@@ -20,6 +20,10 @@ Quotes follow the language at the bottom right. Press `Mod` `Alt` `L` to [choose
 
 You can click to place the cursor, select text, and `Mod` + Click a link to open it. Everything else is done with the keyboard, on purpose.
 
+## Can I edit a Word document with Blank?
+
+You can open it with `Mod` `O`: Blank turns it into a markdown document and leaves the Word file as it is. When you're done, save it as markdown with `Mod` `S`, or send it back as a Word document with `Mod` `Alt` `W`. Blank never writes markdown into a .docx, so the original can't get lost by accident. See [Open Word documents](./writing#open-word-documents) for what comes along.
+
 ## I found a bug or have an idea
 
 Please [open an issue](https://github.com/FPurchess/blank/issues/new/choose) on GitHub.

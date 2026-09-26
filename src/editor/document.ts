@@ -1,6 +1,6 @@
 import { path as tauriPath } from "@tauri-apps/api";
 import { getMatches } from "@tauri-apps/plugin-cli";
-import { readTextFile, exists } from "@tauri-apps/plugin-fs";
+import { exists, readFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import localforage from "localforage";
@@ -8,8 +8,14 @@ import { EditorState } from "prosemirror-state";
 import { defaultMarkdownParser } from "prosemirror-markdown";
 import { Node } from "prosemirror-model";
 
-import { path as _path, transaction } from "../state";
-import { getDocumentFromStorage, getPathfromStorage } from "../storage";
+import { path as _path, importedFrom, transaction } from "../state";
+import {
+  getDocumentFromStorage,
+  getImportedFromStorage,
+  getPathfromStorage,
+} from "../storage";
+import { basename, extname } from "../paths";
+import { errorMessage } from "../errors";
 
 import welcomeMessage from "./welcome.md?raw";
 
@@ -71,11 +77,64 @@ export const restoreDocument = async (
   state: EditorState,
 ): Promise<EditorState | undefined> => {
   const doc = await getDocumentFromStorage();
-  if (doc) return applyDocument(state, doc, await getPathfromStorage());
+  if (!doc) return;
+  importedFrom.value = (await getImportedFromStorage()) ?? null;
+  return applyDocument(state, doc, await getPathfromStorage());
+};
+
+// Word documents, which are imported into an untitled markdown document
+export const WORD_EXTENSIONS = ["docx", "docm", "dotx", "dotm"];
+// document formats Blank can't read, which aren't markdown either
+export const UNREADABLE_EXTENSIONS = ["doc", "odt", "rtf", "pages"];
+// Word documents larger than this are refused
+export const MAX_WORD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * importWordDocument imports the Word document at `path` into an untitled
+ * document. The Word document itself is never written to.
+ */
+const importWordDocument = async (
+  state: EditorState,
+  path: string,
+  silent: boolean,
+): Promise<EditorState | undefined> => {
+  const name = basename(path);
+  const fail = (reason: string) => {
+    console.error(`Failed to import ${path}: ${reason}`);
+    if (!silent) sendNotification(`Failed to import ${name}: ${reason}`);
+  };
+
+  let result;
+  try {
+    if ((await stat(path)).size > MAX_WORD_BYTES) {
+      fail("the file is larger than 50 MB");
+      return;
+    }
+    const { importDocx } = await import("../importers/docx");
+    result = await importDocx(await readFile(path));
+  } catch (err) {
+    fail(errorMessage(err));
+    return;
+  }
+
+  const newState = applyDocument(state, result.doc);
+  // applyDocument keeps the current path, which saving would overwrite
+  _path.value = null;
+  importedFrom.value = path;
+  if (!silent) {
+    sendNotification(
+      [
+        `Imported ${name}. Save it with Mod+S as a markdown file`,
+        ...result.warnings,
+      ].join(". "),
+    );
+  }
+  return newState;
 };
 
 /**
- * reads a document from a given file path
+ * reads a document from a given file path: a markdown file, or a Word
+ * document that is imported
  * @param state The EditorState to mutate
  * @param path file path to load the document from
  * @returns the new EditorState
@@ -93,6 +152,20 @@ export const readDocumentFromFile = async (
     return;
   }
 
+  const extension = extname(resolvedPath);
+  if (WORD_EXTENSIONS.includes(extension)) {
+    return importWordDocument(state, resolvedPath, silent);
+  }
+  if (UNREADABLE_EXTENSIONS.includes(extension)) {
+    console.error(`Can't read .${extension} files: ${resolvedPath}`);
+    if (!silent) {
+      sendNotification(
+        `Blank can't read .${extension} files. Save it as .docx and open that.`,
+      );
+    }
+    return;
+  }
+
   let doc: Node | undefined;
   try {
     const content = await readTextFile(resolvedPath);
@@ -103,8 +176,11 @@ export const readDocumentFromFile = async (
       sendNotification(`Failed to read file: ${JSON.stringify(err)}`);
     return;
   }
-  // the resolved path keeps working when Blank is started from another directory
-  if (doc) return applyDocument(state, doc, resolvedPath);
+  if (doc) {
+    importedFrom.value = null;
+    // the resolved path keeps working when Blank is started from another directory
+    return applyDocument(state, doc, resolvedPath);
+  }
 };
 
 /**

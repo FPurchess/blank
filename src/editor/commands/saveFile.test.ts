@@ -4,7 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { path } from "../../state";
+import { importedFrom, path } from "../../state";
 import { createState, doc, h, p } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import saveFile, { _saveFile } from "./saveFile";
@@ -16,6 +16,52 @@ const markdownFilter = { filters: [{ name: "Markdown", extensions: ["md"] }] };
 describe("command.saveFile", () => {
   beforeEach(() => {
     path.value = null;
+    importedFrom.value = null;
+  });
+
+  it("suggests a markdown file next to an imported Word document", async () => {
+    importedFrom.value = "/docs/report.docx";
+    vi.mocked(save).mockResolvedValue("/docs/report.md");
+
+    await _saveFile(state, {});
+
+    expect(save).toHaveBeenCalledWith({
+      ...markdownFilter,
+      defaultPath: "/docs/report.md",
+    });
+    expect(writeTextFile).toHaveBeenCalledWith("/docs/report.md", markdown);
+    expect(path.value).toBe("/docs/report.md");
+    expect(importedFrom.value).toBeNull();
+  });
+
+  it.each(["/docs/report.docx", "/docs/report.PDF", "/docs/notes.odt"])(
+    "refuses to write markdown into %s",
+    async (target) => {
+      importedFrom.value = "/docs/report.docx";
+      vi.mocked(save).mockResolvedValue(target);
+
+      await _saveFile(state, {});
+
+      expect(writeTextFile).not.toHaveBeenCalled();
+      expect(path.value).toBeNull();
+      expect(importedFrom.value).toBe("/docs/report.docx");
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining("Choose a .md file name"),
+      );
+    },
+  );
+
+  it("asks for a new name instead of overwriting a Word document", async () => {
+    path.value = "/docs/report.docx";
+    vi.mocked(save).mockResolvedValue("/docs/report.md");
+
+    await _saveFile(state, {});
+
+    expect(save).toHaveBeenCalledWith({
+      ...markdownFilter,
+      defaultPath: "/docs/report.md",
+    });
+    expect(writeTextFile).toHaveBeenCalledWith("/docs/report.md", markdown);
   });
 
   it("writes to the current path without asking", async () => {

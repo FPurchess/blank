@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootUI, setupNotification } from "./ui";
 import {
+  importedFrom,
   language,
   languagePicker,
   linkDialog,
@@ -32,6 +33,7 @@ describe("ui", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     path.value = null;
+    importedFrom.value = null;
     textContent.value = "";
     language.value = "de";
     closePicker();
@@ -58,6 +60,14 @@ describe("ui", () => {
 
       path.value = null;
       expect(uiTop()?.textContent).toBe("» Untitled");
+    });
+
+    it("shows the name of an imported Word document until it is saved", () => {
+      importedFrom.value = "/docs/report.docx";
+      expect(uiTop()?.textContent).toBe("» report.docx (imported)");
+
+      path.value = "/docs/report.md";
+      expect(uiTop()?.textContent).toBe("» /docs/report.md");
     });
 
     it("shows a path containing markup as plain text", () => {
