@@ -26,6 +26,9 @@ import {
   insertNode,
   editLink,
   editImage,
+  goToMisspelling,
+  openMenu,
+  toggleSpellcheck,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -83,6 +86,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   ]),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
+  [CommandIdentifier.SPELLCHECK_TOGGLE]: toggleSpellcheck(),
+  [CommandIdentifier.SPELLCHECK_NEXT]: goToMisspelling(1),
+  [CommandIdentifier.SPELLCHECK_PREVIOUS]: goToMisspelling(-1),
+  [CommandIdentifier.CONTEXT_MENU]: openMenu(),
 };
 
 // modifier names people know from their OS, mapped to the ones

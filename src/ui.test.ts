@@ -112,11 +112,12 @@ describe("ui language chooser", () => {
     bootUI();
   });
 
-  it("sits right of the counter in the footer", () => {
+  it("sits right of the counter and the spell check status in the footer", () => {
     const footer = document.querySelector("#ui-bottom")!;
 
     expect([...footer.children].map((child) => child.id)).toEqual([
       "ui-stats",
+      "ui-spellcheck",
       "ui-language",
     ]);
   });
@@ -138,11 +139,11 @@ describe("ui language chooser", () => {
     openPicker();
 
     expect(uiLanguage()?.classList.contains("open")).toBe(true);
-    expect(uiLanguage()?.textContent).toBe("‹csdadeenes›");
+    expect(uiLanguage()?.textContent).toBe("‹csdadede-ATde-CH›");
     expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("de");
 
     move(1);
-    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("en");
+    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("de-AT");
   });
 
   it("shows typed letters and rejected codes", () => {
@@ -175,12 +176,12 @@ describe("ui language chooser", () => {
 
     const option = [
       ...uiLanguage()!.querySelectorAll<HTMLElement>(".option"),
-    ].find((element) => element.textContent === "en")!;
+    ].find((element) => element.textContent === "de-CH")!;
     option.click();
 
-    expect(language.value).toBe("en");
+    expect(language.value).toBe("de-CH");
     expect(languagePicker.value.open).toBe(false);
-    expect(uiLanguage()?.textContent).toBe("EN");
+    expect(uiLanguage()?.textContent).toBe("DE-CH");
   });
 
   it("keeps the focus in the editor when clicked", () => {

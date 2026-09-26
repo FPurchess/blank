@@ -8,9 +8,15 @@ import {
   language,
   languagePicker,
   path,
+  spellcheck,
+  spellcheckMessage,
+  spellcheckStatus,
   textContent,
   type LanguagePickerState,
 } from "./state";
+import type { SpellcheckStatus } from "./spellcheck/types";
+import { languageName } from "./spellcheck/service";
+import { bootContextMenu } from "./contextMenu";
 import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
 import { basename } from "./paths";
@@ -72,6 +78,37 @@ const renderLanguage = (element: HTMLElement, picker: LanguagePickerState) => {
   if (picker.buffer) item(picker.buffer + "_", "buffer");
 };
 
+// how long a message like "No spelling errors" shows
+const MESSAGE_DURATION = 2000;
+
+/**
+ * renderSpellcheck renders the spell check status, or `message` if there is one
+ */
+const renderSpellcheck = (
+  element: HTMLElement,
+  status: SpellcheckStatus,
+  message: string | null,
+) => {
+  const name = languageName(status.tag);
+  const [text, title] = message
+    ? [message, ""]
+    : ({
+        off: ["", ""],
+        loading: ["Spelling …", `Loading the ${name} dictionary`],
+        downloading: [
+          `Spelling ${Math.round((status.progress ?? 0) * 100)} %`,
+          `Downloading the ${name} dictionary`,
+        ],
+        ready: ["Spelling ✓", `Checking ${name} spelling`],
+        unavailable: ["No spelling", `No spell check dictionary for ${name}`],
+        error: ["Spelling ✗", status.message ?? ""],
+      }[status.state] as [string, string]);
+  element.textContent = text;
+  element.title = title && `${title}, click to turn spell check off`;
+  element.hidden = !text;
+  element.dataset.state = status.state;
+};
+
 export const setupNotification = async () => {
   const hasPermission = await isPermissionGranted();
   if (!hasPermission) {
@@ -110,6 +147,32 @@ export const bootUI = () => {
     { immediate: true },
   );
 
+  const uiSpellcheck = document.createElement("span");
+  uiSpellcheck.id = "ui-spellcheck";
+  uiBottom.appendChild(uiSpellcheck);
+  uiSpellcheck.addEventListener("mousedown", (event) => event.preventDefault());
+  uiSpellcheck.addEventListener("click", () => {
+    spellcheck.value = !spellcheck.value;
+  });
+  let messageTimer: number | undefined;
+  const renderStatus = () =>
+    renderSpellcheck(
+      uiSpellcheck,
+      spellcheckStatus.value,
+      spellcheckMessage.value,
+    );
+  spellcheckStatus.subscribe(renderStatus);
+  spellcheckMessage.subscribe((message) => {
+    renderStatus();
+    window.clearTimeout(messageTimer);
+    if (message) {
+      messageTimer = window.setTimeout(() => {
+        spellcheckMessage.value = null;
+      }, MESSAGE_DURATION);
+    }
+  });
+  renderStatus();
+
   const uiLanguage = document.createElement("span");
   uiLanguage.id = "ui-language";
   uiBottom.appendChild(uiLanguage);
@@ -124,6 +187,7 @@ export const bootUI = () => {
 
   bootLinkDialog();
   bootImageDialog();
+  bootContextMenu();
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);

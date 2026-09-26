@@ -7,6 +7,7 @@ import {
   importedFrom,
   language,
   path,
+  spellcheck,
   transaction,
   theme,
   themeType,
@@ -14,7 +15,7 @@ import {
 } from "./state";
 import {
   detectLanguage,
-  isIsoCode,
+  isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
 import { schema } from "prosemirror-markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
@@ -112,13 +113,19 @@ export const bootStorage = async () => {
 
   // the system language on first start, the chosen one afterwards
   const _language = await localforage.getItem("language");
-  language.value = isIsoCode(_language) ? _language : detectLanguage();
+  language.value = isLanguageTag(_language) ? _language : detectLanguage();
   if (_language !== language.value) {
     await localforage.setItem("language", language.value).catch(console.warn);
   }
 
   language.subscribe((value: string) => {
     localforage.setItem("language", value).catch(console.warn);
+  });
+
+  // off until the user turns it on
+  spellcheck.value = (await localforage.getItem("spellcheck")) === true;
+  spellcheck.subscribe((value: boolean) => {
+    localforage.setItem("spellcheck", value).catch(console.warn);
   });
 
   transaction.subscribe((tx: Transaction | null) => {

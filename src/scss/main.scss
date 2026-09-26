@@ -1,6 +1,6 @@
-@use 'reset';
-@use 'themes/index';
-@use 'typography';
+@use "reset";
+@use "themes/index";
+@use "typography";
 
 html {
   overflow-y: auto;
@@ -38,6 +38,18 @@ body {
   align-items: baseline;
   gap: 24px;
   pointer-events: none;
+}
+
+#ui-spellcheck {
+  pointer-events: auto;
+  cursor: pointer;
+  margin-left: auto;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+
+  &[hidden] {
+    display: none;
+  }
 }
 
 #ui-language {
@@ -87,7 +99,7 @@ body {
   white-space: break-spaces;
   -webkit-font-variant-ligatures: none;
   font-variant-ligatures: none;
-  font-feature-settings: 'liga' 0; /* the above doesn't seem to work in Edge */
+  font-feature-settings: "liga" 0; /* the above doesn't seem to work in Edge */
 
   & > :first-child {
     margin-top: 0;
@@ -125,6 +137,12 @@ body {
       font-style: italic;
       opacity: 0.6;
     }
+  }
+
+  .spelling-error {
+    text-decoration: underline wavy var(--spelling-color);
+    text-decoration-skip-ink: none;
+    text-underline-offset: 0.2em;
   }
 
   &.follow-links a {
@@ -244,4 +262,70 @@ body {
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 200px;
+  max-width: min(360px, calc(100% - 8px));
+  padding: 4px 0;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+  color: var(--color);
+  background-color: var(--background-color);
+  border: 1px solid var(--color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  outline: none;
+
+  [role="menuitem"] {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    padding: 4px 12px;
+    cursor: default;
+    outline: none;
+
+    &:focus {
+      color: var(--color-inverted);
+      background: var(--background-inverted);
+    }
+
+    &[aria-disabled="true"] {
+      opacity: 0.5;
+    }
+
+    .label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    kbd {
+      font: inherit;
+      opacity: 0.6;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 2px 6px;
+      font: inherit;
+      color: var(--color);
+      background: var(--background-color);
+      border: 1px solid var(--color);
+      border-radius: 3px;
+      outline: none;
+    }
+  }
+
+  [role="separator"] {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--color);
+    opacity: 0.2;
+  }
 }

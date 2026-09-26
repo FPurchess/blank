@@ -9,6 +9,7 @@ import {
 import type { Transaction } from "prosemirror-state";
 
 import type { InlineTransformer } from "../types";
+import { baseLanguage } from "../languages/lookup";
 
 export const arrows: Record<string, string> = {
   "-->": "→",
@@ -49,7 +50,8 @@ export const own = <T>(
 
 /**
  * lookup returns the replacement for `text`: the user's replacements for the
- * language, then for all languages, then the built-in ones
+ * language (e.g. "de-CH", then "de"), then for all languages, then the
+ * built-in ones
  */
 export const lookup = (ctx: Context, text: string): string | undefined => {
   const { replace } = ctx.config;
@@ -58,6 +60,7 @@ export const lookup = (ctx: Context, text: string): string | undefined => {
   const builtIn = ctx.config.capitalize && ctx.trigger !== ".";
   return (
     user(ctx.lang) ??
+    user(baseLanguage(ctx.lang)) ??
     user("*") ??
     (builtIn ? own(ctx.rules.replace, text) : undefined) ??
     (ctx.config.arrows ? own(arrows, text) : undefined) ??

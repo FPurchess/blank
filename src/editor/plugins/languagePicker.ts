@@ -36,7 +36,7 @@ export const languagePicker = () => {
         else if (event.key === "Enter") confirm();
         else if (event.key === "Escape") closePicker();
         else if (event.key === "Backspace") backspace();
-        else if (plain && /^[a-z]$/i.test(event.key)) typeChar(event.key);
+        else if (plain && /^[a-z-]$/i.test(event.key)) typeChar(event.key);
         // any other key is swallowed while the picker is open
         return true;
       },

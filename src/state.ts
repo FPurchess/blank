@@ -2,6 +2,8 @@ import { Transaction } from "prosemirror-state";
 
 import { debounce, Observable } from "observable.ts";
 
+import type { Spellchecker, SpellcheckStatus } from "./spellcheck/types";
+
 export const path = new Observable<string | null>(null);
 
 // the Word document the untitled document was imported from, which suggests
@@ -77,7 +79,8 @@ export interface ImageDialogRequest {
 // imageDialog holds the request of the open image dialog, or null while it is closed
 export const imageDialog = new Observable<ImageDialogRequest | null>(null);
 
-// language is the ISO 639-1 code of the language autocorrect follows
+// language is the language tag autocorrect and spell check follow: an ISO
+// 639-1 code like "de", or a regional tag like "de-CH"
 export const language = new Observable<string>("en");
 
 export interface LanguagePickerState {
@@ -96,3 +99,49 @@ export const languagePicker = new Observable<LanguagePickerState>({
   buffer: "",
   invalid: false,
 });
+
+// spellcheck is whether spelling is checked, which the user turns on and off
+export const spellcheck = new Observable<boolean>(false);
+
+// spellcheckStatus is what the spell checker is doing
+export const spellcheckStatus = new Observable<SpellcheckStatus>({
+  state: "off",
+  tag: "en",
+});
+
+// spellchecker checks the spelling while spellcheckStatus is "ready"
+export const spellchecker = new Observable<Spellchecker | null>(null);
+
+// spellcheckMessage is a short message shown next to the spell check status,
+// e.g. "No spelling errors", or null
+export const spellcheckMessage = new Observable<string | null>(null);
+
+export type MenuItem =
+  | {
+      id: string;
+      label: string;
+      // the key binding, e.g. "Mod-z"
+      shortcut?: string;
+      disabled?: boolean;
+      // the items of a submenu
+      children?: MenuItem[];
+      run?: () => void;
+      // turns the item into a text field, submitted with Enter
+      edit?: { value: string; submit(value: string): void };
+    }
+  | "separator";
+
+export interface ContextMenuRequest {
+  items: MenuItem[];
+  // where to show the menu, in viewport coordinates
+  anchor: { left: number; top: number; bottom: number };
+  // opened with the keyboard, which focuses the first item
+  keyboard: boolean;
+  // returns the focus to the editor
+  close(): void;
+}
+
+// contextMenu holds the open context menu, or null while it is closed. A new
+// request with the same `close` updates the open menu, e.g. once the
+// suggestions are known.
+export const contextMenu = new Observable<ContextMenuRequest | null>(null);

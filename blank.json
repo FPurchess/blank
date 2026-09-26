@@ -27,7 +27,11 @@
     "export.pdf": "Mod-Alt-p",
     "export.docx": "Mod-Alt-w",
     "theme.cycle": "Mod-Alt-t",
-    "language.choose": "Mod-Alt-l"
+    "language.choose": "Mod-Alt-l",
+    "spellcheck.toggle": "Mod-Alt-s",
+    "spellcheck.next": "Mod-Alt-n",
+    "spellcheck.previous": "Mod-Alt-Shift-n",
+    "menu.context": "Shift-F10"
   },
   "autocorrect": {
     "arrows": true,
@@ -41,5 +45,9 @@
     "replace": {
       "*": {}
     }
+  },
+  "spellcheck": {
+    "ignoreUppercase": true,
+    "ignoreWordsWithNumbers": true
   }
 }

@@ -2,7 +2,7 @@
 
 ## Formatting
 
-A paragraph with *emphasis*, **strong**, `inline code` and a [link](https://example.com).
+A paragraph with _emphasis_, **strong**, `inline code` and a [link](https://example.com).
 A hard break follows:\
 the next line.
 

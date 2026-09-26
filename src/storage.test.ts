@@ -80,7 +80,9 @@ describe("storage", () => {
     });
 
     it.each([
-      ["de-AT", "de"],
+      ["de-AT", "de-AT"],
+      ["de-DE", "de"],
+      ["en-US", "en"],
       ["fr", "fr"],
       ["xx-YY", "en"],
       ["", "en"],

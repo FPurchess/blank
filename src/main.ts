@@ -4,6 +4,7 @@ import { bootConfig } from "./config";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
+import { bootSpellcheck } from "./spellcheck/service";
 
 import "./scss/main.scss";
 
@@ -36,6 +37,8 @@ const showBootError = (error: unknown) => {
     await bootEditor();
     editorReady = true;
     bootUI();
+    // doesn't wait for the dictionary, which may need a download
+    bootSpellcheck();
   } catch (error) {
     console.error("failed to start Blank", error);
     if (!editorReady) {
