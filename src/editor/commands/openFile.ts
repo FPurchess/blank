@@ -11,7 +11,7 @@ const defaultOpenDialogOptions = {
 
 export default (): Command => (state) => {
   (async () => {
-    let newPath: string | null = null;
+    let newPath: string | null;
     try {
       newPath = await open(defaultOpenDialogOptions);
     } catch (err) {
