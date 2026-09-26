@@ -12,8 +12,8 @@ const fallback = "en";
  * undefined if it has none of its own
  */
 const rulesLanguage = (code: string): string | undefined => {
-  const name = aliases[code] ?? code;
-  return name in languageRules ? name : undefined;
+  const name = Object.hasOwn(aliases, code) ? aliases[code] : code;
+  return Object.hasOwn(languageRules, name) ? name : undefined;
 };
 
 /**

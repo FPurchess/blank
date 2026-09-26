@@ -1,11 +1,11 @@
 import { schema } from "prosemirror-markdown";
 import type { MarkType } from "prosemirror-model";
 
-import { CLOSERS, strip, type Context } from "../context";
+import { CLOSERS, OPENERS, charClass, strip, type Context } from "../context";
 import type { InlineTransformer } from "../types";
 
 // what may come right before an opening marker, so snake_case and 2*3*4 stay
-const before = "(?:^|(?<=[\\s\\ufffc([{\"'„“‚‘«‹]))";
+const before = `(?:^|(?<=[\\s\\ufffc]|${charClass(OPENERS)}))`;
 
 interface Format {
   re: RegExp;

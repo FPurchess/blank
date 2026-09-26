@@ -38,17 +38,30 @@ export const symbols: Record<string, string> = {
 };
 
 /**
+ * own returns the value of `table` for `key` if `table` has it as an own
+ * property, so typed words like "constructor" don't find inherited ones
+ */
+export const own = <T>(
+  table: Record<string, T> | undefined,
+  key: string,
+): T | undefined =>
+  table && Object.hasOwn(table, key) ? table[key] : undefined;
+
+/**
  * lookup returns the replacement for `text`: the user's replacements for the
  * language, then for all languages, then the built-in ones
  */
 export const lookup = (ctx: Context, text: string): string | undefined => {
   const { replace } = ctx.config;
+  const user = (lang: string) => own(own(replace, lang), text);
+  // "." after "i" may be part of "i.e."
+  const builtIn = ctx.config.capitalize && ctx.trigger !== ".";
   return (
-    replace[ctx.lang]?.[text] ??
-    replace["*"]?.[text] ??
-    (ctx.config.capitalize ? ctx.rules.replace?.[text] : undefined) ??
-    (ctx.config.arrows ? arrows[text] : undefined) ??
-    (ctx.config.symbols ? symbols[text.toLowerCase()] : undefined)
+    user(ctx.lang) ??
+    user("*") ??
+    (builtIn ? own(ctx.rules.replace, text) : undefined) ??
+    (ctx.config.arrows ? own(arrows, text) : undefined) ??
+    (ctx.config.symbols ? own(symbols, text.toLowerCase()) : undefined)
   );
 };
 

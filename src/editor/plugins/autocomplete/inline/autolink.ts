@@ -1,17 +1,30 @@
 import { schema } from "prosemirror-markdown";
 
-import { OPENERS, strip, tokenSpan, type Context } from "../context";
+import {
+  CLOSERS,
+  OPENERS,
+  PUNCTUATION,
+  count,
+  strip,
+  tokenSpan,
+  type Context,
+} from "../context";
 import type { InlineTransformer } from "../types";
 
 const reUrl =
   /^(https?:\/\/[^\s/?#]+\.[^\s]+|https?:\/\/localhost\S*|www\.[^\s.]+\.[^\s]+)$/i;
 const reEmail = /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/;
+// closing brackets and their opening ones, which may belong to a URL
+const brackets: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
 // chars after a URL that belong to the sentence rather than the URL
-const trailing = ".,;:!?\"'”’»›";
+const trailing = [...(PUNCTUATION + CLOSERS)]
+  .filter((char) => !Object.hasOwn(brackets, char))
+  .join("");
 
 /**
- * trimUrl removes trailing punctuation from `url`. A closing parenthesis only
- * stays when it closes one inside the URL, as in Wikipedia URLs.
+ * trimUrl removes trailing punctuation, quotes and brackets from `url`. A
+ * closing bracket only stays when it closes one inside the URL, as in
+ * Wikipedia URLs.
  */
 const trimUrl = (url: string) => {
   let end = url.length;
@@ -21,8 +34,8 @@ const trimUrl = (url: string) => {
     if (trailing.includes(char)) {
       end--;
     } else if (
-      char === ")" &&
-      text.split("(").length - 1 < text.split(")").length - 1
+      Object.hasOwn(brackets, char) &&
+      count(text, brackets[char]) < count(text, char)
     ) {
       end--;
     } else {

@@ -7,11 +7,6 @@ const reLetter = /[\p{L}\p{N}]$/u;
 const reOpensAfter = /(?:^|[\s￼([{–—])$/u;
 
 /**
- * count returns how often `char` occurs in `text`
- */
-const count = (text: string, char: string) => text.split(char).length - 1;
-
-/**
  * smartQuote returns the correction that turns the straight quote `quote`,
  * just typed at the cursor, into the typographic quote of the language
  */
@@ -32,9 +27,9 @@ export const smartQuote = (
 
   let value: string;
   if (quote === "'" && !opens && reLetter.test(before)) {
-    // an apostrophe, unless it closes a single quote opened before
-    value =
-      close !== "’" && count(before, open) > count(before, close) ? close : "’";
+    // an apostrophe as in "don't" or "l'heure"; inline/closeQuote.ts turns it
+    // into the closing quote of the language once the word ends
+    value = "’";
   } else if (opens) {
     value = open + (quote === '"' ? quoteSpacing : "");
   } else {

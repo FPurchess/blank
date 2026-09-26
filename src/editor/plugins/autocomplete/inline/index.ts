@@ -3,6 +3,7 @@ import type { Correction, InlineTransformer } from "../types";
 
 import autolink from "./autolink";
 import capitalize from "./capitalize";
+import closeQuote from "./closeQuote";
 import dashes from "./dashes";
 import formatting from "./formatting";
 import link from "./link";
@@ -19,10 +20,14 @@ const replacing: InlineTransformer[] = [
 
 /**
  * corrections returns the corrections to apply when the trigger of `ctx` is
- * typed: the first replacing one, then capitalization
+ * typed: the closing quote, the first replacing one, then capitalization
  */
 export const corrections = (ctx: Context): Correction[] => {
   const result: Correction[] = [];
+  // replaces a single char with another, so it goes along with any other
+  // correction, e.g. the link in ‚https://blank.app‘
+  const quote = closeQuote(ctx);
+  if (quote) result.push(quote);
   for (const transformer of replacing) {
     const correction = transformer(ctx);
     if (correction) {

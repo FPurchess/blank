@@ -1,9 +1,15 @@
-import { isUrlLike, type Context } from "../context";
+import {
+  CLOSERS,
+  OPENERS,
+  charClass,
+  isUrlLike,
+  type Context,
+} from "../context";
 import type { InlineTransformer } from "../types";
 
 const alnum = "[\\p{L}\\p{N}]";
-const closers = "[)\\]}\"'”’»›]*";
-const openers = "[(\\[{\"'„“‚‘«‹]*";
+const closers = `${charClass(CLOSERS)}*`;
+const openers = `${charClass(OPENERS)}*`;
 
 // "A - B" and "A -- B", where B is the word just completed
 const reSpaced = new RegExp(

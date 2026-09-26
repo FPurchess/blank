@@ -1,10 +1,13 @@
-import type { Command, TextSelection } from "prosemirror-state";
+import type { Command, TextSelection, Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
+
+import { dispatchCorrection } from "../history";
 
 /**
  * applyBlockCommand turns the block holding the cursor into another block type
- * by running `command`, then deletes the `length` characters of typed shortcut
- * text before the cursor. If the command can't be applied, nothing changes.
+ * by running `command`, and deletes the `length` characters of typed shortcut
+ * text before the cursor in the same transaction, so a single undo restores
+ * the line as typed. If the command can't be applied, nothing changes.
  * @returns whether the block was transformed
  */
 export const applyBlockCommand = (
@@ -13,12 +16,14 @@ export const applyBlockCommand = (
   length: number,
 ): boolean => {
   if (!(view.state.selection as TextSelection).$cursor) return false;
-  if (!command(view.state, (tr) => view.dispatch(tr), view)) return false;
+  let captured: Transaction | undefined;
+  if (!command(view.state, (tr) => (captured = tr), view) || !captured) {
+    return false;
+  }
 
-  const { $cursor } = view.state.selection as TextSelection;
+  const { $cursor } = captured.selection as TextSelection;
   if (!$cursor) return false;
-  view.dispatch(
-    view.state.tr.delete($cursor.pos - length, $cursor.pos).scrollIntoView(),
-  );
+  captured.delete($cursor.pos - length, $cursor.pos);
+  dispatchCorrection(view, captured);
   return true;
 };

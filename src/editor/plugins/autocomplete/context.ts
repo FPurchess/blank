@@ -23,6 +23,19 @@ export const CLOSERS = "\"')]}”’“‘»›«‹";
 export const PUNCTUATION = ".,;:!?";
 
 /**
+ * charClass returns a regular expression character class matching any of
+ * `chars`
+ */
+export const charClass = (chars: string) =>
+  `[${chars.replace(/[\\\]^-]/g, "\\$&")}]`;
+
+/**
+ * count returns how often `char` occurs in `text`
+ */
+export const count = (text: string, char: string) =>
+  text.split(char).length - 1;
+
+/**
  * Trigger is a char from TEXT_TRIGGERS, "Enter" or "Tab"
  */
 export type Trigger = string;

@@ -2,6 +2,7 @@ import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { schema } from "prosemirror-markdown";
 
+import { dispatchCorrection } from "../history";
 import type { BlockTransformer } from "../types";
 
 const reHorizontalRule = /^(---|\*\*\*|___)$/;
@@ -26,7 +27,8 @@ const _transformer: BlockTransformer<Props> = {
     ]);
     // the new paragraph starts after the rule (size 1) and its own opening
     tr.setSelection(TextSelection.create(tr.doc, from + 2));
-    view.dispatch(tr.scrollIntoView());
+    // a single undo restores the line as typed
+    dispatchCorrection(view, tr);
     return true;
   },
 };
