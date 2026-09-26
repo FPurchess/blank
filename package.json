@@ -49,6 +49,7 @@
     "docx": "9.7.2",
     "jszip": "^3.10.2",
     "localforage": "^1.10.0",
+    "mammoth": "^1.12.3",
     "markdown-it": "^15.0.2",
     "observable.ts": "^1.0.1",
     "pdfmake": "^0.3.11",

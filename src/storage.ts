@@ -3,7 +3,15 @@ import { Transaction } from "prosemirror-state";
 import { Node } from "prosemirror-model";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { language, path, transaction, theme, themeType, themes } from "./state";
+import {
+  importedFrom,
+  language,
+  path,
+  transaction,
+  theme,
+  themeType,
+  themes,
+} from "./state";
 import {
   detectLanguage,
   isIsoCode,
@@ -21,12 +29,14 @@ const maxWait = 1000;
 
 let latestDoc: Node | null = null;
 let latestPath: string | null = null;
+let latestImportedFrom: string | null = null;
 let pending = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 /**
  * write stores the latest path and document together, so the stored path
- * never points at a file while the stored document belongs to another one
+ * never points at a file while the stored document belongs to another one.
+ * The Word document an untitled document was imported from belongs to it too.
  */
 const write = () => {
   clearTimeout(timer);
@@ -36,6 +46,7 @@ const write = () => {
   pending = false;
   return Promise.all([
     localforage.setItem("path", latestPath),
+    localforage.setItem("importedFrom", latestImportedFrom),
     localforage.setItem("doc", latestDoc.toJSON()),
   ]).then(() => undefined);
 };
@@ -85,6 +96,11 @@ export const bootStorage = async () => {
     schedule();
   });
 
+  importedFrom.subscribe((value: string | null) => {
+    latestImportedFrom = value;
+    schedule();
+  });
+
   const _theme = await localforage.getItem("theme");
   theme.value = themes.includes(_theme as string)
     ? (_theme as themeType)
@@ -109,6 +125,7 @@ export const bootStorage = async () => {
     if (tx === null) return;
     latestDoc = tx.doc;
     latestPath = path.value;
+    latestImportedFrom = importedFrom.value;
     schedule();
   });
 
@@ -132,4 +149,9 @@ export const getDocumentFromStorage = async (): Promise<Node | undefined> => {
 export const getPathfromStorage = async () =>
   storageAvailable
     ? await localforage.getItem<string | null>("path")
+    : undefined;
+
+export const getImportedFromStorage = async () =>
+  storageAvailable
+    ? await localforage.getItem<string | null>("importedFrom")
     : undefined;

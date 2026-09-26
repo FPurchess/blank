@@ -23,10 +23,11 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 ## Architecture
 
 - Start-up order is fixed (`src/main.ts`): `bootConfig` → `bootStorage` → `bootEditor` → `bootUI`. The keymap reads config when the plugin is created, and the editor restores its document from storage.
-- Modules talk through the Observables in `src/state.ts` (`path`, `transaction`, `textContent`, `theme`, `language`, `languagePicker`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
+- Modules talk through the Observables in `src/state.ts` (`path`, `importedFrom`, `transaction`, `textContent`, `theme`, `language`, `languagePicker`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
 - The theme is applied as `document.body.dataset.theme`, and the SCSS in `src/scss/themes/` keys off it. A new theme needs an entry in `themes` in `state.ts` and a partial registered in `themes/_index.scss`.
 - Markdown uses the stock `prosemirror-markdown` `schema`, `defaultMarkdownParser` and `defaultMarkdownSerializer`. There is no custom schema, so a new node or mark type also needs parser, serializer and PDF-export support.
 - The first document comes from the CLI `path` arg, then the doc saved in localforage, then `src/editor/welcome.md`.
+- Word documents are imported, never edited: `readDocumentFromFile` (`src/editor/document.ts`) converts a .docx with `importDocx` (`src/importers/docx/`) into an untitled document and sets `importedFrom`. Saving never writes markdown into a .docx (`saveFile.ts`).
 
 ## Adding things
 
@@ -36,6 +37,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - **Inline correction** (arrows, dashes, formatting, ...): add an `InlineTransformer` (`Context` → `Correction` or `undefined`) in `src/editor/plugins/autocomplete/inline/` and add it to `replacing` in that folder's `index.ts`, where order matters. A plain replacement belongs in the tables in `inline/replacements.ts` instead. Guard it with a toggle from `config.autocorrect` and document it in `docs/guide/autocorrect.md`.
 - **Autocorrect language:** add a `LanguageRules` file in `src/editor/plugins/autocomplete/languages/` (quotes from CLDR, abbreviations from LibreOffice's `SentenceExceptList.xml`) and register it in that folder's `index.ts`.
 - **Exporter:** write an `exporterFunc` (`(state, { docPath })` → `{ contents, warnings }`) in `src/exporters/` and wire it up through `exportAs`, which shows the warnings. Lay out on the page in `src/exporters/page.ts` and get image bytes from `prepareImages` in `src/images/prepare.ts`.
+- **Importer:** convert the file to a ProseMirror doc in `src/importers/` and dispatch on its extension in `readDocumentFromFile`. Imports from Word go through mammoth (docx → HTML), `cleanup.ts` (HTML the markdown schema can hold) and the schema's DOM parser. Style names map in `styleMap.ts`; `bun scripts/build-docx-fixtures.sh` rebuilds the test documents from `__fixtures__/fixture.md`.
 - **Image handling** lives in `src/images/`. `codec.ts` is the only code that decodes or re-encodes images (webview decoders and a canvas); tests mock it and coverage skips it.
 
 ## Website
@@ -53,6 +55,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - Never narrow `fs:scope` or drop `plugins.fs.requireLiteralLeadingDot: false`: Blank must be able to open and save every file the user can, including hidden folders, other disks and symlinked files. Dialog-granted scope isn't persisted, so CLI-opened and restored files would break.
 - The Word export embeds the regular face of IBM Plex Sans from the PDF font files, unmodified: the obfuscation Word applies to embedded fonts is part of the .docx format, and the OFL allows embedding in documents. Its style names (`Quote`, `Code Block`, `Horizontal Line`, `Inline Code`) are what a Word import maps back. `src/exporters/docx/fixups.ts` patches what docx 9.7.2 writes wrong; drop a fix once docx does it itself. `bun scripts/check-docx.ts <file.md>` exports a file and opens the result with pandoc and LibreOffice.
 - The editor shows local images through Tauri's asset protocol (`convertFileSrc`, see `src/editor/plugins/images.ts`); its scope in `tauri.conf.json` matches the fs scope. Exports download web images with `@tauri-apps/plugin-http`, since the webview's `fetch` is subject to CORS.
+- mammoth's browser build reads `{ arrayBuffer }` and its Node build, which tests use, `{ buffer }`, so `importDocx` passes both. mammoth ignores list level overrides, which `numbering.ts` inlines before the conversion.
 - The markdown parser percent-encodes image `src` and only keeps `data:image/(png|jpeg|gif|webp)` URLs, so decode `src` before using it as a path (`resolveLocalPath`).
 - Tests run in jsdom. `src/vitest.setup.ts` mocks the Tauri notification, fs, dialog, cli and http plugins for all tests. `mockReset: true` resets every mock to its original implementation before each test, so set per-test return values inside the test or its `beforeEach`. `path` from `@tauri-apps/api` can't be mocked with `vi.mock`; use `mockTauriPath()` from `src/test/tauri.ts` in `beforeEach`.
 - Reuse the shared test helpers in `src/test/`: node builders, `createState`, `createTestView` (a stub view, since a real `EditorView` can't scroll in jsdom), `pressKey`, `flushPromises`, `mockCliArgs`, and tiny real images in `src/test/images.ts`.

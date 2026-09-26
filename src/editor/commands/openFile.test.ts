@@ -31,7 +31,11 @@ describe("command.openFile", () => {
     await vi.waitFor(() => expect(path.value).toBe("/notes.md"));
 
     expect(open).toHaveBeenCalledWith({
-      filters: [{ name: "Markdown", extensions: ["md"] }],
+      filters: [
+        { name: "Documents", extensions: ["md", "docx"] },
+        { name: "Markdown", extensions: ["md"] },
+        { name: "Word Document", extensions: ["docx"] },
+      ],
     });
     expect(readTextFile).toHaveBeenCalledWith("/notes.md");
     expect(view.state.doc.eq(defaultMarkdownParser.parse(opened))).toBe(true);

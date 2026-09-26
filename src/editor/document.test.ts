@@ -6,10 +6,11 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
 import { getMatches } from "@tauri-apps/plugin-cli";
-import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { exists, readFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { path as _path, transaction } from "../state";
+import { path as _path, importedFrom, transaction } from "../state";
+import { importDocx } from "../importers/docx";
 import * as storage from "../storage";
 import { doc, p } from "../test/editor";
 import { mockCliArgs, mockTauriPath } from "../test/tauri";
@@ -24,6 +25,8 @@ import {
 
 import welcomeMessage from "./welcome.md?raw";
 
+vi.mock("../importers/docx", () => ({ importDocx: vi.fn() }));
+
 const emptyState = () => EditorState.create({ schema });
 const hello = doc(p("Hello, world!"));
 
@@ -37,6 +40,7 @@ const mockFile = (content: string) => {
 
 beforeEach(() => {
   _path.value = null;
+  importedFrom.value = null;
   transaction.value = null;
   mockTauriPath();
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -90,6 +94,19 @@ describe("restoreDocument", () => {
     expect(newState?.doc).toEqual(storedDoc);
     expect(transaction.value).not.toBeNull();
     expect(_path.value).toBe("/stored.md");
+  });
+
+  it("restores the Word document an unsaved document was imported from", async () => {
+    vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(hello);
+    vi.spyOn(storage, "getPathfromStorage").mockResolvedValue(null);
+    vi.spyOn(storage, "getImportedFromStorage").mockResolvedValue(
+      "/report.docx",
+    );
+
+    await restoreDocument(emptyState());
+
+    expect(_path.value).toBeNull();
+    expect(importedFrom.value).toBe("/report.docx");
   });
 
   it("should return undefined if no document is found in storage", async () => {
@@ -174,6 +191,124 @@ describe("readDocumentFromFile", () => {
     await readDocumentFromFile(emptyState(), "/doc.md", true);
 
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("readDocumentFromFile with a Word document", () => {
+  const imported = doc(p("From Word"));
+  const bytes = new Uint8Array([0x50, 0x4b]);
+
+  beforeEach(() => {
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(stat).mockResolvedValue({ size: 1000 } as Awaited<
+      ReturnType<typeof stat>
+    >);
+    vi.mocked(readFile).mockResolvedValue(bytes);
+    vi.mocked(importDocx).mockResolvedValue({ doc: imported, warnings: [] });
+  });
+
+  it("imports it into an untitled document", async () => {
+    _path.value = "/previous.md";
+
+    const newState = await readDocumentFromFile(
+      emptyState(),
+      "/docs/Report.DOCX",
+    );
+
+    expect(importDocx).toHaveBeenCalledWith(bytes);
+    expect(newState?.doc).toEqual(imported);
+    expect(transaction.value?.doc).toEqual(imported);
+    // saving must not overwrite the previous file, nor the Word document
+    expect(_path.value).toBeNull();
+    expect(importedFrom.value).toBe("/docs/Report.DOCX");
+    expect(readTextFile).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Imported Report.DOCX. Save it with Mod+S as a markdown file",
+    );
+  });
+
+  it("reports what the import left out", async () => {
+    vi.mocked(importDocx).mockResolvedValue({
+      doc: imported,
+      warnings: ["1 table became text", "2 comments left out"],
+    });
+
+    await readDocumentFromFile(emptyState(), "/report.docx");
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Imported report.docx. Save it with Mod+S as a markdown file. 1 table became text. 2 comments left out",
+    );
+  });
+
+  it("refuses documents larger than 50 MB", async () => {
+    vi.mocked(stat).mockResolvedValue({ size: 50 * 1024 * 1024 + 1 } as Awaited<
+      ReturnType<typeof stat>
+    >);
+
+    expect(
+      await readDocumentFromFile(emptyState(), "/big.docx"),
+    ).toBeUndefined();
+
+    expect(readFile).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Failed to import big.docx: the file is larger than 50 MB",
+    );
+  });
+
+  it("reports documents it can't import and keeps the current one", async () => {
+    _path.value = "/previous.md";
+    vi.mocked(importDocx).mockRejectedValue(new Error("not a Word document"));
+
+    expect(
+      await readDocumentFromFile(emptyState(), "/fake.docx"),
+    ).toBeUndefined();
+
+    expect(_path.value).toBe("/previous.md");
+    expect(importedFrom.value).toBeNull();
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Failed to import fake.docx: not a Word document",
+    );
+  });
+
+  it("stays silent when asked to", async () => {
+    await readDocumentFromFile(emptyState(), "/report.docx", true);
+    vi.mocked(importDocx).mockRejectedValue("broken");
+    await readDocumentFromFile(emptyState(), "/broken.docx", true);
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it.each(["doc", "odt", "rtf", "pages"])(
+    "refuses .%s files instead of reading them as markdown",
+    async (extension) => {
+      expect(
+        await readDocumentFromFile(emptyState(), `/old.${extension}`),
+      ).toBeUndefined();
+
+      expect(readTextFile).not.toHaveBeenCalled();
+      expect(sendNotification).toHaveBeenCalledWith(
+        `Blank can't read .${extension} files. Save it as .docx and open that.`,
+      );
+    },
+  );
+
+  it("forgets the Word document when a markdown file is opened", async () => {
+    importedFrom.value = "/report.docx";
+    vi.mocked(readTextFile).mockResolvedValue("text");
+
+    await readDocumentFromFile(emptyState(), "/notes.md");
+
+    expect(importedFrom.value).toBeNull();
+    expect(_path.value).toBe("/notes.md");
+  });
+
+  it("imports a Word document passed on the command line", async () => {
+    mockCliArgs("/cli.docx");
+
+    const newState = await readDocumentFromCliArgs(emptyState());
+
+    expect(newState?.doc).toEqual(imported);
+    expect(importedFrom.value).toBe("/cli.docx");
   });
 });
 
