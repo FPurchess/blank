@@ -139,6 +139,16 @@ describe("ui language chooser", () => {
     expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("tr*");
   });
 
+  it("does not mark the language as rejected once closed", () => {
+    openPicker();
+    typeChar("x");
+    typeChar("x");
+    closePicker();
+
+    expect(uiLanguage()?.classList.contains("invalid")).toBe(false);
+    expect(uiLanguage()?.textContent).toBe("DE");
+  });
+
   it("opens on click and chooses a clicked language", () => {
     uiLanguage()!.click();
     expect(languagePicker.value.open).toBe(true);

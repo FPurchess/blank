@@ -91,6 +91,29 @@ describe("plugin.languagePicker", () => {
     expect(pickerState.value.open).toBe(false);
   });
 
+  it("keeps a current language without rules of its own reachable", () => {
+    const { press } = setup();
+    language.value = "tr";
+    openPicker();
+
+    press("ArrowRight");
+    press("ArrowLeft");
+    press("Enter");
+
+    expect(language.value).toBe("tr");
+  });
+
+  it("clears a rejected code on Escape", () => {
+    const { press } = setup();
+    openPicker();
+
+    press("x");
+    press("x");
+    press("Escape");
+
+    expect(pickerState.value.invalid).toBe(false);
+  });
+
   it("closes with the binding that opened it", () => {
     const { press } = setup();
     openPicker();
