@@ -32,3 +32,6 @@ graphify-out
 # Git worktrees
 .claude/worktrees/
 docs/.vitepress/cache
+
+# downloads of scripts/build-dictionary-catalog.ts
+scripts/.cache
