@@ -3,6 +3,8 @@ import type { Node } from "prosemirror-model";
 import { history } from "prosemirror-history";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
+import { save } from "@tauri-apps/plugin-dialog";
+
 import { CommandIdentifier, config } from "../../config";
 import { languagePicker, linkDialog, path, theme, themes } from "../../state";
 import {
@@ -213,6 +215,19 @@ describe("plugin.keymap", () => {
       expect(press("Mod-Alt-l")).toBe(true);
 
       expect(languagePicker.value.open).toBe(true);
+    });
+
+    it("Mod-Alt-w exports a Word document", async () => {
+      const { press } = setup(doc(p("text")));
+      vi.mocked(save).mockResolvedValue(null);
+
+      expect(press("Mod-Alt-w")).toBe(true);
+      await flushPromises();
+
+      expect(save).toHaveBeenCalledWith({
+        filters: [{ name: "Word Document", extensions: ["docx"] }],
+        defaultPath: "/notes.docx",
+      });
     });
 
     it("Mod-n starts a new file", () => {

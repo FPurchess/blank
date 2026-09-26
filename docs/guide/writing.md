@@ -41,15 +41,22 @@ Blank keeps what you write as you go, at least once a second and once more when 
 
 Documents are plain markdown files, so any other editor can open them.
 
-| Command       | Shortcut          |
-| ------------- | ----------------- |
-| New file      | `Mod` `N`         |
-| Open file     | `Mod` `O`         |
-| Save          | `Mod` `S`         |
-| Save as       | `Mod` `Shift` `S` |
-| Export as PDF | `Mod` `Alt` `P`   |
+| Command        | Shortcut          |
+| -------------- | ----------------- |
+| New file       | `Mod` `N`         |
+| Open file      | `Mod` `O`         |
+| Save           | `Mod` `S`         |
+| Save as        | `Mod` `Shift` `S` |
+| Export as PDF  | `Mod` `Alt` `P`   |
+| Export as Word | `Mod` `Alt` `W`   |
 
 `Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
+
+### Word documents for others
+
+When someone needs your text in Word, press `Mod` `Alt` `W`. Blank writes a .docx that looks like its PDFs, with the same fonts and spacing, and that stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists, links and images come along. Your markdown file stays as it is.
+
+The document embeds Blank's font, IBM Plex Sans, so it looks the same in Word on computers without the font. LibreOffice and Google Docs ignore embedded fonts and use a similar one instead.
 
 ## The status bar
 

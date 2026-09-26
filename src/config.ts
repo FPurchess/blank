@@ -28,6 +28,7 @@ export enum CommandIdentifier {
   FILE_SAVE_AS = "file.save_as",
   FILE_OPEN = "file.open",
   EXPORT_PDF = "export.pdf",
+  EXPORT_DOCX = "export.docx",
   THEME_CYCLE = "theme.cycle",
   LANGUAGE_CHOOSE = "language.choose",
 }
@@ -79,6 +80,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.FILE_SAVE_AS]: "Mod-Shift-s",
     [CommandIdentifier.FILE_OPEN]: "Mod-o",
     [CommandIdentifier.EXPORT_PDF]: "Mod-Alt-p",
+    [CommandIdentifier.EXPORT_DOCX]: "Mod-Alt-w",
     [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",
     [CommandIdentifier.LANGUAGE_CHOOSE]: "Mod-Alt-l",
   },
