@@ -24,4 +24,5 @@ jobs:
       - run: |
           bun install
           bun run lint
+          bun run format:check
           bun run test:coverage

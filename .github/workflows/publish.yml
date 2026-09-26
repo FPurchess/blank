@@ -51,8 +51,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: install app dependencies and build it
-        run: bun install && bun run build
+      # tauri-action builds the frontend itself via beforeBuildCommand
+      - name: install app dependencies
+        run: bun install
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -60,7 +61,7 @@ jobs:
         with:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
           releaseName: "Blank v__VERSION__"
-          releaseBody: "See the assets to download this version and install. On macOS, see https://github.com/FPurchess/blank#macos-blank-is-damaged-or-blank-cannot-be-opened if the app is blocked."
+          releaseBody: "See the assets to download this version and install. On macOS, see https://fpurchess.github.io/blank/guide/install#macos if the app is blocked."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
