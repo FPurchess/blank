@@ -51,8 +51,9 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: install app dependencies and build it
-        run: bun install && bun run build
+      # tauri-action builds the frontend itself via beforeBuildCommand
+      - name: install app dependencies
+        run: bun install
 
       - uses: tauri-apps/tauri-action@v0
         env:

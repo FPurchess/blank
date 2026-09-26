@@ -5,6 +5,8 @@ import type { EditorView } from "prosemirror-view";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
+import { errorMessage } from "../../errors";
+
 // set on the editor while the modifier to open links is held
 const FOLLOW_CLASS = "follow-links";
 
@@ -29,13 +31,7 @@ export const _openLink = async (href: string) => {
   try {
     await openUrl(href);
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === "string"
-          ? err
-          : JSON.stringify(err);
-    sendNotification(`Failed to open link: ${message}`);
+    sendNotification(`Failed to open link: ${errorMessage(err)}`);
   }
 };
 
