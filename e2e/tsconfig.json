@@ -11,5 +11,5 @@
     "noEmit": true,
     "esModuleInterop": true
   },
-  "include": ["*.ts", "specs/**/*.ts"]
+  "include": ["*.ts", "specs/**/*.ts", "shots/**/*.ts"]
 }

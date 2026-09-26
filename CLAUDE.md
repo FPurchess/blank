@@ -30,12 +30,18 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 
 ## Adding things
 
-- **Bindable command:** update all four: the `CommandIdentifier` enum and `defaultConfig.keymap` in `src/config.ts`, `commandMap` in `src/editor/plugins/keymap.ts`, and the reference `blank.json`. Also add it to the README keybinding table.
+- **Bindable command:** update all four: the `CommandIdentifier` enum and `defaultConfig.keymap` in `src/config.ts`, `commandMap` in `src/editor/plugins/keymap.ts`, and the reference `blank.json`. Also add it to `docs/guide/shortcuts.md` (and to the short table in the README if it's an essential one).
 - **File/IO command** (`src/editor/commands/`): return `true` right away, do the Tauri work in an async block, and report success or failure with `sendNotification`. Follow `saveFile.ts` / `exportAs.ts`.
 - **Block shortcut** (a whole line like `#` or `---`): add a `BlockTransformer` (`trigger` `"space"` or `"enter"`, `activate` + `transform`) in `src/editor/plugins/autocomplete/transformers/` and register it in that folder's `index.ts`. The first one that matches and applies wins.
-- **Inline correction** (arrows, dashes, formatting, ...): add an `InlineTransformer` (`Context` → `Correction` or `undefined`) in `src/editor/plugins/autocomplete/inline/` and add it to `replacing` in that folder's `index.ts`, where order matters. A plain replacement belongs in the tables in `inline/replacements.ts` instead. Guard it with a toggle from `config.autocorrect` and document it in the README's Autocorrect section.
+- **Inline correction** (arrows, dashes, formatting, ...): add an `InlineTransformer` (`Context` → `Correction` or `undefined`) in `src/editor/plugins/autocomplete/inline/` and add it to `replacing` in that folder's `index.ts`, where order matters. A plain replacement belongs in the tables in `inline/replacements.ts` instead. Guard it with a toggle from `config.autocorrect` and document it in `docs/guide/autocorrect.md`.
 - **Autocorrect language:** add a `LanguageRules` file in `src/editor/plugins/autocomplete/languages/` (quotes from CLDR, abbreviations from LibreOffice's `SentenceExceptList.xml`) and register it in that folder's `index.ts`.
 - **Exporter:** write an `exporterFunc` (`EditorState` → bytes) in `src/exporters/` and wire it up through `exportAs`.
+
+## Website
+
+- `docs/` is the website and user documentation (VitePress), served at https://fpurchess.github.io/blank/. It's its own package with its own `bun.lock`: run `bun install` in `docs/` first, then `make docs-dev`. The README stays short and links to it; user-facing reference belongs in `docs/guide/`.
+- `.github/workflows/docs.yml` deploys it to the `gh-pages` branch via `docs/deploy.sh`: pushes to `release` rebuild the latest docs at the root and freeze a copy at `v<version>/`, pushes to `main` rebuild `dev/`. `versions.json` at the root feeds the version switcher. Never edit `gh-pages` by hand.
+- The screenshots in `docs/public/screenshots/` are captured from the real app by `e2e/shots/docs.shots.ts`. Regenerate them with `make docs-screenshots` after UI changes and commit the result. They are 800×600, the app's default window size.
 
 ## Gotchas
 

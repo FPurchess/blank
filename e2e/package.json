@@ -5,6 +5,7 @@
   "description": "End-to-end tests for Blank, driving the real app via tauri-driver + WebdriverIO",
   "scripts": {
     "test": "wdio run ./wdio.conf.ts",
+    "screenshots": "wdio run ./wdio.shots.conf.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

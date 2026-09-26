@@ -5,7 +5,7 @@
 
 .PHONY: help install install-e2e dev dev-web build build-debug lint lint-fix \
 	format format-check test test-coverage test-e2e test-e2e-headless check clean \
-	bump release
+	install-docs docs-dev docs-build docs-screenshots bump release
 
 help: ## List all targets
 	@grep -E '^([a-zA-Z0-9_-]+:.*|)## ' $(MAKEFILE_LIST) | \
@@ -65,6 +65,20 @@ test-e2e-headless: install-e2e ## Same as test-e2e, in a virtual display (xvfb)
 
 check: lint format-check test ## Run the checks of the pre-commit hook
 
+## Docs
+
+install-docs: ## Install the dependencies of the website
+	cd docs && bun install
+
+docs-dev: install-docs ## Serve the website with hot reload
+	bun run docs:dev
+
+docs-build: install-docs ## Build the website into docs/.vitepress/dist
+	bun run docs:build
+
+docs-screenshots: install-e2e ## Build the debug app and capture the website's screenshots (Linux only)
+	xvfb-run -a bun run docs:screenshots
+
 ## Release
 
 bump: ## Bump the version in all files: make bump VERSION=<x.y.z|patch|minor|major>
@@ -83,6 +97,7 @@ bump: ## Bump the version in all files: make bump VERSION=<x.y.z|patch|minor|maj
 	perl -pi -e '!$$done && s/^(\s*"version":\s*)"\Q$$ENV{OLD}\E"/$$1"$$ENV{NEW}"/ && ($$done = 1)' src-tauri/tauri.conf.json; \
 	perl -pi -e '!$$done && s/^version = "\Q$$ENV{OLD}\E"/version = "$$ENV{NEW}"/ && ($$done = 1)' src-tauri/Cargo.toml; \
 	perl -pi -e 's|releases/download/v\Q$$ENV{OLD}\E/blank_\Q$$ENV{OLD}\E_|releases/download/v$$ENV{NEW}/blank_$$ENV{NEW}_|g' README.md; \
+	perl -pi -e 's|releases/download/v\Q$$ENV{OLD}\E/blank-\Q$$ENV{OLD}\E-|releases/download/v$$ENV{NEW}/blank-$$ENV{NEW}-|g' README.md; \
 	cargo update --quiet --workspace --manifest-path src-tauri/Cargo.toml; \
 	grep -q "\"version\": \"$$new\"" src-tauri/tauri.conf.json || fail "failed to update src-tauri/tauri.conf.json"; \
 	grep -q "^version = \"$$new\"" src-tauri/Cargo.toml || fail "failed to update src-tauri/Cargo.toml"; \

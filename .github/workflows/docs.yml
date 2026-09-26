@@ -1,0 +1,67 @@
+name: Docs
+
+# Builds the website (docs/) and deploys it to the gh-pages branch, which GitHub Pages serves
+# at https://fpurchess.github.io/blank/. Pushes to `release` update the latest docs at the root
+# and freeze a copy at v<version>/, pushes to `main` update dev/. See docs/deploy.sh.
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    paths:
+      - "docs/**"
+      - "blank.json"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel to deploy from the chosen branch"
+        type: choice
+        options: [dev, latest]
+        default: dev
+
+jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd docs && bun install --frozen-lockfile && bun run build
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # deploys of main and release write to the same branch, so they must not overlap
+    concurrency:
+      group: docs-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd docs && bun install --frozen-lockfile
+
+      - name: check out gh-pages
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null; then
+            git clone --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
+          else
+            mkdir site && git -C site init -b gh-pages
+            git -C site remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          fi
+
+      - name: build and deploy
+        env:
+          CHANNEL: ${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
+        run: |
+          docs/deploy.sh "$CHANNEL" site
+          cd site
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "docs: deploy $CHANNEL from ${GITHUB_SHA::7}"
+          git push origin gh-pages
