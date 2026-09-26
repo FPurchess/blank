@@ -38,6 +38,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - **Autocorrect language:** add a `LanguageRules` file in `src/editor/plugins/autocomplete/languages/` (quotes from CLDR, abbreviations from LibreOffice's `SentenceExceptList.xml`) and register it in that folder's `index.ts`.
 - **Exporter:** write an `exporterFunc` (`(state, { docPath })` → `{ contents, warnings }`) in `src/exporters/` and wire it up through `exportAs`, which shows the warnings. Lay out on the page in `src/exporters/page.ts` and get image bytes from `prepareImages` in `src/images/prepare.ts`.
 - **Importer:** convert the file to a ProseMirror doc in `src/importers/` and dispatch on its extension in `readDocumentFromFile`. Imports from Word go through mammoth (docx → HTML), `cleanup.ts` (HTML the markdown schema can hold) and the schema's DOM parser. Style names map in `styleMap.ts`; `bun scripts/build-docx-fixtures.sh` rebuilds the test documents from `__fixtures__/fixture.md`.
+- **Dialog** (like the link and image dialogs): put its request in an Observable in `state.ts`, open it from a command and render it from `ui.ts` with the helpers in `src/dialog.ts`. Add it to `dialogOpen` in `src/editor/index.ts`, so the editor leaves it the focus.
 - **Image handling** lives in `src/images/`. `codec.ts` is the only code that decodes or re-encodes images (webview decoders and a canvas); tests mock it and coverage skips it.
 
 ## Website

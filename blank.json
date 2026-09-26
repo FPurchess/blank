@@ -12,6 +12,7 @@
     "blocktype.bullet_list": "Mod-8",
     "blocktype.ordered_list": "Mod-9",
     "insert.horizontal_rule": "Mod-h",
+    "insert.image": "Mod-Alt-i",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",

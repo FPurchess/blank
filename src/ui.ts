@@ -12,6 +12,7 @@ import {
   type LanguagePickerState,
 } from "./state";
 import { bootLinkDialog } from "./linkDialog";
+import { bootImageDialog } from "./imageDialog";
 import { basename } from "./paths";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -122,6 +123,7 @@ export const bootUI = () => {
   languagePicker.subscribe(render, { immediate: true });
 
   bootLinkDialog();
+  bootImageDialog();
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);

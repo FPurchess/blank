@@ -23,15 +23,19 @@ Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` 
 
 ## Images
 
-Type `![alt text](address)` and a space to add an image. The address can be:
+Press `Mod` `Alt` `I` to add an image where the cursor is. In the dialog, press _Choose file…_ (Tab gets you there) to pick a picture from your computer, give it a short description and press Enter. Blank puts the picture into the document itself, so your markdown file stays a single file you can move, copy and send without losing images. Large pictures are scaled down to a size that still prints well.
 
-- a file next to your document, like `![Chart](images/chart.png)`: keep the images in a folder beside the markdown file and they travel with it,
-- any file on your computer, like `![Logo](/home/me/logo.png)`,
-- a web address, like `![Map](https://example.com/map.png)`.
+Instead of choosing a file, you can also type an address into the dialog, or type `![description](address)` and a space right in the text:
 
-Images next to your document appear as soon as the document has been saved, since Blank needs to know its folder. Until then Blank shows the alt text in their place. Large images shrink to the width of the page.
+- a web address, like `https://example.com/map.png`,
+- a file next to your document, like `images/chart.png`, which appears once the document has been saved, since Blank needs to know its folder,
+- any file on your computer, like `/home/me/logo.png`.
 
-PDFs include every image at the size you see in Blank, including images from the web. If one can't be loaded, for example because you're offline, the PDF shows its alt text instead and Blank tells you which one.
+These images stay where they are and the document links to them.
+
+To change or remove an image, put the cursor right before or after it and press `Mod` `Alt` `I` again.
+
+Images are as wide as they are in the file, up to the width of the page. PDFs and Word documents include every image at the size you see in Blank, also images from the web. If one can't be loaded, for example because you're offline, the export shows its description instead and Blank tells you which one.
 
 ## Blank remembers your document
 

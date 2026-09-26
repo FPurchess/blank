@@ -55,6 +55,28 @@ export interface LinkDialogRequest {
 // linkDialog holds the request of the open link dialog, or null while it is closed
 export const linkDialog = new Observable<LinkDialogRequest | null>(null);
 
+export interface ChosenImage {
+  // the image as data: URL, to embed it in the document
+  src: string;
+  // the file's name, e.g. "chart.png"
+  name: string;
+}
+
+export interface ImageDialogRequest {
+  src: string;
+  alt: string;
+  // the cursor is at an existing image, which can be removed
+  isEdit: boolean;
+  // lets the user pick an image file, null if cancelled or unreadable
+  chooseFile(): Promise<ChosenImage | null>;
+  submit(src: string, alt: string): void;
+  remove(): void;
+  cancel(): void;
+}
+
+// imageDialog holds the request of the open image dialog, or null while it is closed
+export const imageDialog = new Observable<ImageDialogRequest | null>(null);
+
 // language is the ISO 639-1 code of the language autocorrect follows
 export const language = new Observable<string>("en");
 

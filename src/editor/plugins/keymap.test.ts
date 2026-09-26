@@ -6,7 +6,14 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { save } from "@tauri-apps/plugin-dialog";
 
 import { CommandIdentifier, config } from "../../config";
-import { languagePicker, linkDialog, path, theme, themes } from "../../state";
+import {
+  imageDialog,
+  languagePicker,
+  linkDialog,
+  path,
+  theme,
+  themes,
+} from "../../state";
 import {
   blockquote,
   codeBlock,
@@ -215,6 +222,15 @@ describe("plugin.keymap", () => {
       expect(press("Mod-Alt-l")).toBe(true);
 
       expect(languagePicker.value.open).toBe(true);
+    });
+
+    it("Mod-Alt-i opens the image dialog", () => {
+      const { press } = setup(doc(p("text")));
+
+      expect(press("Mod-Alt-i")).toBe(true);
+
+      expect(imageDialog.value).toMatchObject({ isEdit: false });
+      imageDialog.value = null;
     });
 
     it("Mod-Alt-w exports a Word document", async () => {

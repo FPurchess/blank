@@ -25,6 +25,7 @@ import {
   chooseLanguage,
   insertNode,
   editLink,
+  editImage,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -62,6 +63,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.INSERT_HORIZONTAL_RULE]: insertNode(
     schema.nodes.horizontal_rule,
   ),
+  [CommandIdentifier.INSERT_IMAGE]: editImage(),
   [CommandIdentifier.FORMAT_INDENT]: sinkListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_UNINDENT]: liftListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
