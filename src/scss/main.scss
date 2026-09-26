@@ -140,7 +140,7 @@ body {
   }
 }
 
-#link-dialog {
+.dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -150,7 +150,7 @@ body {
   background: rgba(0, 0, 0, 0.3);
 }
 
-.link-dialog {
+.dialog {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -191,6 +191,19 @@ body {
     margin: -2px 0 6px;
     font-size: 0.8rem;
     opacity: 0.7;
+  }
+
+  // a field with a button next to it
+  .row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      margin-bottom: 0;
+    }
   }
 
   .actions {

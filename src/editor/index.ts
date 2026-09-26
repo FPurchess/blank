@@ -3,7 +3,7 @@ import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 
-import { linkDialog, transaction } from "../state";
+import { imageDialog, linkDialog, transaction } from "../state";
 import {
   autocomplete,
   images,
@@ -12,6 +12,9 @@ import {
   openLink,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
+
+const dialogOpen = () =>
+  linkDialog.value !== null || imageDialog.value !== null;
 
 export const bootEditor = async () => {
   const state = await applyInitialDocument(
@@ -32,12 +35,12 @@ export const bootEditor = async () => {
     state,
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
-        // the link dialog takes the focus while it is open
-        if (linkDialog.value !== null) return false;
+        // the dialogs take the focus while they are open
+        if (dialogOpen()) return false;
         e.preventDefault();
         e.stopPropagation();
         window.setTimeout(() => {
-          if (linkDialog.value === null) view.focus();
+          if (!dialogOpen()) view.focus();
         }, 100);
         return true;
       },

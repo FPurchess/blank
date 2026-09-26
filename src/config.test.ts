@@ -279,6 +279,14 @@ describe("config", () => {
     expect(isRecord(value)).toBe(expected);
   });
 
+  it("binds insert.image to Mod-Alt-i by default", async () => {
+    vi.mocked(exists).mockResolvedValue(false);
+
+    await bootConfig();
+
+    expect(getKeyBinding(CommandIdentifier.INSERT_IMAGE)).toBe("Mod-Alt-i");
+  });
+
   it("binds export.docx to Mod-Alt-w by default", async () => {
     vi.mocked(exists).mockResolvedValue(false);
 

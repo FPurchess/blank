@@ -6,3 +6,4 @@ export { default as saveFile } from "./saveFile";
 export { default as cycleTheme } from "./cycleTheme";
 export { default as chooseLanguage } from "./chooseLanguage";
 export { default as editLink } from "./editLink";
+export { default as editImage } from "./editImage";

@@ -38,12 +38,13 @@
 
 ## Text
 
-| Command              | Shortcut      |
-| -------------------- | ------------- |
-| Bold                 | `Mod` `B`     |
-| Italic               | `Mod` `I`     |
-| Code                 | `Mod` `E`     |
-| Insert or edit link  | `Mod` `K`     |
-| Open link in browser | `Mod` + Click |
+| Command              | Shortcut        |
+| -------------------- | --------------- |
+| Bold                 | `Mod` `B`       |
+| Italic               | `Mod` `I`       |
+| Code                 | `Mod` `E`       |
+| Insert or edit link  | `Mod` `K`       |
+| Open link in browser | `Mod` + Click   |
+| Insert or edit image | `Mod` `Alt` `I` |
 
 You can also create most of these by typing markdown. See [Format as you type](./writing#format-as-you-type).

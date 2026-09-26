@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 
-import { linkDialog, type LinkDialogRequest, transaction } from "../state";
+import {
+  imageDialog,
+  type ImageDialogRequest,
+  linkDialog,
+  type LinkDialogRequest,
+  transaction,
+} from "../state";
 import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
 
@@ -13,6 +19,7 @@ describe("bootEditor", () => {
     mockCliArgs();
     transaction.value = null;
     linkDialog.value = null;
+    imageDialog.value = null;
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     await bootEditor();
   });
@@ -53,6 +60,15 @@ describe("bootEditor", () => {
     expect(document.activeElement).not.toBe(editor());
 
     linkDialog.value = null;
+    editor()?.blur();
+    vi.advanceTimersByTime(100);
+    expect(document.activeElement).not.toBe(editor());
+  });
+
+  it("leaves the focus to the image dialog while it is open", () => {
+    vi.advanceTimersByTime(100);
+    imageDialog.value = {} as ImageDialogRequest;
+
     editor()?.blur();
     vi.advanceTimersByTime(100);
     expect(document.activeElement).not.toBe(editor());

@@ -1,5 +1,6 @@
 import { type LinkDialogRequest, linkDialog } from "./state";
 import { isAbsoluteUrl, isSavableUrl, normalizeUrl } from "./url";
+import { createButton, createDialog, createField } from "./dialog";
 
 const DIALOG_ID = "link-dialog";
 
@@ -12,36 +13,6 @@ const MESSAGES = {
 let unsubscribe: (() => void) | undefined;
 
 /**
- * createField creates a labelled text input
- */
-const createField = (id: string, label: string, value: string) => {
-  const labelElement = document.createElement("label");
-  labelElement.htmlFor = id;
-  labelElement.textContent = label;
-
-  const input = document.createElement("input");
-  input.id = id;
-  input.type = "text";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.value = value;
-
-  return { label: labelElement, input };
-};
-
-const createButton = (
-  text: string,
-  type: "submit" | "button",
-  onClick?: () => void,
-) => {
-  const button = document.createElement("button");
-  button.type = type;
-  button.textContent = text;
-  if (onClick) button.addEventListener("click", onClick);
-  return button;
-};
-
-/**
  * renderDialog renders the dialog for `request` and focuses the URL input
  */
 const renderDialog = (request: LinkDialogRequest) => {
@@ -51,24 +22,11 @@ const renderDialog = (request: LinkDialogRequest) => {
     callback();
   };
 
-  const backdrop = document.createElement("div");
-  backdrop.id = DIALOG_ID;
-  backdrop.addEventListener("mousedown", (event) => {
-    if (event.target === backdrop) {
-      event.preventDefault();
-      close(request.cancel);
-    }
-  });
-
-  const form = document.createElement("form");
-  form.className = "link-dialog";
-  form.setAttribute("role", "dialog");
-  form.setAttribute("aria-modal", "true");
-  form.setAttribute("aria-labelledby", `${DIALOG_ID}-title`);
-
-  const title = document.createElement("h2");
-  title.id = `${DIALOG_ID}-title`;
-  title.textContent = request.isEdit ? "Edit link" : "Link";
+  const { backdrop, form } = createDialog(
+    DIALOG_ID,
+    request.isEdit ? "Edit link" : "Link",
+    () => close(request.cancel),
+  );
 
   const url = createField(`${DIALOG_ID}-url`, "URL", request.url);
   const hint = document.createElement("p");
@@ -119,30 +77,7 @@ const renderDialog = (request: LinkDialogRequest) => {
     }
   });
 
-  form.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(request.cancel);
-    } else if (event.key === "Tab") {
-      // keep the focus inside the dialog
-      const focusable = Array.from(
-        form.querySelectorAll<HTMLElement>("input, button:not(:disabled)"),
-      );
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-  });
-
-  form.append(title, url.label, url.input, hint, text.label, text.input);
-  form.append(actions);
-  backdrop.append(form);
+  form.append(url.label, url.input, hint, text.label, text.input, actions);
   document.body.append(backdrop);
 
   validate();
