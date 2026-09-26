@@ -63,6 +63,25 @@
     ],
     "macOS": {
       "signingIdentity": "-"
+    },
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/blank.desktop",
+        "files": {
+          "/usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml": "linux/io.github.fpurchess.blank.metainfo.xml"
+        }
+      },
+      "rpm": {
+        "desktopTemplate": "linux/blank.desktop",
+        "files": {
+          "/usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml": "linux/io.github.fpurchess.blank.metainfo.xml"
+        }
+      },
+      "appimage": {
+        "files": {
+          "/usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml": "linux/io.github.fpurchess.blank.metainfo.xml"
+        }
+      }
     }
   }
 }

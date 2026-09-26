@@ -88,7 +88,10 @@ docs-screenshots: install-e2e ## Build the debug app and capture the website's s
 
 ## Release
 
-bump: ## Bump the version in all files: make bump VERSION=<x.y.z|patch|minor|major>
+# AppStream metadata of the Linux packages, whose <releases> list gets an entry per version
+METAINFO := src-tauri/linux/io.github.fpurchess.blank.metainfo.xml
+
+bump: ## Bump the version in all files (incl. a metainfo release): make bump VERSION=<x.y.z|patch|minor|major>
 	@set -e; \
 	fail() { echo "error: $$*" >&2; exit 1; }; \
 	case "$(VERSION)" in \
@@ -105,12 +108,14 @@ bump: ## Bump the version in all files: make bump VERSION=<x.y.z|patch|minor|maj
 	perl -pi -e '!$$done && s/^version = "\Q$$ENV{OLD}\E"/version = "$$ENV{NEW}"/ && ($$done = 1)' src-tauri/Cargo.toml; \
 	perl -pi -e 's|releases/download/v\Q$$ENV{OLD}\E/blank_\Q$$ENV{OLD}\E_|releases/download/v$$ENV{NEW}/blank_$$ENV{NEW}_|g' README.md; \
 	perl -pi -e 's|releases/download/v\Q$$ENV{OLD}\E/blank-\Q$$ENV{OLD}\E-|releases/download/v$$ENV{NEW}/blank-$$ENV{NEW}-|g' README.md; \
+	perl -pi -e 'BEGIN { chomp($$d = `date +%F`) } !$$done && s|^(\s*)<release |$$1<release version="$$ENV{NEW}" date="$$d" />\n$$1<release | && ($$done = 1)' $(METAINFO); \
 	cargo update --quiet --workspace --manifest-path src-tauri/Cargo.toml; \
 	grep -q "\"version\": \"$$new\"" src-tauri/tauri.conf.json || fail "failed to update src-tauri/tauri.conf.json"; \
 	grep -q "^version = \"$$new\"" src-tauri/Cargo.toml || fail "failed to update src-tauri/Cargo.toml"; \
 	grep -A1 '^name = "blank"$$' src-tauri/Cargo.lock | grep -q "^version = \"$$new\"" || fail "failed to update src-tauri/Cargo.lock"; \
 	grep -q "releases/download/v$$new/blank_$${new}_" README.md || fail "failed to update the download links in README.md"; \
 	! grep -q "releases/download/v$$old/" README.md || fail "README.md still links to v$$old"; \
+	grep -q "<release version=\"$$new\"" $(METAINFO) || fail "failed to add the release to $(METAINFO)"; \
 	echo "Bumped the version from $$old to $$new:"; \
 	git diff --stat; \
 	echo; \
@@ -130,6 +135,8 @@ release: ## Publish origin/main by pushing it to the release branch (DRY_RUN=1 o
 	git show origin/main:README.md | grep -q "releases/download/v$$v/blank_$${v}_" || \
 		fail "the download links in README.md on origin/main don't point to v$$v"; \
 	tag=$$(git ls-remote --tags origin "refs/tags/v$$v"); \
+	git show "origin/main:$(METAINFO)" | grep -q "<release version=\"$$v\"" || \
+		fail "$(METAINFO) on origin/main has no release entry for v$$v"; \
 	[ -z "$$tag" ] || fail "v$$v is already released, run make bump first"; \
 	[ "$$(git rev-parse origin/main)" != "$$(git rev-parse origin/release)" ] || \
 		fail "nothing to release, release is already at origin/main"; \

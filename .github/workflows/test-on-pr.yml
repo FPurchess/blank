@@ -67,3 +67,17 @@ jobs:
           max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
           echo "highest required glibc symbol: $max"
           [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+
+      - name: check desktop entry and AppStream metadata in the packages (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          meta=usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml
+          dpkg-deb -x src-tauri/target/release/bundle/deb/*.deb "$RUNNER_TEMP/deb"
+          ls -R "$RUNNER_TEMP/deb/usr/share"
+          test -f "$RUNNER_TEMP/deb/$meta" || { echo "::error::the .deb has no $meta"; exit 1; }
+          cat "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop"
+          grep -qx 'Exec=blank %f' "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop" ||
+            { echo "::error::the .deb's desktop entry doesn't pass the file to blank"; exit 1; }
+          sudo apt-get install -y rpm
+          rpm -qlp src-tauri/target/release/bundle/rpm/*.rpm | tee "$RUNNER_TEMP/rpm.txt"
+          grep -qx "/$meta" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /$meta"; exit 1; }
