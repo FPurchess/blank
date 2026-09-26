@@ -70,7 +70,45 @@ describe("storage", () => {
     });
   });
 
+  describe("spellcheck", () => {
+    it("is off on first start", async () => {
+      const { spellcheck } = await bootFresh();
+
+      expect(spellcheck.value).toBe(false);
+    });
+
+    it.each([
+      [true, true],
+      [false, false],
+      ["yes", false],
+    ])("restores the stored value %j as %j", async (stored, expected) => {
+      await localforage.setItem("spellcheck", stored);
+
+      const { spellcheck } = await bootFresh();
+
+      expect(spellcheck.value).toBe(expected);
+    });
+
+    it("stores the setting", async () => {
+      const { spellcheck } = await bootFresh();
+
+      spellcheck.value = true;
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("spellcheck")).toBe(true),
+      );
+    });
+  });
+
   describe("language", () => {
+    it("restores a stored regional language", async () => {
+      await localforage.setItem("language", "de-CH");
+
+      const { language } = await bootFresh();
+
+      expect(language.value).toBe("de-CH");
+    });
+
     it("restores a stored language", async () => {
       await localforage.setItem("language", "pt");
 

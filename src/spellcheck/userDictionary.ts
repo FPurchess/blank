@@ -22,8 +22,11 @@ export const dictionaryKey = (tag: string) => {
   return base === "nb" ? "no" : base;
 };
 
+const dirOf = async () =>
+  await path.join(await path.appConfigDir(), "dictionaries");
+
 const fileOf = async (key: string) =>
-  await path.join(await path.appConfigDir(), "dictionaries", `${key}.txt`);
+  await path.join(await dirOf(), `${key}.txt`);
 
 /**
  * readWords returns the words of the personal dictionary `key`, or undefined if
@@ -51,7 +54,7 @@ export const readWords = async (key: string): Promise<string[] | undefined> => {
 export const writeWords = async (key: string, words: string[]) => {
   const file = await fileOf(key);
   const content = [...new Set(words)].sort().join("\n");
-  await mkdir(await path.dirname(file), { recursive: true });
+  await mkdir(await dirOf(), { recursive: true });
   await writeTextFile(`${file}.tmp`, content ? content + "\n" : "");
   await rename(`${file}.tmp`, file);
 };

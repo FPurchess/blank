@@ -138,7 +138,14 @@ const bindCommands = () => {
         invalid.push(`${key}: ${binding}`);
         return acc;
       }
-      acc[normalized] = commandMap[key as CommandIdentifier];
+      const command = commandMap[key as CommandIdentifier];
+      acc[normalized] = command;
+      // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
+      // on Windows, where the keymap can't fall back to the key code
+      if (/(^|-)shift-/i.test(normalized) && /-[a-z]$/.test(normalized)) {
+        acc[normalized.slice(0, -1) + normalized.slice(-1).toUpperCase()] ??=
+          command;
+      }
       return acc;
     },
     {},

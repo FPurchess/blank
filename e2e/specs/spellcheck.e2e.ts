@@ -221,4 +221,26 @@ describe("spell check", () => {
     await expect(status()).not.toBeDisplayed();
     await expect(errors()).toBeElementsArrayOfSize(0);
   });
+
+  it("downloads a dictionary that isn't built in", async () => {
+    await pressMod(Key.Alt, "s");
+    await pressMod(Key.Alt, "l");
+    await type("engb");
+    await type(Key.Enter);
+    await expect($("#ui-language")).toHaveText("EN-GB");
+
+    await expect(status()).toHaveText("Spelling ✓");
+    await pressMod("n");
+    await type("the colour colr ");
+    await expectFlagged("colr");
+  });
+
+  it("reports a damaged download", async () => {
+    await pressMod(Key.Alt, "l");
+    await type("ptpt");
+    await type(Key.Enter);
+
+    await expect(status()).toHaveText("Spelling ✗");
+    await expect(errors()).toBeElementsArrayOfSize(0);
+  });
 });

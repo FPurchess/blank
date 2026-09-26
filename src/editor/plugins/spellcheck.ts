@@ -318,6 +318,9 @@ export const spellcheck = () =>
         schedule(0);
       });
 
+      // a spell checker that is already there checks the text right away
+      if (spellchecker.value) schedule(0);
+
       return {
         update(view, previous) {
           const state = spellcheckKey.getState(view.state)!;

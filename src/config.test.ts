@@ -295,6 +295,68 @@ describe("config", () => {
     expect(getKeyBinding(CommandIdentifier.EXPORT_DOCX)).toBe("Mod-Alt-w");
   });
 
+  describe("spellcheck", () => {
+    it("leaves words in capitals and with digits alone by default", async () => {
+      vi.mocked(exists).mockResolvedValue(false);
+
+      await bootConfig();
+
+      expect(config.value.spellcheck).toEqual({
+        ignoreUppercase: true,
+        ignoreWordsWithNumbers: true,
+      });
+    });
+
+    it("keeps defaults missing from a partial user config", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ spellcheck: { ignoreUppercase: false } }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.spellcheck).toEqual({
+        ignoreUppercase: false,
+        ignoreWordsWithNumbers: true,
+      });
+    });
+
+    it("keeps the defaults for settings of the wrong type", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({
+          spellcheck: { ignoreUppercase: "no", ignoreWordsWithNumbers: false },
+        }),
+      );
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await bootConfig();
+
+      expect(config.value.spellcheck).toEqual({
+        ignoreUppercase: true,
+        ignoreWordsWithNumbers: false,
+      });
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: spellcheck.ignoreUppercase",
+      );
+    });
+
+    it("ignores spell check settings that aren't an object", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ spellcheck: true, unknown: 1 }),
+      );
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await bootConfig();
+
+      expect(config.value.spellcheck.ignoreUppercase).toBe(true);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: spellcheck",
+      );
+    });
+  });
+
   it("binds language.choose to Mod-Alt-l by default", async () => {
     vi.mocked(exists).mockResolvedValue(false);
 

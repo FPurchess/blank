@@ -248,6 +248,20 @@ describe("plugin.autocomplete", () => {
       expect(typed("So |", "(x)")).toBe("So ✓|");
     });
 
+    it("applies the replacements of the base language to a regional one", () => {
+      setAutocorrect({
+        replace: {
+          "*": {},
+          de: { mfg: "Mit freundlichen Grüßen" },
+          "de-CH": { gruss: "Grüezi" },
+        },
+      });
+      language.value = "de-CH";
+
+      expect(typed("So |", "mfg ")).toBe("So Mit freundlichen Grüßen |");
+      expect(typed("So |", "gruss ")).toBe("So Grüezi |");
+    });
+
     it("prefers the language's replacement over the global one", () => {
       setAutocorrect({
         replace: { "*": { btw: "by the way" }, de: { btw: "übrigens" } },

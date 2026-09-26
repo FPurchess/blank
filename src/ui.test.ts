@@ -8,6 +8,9 @@ import {
   linkDialog,
   type LinkDialogRequest,
   path,
+  spellcheck,
+  spellcheckMessage,
+  spellcheckStatus,
   textContent,
 } from "./state";
 import { closePicker, move, openPicker, typeChar } from "./languagePicker";
@@ -220,5 +223,77 @@ describe("setupNotification", () => {
     await flushPromises();
 
     expect(consoleError).toHaveBeenCalledWith(error);
+  });
+});
+
+describe("ui spell check status", () => {
+  const uiSpellcheck = () =>
+    document.querySelector<HTMLElement>("#ui-spellcheck")!;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    spellcheck.value = false;
+    spellcheckMessage.value = null;
+    spellcheckStatus.value = { state: "off", tag: "de" };
+    stubNotification("granted");
+    bootUI();
+  });
+
+  it.each([
+    [{ state: "off" }, "", ""],
+    [{ state: "loading" }, "Spelling …", "Loading the German dictionary"],
+    [
+      { state: "downloading", progress: 0.42 },
+      "Spelling 42 %",
+      "Downloading the German dictionary",
+    ],
+    [
+      { state: "downloading" },
+      "Spelling 0 %",
+      "Downloading the German dictionary",
+    ],
+    [{ state: "ready" }, "Spelling ✓", "Checking German spelling"],
+    [
+      { state: "unavailable" },
+      "No spelling",
+      "No spell check dictionary for German",
+    ],
+    [{ state: "error", message: "offline" }, "Spelling ✗", "offline"],
+    [{ state: "error" }, "Spelling ✗", ""],
+  ] as const)("shows %j", (status, text, title) => {
+    spellcheckStatus.value = { tag: "de", ...status };
+
+    expect(uiSpellcheck().textContent).toBe(text);
+    expect(uiSpellcheck().hidden).toBe(text === "");
+    expect(uiSpellcheck().title).toBe(
+      title && `${title}, click to turn spell check off`,
+    );
+  });
+
+  it("shows a message for a moment", () => {
+    vi.useFakeTimers();
+    spellcheckStatus.value = { state: "ready", tag: "de" };
+
+    spellcheckMessage.value = "No spelling errors";
+    expect(uiSpellcheck().textContent).toBe("No spelling errors");
+
+    vi.advanceTimersByTime(2000);
+    expect(spellcheckMessage.value).toBeNull();
+    expect(uiSpellcheck().textContent).toBe("Spelling ✓");
+  });
+
+  it("turns spell check on and off when clicked", () => {
+    uiSpellcheck().click();
+    expect(spellcheck.value).toBe(true);
+
+    uiSpellcheck().click();
+    expect(spellcheck.value).toBe(false);
+  });
+
+  it("keeps the focus in the editor when clicked", () => {
+    const event = new MouseEvent("mousedown", { cancelable: true });
+    uiSpellcheck().dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 });

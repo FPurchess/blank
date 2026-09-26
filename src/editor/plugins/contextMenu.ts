@@ -15,7 +15,8 @@ import { type Misspelling, misspellingAt } from "./spellcheck";
 // event is ignored, which some webviews send for the same key press
 const KEYBOARD_EVENT_WINDOW = 500;
 
-let openedByKeyboardAt = -Infinity;
+// when the keyboard last opened the menu of each editor
+const openedByKeyboardAt = new WeakMap<EditorView, number>();
 
 /**
  * wordAt returns the word at `pos`, if any
@@ -67,7 +68,7 @@ export const openContextMenu = (
     keyboard,
   }: { anchor?: ContextMenuRequest["anchor"]; keyboard: boolean },
 ) => {
-  if (keyboard) openedByKeyboardAt = Date.now();
+  if (keyboard) openedByKeyboardAt.set(view, Date.now());
   const target = targetAt(view.state, pos);
   const at = target.misspelling?.from ?? pos;
   let where = anchor;
@@ -126,7 +127,9 @@ export const contextMenuPlugin = () =>
           if (event.shiftKey) return false;
           event.preventDefault();
           // the keyboard shortcut already opened the menu
-          if (Date.now() - openedByKeyboardAt < KEYBOARD_EVENT_WINDOW) {
+          const since =
+            Date.now() - (openedByKeyboardAt.get(view) ?? -Infinity);
+          if (since < KEYBOARD_EVENT_WINDOW) {
             return true;
           }
 
