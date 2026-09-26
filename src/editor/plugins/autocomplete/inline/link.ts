@@ -1,5 +1,6 @@
 import { schema } from "prosemirror-markdown";
 
+import { isSavableUrl } from "../../../../url";
 import type { Context } from "../context";
 import type { InlineTransformer } from "../types";
 
@@ -9,7 +10,8 @@ const reLink = /\[([^\]￼]+)\]\(([^)\s￼]+)\)$/;
 
 /**
  * link turns `![alt](src)` into an image and `[title](url)` into a link. The
- * link keeps the marks of its title, e.g. bold.
+ * link keeps the marks of its title, e.g. bold. Like the link dialog, it only
+ * links URLs that survive saving, so e.g. `javascript:` links stay text.
  */
 const link: InlineTransformer = (ctx: Context) => {
   if (!ctx.config.links) return;
@@ -18,6 +20,7 @@ const link: InlineTransformer = (ctx: Context) => {
   if (image) {
     const from = ctx.start + image.index;
     const [match, alt, src] = image;
+    if (!isSavableUrl(src)) return;
     return (tr) => {
       tr.replaceWith(
         from,
@@ -30,6 +33,7 @@ const link: InlineTransformer = (ctx: Context) => {
   const match = reLink.exec(ctx.textBefore);
   if (!match) return;
   const [whole, title, href] = match;
+  if (!isSavableUrl(href)) return;
   const from = ctx.start + match.index;
   const titleTo = from + 1 + title.length;
   return (tr) => {

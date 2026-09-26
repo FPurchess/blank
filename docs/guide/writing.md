@@ -17,6 +17,8 @@ At the start of an empty line, type one of these to turn the line into a block:
 | `---` `***` `___`           | Enter | Horizontal line |
 | ` ``` ` or ` ```lang `      | Enter | Code block      |
 
+Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
+
 Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` and plain URLs become formatting once you finish the word. See [Autocorrect](./autocorrect) for everything Blank corrects.
 
 ## Blank remembers your document

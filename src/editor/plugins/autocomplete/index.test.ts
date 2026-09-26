@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { splitBlock } from "prosemirror-commands";
 import { history, undo } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
@@ -198,6 +199,30 @@ describe("plugin.autocomplete", () => {
     });
   });
 
+  describe("words named like object properties", () => {
+    it.each([
+      "constructor",
+      "toString",
+      "valueOf",
+      "hasOwnProperty",
+      "__proto__",
+    ])("leaves %j alone", (word) => {
+      expect(typed("The |", word + " ")).toBe(`The ${word} |`);
+      expect(typed("The |", word + ".")).toBe(`The ${word}.|`);
+    });
+
+    it("leaves them alone with custom replacements", () => {
+      setAutocorrect({ replace: { "*": { btw: "by the way" } } });
+      language.value = "de";
+      expect(typed("The |", "constructor ")).toBe("The constructor |");
+      expect(typed("The |", "__proto__ ")).toBe("The __proto__ |");
+    });
+
+    it("leaves them alone as symbols", () => {
+      expect(typed("The |", "(constructor)")).toBe("The (constructor)|");
+    });
+  });
+
   describe("custom replacements", () => {
     beforeEach(() => {
       setAutocorrect({
@@ -258,6 +283,18 @@ describe("plugin.autocomplete", () => {
       expect(typed("A--B.|", " ")).toBe("A—B. |");
     });
 
+    it.each([
+      ["de", "„Das“ - sagte|", "„Das“ – sagte |"],
+      ["de", "Er - „sagte|", "Er – „sagte |"],
+      ["en", "[a] - {b|", "[a] – {b |"],
+    ])(
+      "sets a dash next to quotes and brackets in %s: %j",
+      (lang, before, after) => {
+        language.value = lang;
+        expect(typed(before, " ")).toBe(after);
+      },
+    );
+
     it("uses em dashes between words in Russian", () => {
       language.value = "ru";
       expect(typed("A - B|", " ")).toBe("A — B |");
@@ -294,6 +331,19 @@ describe("plugin.autocomplete", () => {
       const end = after.replace(/\)? \|$/, "").length;
       expect(marksAt(view, end)).toEqual([mark]);
       expect(cursorMarks(view)).toEqual([]);
+    });
+
+    it.each([
+      ["So »*x*«|", "So »x« |"],
+      ["So „*x*“|", "So „x“ |"],
+      ["So ‹*x*›|", "So ‹x› |"],
+      ["So {*x*}|", "So {x} |"],
+    ])("formats inside quotes and brackets: %j", (before, after) => {
+      const { view, type } = setup(before);
+      type(" ");
+
+      expect(show(view)).toBe(after);
+      expect(marksAt(view, 5)).toEqual(["em"]);
     });
 
     it("formats before a punctuation mark", () => {
@@ -355,6 +405,37 @@ describe("plugin.autocomplete", () => {
       expect(image.attrs).toMatchObject({ src: "a.png", alt: "alt" });
     });
 
+    it.each([
+      "The [x](javascript:alert(1)|",
+      "The [x](javascript:void)|",
+      "The [x](file:///etc/passwd)|",
+      "The ![x](javascript:void)|",
+      "The ![x](vbscript:x)|",
+    ])("leaves %j as typed, since saving would drop it", (before) => {
+      const { view, type } = setup(before);
+      type(" ");
+
+      expect(show(view)).toBe(unchanged(before));
+      expect(
+        view.state.doc.rangeHasMark(
+          0,
+          view.state.doc.content.size,
+          schema.marks.link,
+        ),
+      ).toBe(false);
+      expect(view.state.doc.firstChild!.childCount).toBe(1);
+    });
+
+    it.each(["data:image/png;base64,AAAA", "a.png", "https://a.io/a.png"])(
+      "turns an image with a savable src into an image: %j",
+      (src) => {
+        const { view, type } = setup(`The ![a](${src})|`);
+        type(" ");
+
+        expect(view.state.doc.nodeAt(5)!.attrs.src).toBe(src);
+      },
+    );
+
     it("turns image syntax without alt text into an image", () => {
       const { view, type } = setup("The ![](a.png)|");
       type(" ");
@@ -404,6 +485,43 @@ describe("plugin.autocomplete", () => {
         ).toBe(false);
       },
     );
+
+    it.each([
+      ["de", '"https://blank.app/docs" ', "https://blank.app/docs"],
+      ["de", "'https://blank.app/docs' ", "https://blank.app/docs"],
+      ["cs", '"https://blank.app/docs". ', "https://blank.app/docs"],
+      ["ru", '"https://blank.app/docs" ', "https://blank.app/docs"],
+      ["ru", "'https://blank.app/docs' ", "https://blank.app/docs"],
+      ["en", "[https://blank.app] ", "https://blank.app"],
+      ["en", "{https://blank.app} ", "https://blank.app"],
+      ["en", "(https://blank.app/a]) ", "https://blank.app/a"],
+      ["en", "https://w.org/A_(b) ", "https://w.org/A_(b)"],
+      ["en", "(https://w.org/A_(b)). ", "https://w.org/A_(b)"],
+      ["en", "[https://w.org/A_[b]] ", "https://w.org/A_[b]"],
+      ["en", "https://a.io/{id} ", "https://a.io/{id}"],
+    ])("links a URL in %s quotes and brackets: %j", (lang, text, href) => {
+      language.value = lang;
+      const { view, type } = setup("See |");
+      type(text);
+
+      const node = view.state.doc.nodeAt(
+        view.state.doc.textContent.indexOf("h") + 1,
+      )!;
+      expect(node.text).toBe(href);
+      expect(node.marks[0]?.attrs.href).toBe(href);
+    });
+
+    it("links a URL in single quotes and closes the quote", () => {
+      language.value = "de";
+      const { view, type } = setup("See |");
+      type("'https://blank.app' ");
+
+      expect(show(view)).toBe("See ‚https://blank.app‘ |");
+      expect(view.state.doc.nodeAt(6)!.marks[0]?.attrs.href).toBe(
+        "https://blank.app",
+      );
+      expect(view.state.doc.nodeAt(23)!.marks).toEqual([]);
+    });
 
     it("links a URL only once the word ends", () => {
       const { view, type } = setup("See https://a.io|");
@@ -477,6 +595,15 @@ describe("plugin.autocomplete", () => {
       expect(typed("Siehe z.B. das|", " ")).toBe("Siehe z.B. das |");
     });
 
+    it.each([
+      ["Use it, |", "i.e. this", "Use it, i.e. this|"],
+      ["Use it, |", "i.e., x", "Use it, i.e., x|"],
+      ["So |", "i think", "So I think|"],
+      ["So |", "i, too", "So I, too|"],
+    ])("corrects 'i' but not 'i.e.': %j", (before, text, after) => {
+      expect(typed(before, text)).toBe(after);
+    });
+
     it("corrects 'i' in English only", () => {
       language.value = "de";
       expect(typed("So i|", " ")).toBe("So i |");
@@ -492,7 +619,44 @@ describe("plugin.autocomplete", () => {
       ["xx", '"Hi"', "“Hi”"],
     ])("uses the quotes of %s", (lang, text, after) => {
       language.value = lang;
-      expect(typed("|", text)).toBe(after + "|");
+      // a single quote closes once the word ends
+      expect(typed("|", text + " ")).toBe(after + " |");
+    });
+
+    it.each([
+      ["fr", "« C'est l'heure »", "« C’est l’heure »"],
+      ["fr", "J'ai dit", "J’ai dit"],
+      ["it", "'l'uomo'.", "“l’uomo”."],
+      ["pl", "'l'uomo' ", "«l’uomo» "],
+      ["de", "'Haus'", "‚Haus’"],
+      ["de", "'Haus' ", "‚Haus‘ "],
+      ["de", "'Haus',", "‚Haus‘,"],
+      ["de", "'Geht's' ", "‚Geht’s‘ "],
+      ["en", "'don't' ", "‘don’t’ "],
+      ["en", "the dogs' ", "the dogs’ "],
+      ["de", "Hans' Buch ", "Hans’ Buch "],
+    ])("keeps apostrophes in %s: %j", (lang, text, after) => {
+      language.value = lang;
+      expect(typed("So |", text)).toBe("So " + after + "|");
+    });
+
+    it("closes a single quote after an apostrophe mid-word only at its end", () => {
+      language.value = "it";
+      const { view, type } = setup("E |");
+      type("'l'");
+      expect(show(view)).toBe("E “l’|");
+      type("uomo'");
+      expect(show(view)).toBe("E “l’uomo’|");
+      type(" ");
+      expect(show(view)).toBe("E “l’uomo” |");
+    });
+
+    it("leaves the closing quote alone with quotes turned off", () => {
+      language.value = "de";
+      const { view, type } = setup("‚Haus’|");
+      setAutocorrect({ quotes: false });
+      type(" ");
+      expect(show(view)).toBe("‚Haus’ |");
     });
 
     it.each([
@@ -558,6 +722,62 @@ describe("plugin.autocomplete", () => {
 
       expect(press("Enter")).toBe(false);
       expect(show(view)).toBe("---|x");
+    });
+
+    it.each([
+      ["-|", "bullet_list"],
+      ["*|", "bullet_list"],
+      ["3.|", "ordered_list"],
+      [">|", "blockquote"],
+      ["#|", "heading"],
+      ["###|", "heading"],
+    ])("reverts %j with a single undo", (before) => {
+      const { view, type } = setup(before);
+      type(" ");
+      undo(view.state, view.dispatch);
+
+      expect(view.state.doc.toJSON()).toEqual(
+        doc(p(before.replace("|", ""))).toJSON(),
+      );
+      expect(show(view)).toBe(before);
+    });
+
+    it.each([
+      ["---|", "horizontal_rule"],
+      ["```ts|", "code_block"],
+    ])("reverts %j on Enter with a single undo", (before) => {
+      const { view, press } = setup(before);
+      press("Enter");
+      undo(view.state, view.dispatch);
+
+      expect(view.state.doc.toJSON()).toEqual(
+        doc(p(before.replace("|", ""))).toJSON(),
+      );
+      expect(show(view)).toBe(before);
+    });
+
+    it("keeps the text typed just before when a shortcut is undone", () => {
+      const { view, type } = setup(doc(p()));
+      type("Intro");
+      splitBlock(view.state, view.dispatch);
+      type("## ");
+
+      expect(view.state.doc.child(1).type.name).toBe("heading");
+      undo(view.state, view.dispatch);
+      expect(show(view)).toBe("Intro\n##|");
+      undo(view.state, view.dispatch);
+      expect(show(view)).toBe("|");
+    });
+
+    it("keeps what is typed in the new block when the shortcut is undone", () => {
+      const { view, type } = setup("-|");
+      type(" item");
+      undo(view.state, view.dispatch);
+
+      expect(view.state.doc.firstChild!.type.name).toBe("bullet_list");
+      expect(show(view)).toBe("|");
+      undo(view.state, view.dispatch);
+      expect(show(view)).toBe("-|");
     });
 
     it("falls back to typing the space when the shortcut can't apply", () => {

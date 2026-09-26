@@ -45,6 +45,18 @@ describe("editing", () => {
     await expect($(".ProseMirror h2")).toHaveText("Heading");
   });
 
+  it("undoes a block shortcut with a single undo", async () => {
+    await type(Key.Enter);
+    await type("- ");
+    await expect($(".ProseMirror ul")).toExist();
+
+    await pressMod("z");
+
+    await expect($(".ProseMirror ul")).not.toExist();
+    await expect($(".ProseMirror p:last-child")).toHaveText("-");
+    await expect($(".ProseMirror h2")).toHaveText("Heading");
+  });
+
   it("toggles bold via keyboard shortcut", async () => {
     await type(Key.Enter);
     await pressMod("b");
