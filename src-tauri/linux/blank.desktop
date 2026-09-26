@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Blank
+GenericName=Markdown Editor
+Comment=A quiet place to write
+Exec={{exec}} %f
+StartupWMClass={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/markdown;text/x-markdown;
+Keywords=markdown;writing;editor;text;pdf;

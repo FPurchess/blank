@@ -26,3 +26,12 @@ jobs:
           bun run lint
           bun run format:check
           bun run test:coverage
+
+      # app stores and software centers read these, see src-tauri/linux/
+      - name: validate desktop entry and AppStream metadata
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream desktop-file-utils
+          appstreamcli validate --pedantic --no-net src-tauri/linux/io.github.fpurchess.blank.metainfo.xml
+          sed 's/{{exec}}/blank/g; s/{{icon}}/blank/g' src-tauri/linux/blank.desktop > "$RUNNER_TEMP/blank.desktop"
+          desktop-file-validate "$RUNNER_TEMP/blank.desktop"

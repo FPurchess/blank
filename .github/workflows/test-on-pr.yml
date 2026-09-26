@@ -67,3 +67,13 @@ jobs:
           max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
           echo "highest required glibc symbol: $max"
           [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+
+      - name: check desktop entry and AppStream metadata in the packages (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          deb=$(ls src-tauri/target/release/bundle/deb/*.deb)
+          dpkg-deb -c "$deb" | grep -q '/usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml$'
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO usr/share/applications/blank.desktop | tee /dev/stderr | grep -qx 'Exec=blank %f'
+          sudo apt-get install -y rpm
+          rpm=$(ls src-tauri/target/release/bundle/rpm/*.rpm)
+          rpm -qlp "$rpm" | grep -q '^/usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml$'

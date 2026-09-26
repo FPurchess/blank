@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.fpurchess.blank</id>
+  <launchable type="desktop-id">blank.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+
+  <name>Blank</name>
+  <summary>A quiet place to write markdown</summary>
+  <developer id="io.github.fpurchess">
+    <name>Florian Purchess</name>
+  </developer>
+
+  <description>
+    <p>
+      Blank is a minimalist markdown editor made for writing. There are no toolbars, no buttons,
+      no panels asking for your attention: there is the page and the sentence you are writing.
+    </p>
+    <ul>
+      <li>Your hands stay on the keyboard: headings, lists, links and emphasis are one shortcut, or one typed character, away</li>
+      <li>Quotes curl, dashes find their length and sentences start with a capital, in 14 languages, as you type</li>
+      <li>Close the window mid-thought and Blank keeps your words for the next time you open it</li>
+      <li>Plain markdown files, exported as carefully typeset PDFs</li>
+      <li>Light, dark and colored themes, and shortcuts you can rebind</li>
+    </ul>
+  </description>
+
+  <url type="homepage">https://fpurchess.github.io/blank/</url>
+  <url type="bugtracker">https://github.com/FPurchess/blank/issues</url>
+  <url type="help">https://fpurchess.github.io/blank/guide/writing</url>
+  <url type="vcs-browser">https://github.com/FPurchess/blank</url>
+  <url type="contribute">https://fpurchess.github.io/blank/contributing</url>
+
+  <categories>
+    <category>Utility</category>
+    <category>TextEditor</category>
+  </categories>
+  <keywords>
+    <keyword>markdown</keyword>
+    <keyword>writing</keyword>
+    <keyword>editor</keyword>
+    <keyword>pdf</keyword>
+  </keywords>
+  <provides>
+    <binary>blank</binary>
+    <mediatype>text/markdown</mediatype>
+  </provides>
+
+  <content_rating type="oars-1.1" />
+
+  <branding>
+    <color type="primary" scheme_preference="light">#ffffff</color>
+    <color type="primary" scheme_preference="dark">#11191f</color>
+  </branding>
+
+  <requires>
+    <control>keyboard</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+
+  <!-- pinned to a commit, as app stores require; refresh after `make docs-screenshots` -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/FPurchess/blank/478f12e9f7f4afda52f944eed278867a952fcbce/docs/public/screenshots/theme-light.png</image>
+      <caption>Writing in the light theme</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/FPurchess/blank/478f12e9f7f4afda52f944eed278867a952fcbce/docs/public/screenshots/theme-dark.png</image>
+      <caption>The dark theme</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/FPurchess/blank/478f12e9f7f4afda52f944eed278867a952fcbce/docs/public/screenshots/language.png</image>
+      <caption>Choosing the language for autocorrect</caption>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="2.0.0" date="2026-09-25">
+      <url type="details">https://github.com/FPurchess/blank/releases/tag/v2.0.0</url>
+      <description>
+        <p>Autocorrect works anywhere in the text in 14 languages, with a language chooser. Blank now uses IBM Plex Sans in the editor and the PDF, adds a link dialog, and comes with themes.</p>
+      </description>
+    </release>
+  </releases>
+</component>
