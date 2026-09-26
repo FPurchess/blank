@@ -76,6 +76,9 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EXPORT_PDF]: exportAs("PDF-Export", exporters.toPDF, [
     { name: "PDF-File", extensions: ["pdf"] },
   ]),
+  [CommandIdentifier.EXPORT_DOCX]: exportAs("Word-Export", exporters.toDOCX, [
+    { name: "Word Document", extensions: ["docx"] },
+  ]),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
 };

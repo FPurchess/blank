@@ -46,6 +46,8 @@
     "@tauri-apps/plugin-http": "^2.6.1",
     "@tauri-apps/plugin-notification": "^2.4.0",
     "@tauri-apps/plugin-opener": "^2.5.5",
+    "docx": "9.7.2",
+    "jszip": "^3.10.2",
     "localforage": "^1.10.0",
     "markdown-it": "^15.0.2",
     "observable.ts": "^1.0.1",

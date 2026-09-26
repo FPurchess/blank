@@ -279,6 +279,14 @@ describe("config", () => {
     expect(isRecord(value)).toBe(expected);
   });
 
+  it("binds export.docx to Mod-Alt-w by default", async () => {
+    vi.mocked(exists).mockResolvedValue(false);
+
+    await bootConfig();
+
+    expect(getKeyBinding(CommandIdentifier.EXPORT_DOCX)).toBe("Mod-Alt-w");
+  });
+
   it("binds language.choose to Mod-Alt-l by default", async () => {
     vi.mocked(exists).mockResolvedValue(false);
 

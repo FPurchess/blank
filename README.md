@@ -44,7 +44,7 @@ A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ct
 | Bullet list / Numbered list | `Mod 8` / `Mod 9`           |
 | Bold / Italic / Code        | `Mod B` / `Mod I` / `Mod E` |
 | Insert link                 | `Mod K`                     |
-| Export as PDF               | `Mod Alt P`                 |
+| Export as PDF / Word        | `Mod Alt P` / `Mod Alt W`   |
 
 All shortcuts, and how to change them, are in the [documentation](https://fpurchess.github.io/blank/guide/shortcuts).
 

@@ -24,6 +24,7 @@
     "file.save_as": "Mod-Shift-s",
     "file.open": "Mod-o",
     "export.pdf": "Mod-Alt-p",
+    "export.docx": "Mod-Alt-w",
     "theme.cycle": "Mod-Alt-t",
     "language.choose": "Mod-Alt-l"
   },
