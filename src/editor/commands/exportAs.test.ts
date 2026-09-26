@@ -160,7 +160,7 @@ describe("command.exportAs", () => {
 
     expect(sendNotification).toHaveBeenCalledWith({
       title,
-      body: 'Failed to export file: "forbidden path"',
+      body: "Failed to export file: forbidden path",
     });
   });
 });

@@ -5,11 +5,9 @@ import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
+import { errorMessage } from "./errors";
 
 import "./scss/main.scss";
-
-const describeError = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
 
 /**
  * showBootError explains in the window why Blank couldn't start, since there
@@ -22,7 +20,7 @@ const showBootError = (error: unknown) => {
   message.textContent = [
     "Blank couldn't start.",
     "",
-    describeError(error),
+    errorMessage(error),
     "",
     "If you changed blank.json, fix or remove it and start Blank again.",
   ].join("\n");
@@ -48,7 +46,7 @@ const showBootError = (error: unknown) => {
     // the editor works, so don't cover it
     try {
       sendNotification(
-        `Parts of Blank failed to start: ${describeError(error)}`,
+        `Parts of Blank failed to start: ${errorMessage(error)}`,
       );
     } catch (notifyError) {
       console.error("failed to send notification", notifyError);

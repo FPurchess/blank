@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { readDocumentFromFile } from "../document";
+import { errorMessage } from "../../errors";
 
 const defaultOpenDialogOptions = {
   // the first filter is the one Linux dialogs start with
@@ -22,8 +23,8 @@ export default (): Command => (_state, _dispatch, view) => {
     try {
       newPath = await open(defaultOpenDialogOptions);
     } catch (err) {
-      console.error(`Failed to open file: ${JSON.stringify(err)}`);
-      sendNotification(`Failed to open file: ${JSON.stringify(err)}`);
+      console.error(`Failed to open file: ${errorMessage(err)}`);
+      sendNotification(`Failed to open file: ${errorMessage(err)}`);
       return;
     }
     if (!newPath) return;

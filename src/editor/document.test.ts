@@ -178,7 +178,7 @@ describe("readDocumentFromFile", () => {
     expect(newState).toBeUndefined();
     expect(_path.value).toBeNull();
     expect(sendNotification).toHaveBeenCalledWith(
-      `Failed to read file: "Read error"`,
+      "Failed to read file: Read error",
     );
   });
 

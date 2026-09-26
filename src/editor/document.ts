@@ -20,20 +20,6 @@ import { errorMessage } from "../errors";
 import welcomeMessage from "./welcome.md?raw";
 
 /**
- * describeError turns anything thrown (Tauri rejects with plain strings) into
- * readable text
- */
-const describeError = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error) ?? String(error);
-  } catch {
-    return String(error);
-  }
-};
-
-/**
  * Applies a new document to the editor state. It builds a fresh state with the
  * same plugins, so the undo history starts empty and undo can't revert the
  * loaded document.
@@ -171,9 +157,8 @@ export const readDocumentFromFile = async (
     const content = await readTextFile(resolvedPath);
     doc = defaultMarkdownParser.parse(content);
   } catch (err) {
-    console.error(`Failed to read file: ${JSON.stringify(err)}`);
-    if (!silent)
-      sendNotification(`Failed to read file: ${JSON.stringify(err)}`);
+    console.error(`Failed to read file: ${errorMessage(err)}`);
+    if (!silent) sendNotification(`Failed to read file: ${errorMessage(err)}`);
     return;
   }
   if (doc) {
@@ -198,7 +183,7 @@ export const readDocumentFromCliArgs = async (
     // e.g. more than one file or an unknown flag was passed
     console.error("failed to read the command-line arguments", error);
     sendNotification(
-      `Blank opens one file at a time, so the command-line arguments were ignored: ${describeError(error)}`,
+      `Blank opens one file at a time, so the command-line arguments were ignored: ${errorMessage(error)}`,
     );
     return;
   }
@@ -237,7 +222,7 @@ export const applyInitialDocument = async (
     if (fromCli) return fromCli;
   } catch (error) {
     console.error("failed to open the file from the command line", error);
-    sendNotification(`Failed to open file: ${describeError(error)}`);
+    sendNotification(`Failed to open file: ${errorMessage(error)}`);
   }
 
   try {
@@ -248,7 +233,7 @@ export const applyInitialDocument = async (
     const backedUp = await backupStoredDocument();
     const kept = backedUp ? ' A copy was kept as "doc-backup".' : "";
     sendNotification(
-      `Your last document couldn't be restored, so Blank starts with the welcome document.${kept} ${describeError(error)}`,
+      `Your last document couldn't be restored, so Blank starts with the welcome document.${kept} ${errorMessage(error)}`,
     );
   }
 
