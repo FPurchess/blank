@@ -9,7 +9,9 @@ const defaultOpenDialogOptions = {
   filters: [{ name: "Markdown", extensions: ["md"] }],
 };
 
-export default (): Command => (state) => {
+export default (): Command => (_state, _dispatch, view) => {
+  if (!view) return false;
+
   (async () => {
     let newPath: string | null;
     try {
@@ -19,7 +21,11 @@ export default (): Command => (state) => {
       sendNotification(`Failed to open file: ${JSON.stringify(err)}`);
       return;
     }
-    if (newPath) await readDocumentFromFile(state, newPath);
+    if (!newPath) return;
+
+    // the view may have changed while the dialog was open
+    const next = await readDocumentFromFile(view.state, newPath);
+    if (next) view.updateState(next);
   })();
 
   return true;

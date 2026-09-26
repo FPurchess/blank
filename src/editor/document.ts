@@ -13,7 +13,9 @@ import { getDocumentFromStorage, getPathfromStorage } from "../storage";
 import welcomeMessage from "./welcome.md?raw";
 
 /**
- * Applies a new document to the editor state.
+ * Applies a new document to the editor state. It builds a fresh state with the
+ * same plugins, so the undo history starts empty and undo can't revert the
+ * loaded document.
  * @param state The current EditorState
  * @param doc The new document to set
  * @param path path to the document (optional)
@@ -24,10 +26,15 @@ export function applyDocument(
   doc: Node,
   path?: string | null,
 ): EditorState {
-  const tr = state.tr.replaceWith(0, state.doc.content.size, doc);
-  transaction.value = tr;
+  const next = EditorState.create({
+    schema: state.schema,
+    doc,
+    plugins: state.plugins,
+  });
   if (path) _path.value = path;
-  return state.apply(tr);
+  // storage persists the transaction's doc and the UI renders it
+  transaction.value = next.tr;
+  return next;
 }
 
 /**
@@ -73,7 +80,7 @@ export const readDocumentFromFile = async (
 
   let doc: Node | undefined;
   try {
-    const content = await readTextFile(path);
+    const content = await readTextFile(resolvedPath);
     doc = defaultMarkdownParser.parse(content);
   } catch (err) {
     console.error(`Failed to read file: ${JSON.stringify(err)}`);
@@ -81,7 +88,8 @@ export const readDocumentFromFile = async (
       sendNotification(`Failed to read file: ${JSON.stringify(err)}`);
     return;
   }
-  if (doc) return applyDocument(state, doc, path);
+  // the resolved path keeps working when Blank is started from another directory
+  if (doc) return applyDocument(state, doc, resolvedPath);
 };
 
 /**

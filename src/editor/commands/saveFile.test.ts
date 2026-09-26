@@ -60,6 +60,29 @@ describe("command.saveFile", () => {
     expect(sendNotification).not.toHaveBeenCalled();
   });
 
+  it("keeps the current file when saving as fails", async () => {
+    path.value = "/old.md";
+    vi.mocked(save).mockResolvedValue("/readonly/copy.md");
+    vi.mocked(writeTextFile).mockRejectedValue("permission denied");
+
+    await _saveFile(state, { force: true });
+
+    expect(writeTextFile).toHaveBeenCalledWith("/readonly/copy.md", markdown);
+    expect(path.value).toBe("/old.md");
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Failed to save file: permission denied",
+    );
+  });
+
+  it("stays untitled when the first save fails", async () => {
+    vi.mocked(save).mockResolvedValue("/readonly/new.md");
+    vi.mocked(writeTextFile).mockRejectedValue(new Error("disk full"));
+
+    await _saveFile(state, {});
+
+    expect(path.value).toBeNull();
+  });
+
   it.each([
     ["an Error", new Error("disk full"), "disk full"],
     ["a string", "permission denied", "permission denied"],

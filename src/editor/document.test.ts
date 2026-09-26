@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
+import { history, undo } from "prosemirror-history";
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { defaultMarkdownParser, schema } from "prosemirror-markdown";
 
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
@@ -45,6 +47,16 @@ describe("applyDocument", () => {
     expect(newState.doc).toEqual(hello);
     expect(transaction.value?.doc).toEqual(hello);
     expect(_path.value).toBeNull();
+  });
+
+  it("should keep the plugins and start a fresh history", () => {
+    const state = EditorState.create({ schema, plugins: [history()] });
+
+    const newState = applyDocument(state, hello);
+
+    expect(newState.plugins).toEqual(state.plugins);
+    expect(undo(newState)).toBe(false);
+    expect(transaction.value?.doc).toBe(newState.doc);
   });
 
   it("should update the path if provided", () => {
@@ -102,6 +114,21 @@ describe("readDocumentFromFile", () => {
     expect(transaction.value).not.toBeNull();
     expect(_path.value).toBe("/doc.md");
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("should read and remember the resolved path of a relative one", async () => {
+    mockIPC(((cmd: string, args?: { paths?: string[] }) => {
+      if (cmd === "plugin:path|resolve")
+        return "/cwd/" + args?.paths?.join("/");
+    }) as Parameters<typeof mockIPC>[0]);
+    mockFile("relative");
+
+    const newState = await readDocumentFromFile(emptyState(), "../x.md");
+
+    expect(newState?.doc.textContent).toBe("relative");
+    expect(exists).toHaveBeenCalledWith("/cwd/../x.md");
+    expect(readTextFile).toHaveBeenCalledWith("/cwd/../x.md");
+    expect(_path.value).toBe("/cwd/../x.md");
   });
 
   it("should return undefined for an empty path", async () => {
@@ -188,6 +215,42 @@ describe("applyInitialDocument", () => {
     const newState = await applyInitialDocument(emptyState());
 
     expect(newState.doc).toEqual(storedDoc);
+  });
+
+  describe("can't undo the loaded document", () => {
+    const withHistory = () =>
+      EditorState.create({ schema, plugins: [history()] });
+
+    it("from the command line", async () => {
+      mockCliArgs("/cli.md");
+      mockFile("from the cli");
+
+      const newState = await applyInitialDocument(withHistory());
+
+      expect(newState.doc.textContent).toBe("from the cli");
+      expect(undo(newState)).toBe(false);
+    });
+
+    it("from storage", async () => {
+      mockCliArgs();
+      vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(storedDoc);
+      vi.spyOn(storage, "getPathfromStorage").mockResolvedValue("/stored.md");
+
+      const newState = await applyInitialDocument(withHistory());
+
+      expect(newState.doc).toEqual(storedDoc);
+      expect(undo(newState)).toBe(false);
+    });
+
+    it("the welcome document", async () => {
+      mockCliArgs();
+      vi.spyOn(storage, "getDocumentFromStorage").mockResolvedValue(undefined);
+
+      const newState = await applyInitialDocument(withHistory());
+
+      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(undo(newState)).toBe(false);
+    });
   });
 
   it("should fall back to the welcome document", async () => {
