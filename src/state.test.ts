@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Schema } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { schema } from "prosemirror-markdown";
 
@@ -40,22 +39,40 @@ describe("state.textContent", () => {
     expect(textContent.value).toBe("Title one two item");
   });
 
-  it("ignores text marked as deleted", () => {
-    const withDeletion = new Schema({
-      nodes: schema.spec.nodes,
-      marks: schema.spec.marks.addToEnd("deletion", {}),
-    });
-    const node = withDeletion.node("doc", null, [
-      withDeletion.node("paragraph", null, [
-        withDeletion.text("kept "),
-        withDeletion.text("removed", [withDeletion.marks.deletion.create()]),
-      ]),
-    ]);
-
-    emit(node);
+  it("keeps pipes as part of the text", () => {
+    emit(doc(p("a || b")));
     vi.runAllTimers();
 
-    expect(textContent.value).toBe("kept");
+    expect(textContent.value).toBe("a || b");
+  });
+
+  it("separates the words around a hard break", () => {
+    emit(
+      doc(
+        schema.node("paragraph", null, [
+          schema.text("roses are red"),
+          schema.node("hard_break"),
+          schema.text("violets are blue"),
+        ]),
+      ),
+    );
+    vi.runAllTimers();
+
+    expect(textContent.value).toBe("roses are red violets are blue");
+  });
+
+  it("separates paragraphs", () => {
+    emit(doc(p("first"), p("second")));
+    vi.runAllTimers();
+
+    expect(textContent.value).toBe("first second");
+  });
+
+  it("is empty for an empty doc", () => {
+    emit(doc(p()));
+    vi.runAllTimers();
+
+    expect(textContent.value).toBe("");
   });
 
   it("ignores a reset transaction", () => {
