@@ -27,7 +27,7 @@ Blank needs glibc 2.35 or newer and WebKitGTK 4.1, e.g. Ubuntu 22.04+ or Debian 
 - **openSUSE:** `sudo zypper install ./blank-*.x86_64.rpm`
 - **Any distribution:** make the AppImage executable with `chmod +x blank_*.AppImage` and run it. AppImages need FUSE 2, which newer Ubuntu releases don't install by default: `sudo apt install libfuse2t64` (Ubuntu 24.04+) or `libfuse2` (older).
 
-The `.deb` and `.rpm` put Blank in your app menu and in **Open With** for markdown and Word files. Right-click any `.md` file and choose **Open With → Blank**, or set it as the default app for markdown there and open your notes with a double-click. A `.docx` opens as a new markdown document and the Word file stays as it is, see [Open Word documents](./writing#open-word-documents).
+The `.deb` and `.rpm` put Blank in your app menu and in **Open With** for markdown and Word files. Right-click any `.md` file and choose **Open With → Blank**, or set it as the default app for markdown there and open your notes with a double-click. A `.docx` opens as a new markdown document and the Word file stays as it is, see [Open a Word document](./files#open-word-documents).
 
 ## Open a file from the terminal
 
