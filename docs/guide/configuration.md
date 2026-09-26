@@ -5,6 +5,7 @@ Blank reads its settings from `blank.json` in the app config folder. The file is
 | System  | Config file                                                           |
 | ------- | --------------------------------------------------------------------- |
 | Linux   | `~/.config/com.github.fpurchess.blank/blank.json`                     |
+| Snap    | `~/snap/blank/current/.config/com.github.fpurchess.blank/blank.json`  |
 | macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json` |
 | Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                     |
 
