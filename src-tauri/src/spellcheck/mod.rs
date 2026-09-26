@@ -166,11 +166,21 @@ pub fn spellcheck_unload(state: State<'_, SpellState>) {
     *state.speller.write().unwrap() = None;
 }
 
+// async and on a blocking thread, so a dictionary that is being rebuilt, e.g.
+// after removing a word, never blocks the window
 #[tauri::command]
-pub fn spellcheck_check(state: State<'_, SpellState>, words: Vec<String>) -> Result<Vec<bool>> {
-    let speller = state.speller.read().unwrap();
-    let speller = speller.as_ref().ok_or("NotLoaded")?;
-    Ok(words.iter().map(|word| speller.dict.check(word)).collect())
+pub async fn spellcheck_check(
+    state: State<'_, SpellState>,
+    words: Vec<String>,
+) -> Result<Vec<bool>> {
+    let speller = state.speller.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let speller = speller.read().unwrap();
+        let speller = speller.as_ref().ok_or("NotLoaded")?;
+        Ok(words.iter().map(|word| speller.dict.check(word)).collect())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
