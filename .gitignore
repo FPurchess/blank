@@ -31,3 +31,4 @@ graphify-out
 
 # Git worktrees
 .claude/worktrees/
+docs/.vitepress/cache

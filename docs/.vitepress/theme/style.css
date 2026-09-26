@@ -1,0 +1,160 @@
+/* the site uses the typeface of the editor, loaded from the app's own font files */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../public/fonts/IBMPlexSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url("../../../public/fonts/IBMPlexSans-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../public/fonts/IBMPlexSans-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../../../public/fonts/IBMPlexSans-Bold.woff2") format("woff2");
+}
+
+/* the colors of Blank's light and dark theme (src/scss/themes/) */
+:root {
+  --vp-font-family-base:
+    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --vp-c-brand-1: rgb(27, 40, 50);
+  --vp-c-brand-2: rgb(55, 72, 86);
+  --vp-c-brand-3: rgb(27, 40, 50);
+  --vp-c-brand-soft: rgba(27, 40, 50, 0.08);
+  --vp-home-hero-name-color: rgb(27, 40, 50);
+}
+.dark {
+  --vp-c-bg: #11191f;
+  --vp-c-bg-alt: #0c1216;
+  --vp-c-bg-elv: #18222a;
+  --vp-c-bg-soft: #18222a;
+  --vp-c-brand-1: rgba(255, 255, 255, 0.9);
+  --vp-c-brand-2: rgba(255, 255, 255, 0.75);
+  --vp-c-brand-3: #eee;
+  --vp-c-brand-soft: rgba(255, 255, 255, 0.1);
+  --vp-button-brand-text: #11191f;
+  --vp-button-brand-hover-text: #11191f;
+  --vp-home-hero-name-color: rgba(255, 255, 255, 0.9);
+}
+
+/* screenshots of the app */
+.shot {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  box-shadow: var(--vp-shadow-2);
+}
+/* home: the app icon on a soft glow, as in the app's own palette */
+:root {
+  --vp-home-hero-image-background-image: radial-gradient(
+    circle,
+    rgba(27, 40, 50, 0.16) 0%,
+    rgba(27, 40, 50, 0) 70%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+.dark {
+  --vp-home-hero-image-background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+.VPHero .image-src {
+  width: 160px;
+  max-width: 160px;
+}
+@media (min-width: 960px) {
+  .VPHero .image-src {
+    width: 220px;
+    max-width: 220px;
+  }
+}
+.VPFeature .icon {
+  color: var(--vp-c-text-1);
+}
+.home-block {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 72px 24px 0;
+  text-align: center;
+}
+.home-block h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.home-block > p {
+  margin: 8px 0 0;
+  color: var(--vp-c-text-2);
+}
+.theme-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 32px;
+}
+.theme-strip img {
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  transition:
+    transform 0.25s,
+    box-shadow 0.25s;
+}
+.theme-strip:hover img {
+  box-shadow: var(--vp-shadow-2);
+}
+.theme-strip img:hover {
+  transform: translateY(-3px);
+}
+@media (min-width: 960px) {
+  .theme-strip {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+.home-cta {
+  max-width: 720px;
+  padding-bottom: 96px;
+}
+.home-cta .downloads {
+  margin-top: 28px;
+}
+.themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.themes img {
+  cursor: default;
+}
+.themes figure {
+  margin: 0;
+}
+.themes figcaption {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+  text-align: center;
+}

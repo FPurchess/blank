@@ -15,7 +15,7 @@ Blank and it's keyboard shortcuts have quite some advantages over a mouse-driven
 - that way you can stay sharp on your idea, while the editor takes care of the layout
 - and makes you much faster during your creative process
 
-You can find a full list of keyboard shortcuts here: https://github.com/FPurchess/blank#keyboard-shortcuts
+You can find a full list of keyboard shortcuts here: https://fpurchess.github.io/blank/guide/shortcuts
 
 ## What's good to know
 

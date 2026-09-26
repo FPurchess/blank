@@ -1,0 +1,88 @@
+name: Docs
+
+# Builds the website (docs/) and deploys it to the gh-pages branch, which GitHub Pages serves
+# at https://fpurchess.github.io/blank/. Pushes to `release` update the latest docs at the root
+# and freeze a copy at v<version>/, pushes to `main` update dev/. See docs/deploy.sh.
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    paths:
+      - "docs/**"
+      - "blank.json"
+      - "CONTRIBUTING.md"
+      - "package.json"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel to deploy from the chosen branch"
+        type: choice
+        options: [dev, latest]
+        default: dev
+      bootstrap:
+        description: "Allow deploying latest from a branch other than release (first deploy only)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd docs && bun install --frozen-lockfile && bun run typecheck && bun run build
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CHANNEL: ${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
+    # one queue per channel: a single queue would drop a waiting release deploy when a push to
+    # main queues behind it. The channels write to different folders of gh-pages, and the push
+    # below rebases onto a deploy of the other channel that finished in the meantime
+    concurrency:
+      group: docs-deploy-${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
+      cancel-in-progress: false
+    steps:
+      # the latest docs must match a release, see the bootstrap input
+      - name: check the branch
+        if: env.CHANNEL == 'latest' && github.ref_name != 'release' && !inputs.bootstrap
+        run: |
+          echo "::error::latest is deployed from the release branch (set bootstrap for the very first deploy)"
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd docs && bun install --frozen-lockfile
+
+      - name: check out gh-pages
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null; then
+            git clone --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
+          else
+            mkdir site && git -C site init -b gh-pages
+            git -C site remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          fi
+
+      - name: build and deploy
+        run: |
+          docs/deploy.sh "$CHANNEL" site
+          cd site
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          # also used by the rebase below
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "docs: deploy $CHANNEL from ${GITHUB_SHA::7}"
+          for attempt in 1 2 3; do
+            git push origin gh-pages && exit 0
+            git pull --rebase origin gh-pages
+          done
+          exit 1

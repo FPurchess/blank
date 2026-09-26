@@ -29,6 +29,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "cd e2e && bun run test",
+    "docs:dev": "cd docs && bun run dev",
+    "docs:build": "cd docs && bun run build",
+    "docs:screenshots": "cd e2e && bun run screenshots",
     "prepare": "husky"
   },
   "resolutions": {

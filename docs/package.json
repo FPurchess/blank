@@ -1,0 +1,19 @@
+{
+  "name": "blank-docs",
+  "private": true,
+  "type": "module",
+  "description": "The website and user documentation of Blank, built with VitePress",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "^5",
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.0",
+    "vue-tsc": "^3"
+  }
+}
