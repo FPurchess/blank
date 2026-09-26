@@ -23,7 +23,7 @@ Map a command to a key under `keymap`. Keys are written like `Mod-Shift-s`, wher
 }
 ```
 
-::: details All commands and their default keys
+::: details The default configuration, with every command and its key
 <<< @/../blank.json
 :::
 

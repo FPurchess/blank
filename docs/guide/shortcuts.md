@@ -16,24 +16,24 @@
 
 ## Editing
 
-| Command           | Shortcut                        |
-| ----------------- | ------------------------------- |
-| Undo              | `Mod` `Z`                       |
-| Redo              | `Mod` `Shift` `Z`               |
+| Command           | Shortcut                         |
+| ----------------- | -------------------------------- |
+| Undo              | `Mod` `Z`                        |
+| Redo              | `Mod` `Shift` `Z`                |
 | Insert line break | `Mod` `Enter` or `Shift` `Enter` |
 
 ## Blocks
 
-| Command                 | Shortcut          |
-| ----------------------- | ----------------- |
-| Paragraph               | `Mod` `0`         |
-| Heading 1 – 6           | `Mod` `1` … `6`   |
-| Bullet list             | `Mod` `8`         |
-| Numbered list           | `Mod` `9`         |
-| Indent list item        | `Tab`             |
-| Outdent list item       | `Shift` `Tab`     |
-| Blockquote              | `Mod` `G`         |
-| Horizontal line         | `Mod` `H`         |
+| Command           | Shortcut        |
+| ----------------- | --------------- |
+| Paragraph         | `Mod` `0`       |
+| Heading 1 – 6     | `Mod` `1` … `6` |
+| Bullet list       | `Mod` `8`       |
+| Numbered list     | `Mod` `9`       |
+| Indent list item  | `Tab`           |
+| Outdent list item | `Shift` `Tab`   |
+| Blockquote        | `Mod` `G`       |
+| Horizontal line   | `Mod` `H`       |
 
 ## Text
 

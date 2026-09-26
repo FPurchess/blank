@@ -6,7 +6,7 @@ Blank is not notarized by Apple. See [Install → macOS](./install#macos) for ho
 
 ## Where is my document stored?
 
-Files you save are ordinary markdown files wherever you saved them. Until then, Blank keeps the document in its own app storage and restores it on the next start, so closing without saving loses nothing. `Mod` `N` starts a new, empty document.
+Files you save are ordinary markdown files wherever you saved them. On top of that, Blank keeps the open document in its own app storage and restores it on the next start, so closing the window doesn't lose it. This is not a backup, though: `Mod` `N` replaces the document with an empty one right away, so save first what you want to keep.
 
 ## Why did Blank change what I typed?
 

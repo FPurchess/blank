@@ -60,28 +60,94 @@
   border-radius: 8px;
   box-shadow: var(--vp-shadow-2);
 }
-.VPHero .image-src {
-  max-width: min(280px, 80vw);
-  max-height: none;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  box-shadow: var(--vp-shadow-4);
+/* home: the app icon on a soft glow, as in the app's own palette */
+:root {
+  --vp-home-hero-image-background-image: radial-gradient(
+    circle,
+    rgba(27, 40, 50, 0.16) 0%,
+    rgba(27, 40, 50, 0) 70%
+  );
+  --vp-home-hero-image-filter: blur(56px);
 }
-@media (min-width: 640px) {
-  .VPHero .image-src {
-    max-width: 360px;
-  }
+.dark {
+  --vp-home-hero-image-background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+.VPHero .image-src {
+  width: 160px;
+  max-width: 160px;
 }
 @media (min-width: 960px) {
   .VPHero .image-src {
-    max-width: 440px;
+    width: 220px;
+    max-width: 220px;
   }
+}
+.VPFeature .icon {
+  color: var(--vp-c-text-1);
+}
+.home-block {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 72px 24px 0;
+  text-align: center;
+}
+.home-block h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.home-block > p {
+  margin: 8px 0 0;
+  color: var(--vp-c-text-2);
+}
+.theme-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 32px;
+}
+.theme-strip img {
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  transition:
+    transform 0.25s,
+    box-shadow 0.25s;
+}
+.theme-strip:hover img {
+  box-shadow: var(--vp-shadow-2);
+}
+.theme-strip img:hover {
+  transform: translateY(-3px);
+}
+@media (min-width: 960px) {
+  .theme-strip {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+.home-cta {
+  max-width: 720px;
+  padding-bottom: 96px;
+}
+.home-cta .downloads {
+  margin-top: 28px;
 }
 .themes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin: 24px 0;
+}
+.themes img {
+  cursor: default;
 }
 .themes figure {
   margin: 0;

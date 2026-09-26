@@ -10,6 +10,8 @@ on:
     paths:
       - "docs/**"
       - "blank.json"
+      - "CONTRIBUTING.md"
+      - "package.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
     inputs:
@@ -18,6 +20,10 @@ on:
         type: choice
         options: [dev, latest]
         default: dev
+      bootstrap:
+        description: "Allow deploying latest from a branch other than release (first deploy only)"
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -26,18 +32,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: cd docs && bun install --frozen-lockfile && bun run build
+      - run: cd docs && bun install --frozen-lockfile && bun run typecheck && bun run build
 
   deploy:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # deploys of main and release write to the same branch, so they must not overlap
+    env:
+      CHANNEL: ${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
+    # one queue per channel: a single queue would drop a waiting release deploy when a push to
+    # main queues behind it. The channels write to different folders of gh-pages, and the push
+    # below rebases onto a deploy of the other channel that finished in the meantime
     concurrency:
-      group: docs-deploy
+      group: docs-deploy-${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
       cancel-in-progress: false
     steps:
+      # the latest docs must match a release, see the bootstrap input
+      - name: check the branch
+        if: env.CHANNEL == 'latest' && github.ref_name != 'release' && !inputs.bootstrap
+        run: |
+          echo "::error::latest is deployed from the release branch (set bootstrap for the very first deploy)"
+          exit 1
+
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: cd docs && bun install --frozen-lockfile
@@ -52,8 +69,6 @@ jobs:
           fi
 
       - name: build and deploy
-        env:
-          CHANNEL: ${{ inputs.channel || (github.ref_name == 'release' && 'latest' || 'dev') }}
         run: |
           docs/deploy.sh "$CHANNEL" site
           cd site
@@ -62,6 +77,12 @@ jobs:
             echo "nothing changed"
             exit 0
           fi
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -q -m "docs: deploy $CHANNEL from ${GITHUB_SHA::7}"
-          git push origin gh-pages
+          # also used by the rebase below
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "docs: deploy $CHANNEL from ${GITHUB_SHA::7}"
+          for attempt in 1 2 3; do
+            git push origin gh-pages && exit 0
+            git pull --rebase origin gh-pages
+          done
+          exit 1

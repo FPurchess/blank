@@ -10,16 +10,28 @@ const versions = useVersions(blank.root);
 
 // dev always shows the banner, a frozen release only once a newer one exists
 const message = computed(() => {
-  if (blank.channel === "dev") return "You are reading the docs of the unreleased development version.";
-  if (blank.channel === "archive" && versions.value && versions.value.latest !== blank.version)
+  if (blank.channel === "dev")
+    return "You are reading the docs of the unreleased development version.";
+  if (
+    blank.channel === "archive" &&
+    versions.value &&
+    versions.value.latest !== blank.version
+  )
     return `You are reading the docs of Blank v${blank.version}, an older version.`;
   return undefined;
 });
-// the nav bar is fixed on wide screens, so it has to make room for the banner (see the style below)
+// the nav bar is fixed on wide screens, so it has to make room for the banner (see the style
+// below). The dev banner is known at build time, config.ts reserves its room before hydration
 watchEffect(() => {
-  if (inBrowser) document.documentElement.classList.toggle("has-channel-banner", !!message.value);
+  if (inBrowser)
+    document.documentElement.classList.toggle(
+      "has-channel-banner",
+      !!message.value,
+    );
 });
-const latestLink = computed(() => pageIn(route.path, channelBase(blank.root, "latest")));
+const latestLink = computed(() =>
+  pageIn(route.path, channelBase(blank.root, "latest")),
+);
 </script>
 
 <template>

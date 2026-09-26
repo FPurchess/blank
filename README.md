@@ -4,7 +4,7 @@
   </a>
 </p>
 <p align="center">
-  A minimalist, keyboard-only markdown editor made for writing
+  <em>A quiet place to write.</em>
 </p>
 <p align="center">
   <a href="https://github.com/FPurchess/blank/releases"><img src="https://img.shields.io/github/v/release/FPurchess/blank?label=version" alt="latest version"></a>
@@ -14,16 +14,16 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/demo.gif" alt="Typing in Blank, which turns quotes, dashes and arrows into typographic characters" width="720">
+  <img src="docs/public/screenshots/demo.gif" alt="Someone starts writing in Blank: a heading, “A great start”, a few lines about the blank page, the word “uncertain” erased and replaced with “possible”, and a closing line in italics, before the page turns dark" width="800">
 </p>
 
-Blank shows your text as it will look, without toolbars or buttons. You format with the keyboard or by typing markdown, and Blank takes care of the typography.
+Every piece of writing begins the same way: an empty page, a blinking cursor, and the quiet question of what comes next.
 
-- **Keyboard only:** headings, lists, links and formatting are one shortcut away
-- **Autocorrect as you type:** typographic quotes, dashes and arrows in 14 languages, modelled on Word and LibreOffice
-- **Plain markdown files**, with PDF export
-- **Six themes**, from light to black
-- **Never lose a word:** Blank restores your document on the next start
+Blank is made for that moment and for everything after it. There are no toolbars, no buttons, no panels asking for your attention. There is the page and the sentence you are writing. Your hands stay on the keyboard, and the formatting follows them: type `#` and a space, and a heading appears, press `Mod` `I` and your words lean into italics.
+
+The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. Close the window mid-thought and Blank keeps your words for the next time you open it.
+
+Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it. And when a piece is finished, Blank sets it as a PDF that looks as considered as the words in it.
 
 ## Download
 
@@ -35,22 +35,22 @@ Blank shows your text as it will look, without toolbars or buttons. You format w
 
 ## Keyboard shortcuts
 
-`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
+A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
 
-| Command                      | Shortcut                    |
-| ---------------------------- | --------------------------- |
-| Save / Open / New file       | `Mod S` / `Mod O` / `Mod N` |
-| Heading 1 – 6 / Paragraph    | `Mod 1` … `Mod 6` / `Mod 0` |
-| Bullet list / Numbered list  | `Mod 8` / `Mod 9`           |
-| Bold / Italic / Code         | `Mod B` / `Mod I` / `Mod E` |
-| Insert link                  | `Mod K`                     |
-| Export as PDF                | `Mod Alt P`                 |
+| Command                     | Shortcut                    |
+| --------------------------- | --------------------------- |
+| Save / Open / New file      | `Mod S` / `Mod O` / `Mod N` |
+| Heading 1 – 6 / Paragraph   | `Mod 1` … `Mod 6` / `Mod 0` |
+| Bullet list / Numbered list | `Mod 8` / `Mod 9`           |
+| Bold / Italic / Code        | `Mod B` / `Mod I` / `Mod E` |
+| Insert link                 | `Mod K`                     |
+| Export as PDF               | `Mod Alt P`                 |
 
 All shortcuts, and how to change them, are in the [documentation](https://fpurchess.github.io/blank/guide/shortcuts).
 
 ## Documentation
 
-**[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)** covers [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [autocorrect and languages](https://fpurchess.github.io/blank/guide/autocorrect), [themes](https://fpurchess.github.io/blank/guide/themes), [configuration](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
+Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
 
 ## Contributing
 

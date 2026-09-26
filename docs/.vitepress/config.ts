@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vitepress";
+import {
+  defineConfigWithTheme,
+  type DefaultTheme,
+  type HeadConfig,
+} from "vitepress";
 
-// the site is deployed in several channels next to each other (see .github/workflows/docs.yml):
+// the site is deployed in several channels next to each other (see docs/deploy.sh):
 // "latest" at the root, "dev" at dev/ and each release frozen at v<version>/
 const root = process.env.DOCS_ROOT ?? "/blank/";
 const base = process.env.DOCS_BASE ?? root;
@@ -24,38 +28,58 @@ export interface BlankThemeConfig {
 }
 
 const repo = "https://github.com/FPurchess/blank";
+const origin = "https://fpurchess.github.io";
 const description =
   "A minimalist, keyboard-only markdown editor made for writing. For Linux, macOS and Windows.";
 
-export default defineConfig({
+const head: HeadConfig[] = [
+  ["link", { rel: "icon", type: "image/svg+xml", href: `${base}app-icon.svg` }],
+  ["meta", { name: "theme-color", content: "#11191f" }],
+  ["meta", { property: "og:type", content: "website" }],
+  ["meta", { property: "og:title", content: "Blank" }],
+  ["meta", { property: "og:description", content: description }],
+  [
+    "meta",
+    {
+      property: "og:image",
+      content: `${origin}${base}screenshots/theme-light.png`,
+    },
+  ],
+  ["meta", { name: "twitter:card", content: "summary_large_image" }],
+];
+if (channel !== "latest") {
+  // only the latest docs should show up in search engines
+  head.push(["meta", { name: "robots", content: "noindex" }]);
+}
+if (channel === "dev") {
+  // the dev banner is known at build time, so the fixed nav bar makes room for it right
+  // away instead of jumping down once the page is hydrated (see ChannelBanner.vue)
+  head.push([
+    "style",
+    {},
+    "@media (min-width: 960px) { :root { --vp-layout-top-height: 37px; } }",
+  ]);
+}
+
+export default defineConfigWithTheme<
+  DefaultTheme.Config & { blank: BlankThemeConfig }
+>({
   base,
   lang: "en-US",
   title: "Blank",
   description,
   cleanUrls: true,
-  // archived versions must not compete with the latest one in search engines
-  head: [
-    [
-      "link",
-      { rel: "icon", type: "image/svg+xml", href: `${base}app-icon.svg` },
-    ],
-    ["meta", { property: "og:title", content: "Blank" }],
-    ["meta", { property: "og:description", content: description }],
-    ...(channel === "latest"
-      ? []
-      : [
-          ["meta", { name: "robots", content: "noindex" }] as [
-            string,
-            Record<string, string>,
-          ],
-        ]),
-  ],
+  head,
   themeConfig: {
     logo: "/app-icon.svg",
     blank: { root, channel, version } satisfies BlankThemeConfig,
     nav: [
       { text: "Download", link: "/guide/install" },
-      { text: "Guide", link: "/guide/writing" },
+      {
+        text: "Guide",
+        link: "/guide/writing",
+        activeMatch: "^/guide/(writing|autocorrect|themes|configuration|faq)",
+      },
       { text: "Shortcuts", link: "/guide/shortcuts" },
     ],
     sidebar: [
@@ -79,21 +103,27 @@ export default defineConfig({
         text: "Help",
         items: [
           { text: "FAQ", link: "/guide/faq" },
-          { text: "Contributing", link: `${repo}/blob/main/CONTRIBUTING.md` },
+          { text: "Contributing", link: "/contributing" },
         ],
       },
     ],
     socialLinks: [{ icon: "github", link: repo }],
     search: { provider: "local" },
-    editLink:
-      channel === "dev"
-        ? {
-            pattern: `${repo}/edit/main/docs/:path`,
-            text: "Edit this page on GitHub",
-          }
-        : undefined,
+    // fixes to the docs always go to main, whichever version is being read. The function
+    // runs in the browser, so it can't use the constants of this file
+    editLink: {
+      pattern: ({ filePath }) =>
+        filePath === "contributing.md"
+          ? "https://github.com/FPurchess/blank/edit/main/CONTRIBUTING.md"
+          : `https://github.com/FPurchess/blank/edit/main/docs/${filePath}`,
+      text: "Improve this page on GitHub",
+    },
     footer: {
-      message: "Released under the GNU Affero General Public License v3.0.",
+      message: `Released under the <a href="${repo}/blob/main/LICENSE">GNU AGPL v3.0</a> · <a href="${repo}">Source on GitHub</a>`,
+      copyright:
+        channel === "dev"
+          ? "Documentation of the development version"
+          : `Documentation of Blank v${version}`,
     },
   },
 });

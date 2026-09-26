@@ -7,9 +7,10 @@
 set -euo pipefail
 
 channel=${1:?usage: docs/deploy.sh <latest|dev> <site dir>}
-site=$(realpath -m "${2:?usage: docs/deploy.sh <latest|dev> <site dir>}")
+mkdir -p "${2:?usage: docs/deploy.sh <latest|dev> <site dir>}"
+site=$(cd "$2" && pwd)
 root=${DOCS_ROOT:-/blank/}
-docs=$(dirname "$(realpath "$0")")
+docs=$(cd "$(dirname "$0")" && pwd)
 version=$(cd "$docs/.." && bun pm pkg get version | tr -d '"')
 
 build() { # <channel> <base> <target dir>
@@ -17,7 +18,6 @@ build() { # <channel> <base> <target dir>
   (cd "$docs" && DOCS_ROOT=$root DOCS_CHANNEL=$1 DOCS_BASE=$2 bunx vitepress build --outDir "$3")
 }
 
-mkdir -p "$site"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -31,7 +31,9 @@ case "$channel" in
     rsync -a --delete "$tmp/archive/" "$site/v$version/"
 
     # newest version first, so the switcher lists them in order
-    existing=$( { [ -f "$site/versions.json" ] && jq -r '.versions[]' "$site/versions.json"; } || true)
+    # a broken versions.json fails the deploy instead of silently dropping the older versions
+    existing=
+    if [ -f "$site/versions.json" ]; then existing=$(jq -er '.versions[]' "$site/versions.json"); fi
     printf '%s\n' "$version" $existing | sort -u -V -r |
       jq -R . | jq -s --arg latest "$version" '{latest: $latest, versions: .}' >"$site/versions.json"
     ;;

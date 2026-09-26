@@ -23,8 +23,9 @@ Download the `.msi` installer, or the `.exe` if you prefer a setup wizard. Both 
 Blank needs glibc 2.35 or newer and WebKitGTK 4.1, e.g. Ubuntu 22.04+ or Debian 12+.
 
 - **Debian, Ubuntu:** `sudo apt install ./blank_*_amd64.deb`
-- **Fedora, openSUSE:** `sudo dnf install ./blank-*.x86_64.rpm`
-- **Any distribution:** make the AppImage executable with `chmod +x blank_*.AppImage` and run it.
+- **Fedora:** `sudo dnf install ./blank-*.x86_64.rpm`
+- **openSUSE:** `sudo zypper install ./blank-*.x86_64.rpm`
+- **Any distribution:** make the AppImage executable with `chmod +x blank_*.AppImage` and run it. AppImages need FUSE 2, which newer Ubuntu releases don't install by default: `sudo apt install libfuse2t64` (Ubuntu 24.04+) or `libfuse2` (older).
 
 ## Open a file from the terminal
 
@@ -33,11 +34,11 @@ Pass a path to open a markdown file directly:
 ::: code-group
 
 ```sh [Linux]
-blank notes.md
+blank ~/Documents/notes.md
 ```
 
 ```sh [macOS]
-/Applications/blank.app/Contents/MacOS/blank notes.md
+/Applications/blank.app/Contents/MacOS/blank ~/Documents/notes.md
 ```
 
 :::

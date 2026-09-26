@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { useData, withBase } from "vitepress";
+import { inBrowser, useData, withBase } from "vitepress";
 
 import type { BlankThemeConfig } from "../config";
 
@@ -17,6 +17,7 @@ let loading: Promise<void> | undefined;
 export const useBlank = () => useData().theme.value.blank as BlankThemeConfig;
 
 export const useVersions = (root: string) => {
+  if (!inBrowser) return versions;
   loading ??= fetch(`${root}versions.json`)
     .then((res) => (res.ok ? res.json() : undefined))
     .then((value: Versions | undefined) => {

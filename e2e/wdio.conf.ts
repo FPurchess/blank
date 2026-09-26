@@ -10,7 +10,10 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(dirname, "..");
 
 const tauriDriverBin = process.env.TAURI_DRIVER_PATH ?? "tauri-driver";
-const tauriDriverUrl = "http://127.0.0.1:4444";
+// E2E_PORT moves tauri-driver (and the native driver on the next port), so runs in several
+// worktrees can happen at the same time
+const tauriDriverPort = Number(process.env.E2E_PORT ?? 4444);
+const tauriDriverUrl = `http://127.0.0.1:${tauriDriverPort}`;
 
 // keep track of the `tauri-driver` child process and the app profile of the current session
 let tauriDriver: ChildProcess | undefined;
@@ -19,7 +22,7 @@ let profileDir: string | undefined;
 
 export const config: WebdriverIO.Config = {
   hostname: "127.0.0.1",
-  port: 4444,
+  port: tauriDriverPort,
   specs: ["./specs/**/*.e2e.ts"],
   // tauri-driver drives a single app instance, so specs must run serially
   maxInstances: 1,
@@ -69,15 +72,22 @@ export const config: WebdriverIO.Config = {
     profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-"));
     expectingExit = false;
 
-    tauriDriver = spawn(tauriDriverBin, [], {
-      stdio: [null, process.stdout, process.stderr],
-      env: {
-        ...process.env,
-        XDG_DATA_HOME: path.join(profileDir, "data"),
-        XDG_CONFIG_HOME: path.join(profileDir, "config"),
-        XDG_CACHE_HOME: path.join(profileDir, "cache"),
+    tauriDriver = spawn(
+      tauriDriverBin,
+      [
+        ...["--port", String(tauriDriverPort)],
+        ...["--native-port", String(tauriDriverPort + 1)],
+      ],
+      {
+        stdio: [null, process.stdout, process.stderr],
+        env: {
+          ...process.env,
+          XDG_DATA_HOME: path.join(profileDir, "data"),
+          XDG_CONFIG_HOME: path.join(profileDir, "config"),
+          XDG_CACHE_HOME: path.join(profileDir, "cache"),
+        },
       },
-    });
+    );
 
     tauriDriver.on("error", (error: NodeJS.ErrnoException) => {
       console.error("tauri-driver error:", error);
