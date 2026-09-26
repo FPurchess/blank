@@ -2,7 +2,7 @@
 # Linux packages. CI (.github/workflows/distribute.yml) downloads it as blank.deb next to this
 # folder. WebKitGTK, GTK and friends come from the gnome extension's gnome-46-2404 runtime;
 # don't stage them, mixing WebKit versions breaks the webview.
-name: blank-editor
+name: blank
 title: Blank
 base: core24
 adopt-info: blank
@@ -19,9 +19,9 @@ description: |
   - Plain markdown files, exported as carefully typeset PDFs or Word documents
   - Light, dark and colored themes, and shortcuts you can rebind
 
-  Open any file with Mod+O. From the terminal, `blank-editor notes.md` opens files in your
+  Open any file with Mod+O. From the terminal, `blank notes.md` opens files in your
   home folder that aren't hidden. For USB drives and other disks, run
-  `sudo snap connect blank-editor:removable-media` once.
+  `sudo snap connect blank:removable-media` once.
 license: AGPL-3.0-only
 icon: src-tauri/icons/128x128@2x.png
 website: https://fpurchess.github.io/blank/
@@ -35,7 +35,7 @@ platforms:
   amd64:
 
 apps:
-  blank-editor:
+  blank:
     command: usr/bin/blank
     desktop: usr/share/applications/blank.desktop
     # adds the desktop, wayland, x11, opengl and gsettings plugs and the portals, so the
@@ -59,6 +59,8 @@ parts:
     override-build: |
       craftctl default
       craftctl set version="$(dpkg-deb -f "$CRAFT_PROJECT_DIR/blank.deb" Version)"
-      # the deb's icon name doesn't resolve inside the snap, use the one from icon: above
-      sed -i 's|^Icon=.*|Icon=${SNAP}/meta/gui/icon.png|' \
-        "$CRAFT_PART_INSTALL/usr/share/applications/blank.desktop"
+      # the desktop entry of the Linux packages, also for releases whose deb predates it, with
+      # the icon from icon: above, since the deb's icon name doesn't resolve inside the snap
+      sed -e 's|{{exec}}|blank|g' -e 's|^Icon=.*|Icon=${SNAP}/meta/gui/icon.png|' \
+        "$CRAFT_PROJECT_DIR/src-tauri/linux/blank.desktop" \
+        > "$CRAFT_PART_INSTALL/usr/share/applications/blank.desktop"

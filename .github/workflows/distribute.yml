@@ -48,7 +48,7 @@ jobs:
       - name: show the desktop entry as installed
         env:
           SNAP_FILE: ${{ steps.build.outputs.snap }}
-        run: unsquashfs -cat "$SNAP_FILE" meta/gui/blank-editor.desktop
+        run: unsquashfs -cat "$SNAP_FILE" meta/gui/blank.desktop
 
       - uses: actions/upload-artifact@v7
         with:

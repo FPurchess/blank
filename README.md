@@ -29,7 +29,7 @@ Underneath, it's plain markdown, so your writing stays yours, readable by any ed
 
 - **macOS:** [Apple Silicon](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_aarch64.dmg) · [Intel](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64.dmg)
 - **Windows:** [Installer (.msi)](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64_en-US.msi) · [Setup (.exe)](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_x64-setup.exe)
-- **Linux:** [Snap Store](https://snapcraft.io/blank-editor) (`sudo snap install blank-editor`) · [.deb](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.deb) · [.rpm](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank-2.0.0-1.x86_64.rpm) · [AppImage](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.AppImage)
+- **Linux:** [Snap Store](https://snapcraft.io/blank) (`sudo snap install blank`) · [.deb](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.deb) · [.rpm](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank-2.0.0-1.x86_64.rpm) · [AppImage](https://github.com/FPurchess/blank/releases/download/v2.0.0/blank_2.0.0_amd64.AppImage)
 
 **macOS** blocks Blank on first open because it isn't notarized by Apple. **Linux** needs glibc 2.35+ and WebKitGTK 4.1 (Ubuntu 22.04+, Debian 12+). See the [install guide](https://fpurchess.github.io/blank/guide/install) for both.
 
