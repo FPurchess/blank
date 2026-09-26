@@ -6,7 +6,6 @@ import {
   bootConfig,
   CommandIdentifier,
   config,
-  configInitialized,
   getKeyBinding,
   isRecord,
 } from "./config";
@@ -14,7 +13,6 @@ import { mockTauriPath } from "./test/tauri";
 
 describe("config", () => {
   beforeEach(() => {
-    configInitialized.value = false;
     mockTauriPath({ appConfigDir: "/config" });
   });
 
@@ -34,7 +32,6 @@ describe("config", () => {
     expect(readTextFile).not.toHaveBeenCalled();
     expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
     expect(getKeyBinding(CommandIdentifier.FILE_SAVE)).toBe("Mod-s");
-    expect(configInitialized.value).toBe(true);
   });
 
   it("keeps default bindings missing from a partial user keymap", async () => {
@@ -69,7 +66,6 @@ describe("config", () => {
     expect(warn).toHaveBeenCalledWith("failed to check for config file", error);
     expect(readTextFile).not.toHaveBeenCalled();
     expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
-    expect(configInitialized.value).toBe(true);
   });
 
   it.each([
@@ -91,7 +87,6 @@ describe("config", () => {
         expect.any(Error),
       );
       expect(config.value.keymap[CommandIdentifier.FORMAT_BOLD]).toBe("Mod-b");
-      expect(configInitialized.value).toBe(true);
     },
   );
 
@@ -165,7 +160,6 @@ describe("config", () => {
 
         expect(getKeyBinding(CommandIdentifier.FORMAT_BOLD)).toBe("Mod-b");
         expect(config.value.autocorrect.replace).toEqual({ "*": {} });
-        expect(configInitialized.value).toBe(true);
       },
     );
 

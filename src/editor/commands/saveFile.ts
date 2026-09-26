@@ -8,6 +8,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { importedFrom, path } from "../../state";
 import { extname } from "../../paths";
 import suggestPath from "./suggestPath";
+import { errorMessage } from "../../errors";
 
 // files that saving markdown into would destroy, e.g. the Word document a
 // document was imported from
@@ -63,13 +64,7 @@ export const _saveFile = async (state: EditorState, options: Options) => {
 
     sendNotification("Your file has been saved");
   } catch (err) {
-    if (err instanceof Error) {
-      sendNotification(`Failed to save file: ${err.message}`);
-    } else if (typeof err === "string") {
-      sendNotification(`Failed to save file: ${err}`);
-    } else {
-      sendNotification(`Failed to save file: ${JSON.stringify(err)}`);
-    }
+    sendNotification(`Failed to save file: ${errorMessage(err)}`);
   }
 };
 

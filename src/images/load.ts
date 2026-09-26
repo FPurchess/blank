@@ -4,15 +4,13 @@ import { fetch } from "@tauri-apps/plugin-http";
 import { fromDataUrl } from "./dataUrl";
 import { type ImageMime, sniffMime } from "./mime";
 import { classifySrc, resolveLocalPath } from "./src";
+import { errorMessage } from "../errors";
 
 export const REMOTE_TIMEOUT_MS = 10_000;
 export const MAX_REMOTE_BYTES = 20 * 1024 * 1024;
 
 export type LoadedImage = { bytes: Uint8Array; mime: ImageMime };
 export type LoadResult = LoadedImage | { error: string };
-
-const errorMessage = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
 
 const loadRemote = async (url: string): Promise<Uint8Array> => {
   // the HTTP plugin fetches from Rust, so image hosts don't need CORS headers

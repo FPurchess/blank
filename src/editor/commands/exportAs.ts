@@ -8,6 +8,7 @@ import { type exporterFunc } from "../../exporters";
 import { extname } from "../../paths";
 import { path } from "../../state";
 import suggestPath from "./suggestPath";
+import { errorMessage } from "../../errors";
 
 /**
  * isEmpty checks whether the document has neither text nor images
@@ -70,11 +71,10 @@ export default (
           });
         }
       })
-      .catch((err: Error) => {
-        const error = err.message ?? JSON.stringify(err);
+      .catch((err: unknown) => {
         sendNotification({
           title,
-          body: `Failed to export file: ${error}`,
+          body: `Failed to export file: ${errorMessage(err)}`,
         });
       });
 

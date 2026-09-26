@@ -18,6 +18,7 @@ import { basename } from "../../paths";
 import { toDataUrl } from "../../images/dataUrl";
 import { optimizeForMarkdown } from "../../images/optimize";
 import { normalizeUrl } from "../../url";
+import { errorMessage } from "../../errors";
 
 const imageType = schema.nodes.image;
 
@@ -95,8 +96,7 @@ export const chooseImageFile = async (): Promise<ChosenImage | null> => {
     }
     return { src: await toDataUrl(image.bytes, image.mime), name };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    sendNotification(`Failed to read ${name}: ${message}`);
+    sendNotification(`Failed to read ${name}: ${errorMessage(err)}`);
     return null;
   }
 };

@@ -101,10 +101,10 @@ describe("command.openFile", () => {
 
     expect(readTextFile).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
-      'Failed to open file: "dialog broke"',
+      "Failed to open file: dialog broke",
     );
     expect(sendNotification).toHaveBeenCalledWith(
-      'Failed to open file: "dialog broke"',
+      "Failed to open file: dialog broke",
     );
   });
 });

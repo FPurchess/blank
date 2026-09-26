@@ -119,9 +119,6 @@ const defaultConfig: Config = {
   },
 };
 
-// configInitialized is an observable that indicates whether the config has been initialized
-export const configInitialized = new Observable<boolean>(false);
-
 // config is an observable that contains the config
 export const config = new Observable<Config>(defaultConfig);
 
@@ -306,7 +303,6 @@ export const bootConfig = async () => {
       `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
     );
   }
-  configInitialized.value = true;
 };
 
 /**
