@@ -45,4 +45,19 @@ Each [group](./autocorrect#what-gets-corrected) can be turned off with `false`. 
 }
 ```
 
-The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `capitalize` and `blocks`. All are on by default.
+The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `capitalize` and `blocks`. All are on by default. A replacement for a language also applies to its regional variants: one for `de` works in `de-CH` too.
+
+## Spell check
+
+[Spell check](./spelling) leaves words in capitals and words with digits alone. Set these to `false` to check them as well:
+
+```json
+{
+  "spellcheck": {
+    "ignoreUppercase": false,
+    "ignoreWordsWithNumbers": false
+  }
+}
+```
+
+The words you add to the dictionary are kept next to `blank.json`, in the `dictionaries` folder.

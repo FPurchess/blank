@@ -81,4 +81,4 @@ The document embeds Blank's font, IBM Plex Sans, so it looks the same in Word on
 
 ## The status bar
 
-The top of the window shows the open file, _Untitled_, or the Word document an untitled document was imported from. The bottom shows the word and character count and the [autocorrect language](./autocorrect#language).
+The top of the window shows the open file, _Untitled_, or the Word document an untitled document was imported from. The bottom shows the word and character count, [spell check](./spelling) while it is on, and the [language](./autocorrect#language).

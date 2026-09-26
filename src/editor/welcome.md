@@ -28,3 +28,7 @@ You might be in a hurry closing Blank without saving your changes. That's no pro
 Blank comes with a hand-picked list of very unobtrusive autocompletion patterns that support your content-creation process.
 
 Type `##` at the beginning of a line followed by a space to create a heading level 2. Type a dash `-` at the beginning of a line followed by a space to create a bullet list. Type `-->` followed by a space to create a right-arrow `→`. There are some more combinations waiting for you to be explored.
+
+### Spell check when you want it
+
+Press `Mod` `Alt` `S` to underline the words Blank doesn't know. Right-click one, or press `Mod` `Alt` `N` to jump to it, and pick what you meant, or add the word to your dictionary. Press `Mod` `Alt` `S` again for a clean page.

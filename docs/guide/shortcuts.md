@@ -47,4 +47,15 @@
 | Open link in browser | `Mod` + Click   |
 | Insert or edit image | `Mod` `Alt` `I` |
 
+## Spell check
+
+| Command                     | Shortcut                      |
+| --------------------------- | ----------------------------- |
+| Turn spell check on or off  | `Mod` `Alt` `S`               |
+| Next misspelled word        | `Mod` `Alt` `N`               |
+| Previous misspelled word    | `Mod` `Alt` `Shift` `N`       |
+| Open the menu at the cursor | `Shift` `F10` or the menu key |
+
+See [Spell check](./spelling) for what the menu offers.
+
 You can also create most of these by typing markdown. See [Format as you type](./writing#format-as-you-type).

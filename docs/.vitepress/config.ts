@@ -95,6 +95,7 @@ export default defineConfigWithTheme<
         items: [
           { text: "Keyboard shortcuts", link: "/guide/shortcuts" },
           { text: "Autocorrect", link: "/guide/autocorrect" },
+          { text: "Spell check", link: "/guide/spelling" },
           { text: "Themes", link: "/guide/themes" },
           { text: "Configuration", link: "/guide/configuration" },
         ],
