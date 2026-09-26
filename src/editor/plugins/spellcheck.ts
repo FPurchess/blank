@@ -13,8 +13,9 @@ import { language, spellchecker } from "../../state";
 import { words, type Word } from "../../spellcheck/tokenize";
 import type { Spellchecker } from "../../spellcheck/types";
 
-// set on transactions that replace the whole document, e.g. a new or opened
-// file, which forgets the words ignored in the previous one
+// set on transactions that replace the whole document, e.g. for a new file,
+// which forgets the words ignored in the previous one. An opened file gets a
+// fresh editor state, which forgets them anyway.
 export const REPLACE_DOCUMENT = "replaceDocument";
 
 // how long typing pauses before the changed text is checked
