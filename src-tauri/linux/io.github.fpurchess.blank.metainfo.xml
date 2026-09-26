@@ -76,6 +76,12 @@
   </screenshots>
 
   <releases>
+    <release version="2.1.0" date="2026-09-26">
+      <url type="details">https://github.com/FPurchess/blank/releases/tag/v2.1.0</url>
+      <description>
+        <p>Spell check as you type in about 80 languages, with suggestions and a personal dictionary in a new context menu. Blank now shows and inserts images, exports and imports Word documents, keeps images, blockquotes and line breaks in the PDF, and never overwrites or loses files when opening and saving.</p>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-09-25">
       <url type="details">https://github.com/FPurchess/blank/releases/tag/v2.0.0</url>
       <description>

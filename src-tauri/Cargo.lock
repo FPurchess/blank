@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "blank"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "futures-util",
  "reqwest 0.13.5",
