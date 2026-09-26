@@ -80,6 +80,16 @@ describe("ui", () => {
       textContent.value = "";
       expect(uiStats()?.textContent).toBe("0 words 0 chars");
     });
+
+    it("counts pipes as words and chars", () => {
+      textContent.value = "a || b";
+      expect(uiStats()?.textContent).toBe("3 words 6 chars");
+    });
+
+    it("counts the words of a doc with a hard break", () => {
+      textContent.value = "roses are red violets are blue";
+      expect(uiStats()?.textContent).toBe("6 words 30 chars");
+    });
   });
 });
 
