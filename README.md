@@ -21,7 +21,7 @@ Every piece of writing begins the same way: an empty page, a blinking cursor, an
 
 Blank is made for that moment and for everything after it. There are no toolbars, no buttons, no panels asking for your attention. There is the page and the sentence you are writing. Your hands stay on the keyboard, and the formatting follows them: type `#` and a space, and a heading appears, press `Mod` `I` and your words lean into italics.
 
-The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. Close the window mid-thought and Blank keeps your words for the next time you open it.
+The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. When you are ready to proofread, spell check underlines what it doesn't know and offers what you meant. Close the window mid-thought and Blank keeps your words for the next time you open it.
 
 Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it. And when a piece is finished, Blank sets it as a PDF that looks as considered as the words in it.
 
@@ -50,7 +50,7 @@ All shortcuts, and how to change them, are in the [documentation](https://fpurch
 
 ## Documentation
 
-Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
+Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), [spell check](https://fpurchess.github.io/blank/guide/spelling), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
 
 ## Contributing
 

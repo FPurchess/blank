@@ -219,6 +219,27 @@ describe("docs screenshots", () => {
     await type(Key.Escape);
   });
 
+  it("captures spell check", async () => {
+    await pressMod("n");
+    await pressMod(Key.Alt, "s");
+    await expect($("#ui-spellcheck")).toHaveText("Spelling");
+    await type("every story begins with a blank page and a singel idea.");
+    await browser.waitUntil(
+      async () => (await $(".spelling-error").getText()) === "singel",
+    );
+    // at the end of the word, so the menu leaves it visible
+    const word = $(".spelling-error");
+    await word.click({
+      button: "right",
+      x: Math.floor((await word.getSize("width")) / 2) - 2,
+    });
+    await $(`[data-id^="suggestion:"]`).waitForExist();
+    await shot("spelling");
+
+    await type(Key.Escape);
+    await pressMod(Key.Alt, "s");
+  });
+
   it("records the writing demo", async () => {
     const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
     const film = new Recorder(frames);

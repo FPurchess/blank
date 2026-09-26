@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework-free TypeScript + ProseMirror frontend in `src/`. `src-tauri/` only registers Tauri plugins; the app logic lives in the frontend.
+Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework-free TypeScript + ProseMirror frontend in `src/`. The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries.
 
 ## Commands
 
@@ -10,6 +10,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - `make` lists the common tasks from the `Makefile`, which wraps the `package.json` scripts: e.g. `make dev`, `make check` (lint, format check and unit tests), `make test-e2e-headless`. Keep the commands in `package.json` and only call them from the `Makefile`.
 - `bun run tauri dev` runs the app. `bun run dev` serves only the Vite frontend, and every Tauri API call (fs, dialog, notification, cli) fails in a plain browser.
 - `bun run lint` runs eslint and `tsc`, so it is also the type-check.
+- `bun run test:rust` builds the frontend and runs the Rust tests (the spell check engine) with `cargo test`, which needs `dist/` since `generate_context!` embeds it.
 - `bunx vitest run src/config.test.ts` runs one test file, and `bunx vitest run -t "<name>"` runs one test. Run single tests while iterating.
 - Before calling work done, run `bun run lint`, `bun run format:check` and `bun run test`. The husky pre-commit hook runs the same three.
 - `bun run test:e2e` builds a debug binary and runs the E2E tests in `e2e/` (WebdriverIO + `tauri-driver`) against the real app. It works on Linux only and needs `webkit2gtk-driver`, `xvfb` and `cargo install tauri-driver --locked`. Run it with `xvfb-run -a` for headless, and set `E2E_SKIP_BUILD=1` to reuse an existing build. Set `E2E_PORT` (default 4444, the native driver takes the next port) when another worktree runs E2E at the same time. Run `bun install` in `e2e/` first, since that folder is its own package with its own `bun.lock`. `bunx wdio run ./wdio.conf.ts --spec specs/<name>.e2e.ts` in `e2e/` runs one spec. Run E2E after changing boot, editing, storage or file handling. The `E2E` workflow runs it on every push and pull request, and `e2e` is a required check for merging into `main`.
@@ -22,12 +23,15 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 
 ## Architecture
 
-- Start-up order is fixed (`src/main.ts`): `bootConfig` → `bootStorage` → `bootEditor` → `bootUI`. The keymap reads config when the plugin is created, and the editor restores its document from storage.
-- Modules talk through the Observables in `src/state.ts` (`path`, `importedFrom`, `transaction`, `textContent`, `theme`, `language`, `languagePicker`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
+- Start-up order is fixed (`src/main.ts`): `bootConfig` → `bootStorage` → `bootEditor` → `bootUI` → `bootSpellcheck`. The keymap reads config when the plugin is created, and the editor restores its document from storage. `bootSpellcheck` isn't awaited, so a dictionary download never delays the start.
+- Modules talk through the Observables in `src/state.ts` (`path`, `importedFrom`, `transaction`, `textContent`, `theme`, `language`, `languagePicker`, `spellcheck`, `spellcheckStatus`, `spellchecker`, `spellcheckMessage`, `contextMenu`), not by importing each other. Every editor transaction goes to `transaction`; `storage.ts` persists values and `ui.ts` renders them by subscribing. Follow the same pattern for new cross-module state.
 - The theme is applied as `document.body.dataset.theme`, and the SCSS in `src/scss/themes/` keys off it. A new theme needs an entry in `themes` in `state.ts` and a partial registered in `themes/_index.scss`.
 - Markdown uses the stock `prosemirror-markdown` `schema`, `defaultMarkdownParser` and `defaultMarkdownSerializer`. There is no custom schema, so a new node or mark type also needs parser, serializer and PDF-export support.
 - The first document comes from the CLI `path` arg, then the doc saved in localforage, then `src/editor/welcome.md`.
 - Word documents are imported, never edited: `readDocumentFromFile` (`src/editor/document.ts`) converts a .docx with `importDocx` (`src/importers/docx/`) into an untitled document and sets `importedFrom`. Saving never writes markdown into a .docx (`saveFile.ts`).
+- `language` holds an ISO 639-1 code (`de`) or a regional tag of a spell check dictionary (`de-CH`). Autocorrect uses the rules of `baseLanguage(tag)`.
+- Spell check: `src/spellcheck/service.ts` loads the dictionary for `language` while `spellcheck` is on and publishes a `Spellchecker` in `spellchecker`. The `spellcheck` plugin (`src/editor/plugins/spellcheck.ts`) tokenizes changed textblocks (`src/spellcheck/tokenize.ts`), asks it in batches and underlines misspellings with decorations. All Rust calls go through `src/spellcheck/ipc.ts`. Personal dictionaries are text files in `<app config>/dictionaries/`, see `userDictionary.ts`.
+- The context menu replaces the webview's: `src/editor/plugins/contextMenu.ts` opens it, `src/editor/contextMenu/model.ts` builds the items and runs them, and `src/contextMenu.ts` renders it (ARIA menu, keyboard, submenus). New items go into `buildMenu`.
 
 ## Adding things
 
@@ -40,6 +44,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - **Importer:** convert the file to a ProseMirror doc in `src/importers/` and dispatch on its extension in `readDocumentFromFile`. Imports from Word go through mammoth (docx → HTML), `cleanup.ts` (HTML the markdown schema can hold) and the schema's DOM parser. Style names map in `styleMap.ts`; `bun scripts/build-docx-fixtures.sh` rebuilds the test documents from `__fixtures__/fixture.md`.
 - **Dialog** (like the link and image dialogs): put its request in an Observable in `state.ts`, open it from a command and render it from `ui.ts` with the helpers in `src/dialog.ts`. Add it to `dialogOpen` in `src/editor/index.ts`, so the editor leaves it the focus.
 - **Image handling** lives in `src/images/`. `codec.ts` is the only code that decodes or re-encodes images (webview decoders and a canvas); tests mock it and coverage skips it.
+- **Spell check dictionary:** don't edit `src/spellcheck/catalog.json` or `src-tauri/dictionaries/` by hand. `bun run dictionaries:update` lists the dictionaries of wooorm/dictionaries, pins their version and SHA-256, loads each with the engine (dictionaries it can't load are marked `loads: false`) and copies the built-in ones (`BUNDLED` in the script). A new built-in one also needs an entry in `src-tauri/src/spellcheck/bundled.rs`.
 
 ## Website
 
@@ -53,6 +58,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework
 - Do not edit `src/exporters/pdf/pdfmake-vfs.ts` or `src/exporters/pdf/coverage.ts`. `bun run fonts:vfs` generates both from `fonts/*.ttf`. The editor loads the woff2 copies in `public/fonts/`.
 - The main font is IBM Plex Sans. "Plex" is a Reserved Font Name, so ship IBM's official files unmodified: no subsetting, format conversion or renaming. DejaVu Sans is the fallback for characters Plex lacks (e.g. ⇒ ⇔ ⇐): the CSS font stack handles it in the editor, and `src/exporters/pdf/fallback.ts` handles it in the PDF.
 - Editor typography (`src/scss/_typography.scss`), PDF styles (`src/exporters/pdf/template.ts`) and Word styles (`src/exporters/docx/template.ts`) share one major-third scale. Change them together.
+- Dictionaries other than the built-in ones are downloaded at runtime from pinned jsDelivr (then unpkg) URLs and must match the catalog's SHA-256. Debug builds read `BLANK_DICTIONARY_MIRROR` (loopback URLs only), which `e2e/wdio.conf.ts` points at a local server so E2E never needs the CDN. E2E types lowercase only: WebKitWebDriver doesn't type capitals.
 - Never narrow `fs:scope` or drop `plugins.fs.requireLiteralLeadingDot: false`: Blank must be able to open and save every file the user can, including hidden folders, other disks and symlinked files. Dialog-granted scope isn't persisted, so CLI-opened and restored files would break.
 - The Word export embeds the regular face of IBM Plex Sans from the PDF font files, unmodified: the obfuscation Word applies to embedded fonts is part of the .docx format, and the OFL allows embedding in documents. Its style names (`Quote`, `Code Block`, `Horizontal Line`, `Inline Code`) are what a Word import maps back. `src/exporters/docx/fixups.ts` patches what docx 9.7.2 writes wrong; drop a fix once docx does it itself. `bun scripts/check-docx.ts <file.md>` exports a file and opens the result with pandoc and LibreOffice.
 - The editor shows local images through Tauri's asset protocol (`convertFileSrc`, see `src/editor/plugins/images.ts`); its scope in `tauri.conf.json` matches the fs scope. Exports download web images with `@tauri-apps/plugin-http`, since the webview's `fetch` is subject to CORS.

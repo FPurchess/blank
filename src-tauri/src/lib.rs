@@ -1,8 +1,4 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+pub mod spellcheck;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,7 +17,17 @@ pub fn run() {
                 .open_js_links_on_click(false)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![greet])
+        .manage(spellcheck::SpellState::default())
+        .invoke_handler(tauri::generate_handler![
+            spellcheck::spellcheck_status,
+            spellcheck::spellcheck_install,
+            spellcheck::spellcheck_load,
+            spellcheck::spellcheck_unload,
+            spellcheck::spellcheck_check,
+            spellcheck::spellcheck_suggest,
+            spellcheck::spellcheck_add,
+            spellcheck::spellcheck_remove,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -16,6 +16,14 @@ That's [autocorrect](./autocorrect). Press `Mod` `Z` right away to undo a single
 
 Quotes follow the language at the bottom right. Press `Mod` `Alt` `L` to [choose yours](./autocorrect#language).
 
+## Does Blank check my spelling?
+
+If you want it to: press `Mod` `Alt` `S`. See [Spell check](./spelling).
+
+## Does Blank send my text anywhere?
+
+No. The only thing Blank ever downloads is a [spell check dictionary](./spelling#languages), and only when you check a language that doesn't come with Blank.
+
 ## Can I use the mouse?
 
 You can click to place the cursor, select text, and `Mod` + Click a link to open it. Everything else is done with the keyboard, on purpose.

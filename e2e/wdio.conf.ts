@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
@@ -15,8 +16,18 @@ const tauriDriverBin = process.env.TAURI_DRIVER_PATH ?? "tauri-driver";
 const tauriDriverPort = Number(process.env.E2E_PORT ?? 4444);
 const tauriDriverUrl = `http://127.0.0.1:${tauriDriverPort}`;
 
+// the dictionaries the spell check spec downloads from the local mirror
+const catalog = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "src/spellcheck/catalog.json"), "utf8"),
+).dictionaries as Record<string, { package: string; version: string }>;
+const mirrorCache = path.join(dirname, ".cache", "dictionaries");
+const MIRRORED = "en-GB";
+// served with the wrong content, which the app must reject
+const DAMAGED = "pt-PT";
+
 // keep track of the `tauri-driver` child process and the app profile of the current session
 let tauriDriver: ChildProcess | undefined;
+let mirror: http.Server | undefined;
 let expectingExit = false;
 let profileDir: string | undefined;
 
@@ -46,7 +57,9 @@ export const config: WebdriverIO.Config = {
   connectionRetryCount: 0,
 
   // ensure the app is built, since the webdriver sessions expect the binary to exist
-  onPrepare: () => {
+  onPrepare: async () => {
+    await cacheMirroredDictionary();
+
     if (!process.env.E2E_SKIP_BUILD) {
       const build = spawnSync(
         "bun",
@@ -72,6 +85,7 @@ export const config: WebdriverIO.Config = {
     profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-"));
     expectingExit = false;
 
+    const mirrorUrl = await startMirror();
     tauriDriver = spawn(
       tauriDriverBin,
       [
@@ -82,6 +96,8 @@ export const config: WebdriverIO.Config = {
         stdio: [null, process.stdout, process.stderr],
         env: {
           ...process.env,
+          // debug builds download dictionaries from here instead of the CDNs
+          BLANK_DICTIONARY_MIRROR: mirrorUrl,
           XDG_DATA_HOME: path.join(profileDir, "data"),
           XDG_CONFIG_HOME: path.join(profileDir, "config"),
           XDG_CACHE_HOME: path.join(profileDir, "cache"),
@@ -131,10 +147,66 @@ export const config: WebdriverIO.Config = {
   // note that afterSession might not run if the session fails to start, so we also clean up on shutdown
   afterSession: async () => {
     await closeTauriDriver();
+    await new Promise((resolve) =>
+      mirror ? mirror.close(resolve) : resolve(null),
+    );
+    mirror = undefined;
     if (profileDir) fs.rmSync(profileDir, { recursive: true, force: true });
     profileDir = undefined;
   },
 };
+
+/**
+ * downloads the dictionary the spell check spec installs from the local mirror,
+ * once: the app itself never talks to the CDN in the tests
+ */
+async function cacheMirroredDictionary() {
+  const { package: pkg, version } = catalog[MIRRORED];
+  const dir = path.join(mirrorCache, `${pkg}@${version}`);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const file of ["index.aff", "index.dic"]) {
+    const target = path.join(dir, file);
+    if (fs.existsSync(target)) continue;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await fetch(
+          `https://cdn.jsdelivr.net/npm/${pkg}@${version}/${file}`,
+        );
+        if (!response.ok) throw new Error(`${response.status}`);
+        fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()));
+        break;
+      } catch (error) {
+        if (attempt === 3)
+          throw new Error(`failed to download ${pkg}/${file}: ${error}`);
+        await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+      }
+    }
+  }
+}
+
+/**
+ * serves the cached dictionary like the CDN does, and a damaged one
+ * @returns the URL of the mirror
+ */
+async function startMirror() {
+  const mirrored = catalog[MIRRORED];
+  const damaged = catalog[DAMAGED];
+  mirror = http.createServer((request, response) => {
+    const [, name, file] =
+      /^\/([^/]+)\/(index\.(?:aff|dic))$/.exec(request.url ?? "") ?? [];
+    if (name === `${mirrored.package}@${mirrored.version}`) {
+      response.end(fs.readFileSync(path.join(mirrorCache, name, file)));
+    } else if (name === `${damaged.package}@${damaged.version}`) {
+      response.end("damaged");
+    } else {
+      response.statusCode = 404;
+      response.end();
+    }
+  });
+  await new Promise<void>((resolve) => mirror!.listen(0, "127.0.0.1", resolve));
+  const { port } = mirror.address() as { port: number };
+  return `http://127.0.0.1:${port}`;
+}
 
 /**
  * waits until tauri-driver (and the native WebKitWebDriver behind it) accepts connections

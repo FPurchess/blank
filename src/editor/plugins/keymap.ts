@@ -26,6 +26,9 @@ import {
   insertNode,
   editLink,
   editImage,
+  goToMisspelling,
+  openMenu,
+  toggleSpellcheck,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -83,6 +86,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   ]),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
+  [CommandIdentifier.SPELLCHECK_TOGGLE]: toggleSpellcheck(),
+  [CommandIdentifier.SPELLCHECK_NEXT]: goToMisspelling(1),
+  [CommandIdentifier.SPELLCHECK_PREVIOUS]: goToMisspelling(-1),
+  [CommandIdentifier.CONTEXT_MENU]: openMenu(),
 };
 
 // modifier names people know from their OS, mapped to the ones
@@ -131,7 +138,14 @@ const bindCommands = () => {
         invalid.push(`${key}: ${binding}`);
         return acc;
       }
-      acc[normalized] = commandMap[key as CommandIdentifier];
+      const command = commandMap[key as CommandIdentifier];
+      acc[normalized] = command;
+      // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
+      // on Windows, where the keymap can't fall back to the key code
+      if (/(^|-)shift-/i.test(normalized) && /-[a-z]$/.test(normalized)) {
+        acc[normalized.slice(0, -1) + normalized.slice(-1).toUpperCase()] ??=
+          command;
+      }
       return acc;
     },
     {},

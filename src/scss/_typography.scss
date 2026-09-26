@@ -1,9 +1,9 @@
-@use 'sass:math';
+@use "sass:math";
 
 @mixin font-face($family, $file, $weight, $style) {
   @font-face {
     font-family: $family;
-    src: url('/fonts/#{$file}.woff2') format('woff2');
+    src: url("/fonts/#{$file}.woff2") format("woff2");
     font-weight: $weight;
     font-style: $style;
     font-display: block;
@@ -11,18 +11,18 @@
 }
 
 // IBM's official files, shipped unmodified: "Plex" is a Reserved Font Name
-@include font-face('IBM Plex Sans', 'IBMPlexSans-Regular', 400, normal);
-@include font-face('IBM Plex Sans', 'IBMPlexSans-Italic', 400, italic);
-@include font-face('IBM Plex Sans', 'IBMPlexSans-Medium', 500, normal);
-@include font-face('IBM Plex Sans', 'IBMPlexSans-MediumItalic', 500, italic);
-@include font-face('IBM Plex Sans', 'IBMPlexSans-Bold', 700, normal);
-@include font-face('IBM Plex Sans', 'IBMPlexSans-BoldItalic', 700, italic);
+@include font-face("IBM Plex Sans", "IBMPlexSans-Regular", 400, normal);
+@include font-face("IBM Plex Sans", "IBMPlexSans-Italic", 400, italic);
+@include font-face("IBM Plex Sans", "IBMPlexSans-Medium", 500, normal);
+@include font-face("IBM Plex Sans", "IBMPlexSans-MediumItalic", 500, italic);
+@include font-face("IBM Plex Sans", "IBMPlexSans-Bold", 700, normal);
+@include font-face("IBM Plex Sans", "IBMPlexSans-BoldItalic", 700, italic);
 
 // fallback for characters IBM Plex Sans lacks, such as the ⇒ arrows
-@include font-face('DejaVu Sans', 'dejavu-sans', 400, normal);
-@include font-face('DejaVu Sans', 'dejavu-sans-bold', 700, normal);
-@include font-face('DejaVu Sans', 'dejavu-sans-oblique', 400, italic);
-@include font-face('DejaVu Sans', 'dejavu-sans-bold-oblique', 700, italic);
+@include font-face("DejaVu Sans", "dejavu-sans", 400, normal);
+@include font-face("DejaVu Sans", "dejavu-sans-bold", 700, normal);
+@include font-face("DejaVu Sans", "dejavu-sans-oblique", 400, italic);
+@include font-face("DejaVu Sans", "dejavu-sans-bold-oblique", 700, italic);
 
 $font-weight-regular: 400;
 $font-weight-medium: 500;

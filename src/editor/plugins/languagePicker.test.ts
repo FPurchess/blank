@@ -54,7 +54,7 @@ describe("plugin.languagePicker", () => {
     openPicker();
 
     expect(press("ArrowRight")).toBe(true);
-    expect(pickerState.value.selected).toBe("en");
+    expect(pickerState.value.selected).toBe("de-AT");
     expect(press("ArrowLeft")).toBe(true);
     expect(press("ArrowLeft")).toBe(true);
     expect(pickerState.value.selected).toBe("da");
@@ -78,6 +78,16 @@ describe("plugin.languagePicker", () => {
     press("Enter");
 
     expect(language.value).toBe("tr");
+  });
+
+  it("chooses a typed regional variant", () => {
+    const { press } = setup();
+    openPicker();
+
+    for (const key of ["d", "e", "-", "c", "h"]) press(key);
+    press("Enter");
+
+    expect(language.value).toBe("de-CH");
   });
 
   it("closes with Escape without choosing", () => {

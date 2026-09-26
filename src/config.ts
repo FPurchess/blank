@@ -32,6 +32,10 @@ export enum CommandIdentifier {
   EXPORT_DOCX = "export.docx",
   THEME_CYCLE = "theme.cycle",
   LANGUAGE_CHOOSE = "language.choose",
+  SPELLCHECK_TOGGLE = "spellcheck.toggle",
+  SPELLCHECK_NEXT = "spellcheck.next",
+  SPELLCHECK_PREVIOUS = "spellcheck.previous",
+  CONTEXT_MENU = "menu.context",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -50,9 +54,17 @@ export interface AutocorrectConfig {
   replace: Replacements;
 }
 
+export interface SpellcheckConfig {
+  // leave words in ALL CAPS alone, e.g. acronyms
+  ignoreUppercase: boolean;
+  // leave words with digits alone, e.g. "B2B" or "mp3"
+  ignoreWordsWithNumbers: boolean;
+}
+
 export interface Config {
   keymap: { [key in CommandIdentifier]: string };
   autocorrect: AutocorrectConfig;
+  spellcheck: SpellcheckConfig;
 }
 
 const defaultConfig: Config = {
@@ -85,6 +97,10 @@ const defaultConfig: Config = {
     [CommandIdentifier.EXPORT_DOCX]: "Mod-Alt-w",
     [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",
     [CommandIdentifier.LANGUAGE_CHOOSE]: "Mod-Alt-l",
+    [CommandIdentifier.SPELLCHECK_TOGGLE]: "Mod-Alt-s",
+    [CommandIdentifier.SPELLCHECK_NEXT]: "Mod-Alt-n",
+    [CommandIdentifier.SPELLCHECK_PREVIOUS]: "Mod-Alt-Shift-n",
+    [CommandIdentifier.CONTEXT_MENU]: "Shift-F10",
   },
   autocorrect: {
     arrows: true,
@@ -96,6 +112,10 @@ const defaultConfig: Config = {
     capitalize: true,
     blocks: true,
     replace: { "*": {} },
+  },
+  spellcheck: {
+    ignoreUppercase: true,
+    ignoreWordsWithNumbers: true,
   },
 };
 
@@ -237,6 +257,33 @@ const mergeAutocorrect = (
 };
 
 /**
+ * mergeSpellcheck takes the user's spell check settings whose type matches the
+ * default and keeps the defaults for the rest
+ */
+const mergeSpellcheck = (
+  user: unknown,
+  problems: string[],
+): SpellcheckConfig => {
+  const defaults = defaultConfig.spellcheck;
+  const spellcheck = { ...defaults };
+  if (user === undefined) return spellcheck;
+  if (!isRecord(user)) {
+    problems.push("spellcheck");
+    return spellcheck;
+  }
+  for (const [key, value] of Object.entries(user)) {
+    // unknown settings are unused, so they're simply skipped
+    if (!Object.prototype.hasOwnProperty.call(defaults, key)) continue;
+    if (typeof value !== typeof defaults[key as keyof SpellcheckConfig]) {
+      problems.push(`spellcheck.${key}`);
+      continue;
+    }
+    (spellcheck as Record<string, unknown>)[key] = value;
+  }
+  return spellcheck;
+};
+
+/**
  * bootConfig initializes the config. Invalid settings are ignored with a
  * notification, so Blank still starts with the defaults.
  */
@@ -250,6 +297,8 @@ export const bootConfig = async () => {
     keymap: mergeKeymap(userConfig.keymap, problems),
     // merge autocorrect so a partial user config keeps the remaining defaults
     autocorrect: mergeAutocorrect(userConfig.autocorrect, problems),
+    // merge spell check settings the same way
+    spellcheck: mergeSpellcheck(userConfig.spellcheck, problems),
   };
   if (problems.length > 0) {
     console.warn("ignored invalid settings in blank.json", problems);

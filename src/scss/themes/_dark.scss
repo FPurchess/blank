@@ -1,8 +1,10 @@
-[data-theme='dark'] {
+[data-theme="dark"] {
   --color: rgba(255, 255, 255, 0.9);
   --background-color: #11191f;
+  --spelling-color: #ff6b6b;
   --color-inverted: #333;
   --background-inverted: #eee;
-  --font-family: 'IBM Plex Sans', 'DejaVu Sans', system-ui, -apple-system,
-    'Segoe UI', 'Roboto', 'Ubuntu', 'Cantarell', 'Noto Sans', sans-serif;
+  --font-family:
+    "IBM Plex Sans", "DejaVu Sans", system-ui, -apple-system, "Segoe UI",
+    "Roboto", "Ubuntu", "Cantarell", "Noto Sans", sans-serif;
 }

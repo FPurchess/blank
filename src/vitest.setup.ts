@@ -20,7 +20,9 @@ vi.mock("@tauri-apps/plugin-fs", async (importOriginal) => {
     exists: vi.fn(),
     readFile: vi.fn(),
     stat: vi.fn(),
+    mkdir: vi.fn(),
     readTextFile: vi.fn(),
+    rename: vi.fn(),
     writeFile: vi.fn(),
     writeTextFile: vi.fn(),
   };
@@ -37,6 +39,7 @@ vi.mock("@tauri-apps/plugin-cli", () => ({
 
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   readText: vi.fn(),
+  writeText: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-http", () => ({

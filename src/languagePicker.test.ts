@@ -29,26 +29,34 @@ describe("languagePicker", () => {
   });
 
   it("steps through the languages and wraps around", () => {
-    const index = supportedLanguages.indexOf("de");
+    const languages = pickerLanguages();
+    const index = languages.indexOf("de");
 
     move(1);
-    expect(languagePicker.value.selected).toBe(supportedLanguages[index + 1]);
+    expect(languagePicker.value.selected).toBe(languages[index + 1]);
 
     move(-1);
-    move(-supportedLanguages.length);
+    move(-languages.length);
     expect(languagePicker.value.selected).toBe("de");
 
-    select(supportedLanguages[0]);
+    select(languages[0]);
     move(-1);
-    expect(languagePicker.value.selected).toBe(
-      supportedLanguages[supportedLanguages.length - 1],
+    expect(languagePicker.value.selected).toBe(languages[languages.length - 1]);
+  });
+
+  it("steps through the languages with rules and common variants", () => {
+    expect(pickerLanguages()).toEqual(
+      [
+        ...supportedLanguages,
+        ...["de-AT", "de-CH", "en-AU", "en-CA", "en-GB", "pt-PT"],
+      ].sort(),
     );
   });
 
   it("lists a language without rules of its own next to the others", () => {
     select("tr");
 
-    expect(pickerLanguages()).toEqual([...supportedLanguages, "tr"].sort());
+    expect(pickerLanguages()).toContain("tr");
     move(-1);
     expect(languagePicker.value.selected).toBe("sv");
   });
@@ -64,15 +72,62 @@ describe("languagePicker", () => {
   });
 
   it("selects a typed ISO code", () => {
-    typeChar("P");
-    expect(languagePicker.value).toMatchObject({ buffer: "p", invalid: false });
+    typeChar("I");
+    expect(languagePicker.value).toMatchObject({ buffer: "i", invalid: false });
 
     typeChar("t");
     expect(languagePicker.value).toMatchObject({
-      selected: "pt",
+      selected: "it",
       buffer: "",
       invalid: false,
     });
+  });
+
+  it("keeps typing after a code that has regional variants", () => {
+    typeChar("p");
+    typeChar("t");
+    expect(languagePicker.value).toMatchObject({
+      selected: "pt",
+      buffer: "pt",
+      invalid: false,
+    });
+
+    confirm();
+    expect(language.value).toBe("pt");
+  });
+
+  it.each([
+    ["dech", "de-CH"],
+    ["de-ch", "de-CH"],
+    ["esmx", "es-MX"],
+    ["srlatn", "sr-Latn"],
+    ["cavalencia", "ca-valencia"],
+  ])("selects the typed regional variant %j", (letters, tag) => {
+    for (const char of letters) typeChar(char);
+
+    expect(languagePicker.value).toMatchObject({
+      selected: tag,
+      buffer: "",
+      invalid: false,
+    });
+  });
+
+  it("rejects a variant that doesn't exist", () => {
+    for (const char of "dex") typeChar(char);
+
+    expect(languagePicker.value).toMatchObject({
+      selected: "de",
+      buffer: "",
+      invalid: true,
+    });
+  });
+
+  it("removes a typed letter of a variant", () => {
+    for (const char of "de-c") typeChar(char);
+    backspace();
+    backspace();
+
+    expect(languagePicker.value.buffer).toBe("de");
   });
 
   it("selects a typed ISO code without rules of its own", () => {
