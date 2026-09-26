@@ -89,8 +89,9 @@ const step = (level: Level, index: number, direction: 1 | -1) => {
 const first = (level: Level) => step(level, -1, 1);
 
 /**
- * place moves `element` below `anchor`, or above it where there is no room,
- * keeping it inside the window
+ * place moves `element` below `anchor`, or above it if it only fits there,
+ * or else as far up as it needs to fit, like the system menus. A submenu opens
+ * next to the item `side`.
  */
 const place = (
   element: HTMLElement,
@@ -98,13 +99,15 @@ const place = (
   side?: DOMRect,
 ) => {
   const { width, height } = element.getBoundingClientRect();
+  const bottom = window.innerHeight - MARGIN;
   let left = side ? side.right : anchor.left;
   let top = side ? side.top : anchor.bottom + 2;
   if (side && left + width > window.innerWidth - MARGIN) {
     left = side.left - width;
   }
-  if (top + height > window.innerHeight - MARGIN) {
-    top = side ? window.innerHeight - MARGIN - height : anchor.top - height - 2;
+  if (top + height > bottom) {
+    const above = anchor.top - height - 2;
+    top = !side && above >= MARGIN ? above : bottom - height;
   }
   left = Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
   top = Math.max(MARGIN, top);

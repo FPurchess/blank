@@ -99,9 +99,9 @@ const renderSpellcheck = (
           `Spelling ${Math.round((status.progress ?? 0) * 100)} %`,
           `Downloading the ${name} dictionary`,
         ],
-        ready: ["Spelling ✓", `Checking ${name} spelling`],
+        ready: ["Spelling", `Checking ${name} spelling`],
         unavailable: ["No spelling", `No spell check dictionary for ${name}`],
-        error: ["Spelling ✗", status.message ?? ""],
+        error: ["Spelling failed", status.message ?? ""],
       }[status.state] as [string, string]);
   element.textContent = text;
   element.title = title && `${title}, click to turn spell check off`;

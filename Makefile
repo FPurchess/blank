@@ -4,7 +4,8 @@
 .DEFAULT_GOAL := help
 
 .PHONY: help install install-e2e dev dev-web build build-debug lint lint-fix \
-	format format-check test test-coverage test-e2e test-e2e-headless check clean \
+	format format-check test test-coverage test-rust test-e2e test-e2e-headless check clean \
+	dictionaries \
 	install-docs docs-dev docs-build docs-screenshots bump release
 
 help: ## List all targets
@@ -33,6 +34,9 @@ build: ## Build the installers for the current platform
 build-debug: ## Build the debug binary without installers, as used by the e2e tests
 	bun run tauri build --debug --no-bundle
 
+dictionaries: ## Update the spell check dictionaries and their catalog
+	bun run dictionaries:update
+
 clean: ## Remove build output and coverage, incl. the Rust target dir (full rebuild)
 	rm -rf dist coverage e2e/screenshots
 	cargo clean --manifest-path src-tauri/Cargo.toml
@@ -56,6 +60,9 @@ test: ## Run the unit tests
 
 test-coverage: ## Run the unit tests with coverage (fails below 80%)
 	bun run test:coverage
+
+test-rust: ## Build the frontend and run the Rust tests (the spell check engine)
+	bun run test:rust
 
 test-e2e: install-e2e ## Build the debug app and run the e2e tests (Linux only)
 	bun run test:e2e

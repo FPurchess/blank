@@ -252,14 +252,14 @@ describe("ui spell check status", () => {
       "Spelling 0 %",
       "Downloading the German dictionary",
     ],
-    [{ state: "ready" }, "Spelling ✓", "Checking German spelling"],
+    [{ state: "ready" }, "Spelling", "Checking German spelling"],
     [
       { state: "unavailable" },
       "No spelling",
       "No spell check dictionary for German",
     ],
-    [{ state: "error", message: "offline" }, "Spelling ✗", "offline"],
-    [{ state: "error" }, "Spelling ✗", ""],
+    [{ state: "error", message: "offline" }, "Spelling failed", "offline"],
+    [{ state: "error" }, "Spelling failed", ""],
   ] as const)("shows %j", (status, text, title) => {
     spellcheckStatus.value = { tag: "de", ...status };
 
@@ -279,7 +279,7 @@ describe("ui spell check status", () => {
 
     vi.advanceTimersByTime(2000);
     expect(spellcheckMessage.value).toBeNull();
-    expect(uiSpellcheck().textContent).toBe("Spelling ✓");
+    expect(uiSpellcheck().textContent).toBe("Spelling");
   });
 
   it("turns spell check on and off when clicked", () => {

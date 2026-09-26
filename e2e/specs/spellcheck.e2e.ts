@@ -93,7 +93,7 @@ describe("spell check", () => {
   it("flags misspelled words once turned on", async () => {
     await pressMod(Key.Alt, "s");
 
-    await expect(status()).toHaveText("Spelling ✓");
+    await expect(status()).toHaveText("Spelling");
     await expectFlagged("Thiss wrng");
   });
 
@@ -126,7 +126,7 @@ describe("spell check", () => {
     // the document is saved a second after the last change
     await browser.pause(2000);
     await restartApp();
-    await expect(status()).toHaveText("Spelling ✓");
+    await expect(status()).toHaveText("Spelling");
     await expectFlagged("wrng anothr");
   });
 
@@ -229,7 +229,7 @@ describe("spell check", () => {
     await type(Key.Enter);
     await expect($("#ui-language")).toHaveText("EN-GB");
 
-    await expect(status()).toHaveText("Spelling ✓");
+    await expect(status()).toHaveText("Spelling");
     await pressMod("n");
     await type("the colour colr ");
     await expectFlagged("colr");
@@ -240,7 +240,7 @@ describe("spell check", () => {
     await type("ptpt");
     await type(Key.Enter);
 
-    await expect(status()).toHaveText("Spelling ✗");
+    await expect(status()).toHaveText("Spelling failed");
     await expect(errors()).toBeElementsArrayOfSize(0);
   });
 });

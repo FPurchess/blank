@@ -43,3 +43,8 @@ tauri-plugin-cli = "2"
 [dev-dependencies]
 tempfile = "3"
 tiny_http = "0.12"
+
+# checking and suggesting are slow without optimizations, which would make
+# `tauri dev` and the debug builds of the e2e tests lag
+[profile.dev.package.spellbook]
+opt-level = 3

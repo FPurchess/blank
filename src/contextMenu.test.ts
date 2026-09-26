@@ -430,7 +430,19 @@ describe("contextMenu", () => {
   });
 
   describe("position", () => {
-    it("opens above the anchor where there is no room below", () => {
+    it("opens above the anchor where only there is room", () => {
+      vi.spyOn(window, "innerHeight", "get").mockReturnValue(50);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+        DOMRect.fromRect({ x: 0, y: 0, width: 200, height: 14 }),
+      );
+
+      open();
+
+      // above the anchor's top at 20
+      expect(menu()!.style.top).toBe("4px");
+    });
+
+    it("moves up as far as needed where it fits neither below nor above", () => {
       vi.spyOn(window, "innerHeight", "get").mockReturnValue(100);
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
         DOMRect.fromRect({ x: 0, y: 0, width: 200, height: 70 }),
@@ -438,7 +450,7 @@ describe("contextMenu", () => {
 
       open();
 
-      expect(menu()!.style.top).toBe("4px");
+      expect(menu()!.style.top).toBe("26px");
     });
 
     it("opens a submenu to the left where there is no room to the right", () => {
