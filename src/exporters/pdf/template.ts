@@ -1,3 +1,5 @@
+import { PAGE_MARGIN } from "../page";
+
 // Mirrors the editor typography in src/scss/_typography.scss: 11pt body and
 // headings on a major third scale (1.25). pdfmake multiplies lineHeight with
 // the natural line height of IBM Plex Sans (1.3em), so 1.12 is ~1.45 leading.
@@ -44,6 +46,8 @@ type PageNodes = {
 
 export const BASE_DOCUMENT = {
   pageSize: "A4",
+  // also the page of the Word export, see ../page.ts
+  pageMargins: PAGE_MARGIN,
   defaultStyle: {
     font: FONT,
     fontSize: BODY_SIZE,

@@ -4,7 +4,13 @@ import { history } from "prosemirror-history";
 import { schema } from "prosemirror-markdown";
 
 import { linkDialog, transaction } from "../state";
-import { autocomplete, keymap, languagePicker, openLink } from "./plugins";
+import {
+  autocomplete,
+  images,
+  keymap,
+  languagePicker,
+  openLink,
+} from "./plugins";
 import { applyInitialDocument } from "./document";
 
 export const bootEditor = async () => {
@@ -18,6 +24,7 @@ export const bootEditor = async () => {
         autocomplete(),
         keymap(),
         openLink(),
+        images(),
       ],
     }),
   );

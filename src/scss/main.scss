@@ -107,6 +107,26 @@ body {
     min-height: 1em;
   }
 
+  // image nodes, see src/editor/plugins/images.ts
+  .image img {
+    max-width: 100%;
+    height: auto;
+    vertical-align: bottom;
+  }
+
+  // a relative image of an unsaved document shows its alt text
+  .image-unresolved {
+    img {
+      display: none;
+    }
+
+    &::after {
+      content: attr(data-alt);
+      font-style: italic;
+      opacity: 0.6;
+    }
+  }
+
   &.follow-links a {
     cursor: pointer;
   }

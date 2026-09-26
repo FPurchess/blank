@@ -11,6 +11,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // fetches remote images for the exports, which the webview can't because of CORS
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         // links are opened by the editor (src/editor/plugins/openLink.ts), so skip the
         // plugin's injected script, which also opens links on Shift+Click
