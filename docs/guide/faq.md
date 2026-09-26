@@ -30,7 +30,7 @@ You can click to place the cursor, select text, and `Mod` + Click a link to open
 
 ## Can I edit a Word document with Blank?
 
-You can open it with `Mod` `O`: Blank turns it into a markdown document and leaves the Word file as it is. When you're done, save it as markdown with `Mod` `S`, or send it back as a Word document with `Mod` `Alt` `W`. Blank never writes markdown into a .docx, so the original can't get lost by accident. See [Open Word documents](./writing#open-word-documents) for what comes along.
+You can open it with `Mod` `O`: Blank turns it into a markdown document and leaves the Word file as it is. When you're done, save it as markdown with `Mod` `S`, or send it back as a Word document with `Mod` `Alt` `W`. Blank never writes markdown into a .docx, so the original can't get lost by accident. See [Back and forth with Word users](./files#back-and-forth) for how it works and what comes along.
 
 ## I found a bug or have an idea
 

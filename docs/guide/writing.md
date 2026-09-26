@@ -35,7 +35,7 @@ These images stay where they are and the document links to them.
 
 To change or remove an image, put the cursor right before or after it and press `Mod` `Alt` `I` again.
 
-Images are as wide as they are in the file, up to the width of the page. PDFs and Word documents include every image at the size you see in Blank, also images from the web. If one can't be loaded, for example because you're offline, the export shows its description instead and Blank tells you which one.
+Images are as wide as they are in the file, up to the width of the page, and [PDFs and Word documents](./files#pdf) include them at that size.
 
 ## Blank remembers your document
 
@@ -43,42 +43,8 @@ Blank keeps what you write as you go, at least once a second and once more when 
 
 ## Save, open and export
 
-Documents are plain markdown files, so any other editor can open them.
-
-| Command        | Shortcut          |
-| -------------- | ----------------- |
-| New file       | `Mod` `N`         |
-| Open file      | `Mod` `O`         |
-| Save           | `Mod` `S`         |
-| Save as        | `Mod` `Shift` `S` |
-| Export as PDF  | `Mod` `Alt` `P`   |
-| Export as Word | `Mod` `Alt` `W`   |
-
-`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
-
-The PDF looks like your document in Blank: quotes keep their bar on the left and every paragraph, list and heading inside them, line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3.
-
-### Open Word documents
-
-`Mod` `O` also opens Word documents (.docx), and so does starting Blank with one, e.g. `blank report.docx`. Blank turns it into a new, untitled markdown document and never changes the Word file. Press `Mod` `S` to keep it: Blank suggests the same name with `.md`, next to the original. The top of the window shows _report.docx (imported)_ until then.
-
-Headings, bold and italic text, links, lists, quotes, code, line breaks and images come along. Images are stored inside the markdown file, so it stays a single file; large ones are scaled down to a size that still prints well. Word has more than markdown, so a few things change on the way, and Blank tells you when they do:
-
-- tables become one line per row, with the cells separated by `|`,
-- footnotes move to the end of the document,
-- comments, headers and footers, underlining and colours are left out,
-- tracked changes count as accepted,
-- charts and drawings Blank can't show are replaced by their description,
-- numbered lists start at 1.
-
-Older formats (.doc, .odt, .rtf, .pages) can't be opened. Save them as .docx in their app first.
-
-### Word documents for others
-
-When someone needs your text in Word, press `Mod` `Alt` `W`. Blank writes a .docx that looks like its PDFs, with the same fonts and spacing, and that stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists, links and images come along. Your markdown file stays as it is.
-
-The document embeds Blank's font, IBM Plex Sans, so it looks the same in Word on computers without the font. LibreOffice and Google Docs ignore embedded fonts and use a similar one instead.
+Your documents are plain markdown files: `Mod` `S` saves, `Mod` `O` opens, also Word documents. To share a piece, export it as a PDF with `Mod` `Alt` `P` or as a Word document with `Mod` `Alt` `W`. [Files & formats](./files) has everything about PDF and Word.
 
 ## The status bar
 
-The top of the window shows the open file, _Untitled_, or the Word document an untitled document was imported from. The bottom shows the word and character count, [spell check](./spelling) while it is on, and the [language](./autocorrect#language).
+The top of the window shows the open file, _Untitled_, or the [Word document](./files#open-word-documents) an untitled document was imported from. The bottom shows the word and character count, [spell check](./spelling) while it is on, and the [language](./autocorrect#language).

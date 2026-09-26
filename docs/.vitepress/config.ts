@@ -78,7 +78,8 @@ export default defineConfigWithTheme<
       {
         text: "Guide",
         link: "/guide/writing",
-        activeMatch: "^/guide/(writing|autocorrect|themes|configuration|faq)",
+        activeMatch:
+          "^/guide/(writing|files|autocorrect|spelling|themes|configuration|faq)",
       },
       { text: "Shortcuts", link: "/guide/shortcuts" },
     ],
@@ -88,6 +89,7 @@ export default defineConfigWithTheme<
         items: [
           { text: "Install", link: "/guide/install" },
           { text: "Writing in Blank", link: "/guide/writing" },
+          { text: "Files & formats", link: "/guide/files" },
         ],
       },
       {
