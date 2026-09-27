@@ -1,5 +1,7 @@
 import { Fragment, type Node, Slice } from "prosemirror-model";
 import { Plugin, type EditorState, type Transaction } from "prosemirror-state";
+// pastedCells is exported for tests only, but it's how prosemirror-tables
+// reads the cells of a slice, and pasting and copying need the same reading
 import {
   __pastedCells as pastedCells,
   CellSelection,
