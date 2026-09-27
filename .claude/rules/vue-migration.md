@@ -28,7 +28,7 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 ## Waiting to be ported
 
 These arrived or are arriving outside the plan's PRs:
-- `#table-handles` (`src/tableHandles.ts`, table mouse handles): its own surface, ported after the toolbar.
+- `#table-handles` (`src/tableHandles.ts`, table mouse handles, #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
 - `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for.
 - UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests`, `bandRequests`. Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
 
