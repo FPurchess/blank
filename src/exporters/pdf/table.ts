@@ -7,16 +7,12 @@ import {
   hasTallRows,
   tableGrid,
   TABLE_COLORS,
+  TABLE_LINES,
   type GridCell,
   type TableGrid,
 } from "../table";
 import type { PdfImages } from ".";
-import {
-  TABLE_CELL_PADDING_X,
-  TABLE_CELL_PADDING_Y,
-  TABLE_HEADER_LINE,
-  TABLE_LINE,
-} from "./template";
+import { TABLE_CELL_PADDING_X, TABLE_CELL_PADDING_Y } from "./template";
 
 // renders the blocks of a node without outer margins, see edgeless in index.ts
 type Blocks = (n: Node, images: PdfImages) => object[];
@@ -31,10 +27,10 @@ export const tableLayout = (headerRows: number) => ({
     i === 0
       ? 0
       : headerRows && i === headerRows
-        ? TABLE_HEADER_LINE
-        : TABLE_LINE,
+        ? TABLE_LINES.headerLine
+        : TABLE_LINES.line,
   vLineWidth: (i: number, node: { table: { widths: unknown[] } }) =>
-    i === 0 || i === node.table.widths.length ? 0 : TABLE_LINE,
+    i === 0 || i === node.table.widths.length ? 0 : TABLE_LINES.line,
   hLineColor: (i: number) =>
     headerRows && i === headerRows
       ? TABLE_COLORS.headerLine

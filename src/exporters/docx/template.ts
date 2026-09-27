@@ -1,7 +1,7 @@
 import type { ILevelsOptions, IStylesOptions } from "docx";
 
 import { CONTENT_WIDTH, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH } from "../page";
-import { TABLE_COLORS } from "../table";
+import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
 // Mirrors the PDF styles in ../pdf/template.ts (and so the editor typography
 // in src/scss/_typography.scss): 11pt body, headings on a major third scale.
@@ -12,7 +12,10 @@ export const FONT = "IBM Plex Sans";
 const CODE_FONT = "Courier New";
 const CODE_BACKGROUND = "F2F2F2";
 
-export const twips = (points: number) => Math.round(points * 20);
+const twips = (points: number) => Math.round(points * 20);
+// borders are measured in eighths of a point
+const eighths = (points: number) => Math.round(points * 8);
+const BODY_SIZE = 11;
 const halfPoints = (points: number) => Math.round(points * 2);
 // pdfmake multiplies lineHeight with the natural line height of IBM Plex Sans
 const line = (pdfLineHeight: number) => Math.round(pdfLineHeight * 1.3 * 240);
@@ -41,21 +44,19 @@ export const QUOTE_BORDER = {
 
 export const CONTENT_WIDTH_TWIPS = twips(CONTENT_WIDTH);
 
-// tables mirror the PDF (../pdf/template.ts): cells padded by 0.4em and
-// 0.7em, thin lines between rows and columns, a stronger one under the header
-// rows, none around the table's sides and top. Borders are measured in
-// eighths of a point.
-const BODY_SIZE = 11;
+// tables mirror the PDF (../pdf/template.ts): thin lines between rows and
+// columns, a stronger one under the header rows, none around the table's
+// sides and top
 export const TABLE_CELL_MARGINS = {
-  top: twips(0.4 * BODY_SIZE),
-  bottom: twips(0.4 * BODY_SIZE),
-  left: twips(0.7 * BODY_SIZE),
-  right: twips(0.7 * BODY_SIZE),
+  top: twips(TABLE_PADDING.y * BODY_SIZE),
+  bottom: twips(TABLE_PADDING.y * BODY_SIZE),
+  left: twips(TABLE_PADDING.x * BODY_SIZE),
+  right: twips(TABLE_PADDING.x * BODY_SIZE),
 };
 const hex = (color: string) => color.slice(1).toUpperCase();
 const TABLE_LINE = {
   style: "single",
-  size: 5,
+  size: eighths(TABLE_LINES.line),
   color: hex(TABLE_COLORS.line),
 } as const;
 const NO_LINE = { style: "none", size: 0, color: "auto" } as const;
@@ -69,7 +70,7 @@ export const TABLE_BORDERS = {
 };
 export const TABLE_HEADER_BORDER = {
   style: "single",
-  size: 10,
+  size: eighths(TABLE_LINES.headerLine),
   color: hex(TABLE_COLORS.headerLine),
 } as const;
 export const TABLE_HEADER_SHADING = {
@@ -142,7 +143,7 @@ const codeShading = {
 export const STYLES: IStylesOptions = {
   default: {
     document: {
-      run: { font: FONT, size: halfPoints(11) },
+      run: { font: FONT, size: halfPoints(BODY_SIZE) },
       paragraph: {
         spacing: {
           after: BLOCK_SPACING,
@@ -156,9 +157,12 @@ export const STYLES: IStylesOptions = {
     heading2: heading(2, 17, 0.96, { characterSpacing: -4 }),
     // 13.75pt doesn't fit half points
     heading3: heading(3, 13.75, 1),
-    heading4: heading(4, 11, BODY_LINE_HEIGHT, { bold: true }),
-    heading5: heading(5, 11, BODY_LINE_HEIGHT, { bold: true, italics: true }),
-    heading6: heading(6, 11, BODY_LINE_HEIGHT, { italics: true }),
+    heading4: heading(4, BODY_SIZE, BODY_LINE_HEIGHT, { bold: true }),
+    heading5: heading(5, BODY_SIZE, BODY_LINE_HEIGHT, {
+      bold: true,
+      italics: true,
+    }),
+    heading6: heading(6, BODY_SIZE, BODY_LINE_HEIGHT, { italics: true }),
   },
   paragraphStyles: [
     {

@@ -1,4 +1,5 @@
 import { PAGE_HEIGHT, PAGE_MARGIN } from "../page";
+import { TABLE_PADDING } from "../table";
 
 // Mirrors the editor typography in src/scss/_typography.scss: 11pt body and
 // headings on a major third scale (1.25). pdfmake multiplies lineHeight with
@@ -51,12 +52,9 @@ export const BLOCKQUOTE_LAYOUT = {
   paddingBottom: () => 0,
 };
 
-// tables mirror the editor (src/scss/_typography.scss and main.scss): cells
-// padded by 0.4em and 0.7em, 1px lines and a 2px line under the header rows
-export const TABLE_CELL_PADDING_Y = 0.4 * BODY_SIZE;
-export const TABLE_CELL_PADDING_X = 0.7 * BODY_SIZE;
-export const TABLE_LINE = 0.6;
-export const TABLE_HEADER_LINE = 1.2;
+// tables mirror the editor, see TABLE_PADDING and TABLE_LINES
+export const TABLE_CELL_PADDING_Y = TABLE_PADDING.y * BODY_SIZE;
+export const TABLE_CELL_PADDING_X = TABLE_PADDING.x * BODY_SIZE;
 // a caption moves to the next page with its table when less room is left
 // below it: enough for the caption, the header row and a first row
 const CAPTION_ROOM = 72;

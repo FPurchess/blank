@@ -89,9 +89,19 @@ const headerCells = (table: HTMLTableElement) => {
       children.every((child) => child.classList.contains(TABLE_HEADING_CLASS));
     if (heading && cell.closest("table") === table) rename(cell, "th");
   }
-  table.querySelectorAll(`.${TABLE_HEADING_CLASS}`).forEach((paragraph) => {
-    paragraph.removeAttribute("class");
-  });
+};
+
+/**
+ * attachCaption makes the caption paragraph `sibling` the caption of `table`,
+ * if it is one and the table has none yet
+ */
+const attachCaption = (table: HTMLTableElement, sibling: Element | null) => {
+  if (!sibling?.classList.contains(CAPTION_CLASS)) return;
+  if (table.querySelector(":scope > caption")) return;
+  const caption = table.ownerDocument.createElement("caption");
+  caption.append(...sibling.childNodes);
+  table.prepend(caption);
+  sibling.remove();
 };
 
 /**
@@ -102,28 +112,25 @@ const headerCells = (table: HTMLTableElement) => {
  * @returns how many tables inside tables became text
  */
 const tables = (doc: Document) => {
-  let nested = 0;
   const outermost = [...doc.querySelectorAll("table")].filter(
     (table) => !table.parentElement?.closest("table"),
   );
+  // captions above their table first, where Word, pandoc and Blank put them,
+  // so a caption between two tables goes to the one below it
+  for (const table of outermost)
+    attachCaption(table, table.previousElementSibling);
+  for (const table of outermost) attachCaption(table, table.nextElementSibling);
+
+  let nested = 0;
   for (const table of outermost) {
-    const caption = [
-      table.previousElementSibling,
-      table.nextElementSibling,
-    ].find((sibling) => sibling?.classList.contains(CAPTION_CLASS));
-    if (caption) {
-      const element = doc.createElement("caption");
-      element.append(...caption.childNodes);
-      table.prepend(element);
-      caption.remove();
-    }
     headerCells(table);
     nested += normalizeTableHtml(table, tokenizer, { promoteHeader: true });
   }
-  // captions of something else stay as paragraphs
-  doc.querySelectorAll(`.${CAPTION_CLASS}`).forEach((caption) => {
-    caption.removeAttribute("class");
-  });
+  // captions of something else stay plain paragraphs, and so do paragraphs
+  // in the table heading style outside of tables
+  doc
+    .querySelectorAll(`.${CAPTION_CLASS}, .${TABLE_HEADING_CLASS}`)
+    .forEach((paragraph) => paragraph.removeAttribute("class"));
   return nested;
 };
 

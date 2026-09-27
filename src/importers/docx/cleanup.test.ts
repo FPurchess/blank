@@ -83,6 +83,25 @@ describe("importers.docx.cleanup", () => {
     );
   });
 
+  it("gives a caption between two tables to the table below it", () => {
+    const { html } = clean(
+      "<table><tr><th>a</th></tr></table>" +
+        '<p class="blank-caption">Second</p>' +
+        "<table><tr><th>b</th></tr></table>",
+    );
+
+    expect(html).toBe(
+      "<table><tbody><tr><th>a</th></tr></tbody></table>" +
+        '<table data-caption="Second"><tbody><tr><th>b</th></tr></tbody></table>',
+    );
+  });
+
+  it("keeps the table heading style outside tables as plain paragraphs", () => {
+    expect(clean('<p class="blank-th">heading</p>').html).toBe(
+      "<p>heading</p>",
+    );
+  });
+
   it("keeps a caption that isn't next to a table as a paragraph", () => {
     expect(clean('<p class="blank-caption">Figure 1</p><p>text</p>').html).toBe(
       "<p>Figure 1</p><p>text</p>",

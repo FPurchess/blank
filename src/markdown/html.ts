@@ -23,6 +23,19 @@ const MAX_SPAN = 1000;
 export const CELL_SEPARATOR = " | ";
 
 /**
+ * rename replaces `element` with an element named `tag` that has the same
+ * attributes and children
+ */
+export const rename = (element: Element, tag: string) => {
+  const renamed = element.ownerDocument.createElement(tag);
+  for (const { name, value } of [...element.attributes]) {
+    renamed.setAttribute(name, value);
+  }
+  renamed.append(...element.childNodes);
+  element.replaceWith(renamed);
+};
+
+/**
  * rowsOf returns the rows of `table` in reading order, without those of
  * tables nested in its cells
  */
@@ -193,19 +206,6 @@ export const normalizeTableHtml = (
     cellsOf(rows[0]).forEach((cell) => rename(cell, "th"));
   }
   return nested.length;
-};
-
-/**
- * rename replaces `element` with an element named `tag` that has the same
- * attributes and children
- */
-export const rename = (element: Element, tag: string) => {
-  const renamed = element.ownerDocument.createElement(tag);
-  for (const { name, value } of [...element.attributes]) {
-    renamed.setAttribute(name, value);
-  }
-  renamed.append(...element.childNodes);
-  element.replaceWith(renamed);
 };
 
 /**

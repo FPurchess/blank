@@ -37,10 +37,18 @@ export const TABLE_COLORS = {
   headerFill: "#f1f2f3",
 };
 
+// the lines and padding of the table theme: 1px lines and a 2px line under
+// the header rows at the editor's 18px, set in points for 11pt body text, and
+// cells padded by 0.4em and 0.7em
+export const TABLE_LINES = { line: 0.6, headerLine: 1.2 };
+export const TABLE_PADDING = { y: 0.4, x: 0.7 };
+
 // a column is at least this many characters wide and counts at most this
 // many, so a long paragraph doesn't squeeze its neighbours to nothing
 const MIN_CHARS = 3;
 const MAX_CHARS = 40;
+// a cell with more text than this might not fit on a page
+const TALL_TEXT = 600;
 
 /**
  * textLength returns the length of the longest line of `cell`
@@ -119,6 +127,6 @@ export const hasTallRows = (table: Node) =>
         image ||= node.type === schema.nodes.image;
         return !image;
       });
-      return image || cell.textContent.length > 600;
+      return image || cell.textContent.length > TALL_TEXT;
     }),
   );
