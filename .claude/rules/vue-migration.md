@@ -23,6 +23,14 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 - Every `boot…()` of the UI returns a `dispose` function, and tests call it in `afterEach`, so boots don't pile up.
 - Editor code never imports a UI module: shared helpers live in `src/editor/keyBindings.ts` (`formatShortcut`), `src/editor/commands/table/pickerSize.ts` (the table picker's sizes) and `src/popup.ts` (`place`, `placeToolbar`).
 - Keep every id, class, role, `data-*` and aria attribute that E2E, the docs shots or the unit tests use. The migration must not change what the user sees.
+- Modal dialogs boot through `bootDialog(requests, id, render)` (`src/dialog.ts`), which renders one dialog per request and returns `dispose`.
+
+## Waiting to be ported
+
+These arrived or are arriving outside the plan's PRs:
+- `#table-handles` (`src/tableHandles.ts`, table mouse handles): its own surface, ported after the toolbar.
+- `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for.
+- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests`, `bandRequests`. Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
 
 ## Status
 

@@ -1,6 +1,6 @@
 import { type LinkDialogRequest, linkDialog } from "./state";
 import { isAbsoluteUrl, isSavableUrl, normalizeUrl } from "./url";
-import { createButton, createDialog, createField } from "./dialog";
+import { bootDialog, createButton, createDialog, createField } from "./dialog";
 import { uiRoot } from "./uiRoot";
 
 const DIALOG_ID = "link-dialog";
@@ -10,8 +10,6 @@ const MESSAGES = {
   unsavable: "javascript:, vbscript:, file: and data: links can't be saved",
   notAbsolute: "This doesn't look like a full URL, e.g. https://example.com",
 };
-
-let unsubscribe: (() => void) | undefined;
 
 /**
  * renderDialog renders the dialog for `request` and focuses the URL input
@@ -89,18 +87,5 @@ const renderDialog = (request: LinkDialogRequest) => {
 /**
  * bootLinkDialog renders the link dialog whenever `linkDialog` holds a request
  */
-export const bootLinkDialog = () => {
-  unsubscribe?.();
-  unsubscribe = linkDialog.subscribe(
-    (request) => {
-      document.getElementById(DIALOG_ID)?.remove();
-      if (request) renderDialog(request);
-    },
-    { immediate: true },
-  );
-  return () => {
-    unsubscribe?.();
-    unsubscribe = undefined;
-    document.getElementById(DIALOG_ID)?.remove();
-  };
-};
+export const bootLinkDialog = () =>
+  bootDialog(linkDialog, DIALOG_ID, renderDialog);

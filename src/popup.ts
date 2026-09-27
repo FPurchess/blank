@@ -34,10 +34,10 @@ const TOOLBAR_TOP = 36;
 type ToolbarAnchor = TableToolbarState["anchor"];
 
 /**
- * placeToolbar puts the toolbar above the table's right end, where it rarely covers
- * the text above, which starts on the left. It stays at the top of the window
- * while the table's top is scrolled away, and hides while the table is out of
- * view.
+ * placeToolbar puts the table toolbar above the table's right end, where it
+ * rarely covers the text above, which starts on the left. It stays at the top
+ * of the window while the table's top is scrolled away, and hides while the
+ * table is out of view.
  */
 export const placeToolbar = (element: HTMLElement, anchor: ToolbarAnchor) => {
   // measured at the window's left edge, since where it stands now limits

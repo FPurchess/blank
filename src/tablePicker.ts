@@ -1,6 +1,6 @@
 import { place } from "./popup";
-import { uiRoot } from "./uiRoot";
 import { tablePicker, type TablePickerState } from "./state";
+import { uiRoot } from "./uiRoot";
 import {
   choosePickerSize,
   MAX_SIZE,
@@ -40,8 +40,9 @@ const createPicker = (): HTMLElement => {
     (event.target as HTMLElement).closest<HTMLElement>(".cell");
   grid.addEventListener("mouseover", (event) => {
     const cell = cellAt(event);
-    if (cell)
+    if (cell) {
       choosePickerSize(Number(cell.dataset.col), Number(cell.dataset.row));
+    }
   });
   grid.addEventListener("click", (event) => {
     const cell = cellAt(event);

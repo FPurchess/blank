@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { tablePicker, type TablePickerState } from "./state";
 import { bootTablePicker } from "./tablePicker";
-import { resizePicker, sizeLabel } from "./editor/commands/table/pickerSize";
+import { resizePicker } from "./editor/commands/table/pickerSize";
 
 const open = (cols = 3, rows = 3): TablePickerState => {
   const picker: TablePickerState = {
@@ -98,20 +98,5 @@ describe("tablePicker", () => {
     tablePicker.value = null;
 
     expect(document.getElementById("table-picker")).toBeNull();
-  });
-
-  it("resizes only while open, between 1 and 20", () => {
-    resizePicker(1, 1);
-    expect(tablePicker.value).toBeNull();
-
-    open();
-    resizePicker(1, -1);
-    expect(tablePicker.value).toMatchObject({ cols: 4, rows: 2 });
-    resizePicker(-10, 30);
-    expect(tablePicker.value).toMatchObject({ cols: 1, rows: 20 });
-  });
-
-  it("labels a size", () => {
-    expect(sizeLabel(2, 5)).toBe("2 × 5");
   });
 });

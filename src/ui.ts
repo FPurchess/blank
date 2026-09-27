@@ -128,8 +128,15 @@ export const setupNotification = async () => {
   }
 };
 
+/**
+ * bootUI renders the bars and boots the dialogs, menus, pickers and
+ * toolbars. It runs after bootEditor, so the UI comes after the editor.
+ * @returns dispose, which stops rendering and removes the UI, e.g. between
+ * tests
+ */
 export const bootUI = () => {
   const root = uiRoot();
+  // what dispose undoes: subscriptions, timers and the boots below
   const disposers: (() => void)[] = [];
   const uiTop = document.createElement("div");
   uiTop.id = "ui-top";
@@ -154,15 +161,16 @@ export const bootUI = () => {
   const uiStats = document.createElement("span");
   uiStats.id = "ui-stats";
   uiBottom.appendChild(uiStats);
-  const unsubscribeStats = textContent.subscribe(
-    (content) => {
-      const charCount = content.length;
-      const wordCount = content.length ? content.split(/\s/).length : 0;
-      uiStats.textContent = `${wordCount} words ${charCount} chars`;
-    },
-    { immediate: true },
+  disposers.push(
+    textContent.subscribe(
+      (content) => {
+        const charCount = content.length;
+        const wordCount = content.length ? content.split(/\s/).length : 0;
+        uiStats.textContent = `${wordCount} words ${charCount} chars`;
+      },
+      { immediate: true },
+    ),
   );
-  disposers.push(unsubscribeStats);
 
   // the paper of the document, which opens the page setup
   const uiPage = document.createElement("span");
@@ -212,17 +220,19 @@ export const bootUI = () => {
       spellcheckStatus.value,
       spellcheckMessage.value,
     );
-  disposers.push(spellcheckStatus.subscribe(renderStatus));
-  const unsubscribeMessage = spellcheckMessage.subscribe((message) => {
-    renderStatus();
-    window.clearTimeout(messageTimer);
-    if (message) {
-      messageTimer = window.setTimeout(() => {
-        spellcheckMessage.value = null;
-      }, MESSAGE_DURATION);
-    }
-  });
-  disposers.push(unsubscribeMessage, () => window.clearTimeout(messageTimer));
+  disposers.push(
+    spellcheckStatus.subscribe(renderStatus),
+    spellcheckMessage.subscribe((message) => {
+      renderStatus();
+      window.clearTimeout(messageTimer);
+      if (message) {
+        messageTimer = window.setTimeout(() => {
+          spellcheckMessage.value = null;
+        }, MESSAGE_DURATION);
+      }
+    }),
+    () => window.clearTimeout(messageTimer),
+  );
   renderStatus();
 
   // what just happened, e.g. "2 rows added": shown for a moment and read out
@@ -233,20 +243,19 @@ export const bootUI = () => {
   uiAnnouncement.setAttribute("role", "status");
   uiStats.after(uiAnnouncement);
   let announcementTimer: number | undefined;
-  const unsubscribeAnnouncement = announcement.subscribe((message) => {
-    uiAnnouncement.textContent = message ?? "";
-    window.clearTimeout(announcementTimer);
-    if (message) {
-      // long enough to read a longer message too
-      const duration = Math.max(MESSAGE_DURATION, message.length * 60);
-      announcementTimer = window.setTimeout(() => {
-        announcement.value = null;
-      }, duration);
-    }
-  });
-
-  disposers.push(unsubscribeAnnouncement, () =>
-    window.clearTimeout(announcementTimer),
+  disposers.push(
+    announcement.subscribe((message) => {
+      uiAnnouncement.textContent = message ?? "";
+      window.clearTimeout(announcementTimer);
+      if (message) {
+        // long enough to read a longer message too
+        const duration = Math.max(MESSAGE_DURATION, message.length * 60);
+        announcementTimer = window.setTimeout(() => {
+          announcement.value = null;
+        }, duration);
+      }
+    }),
+    () => window.clearTimeout(announcementTimer),
   );
 
   const uiLanguage = document.createElement("span");
@@ -272,7 +281,6 @@ export const bootUI = () => {
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);
 
-  // stops rendering and removes the UI, e.g. between tests
   return () => {
     disposers.forEach((dispose) => dispose());
     root.remove();

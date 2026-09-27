@@ -1,4 +1,4 @@
-import { createButton, createDialog, createField } from "./dialog";
+import { bootDialog, createButton, createDialog, createField } from "./dialog";
 import {
   choicesOf,
   HEADING_OPTIONS,
@@ -21,8 +21,6 @@ import { uiRoot } from "./uiRoot";
 // page. Custom sizes and margins are typed in below their row.
 
 const DIALOG_ID = "page-setup";
-
-let unsubscribe: (() => void) | undefined;
 
 type RowName = "paper" | "orientation" | "margins" | "newPageBefore";
 
@@ -413,18 +411,5 @@ const renderDialog = (request: PageSetupRequest) => {
  * bootPageSetup renders the page setup dialog whenever `pageSetup` holds a
  * request
  */
-export const bootPageSetup = () => {
-  unsubscribe?.();
-  unsubscribe = pageSetup.subscribe(
-    (request) => {
-      document.getElementById(DIALOG_ID)?.remove();
-      if (request) renderDialog(request);
-    },
-    { immediate: true },
-  );
-  return () => {
-    unsubscribe?.();
-    unsubscribe = undefined;
-    document.getElementById(DIALOG_ID)?.remove();
-  };
-};
+export const bootPageSetup = () =>
+  bootDialog(pageSetup, DIALOG_ID, renderDialog);
