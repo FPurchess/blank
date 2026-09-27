@@ -6,7 +6,7 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { sendNotification } from "@tauri-apps/plugin-notification";

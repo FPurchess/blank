@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { schema } from "../editor/schema";
+import { schema } from "../markdown";
 
 import { readFile } from "@tauri-apps/plugin-fs";
 

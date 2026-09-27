@@ -8,6 +8,8 @@ export default (): Command => (state, dispatch) => {
     dispatch(
       state.tr
         .delete(0, state.doc.content.size)
+        // the new document doesn't inherit the properties of the old one
+        .setDocAttribute("frontmatter", null)
         .setMeta(REPLACE_DOCUMENT, true),
     );
     path.value = null;

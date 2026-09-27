@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 
-import { parser, serializer } from ".";
-import { schema } from "../schema";
+import { markdownParser as parser, markdownSerializer as serializer } from ".";
+import { schema } from "./schema";
 import { displayWidth, gfmBlocker } from "./tables";
 import {
   blockquote,
@@ -16,7 +16,7 @@ import {
   th,
   tr,
   ul,
-} from "../../test/editor";
+} from "../test/editor";
 
 const md = (...lines: string[]) => lines.join("\n") + "\n";
 const roundTrip = (text: string) => serializer.serialize(parser.parse(text));

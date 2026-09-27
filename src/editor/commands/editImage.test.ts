@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { NodeSelection } from "prosemirror-state";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";

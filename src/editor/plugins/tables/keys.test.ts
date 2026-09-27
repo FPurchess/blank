@@ -5,7 +5,7 @@ import { TextSelection, type EditorState } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import {
   createState,
   createTestView,

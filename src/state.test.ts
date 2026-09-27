@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
-import { schema } from "./editor/schema";
+import { schema } from "./markdown";
 
 import { textContent, theme, transaction } from "./state";
 import { doc, h, li, p, ul } from "./test/editor";

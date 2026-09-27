@@ -6,8 +6,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 
 import { EditorState } from "prosemirror-state";
-import { schema } from "../src/editor/schema";
-import { parser } from "../src/editor/markdown";
+import { parseMarkdown, schema } from "../src/markdown";
 
 import toDOCX from "../src/exporters/docx";
 import { sniffMime } from "../src/images/mime";
@@ -30,7 +29,7 @@ const inlineImages = (markdown: string) =>
     return `${start}data:${mime};base64,${bytes.toString("base64")}`;
   });
 
-const doc = parser.parse(inlineImages(readFileSync(input, "utf8")));
+const doc = parseMarkdown(inlineImages(readFileSync(input, "utf8")));
 const { contents, warnings } = await toDOCX(
   EditorState.create({ schema, doc }),
   {

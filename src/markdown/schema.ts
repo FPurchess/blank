@@ -58,15 +58,22 @@ const table: NodeSpec = {
       : ["table", ["tbody", 0]],
 };
 
-/**
- * schema is the markdown schema with tables
- */
+// Blank's markdown schema: the prosemirror-markdown schema with the table
+// nodes of prosemirror-tables, whose doc also keeps the file's frontmatter
+// (the YAML block at its top) as it was written, or null if the file has
+// none. Node types of two schemas can't be mixed, so the whole app uses this
+// one (see ./index.ts).
 export const schema = new Schema({
-  nodes: base.spec.nodes.append({
-    table,
-    table_row: cells.table_row,
-    table_cell: cells.table_cell,
-    table_header: cells.table_header,
-  }),
+  nodes: base.spec.nodes
+    .update("doc", {
+      ...base.spec.nodes.get("doc"),
+      attrs: { frontmatter: { default: null } },
+    })
+    .append({
+      table,
+      table_row: cells.table_row,
+      table_cell: cells.table_cell,
+      table_header: cells.table_header,
+    }),
   marks: base.spec.marks,
 });

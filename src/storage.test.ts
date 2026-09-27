@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
-import { schema } from "./editor/schema";
+import { schema } from "./markdown";
 import { Node } from "prosemirror-model";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { doc, h, p } from "./test/editor";
+import { doc, docWithFrontmatter, h, p } from "./test/editor";
 import { flushPromises } from "./test/async";
 
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
@@ -343,7 +343,18 @@ describe("storage", () => {
 
       const restored = await getDocumentFromStorage();
 
+      // the module is imported again, and so is its schema
       expect(restored?.toJSON()).toEqual(stored.toJSON());
+    });
+
+    it("restores the frontmatter of a stored document", async () => {
+      const stored = docWithFrontmatter("title: Stored", p("content"));
+      await localforage.setItem("doc", stored.toJSON());
+      const { getDocumentFromStorage } = await import("./storage");
+
+      const restored = await getDocumentFromStorage();
+
+      expect(restored?.attrs.frontmatter).toBe("title: Stored");
     });
   });
 

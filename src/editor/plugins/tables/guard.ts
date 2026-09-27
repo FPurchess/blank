@@ -1,8 +1,8 @@
 import type { Node } from "prosemirror-model";
 import { Plugin, type EditorState, type Transaction } from "prosemirror-state";
 
-import { schema } from "../../schema";
-import { CELL_SEPARATOR } from "../../markdown/html";
+import { schema } from "../../../markdown";
+import { CELL_SEPARATOR } from "../../../markdown/html";
 import { keepsParagraphAfter } from "./util";
 
 type Visit = (node: Node, pos: number) => boolean | void;

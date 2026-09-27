@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { importedFrom, path } from "../../state";
-import { createState, createTestView, doc, h, p } from "../../test/editor";
+import {
+  createState,
+  createTestView,
+  doc,
+  docWithFrontmatter,
+  h,
+  p,
+} from "../../test/editor";
 import newFile from "./newFile";
 
 describe("command.newFile", () => {
@@ -19,6 +26,16 @@ describe("command.newFile", () => {
     expect(view.state.doc.childCount).toBe(1);
     expect(path.value).toBeNull();
     expect(importedFrom.value).toBeNull();
+  });
+
+  it("forgets the frontmatter of the old document", () => {
+    const view = createTestView(
+      createState(docWithFrontmatter("title: Old", p("text"))),
+    );
+
+    newFile()(view.state, view.dispatch);
+
+    expect(view.state.doc.attrs.frontmatter).toBeNull();
   });
 
   it("changes nothing without dispatch", () => {

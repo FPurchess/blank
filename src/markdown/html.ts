@@ -1,6 +1,6 @@
 import { DOMParser as SchemaParser, Node } from "prosemirror-model";
 
-import { alignment, schema } from "../schema";
+import { alignment, schema } from "./schema";
 
 /**
  * LinkRules normalize and check link and image URLs, like the markdown-it

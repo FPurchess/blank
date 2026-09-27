@@ -105,6 +105,20 @@ body {
     margin-top: 0;
   }
 
+  // the summary of the frontmatter, see src/editor/plugins/properties.ts
+  .doc-properties {
+    font-size: 0.8em;
+    line-height: 1.4;
+    opacity: 0.55;
+    margin-bottom: 1.5em;
+    cursor: default;
+    user-select: none;
+
+    & + * {
+      margin-top: 0;
+    }
+  }
+
   code,
   pre {
     white-space: pre-wrap;

@@ -1,4 +1,4 @@
-import { schema } from "../../../schema";
+import { schema } from "../../../../markdown";
 
 import {
   CLOSERS,

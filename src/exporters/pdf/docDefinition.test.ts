@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import pdfmake from "pdfmake";
-import { schema } from "../../editor/schema";
+import { schema } from "../../markdown";
 
 import {
   blockquote,
   createState,
   createTestView,
   doc,
+  docWithFrontmatter,
   h,
   li,
   ol,
@@ -88,6 +89,29 @@ describe("exporter.pdf document definition", () => {
       pageBreakBefore: BASE_DOCUMENT.pageBreakBefore,
     });
     expect(BASE_DOCUMENT).not.toHaveProperty("content");
+  });
+
+  it("titles the PDF by its first heading", async () => {
+    const { definition } = await exportDoc(
+      doc(p("intro"), h(2, "Report"), h(1, "Later")),
+    );
+
+    expect(definition.info).toEqual({ title: "Report", creator: "Blank" });
+  });
+
+  it("takes the title and author from the frontmatter", async () => {
+    const { definition } = await exportDoc(
+      docWithFrontmatter(
+        "title: The Lighthouse\nauthor: Ada",
+        h(1, "Chapter 1"),
+      ),
+    );
+
+    expect(definition.info).toEqual({
+      title: "The Lighthouse",
+      author: "Ada",
+      creator: "Blank",
+    });
   });
 
   it("styles headings by level", async () => {

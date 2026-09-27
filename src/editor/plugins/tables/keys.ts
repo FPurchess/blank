@@ -16,7 +16,7 @@ import {
   isInTable,
 } from "prosemirror-tables";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import { appendRow } from "../../commands/table/insert";
 import {
   cellDepth,

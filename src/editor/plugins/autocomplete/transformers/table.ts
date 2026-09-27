@@ -2,7 +2,7 @@ import { Fragment, type Node } from "prosemirror-model";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-import { schema } from "../../../schema";
+import { schema } from "../../../../markdown";
 import { dispatchCorrection } from "../history";
 import { inCell } from "../../tables/util";
 import type { BlockTransformer } from "../types";

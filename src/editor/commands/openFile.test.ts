@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parser } from "../markdown";
+import { markdownParser } from "../../markdown";
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -38,7 +38,7 @@ describe("command.openFile", () => {
       ],
     });
     expect(readTextFile).toHaveBeenCalledWith("/notes.md");
-    expect(view.state.doc.eq(parser.parse(opened))).toBe(true);
+    expect(view.state.doc.eq(markdownParser.parse(opened))).toBe(true);
     expect(transaction.value?.doc.eq(view.state.doc)).toBe(true);
   });
 

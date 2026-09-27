@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { splitBlock } from "prosemirror-commands";
 import { history, undo } from "prosemirror-history";
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 

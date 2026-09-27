@@ -2,7 +2,7 @@ import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { tableEditing } from "prosemirror-tables";
-import { schema } from "./schema";
+import { schema } from "../markdown";
 
 import {
   contextMenu as contextMenuState,
@@ -17,6 +17,7 @@ import {
   keymap,
   languagePicker,
   openLink,
+  properties,
   spellcheck,
   tableGuard,
   tableKeys,
@@ -48,6 +49,7 @@ export const bootEditor = async () => {
         keymap(),
         openLink(),
         images(),
+        properties(),
         tableGuard(),
         tableView(),
         tableEditing(),

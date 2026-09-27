@@ -7,7 +7,7 @@ import {
 } from "prosemirror-state";
 import { addRow, TableMap } from "prosemirror-tables";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import { inCell, tableAround } from "../../plugins/tables/util";
 
 /**

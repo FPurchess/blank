@@ -4,9 +4,9 @@ import type {
   INumberingOptions,
 } from "docx";
 import type { Mark, Node } from "prosemirror-model";
-import type { EditorState } from "prosemirror-state";
 
 import { type exporterFunc } from "../../exporters";
+import { firstHeading, readProperties } from "../../markdown";
 import { fitBox } from "../../images/fit";
 import {
   type PreparedImage,
@@ -15,6 +15,7 @@ import {
 } from "../../images/prepare";
 import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
 import { fixPackage } from "./fixups";
+import { FRONTMATTER_PROPERTY } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
@@ -335,15 +336,6 @@ const loadFont = () =>
     ),
   ));
 
-const firstHeading = (state: EditorState) => {
-  let title = "";
-  state.doc.descendants((node) => {
-    if (!title && node.type.name === "heading") title = node.textContent;
-    return !title;
-  });
-  return title;
-};
-
 const toDOCX: exporterFunc = async (state, { docPath }) => {
   const docx = await import("docx");
   const [fontData, { images, failures }] = await Promise.all([
@@ -354,9 +346,22 @@ const toDOCX: exporterFunc = async (state, { docPath }) => {
   const serializer = new Serializer(docx, images);
   const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP));
 
+  const frontmatter = state.doc.attrs.frontmatter as string | null;
+  const { title, author } = readProperties(frontmatter);
   const document = new docx.Document({
-    creator: "Blank",
-    title: firstHeading(state),
+    // Word shows the creator as the author of the document
+    creator: author ?? "",
+    lastModifiedBy: author ?? "",
+    title: title ?? firstHeading(state.doc),
+    // the frontmatter as it was written, so importing the document again
+    // restores what Word has no place for, see src/importers/docx/prepare.ts
+    ...(frontmatter === null
+      ? {}
+      : {
+          customProperties: [
+            { name: FRONTMATTER_PROPERTY, value: frontmatter },
+          ],
+        }),
     // IBM's unmodified font file; Word obfuscates embedded fonts as the
     // format requires. The type asks for a Buffer, but any bytes do.
     fonts: [{ name: FONT, data: fontData as unknown as Buffer }],

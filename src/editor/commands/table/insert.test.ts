@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TextSelection } from "prosemirror-state";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import {
   createState,
   createTestView,

@@ -17,7 +17,7 @@ import {
   detectLanguage,
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
-import { schema } from "./editor/schema";
+import { schema } from "./markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({

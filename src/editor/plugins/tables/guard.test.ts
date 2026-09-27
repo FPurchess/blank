@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Node } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 import { doc, h, li, p, table, td, th, tr, ul } from "../../../test/editor";
 import { tableGuard } from "./guard";
 

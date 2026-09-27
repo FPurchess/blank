@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history, undo, undoDepth } from "prosemirror-history";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 import type { Node } from "prosemirror-model";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 

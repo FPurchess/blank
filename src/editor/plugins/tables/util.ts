@@ -1,7 +1,7 @@
 import type { Node, ResolvedPos } from "prosemirror-model";
 import { TableMap } from "prosemirror-tables";
 
-import { schema } from "../../schema";
+import { schema } from "../../../markdown";
 
 /**
  * isCell tells whether `node` is a table cell or header cell

@@ -1,6 +1,6 @@
 import { DOMSerializer, Node } from "prosemirror-model";
 
-import { Alignment, schema } from "../schema";
+import { Alignment, schema } from "./schema";
 
 /**
  * GfmBlocker names what keeps a table from being written as a pipe table
@@ -62,13 +62,15 @@ const isWide = (code: number) =>
   (code >= 0x1f300 && code <= 0x1faff) ||
   (code >= 0x20000 && code <= 0x3fffd);
 
-const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+// made on first use, so importing the schema doesn't need Intl.Segmenter
+let graphemes: Intl.Segmenter | undefined;
 
 /**
  * displayWidth returns how many columns `text` takes in a monospaced font, so
  * pipe tables line up in the file with CJK text and emoji too
  */
 export const displayWidth = (text: string): number => {
+  graphemes ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
   let width = 0;
   for (const { segment } of graphemes.segment(text)) {
     const wide = isWide(segment.codePointAt(0) ?? 0) || segment.includes("️");

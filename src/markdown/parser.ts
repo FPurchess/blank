@@ -1,7 +1,7 @@
 import { defaultMarkdownParser, MarkdownParser } from "prosemirror-markdown";
 import type { Attrs, Node, NodeType } from "prosemirror-model";
 
-import { alignment, schema } from "../schema";
+import { alignment, schema } from "./schema";
 import { tokenizer } from "./tokenizer";
 
 /**
@@ -24,10 +24,10 @@ type TokenHandler = (
 ) => void;
 
 /**
- * parser reads markdown into a document of Blank's schema, pipe tables and
+ * markdownParser reads markdown into a document of Blank's schema, pipe tables and
  * HTML tables included
  */
-export const parser = new MarkdownParser(
+export const markdownParser = new MarkdownParser(
   schema,
   // prosemirror-markdown is typed against its own copy of markdown-it
   tokenizer as unknown as MarkdownParser["tokenizer"],
@@ -44,7 +44,7 @@ export const parser = new MarkdownParser(
 
 // the html_table rule of the tokenizer has already read the table
 (
-  parser as unknown as { tokenHandlers: Record<string, TokenHandler> }
+  markdownParser as unknown as { tokenHandlers: Record<string, TokenHandler> }
 ).tokenHandlers.html_table = (state, { meta: { table } }) => {
   state.addNode(table.type, table.attrs, table.children);
 };

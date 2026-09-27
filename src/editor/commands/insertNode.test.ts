@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 
 import {
   codeBlock,

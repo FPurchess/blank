@@ -2,6 +2,9 @@
 
 exports[`markdown > parses the welcome document 1`] = `
 {
+  "attrs": {
+    "frontmatter": null,
+  },
   "content": [
     {
       "attrs": {

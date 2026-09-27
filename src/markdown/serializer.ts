@@ -5,6 +5,7 @@ import {
 } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 
+import { schema } from "./schema";
 import { gfmBlocker, gfmLines, htmlLines } from "./tables";
 
 const { nodes, marks } = defaultMarkdownSerializer;
@@ -47,10 +48,10 @@ const hasHardBreak = (node: Node) => {
 };
 
 /**
- * serializer writes a document of Blank's schema as markdown: a table as a
+ * markdownSerializer writes a document of Blank's schema as markdown: a table as a
  * pipe table if it fits one, as an HTML table otherwise
  */
-export const serializer = new MarkdownSerializer(
+export const markdownSerializer = new MarkdownSerializer(
   {
     ...nodes,
     paragraph(state, node, parent, index) {
@@ -68,6 +69,16 @@ export const serializer = new MarkdownSerializer(
       }
       nodes.paragraph(state, node, parent, index);
       options.escapeExtraCharacters = escaped;
+    },
+    horizontal_rule(state, node, parent, index) {
+      // a file that starts with `---` would open with the text up to the next
+      // `---` as its frontmatter, so a rule on top is written as `***`
+      const onTop =
+        index === 0 &&
+        parent.type === schema.topNodeType &&
+        parent.attrs.frontmatter === null;
+      state.write(onTop ? "***" : (node.attrs.markup as string) || "---");
+      state.closeBlock(node);
     },
     table(state: MarkdownSerializerState, node: Node) {
       const lines = gfmBlocker(node)

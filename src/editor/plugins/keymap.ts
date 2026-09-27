@@ -13,7 +13,7 @@ import {
   wrapInList,
   splitListItem,
 } from "prosemirror-schema-list";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {

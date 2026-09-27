@@ -9,10 +9,10 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Blank's schema has tables, and its parser and serializer read and write
-    // them: use src/editor/schema.ts and src/editor/markdown/
+    // Blank's schema has tables and keeps the frontmatter, and node types of
+    // two schemas can't be mixed: use src/markdown instead
     files: ["src/**/*.ts", "scripts/**/*.ts"],
-    ignores: ["src/editor/schema.ts", "src/editor/markdown/**"],
+    ignores: ["src/markdown/**"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -25,8 +25,7 @@ export default [
                 "defaultMarkdownParser",
                 "defaultMarkdownSerializer",
               ],
-              message:
-                "Use the schema from src/editor/schema.ts and the parser and serializer from src/editor/markdown/.",
+              message: "Import Blank's markdown from src/markdown instead.",
             },
           ],
         },

@@ -7,7 +7,7 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
-import { schema } from "../schema";
+import { schema } from "../../markdown";
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
