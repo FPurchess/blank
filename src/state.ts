@@ -2,6 +2,8 @@ import { Transaction } from "prosemirror-state";
 
 import { debounce, Observable } from "observable.ts";
 
+import type { PageSettings } from "./layout/settings";
+import type { Unit } from "./layout/units";
 import type { Spellchecker, SpellcheckStatus } from "./spellcheck/types";
 
 export const path = new Observable<string | null>(null);
@@ -78,6 +80,28 @@ export interface ImageDialogRequest {
 
 // imageDialog holds the request of the open image dialog, or null while it is closed
 export const imageDialog = new Observable<ImageDialogRequest | null>(null);
+
+export interface PageSetupRequest {
+  // the page setup of the document, over the user's defaults
+  settings: PageSettings;
+  // the locale whose paper "auto" is, and the unit to show lengths in
+  locale: string;
+  unit: Unit;
+  // the document's frontmatter, for editing it as text
+  frontmatter: string | null;
+  // what of the document's page setup can't be used
+  warnings: string[];
+  apply(settings: PageSettings): void;
+  // returns what is wrong with the frontmatter, or null once it is applied
+  applyText(frontmatter: string): string | null;
+  // makes the settings the user's default for documents without their own
+  makeDefault(settings: PageSettings): void;
+  cancel(): void;
+}
+
+// pageSetup holds the request of the open page setup dialog, or null while
+// it is closed
+export const pageSetup = new Observable<PageSetupRequest | null>(null);
 
 // language is the language tag autocorrect and spell check follow: an ISO
 // 639-1 code like "de", or a regional tag like "de-CH"

@@ -4,6 +4,7 @@ import { markdownParser, schema } from "../../markdown";
 
 import { IMAGES, dataUrl } from "../../test/images";
 import toPDF, { hasMark } from "./index";
+import { testLayout } from "../../test/layout";
 
 // vite resolves pdfmake to its browser build, so test against the same bundle
 vi.mock("pdfmake", async () => {
@@ -53,12 +54,15 @@ describe("exporters.pdf", () => {
         doc: markdownParser.parse(SAMPLE),
       });
 
-      const { contents: bytes, warnings } = await toPDF(state, {
-        docPath: null,
-      });
+      const {
+        contents: bytes,
+        warnings,
+        pages,
+      } = await toPDF(state, { docPath: null, layout: testLayout() });
 
       expect(bytes).toBeInstanceOf(Uint8Array);
       expect(warnings).toEqual([]);
+      expect(pages).toBe(1);
       expect(bytes.length).toBeGreaterThan(1000);
       const text = decode(bytes);
       expect(text.startsWith("%PDF-")).toBe(true);
@@ -89,7 +93,10 @@ describe("exporters.pdf", () => {
         doc: markdownParser.parse(tables),
       });
 
-      const { contents, warnings } = await toPDF(state, { docPath: null });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
 
       expect(warnings).toEqual([]);
       expect(decode(contents).trimEnd().endsWith("%%EOF")).toBe(true);
@@ -101,7 +108,9 @@ describe("exporters.pdf", () => {
         doc: markdownParser.parse(SAMPLE + "\n***both*** ⇒\n"),
       });
 
-      const text = decode((await toPDF(state, { docPath: null })).contents);
+      const text = decode(
+        (await toPDF(state, { docPath: null, layout: testLayout() })).contents,
+      );
 
       for (const face of [
         "IBMPlexSans",
@@ -122,7 +131,9 @@ describe("exporters.pdf", () => {
         doc: markdownParser.parse("see [Blank](https://blank.app)"),
       });
 
-      const text = decode((await toPDF(state, { docPath: null })).contents);
+      const text = decode(
+        (await toPDF(state, { docPath: null, layout: testLayout() })).contents,
+      );
 
       expect(text).toContain("/URI (https://blank.app)");
     });
@@ -135,7 +146,9 @@ describe("exporters.pdf", () => {
         ),
       });
 
-      const text = decode((await toPDF(state, { docPath: null })).contents);
+      const text = decode(
+        (await toPDF(state, { docPath: null, layout: testLayout() })).contents,
+      );
 
       expect(text).toMatch(/\/Subtype \/Image/);
       expect(text).toMatch(/\/Width 3\b/);

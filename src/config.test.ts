@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import {
+  exists,
+  mkdir,
+  readTextFile,
+  writeTextFile,
+} from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
@@ -8,7 +13,9 @@ import {
   config,
   getKeyBinding,
   isRecord,
+  saveDefaultPage,
 } from "./config";
+import { allMargins, DEFAULT_PAGE } from "./layout/settings";
 import { mockTauriPath } from "./test/tauri";
 
 describe("config", () => {
@@ -349,6 +356,103 @@ describe("config", () => {
         "Ignored invalid settings in blank.json: spellcheck",
       );
     });
+  });
+
+  describe("layout", () => {
+    it("lays out on the paper of the region with 2.5 cm margins", async () => {
+      vi.mocked(exists).mockResolvedValue(false);
+
+      await bootConfig();
+
+      expect(config.value.layout.page).toEqual(DEFAULT_PAGE);
+    });
+
+    it("reads the user's page setup over Blank's", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({
+          layout: { page: { size: "letter", margins: "1in" } },
+        }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.layout.page).toEqual({
+        ...DEFAULT_PAGE,
+        size: "letter",
+        margins: allMargins(72),
+      });
+    });
+
+    it.each([
+      [{ layout: { page: { size: "a2" } } }, "layout.page.size"],
+      [{ layout: { page: "a4" } }, "layout.page"],
+      [{ layout: [] }, "layout"],
+    ])("ignores %j", async (user, problem) => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(JSON.stringify(user));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await bootConfig();
+
+      expect(config.value.layout.page).toEqual(DEFAULT_PAGE);
+      expect(sendNotification).toHaveBeenCalledWith(
+        `Ignored invalid settings in blank.json: ${problem}`,
+      );
+    });
+  });
+
+  describe("saveDefaultPage", () => {
+    const page = {
+      ...DEFAULT_PAGE,
+      size: "a5" as const,
+      margins: allMargins(72),
+    };
+
+    it("writes the page setup and keeps the other settings", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ keymap: { undo: "Mod-u" }, layout: { other: 1 } }),
+      );
+
+      await saveDefaultPage(page, "in");
+
+      expect(mkdir).toHaveBeenCalledWith("/config", { recursive: true });
+      const [file, written] = vi.mocked(writeTextFile).mock.calls[0];
+      expect(file).toBe("/config/blank.json");
+      expect(JSON.parse(written as string)).toEqual({
+        keymap: { undo: "Mod-u" },
+        layout: {
+          other: 1,
+          page: { size: "a5", orientation: "portrait", margins: "1in" },
+        },
+      });
+      expect(config.value.layout.page).toEqual(page);
+    });
+
+    it("creates blank.json", async () => {
+      vi.mocked(exists).mockResolvedValue(false);
+
+      await saveDefaultPage(page, "cm");
+
+      const [, written] = vi.mocked(writeTextFile).mock.calls[0];
+      expect(JSON.parse(written as string)).toEqual({
+        layout: {
+          page: { size: "a5", orientation: "portrait", margins: "2.54cm" },
+        },
+      });
+    });
+
+    it.each([["not json"], ["[1]"]])(
+      "doesn't overwrite a blank.json it can't read: %s",
+      async (content) => {
+        vi.mocked(exists).mockResolvedValue(true);
+        vi.mocked(readTextFile).mockResolvedValue(content);
+
+        await expect(saveDefaultPage(page, "cm")).rejects.toThrow();
+        expect(writeTextFile).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it("binds language.choose to Mod-Alt-l by default", async () => {

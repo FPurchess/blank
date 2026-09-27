@@ -6,6 +6,8 @@ import type { Node } from "prosemirror-model";
 import { createState } from "../../test/editor";
 import { IMAGES, dataUrl } from "../../test/images";
 import toDOCX from ".";
+import { pageGeometry } from "../../layout/resolve";
+import { testLayout } from "../../test/layout";
 
 vi.mock("../pdf/pdfmake-vfs", () => ({
   default: { "IBMPlexSans-Regular.ttf": btoa("not really a font") },
@@ -20,8 +22,15 @@ interface Exported {
   text: (name: string) => Promise<string>;
 }
 
-const exportDoc = async (doc: Node, docPath: string | null = null) => {
-  const { contents, warnings } = await toDOCX(createState(doc), { docPath });
+const exportDoc = async (
+  doc: Node,
+  docPath: string | null = null,
+  layout = testLayout(),
+) => {
+  const { contents, warnings } = await toDOCX(createState(doc), {
+    docPath,
+    layout,
+  });
   const zip = await JSZip.loadAsync(contents);
   const text = async (name: string) => {
     const file = zip.file(name);
@@ -281,6 +290,59 @@ describe("exporter.docx", () => {
     expect(exported.warnings).toEqual(["1 image could not be embedded: Chart"]);
   });
 
+  describe("page", () => {
+    const section = async (exported: Exported) => {
+      const sectPr = all(await exported.xml("word/document.xml"), "sectPr");
+      expect(sectPr).toHaveLength(1);
+      const [pgSz] = all(sectPr[0], "pgSz");
+      const [pgMar] = all(sectPr[0], "pgMar");
+      const attrs = (element: Element, names: string[]) =>
+        Object.fromEntries(names.map((name) => [name, attr(element, name)]));
+      return {
+        size: attrs(pgSz, ["w", "h", "orient"]),
+        margins: attrs(pgMar, [
+          "top",
+          "right",
+          "bottom",
+          "left",
+          "header",
+          "footer",
+          "gutter",
+        ]),
+      };
+    };
+
+    it("lays out on A4 with 2.5 cm margins by default", async () => {
+      expect(await section(await exportMarkdown("text"))).toEqual({
+        size: { w: "11906", h: "16838", orient: "portrait" },
+        margins: {
+          top: "1417",
+          right: "1417",
+          bottom: "1417",
+          left: "1417",
+          header: "720",
+          footer: "720",
+          gutter: "0",
+        },
+      });
+    });
+
+    it("turns landscape pages, with their margins", async () => {
+      const layout = testLayout({
+        size: "letter",
+        orientation: "landscape",
+        margins: { top: 36, right: 54, bottom: 72, left: 90 },
+      });
+
+      const exported = await exportDoc(parseMarkdown("text"), null, layout);
+
+      expect(await section(exported)).toMatchObject({
+        size: { w: "15840", h: "12240", orient: "landscape" },
+        margins: { top: "720", right: "1080", bottom: "1440", left: "1800" },
+      });
+    });
+  });
+
   it("embeds the regular face of IBM Plex Sans", async () => {
     const exported = await exportMarkdown("text");
 
@@ -410,6 +472,26 @@ describe("exporter.docx tables", () => {
     );
     expect(widths[0] / widths[1]).toBeCloseTo(4 / 11);
     expect(attr(child(table, "tblLayout"), "type")).toBe("fixed");
+  });
+
+  it("is as wide as the text of the page", async () => {
+    const widthOn = async (layout: ReturnType<typeof testLayout>) => {
+      const exported = await exportDoc(
+        parseMarkdown("| a | b |\n| - | - |\n| c | d |"),
+        null,
+        layout,
+      );
+      const { table } = await tableOf(exported);
+      return Number(attr(child(table, "tblW"), "w"));
+    };
+    const landscape = testLayout({ orientation: "landscape" });
+
+    expect(await widthOn(testLayout())).toBe(
+      Math.round(pageGeometry(testLayout()).contentWidth * 20),
+    );
+    expect(await widthOn(landscape)).toBe(
+      Math.round(pageGeometry(landscape).contentWidth * 20),
+    );
   });
 
   it("merges cells across columns and rows", async () => {

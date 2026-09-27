@@ -19,6 +19,7 @@ import {
   type Misspelling,
   occurrences,
 } from "../plugins/spellcheck";
+import { openPageSetup } from "../commands/pageSetup";
 
 // suggestions shown for a misspelled word at most
 export const MAX_SUGGESTIONS = 5;
@@ -288,6 +289,12 @@ export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {
     ...(spelling.length ? ["separator" as const] : []),
     ...editItems(view),
     "separator",
+    {
+      id: "page-setup",
+      label: "Page Setup…",
+      shortcut: getKeyBinding(CommandIdentifier.PAGE_SETUP),
+      run: run(view, openPageSetup),
+    },
     ...spellcheckItems(),
   ];
 };

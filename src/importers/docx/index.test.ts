@@ -3,12 +3,19 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { parseMarkdown, schema, serializeMarkdown } from "../../markdown";
+import {
+  markdownSerializer,
+  parseMarkdown,
+  schema,
+  serializeMarkdown,
+} from "../../markdown";
 
 import toDOCX from "../../exporters/docx";
 import type { Node } from "prosemirror-model";
 
 import { blockquote, createState, doc, p } from "../../test/editor";
+import { resolveLayout } from "../../layout/resolve";
+import { allMargins, DEFAULT_PAGE } from "../../layout/settings";
 import { rewriteDocx } from "../../test/docx";
 import { IMAGES, dataUrl } from "../../test/images";
 import { importDocx } from ".";
@@ -26,13 +33,18 @@ const fixture = (name: string) =>
   new Uint8Array(readFileSync(join("src/importers/docx/__fixtures__", name)));
 
 const toMarkdown = async (bytes: Uint8Array) => {
-  const { doc, warnings } = await importDocx(bytes);
-  return { markdown: serializeMarkdown(doc), warnings, doc };
+  const { doc, warnings, page } = await importDocx(bytes, DEFAULT_PAGE);
+  return { markdown: serializeMarkdown(doc), warnings, page, doc };
 };
 
+/**
+ * exportDocx exports `markdown` as a Word document on the page its
+ * frontmatter and Blank's defaults give, like exportAs
+ */
 const exportDocx = async (markdown: string | Node) => {
   const doc = typeof markdown === "string" ? parseMarkdown(markdown) : markdown;
-  return (await toDOCX(createState(doc), { docPath: null })).contents;
+  const { layout } = resolveLayout(doc.attrs.frontmatter, DEFAULT_PAGE);
+  return (await toDOCX(createState(doc), { docPath: null, layout })).contents;
 };
 
 /**
@@ -175,6 +187,47 @@ describe("importers.docx", () => {
       expect(markdown).toBe("---\ntitle: a: b\n---\n\n# Chapter 1");
     });
 
+    it("keeps the page setup", async () => {
+      const markdown =
+        "---\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 3cm\n    right: 2cm\n    bottom: 2cm\n    left: 2cm\n---\n\ntext";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps a custom paper size", async () => {
+      const markdown = "---\npage:\n  size: 170mm x 240mm\n---\n\ntext";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("takes the page setup changed in Word", async () => {
+      const exported = await exportDocx(
+        "---\ntags: [sea]\npage:\n  size: a5\n---\n\ntext",
+      );
+      // landscape Letter with 1 inch margins, as Word's page setup writes it
+      const changed = await rewriteDocx(
+        exported,
+        "word/document.xml",
+        (xml = "") =>
+          xml
+            .replace(
+              /<w:pgSz [^>]*\/>/,
+              '<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>',
+            )
+            .replace(
+              /<w:pgMar [^>]*\/>/,
+              '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>',
+            ),
+      );
+
+      const { markdown, page } = await toMarkdown(changed);
+
+      expect(markdown).toBe(
+        "---\ntags: [sea]\npage:\n  size: letter\n  orientation: landscape\n  margins: 1in\n---\n\ntext",
+      );
+      expect(page).toBe("Letter landscape");
+    });
+
     // what a Word document written by Blank can't carry back, one test each so
     // an improvement shows up here
 
@@ -270,10 +323,7 @@ describe("importers.docx", () => {
   });
 
   it("writes the alt text of images it can't import", async () => {
-    const { contents } = await toDOCX(
-      createState(parseMarkdown(`![Chart](${PNG})`)),
-      { docPath: null },
-    );
+    const contents = await exportDocx(`![Chart](${PNG})`);
     // replace the embedded image with an EMF, which the webview can't decode
     const zip = await JSZip.loadAsync(contents);
     const [media] = zip.file(/^word\/media\//);
@@ -312,12 +362,49 @@ describe("importers.docx", () => {
       ],
     });
 
-    const { markdown, warnings } = await toMarkdown(
+    const { doc, warnings } = await toMarkdown(
       await docx.Packer.pack(document, "uint8array"),
     );
 
-    expect(markdown).toBe("commented");
+    expect(markdownSerializer.serialize(doc)).toBe("commented");
     expect(warnings).toEqual(["1 comment left out"]);
+  });
+
+  it("writes the page setup of a Word document that differs from the user's", async () => {
+    const docx = await import("docx");
+    // docx's default page: A4 with 1 inch margins
+    const bytes = await docx.Packer.pack(
+      new docx.Document({
+        sections: [{ children: [new docx.Paragraph("text")] }],
+      }),
+      "uint8array",
+    );
+
+    const { markdown, page } = await toMarkdown(bytes);
+
+    expect(markdown).toBe(
+      "---\npage:\n  size: a4\n  margins: 1in\n---\n\ntext",
+    );
+    expect(page).toBe("A4");
+  });
+
+  it("writes nothing for the page the user's defaults give", async () => {
+    const docx = await import("docx");
+    const bytes = await docx.Packer.pack(
+      new docx.Document({
+        sections: [{ children: [new docx.Paragraph("text")] }],
+      }),
+      "uint8array",
+    );
+
+    const { doc, page } = await importDocx(bytes, {
+      ...DEFAULT_PAGE,
+      size: "a4",
+      margins: allMargins(72),
+    });
+
+    expect(doc.attrs.frontmatter).toBeNull();
+    expect(page).toBeNull();
   });
 
   it("imports an empty document as an empty paragraph", async () => {
@@ -329,8 +416,8 @@ describe("importers.docx", () => {
 
     const { doc } = await importDocx(bytes);
 
-    expect(doc.toJSON()).toEqual(
-      schema.node("doc", null, [schema.node("paragraph")]).toJSON(),
+    expect(doc.content.toJSON()).toEqual(
+      schema.node("doc", null, [schema.node("paragraph")]).content.toJSON(),
     );
   });
 

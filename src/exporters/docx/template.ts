@@ -1,6 +1,6 @@
 import type { ILevelsOptions, IStylesOptions } from "docx";
 
-import { CONTENT_WIDTH, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH } from "../page";
+import { type Layout } from "../../layout/resolve";
 import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
 // Mirrors the PDF styles in ../pdf/template.ts (and so the editor typography
@@ -12,7 +12,7 @@ export const FONT = "IBM Plex Sans";
 const CODE_FONT = "Courier New";
 const CODE_BACKGROUND = "F2F2F2";
 
-const twips = (points: number) => Math.round(points * 20);
+export const twips = (points: number) => Math.round(points * 20);
 // borders are measured in eighths of a point
 const eighths = (points: number) => Math.round(points * 8);
 const BODY_SIZE = 11;
@@ -41,8 +41,6 @@ export const QUOTE_BORDER = {
   color: "auto",
   space: 12,
 } as const;
-
-export const CONTENT_WIDTH_TWIPS = twips(CONTENT_WIDTH);
 
 // tables mirror the PDF (../pdf/template.ts): thin lines between rows and
 // columns, a stronger one under the header rows, none around the table's
@@ -79,15 +77,28 @@ export const TABLE_HEADER_SHADING = {
   fill: hex(TABLE_COLORS.headerFill),
 } as const;
 
-export const PAGE = {
-  size: { width: twips(PAGE_WIDTH), height: twips(PAGE_HEIGHT) },
-  margin: {
-    top: twips(PAGE_MARGIN),
-    right: twips(PAGE_MARGIN),
-    bottom: twips(PAGE_MARGIN),
-    left: twips(PAGE_MARGIN),
+/**
+ * pageProperties returns the page of the Word document for `layout`. docx
+ * swaps the width and height of landscape pages itself, so it gets the
+ * portrait size.
+ */
+export const pageProperties = ({ paper, orientation, margins }: Layout) => ({
+  size: {
+    width: twips(paper.width),
+    height: twips(paper.height),
+    orientation,
   },
-};
+  margin: {
+    top: twips(margins.top),
+    right: twips(margins.right),
+    bottom: twips(margins.bottom),
+    left: twips(margins.left),
+    // Word's own distance of headers and footers from the edge
+    header: 720,
+    footer: 720,
+    gutter: 0,
+  },
+});
 
 // Only the regular face of IBM Plex Sans is embedded, so the large headings
 // that the PDF sets in medium use the regular weight instead of a synthesized

@@ -8,6 +8,7 @@ import {
   contextMenu as contextMenuState,
   imageDialog,
   linkDialog,
+  pageSetup,
   transaction,
 } from "../state";
 import {
@@ -30,6 +31,7 @@ import { applyInitialDocument } from "./document";
 const dialogOpen = () =>
   linkDialog.value !== null ||
   imageDialog.value !== null ||
+  pageSetup.value !== null ||
   contextMenuState.value !== null;
 
 export const bootEditor = async () => {

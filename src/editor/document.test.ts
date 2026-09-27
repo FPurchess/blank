@@ -202,7 +202,11 @@ describe("readDocumentFromFile with a Word document", () => {
       ReturnType<typeof stat>
     >);
     vi.mocked(readFile).mockResolvedValue(bytes);
-    vi.mocked(importDocx).mockResolvedValue({ doc: imported, warnings: [] });
+    vi.mocked(importDocx).mockResolvedValue({
+      doc: imported,
+      warnings: [],
+      page: null,
+    });
   });
 
   it("imports it into an untitled document", async () => {
@@ -225,10 +229,25 @@ describe("readDocumentFromFile with a Word document", () => {
     );
   });
 
+  it("tells which page setup came along", async () => {
+    vi.mocked(importDocx).mockResolvedValue({
+      doc: imported,
+      warnings: [],
+      page: "Letter landscape",
+    });
+
+    await readDocumentFromFile(emptyState(), "/docs/Report.docx");
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      "Imported Report.docx. Save it with Mod+S as a markdown file. Its Letter landscape pages came along",
+    );
+  });
+
   it("reports what the import left out", async () => {
     vi.mocked(importDocx).mockResolvedValue({
       doc: imported,
       warnings: ["1 table inside a table became text", "2 comments left out"],
+      page: null,
     });
 
     await readDocumentFromFile(emptyState(), "/report.docx");

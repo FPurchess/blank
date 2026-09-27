@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  frontmatterError,
   joinFrontmatter,
   readFrontmatter,
   readProperties,
@@ -162,8 +163,8 @@ describe("setProperties", () => {
     expect(setProperties(frontmatter, { title: "Hi" })).toBe(frontmatter);
   });
 
-  it("leaves empty frontmatter when the last key is removed", () => {
-    expect(setProperties("title: Hi", { title: undefined })).toBe("");
+  it("removes the frontmatter with its last key", () => {
+    expect(setProperties("title: Hi", { title: undefined })).toBeNull();
   });
 });
 
@@ -188,4 +189,29 @@ describe("readFrontmatter", () => {
       expect(readFrontmatter(frontmatter)).toBeUndefined();
     },
   );
+});
+
+describe("frontmatterError", () => {
+  it.each(["", "title: Hi\n# note", "# only a comment"])(
+    "accepts %j",
+    (yaml) => {
+      expect(frontmatterError(yaml)).toBeNull();
+    },
+  );
+
+  it("explains YAML errors in one line", () => {
+    expect(frontmatterError("title: [unclosed")).toMatch(/^[A-Z].*at line 1/);
+  });
+
+  it.each(["- a list", "just text"])("refuses %j", (yaml) => {
+    expect(frontmatterError(yaml)).toBe(
+      "The properties must be names with values, like title: My text",
+    );
+  });
+
+  it("refuses a line that would end the frontmatter", () => {
+    expect(frontmatterError("a: 1\n---\nb: 2")).toBe(
+      "A line with only --- or ... would end the properties",
+    );
+  });
 });

@@ -8,10 +8,12 @@ import { firstHeading, readProperties } from "../../markdown";
 import { toDataUrl } from "../../images/dataUrl";
 import { fitBox } from "../../images/fit";
 import { failureWarning, prepareImages } from "../../images/prepare";
-import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
+import { type Layout, pageGeometry } from "../../layout/resolve";
+import { POINTS_PER_PIXEL } from "../../layout/units";
 import {
   BASE_DOCUMENT,
   BLOCKQUOTE_LAYOUT,
+  pageBreakBefore,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
@@ -58,6 +60,13 @@ export type PdfImages = Map<
   { key: string; width: number; height: number }
 >;
 
+// what the blocks of a node are laid out in: the images, fitted to the room
+// for the text, which is the page or a table cell, in points
+export interface PdfContext {
+  images: PdfImages;
+  content: { width: number; height: number };
+}
+
 /**
  * imageBlock renders an image node, or its alt text if it couldn't be loaded
  */
@@ -86,15 +95,15 @@ const hasImage = (n: Node) => {
  * and whose last block no bottom margin, for a container like a quote or a
  * table cell, whose own spacing separates it from its siblings
  */
-const edgeless = (n: Node, images: PdfImages) =>
+const edgeless = (n: Node, context: PdfContext) =>
   n.children.map((node, index) => ({
-    ...transformNode(node, images),
+    ...transformNode(node, context),
     ...(index === 0 ? { marginTop: 0 } : {}),
     ...(index === n.childCount - 1 ? { marginBottom: 0 } : {}),
   }));
 
 // TODO: support horizontal lines
-const transformNode = (n: Node, images: PdfImages) => {
+const transformNode = (n: Node, context: PdfContext) => {
   const link = n.marks.find((mark: Mark) => mark.type.name === "link");
   const item = {
     style: `${n.type.name}${(n.attrs.level as number) ?? ""}`,
@@ -136,7 +145,7 @@ const transformNode = (n: Node, images: PdfImages) => {
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.ul.push(transformNode(node, images));
+        item.ul.push(transformNode(node, context));
       });
       break;
 
@@ -151,14 +160,14 @@ const transformNode = (n: Node, images: PdfImages) => {
       // editor
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
-      item.table = { widths: ["*"], body: [[{ stack: edgeless(n, images) }]] };
+      item.table = { widths: ["*"], body: [[{ stack: edgeless(n, context) }]] };
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       item.layout = BLOCKQUOTE_LAYOUT;
       break;
 
     case "table":
-      Object.assign(item, tableBlock(n, images, edgeless));
+      Object.assign(item, tableBlock(n, context, edgeless));
       break;
 
     case "ordered_list":
@@ -173,7 +182,7 @@ const transformNode = (n: Node, images: PdfImages) => {
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.ol.push(transformNode(node, images));
+        item.ol.push(transformNode(node, context));
       });
       break;
 
@@ -187,7 +196,7 @@ const transformNode = (n: Node, images: PdfImages) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         item.stack.push({
-          ...transformNode(node, images),
+          ...transformNode(node, context),
           margin: [0, index ? LIST_ITEM_BLOCK_MARGIN_TOP : 0, 0, 0],
         });
       });
@@ -206,9 +215,9 @@ const transformNode = (n: Node, images: PdfImages) => {
         n.forEach((node) => {
           if (node.type.name === "image") {
             flush();
-            stack.push(imageBlock(node, images));
+            stack.push(imageBlock(node, context.images));
           } else {
-            run.push(transformNode(node, images));
+            run.push(transformNode(node, context));
           }
         });
         flush();
@@ -223,7 +232,7 @@ const transformNode = (n: Node, images: PdfImages) => {
       n.forEach((node) => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        item.text.push(transformNode(node, images));
+        item.text.push(transformNode(node, context));
       });
   }
 
@@ -246,7 +255,11 @@ const adjustMargins = (content: Block[]) =>
  * embedImages loads the images of `state` as data URLs for pdfmake, which only
  * takes PNG and JPEG, sized like in the editor and at most as large as a page
  */
-const embedImages = async (state: EditorState, docPath: string | null) => {
+const embedImages = async (
+  state: EditorState,
+  docPath: string | null,
+  { contentWidth, contentHeight }: ReturnType<typeof pageGeometry>,
+) => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
     "image/png",
     "image/jpeg",
@@ -261,32 +274,68 @@ const embedImages = async (state: EditorState, docPath: string | null) => {
         width: image.width * POINTS_PER_PIXEL,
         height: image.height * POINTS_PER_PIXEL,
       },
-      CONTENT_WIDTH,
-      CONTENT_HEIGHT,
+      contentWidth,
+      contentHeight,
     );
     bySrc.set(src, { key, ...size });
   }
   return { byKey, bySrc, failures };
 };
 
-const toPDF: exporterFunc = async (state: EditorState, { docPath }) => {
+/**
+ * pageDefinition returns the page of the pdfmake document for `layout`
+ */
+export const pageDefinition = (layout: Layout) => {
+  const { width, height, margins } = pageGeometry(layout);
+  return {
+    pageSize: { width, height },
+    pageOrientation: layout.orientation,
+    // [left, top, right, bottom]
+    pageMargins: [margins.left, margins.top, margins.right, margins.bottom],
+  };
+};
+
+const toPDF: exporterFunc = async (state: EditorState, { docPath, layout }) => {
   await registerFonts();
-  const { byKey, bySrc, failures } = await embedImages(state, docPath);
+  const geometry = pageGeometry(layout);
+  const { byKey, bySrc, failures } = await embedImages(
+    state,
+    docPath,
+    geometry,
+  );
+  const context: PdfContext = {
+    images: bySrc,
+    content: { width: geometry.contentWidth, height: geometry.contentHeight },
+  };
 
   const content = adjustMargins(
-    transformNode(state.doc, bySrc).text as unknown as Block[],
+    transformNode(state.doc, context).text as unknown as Block[],
   );
   const { title, author } = readProperties(state.doc.attrs.frontmatter);
-  const docDefinition = Object.assign({}, BASE_DOCUMENT, {
-    // shown by PDF viewers and read by search engines and screen readers
-    info: {
-      title: title ?? firstHeading(state.doc),
-      ...(author ? { author } : {}),
-      creator: "Blank",
+  // pdfmake tells the footer how many pages there are
+  let pages = 0;
+  const docDefinition = Object.assign(
+    {},
+    BASE_DOCUMENT,
+    pageDefinition(layout),
+    {
+      pageBreakBefore: pageBreakBefore(
+        geometry.height - geometry.margins.bottom,
+      ),
+      footer: (_: number, pageCount: number) => {
+        pages = pageCount;
+        return null;
+      },
+      // shown by PDF viewers and read by search engines and screen readers
+      info: {
+        title: title ?? firstHeading(state.doc),
+        ...(author ? { author } : {}),
+        creator: "Blank",
+      },
+      content,
+      images: byKey,
     },
-    content,
-    images: byKey,
-  });
+  );
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error
@@ -295,6 +344,7 @@ const toPDF: exporterFunc = async (state: EditorState, { docPath }) => {
   return {
     contents: (await pdf.getBuffer()) as Uint8Array,
     warnings: failureWarning(failures),
+    pages,
   };
 };
 

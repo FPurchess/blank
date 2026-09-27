@@ -64,9 +64,13 @@ export const createDialog = (id: string, title: string, cancel: () => void) => {
       cancel();
     } else if (event.key === "Tab") {
       // keep the focus inside the dialog
+      // what Tab can reach: not the unchecked options of a radio group, nor
+      // what is hidden
       const focusable = Array.from(
-        form.querySelectorAll<HTMLElement>("input, button:not(:disabled)"),
-      );
+        form.querySelectorAll<HTMLElement>(
+          'input, textarea, button:not(:disabled):not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.closest("[hidden]"));
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) {

@@ -9,6 +9,7 @@ import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { doc, p } from "../../test/editor";
 import {
   type MenuItem,
+  pageSetup,
   spellcheck,
   spellchecker,
   spellcheckStatus,
@@ -76,6 +77,20 @@ describe("contextMenu model", () => {
   });
 
   describe("items", () => {
+    it("opens the page setup", () => {
+      setup();
+      const item = find(buildMenu(view, {}), "page-setup");
+
+      expect(item).toMatchObject({
+        label: "Page Setup…",
+        shortcut: "Mod-Alt-u",
+      });
+      item.run?.();
+
+      expect(pageSetup.value).not.toBeNull();
+      pageSetup.value = null;
+    });
+
     it("offers suggestions for a misspelled word, then editing and the toggle", () => {
       setup();
 
@@ -105,6 +120,7 @@ describe("contextMenu model", () => {
         "delete",
         "select-all",
         "-",
+        "page-setup",
         "disable",
       ]);
       expect(find(items, "change-all").children).toHaveLength(5);

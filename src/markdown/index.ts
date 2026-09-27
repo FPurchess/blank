@@ -11,10 +11,12 @@ import { markdownSerializer } from "./serializer";
 export { alignment, type Alignment, schema } from "./schema";
 export {
   type DocumentProperties,
+  frontmatterError,
   propertiesOf,
   readFrontmatter,
   readProperties,
   setProperties,
+  updateFrontmatter,
 } from "./frontmatter";
 
 export { markdownParser } from "./parser";

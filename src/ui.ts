@@ -20,6 +20,7 @@ import { bootContextMenu } from "./contextMenu";
 import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
 import { bootTablePicker } from "./tablePicker";
+import { bootPageSetup } from "./pageSetup";
 import { basename } from "./paths";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -188,6 +189,7 @@ export const bootUI = () => {
 
   bootLinkDialog();
   bootImageDialog();
+  bootPageSetup();
   bootContextMenu();
   bootTablePicker();
 

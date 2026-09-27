@@ -4,7 +4,11 @@ import { type DialogFilter, save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
+import { config } from "../../config";
 import { type exporterFunc } from "../../exporters";
+import { describePaper, layoutWarnings } from "../../layout/describe";
+import { resolveLayout } from "../../layout/resolve";
+import { localeUnit } from "../../layout/paper";
 import { extname } from "../../paths";
 import { path } from "../../state";
 import suggestPath from "./suggestPath";
@@ -56,20 +60,27 @@ export default (
         throw new Error(`choose a .${extension} file name`);
       }
 
-      const { contents, warnings } = await exporter(state, {
+      const { layout, problems } = resolveLayout(
+        state.doc.attrs.frontmatter as string | null,
+        config.value.layout.page,
+      );
+      const { contents, warnings, pages } = await exporter(state, {
         docPath: path.value,
+        layout,
       });
       await writeFile(dest, contents);
 
-      return warnings;
+      // e.g. "Exported 3 A4 pages", or for Word, which lays out the pages
+      // itself, "Exported on A4 pages"
+      const paper = describePaper(layout, localeUnit());
+      const exported =
+        pages === undefined
+          ? `Exported on ${paper} pages`
+          : `Exported ${pages} ${paper} ${pages === 1 ? "page" : "pages"}`;
+      return [exported, ...layoutWarnings(problems), ...warnings];
     })()
-      .then((warnings: string[] | null) => {
-        if (warnings) {
-          sendNotification({
-            title,
-            body: ["Your file has been exported", ...warnings].join(". "),
-          });
-        }
+      .then((messages: string[] | null) => {
+        if (messages) sendNotification({ title, body: messages.join(". ") });
       })
       .catch((err: unknown) => {
         sendNotification({

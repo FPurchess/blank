@@ -1,4 +1,4 @@
-import { isMap, parse, parseDocument } from "yaml";
+import { type Document, isMap, parse, parseDocument } from "yaml";
 
 // Frontmatter is the YAML block between two `---` lines at the very top of a
 // markdown file, which pandoc, Obsidian and static site generators read. Blank
@@ -112,40 +112,72 @@ export const readProperties = (
 ): DocumentProperties => propertiesOf(readFrontmatter(frontmatter) ?? {});
 
 /**
- * setProperties sets or removes top-level keys of the frontmatter, keeping
+ * frontmatterError checks frontmatter typed by the user
+ * @param yaml the frontmatter, without the `---` lines around it
+ * @returns what is wrong with it, or null if it can be written
+ */
+export const frontmatterError = (yaml: string): string | null => {
+  // the file would end the frontmatter there
+  if (/^(---|\.\.\.)\s*$/m.test(yaml)) {
+    return "A line with only --- or ... would end the properties";
+  }
+  const document = parseDocument(yaml);
+  const [error] = document.errors;
+  if (error) return error.message.split("\n")[0];
+  const { contents } = document;
+  return contents === null || isMap(contents)
+    ? null
+    : "The properties must be names with values, like title: My text";
+};
+
+/**
+ * updateFrontmatter changes the frontmatter as a YAML document, which keeps
  * its other keys, their order and its comments. Frontmatter that can't be
  * read is left as it is, since changing it could destroy what was written.
  * @param frontmatter the frontmatter, or null
- * @param values the keys to set; undefined removes a key
- * @returns the frontmatter, or null if it was null and nothing was set
+ * @param change changes the document and returns whether it did
+ * @returns the frontmatter, or null if nothing is left
  */
-export const setProperties = (
+export const updateFrontmatter = (
   frontmatter: string | null,
-  values: Record<string, unknown>,
+  change: (document: Document) => boolean,
 ): string | null => {
   const document = parseDocument(frontmatter ?? "");
   const { contents } = document;
   if (document.errors.length || (contents !== null && !isMap(contents))) {
     return frontmatter;
   }
-  let changed = false;
-  for (const [key, value] of Object.entries(values)) {
-    if (value === undefined) {
-      if (document.has(key)) {
-        document.delete(key);
-        changed = true;
-      }
-    } else if (document.get(key) !== value) {
-      document.set(key, value);
-      changed = true;
-    }
-  }
-  if (!changed) return frontmatter;
+  if (!change(document)) return frontmatter;
   const map = document.contents;
-  if (isMap(map) && map.items.length === 0 && !document.comment) {
-    return frontmatter === null ? null : "";
-  }
+  // no `---` lines around nothing are left behind
+  if (isMap(map) && map.items.length === 0) return null;
   return document
     .toString({ lineWidth: 0, flowCollectionPadding: false })
     .replace(/\n$/, "");
 };
+
+/**
+ * setProperties sets or removes top-level keys of the frontmatter, see
+ * updateFrontmatter
+ * @param frontmatter the frontmatter, or null
+ * @param values the keys to set; undefined removes a key
+ */
+export const setProperties = (
+  frontmatter: string | null,
+  values: Record<string, unknown>,
+): string | null =>
+  updateFrontmatter(frontmatter, (document) => {
+    let changed = false;
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined) {
+        if (document.has(key)) {
+          document.delete(key);
+          changed = true;
+        }
+      } else if (document.get(key) !== value) {
+        document.set(key, value);
+        changed = true;
+      }
+    }
+    return changed;
+  });
