@@ -183,12 +183,19 @@ export interface TableToolbarState {
 // tableToolbar is the toolbar of the table the cursor is in, or null
 export const tableToolbar = new Observable<TableToolbarState | null>(null);
 
+// a point in the window, in viewport coordinates, e.g. where the mouse is
+export interface Point {
+  x: number;
+  y: number;
+}
+
 // a row, a column or several of them: from the first to the last (excluded)
 export type Span = [from: number, to: number];
 
 export interface TableHandlesState {
-  // the box of the table under the mouse, in viewport coordinates, and the
-  // part of it in view sideways, since a wide table scrolls
+  // the box of the rows of the table under the mouse (without its caption),
+  // in viewport coordinates, and the part of it in view sideways, since a
+  // wide table scrolls
   box: { left: number; top: number; right: number; bottom: number };
   visible: { left: number; right: number };
   // where each row and column starts, and where the last one ends

@@ -166,6 +166,19 @@ describe("bootTableHandles", () => {
     expect(root().hidden).toBe(true);
   });
 
+  it("keeps the row handles in view on a table scrolled sideways", () => {
+    tableHandles.value = fake({
+      box: { left: 20, top: 100, right: 400, bottom: 220 },
+      visible: { left: 100, right: 400 },
+      columns: [20, 200, 300, 400],
+    });
+    mouse(150, 150);
+    expect(get(".grip.row").style.left).toBe("94px");
+
+    mouse(101, 179);
+    expect(get(".insert").style.left).toBe("91px");
+  });
+
   it("inserts a row with the + on the line between rows", () => {
     const table = fake();
     tableHandles.value = table;

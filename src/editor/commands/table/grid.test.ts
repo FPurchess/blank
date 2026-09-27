@@ -112,6 +112,17 @@ describe("table commands for the mouse", () => {
     expect(cellTypes(grown.doc)[0][3]).toBe("th");
   });
 
+  it("grows a table of a header row only with body rows", () => {
+    const node = doc(p("intro"), table(tr(th("Fruit"), th("Qty"))), p());
+    const grown = run(resizeTable(START, 2, 3), cursorAt(node, "intro"))!;
+
+    expect(cellTypes(grown.doc)).toEqual([
+      ["th", "th"],
+      ["td", "td"],
+      ["td", "td"],
+    ]);
+  });
+
   it("grows a table with the plugins that fix tables as it changes", () => {
     const state = createState(grid(), {
       cursor: 1,

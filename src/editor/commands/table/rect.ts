@@ -124,20 +124,26 @@ export const tableRect = (
 /**
  * selectIn returns a command that selects the rows `top` to `bottom` and the
  * columns `left` to `right` (ends excluded) of the table at `tableStart`, see
- * selectCells
+ * selectCells. Bounds left out cover the whole table, e.g. all columns for
+ * rows.
  */
 export const selectIn =
   (
     tableStart: number,
-    cells: Pick<TableRect, "top" | "bottom" | "left" | "right">,
+    cells: Partial<Pick<TableRect, "top" | "bottom" | "left" | "right">>,
   ): Command =>
   (state, dispatch) => {
     if (!tableAt(state.doc, tableStart)) return false;
     const rect = tableRect(state, tableStart);
-    const { top, bottom, left, right } = cells;
+    const {
+      top = 0,
+      bottom = rect.map.height,
+      left = 0,
+      right = rect.map.width,
+    } = cells;
     if (top < 0 || left < 0 || bottom > rect.map.height) return false;
     if (right > rect.map.width || top >= bottom || left >= right) return false;
-    dispatch?.(selectCells(state.tr, rect, cells));
+    dispatch?.(selectCells(state.tr, rect, { top, bottom, left, right }));
     return true;
   };
 

@@ -5,6 +5,7 @@ import type { EditorView } from "prosemirror-view";
 import { columnPercents, roundPercent } from "../../../markdown/tables";
 import { headerRowCount } from "../../../markdown";
 import {
+  type Point,
   tableHandles as handles,
   type TableHandlesState,
 } from "../../../state";
@@ -32,11 +33,6 @@ import { columnWidths, tableViewOf, type TableView } from "./view";
 // how far around a table the mouse still shows its handles, which sit on and
 // just outside its edges, in px
 const MARGIN = { left: 28, top: 20, right: 24, bottom: 24 };
-
-interface Point {
-  x: number;
-  y: number;
-}
 
 /**
  * tableUnder returns the view of the table at `point` or just around it
@@ -105,10 +101,12 @@ export const tableHandles = () => {
     }
     shown = table;
     const { node, start } = located;
-    const element = table.element;
-    const box = element.getBoundingClientRect();
+    const { element } = table;
+    // the rows, without the caption above them
+    const body = element.tBodies[0];
+    const box = body.getBoundingClientRect();
     const scroll = element.parentElement!.getBoundingClientRect();
-    const rowElements = [...element.tBodies[0].rows];
+    const rowElements = [...body.rows];
     const rows = rowElements.map((row) => row.getBoundingClientRect().top);
     rows.push(box.bottom);
     const widths = columnWidths(node, rowElements);

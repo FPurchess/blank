@@ -1,6 +1,11 @@
 import { roundPercent } from "./markdown/tables";
+import {
+  type Point,
+  type Span,
+  tableHandles,
+  type TableHandlesState,
+} from "./state";
 import { uiRoot } from "./uiRoot";
-import { type Span, tableHandles, type TableHandlesState } from "./state";
 
 // The handles of the table under the mouse, see
 // src/editor/plugins/tables/handles.ts: a handle on the left edge of the row
@@ -23,11 +28,6 @@ const MIN_COLUMN = 32;
 const COLUMN_STEP = 60;
 // how soon a second press on a line is a double click, in ms
 const DOUBLE_CLICK = 400;
-
-export interface Point {
-  x: number;
-  y: number;
-}
 
 export interface Hover {
   // the row and column under the mouse
@@ -81,7 +81,7 @@ export const hoverAt = (table: TableHandlesState, point: Point): Hover => {
   const y = Math.min(Math.max(point.y, box.top), box.bottom - 1);
   // nothing goes before the header row or header column
   const insertRow =
-    Math.abs(point.x - box.left) <= EDGE_NEAR
+    Math.abs(point.x - visible.left) <= EDGE_NEAR
       ? nearestLine(rows, point.y, INSERT_NEAR, headerRows > 0 ? 1 : 0)
       : null;
   const insertColumn =
@@ -352,7 +352,7 @@ export const bootTableHandles = () => {
       row === null
         ? null
         : {
-            left: box.left - 6,
+            left: visible.left - 6,
             top: rows[row] + 6,
             width: 12,
             height: Math.max(rows[row + 1] - rows[row] - 12, 8),
@@ -387,7 +387,12 @@ export const bootTableHandles = () => {
     const x = hover.insertColumn === null ? null : columns[hover.insertColumn];
     const columnShown = x !== null && x >= visible.left && x <= visible.right;
     if (!drag && y !== null) {
-      place(insert, { left: box.left - 9, top: y - 9, width: 18, height: 18 });
+      place(insert, {
+        left: visible.left - 9,
+        top: y - 9,
+        width: 18,
+        height: 18,
+      });
       place(insertLine, {
         left: visible.left,
         top: y - 1,

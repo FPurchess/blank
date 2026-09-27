@@ -68,6 +68,17 @@ describe("tableHandles", () => {
     expect(handles.value).toBeNull();
   });
 
+  it("measures the rows without the caption above them", () => {
+    const element = view.dom.querySelector("table")!;
+    element.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 300, bottom: 200 }) as DOMRect;
+    element.tBodies[0].getBoundingClientRect = () =>
+      ({ left: 0, top: 30, right: 300, bottom: 200 }) as DOMRect;
+    hover(10, 10);
+
+    expect(state().box).toEqual({ left: 0, top: 30, right: 300, bottom: 200 });
+  });
+
   it("measures the table again only when the mouse gets to another one", () => {
     hover();
     const first = handles.value;

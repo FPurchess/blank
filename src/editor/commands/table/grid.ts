@@ -15,33 +15,15 @@ import { deleteColumns, deleteRows } from "./remove";
  * selectRows selects the rows `from` to `to` (excluded) of the table at
  * `tableStart`
  */
-export const selectRows =
-  (tableStart: number, from: number, to: number): Command =>
-  (state, dispatch) => {
-    const table = tableAt(state.doc, tableStart);
-    if (!table) return false;
-    const right = TableMap.get(table).width;
-    return selectIn(tableStart, { top: from, bottom: to, left: 0, right })(
-      state,
-      dispatch,
-    );
-  };
+export const selectRows = (tableStart: number, from: number, to: number) =>
+  selectIn(tableStart, { top: from, bottom: to });
 
 /**
  * selectColumns selects the columns `from` to `to` (excluded) of the table
  * at `tableStart`
  */
-export const selectColumns =
-  (tableStart: number, from: number, to: number): Command =>
-  (state, dispatch) => {
-    const table = tableAt(state.doc, tableStart);
-    if (!table) return false;
-    const bottom = TableMap.get(table).height;
-    return selectIn(tableStart, { top: 0, bottom, left: from, right: to })(
-      state,
-      dispatch,
-    );
-  };
+export const selectColumns = (tableStart: number, from: number, to: number) =>
+  selectIn(tableStart, { left: from, right: to });
 
 /**
  * insertRowAt inserts a row into the table at `tableStart` so it becomes row

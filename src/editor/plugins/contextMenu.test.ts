@@ -4,7 +4,8 @@ import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { schema } from "../../markdown";
 
-import { doc, p } from "../../test/editor";
+import { doc, p, table, td, th, tr } from "../../test/editor";
+import { cursorAt } from "../../test/tables";
 import { deferred } from "../../test/async";
 import {
   contextMenu,
@@ -18,6 +19,7 @@ import { spellcheck as spellcheckPlugin } from "./spellcheck";
 import {
   contextMenuPlugin,
   openContextMenu,
+  openTableMenu,
   prefetch,
   SUGGESTION_WAIT,
 } from "./contextMenu";
@@ -288,5 +290,31 @@ describe("plugin.contextMenu", () => {
     openContextMenu(view, 3, { keyboard: true });
 
     expect(contextMenu.value?.anchor).toEqual({ left: 0, top: 0, bottom: 0 });
+  });
+});
+
+describe("openTableMenu", () => {
+  afterEach(() => {
+    contextMenu.value = null;
+  });
+
+  it("opens the table actions below the anchor, and returns the focus", () => {
+    const tableView = new EditorView(document.createElement("div"), {
+      state: cursorAt(doc(table(tr(th("a")), tr(td("b"))), p()), "b"),
+    });
+    const focus = vi.spyOn(tableView, "focus");
+    openTableMenu(tableView, { left: 10, top: 20, bottom: 30 });
+
+    const menu = contextMenu.value!;
+    expect(menu.anchor).toEqual({ left: 10, top: 20, bottom: 30 });
+    expect(menu.keyboard).toBe(false);
+    expect(menu.items).toContainEqual(
+      expect.objectContaining({ id: "table-row-below" }),
+    );
+
+    menu.close();
+    expect(contextMenu.value).toBeNull();
+    expect(focus).toHaveBeenCalled();
+    tableView.destroy();
   });
 });
