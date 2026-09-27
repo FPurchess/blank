@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../schema";
 import type { Node } from "prosemirror-model";
 
 import {
@@ -10,6 +10,10 @@ import {
   h,
   li,
   p,
+  table as tableNode,
+  td,
+  th,
+  tr,
   ul,
 } from "../../../../test/editor";
 import blockquote from "./blockquote";
@@ -19,6 +23,7 @@ import type { BlockTransformer } from "../types";
 import code_block from "./code_block";
 import horizontal_rule from "./horizontal_rule";
 import ordered_list from "./ordered_list";
+import table from "./table";
 
 /**
  * runTransformer places the cursor at the end of top-level block `index`
@@ -306,5 +311,87 @@ describe("transformer.code_block", () => {
 
     expect(result).toBe(false);
     expect(view.state.doc).toBe(node);
+  });
+});
+
+describe("transformer.table", () => {
+  describe("activate", () => {
+    it.each([
+      ["| Name | Qty |", ["Name", "Qty"]],
+      ["|a|b|", ["a", "b"]],
+      ["| one |", ["one"]],
+      ["| a | |", ["a", ""]],
+      ["| a \\| b | c |", ["a \\| b", "c"]],
+    ])("splits %j into its cells", (line, cells) => {
+      const props = table.activate(line)!;
+      expect(props.map(({ from, to }) => line.slice(from, to))).toEqual(cells);
+    });
+
+    it.each([
+      "|",
+      "||",
+      "| |",
+      "a | b",
+      "| a | b",
+      "|---|---|",
+      "| :-- | --: |",
+    ])("ignores %j", (line) => {
+      expect(table.activate(line)).toBeUndefined();
+    });
+  });
+
+  describe("transform", () => {
+    it.each(positions(p("| Name | Qty |")))(
+      "turns the $position block into a table",
+      ({ node, index }) => {
+        const { view, result } = runTransformer(
+          table,
+          node,
+          index,
+          "| Name | Qty |",
+        );
+
+        expect(result).toBe(true);
+        const created = view.state.doc.child(index);
+        expect(created.type).toBe(schema.nodes.table);
+        expect(created.childCount).toBe(2);
+        expect(created.firstChild!.textContent).toBe("NameQty");
+        // the cursor is in the first cell of the new row
+        expect(view.state.selection.$head.node(-1)).toBe(
+          created.child(1).firstChild,
+        );
+      },
+    );
+
+    it("keeps the header's formatting and unescapes its pipes", () => {
+      const bold = schema.text("Name", [schema.marks.strong.create()]);
+      const line = schema.nodes.paragraph.create(null, [
+        schema.text("| "),
+        bold,
+        schema.text(" | a \\| b |"),
+      ]);
+      const { view } = runTransformer(
+        table,
+        doc(line),
+        0,
+        "| Name | a \\| b |",
+      );
+
+      const header = view.state.doc.firstChild!.firstChild!;
+      expect(header.child(0).firstChild!.firstChild!.marks).toHaveLength(1);
+      expect(header.child(1).textContent).toBe("a | b");
+    });
+
+    it("leaves a line in a list in a table cell alone", () => {
+      const line = "| a | b |";
+      const node = doc(tableNode(tr(th("x")), tr(td(ul(li(p(line)))))), p());
+      // the end of the line: table, row, cell, list, item and paragraph
+      const cursor = node.firstChild!.firstChild!.nodeSize + 6 + line.length;
+      const view = createTestView(createState(node, { cursor }));
+      expect(view.state.selection.$head.parent.textContent).toBe(line);
+
+      expect(table.transform(view, line, table.activate(line)!)).toBe(false);
+      expect(view.state.doc.eq(node)).toBe(true);
+    });
   });
 });

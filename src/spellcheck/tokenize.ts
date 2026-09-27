@@ -1,5 +1,5 @@
 import type { Node } from "prosemirror-model";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../editor/schema";
 
 import type { SpellcheckConfig } from "../config";
 import { isUrlLike, LEAF } from "../editor/plugins/autocomplete/context";

@@ -1,6 +1,6 @@
 import { EditorView } from "prosemirror-view";
 import { wrapInList } from "prosemirror-schema-list";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../schema";
 
 import type { BlockTransformer } from "../types";
 import { applyBlockCommand } from "./util";
@@ -13,6 +13,7 @@ interface Props {
 
 const _transformer: BlockTransformer<Props> = {
   trigger: "space",
+  inCells: true,
   activate: (line: string): undefined | Props => {
     const match = reOrderedList.exec(line);
     return match ? { order: Number(match[1]) } : undefined;

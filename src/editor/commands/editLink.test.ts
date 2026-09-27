@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { NodeSelection, TextSelection } from "prosemirror-state";
 import { history, undo } from "prosemirror-history";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../schema";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 

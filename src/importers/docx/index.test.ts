@@ -3,11 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import {
-  defaultMarkdownParser,
-  defaultMarkdownSerializer,
-  schema,
-} from "prosemirror-markdown";
+import { schema } from "../../editor/schema";
+import { parser, serializer } from "../../editor/markdown";
 
 import toDOCX from "../../exporters/docx";
 import type { Node } from "prosemirror-model";
@@ -30,17 +27,14 @@ const fixture = (name: string) =>
 
 const toMarkdown = async (bytes: Uint8Array) => {
   const { doc, warnings } = await importDocx(bytes);
-  return { markdown: defaultMarkdownSerializer.serialize(doc), warnings, doc };
+  return { markdown: serializer.serialize(doc), warnings, doc };
 };
 
 /**
  * roundTrip exports `markdown` as a Word document and imports it again
  */
 const roundTrip = async (markdown: string | Node) => {
-  const doc =
-    typeof markdown === "string"
-      ? defaultMarkdownParser.parse(markdown)
-      : markdown;
+  const doc = typeof markdown === "string" ? parser.parse(markdown) : markdown;
   const { contents } = await toDOCX(createState(doc), { docPath: null });
   return (await toMarkdown(contents)).markdown;
 };
@@ -148,7 +142,7 @@ describe("importers.docx", () => {
 
   it("writes the alt text of images it can't import", async () => {
     const { contents } = await toDOCX(
-      createState(defaultMarkdownParser.parse(`![Chart](${PNG})`)),
+      createState(parser.parse(`![Chart](${PNG})`)),
       { docPath: null },
     );
     // replace the embedded image with an EMF, which the webview can't decode

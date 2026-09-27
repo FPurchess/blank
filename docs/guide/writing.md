@@ -16,10 +16,15 @@ At the start of an empty line, type one of these to turn the line into a block:
 | `>`                         | Space | Blockquote      |
 | `---` `***` `___`           | Enter | Horizontal line |
 | ` ``` ` or ` ```lang `      | Enter | Code block      |
+| `\| Name \| Qty \|`         | Enter | Table           |
 
 Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
 
 Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` and plain URLs become formatting once you finish the word. See [Autocorrect](./autocorrect) for everything Blank corrects.
+
+## Tables
+
+Press `Mod` `T`, pick a size with the arrow keys and press Enter. `Tab` takes you from cell to cell and adds a row at the end. [Tables](./tables) has everything about making, filling and saving them.
 
 ## Images
 

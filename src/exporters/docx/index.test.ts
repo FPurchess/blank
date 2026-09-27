@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { defaultMarkdownParser, schema } from "prosemirror-markdown";
+import { schema } from "../../editor/schema";
+import { parser } from "../../editor/markdown";
 import type { Node } from "prosemirror-model";
 
 import { createState } from "../../test/editor";
@@ -33,8 +34,7 @@ const exportDoc = async (doc: Node, docPath: string | null = null) => {
   return { zip, warnings, xml, text } satisfies Exported;
 };
 
-const exportMarkdown = (markdown: string) =>
-  exportDoc(defaultMarkdownParser.parse(markdown));
+const exportMarkdown = (markdown: string) => exportDoc(parser.parse(markdown));
 
 const all = (root: Document | Element, tag: string) => [
   ...root.getElementsByTagNameNS(W, tag),

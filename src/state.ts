@@ -100,6 +100,28 @@ export const languagePicker = new Observable<LanguagePickerState>({
   invalid: false,
 });
 
+// where a popup like a menu is shown: below the cursor, in viewport coordinates
+export interface Anchor {
+  left: number;
+  top: number;
+  bottom: number;
+}
+
+export interface TablePickerState {
+  // the size of the table Enter inserts, the header row included
+  cols: number;
+  rows: number;
+  // where to show the picker
+  anchor: Anchor;
+  // inserts a table of the given size
+  submit(cols: number, rows: number): void;
+  // closes the picker without inserting a table
+  cancel(): void;
+}
+
+// tablePicker is the open picker for the size of a new table, or null
+export const tablePicker = new Observable<TablePickerState | null>(null);
+
 // spellcheck is whether spelling is checked, which the user turns on and off
 export const spellcheck = new Observable<boolean>(false);
 
@@ -133,8 +155,8 @@ export type MenuItem =
 
 export interface ContextMenuRequest {
   items: MenuItem[];
-  // where to show the menu, in viewport coordinates
-  anchor: { left: number; top: number; bottom: number };
+  // where to show the menu
+  anchor: Anchor;
   // opened with the keyboard, which focuses the first item
   keyboard: boolean;
   // returns the focus to the editor

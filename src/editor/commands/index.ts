@@ -8,3 +8,4 @@ export { default as chooseLanguage } from "./chooseLanguage";
 export { default as editLink } from "./editLink";
 export { default as editImage } from "./editImage";
 export { goToMisspelling, openMenu, toggleSpellcheck } from "./spellcheck";
+export { tableKey } from "./table";

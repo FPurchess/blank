@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../schema";
 
 import { doc, p } from "../../test/editor";
 import { deferred } from "../../test/async";

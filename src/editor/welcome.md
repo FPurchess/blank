@@ -29,6 +29,16 @@ Blank comes with a hand-picked list of very unobtrusive autocompletion patterns 
 
 Type `##` at the beginning of a line followed by a space to create a heading level 2. Type a dash `-` at the beginning of a line followed by a space to create a bullet list. Type `-->` followed by a space to create a right-arrow `→`. There are some more combinations waiting for you to be explored.
 
+### Tables that stay out of your way
+
+Press `Mod` `T` and Enter for a table, or type the column titles between pipes, like `| Name | Qty |`, and press Enter. `Tab` takes you to the next cell and adds a row at the end.
+
+| Press      | To                               |
+| ---------- | -------------------------------- |
+| `Mod` `T`  | insert a table                   |
+| `Tab`      | go to the next cell or add a row |
+| Arrow keys | move around and out of the table |
+
 ### Spell check when you want it
 
 Press `Mod` `Alt` `S` to underline the words Blank doesn't know. Right-click one, or press `Mod` `Alt` `N` to jump to it, and pick what you meant, or add the word to your dictionary. Press `Mod` `Alt` `S` again for a clean page.

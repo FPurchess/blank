@@ -12,6 +12,7 @@ import { corrections } from "./inline";
 import { replace } from "./inline/replacements";
 import { smartQuote } from "./quotes";
 import blockTransformers from "./transformers";
+import { inCell, plainCell } from "../tables/util";
 
 /**
  * applyBlock runs the first block shortcut for `trigger` that matches the
@@ -23,9 +24,12 @@ const applyBlock = (view: EditorView, trigger: "space" | "enter") => {
   if (!ctx?.config.blocks) return false;
   const { $cursor } = ctx;
   if ($cursor.parentOffset !== $cursor.parent.content.size) return false;
+  if (plainCell($cursor)) return false;
+  const cell = inCell($cursor);
 
   for (const transformer of Object.values(blockTransformers)) {
     if (transformer.trigger !== trigger) continue;
+    if (cell && !transformer.inCells) continue;
     const props = transformer.activate(ctx.textBefore);
     if (
       props !== undefined &&

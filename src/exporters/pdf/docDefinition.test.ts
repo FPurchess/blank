@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import pdfmake from "pdfmake";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../editor/schema";
 
 import {
   blockquote,

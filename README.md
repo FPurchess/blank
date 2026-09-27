@@ -44,13 +44,14 @@ A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ct
 | Bullet list / Numbered list | `Mod 8` / `Mod 9`           |
 | Bold / Italic / Code        | `Mod B` / `Mod I` / `Mod E` |
 | Insert link                 | `Mod K`                     |
+| Insert table                | `Mod T`                     |
 | Export as PDF / Word        | `Mod Alt P` / `Mod Alt W`   |
 
 All shortcuts, and how to change them, are in the [documentation](https://fpurchess.github.io/blank/guide/shortcuts).
 
 ## Documentation
 
-Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [files and formats: PDF and Word](https://fpurchess.github.io/blank/guide/files), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), [spell check](https://fpurchess.github.io/blank/guide/spelling), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
+Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [tables](https://fpurchess.github.io/blank/guide/tables), [files and formats: PDF and Word](https://fpurchess.github.io/blank/guide/files), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), [spell check](https://fpurchess.github.io/blank/guide/spelling), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
 
 ## Contributing
 
