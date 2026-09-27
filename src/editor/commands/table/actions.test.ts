@@ -63,6 +63,7 @@ describe("tableActions", () => {
       "header-row": ["Header row", "Header row off"],
       "header-column": ["Header column", "Header column on"],
       caption: ["Caption…", ""],
+      "widths-reset": ["Reset column widths", "Column widths reset"],
       "table-delete": ["Delete table", "Table deleted"],
     });
   });

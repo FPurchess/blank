@@ -3,7 +3,12 @@ import type { Node } from "prosemirror-model";
 
 import { markdownParser as parser, markdownSerializer as serializer } from ".";
 import { schema } from "./schema";
-import { displayWidth, gfmBlocker } from "./tables";
+import {
+  columnPercents,
+  displayWidth,
+  gfmBlocker,
+  withColumnPercents,
+} from "./tables";
 import {
   blockquote,
   captioned,
@@ -221,6 +226,13 @@ describe("HTML tables", () => {
       table(tr(th("a", { align: "left" })), tr(td("b", { align: "right" }))),
     ],
     [
+      "column widths",
+      table(
+        tr(th("a", { colwidth: [30] }), th("b", { colwidth: [70] })),
+        tr(td("c", { colwidth: [30] }), td("d", { colwidth: [70] })),
+      ),
+    ],
+    [
       "a rowspan",
       table(
         tr(th("a"), th("b")),
@@ -419,6 +431,95 @@ describe("text that looks like a table", () => {
   });
 });
 
+describe("column widths", () => {
+  const widths = (a: number, b: number) =>
+    table(
+      tr(th("a", { colwidth: [a] }), th("b", { colwidth: [b] })),
+      tr(td("c", { colwidth: [a] }), td("d", { colwidth: [b] })),
+    );
+
+  it("writes the widths set on the columns as a colgroup", () => {
+    expect(serialize(widths(25, 75)).split("\n").slice(0, 5)).toEqual([
+      "<table>",
+      "  <colgroup>",
+      '    <col style="width: 25%">',
+      '    <col style="width: 75%">',
+      "  </colgroup>",
+    ]);
+  });
+
+  it("gives the widths as shares of the table, rounded to a tenth", () => {
+    expect(columnPercents(widths(1, 2))).toEqual([33.3, 66.7]);
+    expect(columnPercents(table(tr(th("a"), th("b"))))).toBeNull();
+  });
+
+  it("gives a column without a width the average of the others", () => {
+    const added = table(
+      tr(th("a", { colwidth: [20] }), th("b", { colwidth: [60] }), th("c")),
+    );
+
+    expect(columnPercents(added)).toEqual([16.7, 50, 33.3]);
+  });
+
+  it("reads the widths of merged cells per column", () => {
+    const merged = table(
+      tr(th("a", { colspan: 2, colwidth: [40, 20] }), th("b")),
+      tr(td("c"), td("d"), td("e", { colwidth: [40] })),
+    );
+
+    expect(columnPercents(merged)).toEqual([40, 20, 40]);
+  });
+
+  it("sets widths on every cell of a column", () => {
+    const merged = table(
+      tr(th("a", { colspan: 2 }), th("b")),
+      tr(td("c"), td("d"), td("e")),
+    );
+    const set = withColumnPercents(merged, [50, 20, 30]);
+
+    expect(set.child(0).child(0).attrs.colwidth).toEqual([50, 20]);
+    expect(set.child(1).children.map((cell) => cell.attrs.colwidth)).toEqual([
+      [50],
+      [20],
+      [30],
+    ]);
+  });
+
+  it("ignores widths in a colgroup that don't fit the table", () => {
+    const text = md(
+      "<table>",
+      "  <colgroup>",
+      '    <col style="width: 100%">',
+      "  </colgroup>",
+      "  <tr><th>a</th><th>b</th></tr>",
+      "</table>",
+    );
+
+    expect(columnPercents(parser.parse(text).firstChild!)).toBeNull();
+  });
+
+  it("reads widths in px as no widths, and a col spanning columns", () => {
+    const html = (col: string) =>
+      md(
+        "<table>",
+        `  <colgroup>${col}</colgroup>`,
+        "  <tr><th>a</th><th>b</th></tr>",
+        "</table>",
+      );
+
+    expect(
+      columnPercents(
+        parser.parse(html('<col style="width: 80px"><col>')).firstChild!,
+      ),
+    ).toBeNull();
+    expect(
+      columnPercents(
+        parser.parse(html('<col span="2" style="width: 100%">')).firstChild!,
+      ),
+    ).toEqual([50, 50]);
+  });
+});
+
 describe("gfmBlocker", () => {
   it("returns null for a table a pipe table can hold", () => {
     expect(gfmBlocker(table(tr(th("a")), tr(td("b"))))).toBeNull();
@@ -427,6 +528,7 @@ describe("gfmBlocker", () => {
   it("names the first thing that keeps a table from being a pipe table", () => {
     expect(gfmBlocker(table(tr(td("a"))))).toBe("noHeader");
     expect(gfmBlocker(captioned("c", tr(th("a"))))).toBe("caption");
+    expect(gfmBlocker(table(tr(th("a", { colwidth: [100] }))))).toBe("widths");
     expect(
       gfmBlocker(captioned("c", tr(th("a", { colspan: 2 })), tr(td(), td()))),
     ).toBe("merged");

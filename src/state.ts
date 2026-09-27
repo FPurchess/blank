@@ -183,6 +183,46 @@ export interface TableToolbarState {
 // tableToolbar is the toolbar of the table the cursor is in, or null
 export const tableToolbar = new Observable<TableToolbarState | null>(null);
 
+// a row, a column or several of them: from the first to the last (excluded)
+export type Span = [from: number, to: number];
+
+export interface TableHandlesState {
+  // the box of the table under the mouse, in viewport coordinates, and the
+  // part of it in view sideways, since a wide table scrolls
+  box: { left: number; top: number; right: number; bottom: number };
+  visible: { left: number; right: number };
+  // where each row and column starts, and where the last one ends
+  rows: number[];
+  columns: number[];
+  // the header rows and header column, which rows and columns don't move
+  // into and nothing is inserted before
+  headerRows: number;
+  headerColumn: boolean;
+  // how few columns and rows dragging the table's edge leaves: empty ones
+  // at its end go, others stay
+  smallest: { cols: number; rows: number };
+  // the width of each column in percent of the table
+  percents: number[];
+  // the selected rows and columns, if the selection is in this table
+  selected: { rows: Span; columns: Span } | null;
+  insertRow(index: number): void;
+  insertColumn(index: number): void;
+  // selects rows or columns and opens the table menu below `anchor`
+  selectRows(rows: Span, anchor: Anchor): void;
+  selectColumns(columns: Span, anchor: Anchor): void;
+  moveRows(rows: Span, by: number): void;
+  moveColumns(columns: Span, by: number): void;
+  resize(cols: number, rows: number): void;
+  // sets the column widths in percent, or null for widths by content
+  setWidths(percents: number[] | null): void;
+  // keeps the handles on this table while the mouse drags one
+  hold(held: boolean): void;
+}
+
+// tableHandles is the table the mouse is over, whose rows and columns the
+// mouse can select, insert, move and resize, or null
+export const tableHandles = new Observable<TableHandlesState | null>(null);
+
 // announcement is a short message about what just happened, e.g. "2 rows
 // added", shown in the status bar and read out by screen readers
 export const announcement = new Observable<string | null>(null);

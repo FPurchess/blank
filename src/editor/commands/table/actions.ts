@@ -18,6 +18,7 @@ import { moveColumns, moveRows } from "./move";
 import { hasHeaderColumn, hasHeaderRow } from "./rect";
 import { deleteColumns, deleteRows, deleteTable } from "./remove";
 import { sortByColumn, sortColumn, sortOrder } from "./sort";
+import { resetColumnWidths } from "./widths";
 
 // Everything that can be done to a table, in one list: the table toolbar
 // shows it as buttons, table mode (Mod+T in a table) as keys, and the context
@@ -287,6 +288,16 @@ export const tableActions = (
     done: () => "",
     run: editCaption,
   },
+  commandAction(resetColumnWidths, {
+    id: "widths-reset",
+    group: "table",
+    label: () => "Reset column widths",
+    icon: "widths-reset",
+    key: { code: "KeyW", label: "W" },
+    // a double click on a column line in the table does it
+    toolbar: false,
+    done: () => "Column widths reset",
+  }),
   commandAction(deleteTable, {
     id: "table-delete",
     group: "table",

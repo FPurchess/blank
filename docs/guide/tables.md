@@ -76,10 +76,11 @@ While the cursor is in a table, a small toolbar sits above its right end. It add
 | `M`                               | Merge the selected cells, or split a merged cell       |
 | `H` / `Shift` `H`                 | Header row / header column on or off                   |
 | `T`                               | Write the caption, Enter keeps it                      |
+| `W`                               | Reset the column widths you set with the mouse         |
 
 The letters stay where they are on your keyboard, whatever its layout. Any other key ends table mode without typing anything, and shortcuts like `Mod` `S` still do their job.
 
-**With the mouse:** click the buttons of the toolbar, or right-click a cell and open _Table_ in the menu, which has everything, including moving rows and columns.
+**From the menu:** right-click a cell and open _Table_, which has everything, including moving rows and columns.
 
 A few things good to know:
 
@@ -87,6 +88,20 @@ A few things good to know:
 - **Rows move below the header** and a header column stays first. Deleting the header row makes the row below it the header.
 - **Merged cells** keep everything they held. Splitting a cell leaves its content in the first cell.
 - The status bar says what happened, like _2 rows added_, and screen readers read it out.
+
+## Change a table with the mouse {#mouse}
+
+Move the mouse over a table and it shows handles right where you need them. They step aside while you type.
+
+<img class="shot" src="/screenshots/table-mouse.gif" alt="Dragging the handle of the Kiwis row moves it to the top; the + between two rows inserts one, which gets filled; dragging the line between two columns widens the first; dragging the bottom edge adds two rows" />
+
+- **Move rows and columns:** grab the handle on the left edge of a row, or on the top edge of a column, and drag it where it should go. A line shows where it lands. With several rows selected, dragging one of their handles moves them all.
+- **Select them:** click a handle. The row or column gets selected and the table menu opens right there, to delete it, align it, sort by it and more.
+- **Insert one:** point at the line between two rows on the table's left edge, or between two columns on its top edge, and click the **+** that shows up.
+- **Resize columns:** drag the line between two columns. The columns on both sides share their width anew, and the table keeps its width. A double click on the line gives the columns their widths by content again, as does _Reset column widths_ in the table menu.
+- **Grow and shrink the table:** drag its right edge, its bottom edge or its corner. A dashed outline shows the new size, like _4 × 6_. Growing adds empty rows and columns at the end; shrinking only takes away empty ones, so nothing you wrote gets lost.
+
+`Esc` cancels a drag, and `Mod` `Z` undoes any change in one step.
 
 ## How tables are saved {#saving}
 
@@ -101,13 +116,13 @@ A table is saved as a markdown table, with the columns lined up so the file read
 
 Line breaks in a cell are saved as `<br>`, and the colons in the second line keep the alignment of each column.
 
-A markdown table holds one line of text per cell. When a table needs more, like a list or several paragraphs in a cell, merged cells, a header column or a caption, Blank saves that one table as an HTML table in the same markdown file, and tells you the first time. GitHub, Obsidian, Typora and pandoc show it as a table as well. Once the table fits a markdown table again, Blank saves it as one.
+A markdown table holds one line of text per cell. When a table needs more, like a list or several paragraphs in a cell, merged cells, a header column, a caption or column widths you set, Blank saves that one table as an HTML table in the same markdown file, and tells you the first time. GitHub, Obsidian, Typora and pandoc show it as a table as well. Once the table fits a markdown table again, Blank saves it as one.
 
 Blank opens both kinds, so you can also open markdown files with tables written in other editors.
 
 ## PDF and Word {#export}
 
-Tables go into your [PDF and Word documents](./files) the way you see them in Blank: the tinted header, the lines between the rows and columns, the alignment of each column, merged cells, lists in cells and the caption above the table. Columns get their width from their content, like in the editor.
+Tables go into your [PDF and Word documents](./files) the way you see them in Blank: the tinted header, the lines between the rows and columns, the alignment of each column, merged cells, lists in cells and the caption above the table. Columns get the widths you set, or else their width from their content, like in the editor.
 
 - A table longer than a page repeats its header row at the top of every page.
 - Rows stay whole instead of breaking across two pages, unless a row is too tall for one.

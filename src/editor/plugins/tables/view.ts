@@ -7,6 +7,7 @@ import type {
   ViewMutationRecord,
 } from "prosemirror-view";
 
+import { columnPercents } from "../../../markdown/tables";
 import { tableAround } from "./util";
 
 // the NodeView of each rendered table, found through its DOM
@@ -62,29 +63,35 @@ export const columnWidths = (node: Node, rows: HTMLElement[]): number[] => {
 
 /**
  * TableView renders a table in a box that scrolls sideways when the table is
- * wider than the page, with its caption, and can freeze its column widths
+ * wider than the page, with its caption and the column widths set on it. A
+ * table without them sizes its columns to their content, and can freeze them.
  */
 export class TableView implements NodeView {
   dom: HTMLElement;
   contentDOM: HTMLElement;
-  private table: HTMLTableElement;
+  // the rendered table
+  readonly element: HTMLTableElement;
   private caption: HTMLElement;
   private colgroup: HTMLElement;
   private frozenColumns = 0;
   private refreezeTimer: number | undefined;
 
-  constructor(private node: Node) {
+  constructor(
+    private node: Node,
+    // where the table is in the document, from ProseMirror
+    private getPos: () => number | undefined = () => undefined,
+  ) {
     this.dom = document.createElement("div");
     this.dom.className = "table-block";
     const scroll = document.createElement("div");
     scroll.className = "table-scroll";
-    this.table = document.createElement("table");
+    this.element = document.createElement("table");
     this.caption = document.createElement("caption");
     this.caption.contentEditable = "false";
     this.colgroup = document.createElement("colgroup");
     this.contentDOM = document.createElement("tbody");
-    this.table.append(this.caption, this.colgroup, this.contentDOM);
-    scroll.append(this.table);
+    this.element.append(this.caption, this.colgroup, this.contentDOM);
+    scroll.append(this.element);
     this.dom.append(scroll);
     this.render();
     views.set(this.dom, this);
@@ -94,6 +101,40 @@ export class TableView implements NodeView {
     const caption = this.node.attrs.caption as string | null;
     this.caption.textContent = caption ?? "";
     this.caption.hidden = !caption;
+    const percents = columnPercents(this.node);
+    if (percents) {
+      this.frozenColumns = 0;
+      this.setColumns(
+        percents.map((percent) => `${percent}%`),
+        "100%",
+      );
+    } else if (!this.frozen) {
+      this.setColumns(null);
+    }
+  }
+
+  /**
+   * setColumns gives the columns the CSS `widths` and the table `width`, or
+   * lets them size to their content for null
+   */
+  private setColumns(widths: string[] | null, width = "") {
+    this.colgroup.replaceChildren(
+      ...(widths ?? []).map((value) => {
+        const col = document.createElement("col");
+        col.style.width = value;
+        return col;
+      }),
+    );
+    this.element.style.width = widths ? width : "";
+    this.element.style.tableLayout = widths ? "fixed" : "";
+  }
+
+  /**
+   * located returns the table node and where it starts (inside it)
+   */
+  get located(): { node: Node; start: number } | null {
+    const pos = this.getPos();
+    return pos === undefined ? null : { node: this.node, start: pos + 1 };
   }
 
   get frozen() {
@@ -102,21 +143,18 @@ export class TableView implements NodeView {
 
   /**
    * freeze fixes the column widths as they are, so they don't change while
-   * the cursor is in the table
+   * the cursor is in the table. Widths set on the table stay as they are.
    */
   freeze() {
+    if (columnPercents(this.node)) return;
     const rows = [...this.contentDOM.children] as HTMLElement[];
     const widths = columnWidths(this.node, rows);
     if (!widths.some((width) => width > 0)) return;
-    this.colgroup.replaceChildren(
-      ...widths.map((width) => {
-        const col = document.createElement("col");
-        col.style.width = `${width}px`;
-        return col;
-      }),
+    const total = widths.reduce((a, b) => a + b, 0);
+    this.setColumns(
+      widths.map((width) => `${width}px`),
+      `${total}px`,
     );
-    this.table.style.width = `${widths.reduce((a, b) => a + b, 0)}px`;
-    this.table.style.tableLayout = "fixed";
     this.frozenColumns = widths.length;
   }
 
@@ -124,9 +162,8 @@ export class TableView implements NodeView {
    * unfreeze lets the columns size to their content again
    */
   unfreeze() {
-    this.colgroup.replaceChildren();
-    this.table.style.width = "";
-    this.table.style.tableLayout = "";
+    if (!this.frozen) return;
+    this.setColumns(null);
     this.frozenColumns = 0;
   }
 
@@ -164,13 +201,19 @@ export class TableView implements NodeView {
 }
 
 /**
+ * tableViewOf returns the view of the table rendered as `dom`, a
+ * `.table-block`
+ */
+export const tableViewOf = (dom: Element) => views.get(dom as HTMLElement);
+
+/**
  * tableViewAt returns the view of the table the selection is in
  */
 const tableViewAt = (view: EditorView): TableView | undefined => {
   const table = tableAround(view.state.selection.$head);
   if (!table) return undefined;
   const dom = view.nodeDOM(table.pos);
-  return dom instanceof HTMLElement ? views.get(dom) : undefined;
+  return dom instanceof HTMLElement ? tableViewOf(dom) : undefined;
 };
 
 /**
@@ -180,7 +223,9 @@ const tableViewAt = (view: EditorView): TableView | undefined => {
 export const tableView = () =>
   new Plugin({
     props: {
-      nodeViews: { table: (node) => new TableView(node) },
+      nodeViews: {
+        table: (node, _view, getPos) => new TableView(node, getPos),
+      },
     },
     view(view) {
       let frozen: TableView | undefined;

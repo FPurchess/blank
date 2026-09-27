@@ -75,6 +75,7 @@ const REASONS: Record<GfmBlocker, string> = {
   blocks: "lists or paragraphs in a cell",
   caption: "a caption",
   mixedAlign: "cells aligned differently within a column",
+  widths: "column widths you set",
 };
 
 /**
@@ -99,17 +100,14 @@ export const announce = (message: string) => {
 };
 
 /**
- * performAction runs `action` and announces what it did, or why it can't
+ * reporting runs `change`, which returns what it did, and announces that
+ * with what it led to, e.g. a table that is now saved as an HTML table
  */
-export const performAction = (view: EditorView, action: TableAction) => {
-  if (!action.enabled(view.state)) {
-    announce(`${action.label(view.state)} isn't possible here`);
-    return;
-  }
-  const message = action.done(view.state);
+export const reporting = (change: () => string) => {
   following = [];
+  let message = "";
   try {
-    action.run(view);
+    message = change();
   } finally {
     const messages = [message && `${message}.`, ...following].filter(Boolean);
     following = null;
@@ -118,6 +116,21 @@ export const performAction = (view: EditorView, action: TableAction) => {
       announce(messages.join(" ").replace(/^([^.]*)\.$/, "$1"));
     }
   }
+};
+
+/**
+ * performAction runs `action` and announces what it did, or why it can't
+ */
+export const performAction = (view: EditorView, action: TableAction) => {
+  if (!action.enabled(view.state)) {
+    announce(`${action.label(view.state)} isn't possible here`);
+    return;
+  }
+  const message = action.done(view.state);
+  reporting(() => {
+    action.run(view);
+    return message;
+  });
 };
 
 const MODIFIERS = ["Shift", "Control", "Alt", "Meta", "AltGraph", "CapsLock"];

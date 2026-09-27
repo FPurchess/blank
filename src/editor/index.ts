@@ -25,6 +25,7 @@ import {
   tableGuard,
   tableKeys,
   tablePickerKeys,
+  tableHandles,
   tableTools,
   tableView,
 } from "./plugins";
@@ -63,6 +64,7 @@ export const bootEditor = async () => {
         properties(),
         tableGuard(),
         tableView(),
+        tableHandles(),
         tableEditing(),
       ],
     }),

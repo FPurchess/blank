@@ -21,6 +21,8 @@ const TABLE_ICONS: Record<string, string> = {
   "header-row": "M3 4h14v12H3z M3 8h14 M5.5 6h9",
   "header-column": "M3 4h14v12H3z M7 4v12 M5 6.5v7",
   caption: "M4 4h12 M4 7h7 M3 10h14v6H3z",
+  "widths-reset":
+    "M3 4v12 M17 4v12 M6 10h8 M8 7.5 5.5 10 8 12.5 M12 7.5l2.5 2.5-2.5 2.5",
   "table-delete": "M4 6h12 M8 6V4h4v2 M6 6l1 10h6l1-10 M9 9v4.5 M11 9v4.5",
 };
 

@@ -10,6 +10,7 @@ export {
   tableGuard,
   tableKeys,
   tablePickerKeys,
+  tableHandles,
   tableTools,
   tableView,
 } from "./tables";

@@ -1,6 +1,8 @@
 import { DOMParser as SchemaParser, Node } from "prosemirror-model";
+import { TableMap } from "prosemirror-tables";
 
 import { alignment, schema } from "./schema";
+import { withColumnPercents } from "./tables";
 
 /**
  * LinkRules normalize and check link and image URLs, like the markdown-it
@@ -209,6 +211,23 @@ export const normalizeTableHtml = (
 };
 
 /**
+ * colgroupPercents returns the column widths the `<colgroup>` of `table` sets
+ * in percent, as Blank writes them, or null if it sets none or others
+ */
+const colgroupPercents = (table: HTMLTableElement): number[] | null => {
+  const percents: number[] = [];
+  for (const col of table.querySelectorAll(":scope > colgroup > col")) {
+    const match = /^(\d+(?:\.\d+)?)%$/.exec(
+      (col as HTMLElement).style.width.trim(),
+    );
+    if (!match || !Number(match[1])) return null;
+    const span = Math.max(1, Number(col.getAttribute("span")) || 1);
+    for (let i = 0; i < span; i++) percents.push(Number(match[1]) / span);
+  }
+  return percents.length ? percents : null;
+};
+
+/**
  * parseHtmlTable reads the HTML of a single table, as Blank writes a table a
  * pipe table can't hold. Returns null if the HTML is anything but exactly one
  * table, e.g. with text after it, or if there's no DOM to read it with.
@@ -221,6 +240,9 @@ export const parseHtmlTable = (html: string, links: LinkRules): Node | null => {
   );
   const [table] = content;
   if (content.length !== 1 || table.nodeName !== "TABLE") return null;
+  // Blank's own column widths; tables pasted or imported from elsewhere size
+  // to their content, see normalizeTableHtml
+  const percents = colgroupPercents(table as HTMLTableElement);
   normalizeTableHtml(table as HTMLTableElement, links);
   try {
     const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
@@ -229,7 +251,9 @@ export const parseHtmlTable = (html: string, links: LinkRules): Node | null => {
       return null;
     }
     node.check();
-    return node;
+    return percents?.length === TableMap.get(node).width
+      ? withColumnPercents(node, percents)
+      : node;
   } catch {
     return null;
   }

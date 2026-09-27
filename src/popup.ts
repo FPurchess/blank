@@ -26,8 +26,9 @@ export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
   element.style.top = `${top}px`;
 };
 
-// the space between a toolbar and its table, and the window's edges
-const TOOLBAR_GAP = 6;
+// the space between the toolbar and the table, which leaves room for the
+// handles on the table's top edge (src/tableHandles.ts), and the window's edges
+const TOOLBAR_GAP = 10;
 // the top bar with the file name, which the toolbar stays below
 const TOOLBAR_TOP = 36;
 

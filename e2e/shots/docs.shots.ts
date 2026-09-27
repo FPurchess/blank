@@ -123,6 +123,59 @@ class Recorder {
     await showKeys([]);
   }
 
+  private at: Point = { x: 400, y: 20 };
+  private down = false;
+
+  /**
+   * move the mouse to `to` in `seconds`, eased like a hand moves it, with a
+   * frame per step; the page sees every step, so hovers show as they would
+   */
+  async moveTo(to: Point, seconds = 0.6) {
+    const from = this.at;
+    const steps = Math.max(2, Math.round(seconds / 0.06));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      const at = {
+        x: Math.round(from.x + (to.x - from.x) * ease),
+        y: Math.round(from.y + (to.y - from.y) * ease),
+      };
+      // keeps the button pressed between the actions of a drag
+      await browser.action("pointer").move(at).perform(true);
+      await showPointer(at, this.down);
+      await this.frame(seconds / steps);
+    }
+    this.at = to;
+  }
+
+  /** press the mouse button, drag it to `to` in `seconds` and let go */
+  async drag(to: Point, seconds = 1, hold = 0.4) {
+    await browser.action("pointer").move(this.at).down().perform(true);
+    this.down = true;
+    await showPointer(this.at, true);
+    await this.frame(0.3);
+    await this.moveTo(to, seconds);
+    await this.frame(hold);
+    await browser.action("pointer").move(to).up().perform(true);
+    this.down = false;
+    await showPointer(to);
+    await this.frame(0.3);
+  }
+
+  /** click where the mouse is, showing the press */
+  async click(seconds = 0.6) {
+    await showPointer(this.at, true);
+    await browser.action("pointer").move(this.at).down().up().perform(true);
+    await this.frame(0.25);
+    await showPointer(this.at);
+    await this.frame(seconds);
+  }
+
+  /** hide the drawn mouse pointer, e.g. before typing again */
+  async hidePointer() {
+    await showPointer(null);
+  }
+
   async enter(pause = 0.6) {
     await type(Key.Enter);
     await this.frame(pause);
@@ -179,6 +232,65 @@ class Recorder {
 
 // `Mod` is Ctrl on Linux, where the recording runs, and Cmd on macOS
 const keyLabel = (key: string) => (key === "Mod" ? "Ctrl / ⌘" : key);
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * draws the mouse pointer at `at`, with a ring while its button is down, or
+ * hides it for null: screenshots leave out the real one
+ */
+const showPointer = (at: Point | null, pressed = false) =>
+  browser.execute(
+    (at: Point | null, pressed: boolean) => {
+      let pointer = document.getElementById("shots-pointer");
+      if (!pointer) {
+        pointer = document.createElement("div");
+        pointer.id = "shots-pointer";
+        // an arrow with a light outline, readable on every theme, and the
+        // ring that shows a press
+        pointer.innerHTML =
+          '<div class="ring"></div><svg width="20" height="24" viewBox="0 0 20 24"><path d="M2 2 L2 19 L6.5 15 L9.5 22 L12.5 20.7 L9.6 14 L16 14 Z" fill="#1e2429" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+        Object.assign(pointer.style, {
+          position: "fixed",
+          width: "0",
+          height: "0",
+          pointerEvents: "none",
+          zIndex: "1001",
+        });
+        const ring = pointer.querySelector<HTMLElement>(".ring")!;
+        Object.assign(ring.style, {
+          position: "absolute",
+          left: "-11px",
+          top: "-11px",
+          width: "22px",
+          height: "22px",
+          borderRadius: "50%",
+          background: "rgba(38, 50, 60, 0.28)",
+          border: "2px solid rgba(38, 50, 60, 0.55)",
+          boxSizing: "border-box",
+        });
+        const arrow = pointer.querySelector<SVGElement>("svg")!;
+        Object.assign(arrow.style, {
+          position: "absolute",
+          left: "-2px",
+          top: "-2px",
+        });
+        document.body.appendChild(pointer);
+      }
+      pointer.style.display = at ? "block" : "none";
+      if (!at) return;
+      pointer.style.left = `${at.x}px`;
+      pointer.style.top = `${at.y}px`;
+      pointer.querySelector<HTMLElement>(".ring")!.style.display = pressed
+        ? "block"
+        : "none";
+    },
+    at,
+    pressed,
+  );
 
 /** shows `keys` in the shortcut overlay, or hides it for no keys */
 const showKeys = (keys: string[]) =>
@@ -414,6 +526,79 @@ describe("docs screenshots", () => {
     await film.press("Esc", Key.Escape, 0.8);
     await film.pause(2);
     film.save(path.join(outDir, "table-mode.gif"), 360);
+  });
+
+  it("records changing a table with the mouse", async () => {
+    const film = await filmNew();
+    // the table is there before the film starts
+    for (const [i, line] of [
+      "| Fruit | Qty | Note |",
+      "Pears",
+      "12",
+      "ripe",
+      "Apples",
+      "40",
+      "",
+      "Kiwis",
+      "25",
+    ].entries()) {
+      if (i > 1) await type(Key.Tab);
+      for (const char of line) await typeChar(char);
+      if (i === 0) await type(Key.Enter);
+    }
+    await film.pause(0.8);
+    const layout = () =>
+      browser.execute(() => {
+        const table = document.querySelector(".ProseMirror table")!;
+        const box = table.getBoundingClientRect();
+        const rows = [...table.querySelectorAll("tr")].map(
+          (row) => row.getBoundingClientRect().top,
+        );
+        const columns = [...table.querySelectorAll("tr:first-child > *")].map(
+          (cell) => cell.getBoundingClientRect().left,
+        );
+        return {
+          rows: [...rows, box.bottom],
+          columns: [...columns, box.right],
+          left: box.left,
+          bottom: box.bottom,
+        };
+      });
+    const middle = (lines: number[], i: number) =>
+      Math.round((lines[i] + lines[i + 1]) / 2);
+
+    // the handle of the Kiwis row moves it to the top
+    let table = await layout();
+    await film.moveTo({ x: table.left + 70, y: middle(table.rows, 3) }, 0.8);
+    await film.moveTo({ x: table.left, y: middle(table.rows, 3) }, 0.4);
+    await film.drag({ x: table.left, y: table.rows[1] + 4 }, 0.9);
+
+    // the + between two rows inserts one, which gets filled
+    table = await layout();
+    await film.moveTo({ x: table.left + 1, y: Math.round(table.rows[3]) }, 0.7);
+    await film.click(0.6);
+    await film.hidePointer();
+    await film.type("Plums");
+    await film.press("Tab", Key.Tab, 0.3);
+    await film.type("7");
+    await film.pause(0.6);
+
+    // the line between two columns resizes them
+    table = await layout();
+    const y = middle(table.rows, 2);
+    await film.moveTo({ x: Math.round(table.columns[1]), y }, 0.8);
+    await film.drag({ x: Math.round(table.columns[1]) + 110, y }, 0.8);
+
+    // the bottom edge adds rows
+    table = await layout();
+    const x = Math.round((table.columns[0] + table.columns[1]) / 2);
+    await film.moveTo({ x, y: Math.round(table.bottom) + 1 }, 0.7);
+    await film.drag({ x, y: Math.round(table.bottom) + 70 }, 0.9);
+    await film.moveTo({ x: 700, y: 20 }, 0.6);
+    await film.hidePointer();
+    await film.pause(2);
+    await browser.releaseActions();
+    film.save(path.join(outDir, "table-mouse.gif"), 440);
   });
 
   it("records the writing demo", async () => {

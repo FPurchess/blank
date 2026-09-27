@@ -305,20 +305,26 @@ const tableItems = (view: EditorView): MenuItem[] => {
       },
     ];
   }
+  return [{ id: "table", label: "Table", shortcut, children: tableMenu(view) }];
+};
+
+/**
+ * tableMenu returns an item for each action on the table the selection is
+ * in, in groups: the Table submenu, and the menu of a row or column handle
+ */
+export const tableMenu = (view: EditorView): MenuItem[] => {
   const actions = tableActions((view) => setTools(view, { caption: true }));
-  const children = separated(actions, "separator" as const).map(
-    (action): MenuItem =>
-      action === "separator"
-        ? action
-        : {
-            id: `table-${action.id}`,
-            label: action.label(view.state),
-            disabled: !action.enabled(view.state),
-            checked: action.checked?.(view.state),
-            run: run(view, (view) => performAction(view, action)),
-          },
+  return separated(actions, "separator" as const).map((action): MenuItem =>
+    action === "separator"
+      ? action
+      : {
+          id: `table-${action.id}`,
+          label: action.label(view.state),
+          disabled: !action.enabled(view.state),
+          checked: action.checked?.(view.state),
+          run: run(view, (view) => performAction(view, action)),
+        },
   );
-  return [{ id: "table", label: "Table", shortcut, children }];
 };
 
 export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {

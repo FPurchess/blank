@@ -1,4 +1,5 @@
-import { DOMSerializer, Node } from "prosemirror-model";
+import { DOMSerializer, Fragment, Node } from "prosemirror-model";
+import { TableMap } from "prosemirror-tables";
 
 import { Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
 
@@ -6,7 +7,13 @@ import { Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
  * GfmBlocker names what keeps a table from being written as a pipe table
  */
 export type GfmBlocker =
-  "merged" | "headerColumn" | "noHeader" | "blocks" | "caption" | "mixedAlign";
+  | "merged"
+  | "headerColumn"
+  | "noHeader"
+  | "blocks"
+  | "caption"
+  | "mixedAlign"
+  | "widths";
 
 // the order in which gfmBlocker names what it found
 const BLOCKERS: GfmBlocker[] = [
@@ -16,7 +23,84 @@ const BLOCKERS: GfmBlocker[] = [
   "blocks",
   "caption",
   "mixedAlign",
+  "widths",
 ];
+
+/**
+ * roundPercent rounds a percentage to a tenth, as the file keeps it
+ */
+export const roundPercent = (value: number) => Math.round(value * 10) / 10;
+
+/**
+ * columnPercents returns the width of each column of `table` as a percentage
+ * of the table, as set by resizing a column, or null if its columns size to
+ * their content. The widths live in the `colwidth` of the cells, one per
+ * column a cell spans; a column without one gets the average of the others.
+ */
+export const columnPercents = (table: Node): number[] | null => {
+  const map = TableMap.get(table);
+  const widths: (number | null)[] = Array(map.width).fill(null);
+  for (const offset of new Set(map.map)) {
+    const { colwidth, colspan } = table.nodeAt(offset)!.attrs as {
+      colwidth: number[] | null;
+      colspan: number;
+    };
+    const col = map.colCount(offset);
+    for (let i = 0; i < colspan; i++) {
+      if (colwidth?.[i]) widths[col + i] ??= colwidth[i];
+    }
+  }
+  const known = widths.filter((width): width is number => width !== null);
+  if (!known.length) return null;
+  const average = known.reduce((sum, width) => sum + width, 0) / known.length;
+  const filled = widths.map((width) => width ?? average);
+  const total = filled.reduce((sum, width) => sum + width, 0);
+  return filled.map((width) => roundPercent((width / total) * 100));
+};
+
+/**
+ * cellWidths returns the `colwidth` each cell of `table` gets for the column
+ * widths `percents`, or null for all of them, by the cell's offset in the
+ * table
+ */
+export const cellWidths = (
+  table: Node,
+  percents: readonly number[] | null,
+): Map<number, number[] | null> => {
+  const map = TableMap.get(table);
+  const result = new Map<number, number[] | null>();
+  for (const offset of new Set(map.map)) {
+    const col = map.colCount(offset);
+    const { colspan } = table.nodeAt(offset)!.attrs as { colspan: number };
+    result.set(offset, percents ? percents.slice(col, col + colspan) : null);
+  }
+  return result;
+};
+
+/**
+ * withColumnPercents returns `table` with the column widths `percents`, see
+ * columnPercents
+ */
+export const withColumnPercents = (
+  table: Node,
+  percents: readonly number[],
+): Node => {
+  const widths = cellWidths(table, percents);
+  const rows: Node[] = [];
+  let offset = 0;
+  table.forEach((row) => {
+    const cells: Node[] = [];
+    let cellOffset = offset + 1;
+    row.forEach((cell) => {
+      const colwidth = widths.get(cellOffset) ?? null;
+      cells.push(cell.type.create({ ...cell.attrs, colwidth }, cell.content));
+      cellOffset += cell.nodeSize;
+    });
+    rows.push(row.copy(Fragment.from(cells)));
+    offset += row.nodeSize;
+  });
+  return table.copy(Fragment.from(rows));
+};
 
 /**
  * gfmBlocker returns what keeps `table` from being written as a GitHub
@@ -42,6 +126,7 @@ export const gfmBlocker = (table: Node): GfmBlocker | null => {
     });
   });
   if (table.attrs.caption) found.add("caption");
+  if (columnPercents(table)) found.add("widths");
   return BLOCKERS.find((blocker) => found.has(blocker)) ?? null;
 };
 
@@ -156,7 +241,8 @@ const cellHtml = (cell: Node): string => {
 
 /**
  * htmlLines writes `table` as an HTML table that holds what a pipe table
- * can't: merged cells, header columns, blocks in cells and a caption
+ * can't: merged cells, header columns, blocks in cells, a caption and column
+ * widths
  */
 export const htmlLines = (table: Node): string[] => {
   const rows = table.children;
@@ -190,9 +276,18 @@ export const htmlLines = (table: Node): string[] => {
   const caption = table.attrs.caption
     ? [`  <caption>${escapeHtml(table.attrs.caption)}</caption>`]
     : [];
+  const percents = columnPercents(table);
+  const columns = percents
+    ? [
+        "  <colgroup>",
+        ...percents.map((percent) => `    <col style="width: ${percent}%">`),
+        "  </colgroup>",
+      ]
+    : [];
   return [
     "<table>",
     ...caption,
+    ...columns,
     ...section("thead", rows.slice(0, headerRows), true),
     ...section("tbody", rows.slice(headerRows), false),
     "</table>",
