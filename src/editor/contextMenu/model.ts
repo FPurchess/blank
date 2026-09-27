@@ -20,7 +20,7 @@ import { insertTable } from "../commands/table/insert";
 import { tableKey } from "../commands/table/tableKey";
 import { performAction, setTools } from "../plugins/tables/tools";
 import { separated } from "../../separated";
-import { DEFAULT_SIZE } from "../../tablePicker";
+import { DEFAULT_SIZE } from "../commands/table/pickerSize";
 import {
   ignoreAll,
   type Misspelling,

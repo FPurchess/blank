@@ -1,6 +1,7 @@
 import { type ImageDialogRequest, imageDialog } from "./state";
-import { createButton, createDialog, createField } from "./dialog";
+import { bootDialog, createButton, createDialog, createField } from "./dialog";
 import { isSavableUrl, normalizeUrl } from "./url";
+import { uiRoot } from "./uiRoot";
 
 const DIALOG_ID = "image-dialog";
 
@@ -10,8 +11,6 @@ const MESSAGES = {
   embedded: "Embedded in the document",
   choosing: "Choosing a file…",
 };
-
-let unsubscribe: (() => void) | undefined;
 
 /**
  * renderDialog renders the dialog for `request` and focuses its first field
@@ -123,7 +122,7 @@ const renderDialog = (request: ImageDialogRequest) => {
   sourceRow.className = "row";
   sourceRow.append(source.input, choose);
   form.append(source.label, sourceRow, hint, alt.label, alt.input, actions);
-  document.body.append(backdrop);
+  uiRoot().append(backdrop);
 
   validate();
   source.input.focus();
@@ -133,13 +132,5 @@ const renderDialog = (request: ImageDialogRequest) => {
 /**
  * bootImageDialog renders the image dialog whenever `imageDialog` holds a request
  */
-export const bootImageDialog = () => {
-  unsubscribe?.();
-  unsubscribe = imageDialog.subscribe(
-    (request) => {
-      document.getElementById(DIALOG_ID)?.remove();
-      if (request) renderDialog(request);
-    },
-    { immediate: true },
-  );
-};
+export const bootImageDialog = () =>
+  bootDialog(imageDialog, DIALOG_ID, renderDialog);

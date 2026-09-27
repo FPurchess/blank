@@ -39,10 +39,21 @@ const button = (id: string) =>
   toolbar().querySelector<HTMLButtonElement>(`button[data-id="${id}"]`)!;
 
 describe("table toolbar", () => {
-  bootTableToolbar();
+  let dispose = bootTableToolbar();
 
   afterEach(() => {
     tableToolbar.value = null;
+  });
+
+  it("removes the toolbar and stops rendering when disposed", () => {
+    show();
+    dispose();
+
+    expect(document.getElementById("table-toolbar")).toBeNull();
+    show();
+    expect(document.getElementById("table-toolbar")).toBeNull();
+    tableToolbar.value = null;
+    dispose = bootTableToolbar();
   });
 
   it("shows a labelled button with an icon for each item, in groups", () => {

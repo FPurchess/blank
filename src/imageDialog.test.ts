@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootImageDialog } from "./imageDialog";
 import { type ImageDialogRequest, imageDialog } from "./state";
 import { deferred, flushPromises } from "./test/async";
+
+// stops what the last boot rendered, so boots don't pile up
+let dispose = () => {};
+afterEach(() => dispose());
 
 const dialog = () => document.querySelector<HTMLElement>("#image-dialog");
 const form = () => dialog()?.querySelector("form") as HTMLFormElement;
@@ -44,7 +48,7 @@ describe("imageDialog", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     imageDialog.value = null;
-    bootImageDialog();
+    dispose = bootImageDialog();
   });
 
   it("is hidden without a request", () => {

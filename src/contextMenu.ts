@@ -5,8 +5,9 @@ import {
   type MenuItem,
   spellcheck,
 } from "./state";
-import { isMac } from "./editor/plugins/openLink";
+import { formatShortcut } from "./editor/keyBindings";
 import { place } from "./popup";
+import { uiRoot } from "./uiRoot";
 
 const MENU_ID = "context-menu";
 
@@ -29,29 +30,6 @@ let unsubscribers: (() => void)[] = [];
 // close the menu right away
 let openedAt = -Infinity;
 const SCROLL_GRACE = 500;
-
-/**
- * formatShortcut returns a key binding like "Mod-Shift-z" as the platform
- * shows it: "⇧⌘Z" on macOS, "Ctrl+Shift+Z" elsewhere
- */
-export const formatShortcut = (binding: string) => {
-  const parts = binding.split(/-(?!$)/);
-  const key = parts.pop()!;
-  const mac = isMac();
-  const names: Record<string, [string, string]> = {
-    Mod: ["⌘", "Ctrl"],
-    Ctrl: ["⌃", "Ctrl"],
-    Alt: ["⌥", "Alt"],
-    Shift: ["⇧", "Shift"],
-    Meta: ["⌘", "Meta"],
-  };
-  const order = ["Ctrl", "Alt", "Shift", "Mod", "Meta"];
-  const modifiers = parts
-    .sort((a, b) => (mac ? order.indexOf(a) - order.indexOf(b) : 0))
-    .map((part) => names[part]?.[mac ? 0 : 1] ?? part);
-  const name = key.length === 1 ? key.toUpperCase() : key;
-  return mac ? modifiers.join("") + name : [...modifiers, name].join("+");
-};
 
 const isItem = (item: MenuItem): item is Item => item !== "separator";
 
@@ -246,7 +224,7 @@ const openSubmenu = (depth: number, index: number) => {
   const parent = levels[depth];
   const item = parent.items[index] as Item;
   const level = renderLevel(item.children!, depth + 1);
-  document.body.append(level.element);
+  uiRoot().append(level.element);
   place(
     level.element,
     request!.anchor,
@@ -347,7 +325,7 @@ const render = (next: ContextMenuRequest | null) => {
   }
 
   const level = renderLevel(next.items, 0);
-  document.body.append(level.element);
+  uiRoot().append(level.element);
   place(level.element, next.anchor);
   levels = [level];
 
@@ -411,4 +389,10 @@ export const bootContextMenu = () => {
       false,
     ),
   ];
+  return () => {
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+    unsubscribers = [];
+    remove();
+    request = null;
+  };
 };

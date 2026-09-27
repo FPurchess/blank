@@ -1,7 +1,9 @@
 import { CommandIdentifier, getKeyBinding } from "./config";
-import { formatShortcut } from "./contextMenu";
+import { formatShortcut } from "./editor/keyBindings";
 import { icon } from "./icons";
+import { placeToolbar } from "./popup";
 import { separated } from "./separated";
+import { uiRoot } from "./uiRoot";
 import {
   tableToolbar,
   type TableToolbarItem,
@@ -9,10 +11,6 @@ import {
 } from "./state";
 
 const TOOLBAR_ID = "table-toolbar";
-// the space between the toolbar and the table, and the window's edges
-const GAP = 6;
-// the top bar with the file name, which the toolbar stays below
-const TOP = 36;
 
 /**
  * button creates the button of `item`
@@ -122,34 +120,12 @@ const updateCaption = (element: HTMLElement, state: TableToolbarState) => {
 };
 
 /**
- * place puts the toolbar above the table's right end, where it rarely covers
- * the text above, which starts on the left. It stays at the top of the window
- * while the table's top is scrolled away, and hides while the table is out of
- * view.
- */
-const place = (element: HTMLElement, anchor: TableToolbarState["anchor"]) => {
-  // measured at the window's left edge, since where it stands now limits
-  // its width, e.g. while table mode makes it wider
-  element.style.left = "0px";
-  const { width, height } = element.getBoundingClientRect();
-  const top = Math.max(anchor.top - height - GAP, TOP);
-  element.hidden =
-    anchor.bottom < TOP + height || anchor.top > window.innerHeight;
-  const left = Math.max(
-    GAP,
-    Math.min(anchor.right - width, window.innerWidth - GAP - width),
-  );
-  element.style.left = `${left}px`;
-  element.style.top = `${top}px`;
-};
-
-/**
  * bootTableToolbar shows the toolbar of the table the cursor is in. It is
  * created once per table visit and updated in place, so it doesn't flicker.
  */
 export const bootTableToolbar = () => {
   let element: HTMLElement | null = null;
-  tableToolbar.subscribe(
+  const unsubscribe = tableToolbar.subscribe(
     (state) => {
       if (!state) {
         element?.remove();
@@ -158,13 +134,18 @@ export const bootTableToolbar = () => {
       }
       if (!element) {
         element = createToolbar(state.items);
-        document.body.append(element);
+        uiRoot().append(element);
       }
       element.classList.toggle("keys", state.keys);
       updateButtons(element, state);
       updateCaption(element, state);
-      place(element, state.anchor);
+      placeToolbar(element, state.anchor);
     },
     { immediate: true },
   );
+  return () => {
+    unsubscribe();
+    element?.remove();
+    element = null;
+  };
 };

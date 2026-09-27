@@ -2,7 +2,7 @@ import type { Command } from "prosemirror-state";
 import { isInTable } from "prosemirror-tables";
 
 import { tablePicker } from "../../../state";
-import { DEFAULT_SIZE } from "../../../tablePicker";
+import { DEFAULT_SIZE } from "./pickerSize";
 import { toolsKey } from "../../plugins/tables/tools";
 import { insertTable } from "./insert";
 

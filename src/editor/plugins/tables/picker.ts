@@ -2,7 +2,7 @@ import { keydownHandler } from "prosemirror-keymap";
 import { Plugin } from "prosemirror-state";
 
 import { tablePicker } from "../../../state";
-import { resizePicker } from "../../../tablePicker";
+import { resizePicker } from "../../commands/table/pickerSize";
 import { tableKeyBinding } from "../../keyBindings";
 
 /**
