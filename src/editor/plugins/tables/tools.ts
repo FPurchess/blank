@@ -176,6 +176,16 @@ export const tableTools = () => {
         },
       }));
 
+  // the items only change with the editor's state. While scrolling, the
+  // toolbar gets the same objects again, so it doesn't update its buttons.
+  let itemsFor: { state: EditorState; items: TableToolbarItem[] } | null = null;
+  const currentItems = (view: EditorView) => {
+    if (itemsFor?.state !== view.state) {
+      itemsFor = { state: view.state, items: items(view) };
+    }
+    return itemsFor.items;
+  };
+
   /**
    * publish shows the toolbar of the table at the cursor, or hides it
    */
@@ -190,7 +200,7 @@ export const tableTools = () => {
     const { left, top, bottom, right } = dom.getBoundingClientRect();
     tableToolbar.value = {
       anchor: { left, top, bottom, right },
-      items: items(view),
+      items: currentItems(view),
       keys: tools.keys,
       caption: tools.caption
         ? {

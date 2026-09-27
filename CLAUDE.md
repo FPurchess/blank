@@ -2,14 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a framework-free TypeScript + ProseMirror frontend in `src/`. The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries.
+Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScript + ProseMirror frontend in `src/`, whose UI around the editor is moving to Vue 3 (the table toolbar so far, see `.claude/rules/vue-migration.md`). The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries.
 
 ## Commands
 
 - Use `bun`, not npm or yarn. The lockfile is `bun.lockb`.
 - `make` lists the common tasks from the `Makefile`, which wraps the `package.json` scripts: e.g. `make dev`, `make check` (lint, format check and unit tests), `make test-e2e-headless`. Keep the commands in `package.json` and only call them from the `Makefile`.
 - `bun run tauri dev` runs the app. `bun run dev` serves only the Vite frontend, and every Tauri API call (fs, dialog, notification, cli) fails in a plain browser.
-- `bun run lint` runs eslint and `tsc`, so it is also the type-check.
+- `bun run lint` runs eslint and `vue-tsc`, so it is also the type-check, `.vue` files included.
 - `bun run test:rust` builds the frontend and runs the Rust tests (the spell check engine) with `cargo test`, which needs `dist/` since `generate_context!` embeds it.
 - `bunx vitest run src/config.test.ts` runs one test file, and `bunx vitest run -t "<name>"` runs one test. Run single tests while iterating.
 - Before calling work done, run `bun run lint`, `bun run format:check` and `bun run test`. The husky pre-commit hook runs the same three.

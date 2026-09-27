@@ -9,6 +9,10 @@ paths:
   - "src/importers/docx/cleanup.ts"
   - "src/editor/contextMenu/model.ts"
   - "src/table*.ts"
+  - "src/ui/TableToolbar.vue"
+  - "src/ui/ToolbarButton.vue"
+  - "src/ui/CaptionField.vue"
+  - "src/ui/tableToolbarModel.ts"
 ---
 
 # Tables
@@ -25,7 +29,7 @@ paths:
   - `guard.ts`: no table, heading or rule in a cell, and a paragraph next to tables at the edges of the document;
   - `view.ts`: the NodeView, which freezes the column widths while the cursor is in the table;
   - `picker.ts`, `tools.ts` (the table toolbar and table mode) and `handles.ts` (the mouse handles, below).
-- The commands are in `src/editor/commands/table/`. `actions.ts` there lists every action on a table once, with its label, icon, table-mode key and announcement. The toolbar (`src/tableToolbar.ts`), table mode (`Mod+T` in a table) and the context menu's Table submenu all use that list, so a new action goes there.
+- The commands are in `src/editor/commands/table/`. `actions.ts` there lists every action on a table once, with its label, icon, table-mode key and announcement. The toolbar (`src/ui/TableToolbar.vue`), table mode (`Mod+T` in a table) and the context menu's Table submenu all use that list, so a new action goes there.
 - Actions announce what they did through `announcement`, which the status bar shows and screen readers read. `reporting()` in `tools.ts` joins that with what it led to, e.g. a table that's now saved as HTML.
 
 ## Mouse handles

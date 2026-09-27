@@ -24,10 +24,15 @@ import {
   tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
+import { createEditorHandle, syncPlugin } from "./handle";
 import { openPageSetup } from "./commands/pageSetup";
 
 let stopRequests: (() => void) | undefined;
 
+/**
+ * bootEditor mounts the editor with the first document
+ * @returns the handle the UI works with the editor through
+ */
 export const bootEditor = async () => {
   const state = await applyInitialDocument(
     EditorState.create({
@@ -56,8 +61,11 @@ export const bootEditor = async () => {
       ],
     }),
   );
+  // keeps the handle's state up to date, once the handle exists
+  let sync = () => {};
   const view = new EditorView(document.body, {
     state,
+    plugins: [syncPlugin(() => sync())],
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
         // the dialogs take the focus while they are open
@@ -75,6 +83,8 @@ export const bootEditor = async () => {
       view.updateState(view.state.apply(tx));
     },
   });
+  const editor = createEditorHandle(view);
+  sync = editor.sync;
   transaction.value = view.state.tr;
   // e.g. the button in the bottom bar asks for the page setup
   stopRequests?.();
@@ -85,4 +95,5 @@ export const bootEditor = async () => {
   window.setTimeout(() => {
     if (!view.hasFocus()) view.focus();
   }, 100);
+  return editor.handle;
 };

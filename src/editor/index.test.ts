@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
+import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
 import {
@@ -13,10 +14,13 @@ import {
 } from "../state";
 import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
+import type { EditorHandle } from "./handle";
 
 const editor = () => document.querySelector<HTMLElement>(".ProseMirror");
 
 describe("bootEditor", () => {
+  let handle: EditorHandle;
+
   beforeEach(async () => {
     await localforage.clear();
     mockCliArgs();
@@ -24,11 +28,34 @@ describe("bootEditor", () => {
     linkDialog.value = null;
     imageDialog.value = null;
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    await bootEditor();
+    handle = await bootEditor();
   });
 
   afterEach(() => {
     document.body.innerHTML = "";
+  });
+
+  it("returns a handle that follows the editor", () => {
+    const { view } = handle;
+    expect(view.dom).toBe(editor());
+
+    handle.run((state, dispatch) => {
+      dispatch?.(state.tr.insertText("hello ", 1));
+      return true;
+    });
+
+    expect(handle.state.value).toBe(view.state);
+    expect(handle.state.value.doc.textContent).toMatch(/^hello /);
+  });
+
+  it("keeps the handle's state when a new document is opened", () => {
+    const next = EditorState.create({
+      schema: handle.view.state.schema,
+      plugins: handle.view.state.plugins,
+    });
+    handle.view.updateState(next);
+
+    expect(handle.state.value).toBe(next);
   });
 
   it("mounts the editor with the welcome document", () => {

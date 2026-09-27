@@ -31,9 +31,10 @@ import { bootImageDialog } from "./imageDialog";
 import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
 import { bootTableHandles } from "./tableHandles";
-import { bootTableToolbar } from "./tableToolbar";
 import { basename } from "./paths";
 import { bootScope } from "./scope";
+import { bootApp } from "./ui/mount";
+import type { EditorHandle } from "./editor/handle";
 import { uiRoot } from "./uiRoot";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -129,12 +130,13 @@ export const setupNotification = async () => {
 };
 
 /**
- * bootUI renders the bars and boots the dialogs, menus, pickers and
- * toolbars. It runs after bootEditor, so the UI comes after the editor.
+ * bootUI renders the bars, boots the dialogs, menus, pickers and toolbars,
+ * and mounts the Vue app, which works with `editor`. It runs after bootEditor,
+ * so the UI comes after the editor.
  * @returns dispose, which stops rendering and removes the UI, e.g. between
  * tests
  */
-export const bootUI = () =>
+export const bootUI = (editor: EditorHandle) =>
   bootScope(() => {
     const root = uiRoot();
     onScopeDispose(() => root.remove());
@@ -260,7 +262,7 @@ export const bootUI = () =>
     bootPageSetup();
     bootContextMenu();
     bootTablePicker();
-    bootTableToolbar();
+    bootApp(editor);
     bootTableHandles();
 
     // FIXME: better handling of permission errors

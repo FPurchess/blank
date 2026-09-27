@@ -20,7 +20,7 @@ import {
 } from "./state";
 import { config } from "./config";
 import { schema } from "./markdown";
-import { createState } from "./test/editor";
+import { createState, createTestHandle } from "./test/editor";
 import { closePicker, move, openPicker, typeChar } from "./languagePicker";
 import { flushPromises } from "./test/async";
 
@@ -53,7 +53,7 @@ describe("ui", () => {
     language.value = "de";
     closePicker();
     stubNotification("granted");
-    dispose = bootUI();
+    dispose = bootUI(createTestHandle());
   });
 
   it("renders the link dialog", () => {
@@ -62,6 +62,14 @@ describe("ui", () => {
 
     linkDialog.value = null;
     expect(document.querySelector("#link-dialog")).toBeNull();
+  });
+
+  it("mounts the Vue app into the UI root until disposed", () => {
+    expect(document.querySelector("#ui > #ui-app")).not.toBeNull();
+
+    dispose();
+    dispose = () => {};
+    expect(document.getElementById("ui-app")).toBeNull();
   });
 
   it("puts the bars into the UI root after the editor", () => {
@@ -139,7 +147,7 @@ describe("ui language chooser", () => {
     language.value = "de";
     closePicker();
     stubNotification("granted");
-    dispose = bootUI();
+    dispose = bootUI(createTestHandle());
   });
 
   it("sits right of the counter and the spell check status in the footer", () => {
@@ -234,7 +242,7 @@ describe("ui page button", () => {
     document.body.innerHTML = "";
     transaction.value = null;
     stubNotification("granted");
-    dispose = bootUI();
+    dispose = bootUI(createTestHandle());
   });
 
   it("shows the paper of the region and its orientation", () => {
@@ -311,7 +319,7 @@ describe("setupNotification", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
 
-    expect(() => (dispose = bootUI())).not.toThrow();
+    expect(() => (dispose = bootUI(createTestHandle()))).not.toThrow();
     await flushPromises();
 
     expect(consoleError).toHaveBeenCalledWith(error);
@@ -328,7 +336,7 @@ describe("ui spell check status", () => {
     spellcheckMessage.value = null;
     spellcheckStatus.value = { state: "off", tag: "de" };
     stubNotification("granted");
-    dispose = bootUI();
+    dispose = bootUI(createTestHandle());
   });
 
   it.each([
@@ -396,7 +404,7 @@ describe("ui announcement", () => {
     document.body.innerHTML = "";
     announcement.value = null;
     stubNotification("granted");
-    dispose = bootUI();
+    dispose = bootUI(createTestHandle());
   });
 
   it("is always there as a status, empty in between", () => {
