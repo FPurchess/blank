@@ -488,6 +488,140 @@ body {
   word-wrap: break-word;
 }
 
+// the handles of the table under the mouse, see src/tableHandles.ts: they sit
+// on the table's edges and lines, drawn in the text colour so they suit
+// every theme
+.table-handles {
+  position: fixed;
+  inset: 0;
+  // below the toolbar and menus
+  z-index: 4;
+  pointer-events: none;
+
+  // before the rules below, which set how each handle displays
+  &[hidden],
+  [hidden] {
+    display: none !important;
+  }
+
+  > *,
+  .resizer {
+    position: fixed;
+    box-sizing: border-box;
+    pointer-events: auto;
+  }
+
+  .grip {
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color) 18%, var(--background-color));
+    border: 1px solid color-mix(in srgb, var(--color) 30%, transparent);
+    cursor: grab;
+
+    &:hover,
+    &.selected {
+      background: color-mix(in srgb, var(--color) 45%, var(--background-color));
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  // above the lines between columns, which it sits on
+  .insert {
+    z-index: 1;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color) 70%, var(--background-color));
+    cursor: pointer;
+
+    // the plus: two bars
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 50% 4px auto;
+      height: 2px;
+      margin-top: -1px;
+      border-radius: 1px;
+      background: var(--background-color);
+    }
+
+    &::after {
+      transform: rotate(90deg);
+    }
+
+    &:hover {
+      background: var(--color);
+    }
+  }
+
+  .insert-line,
+  .guide {
+    pointer-events: none;
+    background: color-mix(in srgb, var(--color) 60%, transparent);
+  }
+
+  // where dragged rows or columns land
+  .guide {
+    border-radius: 2px;
+    background: var(--color);
+  }
+
+  .dragged {
+    pointer-events: none;
+    background: color-mix(in srgb, var(--color) 10%, transparent);
+  }
+
+  .resizer {
+    cursor: col-resize;
+
+    // the line shows while the mouse is on it
+    &:hover::after {
+      content: "";
+      position: absolute;
+      inset: 0 3px;
+      background: color-mix(in srgb, var(--color) 45%, transparent);
+    }
+  }
+
+  .edge {
+    &.right {
+      cursor: ew-resize;
+    }
+
+    &.bottom {
+      cursor: ns-resize;
+    }
+
+    &.corner {
+      cursor: nwse-resize;
+      border-radius: 3px;
+
+      &:hover {
+        background: color-mix(in srgb, var(--color) 30%, transparent);
+      }
+    }
+  }
+
+  .ghost {
+    pointer-events: none;
+    border: 2px dashed color-mix(in srgb, var(--color) 55%, transparent);
+    border-radius: 2px;
+  }
+
+  .size {
+    position: absolute;
+    right: -2px;
+    bottom: -26px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    color: var(--background-color);
+    background: color-mix(in srgb, var(--color) 75%, var(--background-color));
+  }
+}
+
 // the toolbar of the table the cursor is in, see src/tableToolbar.ts
 .table-toolbar {
   position: fixed;

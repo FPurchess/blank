@@ -3,12 +3,13 @@ import type { EditorView } from "prosemirror-view";
 
 import { config } from "../../config";
 import {
+  type Anchor,
   contextMenu,
   spellchecker,
   type ContextMenuRequest,
 } from "../../state";
 import { words } from "../../spellcheck/tokenize";
-import { buildMenu, type MenuTarget } from "../contextMenu/model";
+import { buildMenu, type MenuTarget, tableMenu } from "../contextMenu/model";
 import { type Misspelling, misspellingAt } from "./spellcheck";
 
 // how long after the keyboard opened the menu the browser's own contextmenu
@@ -64,6 +65,19 @@ export const prefetch = (state: EditorState, pos: number) => {
 };
 
 /**
+ * closer returns the function that closes the menu about to open, unless
+ * another one opened meanwhile, and returns the focus to the editor
+ */
+const closer = (view: EditorView) => {
+  const close = () => {
+    if (contextMenu.value?.close === close) contextMenu.value = null;
+    view.focus();
+  };
+  latest = close;
+  return close;
+};
+
+/**
  * openContextMenu opens the context menu for the word at `pos`, below `anchor`
  * or below the word if there is no anchor
  */
@@ -88,17 +102,13 @@ export const openContextMenu = (
     }
   }
 
-  const close = () => {
-    if (contextMenu.value?.close === close) contextMenu.value = null;
-    view.focus();
-  };
+  const close = closer(view);
   const request = (target: MenuTarget): ContextMenuRequest => ({
     items: buildMenu(view, target),
     anchor: where,
     keyboard,
     close,
   });
-  latest = close;
 
   const { misspelling } = target;
   const checker = spellchecker.value;
@@ -124,6 +134,19 @@ export const openContextMenu = (
     if (!shown || contextMenu.value?.close === close) open(suggestions);
   };
   checker.suggest(misspelling.word).then(show, () => show([]));
+};
+
+/**
+ * openTableMenu opens a menu of the actions on the table the selection is
+ * in below `anchor`, e.g. for the handle of the selected rows
+ */
+export const openTableMenu = (view: EditorView, anchor: Anchor) => {
+  contextMenu.value = {
+    items: tableMenu(view),
+    anchor,
+    keyboard: false,
+    close: closer(view),
+  };
 };
 
 /**

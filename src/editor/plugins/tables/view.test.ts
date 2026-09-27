@@ -87,6 +87,30 @@ describe("TableView", () => {
     expect(view.dom.querySelectorAll("col")).toHaveLength(0);
   });
 
+  it("renders the column widths set on the table, which don't freeze", () => {
+    const sized = (a: number, b: number) =>
+      table(tr(th("a", { colwidth: [a] }), th("b", { colwidth: [b] })));
+    const view = new TableView(sized(30, 70));
+    view.contentDOM.appendChild(rendered([[120, 80]])[0]);
+    const cols = () =>
+      [...view.dom.querySelectorAll("col")].map((col) => col.style.width);
+    const table_ = view.dom.querySelector("table")!;
+
+    expect(cols()).toEqual(["30%", "70%"]);
+    expect(table_.style.width).toBe("100%");
+    view.freeze();
+    expect(view.frozen).toBe(false);
+    expect(cols()).toEqual(["30%", "70%"]);
+
+    view.update(sized(60, 40));
+    expect(cols()).toEqual(["60%", "40%"]);
+
+    // reset to automatic widths
+    view.update(table(tr(th("a"), th("b"))));
+    expect(cols()).toEqual([]);
+    expect(table_.style.tableLayout).toBe("");
+  });
+
   it("measures again once columns were added", () => {
     vi.useFakeTimers();
     const view = new TableView(table(tr(th("a"))));

@@ -29,6 +29,7 @@ import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
 import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
+import { bootTableHandles } from "./tableHandles";
 import { bootTableToolbar } from "./tableToolbar";
 import { basename } from "./paths";
 import { uiRoot } from "./uiRoot";
@@ -276,6 +277,7 @@ export const bootUI = () => {
     bootContextMenu(),
     bootTablePicker(),
     bootTableToolbar(),
+    bootTableHandles(),
   );
 
   // FIXME: better handling of permission errors

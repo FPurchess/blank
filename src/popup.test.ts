@@ -25,7 +25,7 @@ describe("placeToolbar", () => {
     placeToolbar(element, table(300, 500));
 
     expect(element.style.left).toBe("600px");
-    expect(element.style.top).toBe(`${300 - 30 - 6}px`);
+    expect(element.style.top).toBe(`${300 - 30 - 10}px`);
     expect(element.hidden).toBe(false);
   });
 
@@ -53,8 +53,8 @@ describe("placeToolbar", () => {
     const left = toolbar(300);
     placeToolbar(left, table(300, 500, 100));
 
-    expect(wide.style.left).toBe(`${1024 - 6 - 300}px`);
-    expect(left.style.left).toBe("6px");
+    expect(wide.style.left).toBe(`${1024 - 10 - 300}px`);
+    expect(left.style.left).toBe("10px");
   });
 
   it("measures its width at the window's left edge", () => {

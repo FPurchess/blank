@@ -52,6 +52,19 @@ describe("tableGrid", () => {
     expect(grid.widths.reduce((a, b) => a + b)).toBeCloseTo(1);
   });
 
+  it("takes the column widths set by resizing", () => {
+    const grid = tableGrid(
+      table(
+        tr(
+          th("a long heading", { colwidth: [80] }),
+          th("b", { colwidth: [20] }),
+        ),
+      ),
+    );
+
+    expect(grid.widths).toEqual([0.8, 0.2]);
+  });
+
   it("leaves merged cells out of the column widths", () => {
     const grid = tableGrid(
       table(

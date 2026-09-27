@@ -2,11 +2,12 @@ import type { Node } from "prosemirror-model";
 import { TableMap } from "prosemirror-tables";
 
 import { headerRowCount, isHeaderCell, schema } from "../markdown";
+import { columnPercents } from "../markdown/tables";
 
 // Lays out a table for the PDF and the Word export alike: which cell sits
 // where, which rows repeat as a header on every page, and how wide each
-// column is. The widths follow the content like the editor's automatic
-// layout does.
+// column is. The widths are the ones set by resizing the columns, or follow
+// the content like the editor's automatic layout does.
 
 export interface GridCell {
   node: Node;
@@ -94,8 +95,12 @@ export const tableGrid = (table: Node): TableGrid => {
   const leading = headerRowCount(table);
   const headerRows = leading === map.height ? 0 : leading;
 
+  const percents = columnPercents(table);
   const total = chars.reduce((sum, n) => sum + n, 0);
-  return { rows, headerRows, widths: chars.map((n) => n / total) };
+  const widths = percents
+    ? percents.map((percent) => percent / 100)
+    : chars.map((n) => n / total);
+  return { rows, headerRows, widths };
 };
 
 /**

@@ -30,7 +30,13 @@ export const docWithFrontmatter = (frontmatter: string, ...blocks: Node[]) =>
   schema.node("doc", { frontmatter }, blocks);
 
 type CellContent = string | Node | Node[];
-type CellAttrs = { colspan?: number; rowspan?: number; align?: string | null };
+type CellAttrs = {
+  colspan?: number;
+  rowspan?: number;
+  align?: string | null;
+  // the widths of the columns the cell spans, in percent
+  colwidth?: number[] | null;
+};
 
 // a cell holds a paragraph with `content` if it's text, or the given blocks
 const cellBlocks = (content: CellContent) =>

@@ -198,6 +198,139 @@ describe("tables", () => {
     expect(saved).toContain('      <th scope="row">c</th>');
   });
 
+  describe("with the mouse", () => {
+    /**
+     * where the first table's rows and columns start, and where the last
+     * one ends, in viewport px
+     */
+    const layout = () =>
+      browser.execute(() => {
+        const table = document.querySelector(".ProseMirror table")!;
+        const box = table.getBoundingClientRect();
+        const rows = [...table.querySelectorAll("tr")].map(
+          (row) => row.getBoundingClientRect().top,
+        );
+        const columns = [...table.querySelectorAll("tr:first-child > *")].map(
+          (cell) => cell.getBoundingClientRect().left,
+        );
+        return {
+          rows: [...rows, box.bottom],
+          columns: [...columns, box.right],
+          box: {
+            left: box.left,
+            top: box.top,
+            right: box.right,
+            bottom: box.bottom,
+          },
+        };
+      });
+    const at = (x: number, y: number) => ({
+      x: Math.round(x),
+      y: Math.round(y),
+    });
+    // moves the mouse over the table first, which shows its handles
+    const drag = async (
+      from: { x: number; y: number },
+      to: { x: number; y: number },
+      hover: { x: number; y: number },
+    ) => {
+      await browser.action("pointer").move(hover).perform();
+      await browser
+        .action("pointer")
+        .move(from)
+        .down()
+        .move(at((from.x + to.x) / 2, (from.y + to.y) / 2))
+        .move(to)
+        .up()
+        .perform();
+    };
+    const save = async (text: string) => {
+      await pressMod("s");
+      return waitForSaved(file, text);
+    };
+
+    it("inserts a row with the + between two rows", async () => {
+      await open("| a |\n| - |\n| b |\n| c |\n");
+      const { box, rows } = await layout();
+      await browser
+        .action("pointer")
+        .move(at(box.left + 40, rows[2] + 10))
+        .perform();
+      await browser
+        .action("pointer")
+        .move(at(box.left + 1, rows[2] + 1))
+        .perform();
+      await $("#table-handles .insert").click();
+
+      const saved = await save("|     |");
+      expect(saved).toBe("| a   |\n| --- |\n| b   |\n|     |\n| c   |");
+    });
+
+    it("moves a row by dragging its handle", async () => {
+      await open("| a |\n| - |\n| b |\n| c |\n");
+      const { box, rows } = await layout();
+      const c = (rows[2] + rows[3]) / 2;
+      await drag(
+        at(box.left, c),
+        at(box.left, rows[1] + 2),
+        at(box.left + 40, c),
+      );
+
+      const saved = await save("| c   |\n| b");
+      expect(saved).toBe("| a   |\n| --- |\n| c   |\n| b   |");
+    });
+
+    it("resizes columns, saved as an HTML table, and resets them", async () => {
+      await open("| a | b |\n| - | - |\n| c | d |\n");
+      const { box, columns } = await layout();
+      const y = (box.top + box.bottom) / 2;
+      const line = at(columns[1], y);
+      await drag(line, at(box.left + (box.right - box.left) * 0.25, y), line);
+
+      const saved = await save("<colgroup>");
+      expect(saved).toContain('    <col style="width: 25');
+
+      await browser
+        .action("pointer")
+        .move(at(box.left + 40, y))
+        .perform();
+      const moved = await layout();
+      await browser.action("pointer").move(at(moved.columns[1], y)).perform();
+      await $("#table-handles .resizer").doubleClick();
+      const reset = await save("| a");
+      expect(reset).toBe("| a   | b   |\n| --- | --- |\n| c   | d   |");
+    });
+
+    it("adds rows by dragging the bottom edge and drops empty columns", async () => {
+      await open("| a | b |   |\n| - | - | - |\n| c | d |   |\n");
+      const { box, rows, columns } = await layout();
+      const height = rows[2] - rows[1];
+      const x = (box.left + box.right) / 2;
+      await drag(
+        at(x, box.bottom + 1),
+        at(x, box.bottom + height * 2),
+        at(x, box.bottom - 10),
+      );
+      const y = (box.top + box.bottom) / 2;
+      await drag(
+        at(box.right, y),
+        at((columns[1] + columns[2]) / 2 + 10, y),
+        at(box.right - 20, y),
+      );
+
+      const saved = await save("|     |     |\n|     |     |");
+      expect(saved).toBe(
+        [
+          "| a   | b   |",
+          "| --- | --- |",
+          "| c   | d   |",
+          "|     |     |",
+          "|     |     |",
+        ].join("\n"),
+      );
+    });
+  });
+
   it("deletes a row from the table menu", async () => {
     await open("| a |\n| - |\n| b |\n| c |\n");
     await $$(".ProseMirror td")[0].click({ button: "right" });
