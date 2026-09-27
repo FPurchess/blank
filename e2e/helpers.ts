@@ -26,6 +26,13 @@ export const waitForAppReady = async () => {
       timeoutMsg: "the app did not boot (no editor / UI rendered)",
     },
   );
+  // and until it's laid out with its fonts and on screen: a click right
+  // after the page is rendered can get lost otherwise
+  await browser.executeAsync((done: () => void) => {
+    void document.fonts.ready.then(() =>
+      requestAnimationFrame(() => requestAnimationFrame(() => done())),
+    );
+  });
 };
 
 /**
