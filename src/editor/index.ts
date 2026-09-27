@@ -1,6 +1,7 @@
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
+import { tableEditing } from "prosemirror-tables";
 import { schema } from "../markdown";
 
 import {
@@ -18,6 +19,10 @@ import {
   openLink,
   properties,
   spellcheck,
+  tableGuard,
+  tableKeys,
+  tablePickerKeys,
+  tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
 
@@ -31,17 +36,23 @@ export const bootEditor = async () => {
   const state = await applyInitialDocument(
     EditorState.create({
       schema,
-      // the picker and autocorrect see Enter and Tab before the keymap does
+      // the pickers and autocorrect see Enter and Tab before the table keys
+      // and the keymap do; prosemirror-tables asks for tableEditing last
       plugins: [
         history(),
         languagePicker(),
+        tablePickerKeys(),
         contextMenu(),
         spellcheck(),
         autocomplete(),
+        tableKeys(),
         keymap(),
         openLink(),
         images(),
         properties(),
+        tableGuard(),
+        tableView(),
+        tableEditing(),
       ],
     }),
   );

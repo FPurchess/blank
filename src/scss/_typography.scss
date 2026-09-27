@@ -139,3 +139,34 @@ hr {
   color: var(--color);
   margin: 2rem 0;
 }
+
+// Tables are set in the body size, with a bold header and a caption one step
+// down. The PDF and Word exports mirror these values.
+table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+caption {
+  caption-side: top;
+  padding: 0 0 0.4em;
+  text-align: left;
+  font-size: #{math.div(1, $scale-ratio)}em;
+  font-style: italic;
+}
+
+th,
+td {
+  padding: 0.4em 0.7em;
+  text-align: left;
+  vertical-align: top;
+
+  & > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+th {
+  font-weight: $font-weight-bold;
+}

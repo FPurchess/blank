@@ -10,6 +10,7 @@ import {
   type Context,
 } from "../context";
 import type { InlineTransformer } from "../types";
+import { plainCell } from "../../tables/util";
 
 // Markdown emphasis markers around a word, e.g. "**bold**"
 const markers = "*_`";
@@ -61,11 +62,11 @@ const capitalize: InlineTransformer = (ctx: Context) => {
   );
   if (!reWord.test(word.text)) return;
 
+  const before = ctx.textBefore.slice(0, ctx.tokenIndex);
+  // table cells often hold values like "kg" or "n/a", not sentences
+  const cellStart = plainCell(ctx.$cursor) && !before.trim();
   let fix: ((tr: Transaction, pos: number) => void) | undefined;
-  if (
-    reLower.test(word.text) &&
-    startsSentence(ctx, ctx.textBefore.slice(0, ctx.tokenIndex))
-  ) {
+  if (reLower.test(word.text) && !cellStart && startsSentence(ctx, before)) {
     const upper = word.text[0].toLocaleUpperCase(ctx.lang);
     fix = (tr, pos) => tr.insertText(upper, pos, pos + 1);
   } else if (

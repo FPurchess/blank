@@ -51,6 +51,23 @@ describe("serializeMarkdown", () => {
   });
 });
 
+describe("frontmatter and tables", () => {
+  it("round-trips frontmatter above a pipe table", () => {
+    const text =
+      "---\ntitle: Hi\n---\n\n| a   | b   |\n| --- | --- |\n| 1   | 2   |";
+    const parsed = parseMarkdown(text);
+    expect(parsed.attrs.frontmatter).toBe("title: Hi");
+    expect(parsed.firstChild?.type.name).toBe("table");
+    expect(serializeMarkdown(parsed)).toBe(text);
+  });
+
+  it("leaves out the empty paragraph before a table on top", () => {
+    const table = parseMarkdown("| a |\n| - |\n| 1 |").firstChild!;
+    const written = serializeMarkdown(docWithFrontmatter("a: 1", p(), table));
+    expect(written).toBe("---\na: 1\n---\n\n| a   |\n| --- |\n| 1   |");
+  });
+});
+
 describe("firstHeading", () => {
   it("returns the text of the first heading", () => {
     expect(firstHeading(doc(p("intro"), h(2, "First"), h(1, "Second")))).toBe(

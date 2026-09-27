@@ -13,6 +13,7 @@
     "blocktype.ordered_list": "Mod-9",
     "insert.horizontal_rule": "Mod-h",
     "insert.image": "Mod-Alt-i",
+    "insert.table": "Mod-t",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",

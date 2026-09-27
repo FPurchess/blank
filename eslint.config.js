@@ -9,9 +9,9 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Blank's schema keeps the frontmatter, and node types of two schemas
-    // can't be mixed: use src/markdown instead
-    files: ["src/**/*.ts"],
+    // Blank's schema has tables and keeps the frontmatter, and node types of
+    // two schemas can't be mixed: use src/markdown instead
+    files: ["src/**/*.ts", "scripts/**/*.ts"],
     ignores: ["src/markdown/**"],
     rules: {
       "no-restricted-imports": [

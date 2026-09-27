@@ -6,6 +6,7 @@ import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 
 import {
+  blockquote,
   codeBlock,
   createState,
   createTestView,
@@ -13,6 +14,10 @@ import {
   li,
   p,
   pressKey,
+  table,
+  td,
+  th,
+  tr,
   typeText,
   ul,
 } from "../../../test/editor";
@@ -853,6 +858,70 @@ describe("plugin.autocomplete", () => {
       expect(show(view)).toBe("The → |");
       undo(view.state, view.dispatch);
       expect(show(view)).toBe("The --> |");
+    });
+  });
+
+  describe("tables", () => {
+    // a table whose body cell holds `content`, with the cursor at the end of
+    // the textblock holding `cursorText`
+    const inCell = (content: Node | Node[], cursorText: string) => {
+      const node = doc(table(tr(th("head")), tr(td(content))), p());
+      let cursor = -1;
+      node.descendants((child, pos) => {
+        if (
+          cursor < 0 &&
+          child.isTextblock &&
+          child.textContent === cursorText
+        ) {
+          cursor = pos + 1 + child.content.size;
+        }
+      });
+      return setup(node, cursor);
+    };
+    const bodyCell = (view: EditorView) =>
+      view.state.doc.firstChild!.lastChild!.firstChild!;
+
+    it.each(["- ", "1. ", "> ", "# "])(
+      "keeps the block shortcut %j as text in a cell",
+      (shortcut) => {
+        const { view, type } = inCell(p(), "");
+        type(shortcut);
+
+        const cell = bodyCell(view);
+        expect(cell.childCount).toBe(1);
+        expect(cell.firstChild!.type).toBe(schema.nodes.paragraph);
+        expect(cell.textContent).toBe(shortcut);
+      },
+    );
+
+    it("starts a list in a quote in a cell", () => {
+      const { view, type } = inCell(blockquote(p()), "");
+      type("- ");
+
+      expect(bodyCell(view).firstChild!.firstChild!.type).toBe(
+        schema.nodes.bullet_list,
+      );
+    });
+
+    it("keeps headings out of a list in a cell", () => {
+      const { view, type } = inCell(ul(li(p())), "");
+      type("# ");
+
+      expect(bodyCell(view).textContent).toBe("# ");
+    });
+
+    it("doesn't capitalize the first word of a cell", () => {
+      const { view, type } = inCell(p(), "");
+      type("kg ");
+
+      expect(bodyCell(view).textContent).toBe("kg ");
+    });
+
+    it("capitalizes a sentence after the first in a cell", () => {
+      const { view, type } = inCell(p("done."), "done.");
+      type(" next ");
+
+      expect(bodyCell(view).textContent).toBe("done. Next ");
     });
   });
 

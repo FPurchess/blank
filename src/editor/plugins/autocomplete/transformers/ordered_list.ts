@@ -13,6 +13,7 @@ interface Props {
 
 const _transformer: BlockTransformer<Props> = {
   trigger: "space",
+  inCells: true,
   activate: (line: string): undefined | Props => {
     const match = reOrderedList.exec(line);
     return match ? { order: Number(match[1]) } : undefined;

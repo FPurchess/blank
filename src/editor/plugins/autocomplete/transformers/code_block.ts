@@ -15,6 +15,7 @@ interface Props {
 
 const _transformer: BlockTransformer<Props> = {
   trigger: "enter",
+  inCells: true,
   activate: (line: string): undefined | Props => {
     const match = reFence.exec(line);
     return match ? { params: match[1] } : undefined;

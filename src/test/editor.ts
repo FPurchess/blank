@@ -8,7 +8,7 @@ import {
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-// Node builders for Blank's markdown schema (src/markdown).
+// Node builders for Blank's markdown schema (src/markdown), tables included.
 
 const text = (content?: string) => (content ? [schema.text(content)] : []);
 
@@ -28,6 +28,26 @@ export const doc = (...blocks: Node[]) => schema.node("doc", null, blocks);
 // a document of a file that starts with `frontmatter`
 export const docWithFrontmatter = (frontmatter: string, ...blocks: Node[]) =>
   schema.node("doc", { frontmatter }, blocks);
+
+type CellContent = string | Node | Node[];
+type CellAttrs = { colspan?: number; rowspan?: number; align?: string | null };
+
+// a cell holds a paragraph with `content` if it's text, or the given blocks
+const cellBlocks = (content: CellContent) =>
+  typeof content === "string"
+    ? [p(content)]
+    : Array.isArray(content)
+      ? content
+      : [content];
+
+export const th = (content: CellContent = "", attrs: CellAttrs = {}) =>
+  schema.node("table_header", attrs, cellBlocks(content));
+export const td = (content: CellContent = "", attrs: CellAttrs = {}) =>
+  schema.node("table_cell", attrs, cellBlocks(content));
+export const tr = (...cells: Node[]) => schema.node("table_row", null, cells);
+export const table = (...rows: Node[]) => schema.node("table", null, rows);
+export const captioned = (caption: string, ...rows: Node[]) =>
+  schema.node("table", { caption }, rows);
 
 export interface StateOptions {
   // "end" (default), a cursor position or a [from, to] text selection

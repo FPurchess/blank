@@ -1,19 +1,14 @@
-import {
-  MarkdownParser,
-  MarkdownSerializer,
-  defaultMarkdownParser,
-  defaultMarkdownSerializer,
-} from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 
 import { joinFrontmatter, splitFrontmatter } from "./frontmatter";
-import { schema } from "./schema";
+import { markdownParser } from "./parser";
+import { markdownSerializer } from "./serializer";
 
-// Blank's markdown: the stock prosemirror-markdown parser and serializer on
-// Blank's schema, plus the frontmatter. Import the schema, parser and
+// Blank's markdown: the schema with tables, the parser and serializer that
+// read and write them, and the frontmatter. Import the schema, parser and
 // serializer from here, never from prosemirror-markdown.
 
-export { schema };
+export { alignment, type Alignment, schema } from "./schema";
 export {
   type DocumentProperties,
   propertiesOf,
@@ -22,28 +17,9 @@ export {
   setProperties,
 } from "./frontmatter";
 
-export const markdownParser = new MarkdownParser(
-  schema,
-  defaultMarkdownParser.tokenizer,
-  defaultMarkdownParser.tokens,
-);
-
-export const markdownSerializer = new MarkdownSerializer(
-  {
-    ...defaultMarkdownSerializer.nodes,
-    horizontal_rule(state, node, parent, index) {
-      // a file that starts with `---` would open with the text up to the next
-      // `---` as its frontmatter, so a rule on top is written as `***`
-      const onTop =
-        index === 0 &&
-        parent.type === schema.topNodeType &&
-        parent.attrs.frontmatter === null;
-      state.write(onTop ? "***" : (node.attrs.markup as string) || "---");
-      state.closeBlock(node);
-    },
-  },
-  defaultMarkdownSerializer.marks,
-);
+export { markdownParser } from "./parser";
+export { markdownSerializer } from "./serializer";
+export { tokenizer } from "./tokenizer";
 
 /**
  * parseMarkdown parses a markdown file, including its frontmatter

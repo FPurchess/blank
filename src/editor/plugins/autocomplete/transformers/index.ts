@@ -6,6 +6,7 @@ import code_block from "./code_block";
 import heading from "./heading";
 import horizontal_rule from "./horizontal_rule";
 import ordered_list from "./ordered_list";
+import table from "./table";
 
 // block shortcuts; the first one that matches and applies wins. Their props
 // types differ, but each `transform` only gets its own `activate` result
@@ -16,6 +17,7 @@ const transformers = {
   ordered_list,
   horizontal_rule,
   code_block,
+  table,
 } as Record<string, BlockTransformer<unknown>>;
 
 export default transformers;

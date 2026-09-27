@@ -35,6 +35,21 @@
 | Outdent list item | `Shift` `Tab`   |
 | Blockquote        | `Mod` `G`       |
 | Horizontal line   | `Mod` `H`       |
+| Table             | `Mod` `T`       |
+
+## Tables
+
+| Command                         | Shortcut                 |
+| ------------------------------- | ------------------------ |
+| Insert a table                  | `Mod` `T`, arrows, Enter |
+| Next / previous cell            | `Tab` / `Shift` `Tab`    |
+| Add a row (in the last cell)    | `Tab`                    |
+| New line in a cell              | `Enter`                  |
+| Select cells                    | `Shift` + arrow keys     |
+| Select the cell, then the table | `Mod` `A`                |
+| Clear the selected cells        | `Backspace` or `Delete`  |
+
+See [Tables](./tables) for how tables work.
 
 ## Text
 

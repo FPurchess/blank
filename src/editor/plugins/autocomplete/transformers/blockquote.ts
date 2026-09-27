@@ -11,6 +11,7 @@ type Props = boolean;
 
 const _transformer: BlockTransformer<Props> = {
   trigger: "space",
+  inCells: true,
   activate: (line: string): Props | undefined => line === cmd || undefined,
   transform: (view: EditorView): boolean =>
     applyBlockCommand(view, wrapIn(schema.nodes.blockquote), cmd.length),
