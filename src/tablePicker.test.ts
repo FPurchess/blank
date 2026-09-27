@@ -66,15 +66,19 @@ describe("tablePicker", () => {
     expect(picker.submit).toHaveBeenCalledWith(4, 2);
   });
 
-  it("keeps the focus in the editor when a cell is pressed", () => {
+  it("keeps the focus in the editor when it's pressed anywhere", () => {
     open();
-    const event = new MouseEvent("mousedown", {
-      bubbles: true,
-      cancelable: true,
-    });
-    cellAt(1, 1).dispatchEvent(event);
+    const press = (target: Element) => {
+      const event = new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
 
-    expect(event.defaultPrevented).toBe(true);
+    expect(press(cellAt(1, 1))).toBe(true);
+    expect(press(document.querySelector("#table-picker .size")!)).toBe(true);
   });
 
   it("is removed once closed", () => {

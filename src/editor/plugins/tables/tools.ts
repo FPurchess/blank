@@ -158,7 +158,8 @@ export const tableTools = () => {
         checked: action.checked?.(view.state),
         run: () => {
           performAction(view, action);
-          view.focus();
+          // the caption field keeps the focus it took
+          if (!toolsKey.getState(view.state)?.caption) view.focus();
         },
       }));
 

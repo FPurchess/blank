@@ -61,7 +61,10 @@ describe("table toolbar", () => {
 
   it("runs an enabled item when its button is clicked, keeping the focus", () => {
     const state = show();
-    const down = new MouseEvent("mousedown", { cancelable: true });
+    const down = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
     button("x").dispatchEvent(down);
     button("x").click();
     button("z").click();
@@ -115,6 +118,13 @@ describe("table toolbar", () => {
 
     expect(input.value).toBe("Old");
     expect(document.activeElement).toBe(input);
+    // a press in the field places its cursor as usual
+    const down = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
     input.value = "New";
     input.form!.requestSubmit();
     expect(submit).toHaveBeenCalledWith("New");

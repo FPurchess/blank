@@ -175,6 +175,19 @@ describe("tables", () => {
     expect(saved).toContain("  <caption>fruit</caption>");
   });
 
+  it("writes a caption from the toolbar", async () => {
+    await open("| a |\n| - |\n| b |\n");
+    await $(".ProseMirror td").click();
+    await $('#table-toolbar button[data-id="caption"]').click();
+    await expect($("#table-toolbar .caption input")).toBeFocused();
+    await type("stock");
+    await type(Key.Enter);
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "caption");
+    expect(saved).toContain("  <caption>stock</caption>");
+  });
+
   it("switches a header column on from the toolbar", async () => {
     await open("| a | b |\n| - | - |\n| c | d |\n");
     await $(".ProseMirror td").click();

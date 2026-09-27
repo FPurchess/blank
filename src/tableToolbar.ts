@@ -15,8 +15,7 @@ const GAP = 6;
 const TOP = 36;
 
 /**
- * button creates the button of `item`. Pressing it keeps the focus in the
- * editor, which the toolbar works on.
+ * button creates the button of `item`
  */
 const button = (item: TableToolbarItem) => {
   const element = document.createElement("button");
@@ -27,7 +26,6 @@ const button = (item: TableToolbarItem) => {
   const key = document.createElement("kbd");
   key.setAttribute("aria-hidden", "true");
   element.append(key);
-  element.addEventListener("mousedown", (event) => event.preventDefault());
   return element;
 };
 
@@ -41,6 +39,11 @@ const createToolbar = (items: TableToolbarItem[]) => {
   element.className = "table-toolbar";
   element.setAttribute("role", "toolbar");
   element.setAttribute("aria-label", "Table");
+  // a press keeps the focus in the editor, which the toolbar works on, except
+  // in the caption field
+  element.addEventListener("mousedown", (event) => {
+    if (!(event.target as Element).closest("form")) event.preventDefault();
+  });
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";

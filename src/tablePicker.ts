@@ -55,13 +55,14 @@ const createPicker = (): HTMLElement => {
   element.className = "table-picker";
   element.setAttribute("role", "dialog");
   element.setAttribute("aria-label", "Insert table");
+  // a press anywhere on it keeps the focus in the editor, which handles keys
+  element.addEventListener("mousedown", (event) => event.preventDefault());
 
   const grid = document.createElement("div");
   grid.className = "grid";
   // the cells touch, so there's no gap where the mouse chooses nothing
   const cellAt = (event: Event) =>
     (event.target as HTMLElement).closest<HTMLElement>(".cell");
-  grid.addEventListener("mousedown", (event) => event.preventDefault());
   grid.addEventListener("mouseover", (event) => {
     const cell = cellAt(event);
     if (cell) choose(Number(cell.dataset.col), Number(cell.dataset.row));

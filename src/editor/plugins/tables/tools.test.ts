@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
@@ -75,8 +75,10 @@ describe("tableTools", () => {
 
     it("runs a button's action and announces what it did", () => {
       setup();
+      const focus = vi.spyOn(view, "focus");
       item("row-below").run();
 
+      expect(focus).toHaveBeenCalled();
       expect(cellTexts(view.state.doc)).toHaveLength(4);
       expect(announcement.value).toBe("A row added");
     });
@@ -186,8 +188,11 @@ describe("tableTools", () => {
   describe("caption", () => {
     it("opens a field for the caption and sets it", () => {
       setup();
+      const focus = vi.spyOn(view, "focus");
       item("caption").run();
       expect(toolbar().caption).toMatchObject({ value: "" });
+      // the field keeps the focus
+      expect(focus).not.toHaveBeenCalled();
 
       toolbar().caption!.submit("  Stock ");
       expect(view.state.doc.child(1).attrs.caption).toBe("Stock");

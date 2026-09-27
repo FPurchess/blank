@@ -491,7 +491,8 @@ body {
 // the toolbar of the table the cursor is in, see src/tableToolbar.ts
 .table-toolbar {
   position: fixed;
-  z-index: 15;
+  // below .dialog-backdrop, so a dialog covers it
+  z-index: 5;
   box-sizing: border-box;
   max-width: calc(100vw - 12px);
   display: flex;
