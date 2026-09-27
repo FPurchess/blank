@@ -47,27 +47,6 @@ export const describePaper = (layout: Layout, unit: Unit = "cm") => {
 export const describePageSize = (layout: Layout, unit: Unit) =>
   `${layoutPaper(layout, unit)} (${layout.orientation})`;
 
-/**
- * headingLevels names heading levels: "headings 1", "headings 1 and 2",
- * "headings 1, 2 and 3"
- */
-const headingLevels = (levels: number[]) => {
-  const last = levels[levels.length - 1];
-  const list =
-    levels.length > 1 ? `${levels.slice(0, -1).join(", ")} and ${last}` : last;
-  return `headings ${list}`;
-};
-
-/**
- * describeNewPages says which headings start a new page, e.g. "chapters on
- * new pages" for the headings of level 1
- * @returns the description, or null for none
- */
-export const describeNewPages = (levels: number[]): string | null => {
-  if (levels.length === 0) return null;
-  return `${levels.length === 1 && levels[0] === 1 ? "chapters" : headingLevels(levels)} on new pages`;
-};
-
 // what the problems of resolveLayout mean to the user
 const PROBLEMS: Record<string, string> = {
   frontmatter: "the properties at the top of the file can't be read",

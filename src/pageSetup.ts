@@ -1,7 +1,7 @@
 import { createButton, createDialog, createField } from "./dialog";
 import {
-  chapterOptions,
   choicesOf,
+  HEADING_OPTIONS,
   MARGIN_OPTIONS,
   type Option,
   ORIENTATION_OPTIONS,
@@ -16,37 +16,31 @@ import { thumbnailSvg } from "./layout/thumbnail";
 import { type PageSetupRequest, pageSetup } from "./state";
 
 // The page setup dialog: a row of choices for the paper, the orientation, the
-// margins and where chapters start, which ↑↓ move between and ←→ change, with a picture of the
+// margins and the headings that start a new page, which ↑↓ move between and ←→ change, with a picture of the
 // page. Custom sizes and margins are typed in below their row.
 
 const DIALOG_ID = "page-setup";
 
 let unsubscribe: (() => void) | undefined;
 
-type RowName = "paper" | "orientation" | "margins" | "chapters";
-
-interface Row {
-  element: HTMLElement;
-  // selects an option and focuses it
-  select(index: number): void;
-  selected(): number;
-}
+type RowName = "paper" | "orientation" | "margins" | "newPageBefore";
 
 /**
- * createRow creates a labelled group of options, of which one is checked,
- * as ARIA describes radio groups
+ * createSetting creates a labelled row of option buttons with the ARIA `role`
+ * of the group. One button is in the tab order at a time, which ←→ (and
+ * Home and End) move: `move` gets the index to go to.
  */
-const createRow = <T extends string>(
+const createSetting = <T>(
   name: RowName,
   label: string,
+  role: "radiogroup" | "group",
   options: Option<T>[],
-  value: T,
-  onChange: (value: T) => void,
-): Row => {
+  move: (index: number) => void,
+) => {
   const element = document.createElement("div");
   element.className = "setting";
   element.dataset.row = name;
-  element.setAttribute("role", "radiogroup");
+  element.setAttribute("role", role);
   const title = document.createElement("span");
   title.id = `${DIALOG_ID}-${name}`;
   title.className = "setting-label";
@@ -57,31 +51,16 @@ const createRow = <T extends string>(
   choices.className = "options";
   const buttons = options.map((option) => {
     const button = createButton(option.label, "button");
-    button.setAttribute("role", "radio");
-    button.dataset.value = option.value;
+    button.dataset.value = String(option.value);
     choices.append(button);
     return button;
   });
-
-  let current = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
-  const render = () =>
-    buttons.forEach((button, index) => {
-      button.setAttribute("aria-checked", String(index === current));
-      // only the checked option is in the tab order
-      button.tabIndex = index === current ? 0 : -1;
-    });
-  const select = (index: number) => {
+  let current = 0;
+  const focusable = (index: number) => {
     current = (index + options.length) % options.length;
-    render();
-    buttons[current].focus();
-    onChange(options[current].value);
+    buttons.forEach((button, i) => (button.tabIndex = i === current ? 0 : -1));
+    return current;
   };
-  buttons.forEach((button, index) =>
-    button.addEventListener("click", () => select(index)),
-  );
   element.addEventListener("keydown", (event) => {
     const moves: Record<string, number> = {
       ArrowRight: current + 1,
@@ -91,12 +70,90 @@ const createRow = <T extends string>(
     };
     if (event.key in moves) {
       event.preventDefault();
-      select(moves[event.key]);
+      move(focusable(moves[event.key]));
     }
   });
-  render();
   element.append(title, choices);
-  return { element, select, selected: () => current };
+  return { element, buttons, focusable };
+};
+
+/**
+ * createRow creates a row of options of which one is checked, as ARIA
+ * describes radio groups: ←→ check the next option
+ */
+const createRow = <T extends string>(
+  name: RowName,
+  label: string,
+  options: Option<T>[],
+  value: T,
+  onChange: (value: T) => void,
+) => {
+  let checked = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const check = (index: number) => {
+    checked = index;
+    buttons.forEach((button, i) =>
+      button.setAttribute("aria-checked", String(i === checked)),
+    );
+  };
+  const select = (index: number) => {
+    check(focusable(index));
+    buttons[checked].focus();
+    onChange(options[checked].value);
+  };
+  const { element, buttons, focusable } = createSetting(
+    name,
+    label,
+    "radiogroup",
+    options,
+    select,
+  );
+  buttons.forEach((button, index) => {
+    button.setAttribute("role", "radio");
+    button.addEventListener("click", () => select(index));
+  });
+  check(focusable(checked));
+  return { element };
+};
+
+/**
+ * createToggleRow creates a row of options that are each on or off, as
+ * toggle buttons: ←→ move between them and Space switches one
+ */
+const createToggleRow = <T>(
+  name: RowName,
+  label: string,
+  options: Option<T>[],
+  values: T[],
+  onChange: (values: T[]) => void,
+) => {
+  const on = new Set(values);
+  const { element, buttons, focusable } = createSetting(
+    name,
+    label,
+    "group",
+    options,
+    (index) => buttons[index].focus(),
+  );
+  const render = () =>
+    buttons.forEach((button, index) =>
+      button.setAttribute("aria-pressed", String(on.has(options[index].value))),
+    );
+  buttons.forEach((button, index) =>
+    button.addEventListener("click", () => {
+      const { value } = options[index];
+      if (on.has(value)) on.delete(value);
+      else on.add(value);
+      focusable(index);
+      render();
+      onChange(options.map((option) => option.value).filter((v) => on.has(v)));
+    }),
+  );
+  focusable(0);
+  render();
+  return { element };
 };
 
 /**
@@ -162,7 +219,8 @@ const renderDialog = (request: PageSetupRequest) => {
 
   const hint = document.createElement("p");
   hint.className = "hint";
-  hint.textContent = "↑↓ choose · ←→ change · Enter apply · Esc cancel";
+  hint.textContent =
+    "↑↓ choose · ←→ change · Space switch a heading · Enter apply · Esc cancel";
 
   const apply = createButton("Apply", "submit");
   const makeDefault = createButton("Make This My Default", "button");
@@ -241,13 +299,13 @@ const renderDialog = (request: PageSetupRequest) => {
       update();
     },
   );
-  const chapters = createRow(
-    "chapters",
-    "Chapters",
-    chapterOptions(choices.levels),
-    choices.chapters,
-    (value) => {
-      choices.chapters = value;
+  const newPageBefore = createToggleRow(
+    "newPageBefore",
+    "New page before",
+    HEADING_OPTIONS,
+    choices.newPageBefore,
+    (levels) => {
+      choices.newPageBefore = levels;
       update();
     },
   );
@@ -257,14 +315,14 @@ const renderDialog = (request: PageSetupRequest) => {
     orientation.element,
     margins.element,
     marginFields,
-    chapters.element,
+    newPageBefore.element,
   );
 
   // ↑↓ move between the rows and the visible inputs, Enter applies
   const stops = () =>
     [
       ...form.querySelectorAll<HTMLElement>(
-        '[role="radio"][aria-checked="true"], .custom input',
+        '[data-row] button[tabindex="0"], .custom input',
       ),
     ].filter((element) => !element.closest("[hidden]"));
   settings.addEventListener("keydown", (event) => {

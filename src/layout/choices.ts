@@ -1,4 +1,4 @@
-import { describeNewPages, paperName } from "./describe";
+import { paperName } from "./describe";
 import { localePaper, matchPaper, PAPER_NAMES, type PaperName } from "./paper";
 import { differences, layoutOf, leavesRoom } from "./resolve";
 import {
@@ -8,7 +8,6 @@ import {
   type PageChanges,
   type PageSettings,
   portrait,
-  sameLevels,
   sameMargins,
   SIDES,
 } from "./settings";
@@ -34,9 +33,8 @@ export interface PageChoices {
   margins: MarginPreset | "custom";
   // the custom margins as typed
   sides: Record<keyof Margins, string>;
-  // "custom" keeps the heading levels of the document, e.g. [1, 2]
-  chapters: "run-on" | "new-page" | "custom";
-  levels: number[];
+  // the levels of the headings that start a new page
+  newPageBefore: number[];
 }
 
 export interface Option<T> {
@@ -74,32 +72,10 @@ export const MARGIN_OPTIONS: Option<PageChoices["margins"]>[] = [
   { value: "custom", label: "Custom…" },
 ];
 
-/**
- * chapterOptions lists how chapters can start: on the page of the text
- * before them, or on a new page, and the levels the document has if they are
- * neither
- */
-export const chapterOptions = (
-  levels: number[],
-): Option<PageChoices["chapters"]>[] => [
-  { value: "run-on", label: "Run On" },
-  { value: "new-page", label: "Each on a New Page" },
-  ...(chaptersOf(levels) === "custom"
-    ? [
-        {
-          value: "custom" as const,
-          label: capitalize(describeNewPages(levels) as string),
-        },
-      ]
-    : []),
-];
-
-const capitalize = (text: string) => text[0].toUpperCase() + text.slice(1);
-
-const chaptersOf = (levels: number[]): PageChoices["chapters"] => {
-  if (levels.length === 0) return "run-on";
-  return sameLevels(levels, [1]) ? "new-page" : "custom";
-};
+// the headings that can start a new page
+export const HEADING_OPTIONS: Option<number>[] = [1, 2, 3, 4, 5, 6].map(
+  (level) => ({ value: level, label: `Heading ${level}` }),
+);
 
 /**
  * choicesOf returns what the dialog shows for page settings
@@ -131,8 +107,7 @@ export const choicesOf = (
     sides: Object.fromEntries(
       SIDES.map((side) => [side, show(margins[side])]),
     ) as PageChoices["sides"],
-    chapters: chaptersOf(settings.newPageBefore),
-    levels: settings.newPageBefore,
+    newPageBefore: settings.newPageBefore,
   };
 };
 
@@ -177,16 +152,11 @@ export const settingsOf = (
   } else {
     margins = allMargins(MARGIN_PRESETS[choices.margins]);
   }
-  const newPageBefore = {
-    "run-on": [],
-    "new-page": [1],
-    custom: choices.levels,
-  }[choices.chapters];
   const settings = {
     size,
     orientation: choices.orientation,
     margins,
-    newPageBefore,
+    newPageBefore: [...choices.newPageBefore].sort((a, b) => a - b),
   };
   if (!errors.paper && !leavesRoom(layoutOf(settings, locale))) {
     errors.margins = "The margins leave no room for the text";

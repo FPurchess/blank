@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  chapterOptions,
+  HEADING_OPTIONS,
   changesOf,
   choicesOf,
   MARGIN_PRESETS,
@@ -35,20 +35,12 @@ describe("paperOptions", () => {
   });
 });
 
-describe("chapterOptions", () => {
-  it("offers to run chapters on or start them on new pages", () => {
-    expect(chapterOptions([])).toEqual([
-      { value: "run-on", label: "Run On" },
-      { value: "new-page", label: "Each on a New Page" },
+describe("HEADING_OPTIONS", () => {
+  it("offers every heading level to start a new page", () => {
+    expect(HEADING_OPTIONS.map(({ value }) => value)).toEqual([
+      1, 2, 3, 4, 5, 6,
     ]);
-    expect(chapterOptions([1])).toHaveLength(2);
-  });
-
-  it("offers the levels of the document the rows don't name", () => {
-    expect(chapterOptions([1, 2])[2]).toEqual({
-      value: "custom",
-      label: "Headings 1 and 2 on new pages",
-    });
+    expect(HEADING_OPTIONS[0].label).toBe("Heading 1");
   });
 });
 
@@ -61,8 +53,7 @@ describe("choicesOf", () => {
       orientation: "portrait",
       margins: "normal",
       sides: { top: "2.5", right: "2.5", bottom: "2.5", left: "2.5" },
-      chapters: "run-on",
-      levels: [],
+      newPageBefore: [],
     });
   });
 
@@ -111,27 +102,27 @@ describe("settingsOf", () => {
         paper: "letter",
         orientation: "landscape",
         margins: "narrow",
-        chapters: "new-page",
+        newPageBefore: [2, 1],
       }),
     ).toEqual({
       settings: {
         size: "letter",
         orientation: "landscape",
         margins: allMargins(cm(1.27)),
-        newPageBefore: [1],
+        newPageBefore: [1, 2],
       },
     });
   });
 
-  it("keeps heading levels of the document the rows don't name", () => {
+  it("shows the heading levels that start a new page", () => {
     const choices = choicesOf(
-      settings({ newPageBefore: [1, 2] }),
+      settings({ newPageBefore: [1, 3] }),
       "de-DE",
       "cm",
     );
-    expect(choices).toMatchObject({ chapters: "custom", levels: [1, 2] });
+    expect(choices.newPageBefore).toEqual([1, 3]);
     expect(settingsOf(choices, "de-DE", "cm")).toMatchObject({
-      settings: { newPageBefore: [1, 2] },
+      settings: { newPageBefore: [1, 3] },
     });
   });
 

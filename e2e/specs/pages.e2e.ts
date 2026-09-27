@@ -94,6 +94,32 @@ describe("page setup", () => {
     await browser.keys(Key.Escape);
   });
 
+  it("starts headings of the levels turned on on a new page", async () => {
+    await pressMod(Key.Alt, "u");
+    const headings = '#page-setup [data-row="newPageBefore"] button';
+
+    // down to the headings (past the custom margins of the test before),
+    // then the second one, switched on with Space
+    const inHeadings = () =>
+      browser.execute(
+        () => !!document.activeElement?.closest('[data-row="newPageBefore"]'),
+      );
+    for (let stop = 0; stop < 10 && !(await inHeadings()); stop++) {
+      await browser.keys(Key.ArrowDown);
+    }
+    await browser.keys(Key.ArrowRight);
+    await browser.keys(Key.Space);
+    await expect($(`${headings}[aria-pressed="true"]`)).toHaveText("Heading 2");
+    await browser.keys(Key.Enter);
+
+    await expect($("#page-setup")).not.toExist();
+    await pressMod("s");
+    await browser.waitUntil(
+      () => fs.readFileSync(fixturePath, "utf8").includes("new-page-before: 2"),
+      { timeoutMsg: "the heading levels have not been saved" },
+    );
+  });
+
   // +++ is tested in the unit tests: WebKitWebDriver can't type a +
   it("starts new pages with Mod+Enter, and saves them", async () => {
     const breaksPath = path.join(fixtureDir, "breaks.md");

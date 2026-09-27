@@ -30,9 +30,9 @@ In the file, a page break is the line `<!-- pagebreak -->`, which other markdown
 
 ## Chapters on new pages {#chapters}
 
-For a book, a thesis or a long report, set **Chapters** in the page setup to **Each on a New Page**: every heading 1 then starts a new page, in the PDF and in Word. A heading right after a page break stays where it is, so you never get an empty page.
+For a book, a thesis or a long report, turn on **Heading 1** under **New page before** in the page setup: every heading 1 then starts a new page, in the PDF and in Word. Turn on more levels, e.g. **Heading 2** for sections, and those start new pages too. With the keyboard, `←` `→` move between the headings and `Space` turns one on or off.
 
-To start other headings on new pages too, list their levels in the [properties](#frontmatter), e.g. `new-page-before: [1, 2]`.
+A heading right after a page break stays where it is, so you never get an empty page. In the [properties](#frontmatter), the setting reads `new-page-before: [1, 2]`.
 
 ## Where the page setup is kept {#frontmatter}
 
