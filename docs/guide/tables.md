@@ -6,7 +6,7 @@ Tables in Blank work like the rest of your writing: you type, press `Tab` to go 
 
 ## Make a table {#make}
 
-There are two ways:
+There are three ways:
 
 - **`Mod` `T`** shows a small grid under the cursor. Pick the size with the arrow keys and press Enter, or point at the size and click. Want the usual? `Mod` `T` then Enter gives you three columns with a header row and two rows.
 
@@ -19,6 +19,8 @@ There are two ways:
   The line becomes a table with that header and an empty row, and the cursor waits in the first cell. Changed your mind? `Mod` `Z` gives you back the line as you typed it.
 
   <img class="shot" src="/screenshots/table-header.gif" alt="Typing | Name | Role | and Enter turns the line into a table, which Tab then fills" />
+
+- **Paste one** from a spreadsheet, a web page or Word, see [Copy and paste](#clipboard).
 
 The first row is the header. It's bold and tinted, and screen readers announce it with every cell.
 
@@ -102,6 +104,19 @@ Move the mouse over a table and it shows handles right where you need them. They
 - **Grow and shrink the table:** drag its right edge, its bottom edge or its corner. A dashed outline shows the new size, like _4 × 6_. Growing adds empty rows and columns at the end; shrinking only takes away empty ones, so nothing you wrote gets lost.
 
 `Esc` cancels a drag, and `Mod` `Z` undoes any change in one step.
+
+## Copy and paste {#clipboard}
+
+Tables move between Blank and your spreadsheet in both directions.
+
+<img class="shot" src="/screenshots/table-paste.gif" alt="Mod V pastes cells copied from a spreadsheet as a table; with the cursor in the table, Mod V pastes two more rows, and the table grows to take them" />
+
+- **Paste cells** you copied in LibreOffice Calc, Excel, Google Sheets or Numbers, or a table from a web page or Word, and you get a table. Its first row becomes the header. A column keeps its alignment when all its cells agree, like numbers aligned right.
+- **Paste into a table**, and the cells fill from the cursor, or fill the cells you selected. The table grows when they need more room. The pasted cells fit in where they land: header cells in the header row, plain cells below it.
+- **Copy cells**, selected with `Shift` + arrows or `Mod` `A`, and paste them into a spreadsheet: every cell lands in its own cell there.
+- **Paste as Plain Text** in the right-click menu keeps copied cells as text.
+
+Tables pasted from elsewhere get their widths from their content, like any other table.
 
 ## How tables are saved {#saving}
 

@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { clickInto, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  Key,
+  paste,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 /**
  * waits until the file at `filePath` contains `text` and returns its content
@@ -196,6 +203,61 @@ describe("tables", () => {
     await pressMod("s");
     const saved = await waitForSaved(file, "<table>");
     expect(saved).toContain('      <th scope="row">c</th>');
+  });
+
+  describe("with the clipboard", () => {
+    it("pastes cells copied from a spreadsheet as a table", async () => {
+      await open("Start\n");
+      await clickInto(".ProseMirror p");
+      await type(Key.End);
+      await type(Key.Enter);
+      await paste({ "text/plain": "fruit\tqty\nkiwi\t10\n" });
+      await pressMod("s");
+
+      const saved = await waitForSaved(file, "kiwi");
+      expect(saved).toBe(
+        "Start\n\n| fruit | qty |\n| ----- | --- |\n| kiwi  | 10  |",
+      );
+    });
+
+    it("pastes a table from a web page with a header row", async () => {
+      await open("Start\n");
+      await clickInto(".ProseMirror p");
+      await type(Key.End);
+      await type(Key.Enter);
+      await paste({
+        "text/html":
+          '<table class="data"><tr><td>fruit</td><td align="right">qty</td></tr><tr><td>kiwi</td><td align="right">10</td></tr></table>',
+        "text/plain": "fruit\tqty\nkiwi\t10",
+      });
+      await pressMod("s");
+
+      const saved = await waitForSaved(file, "kiwi");
+      expect(saved).toBe(
+        "Start\n\n| fruit | qty |\n| ----- | --: |\n| kiwi  |  10 |",
+      );
+    });
+
+    it("copies cells as tab-separated text", async () => {
+      await open("| fruit | qty |\n| - | - |\n| kiwi | 10 |\n");
+      await clickInto(".ProseMirror td");
+      // the cell, then the whole table
+      await pressMod("a");
+      await pressMod("a");
+      const copied = await browser.execute(() => {
+        const clipboard = new DataTransfer();
+        document.querySelector(".ProseMirror")!.dispatchEvent(
+          new ClipboardEvent("copy", {
+            clipboardData: clipboard,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        return clipboard.getData("text/plain");
+      });
+
+      expect(copied).toBe("fruit\tqty\nkiwi\t10");
+    });
   });
 
   describe("with the mouse", () => {

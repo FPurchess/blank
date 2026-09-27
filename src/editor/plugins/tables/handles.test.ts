@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Plugin } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 
@@ -167,9 +168,18 @@ describe("tableHandles", () => {
   });
 
   it("hides the handles while typing, until the mouse moves", () => {
+    // the keys a plugin before them handles, like Tab in a table, too
+    view.destroy();
+    const keys = new Plugin({ props: { handleKeyDown: () => true } });
+    view = new EditorView(document.createElement("div"), {
+      state: createState(grid(), {
+        cursor: 2,
+        plugins: [keys, tableView(), tableHandles()],
+      }),
+    });
     hover();
-    view.someProp("handleKeyDown", (f) =>
-      f(view, new KeyboardEvent("keydown", { key: "a" })),
+    view.dom.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
     );
     expect(handles.value).toBeNull();
 

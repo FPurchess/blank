@@ -5,7 +5,14 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { $, browser } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  focusEditor,
+  Key,
+  paste,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(
@@ -526,6 +533,42 @@ describe("docs screenshots", () => {
     await film.press("Esc", Key.Escape, 0.8);
     await film.pause(2);
     film.save(path.join(outDir, "table-mode.gif"), 360);
+  });
+
+  it("records pasting cells from a spreadsheet", async () => {
+    const film = await filmNew();
+    await film.type("# Fruit stock");
+    await film.enter(0.6);
+    // cells copied in a spreadsheet: tab-separated text
+    await film.shortcut(
+      ["Mod", "V"],
+      () =>
+        paste({
+          "text/plain": "Fruit\tQty\tPrice\nApples\t40\t1.20\nPears\t12\t0.80",
+        }),
+      1.6,
+    );
+    // Tab in the last cell adds a row, where two more rows get pasted
+    const lastCell = await browser.execute(() => {
+      const cell = document.querySelector(
+        ".ProseMirror tr:last-child td:last-child",
+      )!;
+      const rect = cell.getBoundingClientRect();
+      return {
+        x: Math.round(rect.left + 30),
+        y: Math.round(rect.top + rect.height / 2),
+      };
+    });
+    await browser.action("pointer").move(lastCell).down().up().perform();
+    await film.pause(0.4);
+    await film.press("Tab", Key.Tab, 0.6);
+    await film.shortcut(
+      ["Mod", "V"],
+      () => paste({ "text/plain": "Kiwis\t25\t0.40\nPlums\t30\t0.25" }),
+      1.6,
+    );
+    await film.pause(2);
+    film.save(path.join(outDir, "table-paste.gif"), 360);
   });
 
   it("records changing a table with the mouse", async () => {

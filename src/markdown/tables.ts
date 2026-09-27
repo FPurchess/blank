@@ -78,28 +78,78 @@ export const cellWidths = (
 };
 
 /**
- * withColumnPercents returns `table` with the column widths `percents`, see
- * columnPercents
+ * mapCells returns `table` with each cell replaced by what `change` makes of
+ * it, given the column it starts in
  */
-export const withColumnPercents = (
+const mapCells = (
   table: Node,
-  percents: readonly number[],
+  change: (cell: Node, col: number) => Node,
 ): Node => {
-  const widths = cellWidths(table, percents);
+  const map = TableMap.get(table);
   const rows: Node[] = [];
   let offset = 0;
   table.forEach((row) => {
     const cells: Node[] = [];
     let cellOffset = offset + 1;
     row.forEach((cell) => {
-      const colwidth = widths.get(cellOffset) ?? null;
-      cells.push(cell.type.create({ ...cell.attrs, colwidth }, cell.content));
+      cells.push(change(cell, map.colCount(cellOffset)));
       cellOffset += cell.nodeSize;
     });
     rows.push(row.copy(Fragment.from(cells)));
     offset += row.nodeSize;
   });
   return table.copy(Fragment.from(rows));
+};
+
+/**
+ * withAttrs returns `cell` with `attrs` changed
+ */
+const withAttrs = (cell: Node, attrs: Record<string, unknown>) =>
+  cell.type.create({ ...cell.attrs, ...attrs }, cell.content, cell.marks);
+
+/**
+ * withColumnPercents returns `table` with the column widths `percents`, see
+ * columnPercents
+ */
+export const withColumnPercents = (
+  table: Node,
+  percents: readonly number[],
+): Node =>
+  mapCells(table, (cell, col) =>
+    withAttrs(cell, {
+      colwidth: percents.slice(col, col + (cell.attrs.colspan as number)),
+    }),
+  );
+
+/**
+ * withColumnAlignment returns `table` aligned by columns, as a pipe table
+ * is: a column keeps the alignment all its body cells agree on, for all its
+ * cells, and none otherwise. Left, the default, counts as none. Merged cells
+ * aren't aligned.
+ */
+export const withColumnAlignment = (table: Node): Node => {
+  const map = TableMap.get(table);
+  // the header rows unless they're all there is
+  const headerRows = headerRowCount(table);
+  const body = headerRows < map.height ? headerRows : 0;
+  const found: Set<Alignment | null>[] = Array.from(
+    { length: map.width },
+    () => new Set(),
+  );
+  for (const offset of new Set(map.map)) {
+    const cell = table.nodeAt(offset)!;
+    const { top, left } = map.findCell(offset);
+    if (top >= body && cell.attrs.colspan === 1) {
+      const align = cell.attrs.align as Alignment | null;
+      found[left].add(align === "left" ? null : align);
+    }
+  }
+  const aligns = found.map((set) => (set.size === 1 ? [...set][0] : null));
+  return mapCells(table, (cell, col) =>
+    withAttrs(cell, {
+      align: cell.attrs.colspan === 1 ? aligns[col] : null,
+    }),
+  );
 };
 
 /**

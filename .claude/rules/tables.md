@@ -7,6 +7,7 @@ paths:
   - "src/markdown/tokenizer.ts"
   - "src/exporters/table.ts"
   - "src/importers/docx/cleanup.ts"
+  - "src/editor/contextMenu/model.ts"
   - "src/table*.ts"
 ---
 
@@ -38,6 +39,16 @@ paths:
 - Widths set with the mouse are percentages in the cells' `colwidth`, one per column a cell spans (`columnPercents`, `cellWidths`, `withColumnPercents` in `src/markdown/tables.ts`). prosemirror-tables keeps them through inserts, deletes, merges and splits, and its `fixTables` gives new rows their columns' widths; a new column has none and gets the average.
 - They make a table an HTML table (the `widths` reason of `gfmBlocker`), saved as a `<colgroup>` of percentages. `parseHtmlTable` reads them back only from Blank's own files; `normalizeTableHtml` drops `<colgroup>`, so pasted and imported tables size to their content.
 - The NodeView renders them and doesn't freeze such tables.
+
+## Clipboard
+
+- `src/editor/plugins/tables/clipboard.ts` (`tableClipboard`, before `tableEditing`, whose paste it wraps):
+  - `transformPastedHTML` runs every table from another app (HTML without `data-pm-slice`) through `normalizeTableHtml`, promoting the first row to the header outside a table; `transformPasted` then aligns those tables by column (`withColumnAlignment`), since spreadsheets align each cell by what it holds. Blank's own copies are kept as they are.
+  - `clipboardTextParser` turns tab-separated text (`parseTsv`, with spreadsheet quoting, a quote that doesn't enclose a whole cell read as text, and lines indented with tabs, an empty first column, kept as text) into a table, unless it's a paste as plain text: ProseMirror's `pasteText` always says plain, so the menu's paste goes through `pasteText(view, text, plain)` from this module.
+  - `handlePaste` runs prosemirror-tables' paste, for cells and for anything pasted into selected cells, with a dispatch that retypes the cells it lands on (header cells in the header rows and header column, plain cells elsewhere).
+  - `clipboardTextSerializer` writes copied cells as tab-separated text (`tsvOf`), with empty cells where merged cells span; the menu's copy fallback gets it through `view.serializeForClipboard`.
+- E2E and the docs recordings paste with `paste()` from `e2e/helpers.ts`, a synthetic paste event with clipboard data, since the system clipboard is out of reach there.
+- The mouse handles hide on the DOM `keydown`, not `handleKeyDown`: the table keys handle Tab and Enter before them.
 
 ## Export and import
 

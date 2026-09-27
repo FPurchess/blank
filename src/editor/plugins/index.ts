@@ -7,6 +7,7 @@ export { default as openLink } from "./openLink";
 export { spellcheck } from "./spellcheck";
 export { default as properties } from "./properties";
 export {
+  tableClipboard,
   tableGuard,
   tableKeys,
   tablePickerKeys,

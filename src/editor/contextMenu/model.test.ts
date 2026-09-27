@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorState, type Plugin, TextSelection } from "prosemirror-state";
+import { CellSelection, tableEditing } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 import { history, undo, undoDepth } from "prosemirror-history";
 import { schema } from "../../markdown";
@@ -21,6 +22,7 @@ import {
   spellcheck as spellcheckPlugin,
   spellcheckKey,
 } from "../plugins/spellcheck";
+import { tableClipboard } from "../plugins/tables/clipboard";
 import { buildMenu, changeAll, copy, paste, replaceWord } from "./model";
 
 vi.mock("../../spellcheck/service", async (importOriginal) => ({
@@ -424,9 +426,13 @@ describe("contextMenu model tables", () => {
   const grid = () =>
     doc(table(tr(th("Fruit"), th("Qty")), tr(td("kiwi"), td("10"))), p());
 
-  const setupAt = (node: Node, cursor: number | null) => {
+  const setupAt = (
+    node: Node,
+    cursor: number | null,
+    plugins: Plugin[] = [],
+  ) => {
     view = new EditorView(document.createElement("div"), {
-      state: EditorState.create({ schema, doc: node }),
+      state: EditorState.create({ schema, doc: node, plugins }),
     });
     if (cursor !== null) {
       view.dispatch(
@@ -458,6 +464,45 @@ describe("contextMenu model tables", () => {
 
     find(children, "table-row-below").run!();
     expect(view.state.doc.firstChild!.childCount).toBe(3);
+  });
+
+  describe("clipboard", () => {
+    beforeEach(() => {
+      vi.stubGlobal("ClipboardEvent", class extends Event {});
+    });
+
+    it("copies cells as tab-separated text where the webview doesn't let it", async () => {
+      const node = grid();
+      setupAt(node, null, [tableClipboard(), tableEditing()]);
+      const cell = (text: string) =>
+        view.state.doc.resolve(at(node, text)).before(-1);
+      view.dispatch(
+        view.state.tr.setSelection(
+          CellSelection.create(view.state.doc, cell("Fruit"), cell("10")),
+        ),
+      );
+      document.execCommand = vi.fn(() => false);
+
+      await copy(view);
+      expect(writeText).toHaveBeenCalledWith("Fruit\tQty\nkiwi\t10");
+    });
+
+    it("pastes copied spreadsheet cells as a table, unless as plain text", async () => {
+      setupAt(doc(p("")), 1, [tableClipboard(), tableEditing()]);
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { read: async () => [] },
+      });
+      vi.mocked(readText).mockResolvedValue("Fruit\tQty\nkiwi\t10");
+      const tables = () =>
+        view.state.doc.children.filter((node) => node.type.name === "table");
+
+      await paste(view, true);
+      expect(tables()).toHaveLength(0);
+
+      await paste(view);
+      expect(tables()).toHaveLength(1);
+    });
   });
 
   it("offers to insert a table elsewhere", () => {

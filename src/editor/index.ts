@@ -18,6 +18,7 @@ import {
   tableGuard,
   tableKeys,
   tablePickerKeys,
+  tableClipboard,
   tableHandles,
   tableTools,
   tableView,
@@ -49,6 +50,8 @@ export const bootEditor = async () => {
         tableGuard(),
         tableView(),
         tableHandles(),
+        // before tableEditing, whose paste it wraps
+        tableClipboard(),
         tableEditing(),
       ],
     }),
