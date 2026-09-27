@@ -8,6 +8,16 @@ import { Alignment, schema } from "../schema";
 export type GfmBlocker =
   "merged" | "headerColumn" | "noHeader" | "blocks" | "caption" | "mixedAlign";
 
+// the order in which gfmBlocker names what it found
+const BLOCKERS: GfmBlocker[] = [
+  "merged",
+  "headerColumn",
+  "noHeader",
+  "blocks",
+  "caption",
+  "mixedAlign",
+];
+
 const isHeader = (cell: Node) => cell.type === schema.nodes.table_header;
 
 /**
@@ -34,15 +44,7 @@ export const gfmBlocker = (table: Node): GfmBlocker | null => {
     });
   });
   if (table.attrs.caption) found.add("caption");
-  const order: GfmBlocker[] = [
-    "merged",
-    "headerColumn",
-    "noHeader",
-    "blocks",
-    "caption",
-    "mixedAlign",
-  ];
-  return order.find((blocker) => found.has(blocker)) ?? null;
+  return BLOCKERS.find((blocker) => found.has(blocker)) ?? null;
 };
 
 /**
@@ -107,14 +109,10 @@ export const gfmLines = (
   table: Node,
   cellText: (cell: Node) => string,
 ): string[] => {
-  const rows: string[][] = [];
-  table.forEach((row) => {
-    const texts: string[] = [];
-    row.forEach((cell) => texts.push(cellText(cell)));
-    rows.push(texts);
-  });
-  const aligns: (Alignment | null)[] = [];
-  table.firstChild?.forEach((cell) => aligns.push(cell.attrs.align));
+  const rows = table.children.map((row) => row.children.map(cellText));
+  const aligns: (Alignment | null)[] = table.children[0].children.map(
+    (cell) => cell.attrs.align,
+  );
   const widths = aligns.map((_, c) =>
     Math.max(3, ...rows.map((row) => displayWidth(row[c] ?? ""))),
   );
@@ -161,12 +159,11 @@ const cellHtml = (cell: Node): string => {
  * can't: merged cells, header columns, blocks in cells and a caption
  */
 export const htmlLines = (table: Node): string[] => {
-  const rows: Node[] = [];
-  table.forEach((row) => rows.push(row));
+  const rows = table.children;
   let headerRows = 0;
   while (
     headerRows < rows.length &&
-    rows[headerRows].content.content.every(isHeader)
+    rows[headerRows].children.every(isHeader)
   ) {
     headerRows++;
   }
@@ -187,7 +184,7 @@ export const htmlLines = (table: Node): string[] => {
     });
     return ["    <tr>", ...cells, "    </tr>"];
   };
-  const section = (tag: string, part: Node[], inHead: boolean) =>
+  const section = (tag: string, part: readonly Node[], inHead: boolean) =>
     part.length
       ? [
           `  <${tag}>`,

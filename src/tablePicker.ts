@@ -1,3 +1,4 @@
+import { place } from "./popup";
 import { tablePicker, type TablePickerState } from "./state";
 
 const PICKER_ID = "table-picker";
@@ -5,8 +6,8 @@ const PICKER_ID = "table-picker";
 export const MAX_SIZE = 20;
 // the size the picker opens with: three columns, a header row and two rows
 export const DEFAULT_SIZE = { cols: 3, rows: 3 };
-// space between the picker and the edges of the window
-const MARGIN = 4;
+// the grid shows at least this many columns and rows, like Word's
+const MIN_SHOWN = { cols: 10, rows: 8 };
 
 /**
  * resizePicker changes the size the open picker would insert by `cols` and
@@ -15,12 +16,19 @@ const MARGIN = 4;
 export const resizePicker = (cols: number, rows: number) => {
   const picker = tablePicker.value;
   if (!picker) return;
+  choose(picker.cols + cols, picker.rows + rows);
+};
+
+/**
+ * choose sets the size the open picker would insert
+ */
+const choose = (cols: number, rows: number) => {
+  const picker = tablePicker.value;
   const clamp = (n: number) => Math.min(Math.max(n, 1), MAX_SIZE);
-  tablePicker.value = {
-    ...picker,
-    cols: clamp(picker.cols + cols),
-    rows: clamp(picker.rows + rows),
-  };
+  if (!picker || (picker.cols === clamp(cols) && picker.rows === clamp(rows))) {
+    return;
+  }
+  tablePicker.value = { ...picker, cols: clamp(cols), rows: clamp(rows) };
 };
 
 /**
@@ -29,84 +37,112 @@ export const resizePicker = (cols: number, rows: number) => {
 export const sizeLabel = (cols: number, rows: number) => `${cols} × ${rows}`;
 
 /**
- * place positions the picker below the cursor, or above it if there's no
- * room below
+ * shown returns how many columns and rows the grid shows for `picker`: at
+ * least MIN_SHOWN, and always one more than chosen, so the mouse can grow it
  */
-const place = (element: HTMLElement, anchor: TablePickerState["anchor"]) => {
-  const { width, height } = element.getBoundingClientRect();
-  let top = anchor.bottom + 4;
-  if (top + height > window.innerHeight - MARGIN) {
-    top = Math.max(MARGIN, anchor.top - height - 4);
-  }
-  const left = Math.max(
-    MARGIN,
-    Math.min(anchor.left, window.innerWidth - MARGIN - width),
-  );
-  element.style.left = `${left}px`;
-  element.style.top = `${top}px`;
-};
+const shown = ({ cols, rows }: TablePickerState) => ({
+  cols: Math.min(Math.max(cols + 1, MIN_SHOWN.cols), MAX_SIZE),
+  rows: Math.min(Math.max(rows + 1, MIN_SHOWN.rows), MAX_SIZE),
+});
 
 /**
- * renderPicker renders the grid of the table picker: the cells of the chosen
- * size are marked, and one more column and row than chosen are shown
+ * createPicker creates the picker: a grid whose cells choose the size under
+ * the mouse and insert it on a click, the size and a hint
  */
-const renderPicker = (picker: TablePickerState): HTMLElement => {
+const createPicker = (): HTMLElement => {
   const element = document.createElement("div");
   element.id = PICKER_ID;
   element.className = "table-picker";
   element.setAttribute("role", "dialog");
   element.setAttribute("aria-label", "Insert table");
 
-  const shownCols = Math.min(Math.max(picker.cols + 1, 5), MAX_SIZE);
-  const shownRows = Math.min(Math.max(picker.rows + 1, 5), MAX_SIZE);
   const grid = document.createElement("div");
   grid.className = "grid";
-  grid.style.gridTemplateColumns = `repeat(${shownCols}, auto)`;
-  for (let row = 1; row <= shownRows; row++) {
-    for (let col = 1; col <= shownCols; col++) {
-      const cell = document.createElement("span");
-      cell.className = "cell";
-      if (row === 1) cell.classList.add("header");
-      if (col <= picker.cols && row <= picker.rows) {
-        cell.classList.add("chosen");
-      }
-      // the mouse can choose a size too
-      cell.addEventListener("mousedown", (event) => event.preventDefault());
-      cell.addEventListener("mouseenter", () => {
-        const open = tablePicker.value;
-        if (open && (open.cols !== col || open.rows !== row)) {
-          tablePicker.value = { ...open, cols: col, rows: row };
-        }
-      });
-      cell.addEventListener("click", () => picker.submit(col, row));
-      grid.appendChild(cell);
+  // the cells touch, so there's no gap where the mouse chooses nothing
+  const cellAt = (event: Event) =>
+    (event.target as HTMLElement).closest<HTMLElement>(".cell");
+  grid.addEventListener("mousedown", (event) => event.preventDefault());
+  grid.addEventListener("mouseover", (event) => {
+    const cell = cellAt(event);
+    if (cell) choose(Number(cell.dataset.col), Number(cell.dataset.row));
+  });
+  grid.addEventListener("click", (event) => {
+    const cell = cellAt(event);
+    const picker = tablePicker.value;
+    if (cell && picker) {
+      picker.submit(Number(cell.dataset.col), Number(cell.dataset.row));
     }
-  }
+  });
 
-  const label = document.createElement("div");
-  label.className = "size";
-  label.setAttribute("aria-live", "polite");
-  label.textContent = sizeLabel(picker.cols, picker.rows);
+  const size = document.createElement("div");
+  size.className = "size";
+  size.setAttribute("aria-live", "polite");
 
   const hint = document.createElement("div");
   hint.className = "hint";
-  hint.textContent = "Arrows: size · Enter: insert · Esc: cancel";
+  hint.textContent = "Arrows or mouse: size · Enter or click: insert";
 
-  element.append(grid, label, hint);
+  element.append(grid, size, hint);
   return element;
 };
 
 /**
- * bootTablePicker renders the table picker whenever it opens or changes
+ * updatePicker shows the chosen size of `picker` in `element`. It changes the
+ * grid in place, so nothing flickers while the size changes.
+ */
+const updatePicker = (element: HTMLElement, picker: TablePickerState) => {
+  const grid = element.querySelector<HTMLElement>(".grid")!;
+  const { cols, rows } = shown(picker);
+  if (grid.childElementCount !== cols * rows) {
+    grid.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+    const cells = [];
+    for (let row = 1; row <= rows; row++) {
+      for (let col = 1; col <= cols; col++) {
+        const cell = document.createElement("span");
+        cell.className = row === 1 ? "cell header" : "cell";
+        cell.dataset.col = String(col);
+        cell.dataset.row = String(row);
+        cells.push(cell);
+      }
+    }
+    grid.replaceChildren(...cells);
+  }
+  for (const cell of grid.children as HTMLCollectionOf<HTMLElement>) {
+    const chosen =
+      Number(cell.dataset.col) <= picker.cols &&
+      Number(cell.dataset.row) <= picker.rows;
+    cell.classList.toggle("chosen", chosen);
+  }
+  element.querySelector(".size")!.textContent = sizeLabel(
+    picker.cols,
+    picker.rows,
+  );
+};
+
+/**
+ * bootTablePicker shows the table picker while it's open
  */
 export const bootTablePicker = () => {
+  let element: HTMLElement | null = null;
+  let anchor: TablePickerState["anchor"] | null = null;
   tablePicker.subscribe(
     (picker) => {
-      document.getElementById(PICKER_ID)?.remove();
-      if (!picker) return;
-      const element = renderPicker(picker);
-      document.body.appendChild(element);
-      place(element, picker.anchor);
+      if (!picker) {
+        element?.remove();
+        element = anchor = null;
+        return;
+      }
+      if (!element) {
+        element = createPicker();
+        document.body.appendChild(element);
+      }
+      const height = element.offsetHeight;
+      updatePicker(element, picker);
+      // placed when it opens and when the grid grows, so it stays in view
+      if (anchor !== picker.anchor || element.offsetHeight !== height) {
+        anchor = picker.anchor;
+        place(element, anchor);
+      }
     },
     { immediate: true },
   );

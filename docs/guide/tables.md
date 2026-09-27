@@ -2,15 +2,13 @@
 
 Tables in Blank work like the rest of your writing: you type, press `Tab` to go to the next cell, and the table grows as you need it. The columns stay put while you type, and nothing is ever lost by a key pressed at the wrong time. Your tables are saved as plain markdown tables that GitHub, Obsidian, Typora and pandoc show as tables too.
 
-<img class="shot" src="/screenshots/table.png" alt="A table in Blank, with a header row and a right-aligned column" />
+<img class="shot" src="/screenshots/table-insert.gif" alt="Mod T opens a grid, the arrow keys make it four columns wide, Enter inserts the table, Tab fills it cell by cell and the arrow key leads out of it" />
 
 ## Make a table {#make}
 
-Two ways, both from the keyboard:
+There are two ways:
 
-- **`Mod` `T`** shows a small grid under the cursor. Pick the size with the arrow keys and press Enter. Want the usual? `Mod` `T` then Enter gives you three columns with a header row and two rows. The mouse works too: point at the size and click.
-
-  <img class="shot" src="/screenshots/table-picker.png" alt="The grid for the size of a new table, set to four columns and three rows" />
+- **`Mod` `T`** shows a small grid under the cursor. Pick the size with the arrow keys and press Enter, or point at the size and click. Want the usual? `Mod` `T` then Enter gives you three columns with a header row and two rows.
 
 - **Type the header.** On an empty line, type the column titles between pipes and press Enter:
 
@@ -19,6 +17,8 @@ Two ways, both from the keyboard:
   ```
 
   The line becomes a table with that header and an empty row, and the cursor waits in the first cell. Changed your mind? `Mod` `Z` gives you back the line as you typed it.
+
+  <img class="shot" src="/screenshots/table-header.gif" alt="Typing | Name | Role | and Enter turns the line into a table, which Tab then fills" />
 
 The first row is the header. It's bold and tinted, and screen readers announce it with every cell.
 
@@ -36,6 +36,8 @@ The first row is the header. It's bold and tinted, and screen readers announce i
 ## Write in a cell {#cells}
 
 A cell is a small page of its own. Bold, italic, code, links and images all work in it.
+
+<img class="shot" src="/screenshots/table-cells.gif" alt="Enter starts a second line in a cell; Shift and the left arrow select two cells, which Backspace clears" />
 
 - **Enter** starts a new line in the cell.
 - **Enter on an empty line** turns it into a new paragraph.

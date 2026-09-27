@@ -4,6 +4,8 @@ import MarkdownIt, {
   type StateInline,
 } from "markdown-it";
 
+import { parseHtmlTable } from "./html";
+
 /**
  * htmlBreak reads `<br>`, `<br/>` and `<br />` as a hard break, which is how a
  * line break is written inside a cell of a pipe table
@@ -20,9 +22,10 @@ const htmlBreak = (state: StateInline, silent: boolean): boolean => {
 const reTableTag = /<(\/?)table(?=[\s>]|$)/gi;
 
 /**
- * htmlTable reads a whole HTML `<table>` as one `html_table` token. Blank
- * writes a table as HTML when a pipe table can't hold it, e.g. with merged
- * cells. Any other HTML stays text, as `html` is off.
+ * htmlTable reads a whole HTML `<table>` as one `html_table` token that holds
+ * the table node in its `meta`. Blank writes a table as HTML when a pipe table
+ * can't hold it, e.g. with merged cells. HTML that isn't a table it can read
+ * stays text, like any other HTML, as `html` is off.
  */
 const htmlTable = (
   state: StateBlock,
@@ -50,12 +53,16 @@ const htmlTable = (
     if (depth <= 0) break;
   }
   if (depth > 0) return false;
+  const content = state.getLines(startLine, line + 1, state.blkIndent, false);
+  const table = parseHtmlTable(content, state.md);
+  if (!table) return false;
   if (silent) return true;
 
   const token = state.push("html_table", "table", 0);
   token.block = true;
   token.map = [startLine, line + 1];
-  token.content = state.getLines(startLine, line + 1, state.blkIndent, false);
+  token.content = content;
+  token.meta = { table };
   state.line = line + 1;
   return true;
 };

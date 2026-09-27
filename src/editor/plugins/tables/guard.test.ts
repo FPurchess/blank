@@ -85,6 +85,25 @@ describe("tableGuard", () => {
     ).toBe(true);
   });
 
+  it("keeps the words of a nested table's cells apart", () => {
+    const inner = table(tr(th([p("one"), p("two")]), th("three")));
+    const nested = doc(
+      p(),
+      table(tr(th("a")), tr(td(ul(li(p("x"), inner))))),
+      p(),
+    );
+
+    expect(
+      guarded(nested).eq(
+        doc(
+          p(),
+          table(tr(th("a")), tr(td(ul(li(p("x"), p("one two | three")))))),
+          p(),
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("replaces a rule in a list in a cell", () => {
     const rule = schema.nodes.horizontal_rule.create();
     const withRule = doc(

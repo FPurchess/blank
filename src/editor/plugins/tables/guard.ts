@@ -2,6 +2,8 @@ import type { Node } from "prosemirror-model";
 import { Plugin, type EditorState, type Transaction } from "prosemirror-state";
 
 import { schema } from "../../schema";
+import { CELL_SEPARATOR } from "../../markdown/html";
+import { keepsParagraphAfter } from "./util";
 
 type Visit = (node: Node, pos: number) => boolean | void;
 
@@ -42,14 +44,12 @@ const flattened = (node: Node): Node[] => {
     return [paragraph.create(null, node.content, node.marks)];
   }
   if (node.type !== schema.nodes.table) return [paragraph.create()];
-  const rows: Node[] = [];
-  node.forEach((row) => {
-    const cells: string[] = [];
-    row.forEach((cell) => cells.push(cell.textContent));
-    const text = cells.join(" | ");
-    rows.push(paragraph.create(null, text ? schema.text(text) : null));
+  return node.children.map((row) => {
+    const text = row.children
+      .map((cell) => cell.textBetween(0, cell.content.size, " ", " ").trim())
+      .join(CELL_SEPARATOR);
+    return paragraph.create(null, text ? schema.text(text) : null);
   });
-  return rows;
 };
 
 const outOfPlace = (node: Node) =>
@@ -91,8 +91,7 @@ const keepParagraphs = (tr: Transaction) => {
   doc.forEach((node, offset, index) => {
     if (node.type !== table) return;
     if (index === 0) missing.push(0);
-    const next = index + 1 < doc.childCount ? doc.child(index + 1) : null;
-    if (!next || next.type === table) missing.push(offset + node.nodeSize);
+    if (keepsParagraphAfter(doc, index)) missing.push(offset + node.nodeSize);
   });
   for (const at of missing.reverse()) tr.insert(at, paragraph.create());
 };

@@ -18,7 +18,6 @@ const outDir = path.resolve(
 );
 // opened from a neutral path, since the app shows it in the top bar
 const sample = path.join(os.tmpdir(), "on-writing.md");
-const tableSample = path.join(os.tmpdir(), "fruit-stock.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 
 const shot = (name: string) =>
@@ -28,6 +27,40 @@ const setTheme = async (theme: string) => {
   while ((await browser.execute(() => document.body.dataset.theme)) !== theme) {
     await pressMod(Key.Alt, "t");
   }
+};
+
+/**
+ * shift presses `key` with Shift held, as separate actions: WebKitWebDriver
+ * drops the Shift of `browser.keys`
+ */
+const shift = async (key: string) => {
+  await browser.performActions([
+    {
+      type: "key",
+      id: "keyboard",
+      actions: [
+        { type: "keyDown", value: Key.Shift },
+        { type: "keyDown", value: key },
+        { type: "keyUp", value: key },
+        { type: "keyUp", value: Key.Shift },
+      ],
+    },
+  ]);
+  await browser.releaseActions();
+};
+
+// the symbols typed with Shift on a US keyboard, and the keys they're on
+const SHIFTED = '~!@#$%^&*()_+{}|:"<>?';
+const UNSHIFTED = "`1234567890-=[]\\;',./";
+
+/**
+ * typeChar types `char`. Capitals and the symbols on Shift are typed with
+ * Shift held, since WebKitWebDriver types them without it after a right-click.
+ */
+const typeChar = (char: string) => {
+  const index = SHIFTED.indexOf(char);
+  if (index >= 0) return shift(UNSHIFTED[index]);
+  return char === char.toLowerCase() ? type(char) : shift(char.toLowerCase());
 };
 
 /**
@@ -60,7 +93,7 @@ class Recorder {
   /** type `text` at the rhythm of a writer: quick within words, slower at punctuation */
   async type(text: string) {
     for (const [i, char] of [...text].entries()) {
-      await type(char);
+      await typeChar(char);
       // a small, repeatable variation, so the typing doesn't look mechanical
       const jitter = ((i * 7919) % 5) * 0.012;
       let duration = 0.045 + jitter;
@@ -95,8 +128,16 @@ class Recorder {
     await this.frame(pause);
   }
 
-  /** write the GIF, with the frame durations from above */
-  save(gif: string) {
+  /** press `key`, shown as a keycap labelled `label`, e.g. Tab or an arrow */
+  async press(label: string, key: string, seconds = 0.5) {
+    await this.shortcut([label], () => type(key), seconds);
+  }
+
+  /**
+   * write the GIF, with the frame durations from above. It shows the top
+   * `height` pixels of the window and the status bar below them.
+   */
+  save(gif: string, height = 345) {
     const list = path.join(this.dir, "frames.txt");
     const entries = this.frames.map(
       ({ file, duration }) => `file '${file}'\nduration ${duration.toFixed(3)}`,
@@ -124,7 +165,7 @@ class Recorder {
           "-vf",
           // a shorter window: the writing area on top, the status bar (fixed to the bottom
           // of the window in the app) below it, without the empty page in between
-          "split[t][b];[t]crop=800:345:0:0[top];[b]crop=800:55:0:545[bar];[top][bar]vstack," +
+          `split[t][b];[t]crop=800:${height}:0:0[top];[b]crop=800:55:0:545[bar];[top][bar]vstack,` +
             "split[c][d];[c]palettegen=max_colors=64:stats_mode=full[p];[d][p]paletteuse=dither=none",
         ],
         ...["-fps_mode", "vfr", gif],
@@ -195,7 +236,26 @@ const setCaret = (visible: boolean) =>
     document.body.classList.toggle("shots-no-caret", !visible);
   }, visible);
 
+const recordings: string[] = [];
+
+/** starts a recording in a new, untitled document */
+const filmNew = async () => {
+  const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
+  recordings.push(frames);
+  await pressMod("n");
+  await expect($("#ui-top")).toHaveText("» Untitled");
+  const film = new Recorder(frames);
+  await film.pause(0.8);
+  return film;
+};
+
 describe("docs screenshots", () => {
+  after(() => {
+    for (const frames of recordings) {
+      fs.rmSync(frames, { recursive: true, force: true });
+    }
+  });
+
   before(async () => {
     fs.mkdirSync(outDir, { recursive: true });
     fs.copyFileSync(path.join(dirname, "sample.md"), sample);
@@ -245,22 +305,66 @@ describe("docs screenshots", () => {
     await pressMod(Key.Alt, "s");
   });
 
-  it("captures a table and the table picker", async () => {
-    fs.copyFileSync(path.join(dirname, "tables.md"), tableSample);
-    await restartApp([tableSample]);
-    await addCaretStyle();
-    await setCaret(false);
-    await shot("table");
+  it("records making a table", async () => {
+    const film = await filmNew();
+    await film.type("# Fruit stock");
+    await film.enter(0.5);
+    await film.shortcut(["Mod", "T"], () => pressMod("t"), 1);
+    await film.press("→", Key.ArrowRight, 0.6);
+    await film.press("↓", Key.ArrowDown, 0.6);
+    await film.press("Enter", Key.Enter, 0.8);
+    const cells = ["Fruit", "Origin", "Qty", "Price"];
+    const rows = [
+      ["Apples", "Tyrol", "40", "1.20"],
+      ["Pears", "Valais", "12", "0.80"],
+      ["Kiwis", "Italy", "25", "0.45"],
+    ];
+    for (const [i, text] of [...cells, ...rows.flat()].entries()) {
+      if (i > 0) await film.press("Tab", Key.Tab, 0.35);
+      await film.type(text);
+    }
+    await film.pause(0.8);
+    // out of the table and on with the text
+    await film.press("↓", Key.ArrowDown, 0.8);
+    await film.type("Prices are per piece.");
+    await film.pause(2.5);
+    film.save(path.join(outDir, "table-insert.gif"), 420);
+  });
 
-    // a new table after the last paragraph, one column wider than usual
-    await $(".ProseMirror > p:last-child").click();
-    await type(Key.End);
-    await type(Key.Enter);
-    await pressMod("t");
-    await type(Key.ArrowRight);
-    await shot("table-picker");
-    await type(Key.Escape);
-    fs.rmSync(tableSample, { force: true });
+  it("records typing a table header", async () => {
+    const film = await filmNew();
+    await film.type("| Name | Role |");
+    await film.pause(0.6);
+    await film.press("Enter", Key.Enter, 1);
+    for (const [i, text] of ["Ada", "Engineer", "Grace", "Admiral"].entries()) {
+      if (i > 0) await film.press("Tab", Key.Tab, 0.35);
+      await film.type(text);
+    }
+    await film.pause(2.5);
+    film.save(path.join(outDir, "table-header.gif"), 300);
+  });
+
+  it("records writing in cells", async () => {
+    const film = await filmNew();
+    await film.type("| Task | Notes |");
+    await film.enter(0.6);
+    await film.type("Print");
+    await film.press("Tab", Key.Tab, 0.35);
+    await film.type("A4, both sides");
+    // a second line in the same cell
+    await film.press("Enter", Key.Enter, 0.6);
+    await film.type("Staple it");
+    await film.press("Tab", Key.Tab, 0.35);
+    await film.type("Send");
+    await film.press("Tab", Key.Tab, 0.35);
+    await film.type("By Friday");
+    await film.pause(1);
+    // from the start of the cell, Shift+← selects both cells of the row
+    await film.press("Home", Key.Home, 0.4);
+    await film.shortcut(["Shift", "←"], () => shift(Key.ArrowLeft), 0.9);
+    await film.press("Backspace", Key.Backspace, 1);
+    await film.pause(2);
+    film.save(path.join(outDir, "table-cells.gif"), 360);
   });
 
   it("records the writing demo", async () => {

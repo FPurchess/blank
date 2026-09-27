@@ -71,6 +71,7 @@ export class TableView implements NodeView {
   private caption: HTMLElement;
   private colgroup: HTMLElement;
   private frozenColumns = 0;
+  private refreezeTimer: number | undefined;
 
   constructor(private node: Node) {
     this.dom = document.createElement("div");
@@ -145,9 +146,14 @@ export class TableView implements NodeView {
     this.render();
     if (columnsChanged) {
       // measure once the new cells are rendered
-      window.setTimeout(() => this.refreeze());
+      window.clearTimeout(this.refreezeTimer);
+      this.refreezeTimer = window.setTimeout(() => this.refreeze());
     }
     return true;
+  }
+
+  destroy() {
+    window.clearTimeout(this.refreezeTimer);
   }
 
   ignoreMutation(mutation: ViewMutationRecord) {

@@ -10,6 +10,7 @@ import {
   createState,
   createTestView,
   doc,
+  h,
   li,
   p,
   pressKey,
@@ -172,6 +173,7 @@ describe("Enter", () => {
     expect(cell.childCount).toBe(2);
     expect(cell.firstChild!.textContent).toBe("c");
     expect(cell.firstChild!.childCount).toBe(1);
+    expect(view.state.selection.$head.parent).toBe(cell.lastChild);
   });
 
   it("replaces selected text with a line break", () => {
@@ -329,6 +331,13 @@ describe("Backspace", () => {
     press("Backspace");
     expect(view.state.doc.eq(doc(grid(), p("after")))).toBe(true);
     expect(view.state.selection.$head.parent.textContent).toBe("f");
+  });
+
+  it("leaves an empty heading after a table to the keymap", () => {
+    const node = doc(grid(), h(2), p("after"));
+    const { press } = setup(node, grid().nodeSize + 1);
+
+    expect(press("Backspace")).toBe(false);
   });
 
   it("leaves a paragraph with text after a table to the keymap", () => {

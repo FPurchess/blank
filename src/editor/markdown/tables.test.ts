@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 
 import { parser, serializer } from ".";
@@ -345,7 +345,41 @@ describe("HTML tables", () => {
   it("keeps something that isn't a single table as text", () => {
     const parsed = parser.parse(md("<table></table><p>x</p>"));
 
+    expect(parsed.eq(doc(p("<table></table><p>x</p>")))).toBe(true);
+  });
+
+  it("keeps text after a table on its last line", () => {
+    const text = md("<table><tr><td>a</td></tr></table> and *more*");
+    const emphasis = schema.text("more", [schema.marks.em.create()]);
+
+    expect(
+      parser
+        .parse(text)
+        .eq(
+          doc(
+            schema.nodes.paragraph.create(null, [
+              schema.text("<table><tr><td>a</td></tr></table> and "),
+              emphasis,
+            ]),
+          ),
+        ),
+    ).toBe(true);
+  });
+
+  it("keeps an HTML table as text where there's no DOM to read it", () => {
+    vi.stubGlobal("DOMParser", undefined);
+    const parsed = parser.parse(md("<table><tr><td>a</td></tr></table>"));
+    vi.unstubAllGlobals();
+
     expect(parsed.firstChild?.type).toBe(schema.nodes.paragraph);
+  });
+
+  it("can interrupt a paragraph", () => {
+    const parsed = parser.parse(
+      md("text", "<table><tr><td>a</td></tr></table>"),
+    );
+
+    expect(parsed.eq(doc(p("text"), table(tr(td("a")))))).toBe(true);
   });
 });
 

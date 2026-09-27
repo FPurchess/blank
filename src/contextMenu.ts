@@ -6,10 +6,9 @@ import {
   spellcheck,
 } from "./state";
 import { isMac } from "./editor/plugins/openLink";
+import { place } from "./popup";
 
 const MENU_ID = "context-menu";
-// space between the menu and the edges of the window
-const MARGIN = 4;
 
 type Item = Exclude<MenuItem, "separator">;
 
@@ -87,33 +86,6 @@ const step = (level: Level, index: number, direction: 1 | -1) => {
 };
 
 const first = (level: Level) => step(level, -1, 1);
-
-/**
- * place moves `element` below `anchor`, or above it if it only fits there,
- * or else as far up as it needs to fit, like the system menus. A submenu opens
- * next to the item `side`.
- */
-const place = (
-  element: HTMLElement,
-  anchor: { left: number; top: number; bottom: number },
-  side?: DOMRect,
-) => {
-  const { width, height } = element.getBoundingClientRect();
-  const bottom = window.innerHeight - MARGIN;
-  let left = side ? side.right : anchor.left;
-  let top = side ? side.top : anchor.bottom + 2;
-  if (side && left + width > window.innerWidth - MARGIN) {
-    left = side.left - width;
-  }
-  if (top + height > bottom) {
-    const above = anchor.top - height - 2;
-    top = !side && above >= MARGIN ? above : bottom - height;
-  }
-  left = Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
-  top = Math.max(MARGIN, top);
-  element.style.left = `${left}px`;
-  element.style.top = `${top}px`;
-};
 
 const closeSubmenus = (depth: number) => {
   for (const level of levels.splice(depth + 1)) {

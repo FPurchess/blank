@@ -65,6 +65,15 @@ export const tableAround = ($pos: ResolvedPos): TableAt | undefined => {
 };
 
 /**
+ * keepsParagraphAfter tells whether Blank keeps a paragraph after the child
+ * at `index` of `parent`, a table or the paragraph after one: when nothing
+ * follows it, or a table does
+ */
+export const keepsParagraphAfter = (parent: Node, index: number) =>
+  index + 1 >= parent.childCount ||
+  parent.child(index + 1).type === schema.nodes.table;
+
+/**
  * isEmptyTable tells whether no cell of `table` holds any text or image
  */
 export const isEmptyTable = (table: Node) => {

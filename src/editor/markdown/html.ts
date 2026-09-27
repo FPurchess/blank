@@ -1,33 +1,20 @@
 import { DOMParser as SchemaParser, Node } from "prosemirror-model";
 
 import { alignment, schema } from "../schema";
-import { tokenizer } from "./tokenizer";
-
-export interface NormalizeOptions {
-  // gives a table without header cells a header row, as a pipe table needs one
-  promoteHeader?: boolean;
-}
-
-export interface NormalizeReport {
-  // tables inside cells, which became text
-  nestedTables: number;
-}
-
-const MAX_SPAN = 1000;
 
 /**
- * rename replaces `element` with a new element named `tag` that holds the
- * same children and attributes
+ * LinkRules normalize and check link and image URLs, like the markdown-it
+ * instance that reads markdown does
  */
-const rename = (element: Element, tag: string): Element => {
-  const renamed = element.ownerDocument.createElement(tag);
-  for (const { name, value } of [...element.attributes]) {
-    renamed.setAttribute(name, value);
-  }
-  renamed.append(...element.childNodes);
-  element.replaceWith(renamed);
-  return renamed;
-};
+export interface LinkRules {
+  normalizeLink(url: string): string;
+  validateLink(url: string): boolean;
+}
+
+// the largest span HTML allows
+const MAX_SPAN = 1000;
+// what separates the cells of a nested table that became text
+export const CELL_SEPARATOR = " | ";
 
 /**
  * rowsOf returns the rows of `table` in reading order, without those of
@@ -57,7 +44,7 @@ const flatten = (table: HTMLTableElement) => {
     const p = doc.createElement("p");
     p.textContent = cellsOf(row)
       .map((cell) => cell.textContent?.replace(/\s+/g, " ").trim() ?? "")
-      .join(" | ");
+      .join(CELL_SEPARATOR);
     return p;
   });
   table.replaceWith(...rows);
@@ -106,14 +93,14 @@ const cleanCell = (cell: HTMLTableCellElement) => {
 };
 
 /**
- * cleanLinks checks links and images like the markdown parser does, so HTML
- * can't bring in what markdown would drop (e.g. javascript: links)
+ * cleanLinks checks links and images with the rules markdown links get, so
+ * HTML can't bring in what markdown would drop (e.g. javascript: links)
  */
-const cleanLinks = (table: HTMLTableElement) => {
+const cleanLinks = (table: HTMLTableElement, links: LinkRules) => {
   const check = (url: string | null): string | null => {
     if (url === null) return null;
-    const normalized = tokenizer.normalizeLink(url.trim());
-    return tokenizer.validateLink(normalized) ? normalized : null;
+    const normalized = links.normalizeLink(url.trim());
+    return links.validateLink(normalized) ? normalized : null;
   };
   for (const link of table.querySelectorAll("a")) {
     const href = check(link.getAttribute("href"));
@@ -168,12 +155,11 @@ const rectangular = (rows: HTMLTableRowElement[]) => {
  */
 export const normalizeTableHtml = (
   table: HTMLTableElement,
-  { promoteHeader = false }: NormalizeOptions = {},
-  report: NormalizeReport = { nestedTables: 0 },
-): NormalizeReport => {
-  const nested = [...table.querySelectorAll("table")].reverse();
-  for (const inner of nested) flatten(inner);
-  report.nestedTables += nested.length;
+  links: LinkRules,
+) => {
+  for (const inner of [...table.querySelectorAll("table")].reverse()) {
+    flatten(inner);
+  }
 
   const caption = table.querySelector(":scope > caption");
   for (const { name } of [...table.attributes]) table.removeAttribute(name);
@@ -195,24 +181,23 @@ export const normalizeTableHtml = (
   rows = rowsOf(table);
   for (const row of rows) cellsOf(row).forEach(cleanCell);
   rectangular(rows);
-  cleanLinks(table);
-
-  const hasHeader = table.querySelector("th") !== null;
-  if (promoteHeader && !hasHeader && rows.length) {
-    for (const cell of cellsOf(rows[0])) rename(cell, "th");
-  }
-  return report;
+  cleanLinks(table, links);
 };
 
 /**
  * parseHtmlTable reads the HTML of a single table, as Blank writes a table a
- * pipe table can't hold. Returns null if the HTML isn't exactly one table.
+ * pipe table can't hold. Returns null if the HTML is anything but exactly one
+ * table, e.g. with text after it, or if there's no DOM to read it with.
  */
-export const parseHtmlTable = (html: string): Node | null => {
+export const parseHtmlTable = (html: string, links: LinkRules): Node | null => {
+  if (typeof DOMParser === "undefined") return null;
   const dom = new DOMParser().parseFromString(html, "text/html");
-  const [table, ...rest] = [...dom.body.children];
-  if (table?.tagName !== "TABLE" || rest.length) return null;
-  normalizeTableHtml(table as HTMLTableElement);
+  const content = [...dom.body.childNodes].filter(
+    (node) => node.nodeType !== 3 /* text */ || node.textContent?.trim(),
+  );
+  const [table] = content;
+  if (content.length !== 1 || table.nodeName !== "TABLE") return null;
+  normalizeTableHtml(table as HTMLTableElement, links);
   try {
     const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
     const node = parsed.firstChild;

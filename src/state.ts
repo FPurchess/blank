@@ -100,12 +100,19 @@ export const languagePicker = new Observable<LanguagePickerState>({
   invalid: false,
 });
 
+// where a popup like a menu is shown: below the cursor, in viewport coordinates
+export interface Anchor {
+  left: number;
+  top: number;
+  bottom: number;
+}
+
 export interface TablePickerState {
   // the size of the table Enter inserts, the header row included
   cols: number;
   rows: number;
-  // where to show the picker, in viewport coordinates
-  anchor: { left: number; top: number; bottom: number };
+  // where to show the picker
+  anchor: Anchor;
   // inserts a table of the given size
   submit(cols: number, rows: number): void;
   // closes the picker without inserting a table
@@ -148,8 +155,8 @@ export type MenuItem =
 
 export interface ContextMenuRequest {
   items: MenuItem[];
-  // where to show the menu, in viewport coordinates
-  anchor: { left: number; top: number; bottom: number };
+  // where to show the menu
+  anchor: Anchor;
   // opened with the keyboard, which focuses the first item
   keyboard: boolean;
   // returns the focus to the editor

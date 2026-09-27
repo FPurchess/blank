@@ -1,5 +1,5 @@
 import { keydownHandler } from "prosemirror-keymap";
-import type { Node, ResolvedPos } from "prosemirror-model";
+import type { ResolvedPos } from "prosemirror-model";
 import {
   Plugin,
   Selection,
@@ -21,6 +21,7 @@ import { appendRow } from "../../commands/table/insert";
 import {
   cellDepth,
   isEmptyTable,
+  keepsParagraphAfter,
   plainCell,
   tableAround,
   textblockRange,
@@ -49,8 +50,9 @@ const tab =
   (state, dispatch) => {
     if (!isInTable(state)) return false;
     const { selection } = state;
+    // isInTable means the list item is in a cell
     const item = selection.empty ? listItemStart(selection.$from) : -1;
-    if (item > 0 && cellDepth(selection.$from) > 0) {
+    if (item > 0) {
       const itemType = schema.nodes.list_item;
       if (dir === 1 && sinkListItem(itemType)(state, dispatch)) return true;
       // only nested items are outdented, the others stay in their list
@@ -87,8 +89,10 @@ const enter: Command = (state, dispatch) => {
   if (dispatch) {
     const tr = state.tr;
     if (emptyLine) {
-      tr.delete($from.pos - 1, $from.pos);
-      tr.split(tr.mapping.map($from.pos));
+      const at = $from.pos - 1;
+      tr.delete(at, $from.pos).split(at);
+      // the new paragraph opens right after the split
+      tr.setSelection(TextSelection.create(tr.doc, at + 2));
     } else {
       tr.replaceSelectionWith(hard_break.create());
     }
@@ -194,16 +198,6 @@ const clearCells: Command = (state, dispatch) => {
 };
 
 /**
- * precedingTable returns the table right before the block around `$pos`
- */
-const precedingTable = ($pos: ResolvedPos): Node | null => {
-  if ($pos.depth < 1) return null;
-  const index = $pos.index(-1);
-  const before = index > 0 ? $pos.node(-1).child(index - 1) : null;
-  return before?.type === schema.nodes.table ? before : null;
-};
-
-/**
  * backspace removes a table that is still empty from its first cell, and
  * moves from the empty line after a table into its last cell
  */
@@ -219,18 +213,22 @@ const backspace: Command = (state, dispatch) => {
     return true;
   }
 
-  const before = precedingTable($cursor);
-  if (!before || $cursor.parent.content.size > 0) return false;
+  // an empty paragraph right after a table
+  const { parent } = $cursor;
+  if (parent.type !== schema.nodes.paragraph || parent.content.size > 0) {
+    return false;
+  }
+  const container = $cursor.node(-1);
+  const index = $cursor.index(-1);
+  if (index === 0 || container.child(index - 1).type !== schema.nodes.table) {
+    return false;
+  }
   if (dispatch) {
     const tr = state.tr;
-    const container = $cursor.node(-1);
-    const index = $cursor.index(-1);
-    const next =
-      index + 1 < container.childCount ? container.child(index + 1) : null;
-    // the paragraph stays where Blank keeps one, after a table at the end or
-    // between two tables
-    const kept = !next || next.type === schema.nodes.table;
-    if (!kept) tr.delete($cursor.before(), $cursor.after());
+    // the paragraph stays where Blank keeps one: at the end or between tables
+    if (!keepsParagraphAfter(container, index)) {
+      tr.delete($cursor.before(), $cursor.after());
+    }
     const tableEnd = $cursor.before() - 1;
     tr.setSelection(Selection.near(tr.doc.resolve(tableEnd), -1));
     dispatch(tr.scrollIntoView());
