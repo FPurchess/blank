@@ -1,5 +1,5 @@
 import { schema as base } from "prosemirror-markdown";
-import { NodeSpec, Schema } from "prosemirror-model";
+import { type Node, NodeSpec, Schema } from "prosemirror-model";
 import { tableNodes } from "prosemirror-tables";
 
 export type Alignment = "left" | "center" | "right";
@@ -89,3 +89,24 @@ export const schema = new Schema({
     }),
   marks: base.spec.marks,
 });
+
+/**
+ * isHeaderCell tells whether `node` is a header cell
+ */
+export const isHeaderCell = (node: Node | null | undefined) =>
+  node?.type === schema.nodes.table_header;
+
+/**
+ * headerRowCount returns how many leading rows of `table` hold only header
+ * cells: its header rows
+ */
+export const headerRowCount = (table: Node) => {
+  let count = 0;
+  while (
+    count < table.childCount &&
+    table.child(count).children.every(isHeaderCell)
+  ) {
+    count++;
+  }
+  return count;
+};

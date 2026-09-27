@@ -55,7 +55,38 @@ Typing `1. `, `- ` or `> ` at the start of a cell keeps the text as you typed it
 | `Mod` `A`                      | Selects the cell, then the whole table, then everything |
 | `Backspace` on the whole table | Deletes the table                                       |
 
-To delete a table, press `Mod` `A` twice in it and then `Backspace`. Or press `Backspace` at the start of the line after the table: the first press selects the table, the second deletes it. A table you just made and haven't written in yet goes away with `Backspace` in its first cell. `Mod` `Z` brings anything back.
+To delete a table, click the bin on its toolbar, or press `Mod` `A` twice in it and then `Backspace`. Or press `Backspace` at the start of the line after the table: the first press selects the table, the second deletes it. A table you just made and haven't written in yet goes away with `Backspace` in its first cell. `Mod` `Z` brings anything back.
+
+## Change a table {#change}
+
+While the cursor is in a table, a small toolbar sits above its right end. It adds and deletes rows and columns, aligns columns, sorts, merges cells, switches the header row and a header column on and off, and sets the caption. Everything on it works on what you've selected: with three rows selected, _Insert row below_ adds three rows, and _Align right_ aligns every selected column.
+
+<img class="shot" src="/screenshots/table-mode.gif" alt="Mod T shows a key on every button of the table toolbar; the down arrow adds a row, S sorts by the column, R aligns it right, and Esc ends table mode" />
+
+**From the keyboard:** press `Mod` `T` in a table. Every button of the toolbar shows its key, and the keys work until you press `Esc` or `Mod` `T` again:
+
+| Key                               | What it does                                           |
+| --------------------------------- | ------------------------------------------------------ |
+| `↑` `↓` / `←` `→`                 | Insert rows above or below / columns left or right     |
+| `Shift` + `↑` `↓` / `←` `→`       | Move the selected rows / columns                       |
+| `Backspace` / `Shift` `Backspace` | Delete the selected rows / columns                     |
+| `Mod` `Backspace`                 | Delete the table                                       |
+| `L` `C` `R`                       | Align the selected columns left, centered or right     |
+| `S`                               | Sort by this column; press again to sort the other way |
+| `M`                               | Merge the selected cells, or split a merged cell       |
+| `H` / `Shift` `H`                 | Header row / header column on or off                   |
+| `T`                               | Write the caption, Enter keeps it                      |
+
+The letters stay where they are on your keyboard, whatever its layout. Any other key ends table mode without typing anything, and shortcuts like `Mod` `S` still do their job.
+
+**With the mouse:** click the buttons of the toolbar, or right-click a cell and open _Table_ in the menu, which has everything, including moving rows and columns.
+
+A few things good to know:
+
+- **Sorting** keeps the header row on top and puts empty cells last. Numbers sort by their value, also with a decimal comma like _1,5_ in German, dates by their day, and text the way your language sorts it, _item 9_ before _item 10_.
+- **Rows move below the header** and a header column stays first. Deleting the header row makes the row below it the header.
+- **Merged cells** keep everything they held. Splitting a cell leaves its content in the first cell.
+- The status bar says what happened, like _2 rows added_, and screen readers read it out.
 
 ## How tables are saved {#saving}
 
@@ -70,7 +101,7 @@ A table is saved as a markdown table, with the columns lined up so the file read
 
 Line breaks in a cell are saved as `<br>`, and the colons in the second line keep the alignment of each column.
 
-A markdown table holds one line of text per cell. When a table needs more, like a list or several paragraphs in a cell, Blank saves that one table as an HTML table in the same markdown file. GitHub, Obsidian, Typora and pandoc show it as a table as well. Once the table fits a markdown table again, Blank saves it as one.
+A markdown table holds one line of text per cell. When a table needs more, like a list or several paragraphs in a cell, merged cells, a header column or a caption, Blank saves that one table as an HTML table in the same markdown file, and tells you the first time. GitHub, Obsidian, Typora and pandoc show it as a table as well. Once the table fits a markdown table again, Blank saves it as one.
 
 Blank opens both kinds, so you can also open markdown files with tables written in other editors.
 

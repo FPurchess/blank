@@ -151,6 +151,42 @@ export interface TablePickerState {
 // tablePicker is the open picker for the size of a new table, or null
 export const tablePicker = new Observable<TablePickerState | null>(null);
 
+export interface TableToolbarItem {
+  id: string;
+  label: string;
+  // the name of its icon, see src/icons.ts
+  icon: string;
+  // its key in table mode, e.g. "↑"
+  key: string;
+  // buttons of one group sit together
+  group: string;
+  enabled: boolean;
+  // for buttons that switch something on and off
+  checked?: boolean;
+  run(): void;
+}
+
+export interface TableToolbarState {
+  // the box of the table, in viewport coordinates, which the toolbar sits on
+  anchor: { left: number; top: number; bottom: number; right: number };
+  items: TableToolbarItem[];
+  // table mode (Mod+T): the buttons show their keys, which work until Esc
+  keys: boolean;
+  // the caption field while it's open
+  caption: {
+    value: string;
+    submit(value: string): void;
+    cancel(): void;
+  } | null;
+}
+
+// tableToolbar is the toolbar of the table the cursor is in, or null
+export const tableToolbar = new Observable<TableToolbarState | null>(null);
+
+// announcement is a short message about what just happened, e.g. "2 rows
+// added", shown in the status bar and read out by screen readers
+export const announcement = new Observable<string | null>(null);
+
 // spellcheck is whether spelling is checked, which the user turns on and off
 export const spellcheck = new Observable<boolean>(false);
 
@@ -174,6 +210,8 @@ export type MenuItem =
       // the key binding, e.g. "Mod-z"
       shortcut?: string;
       disabled?: boolean;
+      // whether it's switched on, for items that switch something on and off
+      checked?: boolean;
       // the items of a submenu
       children?: MenuItem[];
       run?: () => void;

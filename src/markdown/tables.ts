@@ -1,6 +1,6 @@
 import { DOMSerializer, Node } from "prosemirror-model";
 
-import { Alignment, schema } from "./schema";
+import { Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
 
 /**
  * GfmBlocker names what keeps a table from being written as a pipe table
@@ -18,8 +18,6 @@ const BLOCKERS: GfmBlocker[] = [
   "mixedAlign",
 ];
 
-const isHeader = (cell: Node) => cell.type === schema.nodes.table_header;
-
 /**
  * gfmBlocker returns what keeps `table` from being written as a GitHub
  * flavored markdown pipe table, or null if it fits one
@@ -30,8 +28,8 @@ export const gfmBlocker = (table: Node): GfmBlocker | null => {
   table.forEach((row, _, r) => {
     row.forEach((cell, _, c) => {
       if (cell.attrs.colspan > 1 || cell.attrs.rowspan > 1) found.add("merged");
-      if (r === 0 && !isHeader(cell)) found.add("noHeader");
-      if (r > 0 && isHeader(cell)) found.add("headerColumn");
+      if (r === 0 && !isHeaderCell(cell)) found.add("noHeader");
+      if (r > 0 && isHeaderCell(cell)) found.add("headerColumn");
       const { firstChild } = cell;
       if (
         cell.childCount !== 1 ||
@@ -162,18 +160,12 @@ const cellHtml = (cell: Node): string => {
  */
 export const htmlLines = (table: Node): string[] => {
   const rows = table.children;
-  let headerRows = 0;
-  while (
-    headerRows < rows.length &&
-    rows[headerRows].children.every(isHeader)
-  ) {
-    headerRows++;
-  }
+  const headerRows = headerRowCount(table);
 
   const rowLines = (row: Node, inHead: boolean): string[] => {
     const cells: string[] = [];
     row.forEach((cell) => {
-      const tag = isHeader(cell) ? "th" : "td";
+      const tag = isHeaderCell(cell) ? "th" : "td";
       const attrs: string[] = [];
       if (tag === "th") attrs.push(`scope="${inHead ? "col" : "row"}"`);
       if (cell.attrs.colspan > 1) attrs.push(`colspan="${cell.attrs.colspan}"`);

@@ -127,6 +127,7 @@ describe("ui language chooser", () => {
       "ui-stats",
       "ui-page",
       "ui-spellcheck",
+      "ui-announcement",
       "ui-language",
     ]);
   });

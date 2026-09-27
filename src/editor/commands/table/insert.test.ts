@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { TextSelection } from "prosemirror-state";
+import {
+  TextSelection,
+  type Command,
+  type EditorState,
+} from "prosemirror-state";
 
-import { schema } from "../../../markdown";
 import {
   createState,
   createTestView,
@@ -13,7 +16,14 @@ import {
   th,
   tr,
 } from "../../../test/editor";
-import { appendRow, createTable, insertTable } from "./insert";
+import {
+  cellTexts,
+  cellTypes,
+  cursorAt,
+  selectCells,
+  selectedText,
+} from "../../../test/tables";
+import { addColumns, addRows, createTable, insertTable } from "./insert";
 
 describe("createTable", () => {
   it("creates a table with a header row", () => {
@@ -57,26 +67,111 @@ describe("insertTable", () => {
   });
 });
 
-describe("appendRow", () => {
-  it("adds a row with the cell types and alignment of the last one", () => {
-    const node = doc(
-      table(
-        tr(th("a"), th("b", { align: "center" })),
-        tr(th("c"), td("d", { align: "center" })),
-      ),
-    );
-    const state = createState(node, { cursor: 4 });
-    const next = state.apply(appendRow(state)!);
+const run = (command: Command, state: EditorState) => {
+  const view = createTestView(state);
+  expect(command(view.state, view.dispatch)).toBe(true);
+  return view.state;
+};
 
-    const added = next.doc.firstChild!.lastChild!;
-    expect(added.child(0).type).toBe(schema.nodes.table_header);
-    expect(added.child(1).type).toBe(schema.nodes.table_cell);
-    expect(added.child(1).attrs.align).toBe("center");
-    expect(next.selection).toBeInstanceOf(TextSelection);
-    expect(next.selection.$head.node(-1)).toBe(added.child(0));
+// a table with a header row, a right-aligned column and three rows
+const grid = () =>
+  doc(
+    table(
+      tr(th("h1"), th("h2", { align: "right" })),
+      tr(td("a1"), td("a2", { align: "right" })),
+      tr(td("b1"), td("b2", { align: "right" })),
+    ),
+    p(),
+  );
+
+describe("addRows", () => {
+  it("adds a row below and puts the cursor in it", () => {
+    const state = run(addRows("below"), cursorAt(grid(), "a2"));
+
+    expect(cellTexts(state.doc)).toEqual([
+      ["h1", "h2"],
+      ["a1", "a2"],
+      ["", ""],
+      ["b1", "b2"],
+    ]);
+    expect(state.selection).toBeInstanceOf(TextSelection);
+    // in the same column as the cursor was, with the column's alignment
+    expect(state.selection.$head.node(-1).attrs.align).toBe("right");
+    expect(state.doc.firstChild!.child(2).child(0).attrs.align).toBeNull();
+  });
+
+  it("adds as many rows as are selected and selects them", () => {
+    const state = run(
+      addRows("above"),
+      selectCells(cursorAt(grid(), "a1"), "a1", "b2"),
+    );
+
+    expect(cellTexts(state.doc).map((row) => row.join())).toEqual([
+      "h1,h2",
+      ",",
+      ",",
+      "a1,a2",
+      "b1,b2",
+    ]);
+    expect(selectedText(state)).toEqual(["", "", "", ""]);
+  });
+
+  it("adds body rows below the header", () => {
+    const state = run(addRows("below"), cursorAt(grid(), "h1"));
+
+    expect(cellTypes(state.doc)[1]).toEqual(["td", "td"]);
+  });
+
+  it("adds nothing above the header row", () => {
+    const state = cursorAt(grid(), "h1");
+
+    expect(addRows("above")(state)).toBe(false);
+  });
+
+  it("gives a new row the header cell of a header column", () => {
+    const node = doc(table(tr(th("h"), th("x")), tr(th("r"), td("v"))), p());
+    const state = run(addRows("below"), cursorAt(node, "v"));
+
+    expect(cellTypes(state.doc)[2]).toEqual(["th", "td"]);
   });
 
   it("does nothing outside tables", () => {
-    expect(appendRow(createState(doc(p("x"))))).toBeUndefined();
+    expect(addRows("below")(createState(doc(p("x"))))).toBe(false);
+  });
+});
+
+describe("addColumns", () => {
+  it("adds a column right, with a header cell in the header row", () => {
+    const state = run(addColumns("right"), cursorAt(grid(), "a1"));
+
+    expect(cellTexts(state.doc)[0]).toEqual(["h1", "", "h2"]);
+    expect(cellTypes(state.doc).map((row) => row[1])).toEqual([
+      "th",
+      "td",
+      "td",
+    ]);
+    const newCell = state.doc.firstChild!.child(1).child(1);
+    expect(state.selection.$head.node(-1)).toBe(newCell);
+  });
+
+  it("adds as many columns as are selected and selects them", () => {
+    const state = run(
+      addColumns("left"),
+      selectCells(cursorAt(grid(), "a1"), "a1", "a2"),
+    );
+
+    expect(cellTexts(state.doc)[1]).toEqual(["", "", "a1", "a2"]);
+    expect(selectedText(state)).toHaveLength(6);
+  });
+
+  it("adds nothing left of a header column", () => {
+    const node = doc(table(tr(th("h"), th("x")), tr(th("r"), td("v"))), p());
+
+    expect(addColumns("left")(cursorAt(node, "r"))).toBe(false);
+    expect(addColumns("left")(cursorAt(node, "v"))).toBe(true);
+  });
+
+  it("does nothing outside tables", () => {
+    expect(addColumns("left")(createState(doc(p("x"))))).toBe(false);
   });
 });

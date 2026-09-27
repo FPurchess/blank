@@ -495,3 +495,35 @@ describe("contextMenu", () => {
     });
   });
 });
+
+describe("context menu check marks", () => {
+  beforeEach(() => {
+    bootContextMenu();
+  });
+
+  afterEach(() => {
+    contextMenu.value = null;
+  });
+
+  it("shows items that switch something on and off as checkboxes", () => {
+    contextMenu.value = {
+      items: [
+        { id: "on", label: "On", checked: true, run: () => {} },
+        { id: "off", label: "Off", checked: false, run: () => {} },
+        { id: "plain", label: "Plain", run: () => {} },
+      ],
+      anchor: { left: 0, top: 0, bottom: 0 },
+      keyboard: true,
+      close: () => {},
+    };
+
+    expect(row("on").getAttribute("role")).toBe("menuitemcheckbox");
+    expect(row("on").getAttribute("aria-checked")).toBe("true");
+    expect(row("on").querySelector(".check")!.textContent).toBe("✓");
+    expect(row("off").getAttribute("aria-checked")).toBe("false");
+    expect(row("off").querySelector(".check")!.textContent).toBe("");
+    // the labels line up, so plain items get the column too
+    expect(row("plain").getAttribute("role")).toBe("menuitem");
+    expect(row("plain").querySelector(".check")).not.toBeNull();
+  });
+});

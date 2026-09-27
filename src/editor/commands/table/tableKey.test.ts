@@ -12,6 +12,7 @@ import {
   tr,
 } from "../../../test/editor";
 import { createTable } from "./insert";
+import { tableTools, toolsKey } from "../../plugins/tables/tools";
 import { tableKey } from "./tableKey";
 
 const setup = (node = doc(p()), cursor = 1) => {
@@ -57,11 +58,16 @@ describe("tableKey", () => {
     expect(tablePicker.value).toBeNull();
   });
 
-  it("does nothing in a table yet", () => {
+  it("switches table mode on and off in a table", () => {
     const node = doc(table(tr(th("a")), tr(td("b"))), p());
     const view = setup(node, 4);
+    view.updateState(view.state.reconfigure({ plugins: [tableTools()] }));
 
     expect(tableKey()(view.state, view.dispatch, view)).toBe(true);
     expect(tablePicker.value).toBeNull();
+    expect(toolsKey.getState(view.state)?.keys).toBe(true);
+
+    tableKey()(view.state, view.dispatch, view);
+    expect(toolsKey.getState(view.state)?.keys).toBe(false);
   });
 });

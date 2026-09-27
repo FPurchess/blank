@@ -20,22 +20,8 @@ import {
   tr,
   ul,
 } from "../../../test/editor";
+import { at, cellTexts, selectCells } from "../../../test/tables";
 import { tableKeys } from "./keys";
-
-/**
- * at returns the position of `needle` in `node`, plus `offset`
- */
-const at = (node: Node, needle: string, offset = 0) => {
-  let found = -1;
-  node.descendants((child, pos) => {
-    if (found >= 0) return false;
-    const index = child.isText ? child.text!.indexOf(needle) : -1;
-    if (index >= 0) found = pos + index;
-    return true;
-  });
-  if (found < 0) throw new Error(`"${needle}" not found`);
-  return found + offset;
-};
 
 const setup = (node: Node, cursor: number | [number, number]) => {
   const plugin = tableKeys();
@@ -51,29 +37,13 @@ const setup = (node: Node, cursor: number | [number, number]) => {
 const grid = () =>
   table(tr(th("a"), th("b")), tr(td("c"), td("d")), tr(td("e"), td("f")));
 
-const selectCells = (view: EditorView, from: string, to: string) => {
-  const { doc: node } = view.state;
-  const cellPos = (needle: string) => node.resolve(at(node, needle)).before(-1);
-  view.dispatch(
-    view.state.tr.setSelection(
-      CellSelection.create(node, cellPos(from), cellPos(to)),
-    ),
-  );
-};
+// selects the cells from the one holding `from` to the one holding `to`
+const selectIn = (view: EditorView, from: string, to: string) =>
+  view.updateState(selectCells(view.state, from, to));
 
-const texts = (state: EditorState) => {
-  const result: string[] = [];
-  state.doc.descendants((node) => {
-    if (node.type === schema.nodes.table_row) {
-      const cells: string[] = [];
-      node.forEach((cell) => cells.push(cell.textContent));
-      result.push(cells.join(","));
-      return false;
-    }
-    return true;
-  });
-  return result;
-};
+// the cells of each row, joined by commas
+const texts = (state: EditorState) =>
+  cellTexts(state.doc).map((row) => row.join(","));
 
 describe("Tab", () => {
   it("moves to the next cell and selects its text", () => {
@@ -266,7 +236,7 @@ describe("Backspace", () => {
   it("clears the selected cells", () => {
     const node = doc(p(), grid(), p());
     const { view, press } = setup(node, 1);
-    selectCells(view, "c", "c");
+    selectIn(view, "c", "c");
 
     expect(press("Backspace")).toBe(true);
     expect(texts(view.state)).toEqual(["a,b", ",d", "e,f"]);
@@ -275,7 +245,7 @@ describe("Backspace", () => {
   it("clears a whole selected row instead of removing it", () => {
     const node = doc(p(), grid(), p());
     const { view, press } = setup(node, 1);
-    selectCells(view, "c", "d");
+    selectIn(view, "c", "d");
 
     press("Backspace");
     expect(texts(view.state)).toEqual(["a,b", ",", "e,f"]);
@@ -284,7 +254,7 @@ describe("Backspace", () => {
   it("clears a selected cell of a one-column table", () => {
     const node = doc(p(), table(tr(th("a")), tr(td("b"))), p());
     const { view, press } = setup(node, 1);
-    selectCells(view, "b", "b");
+    selectIn(view, "b", "b");
 
     press("Delete");
     expect(texts(view.state)).toEqual(["a", ""]);
@@ -293,7 +263,7 @@ describe("Backspace", () => {
   it("removes the table when all of it is selected", () => {
     const node = doc(p("x"), grid(), p("y"));
     const { view, press } = setup(node, 1);
-    selectCells(view, "a", "f");
+    selectIn(view, "a", "f");
 
     press("Backspace");
     expect(view.state.doc.eq(doc(p("x"), p("y")))).toBe(true);
@@ -373,7 +343,7 @@ describe("Mod-a", () => {
   it("selects the whole table from a partial cell selection", () => {
     const node = doc(p(), grid(), p());
     const { view, press } = setup(node, 1);
-    selectCells(view, "a", "b");
+    selectIn(view, "a", "b");
 
     press("Mod-a");
     const selection = view.state.selection as CellSelection;

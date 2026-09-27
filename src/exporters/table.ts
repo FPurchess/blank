@@ -1,7 +1,7 @@
 import type { Node } from "prosemirror-model";
 import { TableMap } from "prosemirror-tables";
 
-import { schema } from "../markdown";
+import { headerRowCount, isHeaderCell, schema } from "../markdown";
 
 // Lays out a table for the PDF and the Word export alike: which cell sits
 // where, which rows repeat as a header on every page, and how wide each
@@ -83,24 +83,16 @@ export const tableGrid = (table: Node): TableGrid => {
       colspan: number;
       rowspan: number;
     };
-    const header = node.type === schema.nodes.table_header;
+    const header = isHeaderCell(node);
     rows[row][col] = { node, row, col, rowspan, colspan, header };
     if (colspan === 1) {
       chars[col] = Math.max(chars[col], Math.min(textLength(node), MAX_CHARS));
     }
   });
 
-  let headerRows = 0;
-  while (
-    headerRows < map.height &&
-    table
-      .child(headerRows)
-      .children.every((cell) => cell.type === schema.nodes.table_header)
-  ) {
-    headerRows++;
-  }
   // a table of header cells only has no body to repeat them over
-  if (headerRows === map.height) headerRows = 0;
+  const leading = headerRowCount(table);
+  const headerRows = leading === map.height ? 0 : leading;
 
   const total = chars.reduce((sum, n) => sum + n, 0);
   return { rows, headerRows, widths: chars.map((n) => n / total) };

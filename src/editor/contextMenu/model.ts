@@ -1,4 +1,5 @@
 import { TextSelection } from "prosemirror-state";
+import { isInTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 import { deleteSelection, selectAll } from "prosemirror-commands";
 import { redo, redoDepth, undo, undoDepth } from "prosemirror-history";
@@ -14,6 +15,11 @@ import {
 import { languageName, matchCase, update } from "../../spellcheck/service";
 import type { Spellchecker } from "../../spellcheck/types";
 import { dispatchCorrection } from "../plugins/autocomplete/history";
+import { tableActions } from "../commands/table/actions";
+import { insertTable } from "../commands/table/insert";
+import { tableKey } from "../commands/table/tableKey";
+import { performAction, setTools } from "../plugins/tables/tools";
+import { DEFAULT_SIZE } from "../../tablePicker";
 import {
   ignoreAll,
   type Misspelling,
@@ -278,6 +284,44 @@ const spellcheckItems = (): MenuItem[] => {
  * buildMenu returns the context menu items for `target`: the spelling items,
  * the editing items the system menus have, then the spell check toggle
  */
+/**
+ * tableItems returns the Table submenu with the actions of the table toolbar
+ * in a table, and the item that inserts a table elsewhere
+ */
+const tableItems = (view: EditorView): MenuItem[] => {
+  const shortcut = getKeyBinding(CommandIdentifier.INSERT_TABLE);
+  if (!isInTable(view.state)) {
+    return [
+      {
+        id: "table-insert",
+        label: "Insert table…",
+        shortcut,
+        disabled: !insertTable(
+          DEFAULT_SIZE.cols,
+          DEFAULT_SIZE.rows,
+        )(view.state),
+        run: run(view, (view) => tableKey()(view.state, view.dispatch, view)),
+      },
+    ];
+  }
+  const children: MenuItem[] = [];
+  tableActions((view) => setTools(view, { caption: true })).forEach(
+    (action, index, actions) => {
+      if (index > 0 && actions[index - 1].group !== action.group) {
+        children.push("separator");
+      }
+      children.push({
+        id: `table-${action.id}`,
+        label: action.label(view.state),
+        disabled: !action.enabled(view.state),
+        checked: action.checked?.(view.state),
+        run: run(view, (view) => performAction(view, action)),
+      });
+    },
+  );
+  return [{ id: "table", label: "Table", shortcut, children }];
+};
+
 export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {
   const checker = spellchecker.value;
   const spelling = [
@@ -288,6 +332,8 @@ export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {
     ...spelling,
     ...(spelling.length ? ["separator" as const] : []),
     ...editItems(view),
+    "separator",
+    ...tableItems(view),
     "separator",
     {
       id: "page-setup",

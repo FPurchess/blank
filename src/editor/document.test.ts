@@ -12,7 +12,8 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { path as _path, importedFrom, transaction } from "../state";
 import { importDocx } from "../importers/docx";
 import * as storage from "../storage";
-import { doc, p } from "../test/editor";
+import { doc, p, table, td, th, tr } from "../test/editor";
+import { tableGuard } from "./plugins";
 import { mockCliArgs, mockTauriPath } from "../test/tauri";
 import {
   applyDocument,
@@ -61,6 +62,22 @@ describe("applyDocument", () => {
     const newState = applyDocument(state, hello);
 
     expect(newState.plugins).toEqual(state.plugins);
+    expect(undo(newState)).toBe(false);
+    expect(transaction.value?.doc).toBe(newState.doc);
+  });
+
+  it("keeps the paragraphs next to tables right away, with nothing to undo", () => {
+    const state = EditorState.create({
+      schema,
+      plugins: [history(), tableGuard()],
+    });
+    const startsWithTable = doc(table(tr(th("a")), tr(td("b"))));
+
+    const newState = applyDocument(state, startsWithTable);
+
+    expect(newState.doc.eq(doc(p(), ...startsWithTable.children, p()))).toBe(
+      true,
+    );
     expect(undo(newState)).toBe(false);
     expect(transaction.value?.doc).toBe(newState.doc);
   });

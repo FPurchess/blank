@@ -6,4 +6,10 @@ export { languagePicker } from "./languagePicker";
 export { default as openLink } from "./openLink";
 export { spellcheck } from "./spellcheck";
 export { default as properties } from "./properties";
-export { tableGuard, tableKeys, tablePickerKeys, tableView } from "./tables";
+export {
+  tableGuard,
+  tableKeys,
+  tablePickerKeys,
+  tableTools,
+  tableView,
+} from "./tables";

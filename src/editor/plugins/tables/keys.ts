@@ -14,10 +14,13 @@ import {
   deleteCellSelection,
   goToNextCell,
   isInTable,
+  selectedRect,
 } from "prosemirror-tables";
 
 import { schema } from "../../../markdown";
-import { appendRow } from "../../commands/table/insert";
+import { addRows } from "../../commands/table/insert";
+import { cellPos, refreshed, transactionOf } from "../../commands/table/rect";
+import { removeTable } from "../../commands/table/remove";
 import {
   cellDepth,
   isEmptyTable,
@@ -65,9 +68,17 @@ const tab =
     if (goToNextCell(dir)(state, dispatch)) return true;
     // in the first cell, Shift+Tab stays put
     if (dir === -1) return true;
-    const tr = appendRow(state);
-    if (tr && dispatch) dispatch(tr);
-    return !!tr;
+    // after the last cell, a new row with the cursor at its start
+    const added = transactionOf(addRows("below"), state);
+    if (!added) return false;
+    if (dispatch) {
+      const rect = refreshed(added, selectedRect(state));
+      const start = cellPos(rect, rect.map.height - 1, 0);
+      dispatch(
+        added.setSelection(TextSelection.near(added.doc.resolve(start + 1))),
+      );
+    }
+    return true;
   };
 
 /**
@@ -162,28 +173,6 @@ const leaveTable =
   };
 
 /**
- * selectedTable returns the table the cell selection is in
- */
-const selectedTable = (selection: CellSelection) =>
-  tableAround(selection.$anchorCell)!;
-
-/**
- * removeTable removes `table` and puts the cursor where it was
- */
-const removeTable = (state: EditorState, table: TableAt): Transaction => {
-  const tr = state.tr;
-  const end = table.pos + table.node.nodeSize;
-  const $pos = tr.doc.resolve(table.pos);
-  if ($pos.parent.childCount === 1) {
-    tr.replaceWith(table.pos, end, schema.nodes.paragraph.create());
-  } else {
-    tr.delete(table.pos, end);
-  }
-  tr.setSelection(Selection.near(tr.doc.resolve(table.pos)));
-  return tr.scrollIntoView();
-};
-
-/**
  * clearCells clears the selected cells, and removes the table only when all
  * of it is selected: removing rows or columns is always asked for explicitly
  */
@@ -191,7 +180,7 @@ const clearCells: Command = (state, dispatch) => {
   const { selection } = state;
   if (!(selection instanceof CellSelection)) return false;
   if (selection.isRowSelection() && selection.isColSelection()) {
-    if (dispatch) dispatch(removeTable(state, selectedTable(selection)));
+    if (dispatch) dispatch(removeTable(state, selectedRect(state)));
     return true;
   }
   return deleteCellSelection(state, dispatch);
@@ -209,7 +198,7 @@ const backspace: Command = (state, dispatch) => {
   if (table) {
     const range = textblockRange(table.node, table.start);
     if (range?.from !== $cursor.pos || !isEmptyTable(table.node)) return false;
-    if (dispatch) dispatch(removeTable(state, table));
+    if (dispatch) dispatch(removeTable(state, selectedRect(state)));
     return true;
   }
 

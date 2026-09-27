@@ -244,6 +244,8 @@ const filmNew = async () => {
   recordings.push(frames);
   await pressMod("n");
   await expect($("#ui-top")).toHaveText("» Untitled");
+  // the pointer out of the way, so no button looks hovered
+  await $("#ui-top").moveTo();
   const film = new Recorder(frames);
   await film.pause(0.8);
   return film;
@@ -386,6 +388,32 @@ describe("docs screenshots", () => {
     await film.press("Backspace", Key.Backspace, 1);
     await film.pause(2);
     film.save(path.join(outDir, "table-cells.gif"), 360);
+  });
+
+  it("records table mode", async () => {
+    const film = await filmNew();
+    await film.type("| Fruit | Qty |");
+    await film.enter(0.5);
+    for (const [i, text] of [
+      "Pears",
+      "12",
+      "Apples",
+      "40",
+      "Kiwis",
+      "25",
+    ].entries()) {
+      if (i > 0) await film.press("Tab", Key.Tab, 0.3);
+      await film.type(text);
+    }
+    await film.pause(0.8);
+    // the toolbar shows its keys, which then change the table
+    await film.shortcut(["Mod", "T"], () => pressMod("t"), 1.4);
+    await film.press("↓", Key.ArrowDown, 1);
+    await film.press("S", "s", 1.2);
+    await film.press("R", "r", 1.2);
+    await film.press("Esc", Key.Escape, 0.8);
+    await film.pause(2);
+    film.save(path.join(outDir, "table-mode.gif"), 360);
   });
 
   it("records the writing demo", async () => {
