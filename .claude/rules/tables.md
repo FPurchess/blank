@@ -44,8 +44,8 @@ paths:
 
 - `src/editor/plugins/tables/clipboard.ts` (`tableClipboard`, before `tableEditing`, whose paste it wraps):
   - `transformPastedHTML` runs every table from another app (HTML without `data-pm-slice`) through `normalizeTableHtml`, promoting the first row to the header outside a table; `transformPasted` then aligns those tables by column (`withColumnAlignment`), since spreadsheets align each cell by what it holds. Blank's own copies are kept as they are.
-  - `clipboardTextParser` turns tab-separated text (`parseTsv`, with spreadsheet quoting; lines indented with tabs aren't a table) into a table, unless it's a paste as plain text: ProseMirror's `pasteText` always says plain, so the menu's paste goes through `pasteText(view, text, plain)` from this module.
-  - `handlePaste` runs prosemirror-tables' paste with a dispatch that retypes the cells it lands on (header cells in the header rows and header column, plain cells elsewhere).
+  - `clipboardTextParser` turns tab-separated text (`parseTsv`, with spreadsheet quoting, a quote that doesn't enclose a whole cell read as text, and lines indented with tabs, an empty first column, kept as text) into a table, unless it's a paste as plain text: ProseMirror's `pasteText` always says plain, so the menu's paste goes through `pasteText(view, text, plain)` from this module.
+  - `handlePaste` runs prosemirror-tables' paste, for cells and for anything pasted into selected cells, with a dispatch that retypes the cells it lands on (header cells in the header rows and header column, plain cells elsewhere).
   - `clipboardTextSerializer` writes copied cells as tab-separated text (`tsvOf`), with empty cells where merged cells span; the menu's copy fallback gets it through `view.serializeForClipboard`.
 - E2E and the docs recordings paste with `paste()` from `e2e/helpers.ts`, a synthetic paste event with clipboard data, since the system clipboard is out of reach there.
 - The mouse handles hide on the DOM `keydown`, not `handleKeyDown`: the table keys handle Tab and Enter before them.

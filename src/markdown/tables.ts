@@ -79,20 +79,20 @@ export const cellWidths = (
 
 /**
  * mapCells returns `table` with each cell replaced by what `change` makes of
- * it, given the row and column it starts in
+ * it, given the column it starts in
  */
-export const mapCells = (
+const mapCells = (
   table: Node,
-  change: (cell: Node, row: number, col: number) => Node,
+  change: (cell: Node, col: number) => Node,
 ): Node => {
   const map = TableMap.get(table);
   const rows: Node[] = [];
   let offset = 0;
-  table.forEach((row, _, r) => {
+  table.forEach((row) => {
     const cells: Node[] = [];
     let cellOffset = offset + 1;
     row.forEach((cell) => {
-      cells.push(change(cell, r, map.colCount(cellOffset)));
+      cells.push(change(cell, map.colCount(cellOffset)));
       cellOffset += cell.nodeSize;
     });
     rows.push(row.copy(Fragment.from(cells)));
@@ -115,7 +115,7 @@ export const withColumnPercents = (
   table: Node,
   percents: readonly number[],
 ): Node =>
-  mapCells(table, (cell, _, col) =>
+  mapCells(table, (cell, col) =>
     withAttrs(cell, {
       colwidth: percents.slice(col, col + (cell.attrs.colspan as number)),
     }),
@@ -145,7 +145,7 @@ export const withColumnAlignment = (table: Node): Node => {
     }
   }
   const aligns = found.map((set) => (set.size === 1 ? [...set][0] : null));
-  return mapCells(table, (cell, _, col) =>
+  return mapCells(table, (cell, col) =>
     withAttrs(cell, {
       align: cell.attrs.colspan === 1 ? aligns[col] : null,
     }),

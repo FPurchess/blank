@@ -44,9 +44,26 @@ describe("tab-separated values", () => {
     expect(parseTsv("a\tb")).toBeNull();
     expect(parseTsv("a\nb")).toBeNull();
     expect(parseTsv("a\tb\nc")).toBeNull();
-    expect(parseTsv('"a"b\tc\nd\te')).toBeNull();
     // lines indented with a tab
     expect(parseTsv("\tfoo\n\tbar")).toBeNull();
+  });
+
+  it("reads a quote that doesn't enclose a whole cell as text", () => {
+    expect(parseTsv('"Hello" she said\tx\ny\tz')).toEqual([
+      ['"Hello" she said', "x"],
+      ["y", "z"],
+    ]);
+    expect(parseTsv('"open\tx\ny\tz')).toEqual([
+      ['"open', "x"],
+      ["y", "z"],
+    ]);
+  });
+
+  it("keeps an empty column in the middle of a table", () => {
+    expect(parseTsv("a\t\tc\nd\t\tf")).toEqual([
+      ["a", "", "c"],
+      ["d", "", "f"],
+    ]);
   });
 
   it("writes rows as tab-separated values that read back the same", () => {
@@ -304,6 +321,15 @@ describe("tableClipboard", () => {
       ["a", "b"],
       ["c", "d"],
     ]);
+  });
+
+  it("keeps selected header cells header cells when text is pasted into them", () => {
+    at("Fruit");
+    view.updateState(selectCells(view.state, "Fruit", "Qty"));
+    pasteText(view, "word", false);
+
+    expect(cellTexts(view.state.doc)[0]).toEqual(["word", "word"]);
+    expect(cellTypes(view.state.doc)[0]).toEqual(["th", "th"]);
   });
 
   it("copies cells as tab-separated text", () => {
