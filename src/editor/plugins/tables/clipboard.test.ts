@@ -4,6 +4,7 @@ import { tableEditing } from "prosemirror-tables";
 import type { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
+import { schema } from "../../../markdown";
 import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import {
   cellTexts,
@@ -44,6 +45,8 @@ describe("tab-separated values", () => {
     expect(parseTsv("a\nb")).toBeNull();
     expect(parseTsv("a\tb\nc")).toBeNull();
     expect(parseTsv('"a"b\tc\nd\te')).toBeNull();
+    // lines indented with a tab
+    expect(parseTsv("\tfoo\n\tbar")).toBeNull();
   });
 
   it("writes rows as tab-separated values that read back the same", () => {
@@ -104,6 +107,34 @@ describe("tsvOf", () => {
     const state = selectCells(cursorAt(grid(), "kiwi"), "kiwi", "two words");
 
     expect(tsvOf(state.selection.content())).toBe("kiwi\t10\ntwo words\t");
+  });
+
+  it("writes a line break in a cell as a quoted newline, and leaves out images", () => {
+    const { hard_break, image, paragraph } = schema.nodes;
+    const node = doc(
+      table(
+        tr(
+          td(
+            paragraph.create(null, [
+              schema.text("two"),
+              hard_break.create(),
+              schema.text("lines"),
+            ]),
+          ),
+          td(
+            paragraph.create(null, [
+              schema.text("pic "),
+              image.create({ src: "a.png" }),
+            ]),
+          ),
+        ),
+        tr(td("c"), td("d")),
+      ),
+      p(),
+    );
+    const state = selectCells(cursorAt(node, "two"), "two", "d");
+
+    expect(tsvOf(state.selection.content())).toBe('"two\nlines"\tpic \nc\td');
   });
 
   it("is nothing for other content", () => {
@@ -169,6 +200,32 @@ describe("tableClipboard", () => {
     ]);
     expect(node.child(0).child(1).attrs.align).toBe("right");
     expect(node.child(0).child(0).attrs.align).toBeNull();
+  });
+
+  it("aligns tables by column wherever they are in what's pasted", () => {
+    setup();
+    view.pasteHTML(
+      [
+        "<p>stock<br>today</p><ul><li><p>fruit</p><table>",
+        '<tr><td>a</td><td align="right">1</td></tr>',
+        '<tr><td align="center">b</td><td align="right">2</td></tr>',
+        "</table></li></ul>",
+      ].join(""),
+    );
+
+    let aligns: (string | null)[][] = [];
+    view.state.doc.descendants((node) => {
+      if (node.type.name !== "table") return true;
+      aligns = node.children.map((row) =>
+        row.children.map((cell) => cell.attrs.align as string | null),
+      );
+      return false;
+    });
+    // the first row became the header, so its cells don't count
+    expect(aligns).toEqual([
+      ["center", "right"],
+      ["center", "right"],
+    ]);
   });
 
   it("keeps a table copied within Blank as it is", () => {

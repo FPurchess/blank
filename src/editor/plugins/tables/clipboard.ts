@@ -8,7 +8,6 @@ import {
   handlePaste,
   isInTable,
   selectedRect,
-  selectionCell,
   TableMap,
 } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
@@ -30,7 +29,8 @@ import {
  * parseTsv reads `text` as tab-separated values the way spreadsheets copy
  * them: a row per line, a cell per tab, and quotes around a cell that holds
  * a tab, a line break or a quote, which is doubled. Returns the rows if the
- * text is a table: at least two rows of the same two or more cells.
+ * text is a table: at least two rows of the same two or more cells, and no
+ * column empty in every row, which would be text indented with tabs.
  */
 export const parseTsv = (text: string): string[][] | null => {
   const input = text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
@@ -66,7 +66,10 @@ export const parseTsv = (text: string): string[][] | null => {
   }
   const width = rows[0].length;
   const table =
-    rows.length >= 2 && width >= 2 && rows.every((row) => row.length === width);
+    rows.length >= 2 &&
+    width >= 2 &&
+    rows.every((row) => row.length === width) &&
+    rows[0].every((_, col) => rows.some((row) => row[col]));
   return table ? rows : null;
 };
 
@@ -177,10 +180,9 @@ const retyping = (
   const rect = selectedRect(state);
   const headerRows = headerRowCount(rect.table);
   const headerColumn = hasHeaderColumn(rect);
+  // the selected cells, or the cell of the cursor
+  const { top, left } = rect;
   const selected = state.selection instanceof CellSelection;
-  const { top, left } = selected
-    ? rect
-    : rect.map.findCell(selectionCell(state).pos - rect.tableStart);
   const bottom = selected ? rect.bottom : top + cells.height;
   const right = selected ? rect.right : left + cells.width;
   return (tr) => {

@@ -129,7 +129,9 @@ export const withColumnPercents = (
  */
 export const withColumnAlignment = (table: Node): Node => {
   const map = TableMap.get(table);
-  const body = headerRowCount(table) < map.height ? headerRowCount(table) : 0;
+  // the header rows unless they're all there is
+  const headerRows = headerRowCount(table);
+  const body = headerRows < map.height ? headerRows : 0;
   const found: Set<Alignment | null>[] = Array.from(
     { length: map.width },
     () => new Set(),
