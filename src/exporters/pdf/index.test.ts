@@ -65,6 +65,36 @@ describe("exporters.pdf", () => {
       expect(text.trimEnd().endsWith("%%EOF")).toBe(true);
     });
 
+    it("renders tables, merged cells, captions and tables in lists", async () => {
+      const tables = [
+        "| Name | Qty |",
+        "| :--- | --: |",
+        "| a    |   1 |",
+        "",
+        "<table>",
+        "  <caption>Quarter</caption>",
+        '  <tr><th colspan="2">Q1</th></tr>',
+        '  <tr><td rowspan="2">Jan</td><td><ul><li>one</li></ul></td></tr>',
+        "  <tr><td>2</td></tr>",
+        "</table>",
+        "",
+        "- item",
+        "",
+        "  | a | b |",
+        "  | - | - |",
+        "  | 1 | 2 |",
+      ].join("\n");
+      const state = EditorState.create({
+        schema,
+        doc: markdownParser.parse(tables),
+      });
+
+      const { contents, warnings } = await toPDF(state, { docPath: null });
+
+      expect(warnings).toEqual([]);
+      expect(decode(contents).trimEnd().endsWith("%%EOF")).toBe(true);
+    });
+
     it("embeds the medium, bold, italic and fallback faces", async () => {
       const state = EditorState.create({
         schema,

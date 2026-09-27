@@ -1,4 +1,4 @@
-import { PAGE_MARGIN } from "../page";
+import { PAGE_HEIGHT, PAGE_MARGIN } from "../page";
 
 // Mirrors the editor typography in src/scss/_typography.scss: 11pt body and
 // headings on a major third scale (1.25). pdfmake multiplies lineHeight with
@@ -51,7 +51,22 @@ export const BLOCKQUOTE_LAYOUT = {
   paddingBottom: () => 0,
 };
 
-type PageNode = { headlineLevel?: number };
+// tables mirror the editor (src/scss/_typography.scss and main.scss): cells
+// padded by 0.4em and 0.7em, 1px lines and a 2px line under the header rows
+export const TABLE_CELL_PADDING_Y = 0.4 * BODY_SIZE;
+export const TABLE_CELL_PADDING_X = 0.7 * BODY_SIZE;
+export const TABLE_LINE = 0.6;
+export const TABLE_HEADER_LINE = 1.2;
+// a caption moves to the next page with its table when less room is left
+// below it: enough for the caption, the header row and a first row
+const CAPTION_ROOM = 72;
+
+type PageNode = {
+  headlineLevel?: number;
+  style?: string;
+  // where the node starts on its page
+  startPosition?: { top: number };
+};
 type PageNodes = {
   getFollowingNodesOnPage: () => PageNode[];
   getNodesOnNextPage: () => PageNode[];
@@ -93,15 +108,34 @@ export const BASE_DOCUMENT = {
     bullet_list: { margin: BLOCK_MARGIN },
     ordered_list: { margin: BLOCK_MARGIN },
     blockquote: { margin: BLOCK_MARGIN },
+    table: { margin: BLOCK_MARGIN },
+    // a step down on the scale, like the caption in the editor
+    table_caption: textStyleMixin(
+      BODY_SIZE / 1.25,
+      BODY_LINE_HEIGHT,
+      [0, 0, 0, 4],
+      {
+        italics: true,
+      },
+    ),
   },
   // Keep headings with the text they introduce: move a heading to the next
   // page when only headings follow it on this page. Checking for "only
   // headings" rather than "nothing" moves a run of headings as a whole, since
-  // pdfmake asks about every node just once.
-  pageBreakBefore: (node: PageNode, nodes: PageNodes) =>
-    node.headlineLevel !== undefined &&
-    nodes.getNodesOnNextPage().length > 0 &&
-    nodes
-      .getFollowingNodesOnPage()
-      .every((following) => following.headlineLevel !== undefined),
+  // pdfmake asks about every node just once. A table caption moves when
+  // there's no room for its table's first rows below it: pdfmake still counts
+  // rows it later moves to the next page as on this one, so the following
+  // nodes can't tell.
+  pageBreakBefore: (node: PageNode, nodes: PageNodes) => {
+    if (node.style === "table_caption" && node.startPosition) {
+      return PAGE_HEIGHT - PAGE_MARGIN - node.startPosition.top < CAPTION_ROOM;
+    }
+    return (
+      node.headlineLevel !== undefined &&
+      nodes.getNodesOnNextPage().length > 0 &&
+      nodes
+        .getFollowingNodesOnPage()
+        .every((following) => following.headlineLevel !== undefined)
+    );
+  },
 };

@@ -23,8 +23,10 @@ const count = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
 const describe = (report: ReturnType<typeof cleanup>, errors: string[]) => [
-  ...(report.tables
-    ? [`${count(report.tables, "table", "tables")} became text`]
+  ...(report.nestedTables
+    ? [
+        `${count(report.nestedTables, "table inside a table", "tables inside tables")} became text`,
+      ]
     : []),
   ...(report.droppedImages
     ? [`${count(report.droppedImages, "image", "images")} couldn't be imported`]

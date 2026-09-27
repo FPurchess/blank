@@ -1,5 +1,11 @@
+import { tokenizer } from "../../markdown";
+import { normalizeTableHtml, rename } from "../../markdown/html";
 import { isSavableUrl } from "../../url";
-import { HORIZONTAL_LINE_CLASS } from "./styleMap";
+import {
+  CAPTION_CLASS,
+  HORIZONTAL_LINE_CLASS,
+  TABLE_HEADING_CLASS,
+} from "./styleMap";
 
 // Turns the HTML mammoth makes of a .docx into HTML the markdown schema can
 // hold, see src/importers/docx/index.ts. Works on an inert document, so no
@@ -9,13 +15,12 @@ import { HORIZONTAL_LINE_CLASS } from "./styleMap";
 export const DROPPED_IMAGE_SRC = "about:blank#dropped-image";
 
 export interface CleanupReport {
-  tables: number;
+  // tables inside table cells, which became text
+  nestedTables: number;
   footnotes: number;
   comments: number;
   droppedImages: number;
 }
-
-const BLOCK = /^(P|H[1-6]|LI|BLOCKQUOTE|PRE|DIV|UL|OL|TABLE)$/;
 
 const unwrap = (element: Element) => element.replaceWith(...element.childNodes);
 
@@ -72,51 +77,54 @@ const comments = (doc: Document) => {
 };
 
 /**
- * inlineContent returns the content of `cell` as inline content: its
- * paragraphs joined by spaces
+ * headerCells makes the cells of `table` that hold only paragraphs in the
+ * table heading style header cells, e.g. those of a header column, since
+ * mammoth only knows header rows
  */
-const inlineContent = (doc: Document, cell: Element) => {
-  const content = doc.createDocumentFragment();
-  for (const node of [...cell.childNodes]) {
-    const parts =
-      node instanceof Element && BLOCK.test(node.tagName)
-        ? [...node.childNodes]
-        : [node];
-    if (parts.length === 0) continue;
-    if (content.childNodes.length) content.append(" ");
-    content.append(...parts);
+const headerCells = (table: HTMLTableElement) => {
+  for (const cell of table.querySelectorAll("td")) {
+    const children = [...cell.children];
+    const heading =
+      children.length > 0 &&
+      children.every((child) => child.classList.contains(TABLE_HEADING_CLASS));
+    if (heading && cell.closest("table") === table) rename(cell, "th");
   }
-  return content;
+  table.querySelectorAll(`.${TABLE_HEADING_CLASS}`).forEach((paragraph) => {
+    paragraph.removeAttribute("class");
+  });
 };
 
 /**
- * tables turns every table row into a paragraph with its cells separated by
- * " | ", since markdown in Blank has no tables. Header rows are bold.
+ * tables keeps the tables in a form the schema holds, see normalizeTableHtml:
+ * a caption paragraph right before or after a table becomes its caption, and
+ * a table without a header row gets its first row as the header, like a
+ * markdown table needs one
+ * @returns how many tables inside tables became text
  */
 const tables = (doc: Document) => {
-  // innermost first, so a nested table becomes text inside its cell
-  const all = [...doc.querySelectorAll("table")].reverse();
-  for (const table of all) {
-    const rows = [...table.querySelectorAll("tr")].map((row) => {
-      const paragraph = doc.createElement("p");
-      const cells = [...row.children].filter((cell) =>
-        /^T[DH]$/.test(cell.tagName),
-      );
-      const header =
-        row.parentElement?.tagName === "THEAD" ||
-        (cells.length > 0 && cells.every((cell) => cell.tagName === "TH"));
-      const target = header
-        ? paragraph.appendChild(doc.createElement("strong"))
-        : paragraph;
-      cells.forEach((cell, index) => {
-        if (index) target.append(" | ");
-        target.append(inlineContent(doc, cell));
-      });
-      return paragraph;
-    });
-    table.replaceWith(...rows);
+  let nested = 0;
+  const outermost = [...doc.querySelectorAll("table")].filter(
+    (table) => !table.parentElement?.closest("table"),
+  );
+  for (const table of outermost) {
+    const caption = [
+      table.previousElementSibling,
+      table.nextElementSibling,
+    ].find((sibling) => sibling?.classList.contains(CAPTION_CLASS));
+    if (caption) {
+      const element = doc.createElement("caption");
+      element.append(...caption.childNodes);
+      table.prepend(element);
+      caption.remove();
+    }
+    headerCells(table);
+    nested += normalizeTableHtml(table, tokenizer, { promoteHeader: true });
   }
-  return all.length;
+  // captions of something else stay as paragraphs
+  doc.querySelectorAll(`.${CAPTION_CLASS}`).forEach((caption) => {
+    caption.removeAttribute("class");
+  });
+  return nested;
 };
 
 /**
@@ -196,13 +204,14 @@ export const cleanup = (doc: Document): CleanupReport => {
   codeLineBreaks(doc);
   const commentCount = comments(doc);
   const footnoteCount = footnotes(doc);
-  const tableCount = tables(doc);
   links(doc);
   const droppedImageCount = droppedImages(doc);
+  // after the empty paragraphs are gone, so a caption is next to its table
   emptyParagraphs(doc);
+  const nestedTableCount = tables(doc);
   tightLists(doc);
   return {
-    tables: tableCount,
+    nestedTables: nestedTableCount,
     footnotes: footnoteCount,
     comments: commentCount,
     droppedImages: droppedImageCount,

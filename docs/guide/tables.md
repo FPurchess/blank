@@ -73,3 +73,13 @@ Line breaks in a cell are saved as `<br>`, and the colons in the second line kee
 A markdown table holds one line of text per cell. When a table needs more, like a list or several paragraphs in a cell, Blank saves that one table as an HTML table in the same markdown file. GitHub, Obsidian, Typora and pandoc show it as a table as well. Once the table fits a markdown table again, Blank saves it as one.
 
 Blank opens both kinds, so you can also open markdown files with tables written in other editors.
+
+## PDF and Word {#export}
+
+Tables go into your [PDF and Word documents](./files) the way you see them in Blank: the tinted header, the lines between the rows and columns, the alignment of each column, merged cells, lists in cells and the caption above the table. Columns get their width from their content, like in the editor.
+
+- A table longer than a page repeats its header row at the top of every page.
+- Rows stay whole instead of breaking across two pages, unless a row is too tall for one.
+- A caption never ends a page on its own: it moves to the next page with its table.
+
+In Word, tables are real Word tables and the caption uses Word's caption style, so the document stays easy to edit. When you [open a Word document](./files#open-word-documents), its tables come along with their merged cells, header rows and captions.

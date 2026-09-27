@@ -57,6 +57,57 @@ const PNG = dataUrl("image/png", IMAGES.png);
 
 describe("importers.docx", () => {
   describe("round trip through the Word export", () => {
+    it.each([
+      ["a pipe table", "| Name | Qty |\n| ---- | --- |\n| a    | 1   |"],
+      [
+        "formatting and line breaks in cells",
+        "| a<br>b | c     |\n| ------ | ----- |\n| `x\\|y` | **z** |",
+      ],
+      [
+        "merged cells and a caption",
+        [
+          "<table>",
+          "  <caption>Stock</caption>",
+          "  <thead>",
+          "    <tr>",
+          '      <th scope="col" colspan="2">Q1</th>',
+          "    </tr>",
+          "  </thead>",
+          "  <tbody>",
+          "    <tr>",
+          '      <td rowspan="2">Jan</td>',
+          "      <td>1</td>",
+          "    </tr>",
+          "    <tr>",
+          "      <td>2</td>",
+          "    </tr>",
+          "  </tbody>",
+          "</table>",
+        ].join("\n"),
+      ],
+      [
+        "a header column",
+        [
+          "<table>",
+          "  <thead>",
+          "    <tr>",
+          '      <th scope="col">a</th>',
+          '      <th scope="col">b</th>',
+          "    </tr>",
+          "  </thead>",
+          "  <tbody>",
+          "    <tr>",
+          '      <th scope="row">c</th>',
+          "      <td>d</td>",
+          "    </tr>",
+          "  </tbody>",
+          "</table>",
+        ].join("\n"),
+      ],
+    ])("keeps %s", async (_, markdown) => {
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
     it("keeps everything markdown in Blank can express", async () => {
       const markdown = [
         "# Heading 1",
@@ -153,6 +204,12 @@ describe("importers.docx", () => {
       );
     });
 
+    it("loses the alignment of table columns", async () => {
+      expect(
+        await roundTrip("| a   |   b |\n| :-- | --: |\n| c   |   d |"),
+      ).toBe("| a   | b   |\n| --- | --- |\n| c   | d   |");
+    });
+
     it("merges adjacent blockquotes", async () => {
       expect(
         await roundTrip(doc(blockquote(p("one")), blockquote(p("two")))),
@@ -180,19 +237,30 @@ describe("importers.docx", () => {
       expect(markdown).toContain(`${dataUrl("image/jpeg", "")}`);
     });
 
-    it("turns tables into text and keeps footnotes at the end", async () => {
+    it("keeps tables with merged cells and footnotes at the end", async () => {
       const { markdown, warnings } = await toMarkdown(
         fixture(`${writer}.docx`),
       );
 
-      expect(markdown).toContain("**Name | Value**\n\na | 1\n\nb | 2");
+      // pandoc keeps the caption, which makes it an HTML table; the
+      // LibreOffice fixture loses its caption style on the way through ODT
+      expect(markdown).toContain(
+        writer === "pandoc"
+          ? "      <td>a</td>\n      <td>1</td>"
+          : "| a    | 1     |\n| b    | 2     |",
+      );
+      expect(markdown).toContain('      <th scope="col" colspan="3">Q1</th>');
+      expect(markdown).toContain('      <td colspan="2">North</td>');
       expect(markdown).toMatch(/A sentence with a footnote\.\\\[1\\\]/);
       expect(markdown).toMatch(/---\n\n1\. The footnote\.\s*$/);
-      expect(warnings).toEqual([
-        "1 table became text",
-        "1 footnote moved to the end",
-      ]);
+      expect(warnings).toEqual(["1 footnote moved to the end"]);
     });
+  });
+
+  it("keeps pandoc's table captions", async () => {
+    const { markdown } = await toMarkdown(fixture("pandoc.docx"));
+
+    expect(markdown).toContain("<table>\n  <caption>Values</caption>");
   });
 
   it("keeps LibreOffice's horizontal lines", async () => {

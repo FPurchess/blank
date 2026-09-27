@@ -345,3 +345,156 @@ describe("exporter.docx", () => {
     );
   });
 });
+
+describe("exporter.docx tables", () => {
+  // the rows of the first table with, per cell, its text and properties
+  const tableOf = async (exported: Exported) => {
+    const [table] = all(await exported.xml("word/document.xml"), "tbl");
+    const rows = all(table, "tr").map((row) => ({
+      header: child(row, "tblHeader") !== undefined,
+      cantSplit: child(row, "cantSplit") !== undefined,
+      cells: all(row, "tc").map((cell) => ({
+        text: all(cell, "t")
+          .map((t) => t.textContent)
+          .join(""),
+        span: attr(child(cell, "gridSpan"), "val"),
+        merge: child(cell, "vMerge")
+          ? (attr(child(cell, "vMerge"), "val") ?? "continue")
+          : null,
+        fill: attr(child(cell, "shd"), "fill"),
+        style: attr(child(cell, "pStyle"), "val"),
+        align: attr(child(cell, "jc"), "val"),
+      })),
+    }));
+    return { table, rows };
+  };
+
+  it("writes a table with its header row repeated and rows kept whole", async () => {
+    const { rows } = await tableOf(
+      await exportMarkdown("| Name | Qty |\n| ---- | --: |\n| a    |   1 |"),
+    );
+
+    expect(rows.map(({ header, cantSplit }) => [header, cantSplit])).toEqual([
+      [true, true],
+      [false, true],
+    ]);
+    expect(rows[0].cells).toMatchObject([
+      { text: "Name", fill: "F1F2F3", style: "TableHeading", align: null },
+      { text: "Qty", style: "TableHeading", align: "right" },
+    ]);
+    expect(rows[1].cells).toMatchObject([
+      { text: "a", fill: null, style: null },
+      { text: "1", align: "right" },
+    ]);
+  });
+
+  it("draws lines like the PDF and sizes the columns by their content", async () => {
+    const { table } = await tableOf(
+      await exportMarkdown("| Name | Description |\n| --- | --- |\n| a | b |"),
+    );
+    const borders = child(table, "tblBorders")!;
+    const border = (side: string) => attr(child(borders, side), "val");
+
+    expect(["top", "left", "right"].map(border)).toEqual([
+      "none",
+      "none",
+      "none",
+    ]);
+    expect(["bottom", "insideH", "insideV"].map(border)).toEqual([
+      "single",
+      "single",
+      "single",
+    ]);
+    const widths = all(child(table, "tblGrid")!, "gridCol").map((col) =>
+      Number(attr(col, "w")),
+    );
+    expect(widths[0] / widths[1]).toBeCloseTo(4 / 11);
+    expect(attr(child(table, "tblLayout"), "type")).toBe("fixed");
+  });
+
+  it("merges cells across columns and rows", async () => {
+    const { rows } = await tableOf(
+      await exportMarkdown(
+        [
+          "<table>",
+          '  <tr><th colspan="2">Q1</th></tr>',
+          '  <tr><td rowspan="2">Jan</td><td>1</td></tr>',
+          "  <tr><td>2</td></tr>",
+          "</table>",
+        ].join("\n"),
+      ),
+    );
+
+    expect(rows[0].cells).toMatchObject([{ text: "Q1", span: "2" }]);
+    expect(rows[1].cells).toMatchObject([
+      { text: "Jan", merge: "restart" },
+      { text: "1" },
+    ]);
+    expect(rows[2].cells).toMatchObject([
+      { text: "", merge: "continue" },
+      { text: "2" },
+    ]);
+  });
+
+  it("puts the caption above the table in Word's caption style", async () => {
+    const exported = await exportMarkdown(
+      "<table><caption>Stock</caption><tr><th>a</th></tr><tr><td>b</td></tr></table>",
+    );
+
+    const [caption] = await paragraphs(exported);
+    expect(caption).toMatchObject({ style: "Caption", text: "Stock" });
+    const [body] = all(await exported.xml("word/document.xml"), "body");
+    expect(body.firstElementChild?.localName).toBe("p");
+    expect(body.firstElementChild?.nextElementSibling?.localName).toBe("tbl");
+  });
+
+  it("styles the header cells of a header column", async () => {
+    const { rows } = await tableOf(
+      await exportMarkdown(
+        '<table><tr><th>a</th><th>b</th></tr><tr><th scope="row">c</th><td>d</td></tr></table>',
+      ),
+    );
+
+    expect(rows[1].cells).toMatchObject([
+      { style: "TableHeading", fill: "F1F2F3" },
+      { style: null, fill: null },
+    ]);
+  });
+
+  it("indents a table in a list like the list's text", async () => {
+    const { table } = await tableOf(
+      await exportMarkdown("- item\n\n  | a |\n  | - |\n  | b |"),
+    );
+
+    expect(attr(child(table, "tblInd"), "w")).toBe("720");
+  });
+
+  it("spaces the block after a table", async () => {
+    const exported = await exportMarkdown("| a |\n| - |\n| b |\n\nafter");
+
+    const [, , after] = await paragraphs(exported);
+    expect(after.text).toBe("after");
+    expect(attr(child(after.p, "spacing"), "before")).toBe("160");
+  });
+
+  it("lets rows break across pages when a cell might not fit on one", async () => {
+    const { rows } = await tableOf(
+      await exportMarkdown(`| a |\n| - |\n| ${"x".repeat(700)} |`),
+    );
+
+    expect(rows.every(({ cantSplit }) => !cantSplit)).toBe(true);
+  });
+
+  it("fits images to their cell", async () => {
+    const png = dataUrl("image/png", IMAGES.png);
+    const exported = await exportMarkdown(
+      `| a | ${"b".repeat(40)} |\n| - | - |\n| ![x](${png}) | c |`,
+    );
+
+    const extent = (await exported.text("word/document.xml")).match(
+      /<wp:extent cx="(\d+)"/,
+    );
+    // 3 × 2 pixels fit the first column, which is 3 of 43 characters wide
+    expect(Number(extent![1])).toBe(3 * 9525);
+  });
+});

@@ -1,6 +1,7 @@
 import type { ILevelsOptions, IStylesOptions } from "docx";
 
-import { PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH } from "../page";
+import { CONTENT_WIDTH, PAGE_HEIGHT, PAGE_MARGIN, PAGE_WIDTH } from "../page";
+import { TABLE_COLORS } from "../table";
 
 // Mirrors the PDF styles in ../pdf/template.ts (and so the editor typography
 // in src/scss/_typography.scss): 11pt body, headings on a major third scale.
@@ -11,7 +12,7 @@ export const FONT = "IBM Plex Sans";
 const CODE_FONT = "Courier New";
 const CODE_BACKGROUND = "F2F2F2";
 
-const twips = (points: number) => Math.round(points * 20);
+export const twips = (points: number) => Math.round(points * 20);
 const halfPoints = (points: number) => Math.round(points * 2);
 // pdfmake multiplies lineHeight with the natural line height of IBM Plex Sans
 const line = (pdfLineHeight: number) => Math.round(pdfLineHeight * 1.3 * 240);
@@ -36,6 +37,45 @@ export const QUOTE_BORDER = {
   size: 18,
   color: "auto",
   space: 12,
+} as const;
+
+export const CONTENT_WIDTH_TWIPS = twips(CONTENT_WIDTH);
+
+// tables mirror the PDF (../pdf/template.ts): cells padded by 0.4em and
+// 0.7em, thin lines between rows and columns, a stronger one under the header
+// rows, none around the table's sides and top. Borders are measured in
+// eighths of a point.
+const BODY_SIZE = 11;
+export const TABLE_CELL_MARGINS = {
+  top: twips(0.4 * BODY_SIZE),
+  bottom: twips(0.4 * BODY_SIZE),
+  left: twips(0.7 * BODY_SIZE),
+  right: twips(0.7 * BODY_SIZE),
+};
+const hex = (color: string) => color.slice(1).toUpperCase();
+const TABLE_LINE = {
+  style: "single",
+  size: 5,
+  color: hex(TABLE_COLORS.line),
+} as const;
+const NO_LINE = { style: "none", size: 0, color: "auto" } as const;
+export const TABLE_BORDERS = {
+  top: NO_LINE,
+  left: NO_LINE,
+  right: NO_LINE,
+  bottom: TABLE_LINE,
+  insideHorizontal: TABLE_LINE,
+  insideVertical: TABLE_LINE,
+};
+export const TABLE_HEADER_BORDER = {
+  style: "single",
+  size: 10,
+  color: hex(TABLE_COLORS.headerLine),
+} as const;
+export const TABLE_HEADER_SHADING = {
+  type: "clear",
+  color: "auto",
+  fill: hex(TABLE_COLORS.headerFill),
 } as const;
 
 export const PAGE = {
@@ -89,6 +129,8 @@ export const STYLE = {
   horizontalLine: "HorizontalLine",
   inlineCode: "InlineCode",
   hyperlink: "Hyperlink",
+  caption: "Caption",
+  tableHeading: "TableHeading",
 };
 
 const codeShading = {
@@ -149,6 +191,24 @@ export const STYLES: IStylesOptions = {
         shading: codeShading,
         spacing: { after: 0, line: 240, lineRule: "auto" as const },
       },
+    },
+    {
+      // Word's own name, so it shows up as its built-in caption style; a step
+      // down on the scale, like the caption in the editor
+      id: STYLE.caption,
+      name: "Caption",
+      basedOn: "Normal",
+      next: "Normal",
+      quickFormat: true,
+      run: { size: halfPoints(BODY_SIZE / 1.25), italics: true },
+      paragraph: { keepNext: true, spacing: { after: twips(4) } },
+    },
+    {
+      // the text of header cells, named like LibreOffice's style for it
+      id: STYLE.tableHeading,
+      name: "Table Heading",
+      basedOn: "Normal",
+      run: { bold: true },
     },
     {
       // also the name LibreOffice gives its horizontal line style
