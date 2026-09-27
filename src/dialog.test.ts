@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Observable } from "observable.ts";
+import { shallowRef } from "vue";
 
 import { bootDialog } from "./dialog";
 
 const ID = "test-dialog";
-const requests = new Observable<string | null>(null);
+const requests = shallowRef<string | null>(null);
 const render = (request: string) => {
   const element = document.createElement("div");
   element.id = ID;

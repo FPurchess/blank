@@ -1,7 +1,7 @@
 import localforage from "localforage";
-import { Transaction } from "prosemirror-state";
 import { Node } from "prosemirror-model";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { type Ref, watch } from "vue";
 
 import {
   importedFrom,
@@ -75,6 +75,18 @@ export const flush = (): Promise<void> =>
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * persist stores the value of `ref` under `key` whenever it changes
+ */
+const persist = <T>(ref: Readonly<Ref<T>>, key: string) =>
+  watch(
+    ref,
+    (value) => {
+      localforage.setItem(key, value).catch(console.warn);
+    },
+    { flush: "sync" },
+  );
+
 // false when the storage can't be used, so nothing is restored or persisted
 let storageAvailable = true;
 
@@ -92,24 +104,30 @@ export const bootStorage = async () => {
     return;
   }
 
-  path.subscribe((value: string | null) => {
-    latestPath = value;
-    schedule();
-  });
+  watch(
+    path,
+    (value) => {
+      latestPath = value;
+      schedule();
+    },
+    { flush: "sync" },
+  );
 
-  importedFrom.subscribe((value: string | null) => {
-    latestImportedFrom = value;
-    schedule();
-  });
+  watch(
+    importedFrom,
+    (value) => {
+      latestImportedFrom = value;
+      schedule();
+    },
+    { flush: "sync" },
+  );
 
   const _theme = await localforage.getItem("theme");
   theme.value = themes.includes(_theme as string)
     ? (_theme as themeType)
     : themes[0];
 
-  theme.subscribe((value: themeType) => {
-    localforage.setItem("theme", value).catch(console.warn);
-  });
+  persist(theme, "theme");
 
   // the system language on first start, the chosen one afterwards
   const _language = await localforage.getItem("language");
@@ -118,23 +136,23 @@ export const bootStorage = async () => {
     await localforage.setItem("language", language.value).catch(console.warn);
   }
 
-  language.subscribe((value: string) => {
-    localforage.setItem("language", value).catch(console.warn);
-  });
+  persist(language, "language");
 
   // off until the user turns it on
   spellcheck.value = (await localforage.getItem("spellcheck")) === true;
-  spellcheck.subscribe((value: boolean) => {
-    localforage.setItem("spellcheck", value).catch(console.warn);
-  });
+  persist(spellcheck, "spellcheck");
 
-  transaction.subscribe((tx: Transaction | null) => {
-    if (tx === null) return;
-    latestDoc = tx.doc;
-    latestPath = path.value;
-    latestImportedFrom = importedFrom.value;
-    schedule();
-  });
+  watch(
+    transaction,
+    (tx) => {
+      if (tx === null) return;
+      latestDoc = tx.doc;
+      latestPath = path.value;
+      latestImportedFrom = importedFrom.value;
+      schedule();
+    },
+    { flush: "sync" },
+  );
 
   // store the last edits before the window closes. A failing or hanging
   // storage must never keep the window open

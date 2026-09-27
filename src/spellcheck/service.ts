@@ -1,4 +1,5 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import { watch } from "vue";
 
 import { language, spellcheck, spellchecker, spellcheckStatus } from "../state";
 import * as ipc from "./ipc";
@@ -226,9 +227,12 @@ export const update = async () => {
 /**
  * bootSpellcheck checks spelling in the current language while spell check is
  * on. It doesn't wait for the dictionary, so a download never delays the start.
+ * @returns dispose, which stops following spellcheck and language
  */
 export const bootSpellcheck = () => {
-  spellcheck.subscribe(() => void update());
-  language.subscribe(() => void update());
+  const stop = watch([spellcheck, language], () => void update(), {
+    flush: "sync",
+  });
   void update();
+  return stop;
 };

@@ -4,15 +4,19 @@ import { EditorState } from "prosemirror-state";
 import { clearMocks, mockWindows } from "@tauri-apps/api/mocks";
 
 import { cycleTheme } from ".";
-import { theme, themes } from "../../state";
+import { bootAppearance, theme, themes } from "../../state";
 
 describe("command.cycleTheme", () => {
+  let disposeAppearance = () => {};
+
   beforeEach(() => {
     mockWindows("main");
     theme.value = themes[0];
+    disposeAppearance = bootAppearance();
   });
 
   afterEach(() => {
+    disposeAppearance();
     clearMocks();
   });
 

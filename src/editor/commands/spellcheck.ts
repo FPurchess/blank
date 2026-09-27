@@ -1,6 +1,10 @@
 import { type Command, TextSelection } from "prosemirror-state";
 
-import { spellcheck, spellcheckMessage, spellcheckStatus } from "../../state";
+import {
+  flashSpellcheckMessage,
+  spellcheck,
+  spellcheckStatus,
+} from "../../state";
 import { openContextMenu } from "../plugins/contextMenu";
 import { nextMisspelling } from "../plugins/spellcheck";
 
@@ -21,7 +25,7 @@ export const goToMisspelling =
   (state, dispatch, view) => {
     if (!spellcheck.value) return false;
     if (spellcheckStatus.value.state !== "ready") {
-      spellcheckMessage.value = "Spell check isn't ready";
+      flashSpellcheckMessage("Spell check isn't ready");
       return true;
     }
     const { from, to } = state.selection;
@@ -31,7 +35,7 @@ export const goToMisspelling =
       direction,
     );
     if (!found) {
-      spellcheckMessage.value = "No spelling errors";
+      flashSpellcheckMessage("No spelling errors");
       return true;
     }
     if (dispatch) {

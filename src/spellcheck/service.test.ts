@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { watch } from "vue";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { language, spellcheck, spellchecker, spellcheckStatus } from "../state";
@@ -29,12 +30,20 @@ const DICTIONARY = new Set(["house", "the", "tree"]);
 
 const installed = { available: true, installed: true, outdated: false };
 
+// what the tests started, stopped after each one
+const stops: (() => void)[] = [];
+afterEach(() => stops.splice(0).forEach((stop) => stop()));
+
 /**
  * statuses records the spell check statuses from now on
  */
 const statuses = () => {
   const seen: SpellcheckStatus["state"][] = [];
-  spellcheckStatus.subscribe((status) => seen.push(status.state));
+  stops.push(
+    watch(spellcheckStatus, (status) => seen.push(status.state), {
+      flush: "sync",
+    }),
+  );
   return seen;
 };
 
@@ -193,7 +202,7 @@ describe("spellcheck service", () => {
     });
 
     it("follows the spell check setting and the language once booted", async () => {
-      bootSpellcheck();
+      stops.push(bootSpellcheck());
       await flushPromises();
       expect(spellcheckStatus.value.state).toBe("off");
 

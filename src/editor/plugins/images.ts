@@ -1,6 +1,7 @@
 import { Plugin } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
 import type { NodeView } from "prosemirror-view";
+import { watch } from "vue";
 
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -90,10 +91,10 @@ export default () => {
       },
     },
     view: () => {
-      const unsubscribe = path.subscribe(() => {
-        views.forEach((view) => view.render());
+      const stop = watch(path, () => views.forEach((view) => view.render()), {
+        flush: "sync",
       });
-      return { destroy: unsubscribe };
+      return { destroy: stop };
     },
   });
 };

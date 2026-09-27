@@ -1,7 +1,9 @@
 // Building blocks of the modal dialogs (link, image, page setup): a backdrop
 // with a form that keeps the focus inside and closes on Escape.
 
-import type { Observable } from "observable.ts";
+import { onScopeDispose, type Ref, watch } from "vue";
+
+import { bootScope } from "./scope";
 
 // the dispose function of each booted dialog, by its id
 const booted = new Map<string, () => void>();
@@ -13,28 +15,27 @@ const booted = new Map<string, () => void>();
  * @returns dispose, which removes the dialog and stops rendering it
  */
 export const bootDialog = <T>(
-  requests: Observable<T | null>,
+  requests: Readonly<Ref<T | null>>,
   id: string,
   render: (request: T) => void,
 ) => {
   booted.get(id)?.();
-  const unsubscribe = requests.subscribe(
-    (request) => {
+  const dispose = bootScope(() => {
+    watch(
+      requests,
+      (request) => {
+        document.getElementById(id)?.remove();
+        if (request) render(request);
+      },
+      { flush: "sync", immediate: true },
+    );
+    // runs once: disposing again, e.g. after booting again, would remove the
+    // dialog of the newer boot
+    onScopeDispose(() => {
       document.getElementById(id)?.remove();
-      if (request) render(request);
-    },
-    { immediate: true },
-  );
-  // only the first call counts: a later one, e.g. after booting again, would
-  // remove the dialog of the newer boot
-  let disposed = false;
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    unsubscribe();
-    document.getElementById(id)?.remove();
-    if (booted.get(id) === dispose) booted.delete(id);
-  };
+      if (booted.get(id) === dispose) booted.delete(id);
+    });
+  });
   booted.set(id, dispose);
   return dispose;
 };

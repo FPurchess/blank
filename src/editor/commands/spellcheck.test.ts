@@ -107,7 +107,7 @@ describe("spell check commands", () => {
     const press = await setup("this");
 
     expect(press("Mod-Alt-n")).toBe(true);
-    expect(spellcheckMessage.value).toBe("No spelling errors");
+    expect(spellcheckMessage.value?.text).toBe("No spelling errors");
     expect(contextMenu.value).toBeNull();
   });
 
@@ -116,7 +116,7 @@ describe("spell check commands", () => {
     spellcheckStatus.value = { state: "downloading", tag: "en" };
 
     expect(press("Mod-Alt-n")).toBe(true);
-    expect(spellcheckMessage.value).toBe("Spell check isn't ready");
+    expect(spellcheckMessage.value?.text).toBe("Spell check isn't ready");
   });
 
   it("leaves the keys alone while spell check is off", async () => {

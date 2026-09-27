@@ -6,7 +6,7 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
-import { Observable } from "observable.ts";
+import { shallowRef } from "vue";
 
 import {
   DEFAULT_PAGE,
@@ -147,8 +147,9 @@ const defaultConfig: Config = {
   },
 };
 
-// config is an observable that contains the config
-export const config = new Observable<Config>(defaultConfig);
+// config is the loaded blank.json, over the defaults. It is replaced whole,
+// never changed in place.
+export const config = shallowRef<Config>(defaultConfig);
 
 const configName = "blank.json";
 

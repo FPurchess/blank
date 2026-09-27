@@ -11,7 +11,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { gfmBlocker, type GfmBlocker } from "../../../markdown/tables";
 import {
-  announcement,
+  announce as announceNow,
   tableToolbar,
   type TableToolbarItem,
 } from "../../../state";
@@ -96,7 +96,7 @@ let following: string[] | null = null;
  */
 export const announce = (message: string) => {
   if (following) following.push(message);
-  else announcement.value = message;
+  else announceNow(message);
 };
 
 /**

@@ -15,13 +15,18 @@ vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
 type CloseHandler = () => Promise<void>;
 let closeHandler: CloseHandler | undefined;
 
+// stops the state the last bootFresh started
+let disposeState = () => {};
+
 /**
- * bootFresh boots storage against freshly imported state observables, so no
- * subscriptions leak between tests.
+ * bootFresh boots the state and then storage, as main.ts does, against freshly
+ * imported state, so no watchers leak between tests.
  */
 const bootFresh = async () => {
+  disposeState();
   vi.resetModules();
   const state = await import("./state");
+  disposeState = state.bootState();
   const storage = await import("./storage");
   await storage.bootStorage();
   return { ...state, ...storage };

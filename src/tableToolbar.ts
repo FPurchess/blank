@@ -1,8 +1,11 @@
+import { onScopeDispose, watch } from "vue";
+
 import { CommandIdentifier, getKeyBinding } from "./config";
 import { formatShortcut } from "./editor/keyBindings";
 import { icon } from "./icons";
 import { placeToolbar } from "./popup";
 import { separated } from "./separated";
+import { bootScope } from "./scope";
 import { uiRoot } from "./uiRoot";
 import {
   tableToolbar,
@@ -123,29 +126,27 @@ const updateCaption = (element: HTMLElement, state: TableToolbarState) => {
  * bootTableToolbar shows the toolbar of the table the cursor is in. It is
  * created once per table visit and updated in place, so it doesn't flicker.
  */
-export const bootTableToolbar = () => {
-  let element: HTMLElement | null = null;
-  const unsubscribe = tableToolbar.subscribe(
-    (state) => {
-      if (!state) {
-        element?.remove();
-        element = null;
-        return;
-      }
-      if (!element) {
-        element = createToolbar(state.items);
-        uiRoot().append(element);
-      }
-      element.classList.toggle("keys", state.keys);
-      updateButtons(element, state);
-      updateCaption(element, state);
-      placeToolbar(element, state.anchor);
-    },
-    { immediate: true },
-  );
-  return () => {
-    unsubscribe();
-    element?.remove();
-    element = null;
-  };
-};
+export const bootTableToolbar = () =>
+  bootScope(() => {
+    let element: HTMLElement | null = null;
+    watch(
+      tableToolbar,
+      (state) => {
+        if (!state) {
+          element?.remove();
+          element = null;
+          return;
+        }
+        if (!element) {
+          element = createToolbar(state.items);
+          uiRoot().append(element);
+        }
+        element.classList.toggle("keys", state.keys);
+        updateButtons(element, state);
+        updateCaption(element, state);
+        placeToolbar(element, state.anchor);
+      },
+      { flush: "sync", immediate: true },
+    );
+    onScopeDispose(() => element?.remove());
+  });
