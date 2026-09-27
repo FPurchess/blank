@@ -10,6 +10,7 @@ import {
   linkDialog,
   pageSetup,
   pageSetupRequests,
+  tableToolbar,
   transaction,
 } from "../state";
 import {
@@ -24,17 +25,20 @@ import {
   tableGuard,
   tableKeys,
   tablePickerKeys,
+  tableTools,
   tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
 import { openPageSetup } from "./commands/pageSetup";
 
-// the dialogs and the context menu take the focus while they are open
+// the dialogs, the context menu and the caption field of the table toolbar
+// take the focus while they are open
 const dialogOpen = () =>
   linkDialog.value !== null ||
   imageDialog.value !== null ||
   pageSetup.value !== null ||
-  contextMenuState.value !== null;
+  contextMenuState.value !== null ||
+  !!tableToolbar.value?.caption;
 
 let unsubscribeRequests: (() => void) | undefined;
 
@@ -48,6 +52,7 @@ export const bootEditor = async () => {
         history(),
         languagePicker(),
         tablePickerKeys(),
+        tableTools(),
         contextMenu(),
         spellcheck(),
         autocomplete(),
@@ -71,7 +76,7 @@ export const bootEditor = async () => {
         e.preventDefault();
         e.stopPropagation();
         window.setTimeout(() => {
-          if (!dialogOpen()) view.focus();
+          if (!dialogOpen() && !view.hasFocus()) view.focus();
         }, 100);
         return true;
       },
@@ -85,5 +90,8 @@ export const bootEditor = async () => {
   // e.g. the button in the bottom bar asks for the page setup
   unsubscribeRequests?.();
   unsubscribeRequests = pageSetupRequests.subscribe(() => openPageSetup(view));
-  window.setTimeout(() => view.focus(), 100);
+  // focus the editor, unless a click was quicker, which focusing would undo
+  window.setTimeout(() => {
+    if (!view.hasFocus()) view.focus();
+  }, 100);
 };

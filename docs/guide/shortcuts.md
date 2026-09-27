@@ -50,8 +50,9 @@
 | Select cells                    | `Shift` + arrow keys     |
 | Select the cell, then the table | `Mod` `A`                |
 | Clear the selected cells        | `Backspace` or `Delete`  |
+| Table mode, in a table          | `Mod` `T`                |
 
-See [Tables](./tables) for how tables work.
+In table mode, the arrow keys insert rows and columns, `Shift` + arrows move them, and letters align (`L` `C` `R`), sort (`S`), merge (`M`) and switch headers (`H`). See [Change a table](./tables#change) for all keys.
 
 ## Text
 

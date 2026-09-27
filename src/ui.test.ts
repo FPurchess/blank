@@ -125,6 +125,7 @@ describe("ui language chooser", () => {
 
     expect([...footer.children].map((child) => child.id)).toEqual([
       "ui-stats",
+      "ui-announcement",
       "ui-page",
       "ui-spellcheck",
       "ui-language",

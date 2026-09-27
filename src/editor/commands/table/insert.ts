@@ -1,14 +1,16 @@
 import type { Node } from "prosemirror-model";
+import { TextSelection, type Command } from "prosemirror-state";
 import {
-  TextSelection,
-  type Command,
-  type EditorState,
-  type Transaction,
-} from "prosemirror-state";
-import { addRow, TableMap } from "prosemirror-tables";
+  addColumn,
+  addRow,
+  isInTable,
+  selectedRect,
+  type TableRect,
+} from "prosemirror-tables";
 
-import { schema } from "../../../markdown";
-import { inCell, tableAround } from "../../plugins/tables/util";
+import { type Alignment, headerRowCount, schema } from "../../../markdown";
+import { inCell } from "../../plugins/tables/util";
+import { cellPos, hasHeaderColumn, refreshed, selectCells } from "./rect";
 
 /**
  * createTable returns an empty table of `cols` columns and `rows` rows, the
@@ -62,44 +64,94 @@ export const insertTable =
   };
 
 /**
- * appendRow adds a row to the end of the table around the selection, with the
- * cell types and alignment of the last row, and puts the cursor in its first
- * cell
+ * addRows adds as many rows as are selected above or below them, and selects
+ * the new rows. They take the alignment of their columns. Nothing goes above
+ * the header row, which stays on top.
  */
-export const appendRow = (state: EditorState): Transaction | undefined => {
-  const table = tableAround(state.selection.$head);
-  if (!table) return;
-  const { map, start, node } = table;
-  const tr = addRow(
-    state.tr,
-    {
-      map,
-      tableStart: start,
-      table: node,
-      left: 0,
-      top: 0,
-      right: 0,
-      bottom: 0,
-    },
-    map.height,
+export const addRows =
+  (side: "above" | "below"): Command =>
+  (state, dispatch) => {
+    if (!isInTable(state)) return false;
+    let rect = selectedRect(state);
+    const { top, bottom, left } = rect;
+    if (side === "above" && top < headerRowCount(rect.table)) return false;
+    if (!dispatch) return true;
+
+    const count = bottom - top;
+    const at = side === "above" ? top : bottom;
+    // the row whose alignment the new rows take
+    const reference = side === "above" ? top : bottom - 1;
+    const aligns = columnAligns(rect, reference);
+    const tr = state.tr;
+    for (let i = 0; i < count; i++) {
+      addRow(tr, rect, at);
+      rect = refreshed(tr, rect);
+    }
+    for (let row = at; row < at + count; row++) {
+      for (let col = 0; col < rect.map.width; col++) {
+        // cells merged across the new rows keep their own alignment
+        if (aligns[col] && isNew(rect, row, col)) {
+          tr.setNodeAttribute(cellPos(rect, row, col), "align", aligns[col]);
+        }
+      }
+    }
+    dispatch(
+      selectCells(tr, rect, {
+        top: at,
+        bottom: at + count,
+        left: count > 1 ? 0 : left,
+        right: count > 1 ? rect.map.width : left + 1,
+      }).scrollIntoView(),
+    );
+    return true;
+  };
+
+/**
+ * addColumns adds as many columns as are selected left or right of them, and
+ * selects the new columns. Nothing goes left of a header column.
+ */
+export const addColumns =
+  (side: "left" | "right"): Command =>
+  (state, dispatch) => {
+    if (!isInTable(state)) return false;
+    const rect = selectedRect(state);
+    const { top, left, right } = rect;
+    if (side === "left" && left === 0 && hasHeaderColumn(rect)) return false;
+    if (!dispatch) return true;
+
+    const count = right - left;
+    const at = side === "left" ? left : right;
+    const tr = state.tr;
+    // unlike addRow, addColumn maps the table it gets through all steps of
+    // the transaction, so it gets the table as it was before them each time
+    for (let i = 0; i < count; i++) addColumn(tr, rect, at);
+    dispatch(
+      selectCells(tr, rect, {
+        top: count > 1 ? 0 : top,
+        bottom: count > 1 ? rect.map.height : top + 1,
+        left: at,
+        right: at + count,
+      }).scrollIntoView(),
+    );
+    return true;
+  };
+
+/**
+ * columnAligns returns the alignment of each column in `row`
+ */
+const columnAligns = (rect: TableRect, row: number) =>
+  Array.from(
+    { length: rect.map.width },
+    (_, col) =>
+      rect.table.nodeAt(rect.map.map[row * rect.map.width + col])!.attrs
+        .align as Alignment | null,
   );
 
-  // new cells take the alignment of the cell above them
-  const added = tr.doc.nodeAt(table.pos)!;
-  const addedMap = TableMap.get(added);
-  const last = addedMap.height - 1;
-  const fresh: number[] = [];
-  for (let col = 0; col < addedMap.width; col++) {
-    const offset = addedMap.map[last * addedMap.width + col];
-    const above = addedMap.map[(last - 1) * addedMap.width + col];
-    // cells merged across rows grow instead of getting a new cell
-    if (offset === above || fresh.includes(offset)) continue;
-    fresh.push(offset);
-    const align = added.nodeAt(above)?.attrs.align ?? null;
-    if (align) tr.setNodeAttribute(start + offset, "align", align);
-  }
-
-  const first = fresh[0] ?? addedMap.map[last * addedMap.width];
-  tr.setSelection(TextSelection.near(tr.doc.resolve(start + first + 1)));
-  return tr.scrollIntoView();
-};
+/**
+ * isNew tells whether the cell at `row` and `col` starts in that row, rather
+ * than being a cell above merged into it
+ */
+const isNew = (rect: TableRect, row: number, col: number) =>
+  row === 0 ||
+  rect.map.map[row * rect.map.width + col] !==
+    rect.map.map[(row - 1) * rect.map.width + col];

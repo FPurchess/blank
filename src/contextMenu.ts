@@ -116,7 +116,7 @@ const edit = (level: Level, index: number, item: Item) => {
       item.edit!.submit(value);
     } else if (event.key === "Escape") {
       event.preventDefault();
-      row.replaceChildren(...rowContent(item));
+      row.replaceChildren(...rowContent(item, level));
       focusRow(level, index);
     } else if (event.key === "Tab") {
       event.preventDefault();
@@ -146,11 +146,26 @@ const activate = (depth: number, index: number) => {
   }
 };
 
-const rowContent = (item: Item) => {
+/**
+ * rowContent returns the content of the row of `item`. In a menu with items
+ * that are switched on or off, every row gets a column for the check mark,
+ * so the labels line up.
+ */
+const rowContent = (item: Item, level: Level) => {
+  const checkable = level.items.some(
+    (other) => isItem(other) && other.checked !== undefined,
+  );
   const label = document.createElement("span");
   label.className = "label";
   label.textContent = item.label;
   const nodes: Node[] = [label];
+  if (checkable) {
+    const check = document.createElement("span");
+    check.className = "check";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = item.checked ? "✓" : "";
+    nodes.unshift(check);
+  }
   if (item.shortcut) {
     const kbd = document.createElement("kbd");
     kbd.textContent = formatShortcut(item.shortcut);
@@ -185,7 +200,12 @@ const renderLevel = (items: MenuItem[], depth: number): Level => {
       element.append(row);
       return;
     }
-    row.setAttribute("role", "menuitem");
+    if (item.checked === undefined) {
+      row.setAttribute("role", "menuitem");
+    } else {
+      row.setAttribute("role", "menuitemcheckbox");
+      row.setAttribute("aria-checked", String(item.checked));
+    }
     row.dataset.id = item.id;
     row.tabIndex = -1;
     if (item.disabled) row.setAttribute("aria-disabled", "true");
@@ -193,7 +213,7 @@ const renderLevel = (items: MenuItem[], depth: number): Level => {
       row.setAttribute("aria-haspopup", "menu");
       row.setAttribute("aria-expanded", "false");
     }
-    row.replaceChildren(...rowContent(item));
+    row.replaceChildren(...rowContent(item, level));
     row.addEventListener("mouseenter", () => {
       if (!enabled(level, index)) return;
       moved = true;

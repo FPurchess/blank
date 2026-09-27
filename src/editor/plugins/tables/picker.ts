@@ -1,10 +1,9 @@
 import { keydownHandler } from "prosemirror-keymap";
 import { Plugin } from "prosemirror-state";
 
-import { CommandIdentifier, getKeyBinding } from "../../../config";
 import { tablePicker } from "../../../state";
 import { resizePicker } from "../../../tablePicker";
-import { normalizeBinding } from "../keymap";
+import { tableKeyBinding } from "../../keyBindings";
 
 /**
  * tablePickerKeys handles the keyboard while the table picker is open, so the
@@ -12,9 +11,7 @@ import { normalizeBinding } from "../keymap";
  */
 export const tablePickerKeys = () => {
   // the binding that opened the picker closes it again
-  const binding = normalizeBinding(
-    getKeyBinding(CommandIdentifier.INSERT_TABLE),
-  );
+  const binding = tableKeyBinding();
   const toggle = keydownHandler(
     binding
       ? {

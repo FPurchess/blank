@@ -11,6 +11,7 @@ import {
   path,
   spellcheck,
   spellcheckMessage,
+  announcement,
   spellcheckStatus,
   textContent,
   transaction,
@@ -28,6 +29,7 @@ import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
 import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
+import { bootTableToolbar } from "./tableToolbar";
 import { basename } from "./paths";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -214,6 +216,26 @@ export const bootUI = () => {
   });
   renderStatus();
 
+  // what just happened, e.g. "2 rows added": shown for a moment and read out
+  // by screen readers, so it's always there, empty in between. It sits on the
+  // left, next to the counter, so it doesn't push the items on the right.
+  const uiAnnouncement = document.createElement("span");
+  uiAnnouncement.id = "ui-announcement";
+  uiAnnouncement.setAttribute("role", "status");
+  uiStats.after(uiAnnouncement);
+  let announcementTimer: number | undefined;
+  announcement.subscribe((message) => {
+    uiAnnouncement.textContent = message ?? "";
+    window.clearTimeout(announcementTimer);
+    if (message) {
+      // long enough to read a longer message too
+      const duration = Math.max(MESSAGE_DURATION, message.length * 60);
+      announcementTimer = window.setTimeout(() => {
+        announcement.value = null;
+      }, duration);
+    }
+  });
+
   const uiLanguage = document.createElement("span");
   uiLanguage.id = "ui-language";
   uiBottom.appendChild(uiLanguage);
@@ -231,6 +253,7 @@ export const bootUI = () => {
   bootPageSetup();
   bootContextMenu();
   bootTablePicker();
+  bootTableToolbar();
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);

@@ -33,11 +33,15 @@ export function applyDocument(
   doc: Node,
   path?: string | null,
 ): EditorState {
-  const next = EditorState.create({
+  const created = EditorState.create({
     schema: state.schema,
     doc,
     plugins: state.plugins,
   });
+  // plugins that keep the document in shape, like the paragraphs the table
+  // guard keeps next to tables, do it right away, not with the first click,
+  // which would then land where the content has moved to
+  const next = created.apply(created.tr);
   if (path) _path.value = path;
   // storage persists the transaction's doc and the UI renders it
   transaction.value = next.tr;

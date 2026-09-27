@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import { clickInto, Key, pressMod, restartApp, type } from "../helpers.ts";
 
 /**
  * waits until the file at `filePath` contains `text` and returns its content
@@ -39,7 +39,7 @@ describe("tables", () => {
 
   it("inserts a table with the picker and fills it with Tab", async () => {
     await open("# Stock\n\nwhat we have:\n");
-    await $(".ProseMirror p").click();
+    await clickInto(".ProseMirror p");
     await type(Key.End);
     await type(Key.Enter);
 
@@ -73,7 +73,7 @@ describe("tables", () => {
 
   it("turns a typed header into a table", async () => {
     await open("start\n");
-    await $(".ProseMirror p").click();
+    await clickInto(".ProseMirror p");
     await type(Key.End);
     await type(Key.Enter);
     await type("| name | qty |");
@@ -86,7 +86,7 @@ describe("tables", () => {
 
   it("saves a line break in a cell as <br>", async () => {
     await open("| a |\n| - |\n| b |\n");
-    await $(".ProseMirror td").click();
+    await clickInto(".ProseMirror td");
     await type(Key.End);
     await type(Key.Enter);
     await type("c");
@@ -115,7 +115,7 @@ describe("tables", () => {
     await open(`intro\n\n${html}\n`);
     await expect($(".ProseMirror th")).toHaveAttribute("colspan", "2");
 
-    await $(".ProseMirror p").click();
+    await clickInto(".ProseMirror p");
     await type(Key.End);
     await type("!");
     await pressMod("s");
@@ -125,7 +125,7 @@ describe("tables", () => {
 
   it("leaves a table at the end of the document with the arrow keys", async () => {
     await open("intro\n\n| a |\n| - |\n| b |\n");
-    await $(".ProseMirror td").click();
+    await clickInto(".ProseMirror td");
     await type(Key.End);
     await type(Key.ArrowDown);
     await type("after");
@@ -133,5 +133,79 @@ describe("tables", () => {
 
     const saved = await waitForSaved(file, "after");
     expect(saved).toBe("intro\n\n| a   |\n| --- |\n| b   |\n\nafter");
+  });
+
+  it("changes a table in table mode", async () => {
+    await open("| name | qty |\n| - | - |\n| pear | 12 |\n| kiwi | 3 |\n");
+    await clickInto(".ProseMirror td", 1);
+
+    await pressMod("t");
+    await expect($("#table-toolbar")).toHaveElementClass("keys");
+    await type(Key.ArrowDown);
+    await type("s");
+    await type("r");
+    await expect($("#ui-announcement")).toHaveText("A column aligned right");
+    await type(Key.Escape);
+    await expect($("#table-toolbar")).not.toHaveElementClass("keys");
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "--:");
+    expect(saved).toBe(
+      [
+        "| name | qty |",
+        "| ---- | --: |",
+        "| kiwi |   3 |",
+        "| pear |  12 |",
+        "|      |     |",
+      ].join("\n"),
+    );
+  });
+
+  it("writes a caption from table mode", async () => {
+    await open("| a |\n| - |\n| b |\n");
+    await clickInto(".ProseMirror td");
+    await pressMod("t");
+    await type("t");
+    await expect($("#table-toolbar .caption input")).toBeFocused();
+    await type("fruit");
+    await type(Key.Enter);
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "caption");
+    expect(saved).toContain("  <caption>fruit</caption>");
+  });
+
+  it("writes a caption from the toolbar", async () => {
+    await open("| a |\n| - |\n| b |\n");
+    await clickInto(".ProseMirror td");
+    await $('#table-toolbar button[data-id="caption"]').click();
+    await expect($("#table-toolbar .caption input")).toBeFocused();
+    await type("stock");
+    await type(Key.Enter);
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "caption");
+    expect(saved).toContain("  <caption>stock</caption>");
+  });
+
+  it("switches a header column on from the toolbar", async () => {
+    await open("| a | b |\n| - | - |\n| c | d |\n");
+    await clickInto(".ProseMirror td");
+    await $('#table-toolbar button[data-id="header-column"]').click();
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "<table>");
+    expect(saved).toContain('      <th scope="row">c</th>');
+  });
+
+  it("deletes a row from the table menu", async () => {
+    await open("| a |\n| - |\n| b |\n| c |\n");
+    await $$(".ProseMirror td")[0].click({ button: "right" });
+    await $('[data-id="table"]').click();
+    await $('[data-id="table-row-delete"]').click();
+
+    await pressMod("s");
+    const saved = await waitForSaved(file, "| c");
+    expect(saved).toBe("| a   |\n| --- |\n| c   |");
   });
 });

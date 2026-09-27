@@ -6,7 +6,8 @@ import { schema } from "../../markdown";
 import type { Node } from "prosemirror-model";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
-import { doc, p } from "../../test/editor";
+import { doc, p, table, td, th, tr } from "../../test/editor";
+import { at } from "../../test/tables";
 import {
   type MenuItem,
   pageSetup,
@@ -119,6 +120,8 @@ describe("contextMenu model", () => {
         "paste-plain",
         "delete",
         "select-all",
+        "-",
+        "table-insert",
         "-",
         "page-setup",
         "disable",
@@ -414,5 +417,56 @@ describe("contextMenu model", () => {
       await paste(view, true);
       expect(text()).toBe("plainplain");
     });
+  });
+});
+
+describe("contextMenu model tables", () => {
+  const grid = () =>
+    doc(table(tr(th("Fruit"), th("Qty")), tr(td("kiwi"), td("10"))), p());
+
+  const setupAt = (node: Node, cursor: number | null) => {
+    view = new EditorView(document.createElement("div"), {
+      state: EditorState.create({ schema, doc: node }),
+    });
+    if (cursor !== null) {
+      view.dispatch(
+        view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, cursor),
+        ),
+      );
+    }
+    return view;
+  };
+
+  afterEach(() => {
+    view.destroy();
+  });
+
+  it("offers the actions of the table toolbar in a Table submenu", () => {
+    const node = grid();
+    setupAt(node, at(node, "kiwi"));
+
+    const table = find(buildMenu(view, {}), "table");
+    expect(table.shortcut).toBe("Mod-t");
+    const children = table.children!;
+    expect(find(children, "table-header-row")).toMatchObject({ checked: true });
+    expect(find(children, "table-merge")).toMatchObject({
+      label: "Split cell",
+      disabled: true,
+    });
+    expect(ids(children)).toContain("-");
+
+    find(children, "table-row-below").run!();
+    expect(view.state.doc.firstChild!.childCount).toBe(3);
+  });
+
+  it("offers to insert a table elsewhere", () => {
+    setupAt(doc(p("text")), 1);
+
+    expect(find(buildMenu(view, {}), "table-insert")).toMatchObject({
+      label: "Insert table…",
+      disabled: false,
+    });
+    expect(ids(buildMenu(view, {}))).not.toContain("table");
   });
 });
