@@ -1,4 +1,4 @@
-import { browser, $ } from "@wdio/globals";
+import { browser, $, $$ } from "@wdio/globals";
 import { Key } from "webdriverio";
 
 import { application } from "./app.ts";
@@ -38,6 +38,20 @@ export const restartApp = async (args: string[] = []) => {
     "tauri:options": { application, args },
   } as unknown as WebdriverIO.Capabilities);
   await waitForAppReady();
+};
+
+/**
+ * clicks into the editor text at `selector` (the `index`th match) and waits until the editor has
+ * taken in where the cursor went: the editor learns that from the
+ * "selectionchange" event, which the webview queues after the click, and
+ * keys sent before it would still go where the cursor was
+ */
+export const clickInto = async (selector: string, index = 0) => {
+  await $$(selector)[index].click();
+  await browser.executeAsync((done: () => void) => {
+    // two frames: the queued events have run once the second one starts
+    requestAnimationFrame(() => requestAnimationFrame(() => done()));
+  });
 };
 
 export const focusEditor = async () => {

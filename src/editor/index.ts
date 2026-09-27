@@ -90,7 +90,7 @@ export const bootEditor = async () => {
   // e.g. the button in the bottom bar asks for the page setup
   unsubscribeRequests?.();
   unsubscribeRequests = pageSetupRequests.subscribe(() => openPageSetup(view));
-  // unless a click was quicker, which focusing would undo
+  // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
     if (!view.hasFocus()) view.focus();
   }, 100);

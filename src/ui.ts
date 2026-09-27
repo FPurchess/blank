@@ -217,11 +217,12 @@ export const bootUI = () => {
   renderStatus();
 
   // what just happened, e.g. "2 rows added": shown for a moment and read out
-  // by screen readers, so it's always there, empty in between
+  // by screen readers, so it's always there, empty in between. It sits on the
+  // left, next to the counter, so it doesn't push the items on the right.
   const uiAnnouncement = document.createElement("span");
   uiAnnouncement.id = "ui-announcement";
   uiAnnouncement.setAttribute("role", "status");
-  uiBottom.appendChild(uiAnnouncement);
+  uiStats.after(uiAnnouncement);
   let announcementTimer: number | undefined;
   announcement.subscribe((message) => {
     uiAnnouncement.textContent = message ?? "";
