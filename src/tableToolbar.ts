@@ -1,6 +1,7 @@
 import { CommandIdentifier, getKeyBinding } from "./config";
 import { formatShortcut } from "./contextMenu";
 import { icon } from "./icons";
+import { separated } from "./separated";
 import {
   tableToolbar,
   type TableToolbarItem,
@@ -43,15 +44,16 @@ const createToolbar = (items: TableToolbarItem[]) => {
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";
-  items.forEach((item, index) => {
-    if (index > 0 && items[index - 1].group !== item.group) {
-      const separator = document.createElement("span");
-      separator.className = "separator";
-      separator.setAttribute("role", "separator");
-      buttons.append(separator);
+  for (const item of separated(items, null)) {
+    if (item) {
+      buttons.append(button(item));
+      continue;
     }
-    buttons.append(button(item));
-  });
+    const separator = document.createElement("span");
+    separator.className = "separator";
+    separator.setAttribute("role", "separator");
+    buttons.append(separator);
+  }
 
   const hint = document.createElement("div");
   hint.className = "hint";

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
+import { EditorView } from "prosemirror-view";
 
 import {
   imageDialog,
@@ -41,6 +42,17 @@ describe("bootEditor", () => {
     vi.advanceTimersByTime(100);
 
     expect(document.activeElement).toBe(editor());
+  });
+
+  it("leaves the cursor where a click right after booting put it", () => {
+    // focusing writes the editor's selection to the DOM, which would undo a
+    // click the editor hasn't read yet
+    vi.spyOn(EditorView.prototype, "hasFocus").mockReturnValue(true);
+    const focus = vi.spyOn(EditorView.prototype, "focus");
+
+    vi.advanceTimersByTime(100);
+
+    expect(focus).not.toHaveBeenCalled();
   });
 
   it("takes the focus back when the editor loses it", () => {

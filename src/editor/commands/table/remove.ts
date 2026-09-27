@@ -7,8 +7,14 @@ import {
   type TableRect,
 } from "prosemirror-tables";
 
-import { isHeaderCell, schema } from "../../../markdown";
-import { cellPos, refreshed, selectCells } from "./rect";
+import { schema } from "../../../markdown";
+import {
+  cellPos,
+  hasHeaderRow,
+  refreshed,
+  selectCells,
+  setCellType,
+} from "./rect";
 
 /**
  * removeTable removes the table of `rect` and puts the cursor where it was
@@ -50,18 +56,15 @@ export const deleteRows: Command = (state, dispatch) => {
     return true;
   }
 
-  const hadHeader = rect.table.firstChild!.children.every(isHeaderCell);
+  const hadHeader = hasHeaderRow(rect);
   const tr = state.tr;
   for (let row = bottom - 1; row >= top; row--) {
     removeRow(tr, rect, row);
     rect = refreshed(tr, rect);
   }
   if (top === 0 && hadHeader) {
-    const header = schema.nodes.table_header;
     for (let col = 0; col < rect.map.width; col++) {
-      const pos = cellPos(rect, 0, col);
-      const cell = tr.doc.nodeAt(pos)!;
-      if (cell.type !== header) tr.setNodeMarkup(pos, header, cell.attrs);
+      setCellType(tr, cellPos(rect, 0, col), schema.nodes.table_header);
     }
   }
   const row = Math.min(top, rect.map.height - 1);

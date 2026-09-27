@@ -76,7 +76,7 @@ export const bootEditor = async () => {
         e.preventDefault();
         e.stopPropagation();
         window.setTimeout(() => {
-          if (!dialogOpen()) view.focus();
+          if (!dialogOpen() && !view.hasFocus()) view.focus();
         }, 100);
         return true;
       },
@@ -90,5 +90,8 @@ export const bootEditor = async () => {
   // e.g. the button in the bottom bar asks for the page setup
   unsubscribeRequests?.();
   unsubscribeRequests = pageSetupRequests.subscribe(() => openPageSetup(view));
-  window.setTimeout(() => view.focus(), 100);
+  // unless a click was quicker, which focusing would undo
+  window.setTimeout(() => {
+    if (!view.hasFocus()) view.focus();
+  }, 100);
 };

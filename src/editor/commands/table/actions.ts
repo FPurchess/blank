@@ -8,15 +8,14 @@ import { isMac } from "../../plugins/openLink";
 import {
   alignColumns,
   canMerge,
-  hasHeaderRow,
+  isAligned,
   mergeOrSplit,
-  setCaption,
   toggleHeaderColumn,
   toggleHeaderRow,
 } from "./format";
 import { addColumns, addRows } from "./insert";
 import { moveColumns, moveRows } from "./move";
-import { cellsOfColumns, hasHeaderColumn } from "./rect";
+import { hasHeaderColumn, hasHeaderRow } from "./rect";
 import { deleteColumns, deleteRows, deleteTable } from "./remove";
 import { sortByColumn, sortColumn, sortOrder } from "./sort";
 
@@ -85,20 +84,15 @@ const commandAction = (
   action: Omit<TableAction, "enabled" | "run">,
 ): TableAction => ({
   ...action,
-  enabled: (state) => isInTable(state) && command(state),
+  enabled: (state) => command(state),
   run: (view) => command(view.state, view.dispatch, view),
 });
 
 /**
- * aligned tells whether all cells of the selected columns are aligned `align`
+ * aligned tells whether the selected columns are aligned `align`
  */
-const aligned = (align: Alignment) => (state: EditorState) => {
-  if (!isInTable(state)) return false;
-  const rect = selectedRect(state);
-  return cellsOfColumns(rect, rect.left, rect.right).every(
-    (pos) => state.doc.nodeAt(pos)!.attrs.align === align,
-  );
-};
+const aligned = (align: Alignment) => (state: EditorState) =>
+  isInTable(state) && isAligned(selectedRect(state), align);
 
 // how each alignment is named in the label and the announcement
 const ALIGNMENTS: Record<Alignment, { label: string; done: string }> = {
@@ -289,7 +283,7 @@ export const tableActions = (
     icon: "caption",
     key: { code: "KeyT", label: "T" },
     toolbar: true,
-    enabled: (state) => isInTable(state) && setCaption("")(state),
+    enabled: isInTable,
     done: () => "",
     run: editCaption,
   },

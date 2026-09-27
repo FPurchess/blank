@@ -4,6 +4,7 @@ import {
   type EditorState,
   type Transaction,
 } from "prosemirror-state";
+import type { NodeType } from "prosemirror-model";
 import { CellSelection, TableMap, type TableRect } from "prosemirror-tables";
 
 import { headerRowCount, isHeaderCell } from "../../../markdown";
@@ -21,7 +22,8 @@ export const refreshed = (tr: Transaction, rect: TableRect): TableRect => {
 };
 
 /**
- * cellPos returns the position of the cell at `row` and `col` in `tr`
+ * cellPos returns the document position of the cell at `row` and `col` of
+ * the table `rect` describes
  */
 export const cellPos = (rect: TableRect, row: number, col: number) =>
   rect.tableStart + rect.map.map[row * rect.map.width + col];
@@ -51,6 +53,20 @@ export const selectCells = (
   );
   return tr;
 };
+
+/**
+ * setCellType turns the cell at `pos` in `tr` into a cell of `type` (a header
+ * cell or a plain cell), keeping its content and attributes
+ */
+export const setCellType = (tr: Transaction, pos: number, type: NodeType) => {
+  const cell = tr.doc.nodeAt(pos)!;
+  if (cell.type !== type) tr.setNodeMarkup(pos, type, cell.attrs);
+};
+
+/**
+ * hasHeaderRow tells whether the first row of `rect`'s table is a header row
+ */
+export const hasHeaderRow = (rect: TableRect) => headerRowCount(rect.table) > 0;
 
 /**
  * hasHeaderColumn tells whether the first column of `rect`'s table holds

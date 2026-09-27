@@ -19,6 +19,7 @@ import { tableActions } from "../commands/table/actions";
 import { insertTable } from "../commands/table/insert";
 import { tableKey } from "../commands/table/tableKey";
 import { performAction, setTools } from "../plugins/tables/tools";
+import { separated } from "../../separated";
 import { DEFAULT_SIZE } from "../../tablePicker";
 import {
   ignoreAll,
@@ -304,20 +305,18 @@ const tableItems = (view: EditorView): MenuItem[] => {
       },
     ];
   }
-  const children: MenuItem[] = [];
-  tableActions((view) => setTools(view, { caption: true })).forEach(
-    (action, index, actions) => {
-      if (index > 0 && actions[index - 1].group !== action.group) {
-        children.push("separator");
-      }
-      children.push({
-        id: `table-${action.id}`,
-        label: action.label(view.state),
-        disabled: !action.enabled(view.state),
-        checked: action.checked?.(view.state),
-        run: run(view, (view) => performAction(view, action)),
-      });
-    },
+  const actions = tableActions((view) => setTools(view, { caption: true }));
+  const children = separated(actions, "separator" as const).map(
+    (action): MenuItem =>
+      action === "separator"
+        ? action
+        : {
+            id: `table-${action.id}`,
+            label: action.label(view.state),
+            disabled: !action.enabled(view.state),
+            checked: action.checked?.(view.state),
+            run: run(view, (view) => performAction(view, action)),
+          },
   );
   return [{ id: "table", label: "Table", shortcut, children }];
 };

@@ -8,8 +8,23 @@ import {
   type TableRect,
 } from "prosemirror-tables";
 
-import { type Alignment, isHeaderCell, schema } from "../../../markdown";
-import { cellPos, cellsOfColumns, hasHeaderColumn } from "./rect";
+import { type Alignment, schema } from "../../../markdown";
+import {
+  cellPos,
+  cellsOfColumns,
+  hasHeaderColumn,
+  hasHeaderRow,
+  setCellType,
+} from "./rect";
+
+/**
+ * isAligned tells whether every cell of the selected columns is aligned
+ * `align`
+ */
+export const isAligned = (rect: TableRect, align: Alignment) =>
+  cellsOfColumns(rect, rect.left, rect.right).every(
+    (pos) => rect.table.nodeAt(pos - rect.tableStart)!.attrs.align === align,
+  );
 
 /**
  * alignColumns aligns the selected columns, header included, as markdown
@@ -22,23 +37,14 @@ export const alignColumns =
     if (!isInTable(state)) return false;
     const rect = selectedRect(state);
     if (!dispatch) return true;
-    const cells = cellsOfColumns(rect, rect.left, rect.right);
-    const aligned = cells.every(
-      (pos) => state.doc.nodeAt(pos)!.attrs.align === align,
-    );
+    const value = isAligned(rect, align) ? null : align;
     const tr = state.tr;
-    for (const pos of cells) {
-      tr.setNodeAttribute(pos, "align", aligned ? null : align);
+    for (const pos of cellsOfColumns(rect, rect.left, rect.right)) {
+      tr.setNodeAttribute(pos, "align", value);
     }
     dispatch(tr);
     return true;
   };
-
-/**
- * hasHeaderRow tells whether the first row of `rect`'s table is a header row
- */
-export const hasHeaderRow = (rect: TableRect) =>
-  rect.table.firstChild!.children.every(isHeaderCell);
 
 /**
  * setHeaders makes the cells of the first row and the first column header
@@ -57,9 +63,11 @@ const setHeaders = (
     if (done.has(pos)) return;
     done.add(pos);
     const header = (row && r === 0) || (col && c === 0);
-    const type = header ? schema.nodes.table_header : schema.nodes.table_cell;
-    const cell = tr.doc.nodeAt(pos)!;
-    if (cell.type !== type) tr.setNodeMarkup(pos, type, cell.attrs);
+    setCellType(
+      tr,
+      pos,
+      header ? schema.nodes.table_header : schema.nodes.table_cell,
+    );
   };
   for (let c = 0; c < map.width; c++) set(0, c);
   for (let r = 1; r < map.height; r++) set(r, 0);

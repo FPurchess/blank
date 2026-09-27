@@ -8,8 +8,7 @@ import {
   type TableRect,
 } from "prosemirror-tables";
 
-import { schema } from "../../../markdown";
-import { headerRowCount } from "../../../markdown";
+import { type Alignment, headerRowCount, schema } from "../../../markdown";
 import { inCell } from "../../plugins/tables/util";
 import { cellPos, hasHeaderColumn, refreshed, selectCells } from "./rect";
 
@@ -74,7 +73,7 @@ export const addRows =
   (state, dispatch) => {
     if (!isInTable(state)) return false;
     let rect = selectedRect(state);
-    const { top, bottom, left, right } = rect;
+    const { top, bottom, left } = rect;
     if (side === "above" && top < headerRowCount(rect.table)) return false;
     if (!dispatch) return true;
 
@@ -101,7 +100,7 @@ export const addRows =
         top: at,
         bottom: at + count,
         left: count > 1 ? 0 : left,
-        right: count > 1 ? rect.map.width : Math.min(right, left + 1),
+        right: count > 1 ? rect.map.width : left + 1,
       }).scrollIntoView(),
     );
     return true;
@@ -144,8 +143,8 @@ const columnAligns = (rect: TableRect, row: number) =>
   Array.from(
     { length: rect.map.width },
     (_, col) =>
-      (rect.table.nodeAt(rect.map.map[row * rect.map.width + col])?.attrs
-        .align as string | null) ?? null,
+      rect.table.nodeAt(rect.map.map[row * rect.map.width + col])!.attrs
+        .align as Alignment | null,
   );
 
 /**
