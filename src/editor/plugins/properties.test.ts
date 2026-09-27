@@ -18,18 +18,13 @@ describe("summarize", () => {
     ["title: ''\ntags: [a]", "title, tags"],
     ["title: [unclosed", "Properties that can't be read"],
     ["- a list", "Properties that can't be read"],
-    // jsdom's locale is en-US, which measures in inches
-    ["page:\n  size: a5\n  orientation: landscape", "A5 landscape"],
-    [
-      "title: Hi\npage:\n  margins: 2.54cm\ntags: [a]",
-      "Hi · margins 1 in · tags",
-    ],
-    ["page: {}", "page"],
+    // the page setup stays out of the way of the text
+    ["title: Hi\npage:\n  margins: 2.54cm\ntags: [a]", "Hi · tags"],
   ])("sums up %j", (frontmatter, summary) => {
     expect(summarize(frontmatter)).toBe(summary);
   });
 
-  it.each([null, "", "  \n", "# only a comment"])(
+  it.each([null, "", "  \n", "# only a comment", "page:\n  size: a5"])(
     "shows nothing for %j",
     (frontmatter) => {
       expect(summarize(frontmatter)).toBeNull();

@@ -49,7 +49,7 @@ page:
 
 You can write these yourself too. `new-page-before` lists the heading levels that start a new page. `size` is `a3`, `a4`, `a5`, `b5`, `letter`, `legal`, `auto` for the paper of your region, or a size like `170mm x 240mm`. `margins` is one length for all four sides, or `top`, `right`, `bottom` and `left` on their own lines. Lengths are written with their unit: `mm`, `cm`, `in` or `pt`.
 
-The line above your text sums the page setup up, for example _A5 landscape · margins 2 cm_. Click it to open the page setup. **Edit as Text** in the dialog shows all properties of the file, to change the ones the dialog has no settings for.
+The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 (landscape)_, and a click on it opens the page setup. **Edit as Text** in the dialog shows all properties of the file, to change the ones the dialog has no settings for.
 
 If a setting can't be used, say a paper size Blank doesn't know, the export uses your default for it and tells you so.
 

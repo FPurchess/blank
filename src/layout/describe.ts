@@ -1,13 +1,7 @@
 import { PAPER } from "./paper";
 import type { Layout } from "./resolve";
-import {
-  DEFAULT_PAGE,
-  NEW_PAGE_BEFORE,
-  type PaperSize,
-  readPageSettings,
-  SIDES,
-} from "./settings";
-import { paperUnit, sameLength, toUnit, type Unit } from "./units";
+import { NEW_PAGE_BEFORE, type PaperSize } from "./settings";
+import { paperUnit, toUnit, type Unit } from "./units";
 
 // How the page setup is put in words for the user.
 
@@ -52,39 +46,6 @@ export const describePaper = (layout: Layout, unit: Unit = "cm") => {
  */
 export const describePageSize = (layout: Layout, unit: Unit) =>
   `${layoutPaper(layout, unit)} (${layout.orientation})`;
-
-/**
- * describePage sums up the page settings a frontmatter holds, for the line
- * above the text: e.g. "A5 landscape · margins 2 cm"
- * @param raw the `page` key of the frontmatter
- * @returns the summary, or null if it holds nothing Blank uses
- */
-export const describePage = (raw: unknown, unit: Unit): string | null => {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return null;
-  }
-  const settings = readPageSettings(raw, DEFAULT_PAGE);
-  const has = (key: string) => Object.hasOwn(raw, key);
-
-  const paper =
-    has("size") && settings.size !== "auto"
-      ? paperName(settings.size, unit)
-      : null;
-  const orientation = has("orientation") ? settings.orientation : null;
-  const parts = [[paper, orientation].filter(Boolean).join(" ")];
-  if (has("margins")) {
-    const { margins } = settings;
-    parts.push(
-      SIDES.every((side) => sameLength(margins[side], margins.top))
-        ? `margins ${length(margins.top, unit)}`
-        : "custom margins",
-    );
-  }
-  if (has(NEW_PAGE_BEFORE))
-    parts.push(describeNewPages(settings.newPageBefore) ?? "");
-  const summary = parts.filter(Boolean).join(" · ");
-  return summary || null;
-};
 
 /**
  * headingLevels names heading levels: "headings 1", "headings 1 and 2",

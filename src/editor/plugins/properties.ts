@@ -2,15 +2,13 @@ import { Plugin } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 
-import { describePage } from "../../layout/describe";
-import { localeUnit } from "../../layout/paper";
 import { propertiesOf, readFrontmatter } from "../../markdown";
 import { openPageSetup } from "../commands/pageSetup";
 
 // Shows a quiet line above the text of a document that has frontmatter, so
 // the properties Blank keeps for it (see src/markdown/frontmatter.ts) aren't
-// hidden: e.g. "The Lighthouse · by Ada · A5 landscape · tags". Clicking
-// it opens the page setup.
+// hidden: e.g. "The Lighthouse · by Ada · tags". Clicking it opens the page
+// setup, where "Edit as Text" shows them all.
 
 export const PROPERTIES_CLASS = "doc-properties";
 
@@ -27,17 +25,17 @@ export const summarize = (frontmatter: string | null): string | null => {
   if (data === undefined) return "Properties that can't be read";
 
   const { title, author } = propertiesOf(data);
-  const page = describePage(data.page, localeUnit());
+  // the page setup stays out of the way of the text: the bottom bar shows
+  // the paper, and the page setup the rest
   const others = Object.keys(data).filter(
     (key) =>
+      key !== "page" &&
       !(key === "title" && title) &&
-      !(key === "author" && author) &&
-      !(key === "page" && page),
+      !(key === "author" && author),
   );
   const parts = [
     ...(title ? [title] : []),
     ...(author ? [`by ${author}`] : []),
-    ...(page ? [page] : []),
   ];
   if (others.length > MAX_NAMED_KEYS) {
     parts.push(`${others.length} ${parts.length ? "more " : ""}properties`);

@@ -51,7 +51,11 @@ describe("page setup", () => {
     await browser.keys(Key.Enter);
 
     await expect($("#page-setup")).not.toExist();
-    await expect($(".ProseMirror .doc-properties")).toHaveText("landscape");
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/\(landscape\)$/),
+    );
+    // the page setup stays out of the way of the text
+    await expect($(".ProseMirror .doc-properties")).not.toExist();
 
     await pressMod("s");
     await browser.waitUntil(
@@ -67,12 +71,14 @@ describe("page setup", () => {
   it("undoes the page setup in one step", async () => {
     await pressMod("z");
 
-    await expect($(".ProseMirror .doc-properties")).not.toExist();
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/\(portrait\)$/),
+    );
   });
 
-  it("opens from the summary line and takes custom margins", async () => {
+  it("takes custom margins", async () => {
     await pressMod(Key.Shift, "z");
-    await $(".ProseMirror .doc-properties").click();
+    await pressMod(Key.Alt, "u");
     await expect($("#page-setup")).toBeDisplayed();
 
     await $('#page-setup [data-row="margins"] [data-value="custom"]').click();
@@ -82,9 +88,10 @@ describe("page setup", () => {
     await browser.keys(Key.Enter);
 
     await expect($("#page-setup")).not.toExist();
-    await expect($(".ProseMirror .doc-properties")).toHaveText(
-      "landscape · custom margins",
-    );
+    await pressMod(Key.Alt, "u");
+    await expect(checked("margins")).toHaveText("Custom…");
+    await expect(checked("orientation")).toHaveText("Landscape");
+    await browser.keys(Key.Escape);
   });
 
   // +++ is tested in the unit tests: WebKitWebDriver can't type a +

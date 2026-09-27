@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  describePage,
-  describePageSize,
-  describePaper,
-  layoutWarnings,
-} from "./describe";
+import { describePageSize, describePaper, layoutWarnings } from "./describe";
 import { layoutOf } from "./resolve";
 import { DEFAULT_PAGE, type PageSettings } from "./settings";
 import { cm } from "../test/layout";
@@ -51,34 +46,6 @@ describe("describePageSize", () => {
       ),
     ).toBe(name);
   });
-});
-
-describe("describePage", () => {
-  it.each([
-    [{ size: "a5" }, "A5"],
-    [{ size: "a5", orientation: "landscape" }, "A5 landscape"],
-    [{ orientation: "portrait" }, "portrait"],
-    [{ margins: "2cm" }, "margins 2 cm"],
-    [{ size: "letter", margins: "1in" }, "Letter · margins 2.54 cm"],
-    [{ margins: { top: "3cm" } }, "custom margins"],
-    [{ size: "170mm x 240mm" }, "170 × 240 mm"],
-    [{ "new-page-before": 1 }, "chapters on new pages"],
-    [{ "new-page-before": [2, 1, 3] }, "headings 1, 2 and 3 on new pages"],
-    [{ "new-page-before": [] }, null],
-  ])("sums up %j", (page, summary) => {
-    expect(describePage(page, "cm")).toBe(summary);
-  });
-
-  it("measures in inches where people do", () => {
-    expect(describePage({ margins: "2.54cm" }, "in")).toBe("margins 1 in");
-  });
-
-  it.each([undefined, null, "a4", ["a4"], {}, { size: "auto" }, { other: 1 }])(
-    "says nothing for %j",
-    (page) => {
-      expect(describePage(page, "cm")).toBeNull();
-    },
-  );
 });
 
 describe("layoutWarnings", () => {
