@@ -1,7 +1,20 @@
 import { path } from "@tauri-apps/api";
-import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import {
+  exists,
+  mkdir,
+  readTextFile,
+  writeTextFile,
+} from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { Observable } from "observable.ts";
+
+import {
+  DEFAULT_PAGE,
+  type PageSettings,
+  pageSettingsJSON,
+  readPageSettings,
+} from "./layout/settings";
+import type { Unit } from "./layout/units";
 
 export enum CommandIdentifier {
   UNDO = "undo",
@@ -37,6 +50,7 @@ export enum CommandIdentifier {
   SPELLCHECK_NEXT = "spellcheck.next",
   SPELLCHECK_PREVIOUS = "spellcheck.previous",
   CONTEXT_MENU = "menu.context",
+  PAGE_SETUP = "page.setup",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -62,10 +76,16 @@ export interface SpellcheckConfig {
   ignoreWordsWithNumbers: boolean;
 }
 
+export interface LayoutConfig {
+  // the page setup of documents that don't have their own
+  page: PageSettings;
+}
+
 export interface Config {
   keymap: { [key in CommandIdentifier]: string };
   autocorrect: AutocorrectConfig;
   spellcheck: SpellcheckConfig;
+  layout: LayoutConfig;
 }
 
 const defaultConfig: Config = {
@@ -103,6 +123,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.SPELLCHECK_NEXT]: "Mod-Alt-n",
     [CommandIdentifier.SPELLCHECK_PREVIOUS]: "Mod-Alt-Shift-n",
     [CommandIdentifier.CONTEXT_MENU]: "Shift-F10",
+    [CommandIdentifier.PAGE_SETUP]: "Mod-Alt-u",
   },
   autocorrect: {
     arrows: true,
@@ -118,6 +139,9 @@ const defaultConfig: Config = {
   spellcheck: {
     ignoreUppercase: true,
     ignoreWordsWithNumbers: true,
+  },
+  layout: {
+    page: DEFAULT_PAGE,
   },
 };
 
@@ -283,6 +307,26 @@ const mergeSpellcheck = (
 };
 
 /**
+ * mergeLayout reads the user's page setup over Blank's, like the frontmatter
+ * of a document over the user's, see src/layout/resolve.ts
+ */
+const mergeLayout = (user: unknown, problems: string[]): LayoutConfig => {
+  if (user === undefined) return defaultConfig.layout;
+  if (!isRecord(user)) {
+    problems.push("layout");
+    return defaultConfig.layout;
+  }
+  return {
+    page: readPageSettings(
+      user.page,
+      defaultConfig.layout.page,
+      problems,
+      "layout.page",
+    ),
+  };
+};
+
+/**
  * bootConfig initializes the config. Invalid settings are ignored with a
  * notification, so Blank still starts with the defaults.
  */
@@ -298,6 +342,7 @@ export const bootConfig = async () => {
     autocorrect: mergeAutocorrect(userConfig.autocorrect, problems),
     // merge spell check settings the same way
     spellcheck: mergeSpellcheck(userConfig.spellcheck, problems),
+    layout: mergeLayout(userConfig.layout, problems),
   };
   if (problems.length > 0) {
     console.warn("ignored invalid settings in blank.json", problems);
@@ -314,3 +359,30 @@ export const bootConfig = async () => {
  */
 export const getKeyBinding = (command: CommandIdentifier) =>
   config.value.keymap[command];
+
+/**
+ * saveDefaultPage makes `page` the page setup of documents that don't have
+ * their own, in blank.json. The file's other settings stay as they are.
+ * @param page the page setup
+ * @param unit the unit to write lengths in
+ * @throws if blank.json can't be read or written
+ */
+export const saveDefaultPage = async (page: PageSettings, unit: Unit) => {
+  const configFile = await getConfigFile();
+  let settings: Record<string, unknown> = {};
+  if (await exists(configFile)) {
+    const parsed: unknown = JSON.parse(await readTextFile(configFile));
+    // overwriting would lose what the user wrote
+    if (!isRecord(parsed)) throw new Error("blank.json holds no settings");
+    settings = parsed;
+  }
+  const layout = isRecord(settings.layout) ? settings.layout : {};
+  settings.layout = { ...layout, page: pageSettingsJSON(page, unit) };
+
+  await mkdir(await path.appConfigDir(), { recursive: true });
+  await writeTextFile(configFile, `${JSON.stringify(settings, null, 2)}\n`);
+  config.value = {
+    ...config.value,
+    layout: { ...config.value.layout, page },
+  };
+};

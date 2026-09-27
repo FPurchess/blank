@@ -284,6 +284,17 @@ describe("docs screenshots", () => {
     await type(Key.Escape);
   });
 
+  it("captures the page setup", async () => {
+    await focusEditor();
+    await pressMod(Key.Alt, "u");
+    await $("#page-setup").waitForDisplayed();
+    // landscape, with the picture turned
+    await browser.keys(Key.ArrowDown);
+    await browser.keys(Key.ArrowRight);
+    await shot("page-setup");
+    await type(Key.Escape);
+  });
+
   it("captures spell check", async () => {
     await pressMod("n");
     await pressMod(Key.Alt, "s");

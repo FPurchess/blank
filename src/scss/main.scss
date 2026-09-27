@@ -111,7 +111,7 @@ body {
     line-height: 1.4;
     opacity: 0.55;
     margin-bottom: 1.5em;
-    cursor: default;
+    cursor: pointer;
     user-select: none;
 
     & + * {
@@ -304,6 +304,158 @@ body {
   button:focus {
     outline: 2px solid var(--color);
     outline-offset: 1px;
+  }
+}
+
+// the page setup dialog, see src/pageSetup.ts
+.dialog.page-setup {
+  max-width: min(640px, calc(100% - 32px));
+
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
+  .body {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .settings,
+  .text-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .setting {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .setting-label {
+    font-size: 0.9rem;
+    opacity: 0.7;
+  }
+
+  // the options of a row look like one control, the checked one filled
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    [role="radio"] {
+      padding: 3px 10px;
+      font-size: 0.9rem;
+      opacity: 0.75;
+
+      &[aria-checked="true"] {
+        color: var(--background-color);
+        background-color: var(--color);
+        opacity: 1;
+      }
+    }
+  }
+
+  .custom {
+    display: flex;
+    gap: 8px;
+
+    > div {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  }
+
+  textarea {
+    min-height: 12em;
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--color);
+    border-radius: 3px;
+    resize: vertical;
+
+    &:focus {
+      outline: 2px solid var(--color);
+      outline-offset: 1px;
+    }
+  }
+
+  .thumbnail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 140px;
+    margin: 18px 0 0;
+
+    .paper {
+      fill: var(--background-color);
+      stroke: var(--color);
+    }
+
+    .margins {
+      fill: none;
+      stroke: var(--color);
+      stroke-dasharray: 2 2;
+      opacity: 0.35;
+    }
+
+    .text line {
+      stroke: var(--color);
+      stroke-width: 1.5;
+      opacity: 0.3;
+    }
+
+    figcaption {
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+  }
+
+  .error,
+  .warning {
+    opacity: 1;
+  }
+
+  .hint {
+    margin-top: 6px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+
+    // "Edit as Text" on the left, away from Apply
+    button:first-child {
+      margin-right: auto;
+    }
+  }
+
+  // small windows put the picture above the rows
+  @media (max-width: 560px) {
+    .body {
+      flex-direction: column-reverse;
+      align-items: stretch;
+    }
+
+    .thumbnail {
+      width: auto;
+      margin: 0;
+    }
   }
 }
 

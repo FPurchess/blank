@@ -1,15 +1,8 @@
 import type JSZip from "jszip";
 
-const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+import { children, val, W } from "./xml";
+
 const NUMBERING = "word/numbering.xml";
-
-const children = (parent: Element, name: string) =>
-  [...parent.children].filter(
-    (child) => child.namespaceURI === W && child.localName === name,
-  );
-
-const val = (element: Element | undefined, name = "val") =>
-  element?.getAttributeNS(W, name) ?? null;
 
 /**
  * inlineLevelOverrides moves the list levels a numbering overrides into a

@@ -9,3 +9,4 @@ export { default as editLink } from "./editLink";
 export { default as editImage } from "./editImage";
 export { goToMisspelling, openMenu, toggleSpellcheck } from "./spellcheck";
 export { tableKey } from "./table";
+export { default as pageSetup, openPageSetup } from "./pageSetup";

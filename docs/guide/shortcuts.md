@@ -12,6 +12,7 @@
 | Save as         | `Mod` `Shift` `S` |
 | Export as PDF   | `Mod` `Alt` `P`   |
 | Export as Word  | `Mod` `Alt` `W`   |
+| Page setup      | `Mod` `Alt` `U`   |
 | Cycle themes    | `Mod` `Alt` `T`   |
 | Choose language | `Mod` `Alt` `L`   |
 

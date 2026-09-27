@@ -32,7 +32,8 @@
     "spellcheck.toggle": "Mod-Alt-s",
     "spellcheck.next": "Mod-Alt-n",
     "spellcheck.previous": "Mod-Alt-Shift-n",
-    "menu.context": "Shift-F10"
+    "menu.context": "Shift-F10",
+    "page.setup": "Mod-Alt-u"
   },
   "autocorrect": {
     "arrows": true,
@@ -50,5 +51,12 @@
   "spellcheck": {
     "ignoreUppercase": true,
     "ignoreWordsWithNumbers": true
+  },
+  "layout": {
+    "page": {
+      "size": "auto",
+      "orientation": "portrait",
+      "margins": "2.5cm"
+    }
   }
 }

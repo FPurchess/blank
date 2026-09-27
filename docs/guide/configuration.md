@@ -61,3 +61,21 @@ The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `
 ```
 
 The words you add to the dictionary are kept next to `blank.json`, in the `dictionaries` folder.
+
+## Page setup {#page-setup}
+
+`layout.page` is the [page setup](./pages) of documents that don't have their own. **Make This My Default** in the page setup writes it for you:
+
+```json
+{
+  "layout": {
+    "page": {
+      "size": "a5",
+      "orientation": "portrait",
+      "margins": "2cm"
+    }
+  }
+}
+```
+
+It takes the same settings as the [properties of a file](./pages#frontmatter). The default `size` is `auto`, the paper of your region.

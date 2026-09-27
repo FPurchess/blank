@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
+import { pageSetup } from "../../state";
 import { doc, docWithFrontmatter, p } from "../../test/editor";
 import properties, { PROPERTIES_CLASS, summarize } from "./properties";
 
@@ -17,6 +18,13 @@ describe("summarize", () => {
     ["title: ''\ntags: [a]", "title, tags"],
     ["title: [unclosed", "Properties that can't be read"],
     ["- a list", "Properties that can't be read"],
+    // jsdom's locale is en-US, which measures in inches
+    ["page:\n  size: a5\n  orientation: landscape", "A5 landscape"],
+    [
+      "title: Hi\npage:\n  margins: 2.54cm\ntags: [a]",
+      "Hi · margins 1 in · tags",
+    ],
+    ["page: {}", "page"],
   ])("sums up %j", (frontmatter, summary) => {
     expect(summarize(frontmatter)).toBe(summary);
   });
@@ -61,6 +69,19 @@ describe("plugins.properties", () => {
 
   it("shows nothing without frontmatter", () => {
     expect(summaries(mount(doc(p("text"))))).toEqual([]);
+  });
+
+  it("opens the page setup when clicked", () => {
+    const editor = mount(docWithFrontmatter("title: Hi", p("text")));
+
+    editor.dom
+      .querySelector(`.${PROPERTIES_CLASS}`)!
+      .dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+      );
+
+    expect(pageSetup.value?.frontmatter).toBe("title: Hi");
+    pageSetup.value = null;
   });
 
   it("follows changes to the frontmatter and keeps it while typing", () => {

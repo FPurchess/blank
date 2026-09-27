@@ -111,6 +111,7 @@ const importWordDocument = async (
     sendNotification(
       [
         `Imported ${name}. Save it with Mod+S as a markdown file`,
+        ...(result.page ? [`Its ${result.page} pages came along`] : []),
         ...result.warnings,
       ].join(". "),
     );

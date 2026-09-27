@@ -10,6 +10,8 @@ import { EditorState } from "prosemirror-state";
 import { parseMarkdown, schema } from "../src/markdown";
 
 import toDOCX from "../src/exporters/docx";
+import { resolveLayout } from "../src/layout/resolve";
+import { DEFAULT_PAGE } from "../src/layout/settings";
 import { sniffMime } from "../src/images/mime";
 
 const [input, output = input.replace(/\.md$/, "") + ".docx"] =
@@ -34,11 +36,12 @@ const inlineImages = (markdown: string) =>
   });
 
 const doc = parseMarkdown(inlineImages(readFileSync(input, "utf8")));
+// laid out like Blank does without a blank.json: the file's page setup over
+// the defaults
+const { layout } = resolveLayout(doc.attrs.frontmatter, DEFAULT_PAGE);
 const { contents, warnings } = await toDOCX(
   EditorState.create({ schema, doc }),
-  {
-    docPath: resolve(input),
-  },
+  { docPath: resolve(input), layout },
 );
 writeFileSync(output, contents);
 console.log(`wrote ${output}`, warnings.length ? warnings : "");

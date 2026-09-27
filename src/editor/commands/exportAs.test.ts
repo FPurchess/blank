@@ -7,7 +7,10 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import type { exporterFunc } from "../../exporters";
 import { path } from "../../state";
-import { createState, doc, p } from "../../test/editor";
+import { config } from "../../config";
+import { layoutOf } from "../../layout/resolve";
+import { DEFAULT_PAGE } from "../../layout/settings";
+import { createState, doc, docWithFrontmatter, p } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import exportAs from "./exportAs";
 
@@ -58,11 +61,15 @@ describe("command.exportAs", () => {
     await flushPromises();
 
     expect(save).toHaveBeenCalledWith({ filters, defaultPath: undefined });
-    expect(exporter).toHaveBeenCalledWith(state, { docPath: null });
+    // jsdom's locale is en-US, so the page is Letter
+    expect(exporter).toHaveBeenCalledWith(state, {
+      docPath: null,
+      layout: layoutOf(DEFAULT_PAGE, "en-US"),
+    });
     expect(writeFile).toHaveBeenCalledWith("/out.pdf", bytes);
     expect(sendNotification).toHaveBeenCalledWith({
       title,
-      body: "Your file has been exported",
+      body: "Exported on Letter pages",
     });
   });
 
@@ -78,9 +85,10 @@ describe("command.exportAs", () => {
       filters,
       defaultPath: "/docs/report.pdf",
     });
-    expect(exporter).toHaveBeenCalledWith(state, {
-      docPath: "/docs/report.md",
-    });
+    expect(exporter).toHaveBeenCalledWith(
+      state,
+      expect.objectContaining({ docPath: "/docs/report.md" }),
+    );
   });
 
   it("adds the exporter's warnings to the notification", async () => {
@@ -95,7 +103,79 @@ describe("command.exportAs", () => {
 
     expect(sendNotification).toHaveBeenCalledWith({
       title,
-      body: "Your file has been exported. 1 image could not be embedded: a",
+      body: "Exported on Letter pages. 1 image could not be embedded: a",
+    });
+  });
+
+  it.each([
+    [1, "Exported 1 Letter page"],
+    [12, "Exported 12 Letter pages"],
+  ])("tells how many pages it exported: %d", async (pages, body) => {
+    vi.mocked(save).mockResolvedValue("/out.pdf");
+    const exporter = vi
+      .fn<exporterFunc>()
+      .mockResolvedValue({ contents: bytes, warnings: [], pages });
+
+    exportAs(title, exporter, filters)(state);
+    await flushPromises();
+
+    expect(sendNotification).toHaveBeenCalledWith({ title, body });
+  });
+
+  it("lays the document out on its own page setup", async () => {
+    vi.mocked(save).mockResolvedValue("/out.pdf");
+    const exporter = createExporter();
+    const landscape = createState(
+      docWithFrontmatter(
+        "page:\n  size: a5\n  orientation: landscape",
+        p("Hello"),
+      ),
+    );
+
+    exportAs(title, exporter, filters)(landscape);
+    await flushPromises();
+
+    const [, { layout }] = exporter.mock.calls[0];
+    expect(layout.paper.name).toBe("a5");
+    expect(layout.orientation).toBe("landscape");
+    expect(sendNotification).toHaveBeenCalledWith({
+      title,
+      body: "Exported on A5 landscape pages",
+    });
+  });
+
+  it("follows the user's default page setup", async () => {
+    vi.mocked(save).mockResolvedValue("/out.pdf");
+    const exporter = createExporter();
+    const before = config.value;
+    config.value = {
+      ...before,
+      layout: { page: { ...DEFAULT_PAGE, size: "legal" } },
+    };
+
+    try {
+      exportAs(title, exporter, filters)(state);
+      await flushPromises();
+    } finally {
+      config.value = before;
+    }
+
+    expect(exporter.mock.calls[0][1].layout.paper.name).toBe("legal");
+  });
+
+  it("tells which page settings it couldn't use", async () => {
+    vi.mocked(save).mockResolvedValue("/out.pdf");
+
+    exportAs(
+      title,
+      createExporter(),
+      filters,
+    )(createState(docWithFrontmatter("page:\n  size: a2", p("Hello"))));
+    await flushPromises();
+
+    expect(sendNotification).toHaveBeenCalledWith({
+      title,
+      body: "Exported on Letter pages. Blank used the default page setup where its paper size is unknown",
     });
   });
 

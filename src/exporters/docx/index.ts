@@ -15,7 +15,8 @@ import {
   failureWarning,
   prepareImages,
 } from "../../images/prepare";
-import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
+import { pageGeometry } from "../../layout/resolve";
+import { POINTS_PER_PIXEL } from "../../layout/units";
 import {
   cellShare,
   hasTallRows,
@@ -28,13 +29,11 @@ import { FRONTMATTER_PROPERTY } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
-  CONTENT_WIDTH_TWIPS,
   FONT,
   HEADING_AFTER_HEADING_SPACING,
   LIST_HANGING,
   LIST_INDENT,
   LIST_ITEM_SPACING,
-  PAGE,
   QUOTE_BORDER,
   QUOTE_INDENT,
   STYLE,
@@ -44,6 +43,8 @@ import {
   TABLE_HEADER_BORDER,
   TABLE_HEADER_SHADING,
   orderedLevels,
+  pageProperties,
+  twips,
 } from "./template";
 
 type Docx = typeof import("docx");
@@ -61,10 +62,6 @@ const IMAGE_TYPES = {
   "image/gif": "gif",
   "image/bmp": "bmp",
 } as const;
-
-// Word measures images in pixels at 96 dpi, like the editor
-const MAX_IMAGE_WIDTH = CONTENT_WIDTH / POINTS_PER_PIXEL;
-const MAX_IMAGE_HEIGHT = CONTENT_HEIGHT / POINTS_PER_PIXEL;
 
 const BULLET_REFERENCE = "bullet";
 const orderedReference = (start: number) => `ordered-${start}`;
@@ -92,13 +89,23 @@ class Serializer {
   // each list gets its own numbering instance, so it counts from its start
   private instances = 0;
   private imageCount = 0;
-  // images in the cell being serialized fit its width
-  private maxImageWidth = MAX_IMAGE_WIDTH;
+  // the width of the text, in twentieths of a point
+  private contentWidth: number;
+  // the largest image that fits the page, or the cell being serialized, in
+  // pixels at 96 dpi like Word
+  private maxImageWidth: number;
+  private maxImageHeight: number;
 
   constructor(
     private docx: Docx,
     private images: Map<string, PreparedImage>,
-  ) {}
+    // the room for the text on the page, in points
+    content: { width: number; height: number },
+  ) {
+    this.contentWidth = twips(content.width);
+    this.maxImageWidth = content.width / POINTS_PER_PIXEL;
+    this.maxImageHeight = content.height / POINTS_PER_PIXEL;
+  }
 
   numbering(): INumberingOptions {
     return {
@@ -262,7 +269,7 @@ class Serializer {
       this.docx;
     const grid = tableGrid(node);
     const left = indentOf(position);
-    const width = CONTENT_WIDTH_TWIPS - left;
+    const width = this.contentWidth - left;
     const cantSplit = !hasTallRows(node);
     const rows = grid.rows.map(
       (cells, index) =>
@@ -396,7 +403,7 @@ class Serializer {
     const image = this.images.get(src);
     if (!image) return new TextRun({ text: alt || src, italics: true });
 
-    const size = fitBox(image, this.maxImageWidth, MAX_IMAGE_HEIGHT);
+    const size = fitBox(image, this.maxImageWidth, this.maxImageHeight);
     return new ImageRun({
       type: IMAGE_TYPES[image.mime as keyof typeof IMAGE_TYPES],
       data: image.bytes,
@@ -465,14 +472,18 @@ const loadFont = () =>
     ),
   ));
 
-const toDOCX: exporterFunc = async (state, { docPath }) => {
+const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const docx = await import("docx");
   const [fontData, { images, failures }] = await Promise.all([
     loadFont(),
     prepareImages(state.doc, docPath, [...EMBEDDABLE]),
   ]);
 
-  const serializer = new Serializer(docx, images);
+  const { contentWidth, contentHeight } = pageGeometry(layout);
+  const serializer = new Serializer(docx, images, {
+    width: contentWidth,
+    height: contentHeight,
+  });
   const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP), serializer);
 
   const frontmatter = state.doc.attrs.frontmatter as string | null;
@@ -498,7 +509,7 @@ const toDOCX: exporterFunc = async (state, { docPath }) => {
     numbering: serializer.numbering(),
     sections: [
       {
-        properties: { page: PAGE },
+        properties: { page: pageProperties(layout) },
         children: blocks.map((block) =>
           serializer.isTable(block) ? block : new docx.Paragraph(block),
         ),

@@ -1,12 +1,16 @@
 import { Plugin } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
-import { Decoration, DecorationSet } from "prosemirror-view";
+import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 
+import { describePage } from "../../layout/describe";
+import { localeUnit } from "../../layout/paper";
 import { propertiesOf, readFrontmatter } from "../../markdown";
+import { openPageSetup } from "../commands/pageSetup";
 
 // Shows a quiet line above the text of a document that has frontmatter, so
 // the properties Blank keeps for it (see src/markdown/frontmatter.ts) aren't
-// hidden: e.g. "The Lighthouse · by Ada · tags".
+// hidden: e.g. "The Lighthouse · by Ada · A5 landscape · tags". Clicking
+// it opens the page setup.
 
 export const PROPERTIES_CLASS = "doc-properties";
 
@@ -23,12 +27,17 @@ export const summarize = (frontmatter: string | null): string | null => {
   if (data === undefined) return "Properties that can't be read";
 
   const { title, author } = propertiesOf(data);
+  const page = describePage(data.page, localeUnit());
   const others = Object.keys(data).filter(
-    (key) => !(key === "title" && title) && !(key === "author" && author),
+    (key) =>
+      !(key === "title" && title) &&
+      !(key === "author" && author) &&
+      !(key === "page" && page),
   );
   const parts = [
     ...(title ? [title] : []),
     ...(author ? [`by ${author}`] : []),
+    ...(page ? [page] : []),
   ];
   if (others.length > MAX_NAMED_KEYS) {
     parts.push(`${others.length} ${parts.length ? "more " : ""}properties`);
@@ -38,13 +47,18 @@ export const summarize = (frontmatter: string | null): string | null => {
   return parts.length ? parts.join(" · ") : null;
 };
 
-const render = (summary: string) => () => {
+const render = (summary: string) => (view: EditorView) => {
   const element = document.createElement("div");
   element.className = PROPERTIES_CLASS;
   element.contentEditable = "false";
   element.setAttribute("role", "note");
-  element.title = "Properties from the top of the file, kept when you save";
+  element.title =
+    "Properties from the top of the file, kept when you save. Click for the page setup";
   element.textContent = summary;
+  element.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    openPageSetup(view);
+  });
   return element;
 };
 

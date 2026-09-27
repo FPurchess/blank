@@ -30,6 +30,7 @@ import {
   openMenu,
   toggleSpellcheck,
   tableKey,
+  pageSetup,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -93,6 +94,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.SPELLCHECK_NEXT]: goToMisspelling(1),
   [CommandIdentifier.SPELLCHECK_PREVIOUS]: goToMisspelling(-1),
   [CommandIdentifier.CONTEXT_MENU]: openMenu(),
+  [CommandIdentifier.PAGE_SETUP]: pageSetup(),
 };
 
 // modifier names people know from their OS, mapped to the ones

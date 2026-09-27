@@ -49,7 +49,7 @@ Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your docum
 
 The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 
-- A4 pages set in IBM Plex Sans,
+- set in IBM Plex Sans on the paper of your region, or the [page setup](./pages) you chose,
 - a heading never ends a page on its own; it moves to the next page with its text,
 - quotes keep their bar on the left and everything inside them,
 - line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3,

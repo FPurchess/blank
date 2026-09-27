@@ -1,7 +1,6 @@
 import type { Node } from "prosemirror-model";
 
 import { fitBox } from "../../images/fit";
-import { CONTENT_HEIGHT, CONTENT_WIDTH } from "../page";
 import {
   cellShare,
   hasTallRows,
@@ -11,11 +10,11 @@ import {
   type GridCell,
   type TableGrid,
 } from "../table";
-import type { PdfImages } from ".";
+import type { PdfContext, PdfImages } from ".";
 import { TABLE_CELL_PADDING_X, TABLE_CELL_PADDING_Y } from "./template";
 
 // renders the blocks of a node without outer margins, see edgeless in index.ts
-type Blocks = (n: Node, images: PdfImages) => object[];
+type Blocks = (n: Node, context: PdfContext) => object[];
 
 /**
  * tableLayout draws the table like the editor: a line under every row, a
@@ -52,28 +51,37 @@ const percentages = (widths: number[]) =>
 /**
  * fitImages returns `images` sized to fit `maxWidth`, for the images of a cell
  */
-const fitImages = (images: PdfImages, maxWidth: number): PdfImages =>
+const fitImages = (
+  images: PdfImages,
+  maxWidth: number,
+  maxHeight: number,
+): PdfImages =>
   new Map(
     [...images].map(([src, image]) => [
       src,
-      { ...image, ...fitBox(image, maxWidth, CONTENT_HEIGHT) },
+      { ...image, ...fitBox(image, maxWidth, maxHeight) },
     ]),
   );
 
 /**
  * cellBlock renders `cell`, with its alignment, and bold and tinted if it's
- * a header cell
+ * a header cell. Its blocks are laid out in the cell's width, so its images
+ * and tables fit it.
  */
 const cellBlock = (
   cell: GridCell,
   grid: TableGrid,
-  images: PdfImages,
+  context: PdfContext,
   blocks: Blocks,
 ) => {
-  const maxWidth =
-    cellShare(grid, cell) * CONTENT_WIDTH - 2 * TABLE_CELL_PADDING_X;
+  const width =
+    cellShare(grid, cell) * context.content.width - 2 * TABLE_CELL_PADDING_X;
+  const { height } = context.content;
   return {
-    stack: blocks(cell.node, fitImages(images, maxWidth)),
+    stack: blocks(cell.node, {
+      images: fitImages(context.images, width, height),
+      content: { width, height },
+    }),
     ...(cell.colspan > 1 ? { colSpan: cell.colspan } : {}),
     ...(cell.rowspan > 1 ? { rowSpan: cell.rowspan } : {}),
     ...(cell.node.attrs.align ? { alignment: cell.node.attrs.align } : {}),
@@ -86,7 +94,7 @@ const cellBlock = (
  * page, rows stay whole unless they might not fit on one, and a caption goes
  * above the table
  */
-export const tableBlock = (n: Node, images: PdfImages, blocks: Blocks) => {
+export const tableBlock = (n: Node, context: PdfContext, blocks: Blocks) => {
   const grid = tableGrid(n);
   const table = {
     table: {
@@ -96,7 +104,7 @@ export const tableBlock = (n: Node, images: PdfImages, blocks: Blocks) => {
       widths: percentages(grid.widths),
       // pdfmake wants an empty object where a merged cell covers a position
       body: grid.rows.map((row) =>
-        row.map((cell) => (cell ? cellBlock(cell, grid, images, blocks) : {})),
+        row.map((cell) => (cell ? cellBlock(cell, grid, context, blocks) : {})),
       ),
     },
     layout: tableLayout(grid.headerRows),

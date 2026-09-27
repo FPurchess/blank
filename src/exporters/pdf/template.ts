@@ -1,4 +1,3 @@
-import { PAGE_HEIGHT, PAGE_MARGIN } from "../page";
 import { TABLE_PADDING } from "../table";
 
 // Mirrors the editor typography in src/scss/_typography.scss: 11pt body and
@@ -70,10 +69,9 @@ type PageNodes = {
   getNodesOnNextPage: () => PageNode[];
 };
 
+// the page size and margins come from the document's layout, see
+// src/layout/resolve.ts
 export const BASE_DOCUMENT = {
-  pageSize: "A4",
-  // also the page of the Word export, see ../page.ts
-  pageMargins: PAGE_MARGIN,
   defaultStyle: {
     font: FONT,
     fontSize: BODY_SIZE,
@@ -117,16 +115,22 @@ export const BASE_DOCUMENT = {
       },
     ),
   },
-  // Keep headings with the text they introduce: move a heading to the next
-  // page when only headings follow it on this page. Checking for "only
-  // headings" rather than "nothing" moves a run of headings as a whole, since
-  // pdfmake asks about every node just once. A table caption moves when
-  // there's no room for its table's first rows below it: pdfmake still counts
-  // rows it later moves to the next page as on this one, so the following
-  // nodes can't tell.
-  pageBreakBefore: (node: PageNode, nodes: PageNodes) => {
+};
+
+/**
+ * pageBreakBefore keeps headings with the text they introduce: it moves a
+ * heading to the next page when only headings follow it on this page.
+ * Checking for "only headings" rather than "nothing" moves a run of headings
+ * as a whole, since pdfmake asks about every node just once. A table caption
+ * moves when there's no room for its table's first rows below it: pdfmake
+ * still counts rows it later moves to the next page as on this one, so the
+ * following nodes can't tell.
+ * @param bottom where the text ends on the page, from its top edge
+ */
+export const pageBreakBefore =
+  (bottom: number) => (node: PageNode, nodes: PageNodes) => {
     if (node.style === "table_caption" && node.startPosition) {
-      return PAGE_HEIGHT - PAGE_MARGIN - node.startPosition.top < CAPTION_ROOM;
+      return bottom - node.startPosition.top < CAPTION_ROOM;
     }
     return (
       node.headlineLevel !== undefined &&
@@ -135,5 +139,4 @@ export const BASE_DOCUMENT = {
         .getFollowingNodesOnPage()
         .every((following) => following.headlineLevel !== undefined)
     );
-  },
-};
+  };

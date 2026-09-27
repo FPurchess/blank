@@ -21,9 +21,10 @@ import {
   ul,
 } from "../../test/editor";
 import autocomplete from "../../editor/plugins/autocomplete";
-import toPDF from ".";
+import toPDF, { pageDefinition } from ".";
 import {
   BASE_DOCUMENT,
+  pageBreakBefore,
   BLOCKQUOTE_LAYOUT,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
@@ -31,14 +32,12 @@ import {
 import { FALLBACK_FONT } from "./fallback";
 import { tableLayout } from "./table";
 import { TABLE_COLORS } from "../table";
-import {
-  CONTENT_HEIGHT,
-  CONTENT_WIDTH,
-  PAGE_HEIGHT,
-  PAGE_MARGIN,
-} from "../page";
+import { pageGeometry } from "../../layout/resolve";
+import type { Layout } from "../../layout/resolve";
 import { IMAGES, dataUrl } from "../../test/images";
 import { rasterize } from "../../images/codec";
+import { allMargins } from "../../layout/settings";
+import { testLayout } from "../../test/layout";
 
 vi.mock("pdfmake", () => ({
   default: {
@@ -62,14 +61,17 @@ const createPdf = vi.mocked(pdfmake.createPdf);
  * exportDoc runs `toPDF` for `node` and returns the pdfmake document
  * definition it produced together with the export result.
  */
-const exportDoc = async (node: ReturnType<typeof doc>) => {
+const exportDoc = async (
+  node: ReturnType<typeof doc>,
+  layout: Layout = testLayout(),
+) => {
   const buffer = new Uint8Array([37, 80, 68, 70]);
   const getBuffer = vi.fn().mockResolvedValue(buffer);
   createPdf.mockReturnValue({ getBuffer } as unknown as ReturnType<
     typeof pdfmake.createPdf
   >);
 
-  const result = await toPDF(createState(node), { docPath: null });
+  const result = await toPDF(createState(node), { docPath: null, layout });
 
   const [definition] = createPdf.mock.calls[0];
   return { definition, result, buffer };
@@ -87,20 +89,64 @@ describe("exporter.pdf document definition", () => {
   it("returns the rendered PDF", async () => {
     const { result, buffer } = await exportDoc(doc(p("text")));
 
-    expect(result).toEqual({ contents: buffer, warnings: [] });
+    // pdfmake is mocked, so it lays out no pages
+    expect(result).toEqual({ contents: buffer, warnings: [], pages: 0 });
+  });
+
+  it("lays the document out on the page of its layout", async () => {
+    const layout = testLayout({
+      size: "letter",
+      orientation: "landscape",
+      margins: { top: 10, right: 20, bottom: 30, left: 40 },
+    });
+
+    const { definition } = await exportDoc(doc(p("text")), layout);
+
+    expect(definition).toMatchObject({
+      pageSize: { width: 792, height: 612 },
+      pageOrientation: "landscape",
+      pageMargins: [40, 10, 20, 30],
+    });
+    expect(pageDefinition(layout)).toEqual({
+      pageSize: { width: 792, height: 612 },
+      pageOrientation: "landscape",
+      pageMargins: [40, 10, 20, 30],
+    });
+  });
+
+  it("draws no footer", async () => {
+    const { definition } = await exportDoc(doc(p("text")));
+
+    expect(
+      (definition.footer as (page: number, pages: number) => unknown)(1, 3),
+    ).toBeNull();
   });
 
   it("uses the base document styles", async () => {
     const { definition } = await exportDoc(doc(p("text")));
 
     expect(definition).toMatchObject({
-      pageSize: BASE_DOCUMENT.pageSize,
-      pageMargins: PAGE_MARGIN,
       defaultStyle: BASE_DOCUMENT.defaultStyle,
       styles: BASE_DOCUMENT.styles,
-      pageBreakBefore: BASE_DOCUMENT.pageBreakBefore,
     });
     expect(BASE_DOCUMENT).not.toHaveProperty("content");
+  });
+
+  it("keeps captions with their table on the page of the layout", async () => {
+    const layout = testLayout({ size: "a5", margins: allMargins(36) });
+    const { definition } = await exportDoc(doc(p("text")), layout);
+    const { height, margins } = pageGeometry(layout);
+    const caption = (top: number) => ({
+      style: "table_caption",
+      startPosition: { top },
+    });
+    const breakBefore = definition.pageBreakBefore as (
+      node: object,
+      nodes: object,
+    ) => boolean;
+
+    expect(breakBefore(caption(height - margins.bottom - 40), {})).toBe(true);
+    expect(breakBefore(caption(height - margins.bottom - 200), {})).toBe(false);
   });
 
   it("titles the PDF by its first heading", async () => {
@@ -169,8 +215,14 @@ describe("exporter.pdf document definition", () => {
       getBuffer: vi.fn(),
     } as unknown as ReturnType<typeof pdfmake.createPdf>);
 
-    await freshToPDF(createState(doc(p("a"))), { docPath: null });
-    await freshToPDF(createState(doc(p("b"))), { docPath: null });
+    await freshToPDF(createState(doc(p("a"))), {
+      docPath: null,
+      layout: testLayout(),
+    });
+    await freshToPDF(createState(doc(p("b"))), {
+      docPath: null,
+      layout: testLayout(),
+    });
 
     expect(freshPdfmake.addVirtualFileSystem).toHaveBeenCalledTimes(1);
     expect(freshPdfmake.addFonts).toHaveBeenCalledTimes(1);
@@ -521,12 +573,37 @@ describe("exporter.pdf images", () => {
     );
 
     const [{ stack }] = definition.content as { stack: object[] }[];
+    const { contentWidth, contentHeight } = pageGeometry(testLayout());
     expect(stack[0]).toEqual({
       image: "img0",
-      width: CONTENT_WIDTH,
-      height: CONTENT_WIDTH / 4,
+      width: contentWidth,
+      height: contentWidth / 4,
     });
-    expect(CONTENT_WIDTH / 4).toBeLessThan(CONTENT_HEIGHT);
+    expect(contentWidth / 4).toBeLessThan(contentHeight);
+  });
+
+  it("scales large images down to a landscape page", async () => {
+    vi.mocked(rasterize).mockResolvedValue({
+      bytes: Uint8Array.from(atob(IMAGES.png), (c) => c.charCodeAt(0)),
+      mime: "image/png",
+      size: { width: 4000, height: 1000 },
+    });
+
+    const { definition } = await exportDoc(
+      doc(paragraph([image(dataUrl("image/webp", IMAGES.webpLossy))])),
+      testLayout({ orientation: "landscape" }),
+    );
+
+    const [{ stack }] = definition.content as { stack: object[] }[];
+    const { contentWidth, contentHeight } = pageGeometry(
+      testLayout({ orientation: "landscape" }),
+    );
+    expect(stack[0]).toEqual({
+      image: "img0",
+      width: contentWidth,
+      height: contentWidth / 4,
+    });
+    expect(contentWidth / 4).toBeLessThan(contentHeight);
   });
 
   it("writes the alt text of images that can't be loaded", async () => {
@@ -546,6 +623,9 @@ describe("exporter.pdf images", () => {
 });
 
 describe("exporter.pdf pageBreakBefore", () => {
+  // where the text ends on the page, e.g. 800pt from the top
+  const bottom = 800;
+  const breakBefore = pageBreakBefore(bottom);
   const heading = { headlineLevel: 2 };
   const body = {};
   const nodes = (onPage: object[], onNextPage: object[] = [body]) => ({
@@ -554,25 +634,23 @@ describe("exporter.pdf pageBreakBefore", () => {
   });
 
   it("moves a heading that ends a page to the next page", () => {
-    expect(BASE_DOCUMENT.pageBreakBefore(heading, nodes([]))).toBe(true);
+    expect(breakBefore(heading, nodes([]))).toBe(true);
   });
 
   it("moves a run of headings that ends a page as a whole", () => {
-    expect(BASE_DOCUMENT.pageBreakBefore(heading, nodes([heading]))).toBe(true);
+    expect(breakBefore(heading, nodes([heading]))).toBe(true);
   });
 
   it("keeps a heading that is followed by content", () => {
-    expect(BASE_DOCUMENT.pageBreakBefore(heading, nodes([heading, body]))).toBe(
-      false,
-    );
+    expect(breakBefore(heading, nodes([heading, body]))).toBe(false);
   });
 
   it("keeps a heading that ends the document", () => {
-    expect(BASE_DOCUMENT.pageBreakBefore(heading, nodes([], []))).toBe(false);
+    expect(breakBefore(heading, nodes([], []))).toBe(false);
   });
 
   it("never breaks before other blocks", () => {
-    expect(BASE_DOCUMENT.pageBreakBefore(body, nodes([]))).toBe(false);
+    expect(breakBefore(body, nodes([]))).toBe(false);
   });
 
   it("moves a caption without room for its table below it", () => {
@@ -580,14 +658,9 @@ describe("exporter.pdf pageBreakBefore", () => {
       style: "table_caption",
       startPosition: { top },
     });
-    const bottom = PAGE_HEIGHT - PAGE_MARGIN;
 
-    expect(
-      BASE_DOCUMENT.pageBreakBefore(caption(bottom - 40), nodes([body])),
-    ).toBe(true);
-    expect(
-      BASE_DOCUMENT.pageBreakBefore(caption(bottom - 200), nodes([body])),
-    ).toBe(false);
+    expect(breakBefore(caption(bottom - 40), nodes([body]))).toBe(true);
+    expect(breakBefore(caption(bottom - 200), nodes([body]))).toBe(false);
   });
 });
 
@@ -735,7 +808,8 @@ describe("exporter.pdf tables", () => {
     );
 
     // the first column is 3 of 43 characters wide, less its padding
-    const cellWidth = (3 / 43) * CONTENT_WIDTH - 2 * 0.7 * 11;
+    const cellWidth =
+      (3 / 43) * pageGeometry(testLayout()).contentWidth - 2 * 0.7 * 11;
     expect(cellImage(block).width).toBeCloseTo(cellWidth);
     expect(cellImage(block).height).toBeCloseTo(cellWidth / 4);
   });
