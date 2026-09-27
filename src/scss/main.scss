@@ -40,10 +40,18 @@ body {
   pointer-events: none;
 }
 
-#ui-spellcheck {
+// the right of the bar: the page, spell check and language
+#ui-page {
   pointer-events: auto;
   cursor: pointer;
   margin-left: auto;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+#ui-spellcheck {
+  pointer-events: auto;
+  cursor: pointer;
   font-size: 0.8rem;
   letter-spacing: 0.05em;
 

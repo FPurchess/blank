@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  chapterOptions,
   changesOf,
   choicesOf,
   MARGIN_PRESETS,
@@ -34,6 +35,23 @@ describe("paperOptions", () => {
   });
 });
 
+describe("chapterOptions", () => {
+  it("offers to run chapters on or start them on new pages", () => {
+    expect(chapterOptions([])).toEqual([
+      { value: "run-on", label: "Run On" },
+      { value: "new-page", label: "Each on a New Page" },
+    ]);
+    expect(chapterOptions([1])).toHaveLength(2);
+  });
+
+  it("offers the levels of the document the rows don't name", () => {
+    expect(chapterOptions([1, 2])[2]).toEqual({
+      value: "custom",
+      label: "Headings 1 and 2 on new pages",
+    });
+  });
+});
+
 describe("choicesOf", () => {
   it("shows the defaults as the paper of the region and normal margins", () => {
     expect(choicesOf(DEFAULT_PAGE, "de-DE", "cm")).toEqual({
@@ -43,6 +61,8 @@ describe("choicesOf", () => {
       orientation: "portrait",
       margins: "normal",
       sides: { top: "2.5", right: "2.5", bottom: "2.5", left: "2.5" },
+      chapters: "run-on",
+      levels: [],
     });
   });
 
@@ -87,13 +107,31 @@ describe("settingsOf", () => {
 
   it("returns the settings of named choices", () => {
     expect(
-      of({ paper: "letter", orientation: "landscape", margins: "narrow" }),
+      of({
+        paper: "letter",
+        orientation: "landscape",
+        margins: "narrow",
+        chapters: "new-page",
+      }),
     ).toEqual({
       settings: {
         size: "letter",
         orientation: "landscape",
         margins: allMargins(cm(1.27)),
+        newPageBefore: [1],
       },
+    });
+  });
+
+  it("keeps heading levels of the document the rows don't name", () => {
+    const choices = choicesOf(
+      settings({ newPageBefore: [1, 2] }),
+      "de-DE",
+      "cm",
+    );
+    expect(choices).toMatchObject({ chapters: "custom", levels: [1, 2] });
+    expect(settingsOf(choices, "de-DE", "cm")).toMatchObject({
+      settings: { newPageBefore: [1, 2] },
     });
   });
 
@@ -111,6 +149,7 @@ describe("settingsOf", () => {
         size: { width: mm(170), height: cm(24) },
         orientation: "portrait",
         margins: { top: cm(3), right: cm(2.5), bottom: 72, left: mm(20) },
+        newPageBefore: [],
       },
     });
   });

@@ -228,6 +228,34 @@ describe("importers.docx", () => {
       expect(page).toBe("Letter landscape");
     });
 
+    it("keeps page breaks: single, in a row and at the end", async () => {
+      const markdown = [
+        "a",
+        "<!-- pagebreak -->",
+        "b",
+        "<!-- pagebreak -->",
+        "<!-- pagebreak -->",
+        "c",
+        "<!-- pagebreak -->",
+      ].join("\n\n");
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps a page break before a table", async () => {
+      const markdown =
+        "a\n\n<!-- pagebreak -->\n\n| b   | c   |\n| --- | --- |\n| d   | e   |";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps chapters on new pages, and a page break before one", async () => {
+      const markdown =
+        "---\npage:\n  new-page-before: [1, 2]\n---\n\n# One\n\na\n\n<!-- pagebreak -->\n\n# Two\n\n## Section";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
     // what a Word document written by Blank can't carry back, one test each so
     // an improvement shows up here
 
@@ -261,6 +289,12 @@ describe("importers.docx", () => {
       expect(
         await roundTrip("| a   |   b |\n| :-- | --: |\n| c   |   d |"),
       ).toBe("| a   | b   |\n| --- | --- |\n| c   | d   |");
+    });
+
+    it("splits a quote at a page break in it", async () => {
+      expect(await roundTrip("> a\n>\n> <!-- pagebreak -->\n>\n> b")).toBe(
+        "> a\n\n<!-- pagebreak -->\n\n> b",
+      );
     });
 
     it("merges adjacent blockquotes", async () => {
@@ -405,6 +439,44 @@ describe("importers.docx", () => {
 
     expect(doc.attrs.frontmatter).toBeNull();
     expect(page).toBeNull();
+  });
+
+  it("keeps the page breaks of a Word document", async () => {
+    const docx = await import("docx");
+    const bytes = await docx.Packer.pack(
+      new docx.Document({
+        sections: [
+          {
+            children: [
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun("a"),
+                  new docx.PageBreak(),
+                  new docx.TextRun("b"),
+                ],
+              }),
+              new docx.Paragraph({ text: "c", pageBreakBefore: true }),
+            ],
+          },
+          { children: [new docx.Paragraph("next section")] },
+        ],
+      }),
+      "uint8array",
+    );
+
+    const { doc } = await toMarkdown(bytes);
+
+    expect(markdownSerializer.serialize(doc)).toBe(
+      [
+        "a",
+        "<!-- pagebreak -->",
+        "b",
+        "<!-- pagebreak -->",
+        "c",
+        "<!-- pagebreak -->",
+        "next section",
+      ].join("\n\n"),
+    );
   });
 
   it("imports an empty document as an empty paragraph", async () => {

@@ -1,5 +1,6 @@
 import { createButton, createDialog, createField } from "./dialog";
 import {
+  chapterOptions,
   choicesOf,
   MARGIN_OPTIONS,
   type Option,
@@ -14,15 +15,15 @@ import { SIDES } from "./layout/settings";
 import { thumbnailSvg } from "./layout/thumbnail";
 import { type PageSetupRequest, pageSetup } from "./state";
 
-// The page setup dialog: a row of choices for the paper, the orientation and
-// the margins, which ↑↓ move between and ←→ change, with a picture of the
+// The page setup dialog: a row of choices for the paper, the orientation, the
+// margins and where chapters start, which ↑↓ move between and ←→ change, with a picture of the
 // page. Custom sizes and margins are typed in below their row.
 
 const DIALOG_ID = "page-setup";
 
 let unsubscribe: (() => void) | undefined;
 
-type RowName = "paper" | "orientation" | "margins";
+type RowName = "paper" | "orientation" | "margins" | "chapters";
 
 interface Row {
   element: HTMLElement;
@@ -240,12 +241,23 @@ const renderDialog = (request: PageSetupRequest) => {
       update();
     },
   );
+  const chapters = createRow(
+    "chapters",
+    "Chapters",
+    chapterOptions(choices.levels),
+    choices.chapters,
+    (value) => {
+      choices.chapters = value;
+      update();
+    },
+  );
   settings.append(
     paper.element,
     paperFields,
     orientation.element,
     margins.element,
     marginFields,
+    chapters.element,
   );
 
   // ↑↓ move between the rows and the visible inputs, Enter applies

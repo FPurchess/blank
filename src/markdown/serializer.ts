@@ -10,10 +10,11 @@ import { gfmBlocker, gfmLines, htmlLines } from "./tables";
 
 const { nodes, marks } = defaultMarkdownSerializer;
 
-// `<br>` and `<table` typed as text are escaped, so they stay text on reopen
-const HTML_START = /<(?=\/?(?:br|table)\b)/gi;
+// `<br>`, `<table` and `<!--` typed as text are escaped, so they stay text on
+// reopen, e.g. a line `<!-- pagebreak -->` that would become a page break
+const HTML_START = /<(?=\/?(?:br|table)\b|!--)/gi;
 // pipes too, in a paragraph that could otherwise turn into a table
-const HTML_START_OR_PIPE = /<(?=\/?(?:br|table)\b)|\|/gi;
+const HTML_START_OR_PIPE = /<(?=\/?(?:br|table)\b|!--)|\|/gi;
 
 /**
  * cellSerializer writes the content of a pipe table cell, with line breaks as
@@ -78,6 +79,10 @@ export const markdownSerializer = new MarkdownSerializer(
         parent.type === schema.topNodeType &&
         parent.attrs.frontmatter === null;
       state.write(onTop ? "***" : (node.attrs.markup as string) || "---");
+      state.closeBlock(node);
+    },
+    page_break(state, node) {
+      state.write("<!-- pagebreak -->");
       state.closeBlock(node);
     },
     table(state: MarkdownSerializerState, node: Node) {

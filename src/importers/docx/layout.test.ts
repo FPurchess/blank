@@ -20,12 +20,18 @@ const sectPr = ({
   `<w:sectPr><w:pgSz w:w="${w}" w:h="${h}"${orient ? ` w:orient="${orient}"` : ""}/>` +
   `<w:pgMar w:top="${top}" w:right="${right}" w:bottom="${bottom}" w:left="${left}" w:header="708" w:footer="708" w:gutter="${gutter}"/></w:sectPr>`;
 
-const docx = (body: string, settings?: string) => {
+const docx = (body: string, settings?: string, styles?: string) => {
   const zip = new JSZip();
   zip.file(
     "word/document.xml",
     `<w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`,
   );
+  if (styles) {
+    zip.file(
+      "word/styles.xml",
+      `<w:styles xmlns:w="${W}">${styles}</w:styles>`,
+    );
+  }
   if (settings) {
     zip.file(
       "word/settings.xml",
@@ -42,6 +48,7 @@ describe("importers.docx.readWordLayout", () => {
         size: "a4",
         orientation: "portrait",
         margins: allMargins(1417 / 20),
+        newPageBefore: [],
       },
       warnings: [],
     });
@@ -104,6 +111,23 @@ describe("importers.docx.readWordLayout", () => {
     expect(warnings).toEqual([]);
   });
 
+  it("reads the heading styles that start a new page", async () => {
+    const style = (id: string, name: string, pPr: string) =>
+      `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:pPr>${pPr}</w:pPr></w:style>`;
+    const { page } = await readWordLayout(
+      docx(
+        sectPr(),
+        undefined,
+        style("Heading1", "heading 1", "<w:pageBreakBefore/>") +
+          // LibreOffice names its styles, and ids can be anything
+          style("berschrift2", "heading 2", "<w:pageBreakBefore/>") +
+          style("Heading3", "heading 3", '<w:pageBreakBefore w:val="0"/>') +
+          style("Normal", "Normal", "<w:pageBreakBefore/>"),
+      ),
+    );
+    expect(page?.newPageBefore).toEqual([1, 2]);
+  });
+
   it.each([
     ["no section properties", "<w:p/>"],
     ["no page size", "<w:sectPr/>"],
@@ -121,6 +145,7 @@ describe("importers.docx.pageChanges", () => {
     size: "a4" as const,
     orientation: "portrait" as const,
     margins: allMargins(cm(2.5)),
+    newPageBefore: [],
   };
   const onA4 = { ...DEFAULT_PAGE, size: "a4" as const };
 
@@ -139,13 +164,19 @@ describe("importers.docx.pageChanges", () => {
     expect(
       pageChanges(
         null,
-        { size: "letter", orientation: "landscape", margins: allMargins(72) },
+        {
+          size: "letter",
+          orientation: "landscape",
+          margins: allMargins(72),
+          newPageBefore: [1],
+        },
         onA4,
       ),
     ).toEqual({
       size: "letter",
       orientation: "landscape",
       margins: allMargins(72),
+      newPageBefore: [1],
     });
   });
 

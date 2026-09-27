@@ -8,15 +8,16 @@ Blank shows your text as it will look, not as markdown syntax. There are no tool
 
 At the start of an empty line, type one of these to turn the line into a block:
 
-| Type at the start of a line | Then  | You get         |
-| --------------------------- | ----- | --------------- |
-| `#` … `######`              | Space | Heading 1–6     |
-| `-` `*` `+`                 | Space | Bullet list     |
-| `1.` (any number)           | Space | Numbered list   |
-| `>`                         | Space | Blockquote      |
-| `---` `***` `___`           | Enter | Horizontal line |
-| ` ``` ` or ` ```lang `      | Enter | Code block      |
-| `\| Name \| Qty \|`         | Enter | Table           |
+| Type at the start of a line | Then  | You get                           |
+| --------------------------- | ----- | --------------------------------- |
+| `#` … `######`              | Space | Heading 1–6                       |
+| `-` `*` `+`                 | Space | Bullet list                       |
+| `1.` (any number)           | Space | Numbered list                     |
+| `>`                         | Space | Blockquote                        |
+| `---` `***` `___`           | Enter | Horizontal line                   |
+| `+++`                       | Enter | [Page break](./pages#page-breaks) |
+| ` ``` ` or ` ```lang `      | Enter | Code block                        |
+| `\| Name \| Qty \|`         | Enter | Table                             |
 
 Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
 

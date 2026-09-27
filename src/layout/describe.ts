@@ -2,6 +2,7 @@ import { PAPER } from "./paper";
 import type { Layout } from "./resolve";
 import {
   DEFAULT_PAGE,
+  NEW_PAGE_BEFORE,
   type PaperSize,
   readPageSettings,
   SIDES,
@@ -27,15 +28,30 @@ export const paperName = (
   return `${toUnit(size.width, sizeUnit)} × ${length(size.height, sizeUnit)}`;
 };
 
+// the name of the paper of a layout
+const layoutPaper = ({ paper }: Layout, unit: Unit) =>
+  paperName(
+    paper.name === "custom"
+      ? { width: paper.width, height: paper.height }
+      : paper.name,
+    unit,
+  );
+
 /**
  * describePaper names the paper of a layout, e.g. "A4", "Letter landscape" or
  * "170 × 240 mm"
  */
 export const describePaper = (layout: Layout, unit: Unit = "cm") => {
-  const { name, width, height } = layout.paper;
-  const paper = paperName(name === "custom" ? { width, height } : name, unit);
+  const paper = layoutPaper(layout, unit);
   return layout.orientation === "landscape" ? `${paper} landscape` : paper;
 };
+
+/**
+ * describePageSize names the paper of a layout with its orientation, e.g.
+ * "A4 (portrait)", for the button in the bottom bar
+ */
+export const describePageSize = (layout: Layout, unit: Unit) =>
+  `${layoutPaper(layout, unit)} (${layout.orientation})`;
 
 /**
  * describePage sums up the page settings a frontmatter holds, for the line
@@ -64,8 +80,31 @@ export const describePage = (raw: unknown, unit: Unit): string | null => {
         : "custom margins",
     );
   }
+  if (has(NEW_PAGE_BEFORE))
+    parts.push(describeNewPages(settings.newPageBefore) ?? "");
   const summary = parts.filter(Boolean).join(" · ");
   return summary || null;
+};
+
+/**
+ * headingLevels names heading levels: "headings 1", "headings 1 and 2",
+ * "headings 1, 2 and 3"
+ */
+const headingLevels = (levels: number[]) => {
+  const last = levels[levels.length - 1];
+  const list =
+    levels.length > 1 ? `${levels.slice(0, -1).join(", ")} and ${last}` : last;
+  return `headings ${list}`;
+};
+
+/**
+ * describeNewPages says which headings start a new page, e.g. "chapters on
+ * new pages" for the headings of level 1
+ * @returns the description, or null for none
+ */
+export const describeNewPages = (levels: number[]): string | null => {
+  if (levels.length === 0) return null;
+  return `${levels.length === 1 && levels[0] === 1 ? "chapters" : headingLevels(levels)} on new pages`;
 };
 
 // what the problems of resolveLayout mean to the user
@@ -75,6 +114,7 @@ const PROBLEMS: Record<string, string> = {
   "page.size": "its paper size is unknown",
   "page.orientation": "its orientation is neither portrait nor landscape",
   "page.margins": "its margins can't be used",
+  [`page.${NEW_PAGE_BEFORE}`]: "the headings to start new pages are unknown",
 };
 
 /**

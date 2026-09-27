@@ -67,6 +67,32 @@ const htmlTable = (
   return true;
 };
 
+// a page break on a line of its own: Blank's comment, or pandoc's commands
+const PAGE_BREAK = /^(?:<!--\s*pagebreak\s*-->|\\newpage|\\pagebreak)\s*$/i;
+
+/**
+ * pageBreak reads a page break, see PAGE_BREAK
+ */
+const pageBreak = (
+  state: StateBlock,
+  startLine: number,
+  _endLine: number,
+  silent: boolean,
+): boolean => {
+  if (state.sCount[startLine] - state.blkIndent >= 4) return false;
+  const line = state.src.slice(
+    state.bMarks[startLine] + state.tShift[startLine],
+    state.eMarks[startLine],
+  );
+  if (!PAGE_BREAK.test(line)) return false;
+  if (silent) return true;
+  const token = state.push("page_break", "hr", 0);
+  token.block = true;
+  token.map = [startLine, startLine + 1];
+  state.line = startLine + 1;
+  return true;
+};
+
 /**
  * cellParagraphs wraps the inline content of every table cell in a paragraph,
  * since a cell of the schema holds blocks
@@ -92,13 +118,16 @@ const cellParagraphs = (state: StateCore) => {
 
 /**
  * tokenizer is the markdown-it instance Blank reads markdown with: CommonMark
- * with GFM pipe tables, `<br>` line breaks and HTML tables
+ * with GFM pipe tables, `<br>` line breaks, HTML tables and page breaks
  */
 export const tokenizer = MarkdownIt("commonmark", { html: false }).enable(
   "table",
 );
 tokenizer.inline.ruler.before("html_inline", "html_break", htmlBreak);
 tokenizer.block.ruler.before("html_block", "html_table", htmlTable, {
+  alt: ["paragraph", "reference", "blockquote"],
+});
+tokenizer.block.ruler.before("paragraph", "page_break", pageBreak, {
   alt: ["paragraph", "reference", "blockquote"],
 });
 tokenizer.core.ruler.after("block", "cell_paragraphs", cellParagraphs);

@@ -31,6 +31,7 @@ describe("readPageSettings", () => {
       size: "letter",
       orientation: "landscape",
       margins: allMargins(72),
+      newPageBefore: [],
     });
   });
 
@@ -43,6 +44,14 @@ describe("readPageSettings", () => {
     expect(
       read({ margins: { top: "3cm", left: "20mm" } }).settings.margins,
     ).toEqual({ ...DEFAULT_PAGE.margins, top: cm(3), left: mm(20) });
+  });
+
+  it("reads the headings that start a new page, as a level or a list", () => {
+    expect(read({ "new-page-before": 1 }).settings.newPageBefore).toEqual([1]);
+    expect(
+      read({ "new-page-before": [3, 1, 1] }).settings.newPageBefore,
+    ).toEqual([1, 3]);
+    expect(read({ "new-page-before": [] }).settings.newPageBefore).toEqual([]);
   });
 
   it("skips keys it doesn't know", () => {
@@ -61,6 +70,8 @@ describe("readPageSettings", () => {
     [{ margins: { top: "2cm", inside: "3cm" } }, "page.margins"],
     [{ margins: { top: 2 } }, "page.margins"],
     [{ margins: ["2cm"] }, "page.margins"],
+    [{ "new-page-before": 7 }, "page.new-page-before"],
+    [{ "new-page-before": ["1"] }, "page.new-page-before"],
     ["a4", "page"],
     [["a4"], "page"],
   ])("reports %j and keeps the base", (raw, problem) => {
@@ -121,6 +132,18 @@ describe("writePageSettings", () => {
         margins: null,
       }).yaml,
     ).toBe("title: Hi\n");
+  });
+
+  it("writes one heading level as a number, several on one line", () => {
+    expect(write("", { newPageBefore: [1] }).yaml).toBe(
+      "page:\n  new-page-before: 1\n",
+    );
+    expect(write("", { newPageBefore: [1, 2] }).yaml).toBe(
+      "page:\n  new-page-before: [1, 2]\n",
+    );
+    expect(
+      write("page:\n  new-page-before: [1]\n", { newPageBefore: [1] }).changed,
+    ).toBe(false);
   });
 
   it("changes nothing to remove what isn't there", () => {

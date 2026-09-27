@@ -79,3 +79,61 @@ describe("firstHeading", () => {
     expect(firstHeading(doc(p("text")))).toBe("");
   });
 });
+
+describe("page breaks", () => {
+  const pageBreak = () => schema.node("page_break");
+
+  it("reads a page break on a line of its own", () => {
+    for (const markdown of [
+      "a\n\n<!-- pagebreak -->\n\nb",
+      "a\n\n<!--pagebreak-->\n\nb",
+      "a\n\n<!-- PageBreak -->  \n\nb",
+      // pandoc's
+      "a\n\n\\newpage\n\nb",
+      "a\n\n\\pagebreak\n\nb",
+      // ending the paragraph above it
+      "a\n<!-- pagebreak -->\nb",
+    ]) {
+      expect(
+        parseMarkdown(markdown).content.eq(
+          doc(p("a"), pageBreak(), p("b")).content,
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("reads page breaks in quotes and lists", () => {
+    const parsed = parseMarkdown("> a\n>\n> <!-- pagebreak -->");
+    expect(parsed.firstChild?.lastChild?.type.name).toBe("page_break");
+  });
+
+  it.each([
+    ["other comments", "<!-- a note -->"],
+    ["text around it", "see <!-- pagebreak --> here"],
+    ["code", "    <!-- pagebreak -->"],
+  ])("leaves %s alone", (_, markdown) => {
+    let found = false;
+    parseMarkdown(markdown).descendants((node) => {
+      if (node.type.name === "page_break") found = true;
+    });
+    expect(found).toBe(false);
+  });
+
+  it("writes a page break as a comment other apps don't show", () => {
+    expect(
+      serializeMarkdown(doc(p("a"), pageBreak(), pageBreak(), p("b"))),
+    ).toBe("a\n\n<!-- pagebreak -->\n\n<!-- pagebreak -->\n\nb");
+    expect(serializeMarkdown(parseMarkdown("a\n\n\\newpage\n\nb"))).toBe(
+      "a\n\n<!-- pagebreak -->\n\nb",
+    );
+  });
+
+  it("keeps the text of a page break typed as text", () => {
+    for (const text of ["<!-- pagebreak -->", "\\newpage", "<!-- a note -->"]) {
+      const written = serializeMarkdown(doc(p(text)));
+      expect(parseMarkdown(written).content.eq(doc(p(text)).content)).toBe(
+        true,
+      );
+    }
+  });
+});

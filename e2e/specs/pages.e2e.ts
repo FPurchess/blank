@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp } from "../helpers.ts";
+import { Key, pressMod, restartApp, type } from "../helpers.ts";
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
@@ -85,6 +85,42 @@ describe("page setup", () => {
     await expect($(".ProseMirror .doc-properties")).toHaveText(
       "landscape · custom margins",
     );
+  });
+
+  // +++ is tested in the unit tests: WebKitWebDriver can't type a +
+  it("starts new pages with Mod+Enter, and saves them", async () => {
+    const breaksPath = path.join(fixtureDir, "breaks.md");
+    fs.writeFileSync(breaksPath, "one\n");
+    await restartApp([breaksPath]);
+
+    await $(".ProseMirror p").click();
+    await type(Key.End);
+    await pressMod(Key.Enter);
+    await type("two");
+    await pressMod(Key.Enter);
+    await type("three");
+    await expect($$(".ProseMirror hr.page-break")).toBeElementsArrayOfSize(2);
+
+    await pressMod("s");
+    const expected =
+      "one\n\n<!-- pagebreak -->\n\ntwo\n\n<!-- pagebreak -->\n\nthree";
+    await browser.waitUntil(
+      () => fs.readFileSync(breaksPath, "utf8") === expected,
+      {
+        timeoutMsg: `the file has not been saved, it contains: ${fs.readFileSync(breaksPath, "utf8")}`,
+      },
+    );
+  });
+
+  it("shows the paper in the bottom bar, which opens the page setup", async () => {
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/^(A4|Letter) \(portrait\)$/),
+    );
+
+    await $("#ui-page").click();
+    await expect($("#page-setup")).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    await expect($("#page-setup")).not.toExist();
   });
 
   it("cancels with Escape", async () => {

@@ -343,6 +343,89 @@ describe("exporter.docx", () => {
     });
   });
 
+  describe("page breaks", () => {
+    // what starts a new page: Word's "Page break before" on each paragraph
+    const breaks = async (exported: Exported) =>
+      (await paragraphs(exported)).map(({ p, text }) => [
+        text,
+        child(p, "pageBreakBefore") !== undefined,
+      ]);
+
+    it("starts the page of the block after a page break", async () => {
+      const exported = await exportMarkdown(
+        "a\n\n<!-- pagebreak -->\n\nb\n\n* c",
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+        ["c", false],
+      ]);
+    });
+
+    it("leaves an empty page between two page breaks, and after the last", async () => {
+      const exported = await exportMarkdown(
+        "a\n\n<!-- pagebreak -->\n\n<!-- pagebreak -->\n\nb\n\n<!-- pagebreak -->",
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["", true],
+        ["b", true],
+        ["", true],
+      ]);
+    });
+
+    it("starts the page of a table with an empty paragraph", async () => {
+      const exported = await exportMarkdown(
+        "a\n\n<!-- pagebreak -->\n\n| b | c |\n| - | - |\n| d | e |",
+      );
+
+      const body = (
+        await exported.xml("word/document.xml")
+      ).getElementsByTagNameNS(W, "body")[0];
+      const blocks = [...body.children]
+        .filter((element) => element.localName !== "sectPr")
+        .map((element) =>
+          element.localName === "tbl"
+            ? "table"
+            : [
+                element.textContent,
+                child(element, "pageBreakBefore") !== undefined,
+              ],
+        );
+      expect(blocks).toEqual([["a", false], ["", true], "table"]);
+    });
+
+    it("starts a page in a quote", async () => {
+      const exported = await exportMarkdown(
+        "> a\n>\n> <!-- pagebreak -->\n>\n> b",
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+      ]);
+    });
+
+    const headingBreaks = async (exported: Exported) =>
+      all(await exported.xml("word/styles.xml"), "style")
+        .filter((style) => /^Heading\d$/.test(attr(style, "styleId") ?? ""))
+        .filter((style) => child(style, "pageBreakBefore"))
+        .map((style) => attr(style, "styleId"));
+
+    it("starts headings of the chosen levels on a new page", async () => {
+      const exported = await exportDoc(
+        parseMarkdown("# One\n\n## Section\n\n# Two"),
+        null,
+        testLayout({ newPageBefore: [1, 3] }),
+      );
+
+      expect(await headingBreaks(exported)).toEqual(["Heading1", "Heading3"]);
+      expect(await headingBreaks(await exportMarkdown("# One"))).toEqual([]);
+    });
+  });
+
   it("embeds the regular face of IBM Plex Sans", async () => {
     const exported = await exportMarkdown("text");
 

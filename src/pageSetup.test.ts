@@ -187,6 +187,35 @@ describe("pageSetup dialog", () => {
     ).toBe("Top (in)");
   });
 
+  it("starts chapters on new pages", () => {
+    const request = openDialog();
+
+    expect(checked("chapters").textContent).toBe("Run On");
+    option("chapters", "Each on a New Page").click();
+    button("Apply").click();
+
+    expect(request.apply).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      newPageBefore: [1],
+    });
+  });
+
+  it("keeps the heading levels of the text", () => {
+    const request = openDialog({
+      settings: { ...DEFAULT_PAGE, newPageBefore: [1, 2] },
+    });
+
+    expect(checked("chapters").textContent).toBe(
+      "Headings 1 and 2 on new pages",
+    );
+    button("Apply").click();
+
+    expect(request.apply).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      newPageBefore: [1, 2],
+    });
+  });
+
   it("makes the settings the default", () => {
     const request = openDialog();
 

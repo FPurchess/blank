@@ -39,6 +39,7 @@ export const markdownParser = new MarkdownParser(
     tr: { block: "table_row" },
     th: { block: "table_header", getAttrs: cellAttrs },
     td: { block: "table_cell", getAttrs: cellAttrs },
+    page_break: { node: "page_break" },
   },
 );
 

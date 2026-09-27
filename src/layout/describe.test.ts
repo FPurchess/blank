@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { describePage, describePaper, layoutWarnings } from "./describe";
+import {
+  describePage,
+  describePageSize,
+  describePaper,
+  layoutWarnings,
+} from "./describe";
 import { layoutOf } from "./resolve";
 import { DEFAULT_PAGE, type PageSettings } from "./settings";
 import { cm } from "../test/layout";
@@ -25,6 +30,29 @@ describe("describePaper", () => {
   });
 });
 
+describe("describePageSize", () => {
+  it.each([
+    [{}, "cm", "A4 (portrait)"],
+    [
+      { size: "letter" as const, orientation: "landscape" as const },
+      "in",
+      "Letter (landscape)",
+    ],
+    [
+      { size: { width: cm(17), height: cm(24) } },
+      "cm",
+      "170 × 240 mm (portrait)",
+    ],
+  ] as const)("names %j with its orientation", (settings, unit, name) => {
+    expect(
+      describePageSize(
+        layoutOf({ ...DEFAULT_PAGE, ...settings }, "de-DE"),
+        unit,
+      ),
+    ).toBe(name);
+  });
+});
+
 describe("describePage", () => {
   it.each([
     [{ size: "a5" }, "A5"],
@@ -34,6 +62,9 @@ describe("describePage", () => {
     [{ size: "letter", margins: "1in" }, "Letter · margins 2.54 cm"],
     [{ margins: { top: "3cm" } }, "custom margins"],
     [{ size: "170mm x 240mm" }, "170 × 240 mm"],
+    [{ "new-page-before": 1 }, "chapters on new pages"],
+    [{ "new-page-before": [2, 1, 3] }, "headings 1, 2 and 3 on new pages"],
+    [{ "new-page-before": [] }, null],
   ])("sums up %j", (page, summary) => {
     expect(describePage(page, "cm")).toBe(summary);
   });

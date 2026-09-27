@@ -18,11 +18,11 @@
 
 ## Editing
 
-| Command           | Shortcut                         |
-| ----------------- | -------------------------------- |
-| Undo              | `Mod` `Z`                        |
-| Redo              | `Mod` `Shift` `Z`                |
-| Insert line break | `Mod` `Enter` or `Shift` `Enter` |
+| Command           | Shortcut          |
+| ----------------- | ----------------- |
+| Undo              | `Mod` `Z`         |
+| Redo              | `Mod` `Shift` `Z` |
+| Insert line break | `Shift` `Enter`   |
 
 ## Blocks
 
@@ -36,6 +36,7 @@
 | Outdent list item | `Shift` `Tab`   |
 | Blockquote        | `Mod` `G`       |
 | Horizontal line   | `Mod` `H`       |
+| Page break        | `Mod` `Enter`   |
 | Table             | `Mod` `T`       |
 
 ## Tables

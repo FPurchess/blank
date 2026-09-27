@@ -1,4 +1,4 @@
-import { paperName } from "./describe";
+import { describeNewPages, paperName } from "./describe";
 import { localePaper, matchPaper, PAPER_NAMES, type PaperName } from "./paper";
 import { differences, layoutOf, leavesRoom } from "./resolve";
 import {
@@ -8,6 +8,7 @@ import {
   type PageChanges,
   type PageSettings,
   portrait,
+  sameLevels,
   sameMargins,
   SIDES,
 } from "./settings";
@@ -33,6 +34,9 @@ export interface PageChoices {
   margins: MarginPreset | "custom";
   // the custom margins as typed
   sides: Record<keyof Margins, string>;
+  // "custom" keeps the heading levels of the document, e.g. [1, 2]
+  chapters: "run-on" | "new-page" | "custom";
+  levels: number[];
 }
 
 export interface Option<T> {
@@ -71,6 +75,33 @@ export const MARGIN_OPTIONS: Option<PageChoices["margins"]>[] = [
 ];
 
 /**
+ * chapterOptions lists how chapters can start: on the page of the text
+ * before them, or on a new page, and the levels the document has if they are
+ * neither
+ */
+export const chapterOptions = (
+  levels: number[],
+): Option<PageChoices["chapters"]>[] => [
+  { value: "run-on", label: "Run On" },
+  { value: "new-page", label: "Each on a New Page" },
+  ...(chaptersOf(levels) === "custom"
+    ? [
+        {
+          value: "custom" as const,
+          label: capitalize(describeNewPages(levels) as string),
+        },
+      ]
+    : []),
+];
+
+const capitalize = (text: string) => text[0].toUpperCase() + text.slice(1);
+
+const chaptersOf = (levels: number[]): PageChoices["chapters"] => {
+  if (levels.length === 0) return "run-on";
+  return sameLevels(levels, [1]) ? "new-page" : "custom";
+};
+
+/**
  * choicesOf returns what the dialog shows for page settings
  * @param settings the settings of the document
  * @param locale the locale whose paper "auto" is
@@ -100,6 +131,8 @@ export const choicesOf = (
     sides: Object.fromEntries(
       SIDES.map((side) => [side, show(margins[side])]),
     ) as PageChoices["sides"],
+    chapters: chaptersOf(settings.newPageBefore),
+    levels: settings.newPageBefore,
   };
 };
 
@@ -144,7 +177,17 @@ export const settingsOf = (
   } else {
     margins = allMargins(MARGIN_PRESETS[choices.margins]);
   }
-  const settings = { size, orientation: choices.orientation, margins };
+  const newPageBefore = {
+    "run-on": [],
+    "new-page": [1],
+    custom: choices.levels,
+  }[choices.chapters];
+  const settings = {
+    size,
+    orientation: choices.orientation,
+    margins,
+    newPageBefore,
+  };
   if (!errors.paper && !leavesRoom(layoutOf(settings, locale))) {
     errors.margins = "The margins leave no room for the text";
   }

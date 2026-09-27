@@ -17,6 +17,7 @@ describe("resolveLayout", () => {
         paper: { name: "a4", auto: true, width: 595.28, height: 841.89 },
         orientation: "portrait",
         margins: allMargins(cm(2.5)),
+        newPageBefore: [],
       },
       settings: DEFAULT_PAGE,
       problems: [],
@@ -89,6 +90,7 @@ describe("pageGeometry", () => {
         size: "a4",
         orientation: "landscape",
         margins: { top: 10, right: 20, bottom: 30, left: 40 },
+        newPageBefore: [],
       },
       "de-DE",
     );
@@ -130,9 +132,14 @@ describe("differences", () => {
     expect(
       differences(
         DEFAULT_PAGE,
-        { size: "a5", orientation: "landscape", margins: allMargins(72) },
+        {
+          size: "a5",
+          orientation: "landscape",
+          margins: allMargins(72),
+          newPageBefore: [1],
+        },
         "de-DE",
       ),
-    ).toEqual(["size", "orientation", "margins"]);
+    ).toEqual(["size", "orientation", "margins", "newPageBefore"]);
   });
 });

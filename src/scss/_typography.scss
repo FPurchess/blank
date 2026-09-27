@@ -140,6 +140,36 @@ hr {
   margin: 2rem 0;
 }
 
+// a page break: a dashed line with its name, unlike a rule
+hr.page-break {
+  position: relative;
+  height: 0;
+  overflow: visible;
+  border: 0;
+  border-top: 1px dashed var(--color);
+  opacity: 0.45;
+
+  &::after {
+    content: "Page break";
+    position: absolute;
+    top: -0.65em;
+    left: 50%;
+    padding: 0 0.6em;
+    font-size: 0.7em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color);
+    background-color: var(--background-color);
+    transform: translateX(-50%);
+  }
+
+  &.ProseMirror-selectednode {
+    opacity: 1;
+    outline: 2px solid var(--color);
+    outline-offset: 4px;
+  }
+}
+
 // Tables are set in the body size, with a bold header and a caption one step
 // down. The PDF and Word exports mirror these values.
 table {

@@ -58,6 +58,17 @@ export const TABLE_CELL_PADDING_X = TABLE_PADDING.x * BODY_SIZE;
 // below it: enough for the caption, the header row and a first row
 const CAPTION_ROOM = 72;
 
+// a horizontal rule: the top line of an empty one-cell table, like the
+// editor's 1px line
+export const RULE_LAYOUT = {
+  hLineWidth: (index: number) => (index === 0 ? 0.75 : 0),
+  vLineWidth: () => 0,
+  paddingLeft: () => 0,
+  paddingRight: () => 0,
+  paddingTop: () => 0,
+  paddingBottom: () => 0,
+};
+
 type PageNode = {
   headlineLevel?: number;
   style?: string;
@@ -114,6 +125,8 @@ export const BASE_DOCUMENT = {
         italics: true,
       },
     ),
+    // 2em of space around it, like in the editor
+    horizontal_rule: { margin: [0, 14, 0, 22] },
   },
 };
 

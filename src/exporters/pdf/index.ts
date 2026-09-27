@@ -16,6 +16,7 @@ import {
   pageBreakBefore,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
+  RULE_LAYOUT,
 } from "./template";
 import { withFallback } from "./fallback";
 import { tableBlock } from "./table";
@@ -102,7 +103,6 @@ const edgeless = (n: Node, context: PdfContext) =>
     ...(index === n.childCount - 1 ? { marginBottom: 0 } : {}),
   }));
 
-// TODO: support horizontal lines
 const transformNode = (n: Node, context: PdfContext) => {
   const link = n.marks.find((mark: Mark) => mark.type.name === "link");
   const item = {
@@ -124,6 +124,7 @@ const transformNode = (n: Node, context: PdfContext) => {
     ...(link ? { link: link.attrs.href as string } : {}),
     headlineLevel:
       n.type.name === "heading" ? (n.attrs.level as number) : undefined,
+    pageBreak: undefined as "before" | "after" | undefined,
   };
 
   switch (n.type.name) {
@@ -147,6 +148,23 @@ const transformNode = (n: Node, context: PdfContext) => {
         // @ts-expect-error
         item.ul.push(transformNode(node, context));
       });
+      break;
+
+    case "page_break":
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.text = "";
+      item.pageBreak = "after";
+      break;
+
+    case "horizontal_rule":
+      // a table as wide as the text around it, with only its top line
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.table = { widths: ["*"], body: [[{ text: "", fontSize: 1 }]] };
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      item.layout = RULE_LAYOUT;
       break;
 
     case "hard_break":
@@ -252,6 +270,29 @@ const adjustMargins = (content: Block[]) =>
   });
 
 /**
+ * withoutLeadingBreak leaves out a page break at the very start, which would
+ * make an empty first page: Word ignores "Page break before" on the first
+ * paragraph too, see ../docx/index.ts
+ */
+const withoutLeadingBreak = (content: Block[]) =>
+  content[0]?.style === "page_break" ? content.slice(1) : content;
+
+/**
+ * startNewPages starts the headings of `levels` on a new page, except the
+ * first block and a heading that a page break already puts on one. Headings
+ * in quotes and lists stay where they are; in Word, whose heading styles
+ * start the new pages, they start one too.
+ */
+const startNewPages = (content: Block[], levels: number[]) =>
+  content.map((block, index) =>
+    index > 0 &&
+    levels.includes(block.headlineLevel ?? 0) &&
+    content[index - 1].style !== "page_break"
+      ? { ...block, pageBreak: "before" as const }
+      : block,
+  );
+
+/**
  * embedImages loads the images of `state` as data URLs for pdfmake, which only
  * takes PNG and JPEG, sized like in the editor and at most as large as a page
  */
@@ -308,8 +349,13 @@ const toPDF: exporterFunc = async (state: EditorState, { docPath, layout }) => {
     content: { width: geometry.contentWidth, height: geometry.contentHeight },
   };
 
-  const content = adjustMargins(
-    transformNode(state.doc, context).text as unknown as Block[],
+  const content = startNewPages(
+    adjustMargins(
+      withoutLeadingBreak(
+        transformNode(state.doc, context).text as unknown as Block[],
+      ),
+    ),
+    layout.newPageBefore,
   );
   const { title, author } = readProperties(state.doc.attrs.frontmatter);
   // pdfmake tells the footer how many pages there are

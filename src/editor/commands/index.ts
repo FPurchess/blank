@@ -1,4 +1,5 @@
 export { default as exportAs } from "./exportAs";
+export { default as insertBlock } from "./insertBlock";
 export { default as insertNode } from "./insertNode";
 export { default as newFile } from "./newFile";
 export { default as openFile } from "./openFile";

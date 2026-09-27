@@ -7,12 +7,17 @@ import {
   languagePicker,
   linkDialog,
   type LinkDialogRequest,
+  pageSetupRequests,
   path,
   spellcheck,
   spellcheckMessage,
   spellcheckStatus,
   textContent,
+  transaction,
 } from "./state";
+import { config } from "./config";
+import { schema } from "./markdown";
+import { createState } from "./test/editor";
 import { closePicker, move, openPicker, typeChar } from "./languagePicker";
 import { flushPromises } from "./test/async";
 
@@ -120,6 +125,7 @@ describe("ui language chooser", () => {
 
     expect([...footer.children].map((child) => child.id)).toEqual([
       "ui-stats",
+      "ui-page",
       "ui-spellcheck",
       "ui-language",
     ]);
@@ -192,6 +198,61 @@ describe("ui language chooser", () => {
     uiLanguage()!.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+});
+
+describe("ui page button", () => {
+  const uiPage = () => document.querySelector<HTMLElement>("#ui-page")!;
+  const withFrontmatter = (frontmatter: string | null) =>
+    createState(schema.node("doc", { frontmatter }, [schema.node("paragraph")]))
+      .tr;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    transaction.value = null;
+    stubNotification("granted");
+    bootUI();
+  });
+
+  it("shows the paper of the region and its orientation", () => {
+    // jsdom's locale is en-US
+    expect(uiPage().textContent).toBe("Letter (portrait)");
+    expect(uiPage().getAttribute("role")).toBe("button");
+    expect(uiPage().title).toBe("Page setup (Mod-Alt-u)");
+  });
+
+  it("follows the page setup of the document", () => {
+    transaction.value = withFrontmatter(
+      "page:\n  size: a4\n  orientation: landscape",
+    );
+    expect(uiPage().textContent).toBe("A4 (landscape)");
+
+    transaction.value = withFrontmatter("page:\n  size: 170mm x 240mm");
+    expect(uiPage().textContent).toBe("6.69 × 9.45 in (portrait)");
+  });
+
+  it("follows the user's default", () => {
+    const before = config.value;
+    try {
+      config.value = {
+        ...before,
+        layout: { page: { ...before.layout.page, size: "a5" } },
+      };
+      expect(uiPage().textContent).toBe("A5 (portrait)");
+    } finally {
+      config.value = before;
+    }
+  });
+
+  it("opens the page setup when clicked, keeping the focus", () => {
+    const before = pageSetupRequests.value;
+    const mousedown = new MouseEvent("mousedown", { cancelable: true });
+
+    uiPage().dispatchEvent(mousedown);
+    uiPage().click();
+
+    expect(mousedown.defaultPrevented).toBe(true);
+    expect(pageSetupRequests.value).toBe(before + 1);
   });
 });
 

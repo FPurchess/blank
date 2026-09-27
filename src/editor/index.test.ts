@@ -6,6 +6,8 @@ import {
   type ImageDialogRequest,
   linkDialog,
   type LinkDialogRequest,
+  pageSetup,
+  pageSetupRequests,
   transaction,
 } from "../state";
 import { mockCliArgs } from "../test/tauri";
@@ -82,6 +84,16 @@ describe("bootEditor", () => {
     vi.advanceTimersByTime(100);
 
     expect(document.activeElement).not.toBe(editor());
+  });
+
+  it("opens the page setup when asked from outside, e.g. the bottom bar", () => {
+    pageSetup.value = null;
+
+    pageSetupRequests.value += 1;
+
+    // the welcome document has no frontmatter
+    expect(pageSetup.value).toMatchObject({ frontmatter: null });
+    pageSetup.value = null;
   });
 
   it("publishes every transaction", () => {
