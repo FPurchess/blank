@@ -11,10 +11,29 @@ export interface LinkRules {
   validateLink(url: string): boolean;
 }
 
+export interface NormalizeOptions {
+  // gives a table without header cells a header row, as a pipe table needs
+  // one, e.g. a table imported from Word
+  promoteHeader?: boolean;
+}
+
 // the largest span HTML allows
 const MAX_SPAN = 1000;
 // what separates the cells of a nested table that became text
 export const CELL_SEPARATOR = " | ";
+
+/**
+ * rename replaces `element` with an element named `tag` that has the same
+ * attributes and children
+ */
+export const rename = (element: Element, tag: string) => {
+  const renamed = element.ownerDocument.createElement(tag);
+  for (const { name, value } of [...element.attributes]) {
+    renamed.setAttribute(name, value);
+  }
+  renamed.append(...element.childNodes);
+  element.replaceWith(renamed);
+};
 
 /**
  * rowsOf returns the rows of `table` in reading order, without those of
@@ -152,14 +171,15 @@ const rectangular = (rows: HTMLTableRowElement[]) => {
  * normalizeTableHtml turns the HTML `table` into one the schema holds exactly:
  * its caption goes into `data-caption`, nested tables become text, cells keep
  * only their spans and alignment, and the grid becomes rectangular
+ * @returns how many nested tables became text
  */
 export const normalizeTableHtml = (
   table: HTMLTableElement,
   links: LinkRules,
-) => {
-  for (const inner of [...table.querySelectorAll("table")].reverse()) {
-    flatten(inner);
-  }
+  { promoteHeader = false }: NormalizeOptions = {},
+): number => {
+  const nested = [...table.querySelectorAll("table")].reverse();
+  for (const inner of nested) flatten(inner);
 
   const caption = table.querySelector(":scope > caption");
   for (const { name } of [...table.attributes]) table.removeAttribute(name);
@@ -182,6 +202,10 @@ export const normalizeTableHtml = (
   for (const row of rows) cellsOf(row).forEach(cleanCell);
   rectangular(rows);
   cleanLinks(table, links);
+  if (promoteHeader && rows.length && !table.querySelector("th")) {
+    cellsOf(rows[0]).forEach((cell) => rename(cell, "th"));
+  }
+  return nested.length;
 };
 
 /**

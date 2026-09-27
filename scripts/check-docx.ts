@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 
+import { JSDOM } from "jsdom";
 import { EditorState } from "prosemirror-state";
 import { parseMarkdown, schema } from "../src/markdown";
 
@@ -17,6 +18,9 @@ if (!input) {
   console.error("usage: bun scripts/check-docx.ts <input.md> [output.docx]");
   process.exit(2);
 }
+
+// the markdown parser reads HTML tables with the DOM, which bun doesn't have
+globalThis.DOMParser = new JSDOM().window.DOMParser;
 
 // the app reads local images through the Tauri fs plugin, which doesn't run
 // here, so they are inlined as data: URLs

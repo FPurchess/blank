@@ -2,6 +2,8 @@ import type {
   IParagraphOptions,
   ParagraphChild,
   INumberingOptions,
+  Paragraph,
+  Table,
 } from "docx";
 import type { Mark, Node } from "prosemirror-model";
 
@@ -14,11 +16,19 @@ import {
   prepareImages,
 } from "../../images/prepare";
 import { CONTENT_HEIGHT, CONTENT_WIDTH, POINTS_PER_PIXEL } from "../page";
+import {
+  cellShare,
+  hasTallRows,
+  tableGrid,
+  type GridCell,
+  type TableGrid,
+} from "../table";
 import { fixPackage } from "./fixups";
 import { FRONTMATTER_PROPERTY } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
+  CONTENT_WIDTH_TWIPS,
   FONT,
   HEADING_AFTER_HEADING_SPACING,
   LIST_HANGING,
@@ -29,6 +39,10 @@ import {
   QUOTE_INDENT,
   STYLE,
   STYLES,
+  TABLE_BORDERS,
+  TABLE_CELL_MARGINS,
+  TABLE_HEADER_BORDER,
+  TABLE_HEADER_SHADING,
   orderedLevels,
 } from "./template";
 
@@ -66,12 +80,20 @@ interface Position {
 
 const TOP: Position = { quotes: 0, inQuote: false, level: -1 };
 
+// a paragraph, or a table, which is a block of its own in Word
+type Block = IParagraphOptions | Table;
+
+// Word measures images in pixels, and tables in twentieths of a point
+const twipsToPixels = (twips: number) => twips / 20 / POINTS_PER_PIXEL;
+
 class Serializer {
   // the ordered list starts that need a numbering definition
   private starts = new Set<number>();
   // each list gets its own numbering instance, so it counts from its start
   private instances = 0;
   private imageCount = 0;
+  // images in the cell being serialized fit its width
+  private maxImageWidth = MAX_IMAGE_WIDTH;
 
   constructor(
     private docx: Docx,
@@ -95,10 +117,12 @@ class Serializer {
    * lines up with the text of its list item and its blockquotes
    */
   private indent(position: Position) {
-    const left =
-      QUOTE_INDENT * position.quotes +
-      (position.level >= 0 ? LIST_INDENT * (position.level + 1) : 0);
+    const left = indentOf(position);
     return left ? { indent: { left } } : {};
+  }
+
+  isTable(block: Block): block is Table {
+    return block instanceof this.docx.Table;
   }
 
   /**
@@ -112,13 +136,13 @@ class Serializer {
     return { border: { left: QUOTE_BORDER } };
   }
 
-  blocks(parent: Node, position: Position): IParagraphOptions[] {
-    const blocks: IParagraphOptions[] = [];
+  blocks(parent: Node, position: Position): Block[] {
+    const blocks: Block[] = [];
     parent.forEach((node) => blocks.push(...this.block(node, position)));
     return blocks;
   }
 
-  private block(node: Node, position: Position): IParagraphOptions[] {
+  private block(node: Node, position: Position): Block[] {
     const { HeadingLevel } = this.docx;
 
     switch (node.type.name) {
@@ -171,13 +195,16 @@ class Serializer {
       case "ordered_list":
         return this.list(node, position);
 
+      case "table":
+        return this.table(node, position);
+
       default:
         // there are no other block nodes in the markdown schema
         return [];
     }
   }
 
-  private list(node: Node, position: Position): IParagraphOptions[] {
+  private list(node: Node, position: Position): Block[] {
     const ordered = node.type.name === "ordered_list";
     const start = (node.attrs.order as number | undefined) ?? 1;
     if (ordered) this.starts.add(start);
@@ -187,7 +214,7 @@ class Serializer {
     const level = position.level + 1;
     const itemPosition = { ...position, inQuote: false, level };
 
-    const blocks: IParagraphOptions[] = [];
+    const blocks: Block[] = [];
     node.forEach((item) => {
       item.forEach((child, _, index) => {
         if (index === 0 && child.type.name === "paragraph") {
@@ -215,14 +242,103 @@ class Serializer {
       });
     });
     // a list is spaced from the next block like a paragraph, also when it is tight
-    const last = blocks.length - 1;
-    if (position.level < 0 && last >= 0) {
-      blocks[last] = {
-        ...blocks[last],
-        spacing: { ...blocks[last].spacing, after: BLOCK_SPACING },
+    const last = blocks[blocks.length - 1];
+    if (position.level < 0 && last && !this.isTable(last)) {
+      blocks[blocks.length - 1] = {
+        ...last,
+        spacing: { ...last.spacing, after: BLOCK_SPACING },
       };
     }
     return blocks;
+  }
+
+  /**
+   * table writes a table like the PDF: the header rows repeat on every page,
+   * rows stay whole unless they might not fit on one, and the caption goes
+   * above the table in Word's caption style
+   */
+  private table(node: Node, position: Position): Block[] {
+    const { Table, TableRow, TableCell, TableLayoutType, TextRun, WidthType } =
+      this.docx;
+    const grid = tableGrid(node);
+    const left = indentOf(position);
+    const width = CONTENT_WIDTH_TWIPS - left;
+    const cantSplit = !hasTallRows(node);
+    const rows = grid.rows.map(
+      (cells, index) =>
+        new TableRow({
+          // only set when true: docx writes false ones, which mammoth reads
+          // as true
+          ...(index < grid.headerRows ? { tableHeader: true } : {}),
+          ...(cantSplit ? { cantSplit } : {}),
+          // Word adds the cells that continue a merged cell itself
+          children: cells
+            .filter((cell): cell is GridCell => cell !== null)
+            .map(
+              (cell) =>
+                new TableCell({
+                  children: this.cellContent(cell, grid, width),
+                  ...(cell.colspan > 1 ? { columnSpan: cell.colspan } : {}),
+                  ...(cell.rowspan > 1 ? { rowSpan: cell.rowspan } : {}),
+                  margins: TABLE_CELL_MARGINS,
+                  ...(cell.header ? { shading: TABLE_HEADER_SHADING } : {}),
+                  ...(cell.row + cell.rowspan === grid.headerRows
+                    ? { borders: { bottom: TABLE_HEADER_BORDER } }
+                    : {}),
+                }),
+            ),
+        }),
+    );
+    const table = new Table({
+      rows,
+      width: { size: width, type: WidthType.DXA },
+      columnWidths: grid.widths.map((share) => Math.round(share * width)),
+      layout: TableLayoutType.FIXED,
+      borders: TABLE_BORDERS,
+      ...(left ? { indent: { size: left, type: WidthType.DXA } } : {}),
+    });
+    const caption = node.attrs.caption as string | null;
+    if (!caption) return [table];
+    return [
+      {
+        style: STYLE.caption,
+        children: [new TextRun(caption)],
+        ...this.indent(position),
+      },
+      table,
+    ];
+  }
+
+  /**
+   * cellContent writes the blocks of `cell`, aligned like the cell, in the
+   * table heading style in a header cell, and without space after the last
+   */
+  private cellContent(
+    cell: GridCell,
+    grid: TableGrid,
+    width: number,
+  ): (Paragraph | Table)[] {
+    const margins = TABLE_CELL_MARGINS.left + TABLE_CELL_MARGINS.right;
+    const outer = this.maxImageWidth;
+    this.maxImageWidth = twipsToPixels(cellShare(grid, cell) * width - margins);
+    const blocks = this.blocks(cell.node, TOP);
+    this.maxImageWidth = outer;
+
+    const align = cell.node.attrs.align as "left" | "center" | "right" | null;
+    return blocks.map((block, index) =>
+      this.isTable(block)
+        ? block
+        : new this.docx.Paragraph({
+            ...block,
+            ...(cell.header && !block.style
+              ? { style: STYLE.tableHeading }
+              : {}),
+            ...(align ? { alignment: align } : {}),
+            ...(index === blocks.length - 1
+              ? { spacing: { ...block.spacing, after: 0 } }
+              : {}),
+          }),
+    );
   }
 
   inline(parent: Node): ParagraphChild[] {
@@ -280,7 +396,7 @@ class Serializer {
     const image = this.images.get(src);
     if (!image) return new TextRun({ text: alt || src, italics: true });
 
-    const size = fitBox(image, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);
+    const size = fitBox(image, this.maxImageWidth, MAX_IMAGE_HEIGHT);
     return new ImageRun({
       type: IMAGE_TYPES[image.mime as keyof typeof IMAGE_TYPES],
       data: image.bytes,
@@ -297,6 +413,14 @@ class Serializer {
   }
 }
 
+/**
+ * indentOf returns the left indent of a block that isn't numbered, so it
+ * lines up with the text of its list item and its blockquotes
+ */
+const indentOf = (position: Position) =>
+  QUOTE_INDENT * position.quotes +
+  (position.level >= 0 ? LIST_INDENT * (position.level + 1) : 0);
+
 const hasMark = (node: Node, name: string) =>
   node.marks.some((mark: Mark) => mark.type.name === name);
 
@@ -310,19 +434,24 @@ const linkOf = (node: Node) => {
 /**
  * spaceTopLevel adjusts the spacing that depends on the previous block, like
  * adjustMargins in the PDF export: Word, unlike CSS, adds the space after a
- * block and the space before the next one
+ * block and the space before the next one. A table has no space after it, so
+ * the block after a table gets it before.
  */
-const spaceTopLevel = (blocks: IParagraphOptions[]) =>
+const spaceTopLevel = (blocks: Block[], serializer: Serializer) =>
   blocks.map((block, index) => {
-    if (index === 0)
-      return { ...block, spacing: { ...block.spacing, before: 0 } };
-    if (block.heading && blocks[index - 1].heading) {
-      return {
-        ...block,
-        spacing: { ...block.spacing, before: HEADING_AFTER_HEADING_SPACING },
-      };
-    }
-    return block;
+    if (serializer.isTable(block)) return block;
+    const previous = blocks[index - 1];
+    const before =
+      index === 0
+        ? 0
+        : serializer.isTable(previous)
+          ? BLOCK_SPACING
+          : block.heading && previous.heading
+            ? HEADING_AFTER_HEADING_SPACING
+            : undefined;
+    return before === undefined
+      ? block
+      : { ...block, spacing: { ...block.spacing, before } };
   });
 
 let font: Promise<Uint8Array> | undefined;
@@ -344,7 +473,7 @@ const toDOCX: exporterFunc = async (state, { docPath }) => {
   ]);
 
   const serializer = new Serializer(docx, images);
-  const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP));
+  const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP), serializer);
 
   const frontmatter = state.doc.attrs.frontmatter as string | null;
   const { title, author } = readProperties(frontmatter);
@@ -370,7 +499,9 @@ const toDOCX: exporterFunc = async (state, { docPath }) => {
     sections: [
       {
         properties: { page: PAGE },
-        children: blocks.map((block) => new docx.Paragraph(block)),
+        children: blocks.map((block) =>
+          serializer.isTable(block) ? block : new docx.Paragraph(block),
+        ),
       },
     ],
   });

@@ -16,6 +16,7 @@ import {
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
 import { withFallback } from "./fallback";
+import { tableBlock } from "./table";
 
 let fontsRegistered: Promise<void> | undefined;
 
@@ -52,7 +53,10 @@ export const hasMark = (n: Node, name: string): boolean =>
   n.marks.find((mark: Mark) => mark.type.name === name) !== undefined;
 
 // the embedded images by src: their key in the document's `images` and size
-type PdfImages = Map<string, { key: string; width: number; height: number }>;
+export type PdfImages = Map<
+  string,
+  { key: string; width: number; height: number }
+>;
 
 /**
  * imageBlock renders an image node, or its alt text if it couldn't be loaded
@@ -76,6 +80,18 @@ const hasImage = (n: Node) => {
   });
   return found;
 };
+
+/**
+ * edgeless renders the blocks of `n` as a stack whose first block has no top
+ * and whose last block no bottom margin, for a container like a quote or a
+ * table cell, whose own spacing separates it from its siblings
+ */
+const edgeless = (n: Node, images: PdfImages) =>
+  n.children.map((node, index) => ({
+    ...transformNode(node, images),
+    ...(index === 0 ? { marginTop: 0 } : {}),
+    ...(index === n.childCount - 1 ? { marginBottom: 0 } : {}),
+  }));
 
 // TODO: support horizontal lines
 const transformNode = (n: Node, images: PdfImages) => {
@@ -130,26 +146,20 @@ const transformNode = (n: Node, images: PdfImages) => {
       item.text = "\n";
       break;
 
-    case "blockquote": {
+    case "blockquote":
       // a one-cell table, so the quote gets a bar on its left like in the
-      // editor. The quote's own margin separates it from its siblings, so its
-      // first block has no top and its last block no bottom margin.
-      const stack: object[] = [];
-      n.forEach((node, _, index) => {
-        stack.push({
-          ...transformNode(node, images),
-          ...(index === 0 ? { marginTop: 0 } : {}),
-          ...(index === n.childCount - 1 ? { marginBottom: 0 } : {}),
-        });
-      });
+      // editor
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
-      item.table = { widths: ["*"], body: [[{ stack }]] };
+      item.table = { widths: ["*"], body: [[{ stack: edgeless(n, images) }]] };
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       item.layout = BLOCKQUOTE_LAYOUT;
       break;
-    }
+
+    case "table":
+      Object.assign(item, tableBlock(n, images, edgeless));
+      break;
 
     case "ordered_list":
       if (n.attrs.order !== 1) {

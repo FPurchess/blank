@@ -43,26 +43,92 @@ describe("importers.docx.cleanup", () => {
     expect(report.comments).toBe(1);
   });
 
-  it("turns tables into a paragraph per row", () => {
+  it("keeps tables, with an empty paragraph in every empty cell", () => {
     const { html, report } = clean(
       "<table><thead><tr><th><p>Name</p></th><th><p>Value</p></th></tr></thead>" +
-        "<tbody><tr><td><p>a</p><p>more</p></td><td><p><em>1</em></p></td></tr>" +
-        "<tr><td></td><td>2</td></tr></tbody></table>",
+        "<tbody><tr><td><p>a</p><p></p><p>more</p></td><td><p><em>1</em></p></td></tr>" +
+        "<tr><td><p></p></td><td>2</td></tr></tbody></table>",
     );
 
     expect(html).toBe(
-      "<p><strong>Name | Value</strong></p><p>a more | <em>1</em></p><p> | 2</p>",
+      "<table><thead><tr><th><p>Name</p></th><th><p>Value</p></th></tr></thead>" +
+        "<tbody><tr><td><p>a</p><p>more</p></td><td><p><em>1</em></p></td></tr>" +
+        "<tr><td><p></p></td><td>2</td></tr></tbody></table>",
     );
-    expect(report.tables).toBe(1);
+    expect(report.nestedTables).toBe(0);
   });
 
-  it("turns nested tables into text inside their cell", () => {
+  it("makes the first row the header of a table without one", () => {
+    const { html } = clean(
+      '<table><tr><td>a</td><td colspan="2">b</td></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>',
+    );
+
+    expect(html).toBe(
+      '<table><tbody><tr><th>a</th><th colspan="2">b</th></tr><tr><td>1</td><td>2</td><td>3</td></tr></tbody></table>',
+    );
+  });
+
+  it.each([
+    [
+      "before",
+      '<p class="blank-caption">Stock</p><table><tr><th>a</th></tr></table>',
+    ],
+    [
+      "after",
+      '<table><tr><th>a</th></tr></table><p class="blank-caption">Stock</p>',
+    ],
+  ])("makes a caption %s a table its caption", (_, input) => {
+    expect(clean(input).html).toBe(
+      '<table data-caption="Stock"><tbody><tr><th>a</th></tr></tbody></table>',
+    );
+  });
+
+  it("gives a caption between two tables to the table below it", () => {
+    const { html } = clean(
+      "<table><tr><th>a</th></tr></table>" +
+        '<p class="blank-caption">Second</p>' +
+        "<table><tr><th>b</th></tr></table>",
+    );
+
+    expect(html).toBe(
+      "<table><tbody><tr><th>a</th></tr></tbody></table>" +
+        '<table data-caption="Second"><tbody><tr><th>b</th></tr></tbody></table>',
+    );
+  });
+
+  it("keeps the table heading style outside tables as plain paragraphs", () => {
+    expect(clean('<p class="blank-th">heading</p>').html).toBe(
+      "<p>heading</p>",
+    );
+  });
+
+  it("keeps a caption that isn't next to a table as a paragraph", () => {
+    expect(clean('<p class="blank-caption">Figure 1</p><p>text</p>').html).toBe(
+      "<p>Figure 1</p><p>text</p>",
+    );
+  });
+
+  it("makes cells in the table heading style header cells", () => {
+    const { html } = clean(
+      '<table><tr><th>a</th><th>b</th></tr><tr><td><p class="blank-th">c</p></td>' +
+        '<td><p class="blank-th">d</p><p>e</p></td></tr></table>',
+    );
+
+    expect(html).toBe(
+      "<table><tbody><tr><th>a</th><th>b</th></tr>" +
+        "<tr><th><p>c</p></th><td><p>d</p><p>e</p></td></tr></tbody></table>",
+    );
+  });
+
+  it("turns tables inside tables into text and counts them", () => {
     const { html, report } = clean(
       "<table><tr><td><p>outer</p><table><tr><th>x</th><th>y</th></tr></table></td></tr></table>",
     );
 
-    expect(html).toBe("<p>outer <strong>x | y</strong></p>");
-    expect(report.tables).toBe(2);
+    expect(html).toBe(
+      "<table><tbody><tr><th><p>outer</p><p>x | y</p></th></tr></tbody></table>",
+    );
+    expect(report.nestedTables).toBe(1);
   });
 
   it("keeps web and mail links and unwraps the others", () => {

@@ -53,6 +53,7 @@ The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 - a heading never ends a page on its own; it moves to the next page with its text,
 - quotes keep their bar on the left and everything inside them,
 - line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3,
+- [tables](./tables#export) look like in the editor, repeat their header row on every page, and keep their rows whole,
 - links stay clickable.
 
 Images come along at the size they have in Blank, up to the width of the page. Images from the web are downloaded for the PDF, so that needs an internet connection. If an image can't be loaded, the PDF shows its description in its place, and Blank tells you which one it was.
@@ -63,7 +64,7 @@ Images come along at the size they have in Blank, up to the width of the page. I
 
 When someone needs your text in Word, press `Mod` `Alt` `W`. Blank suggests your document's name with `.docx`.
 
-The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, and links and images come along. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
+The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, and links and images come along. Tables become real Word tables, with their header row repeated on every page, merged cells and their caption in Word's caption style. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
 
 Your markdown file stays exactly as it is. The document's title and author come along, and so do the [properties](#frontmatter) at the top of your file: open the Word document in Blank again and they're back, including the ones Word has no place for. If someone changed the title or author in Word, you get their version.
 
@@ -79,11 +80,12 @@ Blank never writes to the Word document you opened. It won't even save markdown 
 
 ### What comes along {#what-comes-along}
 
-Headings, bold and italic text, links, lists, quotes, code, line breaks and images make it into your document. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
+Headings, bold and italic text, links, lists, quotes, code, line breaks, images and tables make it into your document. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
 
 Word can do more than markdown, so a few things change on the way:
 
-- tables become one line per row, with the cells separated by `|`,
+- a table inside a table cell becomes text, one line per row with the cells separated by `|`,
+- the alignment of table columns is left out,
 - footnotes move to the end of the document,
 - comments, headers and footers, underlining and colours are left out,
 - tracked changes count as accepted,
@@ -91,7 +93,7 @@ Word can do more than markdown, so a few things change on the way:
 - numbered lists start at 1.
 
 ::: tip Nothing gets lost unnoticed
-Right after opening, Blank tells you what changed, for example _1 table became text_ or _2 comments left out_.
+Right after opening, Blank tells you what changed, for example _1 table inside a table became text_ or _2 comments left out_.
 :::
 
 ### Back and forth with Word users {#back-and-forth}
@@ -102,7 +104,7 @@ A colleague sends you a Word document to work on:
 2. Write, and keep your version with `Mod` `S`, as markdown.
 3. Send it back with `Mod` `Alt` `W`.
 
-On their side, headings, quotes, lists, links and images arrive as they know them from Word. Tables come back as text, one line per row.
+On their side, headings, quotes, lists, links, images and tables arrive as they know them from Word. When they send it back, only the alignment of table columns needs setting again.
 
 ## Good to know {#good-to-know}
 

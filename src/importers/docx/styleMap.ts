@@ -7,6 +7,11 @@
 // marks the paragraphs of a horizontal line, which are empty and so need a
 // class to survive until src/importers/docx/cleanup.ts turns them into <hr>
 export const HORIZONTAL_LINE_CLASS = "blank-hr";
+// marks caption paragraphs, which cleanup.ts moves into the table next to them
+export const CAPTION_CLASS = "blank-caption";
+// marks the paragraphs of header cells: cleanup.ts makes a cell that holds
+// only such paragraphs a header cell, e.g. in a header column
+export const TABLE_HEADING_CLASS = "blank-th";
 
 const paragraphs = (names: string[], html: string) =>
   names.map((name) => `p[style-name='${name}'] => ${html}`);
@@ -33,6 +38,14 @@ export const STYLE_MAP = [
   ),
   // Blank and LibreOffice
   ...paragraphs(["Horizontal Line"], `p.${HORIZONTAL_LINE_CLASS}:fresh`),
+  // table captions: Word and Blank, pandoc, LibreOffice. cleanup.ts makes the
+  // one next to a table its caption.
+  ...paragraphs(
+    ["Caption", "Table Caption", "Table"],
+    `p.${CAPTION_CLASS}:fresh`,
+  ),
+  // Blank and LibreOffice
+  ...paragraphs(["Table Heading"], `p.${TABLE_HEADING_CLASS}:fresh`),
   // renders comments, only to count them (see cleanup.ts)
   "comment-reference => sup",
 ];

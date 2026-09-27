@@ -4,6 +4,7 @@ import { schema } from "../../markdown";
 
 import {
   blockquote,
+  captioned,
   createState,
   createTestView,
   doc,
@@ -12,6 +13,10 @@ import {
   li,
   ol,
   p,
+  table,
+  td,
+  th,
+  tr,
   typeText,
   ul,
 } from "../../test/editor";
@@ -24,7 +29,14 @@ import {
   LIST_ITEM_BLOCK_MARGIN_TOP,
 } from "./template";
 import { FALLBACK_FONT } from "./fallback";
-import { CONTENT_HEIGHT, CONTENT_WIDTH, PAGE_MARGIN } from "../page";
+import { tableLayout } from "./table";
+import { TABLE_COLORS } from "../table";
+import {
+  CONTENT_HEIGHT,
+  CONTENT_WIDTH,
+  PAGE_HEIGHT,
+  PAGE_MARGIN,
+} from "../page";
 import { IMAGES, dataUrl } from "../../test/images";
 import { rasterize } from "../../images/codec";
 
@@ -561,5 +573,186 @@ describe("exporter.pdf pageBreakBefore", () => {
 
   it("never breaks before other blocks", () => {
     expect(BASE_DOCUMENT.pageBreakBefore(body, nodes([]))).toBe(false);
+  });
+
+  it("moves a caption without room for its table below it", () => {
+    const caption = (top: number) => ({
+      style: "table_caption",
+      startPosition: { top },
+    });
+    const bottom = PAGE_HEIGHT - PAGE_MARGIN;
+
+    expect(
+      BASE_DOCUMENT.pageBreakBefore(caption(bottom - 40), nodes([body])),
+    ).toBe(true);
+    expect(
+      BASE_DOCUMENT.pageBreakBefore(caption(bottom - 200), nodes([body])),
+    ).toBe(false);
+  });
+});
+
+describe("exporter.pdf tables", () => {
+  type TableBlock = {
+    style: string;
+    table: {
+      headerRows: number;
+      keepWithHeaderRows?: number;
+      dontBreakRows: boolean;
+      widths: string[];
+      body: Record<string, unknown>[][];
+    };
+    layout: ReturnType<typeof tableLayout>;
+    stack?: object[];
+  };
+  const exportTable = async (node: ReturnType<typeof table>) => {
+    const { definition } = await exportDoc(doc(node));
+    return (definition.content as unknown as TableBlock[])[0];
+  };
+
+  it("renders a table with its header rows, widths and cells", async () => {
+    const block = await exportTable(
+      table(
+        tr(th("Name"), th("Qty", { align: "right" })),
+        tr(td("Apples"), td("3", { align: "right" })),
+      ),
+    );
+
+    expect(block.style).toBe("table");
+    expect(block.table).toMatchObject({
+      headerRows: 1,
+      keepWithHeaderRows: 1,
+      dontBreakRows: true,
+      widths: ["66.667%", "33.333%"],
+    });
+    expect(block.table.body).toMatchObject([
+      [
+        {
+          bold: true,
+          fillColor: TABLE_COLORS.headerFill,
+          stack: [{ text: [text("Name")] }],
+        },
+        { bold: true, alignment: "right" },
+      ],
+      [
+        { stack: [{ style: "paragraph", marginTop: 0, marginBottom: 0 }] },
+        { alignment: "right" },
+      ],
+    ]);
+    expect(block.table.body[1][0]).not.toHaveProperty("bold");
+  });
+
+  it("gives merged cells their spans and pdfmake an empty cell where they reach", async () => {
+    const block = await exportTable(
+      table(
+        tr(th("a", { colspan: 2 })),
+        tr(td("b", { rowspan: 2 }), td("c")),
+        tr(td("d")),
+      ),
+    );
+
+    expect(block.table.body).toMatchObject([
+      [{ colSpan: 2 }, {}],
+      [{ rowSpan: 2 }, { stack: [{ text: [text("c")] }] }],
+      [{}, { stack: [{ text: [text("d")] }] }],
+    ]);
+    expect(block.table.body[0][1]).toEqual({});
+    expect(block.table.body[2][0]).toEqual({});
+  });
+
+  it("keeps the blocks of a cell apart, without space around them", async () => {
+    const block = await exportTable(
+      table(tr(th("a")), tr(td([p("one"), ul(li(p("two")))]))),
+    );
+
+    expect(block.table.body[1][0]).toMatchObject({
+      stack: [
+        { style: "paragraph", marginTop: 0 },
+        { ul: [{}], marginBottom: 0 },
+      ],
+    });
+  });
+
+  it("lets rows break across pages when a cell might not fit on one", async () => {
+    const block = await exportTable(
+      table(tr(th("a")), tr(td("x".repeat(700)))),
+    );
+
+    expect(block.table.dontBreakRows).toBe(false);
+  });
+
+  it("doesn't repeat a table without a header row", async () => {
+    const block = await exportTable(table(tr(td("a")), tr(td("b"))));
+
+    expect(block.table.headerRows).toBe(0);
+    expect(block.table).not.toHaveProperty("keepWithHeaderRows");
+  });
+
+  it("puts the caption above the table", async () => {
+    const block = await exportTable(
+      captioned("Stock", tr(th("a")), tr(td("b"))),
+    );
+
+    expect(block.style).toBe("table");
+    expect(block.stack).toMatchObject([
+      { text: "Stock", style: "table_caption" },
+      { table: { headerRows: 1 } },
+    ]);
+  });
+
+  const imageTable = (src: string) =>
+    table(
+      tr(th("a"), th("b".repeat(40))),
+      tr(
+        td(schema.node("paragraph", null, [schema.node("image", { src })])),
+        td("x"),
+      ),
+    );
+  const cellImage = (block: TableBlock) =>
+    (block.table.body[1][0].stack as { stack: object[] }[])[0].stack[0] as {
+      width: number;
+      height: number;
+    };
+
+  it("keeps the size of an image that fits its cell", async () => {
+    const block = await exportTable(
+      imageTable(dataUrl("image/png", IMAGES.png)),
+    );
+
+    expect(cellImage(block)).toMatchObject({
+      width: 3 * 0.75,
+      height: 2 * 0.75,
+    });
+  });
+
+  it("fits a large image to its cell", async () => {
+    vi.mocked(rasterize).mockResolvedValue({
+      bytes: Uint8Array.from(atob(IMAGES.png), (c) => c.charCodeAt(0)),
+      mime: "image/png",
+      size: { width: 4000, height: 1000 },
+    });
+    const block = await exportTable(
+      imageTable(dataUrl("image/webp", IMAGES.webpLossy)),
+    );
+
+    // the first column is 3 of 43 characters wide, less its padding
+    const cellWidth = (3 / 43) * CONTENT_WIDTH - 2 * 0.7 * 11;
+    expect(cellImage(block).width).toBeCloseTo(cellWidth);
+    expect(cellImage(block).height).toBeCloseTo(cellWidth / 4);
+  });
+
+  it("draws lines like the editor: none at the top and sides", () => {
+    const layout = tableLayout(1);
+    const node = { table: { widths: ["50%", "50%"] } };
+
+    expect([0, 1, 2, 3].map((i) => layout.hLineWidth(i))).toEqual([
+      0, 1.2, 0.6, 0.6,
+    ]);
+    expect([0, 1, 2].map((i) => layout.vLineWidth(i, node))).toEqual([
+      0, 0.6, 0,
+    ]);
+    expect(layout.hLineColor(1)).toBe(TABLE_COLORS.headerLine);
+    expect(layout.hLineColor(2)).toBe(TABLE_COLORS.line);
+    expect(layout.vLineColor()).toBe(TABLE_COLORS.line);
+    expect(tableLayout(0).hLineWidth(1)).toBe(0.6);
   });
 });

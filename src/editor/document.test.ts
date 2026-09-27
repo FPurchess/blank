@@ -228,13 +228,13 @@ describe("readDocumentFromFile with a Word document", () => {
   it("reports what the import left out", async () => {
     vi.mocked(importDocx).mockResolvedValue({
       doc: imported,
-      warnings: ["1 table became text", "2 comments left out"],
+      warnings: ["1 table inside a table became text", "2 comments left out"],
     });
 
     await readDocumentFromFile(emptyState(), "/report.docx");
 
     expect(sendNotification).toHaveBeenCalledWith(
-      "Imported report.docx. Save it with Mod+S as a markdown file. 1 table became text. 2 comments left out",
+      "Imported report.docx. Save it with Mod+S as a markdown file. 1 table inside a table became text. 2 comments left out",
     );
   });
 
