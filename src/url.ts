@@ -1,4 +1,4 @@
-import { defaultMarkdownParser } from "prosemirror-markdown";
+import { markdownParser } from "./markdown";
 
 /**
  * normalizeUrl trims the url and percent-encodes whitespace, `<` and `>`,
@@ -16,7 +16,7 @@ export const normalizeUrl = (url: string) =>
  * @returns boolean
  */
 export const isSavableUrl = (url: string) =>
-  defaultMarkdownParser.tokenizer.validateLink(url);
+  markdownParser.tokenizer.validateLink(url);
 
 /**
  * isAbsoluteUrl checks whether url is a complete url with a scheme,

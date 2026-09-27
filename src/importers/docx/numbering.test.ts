@@ -82,8 +82,12 @@ describe("importers.docx.normalizeNumbering", () => {
       ),
     });
 
-    expect(await normalizeNumbering(withoutNumbering)).toBe(withoutNumbering);
-    expect(await normalizeNumbering(plain)).toBe(plain);
+    for (const bytes of [withoutNumbering, plain]) {
+      const zip = await JSZip.loadAsync(bytes);
+      const before = await zip.generateAsync({ type: "string" });
+      expect(await normalizeNumbering(zip)).toBe(false);
+      expect(await zip.generateAsync({ type: "string" })).toBe(before);
+    }
   });
 
   it("rewrites the numbering of documents with level overrides", async () => {
@@ -94,7 +98,8 @@ describe("importers.docx.normalizeNumbering", () => {
       ),
     });
 
-    const zip = await JSZip.loadAsync(await normalizeNumbering(bytes));
+    const zip = await JSZip.loadAsync(bytes);
+    expect(await normalizeNumbering(zip)).toBe(true);
     const xml = await zip.file("word/numbering.xml")!.async("string");
 
     expect(xml).toContain('w:abstractNumId="3"');

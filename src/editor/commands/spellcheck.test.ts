@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../markdown";
 
 import { doc, keyEvent, p } from "../../test/editor";
 import {

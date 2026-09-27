@@ -63,7 +63,8 @@
     "prosemirror-schema-basic": "^1.2.5",
     "prosemirror-schema-list": "^1.5.1",
     "prosemirror-state": "^1.4.4",
-    "prosemirror-view": "^1.42.6"
+    "prosemirror-view": "^1.42.6",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

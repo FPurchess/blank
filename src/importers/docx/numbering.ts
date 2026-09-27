@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import type JSZip from "jszip";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const NUMBERING = "word/numbering.xml";
@@ -63,14 +63,13 @@ export const inlineLevelOverrides = (xml: string): string | null => {
 /**
  * normalizeNumbering rewrites the numbering of a .docx for mammoth, see
  * inlineLevelOverrides
- * @param bytes the .docx file
- * @returns the .docx file, rewritten if it had to be
+ * @param zip the unpacked .docx file, changed in place
+ * @returns whether it had to be rewritten
  */
-export const normalizeNumbering = async (bytes: Uint8Array) => {
-  const zip = await JSZip.loadAsync(bytes);
+export const normalizeNumbering = async (zip: JSZip) => {
   const xml = await zip.file(NUMBERING)?.async("string");
   const normalized = xml === undefined ? null : inlineLevelOverrides(xml);
-  if (normalized === null) return bytes;
+  if (normalized === null) return false;
   zip.file(NUMBERING, normalized);
-  return zip.generateAsync({ type: "uint8array" });
+  return true;
 };

@@ -1,4 +1,4 @@
-import { schema } from "prosemirror-markdown";
+import { schema } from "../markdown";
 import type { Node } from "prosemirror-model";
 import {
   EditorState,
@@ -8,7 +8,7 @@ import {
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-// Node builders for the stock markdown schema the app uses.
+// Node builders for Blank's markdown schema (src/markdown).
 
 const text = (content?: string) => (content ? [schema.text(content)] : []);
 
@@ -25,6 +25,9 @@ export const ul = (...items: Node[]) => schema.node("bullet_list", null, items);
 export const ol = (...items: Node[]) =>
   schema.node("ordered_list", null, items);
 export const doc = (...blocks: Node[]) => schema.node("doc", null, blocks);
+// a document of a file that starts with `frontmatter`
+export const docWithFrontmatter = (frontmatter: string, ...blocks: Node[]) =>
+  schema.node("doc", { frontmatter }, blocks);
 
 export interface StateOptions {
   // "end" (default), a cursor position or a [from, to] text selection

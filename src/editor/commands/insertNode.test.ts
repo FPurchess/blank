@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../markdown";
 
 import {
   codeBlock,

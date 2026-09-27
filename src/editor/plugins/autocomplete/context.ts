@@ -1,6 +1,6 @@
 import type { EditorState, TextSelection } from "prosemirror-state";
 import type { ResolvedPos } from "prosemirror-model";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../markdown";
 
 import { config, type AutocorrectConfig } from "../../../config";
 import { language } from "../../../state";

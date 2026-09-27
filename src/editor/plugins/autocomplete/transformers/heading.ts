@@ -1,6 +1,6 @@
 import { EditorView } from "prosemirror-view";
 import { setBlockType } from "prosemirror-commands";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../../markdown";
 
 import type { BlockTransformer } from "../types";
 import { applyBlockCommand } from "./util";

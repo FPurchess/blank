@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
-import { defaultMarkdownParser, schema } from "prosemirror-markdown";
+import { markdownParser, schema } from "../../markdown";
 
 import { IMAGES, dataUrl } from "../../test/images";
 import toPDF, { hasMark } from "./index";
@@ -33,7 +33,7 @@ const decode = (bytes: Uint8Array) => new TextDecoder("latin1").decode(bytes);
 describe("exporters.pdf", () => {
   describe("hasMark", () => {
     it("detects marks on a node", () => {
-      const doc = defaultMarkdownParser.parse("**bold** plain");
+      const doc = markdownParser.parse("**bold** plain");
       const [bold, plain] = [
         doc.firstChild!.child(0),
         doc.firstChild!.child(1),
@@ -50,7 +50,7 @@ describe("exporters.pdf", () => {
     it("renders a markdown document to a valid PDF", async () => {
       const state = EditorState.create({
         schema,
-        doc: defaultMarkdownParser.parse(SAMPLE),
+        doc: markdownParser.parse(SAMPLE),
       });
 
       const { contents: bytes, warnings } = await toPDF(state, {
@@ -68,7 +68,7 @@ describe("exporters.pdf", () => {
     it("embeds the medium, bold, italic and fallback faces", async () => {
       const state = EditorState.create({
         schema,
-        doc: defaultMarkdownParser.parse(SAMPLE + "\n***both*** ⇒\n"),
+        doc: markdownParser.parse(SAMPLE + "\n***both*** ⇒\n"),
       });
 
       const text = decode((await toPDF(state, { docPath: null })).contents);
@@ -89,7 +89,7 @@ describe("exporters.pdf", () => {
     it("renders links as clickable link annotations", async () => {
       const state = EditorState.create({
         schema,
-        doc: defaultMarkdownParser.parse("see [Blank](https://blank.app)"),
+        doc: markdownParser.parse("see [Blank](https://blank.app)"),
       });
 
       const text = decode((await toPDF(state, { docPath: null })).contents);
@@ -100,7 +100,7 @@ describe("exporters.pdf", () => {
     it("embeds images", async () => {
       const state = EditorState.create({
         schema,
-        doc: defaultMarkdownParser.parse(
+        doc: markdownParser.parse(
           `text ![pixel](${dataUrl("image/png", IMAGES.png)}) text`,
         ),
       });

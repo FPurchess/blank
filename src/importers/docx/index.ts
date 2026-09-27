@@ -1,10 +1,15 @@
 import { DOMParser as SchemaParser, type Node } from "prosemirror-model";
-import { schema } from "prosemirror-markdown";
 
 import { toDataUrl } from "../../images/dataUrl";
 import { optimizeForMarkdown } from "../../images/optimize";
+import {
+  firstHeading,
+  readProperties,
+  schema,
+  setProperties,
+} from "../../markdown";
 import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
-import { normalizeNumbering } from "./numbering";
+import { type WordProperties, prepareDocx } from "./prepare";
 import { STYLE_MAP } from "./styleMap";
 import { readZipDirectory } from "./zipGuard";
 
@@ -34,6 +39,24 @@ const describe = (report: ReturnType<typeof cleanup>, errors: string[]) => [
 ];
 
 /**
+ * frontmatterOf returns the frontmatter of an imported document: the one
+ * Blank kept in a document it exported, with the title and author Word has
+ * now, since they may have been changed there
+ */
+const frontmatterOf = (properties: WordProperties, doc: Node) => {
+  const kept = properties.frontmatter ?? null;
+  const before = readProperties(kept);
+  const values: Record<string, string | undefined> = {};
+  // the exports fall back to the first heading, so a title that matches it
+  // needs no frontmatter
+  const title =
+    properties.title === firstHeading(doc) ? undefined : properties.title;
+  if (properties.title !== before.title) values.title = title;
+  if (properties.author !== before.author) values.author = properties.author;
+  return setProperties(kept, values);
+};
+
+/**
  * importDocx converts a Word document into a markdown document. Images are
  * kept inside it as data: URLs.
  * @param bytes the .docx file
@@ -44,7 +67,7 @@ export const importDocx = async (bytes: Uint8Array): Promise<ImportResult> => {
   // refuses what isn't a Word document, or unpacks to too much
   readZipDirectory(bytes);
   const { default: mammoth } = await import("mammoth");
-  const docx = await normalizeNumbering(bytes);
+  const { bytes: docx, properties } = await prepareDocx(bytes);
 
   const { value: html, messages } = await mammoth.convertToHtml(
     // the browser build of mammoth reads `arrayBuffer`, the Node build (in
@@ -80,7 +103,11 @@ export const importDocx = async (bytes: Uint8Array): Promise<ImportResult> => {
   // an inert document: nothing in it runs or loads
   const dom = new DOMParser().parseFromString(html, "text/html");
   const report = cleanup(dom);
-  const doc = SchemaParser.fromSchema(schema).parse(dom.body);
+  const body = SchemaParser.fromSchema(schema).parse(dom.body);
+  const doc = body.type.create(
+    { frontmatter: frontmatterOf(properties, body) },
+    body.content,
+  );
 
   const errors = messages
     .filter((message) => message.type === "error")

@@ -25,6 +25,24 @@ Everything you write is kept as markdown: plain text with a few marks like `#` f
 
 The open dialog shows your markdown files and Word documents together. Closed Blank without saving? It keeps your text anyway, see [Blank remembers your document](./writing#blank-remembers-your-document).
 
+### Properties on top of the file {#frontmatter}
+
+Notes from Obsidian, pandoc or a static site generator often start with a few properties between two `---` lines, called frontmatter:
+
+```md
+---
+title: The Lighthouse
+author: Ada Lovelace
+tags: [sea, light]
+---
+
+# Chapter 1
+```
+
+Blank keeps this block exactly as it is, down to the comments and spacing, and saves it back unchanged. Instead of the raw lines, a quiet line above your text sums it up: _The Lighthouse · by Ada Lovelace · tags_.
+
+The `title` and `author` also go into your PDF and Word documents, where readers and search show them. Without a `title`, Blank uses your first heading.
+
 ## Share a PDF {#pdf}
 
 Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your document's name with `.pdf`.
@@ -47,7 +65,7 @@ When someone needs your text in Word, press `Mod` `Alt` `W`. Blank suggests your
 
 The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, and links and images come along. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
 
-Your markdown file stays exactly as it is.
+Your markdown file stays exactly as it is. The document's title and author come along, and so do the [properties](#frontmatter) at the top of your file: open the Word document in Blank again and they're back, including the ones Word has no place for. If someone changed the title or author in Word, you get their version.
 
 ### Open a Word document {#open-word-documents}
 

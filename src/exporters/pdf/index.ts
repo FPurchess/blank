@@ -4,6 +4,7 @@ import { Node, Mark } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 
 import { type exporterFunc } from "../../exporters";
+import { firstHeading, readProperties } from "../../markdown";
 import { toDataUrl } from "../../images/dataUrl";
 import { fitBox } from "../../images/fit";
 import { failureWarning, prepareImages } from "../../images/prepare";
@@ -265,7 +266,14 @@ const toPDF: exporterFunc = async (state: EditorState, { docPath }) => {
   const content = adjustMargins(
     transformNode(state.doc, bySrc).text as unknown as Block[],
   );
+  const { title, author } = readProperties(state.doc.attrs.frontmatter);
   const docDefinition = Object.assign({}, BASE_DOCUMENT, {
+    // shown by PDF viewers and read by search engines and screen readers
+    info: {
+      title: title ?? firstHeading(state.doc),
+      ...(author ? { author } : {}),
+      creator: "Blank",
+    },
     content,
     images: byKey,
   });

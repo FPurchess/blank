@@ -1,7 +1,7 @@
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../markdown";
 
 import {
   contextMenu as contextMenuState,
@@ -16,6 +16,7 @@ import {
   keymap,
   languagePicker,
   openLink,
+  properties,
   spellcheck,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
@@ -40,6 +41,7 @@ export const bootEditor = async () => {
         keymap(),
         openLink(),
         images(),
+        properties(),
       ],
     }),
   );

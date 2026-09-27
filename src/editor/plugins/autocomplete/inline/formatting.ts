@@ -1,4 +1,4 @@
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../../markdown";
 import type { MarkType } from "prosemirror-model";
 
 import { CLOSERS, OPENERS, charClass, strip, type Context } from "../context";

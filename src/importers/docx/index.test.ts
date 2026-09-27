@@ -3,16 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import {
-  defaultMarkdownParser,
-  defaultMarkdownSerializer,
-  schema,
-} from "prosemirror-markdown";
+import { parseMarkdown, schema, serializeMarkdown } from "../../markdown";
 
 import toDOCX from "../../exporters/docx";
 import type { Node } from "prosemirror-model";
 
 import { blockquote, createState, doc, p } from "../../test/editor";
+import { rewriteDocx } from "../../test/docx";
 import { IMAGES, dataUrl } from "../../test/images";
 import { importDocx } from ".";
 
@@ -30,20 +27,31 @@ const fixture = (name: string) =>
 
 const toMarkdown = async (bytes: Uint8Array) => {
   const { doc, warnings } = await importDocx(bytes);
-  return { markdown: defaultMarkdownSerializer.serialize(doc), warnings, doc };
+  return { markdown: serializeMarkdown(doc), warnings, doc };
+};
+
+const exportDocx = async (markdown: string | Node) => {
+  const doc = typeof markdown === "string" ? parseMarkdown(markdown) : markdown;
+  return (await toDOCX(createState(doc), { docPath: null })).contents;
 };
 
 /**
  * roundTrip exports `markdown` as a Word document and imports it again
  */
-const roundTrip = async (markdown: string | Node) => {
-  const doc =
-    typeof markdown === "string"
-      ? defaultMarkdownParser.parse(markdown)
-      : markdown;
-  const { contents } = await toDOCX(createState(doc), { docPath: null });
-  return (await toMarkdown(contents)).markdown;
-};
+const roundTrip = async (markdown: string | Node) =>
+  (await toMarkdown(await exportDocx(markdown))).markdown;
+
+// sets the title and author of a Word document, like Word's File → Info
+const setCore = (bytes: Uint8Array, title: string, author: string) =>
+  rewriteDocx(bytes, "docProps/core.xml", (xml = "") =>
+    xml
+      .replace(/<dc:(title|creator)>[^<]*<\/dc:\1>/g, "")
+      .replace(
+        /<cp:coreProperties[^>]*>/,
+        (start) =>
+          `${start}<dc:title>${title}</dc:title><dc:creator>${author}</dc:creator>`,
+      ),
+  );
 
 const PNG = dataUrl("image/png", IMAGES.png);
 
@@ -67,6 +75,53 @@ describe("importers.docx", () => {
       ].join("\n\n");
 
       expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps the frontmatter as it was written", async () => {
+      const markdown =
+        "---\n# notes\ntitle: The Lighthouse\nauthor: [Ada, Grace]\ntags: [sea]\n---\n\n# Chapter 1\n\ntext";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("adds no frontmatter to a document without it", async () => {
+      const markdown = "# Report\n\ntext";
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("takes the title and author changed in Word", async () => {
+      const exported = await exportDocx(
+        "---\ntitle: Draft\ntags: [sea]\n---\n\n# Chapter 1",
+      );
+
+      const { markdown } = await toMarkdown(
+        await setCore(exported, "The Lighthouse", "Ada"),
+      );
+
+      expect(markdown).toBe(
+        "---\ntitle: The Lighthouse\ntags: [sea]\nauthor: Ada\n---\n\n# Chapter 1",
+      );
+    });
+
+    it("drops the title and author removed in Word", async () => {
+      const exported = await exportDocx(
+        "---\ntitle: Draft\nauthor: Ada\ntags: [sea]\n---\n\n# Chapter 1",
+      );
+
+      const { markdown } = await toMarkdown(await setCore(exported, "", ""));
+
+      expect(markdown).toBe("---\ntags: [sea]\n---\n\n# Chapter 1");
+    });
+
+    it("keeps frontmatter it can't read, whatever Word changed", async () => {
+      const exported = await exportDocx("---\ntitle: a: b\n---\n\n# Chapter 1");
+
+      const { markdown } = await toMarkdown(
+        await setCore(exported, "The Lighthouse", "Ada"),
+      );
+
+      expect(markdown).toBe("---\ntitle: a: b\n---\n\n# Chapter 1");
     });
 
     // what a Word document written by Blank can't carry back, one test each so
@@ -148,7 +203,7 @@ describe("importers.docx", () => {
 
   it("writes the alt text of images it can't import", async () => {
     const { contents } = await toDOCX(
-      createState(defaultMarkdownParser.parse(`![Chart](${PNG})`)),
+      createState(parseMarkdown(`![Chart](${PNG})`)),
       { docPath: null },
     );
     // replace the embedded image with an EMF, which the webview can't decode

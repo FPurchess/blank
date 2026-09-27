@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Plugin } from "prosemirror-state";
 import type { EditorView, MarkViewConstructor } from "prosemirror-view";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../markdown";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 

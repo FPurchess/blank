@@ -1,0 +1,80 @@
+import JSZip from "jszip";
+
+import { FRONTMATTER_PROPERTY } from "../../exporters/docx/properties";
+import { normalizeNumbering } from "./numbering";
+
+// Reads what mammoth leaves out of a .docx and rewrites what it would get
+// wrong, on the package unpacked once.
+
+const CORE = "docProps/core.xml";
+const CUSTOM = "docProps/custom.xml";
+const DC = "http://purl.org/dc/elements/1.1/";
+// Word's placeholder for documents nobody named an author for
+const NO_AUTHOR = "Un-named";
+
+export interface WordProperties {
+  title?: string;
+  author?: string;
+  // the frontmatter of a document Blank exported, see
+  // src/exporters/docx/index.ts
+  frontmatter?: string;
+}
+
+const parseXml = async (zip: JSZip, name: string) => {
+  const xml = await zip.file(name)?.async("string");
+  if (xml === undefined) return null;
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  return doc.getElementsByTagName("parsererror").length ? null : doc;
+};
+
+const textOf = (doc: Document, namespace: string, name: string) =>
+  doc.getElementsByTagNameNS(namespace, name)[0]?.textContent?.trim() ||
+  undefined;
+
+/**
+ * readWordProperties reads the title and author of a Word document, and the
+ * frontmatter Blank keeps in its custom properties
+ */
+export const readWordProperties = async (
+  zip: JSZip,
+): Promise<WordProperties> => {
+  const properties: WordProperties = {};
+  const core = await parseXml(zip, CORE);
+  if (core) {
+    const title = textOf(core, DC, "title");
+    const author = textOf(core, DC, "creator");
+    if (title) properties.title = title;
+    if (author && author !== NO_AUTHOR) properties.author = author;
+  }
+  const custom = await parseXml(zip, CUSTOM);
+  const property = custom
+    ? [...custom.getElementsByTagName("*")].find(
+        (element) =>
+          element.localName === "property" &&
+          element.getAttribute("name") === FRONTMATTER_PROPERTY,
+      )
+    : undefined;
+  if (property) properties.frontmatter = property.textContent ?? "";
+  return properties;
+};
+
+export interface PreparedDocx {
+  // the .docx file for mammoth
+  bytes: Uint8Array;
+  properties: WordProperties;
+}
+
+/**
+ * prepareDocx unpacks a .docx once to read its properties and to rewrite what
+ * mammoth would get wrong
+ * @param bytes the .docx file
+ * @returns the file for mammoth, rewritten if it had to be, and its properties
+ */
+export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
+  const zip = await JSZip.loadAsync(bytes);
+  const rewritten = await normalizeNumbering(zip);
+  return {
+    bytes: rewritten ? await zip.generateAsync({ type: "uint8array" }) : bytes,
+    properties: await readWordProperties(zip),
+  };
+};

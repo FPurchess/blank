@@ -1,5 +1,5 @@
 import type { Command, EditorState } from "prosemirror-state";
-import { defaultMarkdownSerializer } from "prosemirror-markdown";
+import { serializeMarkdown } from "../../markdown";
 
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -56,7 +56,7 @@ export const _saveFile = async (state: EditorState, options: Options) => {
       }
     }
 
-    const content = defaultMarkdownSerializer.serialize(state.doc) ?? "";
+    const content = serializeMarkdown(state.doc);
     await writeTextFile(target, content);
     // only a successful write moves the document to the new file
     path.value = target;

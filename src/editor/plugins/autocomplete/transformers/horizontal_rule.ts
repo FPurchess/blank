@@ -1,6 +1,6 @@
 import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../../markdown";
 
 import { dispatchCorrection } from "../history";
 import type { BlockTransformer } from "../types";

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { defaultMarkdownParser, schema } from "prosemirror-markdown";
+import { parseMarkdown, schema } from "../../markdown";
 import type { Node } from "prosemirror-model";
 
 import { createState } from "../../test/editor";
@@ -33,8 +33,7 @@ const exportDoc = async (doc: Node, docPath: string | null = null) => {
   return { zip, warnings, xml, text } satisfies Exported;
 };
 
-const exportMarkdown = (markdown: string) =>
-  exportDoc(defaultMarkdownParser.parse(markdown));
+const exportMarkdown = (markdown: string) => exportDoc(parseMarkdown(markdown));
 
 const all = (root: Document | Element, tag: string) => [
   ...root.getElementsByTagNameNS(W, tag),
@@ -298,7 +297,40 @@ describe("exporter.docx", () => {
     ).text("docProps/core.xml");
 
     expect(core).toMatch(/<dc:title>Report<\/dc:title>/);
-    expect(core).toMatch(/<dc:creator>Blank<\/dc:creator>/);
+    // Word would show "Blank" as the author
+    expect(core).not.toMatch(/Blank/);
+  });
+
+  it("takes the title and author from the frontmatter", async () => {
+    const core = await (
+      await exportMarkdown(
+        "---\ntitle: The Lighthouse\nauthor: [Ada, Grace]\n---\n\n# Chapter 1",
+      )
+    ).text("docProps/core.xml");
+
+    expect(core).toMatch(/<dc:title>The Lighthouse<\/dc:title>/);
+    expect(core).toMatch(/<dc:creator>Ada, Grace<\/dc:creator>/);
+    expect(core).toMatch(/<cp:lastModifiedBy>Ada, Grace<\/cp:lastModifiedBy>/);
+  });
+
+  it("keeps the frontmatter in a custom property", async () => {
+    const frontmatter = "# kept\ntags: [a, b]\ntitle: <Hi & bye>";
+    const exported = await exportMarkdown(`---\n${frontmatter}\n---\n\ntext`);
+
+    const custom = await exported.xml("docProps/custom.xml");
+    const property = [...custom.getElementsByTagName("property")].find(
+      (element) => element.getAttribute("name") === "BlankFrontmatter",
+    );
+    expect(property?.textContent).toBe(frontmatter);
+  });
+
+  it("writes no custom property without frontmatter", async () => {
+    const exported = await exportMarkdown("text");
+
+    const custom = exported.zip.file("docProps/custom.xml");
+    expect(custom ? await custom.async("string") : "").not.toMatch(
+      /BlankFrontmatter/,
+    );
   });
 
   it("leaves out the empty comments that Google Drive rejects", async () => {
