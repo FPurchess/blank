@@ -18,13 +18,13 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "lint": "eslint src && tsc",
-    "lint:fix": "eslint --fix src && tsc",
-    "format": "prettier --write --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
-    "format:check": "prettier --check --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
+    "lint": "eslint src && vue-tsc",
+    "lint:fix": "eslint --fix src && vue-tsc",
+    "format": "prettier --write --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,vue,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
+    "format:check": "prettier --check --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,vue,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "fonts:vfs": "bun scripts/build-pdf-vfs.ts",
     "dictionaries:update": "bun scripts/build-dictionary-catalog.ts",
     "test": "vitest run",
@@ -71,9 +71,12 @@
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.11.5",
     "@types/pdfmake": "^0.3.3",
+    "@vitejs/plugin-vue": "^6.0.9",
     "@vitest/coverage-v8": "5.0.2",
+    "@vue/eslint-config-typescript": "^14.9.0",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.11.1",
     "fontkit": "^2.0.4",
     "globals": "^17.12.0",
     "husky": "^9.1.7",
@@ -82,8 +85,8 @@
     "prettier": "3.9.9",
     "sass-embedded": "^1.105.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.2",
+    "vue-tsc": "^3.3.11"
   }
 }

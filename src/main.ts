@@ -34,9 +34,9 @@ const showBootError = (error: unknown) => {
     bootState();
     await bootConfig();
     await bootStorage();
-    await bootEditor();
+    const editor = await bootEditor();
     editorReady = true;
-    bootUI();
+    bootUI(editor);
     // doesn't wait for the dictionary, which may need a download
     bootSpellcheck();
   } catch (error) {

@@ -90,6 +90,18 @@ describe("tableTools", () => {
       expect(announcement.value?.text).toBe("Split cell isn't possible here");
     });
 
+    it("keeps its items while scrolling, and makes new ones on a change", () => {
+      setup();
+      const before = toolbar();
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(toolbar()).not.toBe(before);
+      expect(toolbar().items).toBe(before.items);
+
+      select("pear");
+      expect(toolbar().items).not.toBe(before.items);
+    });
+
     it("hides the toolbar when the editor goes away", () => {
       setup();
       view.destroy();

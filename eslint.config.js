@@ -1,17 +1,19 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
-import tseslint from "typescript-eslint";
+import pluginVue from "eslint-plugin-vue";
+import { vueTsConfigs, withVueTs } from "@vue/eslint-config-typescript";
+import prettier from "eslint-config-prettier/flat";
 
-/** @type {import('eslint').Linter.Config[]} */
-export default [
-  { files: ["**/*.{js,mjs,cjs,ts}"] },
+export default withVueTs(
+  { files: ["**/*.{js,mjs,cjs,ts,vue}"] },
   { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
+  pluginVue.configs["flat/recommended"],
+  vueTsConfigs.recommended,
   {
     // Blank's schema has tables and keeps the frontmatter, and node types of
     // two schemas can't be mixed: use src/markdown instead
-    files: ["src/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/**/*.{ts,vue}", "scripts/**/*.ts"],
     ignores: ["src/markdown/**"],
     rules: {
       "no-restricted-imports": [
@@ -32,4 +34,6 @@ export default [
       ],
     },
   },
-];
+  // Prettier formats everything, so no layout rules
+  prettier,
+);

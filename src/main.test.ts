@@ -6,11 +6,15 @@ import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
 import { deferred, flushPromises } from "./test/async";
+import { createTestHandle } from "./test/editor";
 
 vi.mock("./config", () => ({ bootConfig: vi.fn() }));
 vi.mock("./storage", () => ({ bootStorage: vi.fn() }));
 vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
+
+// the handle the mocked bootEditor returns
+const editor = createTestHandle();
 
 // main.ts only runs its side effects on the first import
 const importMain = async () => {
@@ -20,9 +24,9 @@ const importMain = async () => {
 
 describe("main", () => {
   beforeEach(() => {
-    for (const boot of [bootConfig, bootStorage, bootEditor]) {
-      vi.mocked(boot).mockResolvedValue(undefined);
-    }
+    vi.mocked(bootConfig).mockResolvedValue(undefined);
+    vi.mocked(bootStorage).mockResolvedValue(undefined);
+    vi.mocked(bootEditor).mockResolvedValue(editor);
     document.body.replaceChildren();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -39,7 +43,8 @@ describe("main", () => {
     config.resolve();
     await flushPromises();
 
-    expect(bootUI).toHaveBeenCalled();
+    // the UI works with the editor through the handle bootEditor returns
+    expect(bootUI).toHaveBeenCalledWith(editor);
     const order = [bootConfig, bootStorage, bootEditor, bootUI].map(
       (boot) => vi.mocked(boot).mock.invocationCallOrder[0],
     );

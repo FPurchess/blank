@@ -31,15 +31,16 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 These arrived or are arriving outside the plan's PRs:
 - `#table-handles` (`src/tableHandles.ts`, table mouse handles, merged in #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
 - `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for.
-- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests`, `bandRequests`. Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
+- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests` (a counter) and `bandRequests` (#66, `{ band, insert? } | null`, set back to null once handled). Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
+- Context menu (PR C): keep #68's paste fallback `pasteText(view, text, plain)` and its copy fallback `view.serializeForClipboard` in `src/editor/contextMenu/model.ts`.
 
 ## Status
 
 | PR | Scope | State |
 |---|---|---|
 | 0 | Prep, no Vue: helpers out of UI files, `uiRoot()`, `dispose` | done (#64) |
-| A | `src/state/` with Vue refs replacing `observable.ts`, sync watchers | in review (#67) |
-| B | SFC tooling, `App`, `useEditor`, table toolbar (go/no-go gate) | not started |
+| A | `src/state/` with Vue refs replacing `observable.ts`, sync watchers | done (#67) |
+| B | SFC tooling, `App`, `useEditor`, table toolbar (go/no-go gate) | in review (#69) |
 | C | Table picker and context menu | not started |
 | D | Link and image dialogs, `surfaces.ts` registry | not started |
 | E | Page setup, delete `dialog.ts` | not started |
@@ -49,10 +50,18 @@ These arrived or are arriving outside the plan's PRs:
 ## Gate after PR B
 
 All of these must hold, or the migration stops and PR B is reverted:
-- `tables.e2e.ts` and `tableToolbar.test.ts` pass.
+- `tables.e2e.ts` and `src/ui/TableToolbar.test.ts` pass.
 - The table recordings show no unplaced or flickering frame.
 - p95 is at most 2 ms per toolbar update while scrolling a long document in `tauri dev`.
 - With the keyboard only, the editor never loses focus.
 - A button can close the toolbar from inside its own handler.
 
-Record the measured result here.
+Result (PR B): passed.
+- E2E: 11/11 specs, including every toolbar test.
+- The table recordings show no unplaced or flickering frame; differences from main are only capture timing.
+- Cost per toolbar update while scrolling, measured in the debug app under xvfb (599 updates each):
+  - old imperative toolbar: mean 0.39 ms, p95 1 ms, max 8 ms
+  - Vue, first version: mean 1.15 ms, p95 2 ms, max 4 ms
+  - Vue with `ToolbarButton` and stable items: mean 0.54 ms, p95 1 ms, max 2 ms
+- `performance.now()` is only accurate to about 1 ms there, so the mean is the better comparison.
+- Closing the toolbar from its own button's handler works (unit test).

@@ -1,3 +1,4 @@
+import { createEditorHandle } from "../editor/handle";
 import { schema } from "../markdown";
 import type { Node } from "prosemirror-model";
 import {
@@ -102,9 +103,17 @@ export const createTestView = (state: EditorState): EditorView => {
     updateState(next: EditorState) {
       view.state = next;
     },
+    focus() {},
   };
   return view as unknown as EditorView;
 };
+
+/**
+ * createTestHandle returns an editor handle, as useEditor gives components,
+ * on a test view of `state`
+ */
+export const createTestHandle = (state = createState(doc(p()))) =>
+  createEditorHandle(createTestView(state)).handle;
 
 /**
  * keyEvent builds a keydown event from a ProseMirror style key name such as

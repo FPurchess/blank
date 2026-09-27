@@ -622,7 +622,7 @@ body {
   }
 }
 
-// the toolbar of the table the cursor is in, see src/tableToolbar.ts
+// the toolbar of the table the cursor is in, see src/ui/TableToolbar.vue
 .table-toolbar {
   position: fixed;
   // below .dialog-backdrop, so a dialog covers it

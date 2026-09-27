@@ -1,5 +1,6 @@
 // Line icons for the table toolbar, drawn on a 20 × 20 grid with round ends
-// in the text colour, so they follow the theme.
+// in the text colour, so they follow the theme. IconGlyph (src/ui/components)
+// draws them.
 
 const TABLE_ICONS: Record<string, string> = {
   "row-above": "M4 9h12v8H4z M4 13h12 M10 2v5 M7.5 4.5h5",
@@ -26,21 +27,9 @@ const TABLE_ICONS: Record<string, string> = {
   "table-delete": "M4 6h12 M8 6V4h4v2 M6 6l1 10h6l1-10 M9 9v4.5 M11 9v4.5",
 };
 
-const SVG = "http://www.w3.org/2000/svg";
-
 /**
- * icon returns the icon `name` as an SVG element, hidden from screen readers,
- * since its button is labelled
+ * iconPath returns the SVG path of the icon `name`, drawn on a 20 × 20 grid
  */
-export const icon = (name: string): SVGSVGElement => {
-  const svg = document.createElementNS(SVG, "svg");
-  svg.setAttribute("viewBox", "0 0 20 20");
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("icon");
-  const path = document.createElementNS(SVG, "path");
-  path.setAttribute("d", TABLE_ICONS[name] ?? "");
-  svg.appendChild(path);
-  return svg;
-};
+export const iconPath = (name: string) => TABLE_ICONS[name] ?? "";
 
 export const iconNames = Object.keys(TABLE_ICONS);
