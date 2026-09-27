@@ -13,6 +13,9 @@ export interface BlockTransformer<T> {
   activate: (line: string) => undefined | T;
   // returns whether the block was transformed
   transform: (view: EditorView, line: string, props: T) => boolean;
+  // applies in a list or quote in a table cell too. Plain cell text keeps
+  // every shortcut as typed, so e.g. "1. " stays text in a table.
+  inCells?: boolean;
 }
 
 /**

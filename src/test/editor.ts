@@ -1,4 +1,4 @@
-import { schema } from "prosemirror-markdown";
+import { schema } from "../editor/schema";
 import type { Node } from "prosemirror-model";
 import {
   EditorState,
@@ -8,7 +8,7 @@ import {
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-// Node builders for the stock markdown schema the app uses.
+// Node builders for the schema the app uses: the markdown schema with tables.
 
 const text = (content?: string) => (content ? [schema.text(content)] : []);
 
@@ -25,6 +25,26 @@ export const ul = (...items: Node[]) => schema.node("bullet_list", null, items);
 export const ol = (...items: Node[]) =>
   schema.node("ordered_list", null, items);
 export const doc = (...blocks: Node[]) => schema.node("doc", null, blocks);
+
+type CellContent = string | Node | Node[];
+type CellAttrs = { colspan?: number; rowspan?: number; align?: string | null };
+
+// a cell holds a paragraph with `content` if it's text, or the given blocks
+const cellBlocks = (content: CellContent) =>
+  typeof content === "string"
+    ? [p(content)]
+    : Array.isArray(content)
+      ? content
+      : [content];
+
+export const th = (content: CellContent = "", attrs: CellAttrs = {}) =>
+  schema.node("table_header", attrs, cellBlocks(content));
+export const td = (content: CellContent = "", attrs: CellAttrs = {}) =>
+  schema.node("table_cell", attrs, cellBlocks(content));
+export const tr = (...cells: Node[]) => schema.node("table_row", null, cells);
+export const table = (...rows: Node[]) => schema.node("table", null, rows);
+export const captioned = (caption: string, ...rows: Node[]) =>
+  schema.node("table", { caption }, rows);
 
 export interface StateOptions {
   // "end" (default), a cursor position or a [from, to] text selection

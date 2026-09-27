@@ -1,4 +1,4 @@
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../schema";
 
 import { isSavableUrl } from "../../../../url";
 import type { Context } from "../context";

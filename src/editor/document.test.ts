@@ -3,7 +3,8 @@ import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
 import { history, undo } from "prosemirror-history";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { defaultMarkdownParser, schema } from "prosemirror-markdown";
+import { schema } from "./schema";
+import { parser } from "./markdown";
 
 import { getMatches } from "@tauri-apps/plugin-cli";
 import { exists, readFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
@@ -77,7 +78,7 @@ describe("setDefaultDocument", () => {
   it("should set the welcome document to the editor state", () => {
     const newState = setDefaultDocument(emptyState());
 
-    expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+    expect(newState.doc).toEqual(parser.parse(welcomeMessage));
     expect(transaction.value).not.toBeNull();
     expect(_path.value).toBeNull();
   });
@@ -126,9 +127,7 @@ describe("readDocumentFromFile", () => {
 
     const newState = await readDocumentFromFile(emptyState(), "/doc.md");
 
-    expect(newState?.doc).toEqual(
-      defaultMarkdownParser.parse("# Hello, world!"),
-    );
+    expect(newState?.doc).toEqual(parser.parse("# Hello, world!"));
     expect(readTextFile).toHaveBeenCalledWith("/doc.md");
     expect(transaction.value).not.toBeNull();
     expect(_path.value).toBe("/doc.md");
@@ -385,7 +384,7 @@ describe("applyInitialDocument", () => {
 
       const newState = await applyInitialDocument(withHistory());
 
-      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(newState.doc).toEqual(parser.parse(welcomeMessage));
       expect(undo(newState)).toBe(false);
     });
   });
@@ -397,7 +396,7 @@ describe("applyInitialDocument", () => {
 
     const newState = await applyInitialDocument(emptyState());
 
-    expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+    expect(newState.doc).toEqual(parser.parse(welcomeMessage));
   });
   it("should notify and fall back when the command-line arguments are invalid", async () => {
     vi.mocked(getMatches).mockRejectedValue(
@@ -461,7 +460,7 @@ describe("applyInitialDocument", () => {
     it("should back it up and fall back to the welcome document", async () => {
       const newState = await applyInitialDocument(emptyState());
 
-      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(newState.doc).toEqual(parser.parse(welcomeMessage));
       expect(await localforage.getItem("doc-backup")).toEqual(corrupt);
       expect(sendNotification).toHaveBeenCalledOnce();
       expect(sendNotification).toHaveBeenCalledWith(
@@ -474,7 +473,7 @@ describe("applyInitialDocument", () => {
 
       const newState = await applyInitialDocument(emptyState());
 
-      expect(newState.doc).toEqual(defaultMarkdownParser.parse(welcomeMessage));
+      expect(newState.doc).toEqual(parser.parse(welcomeMessage));
       expect(sendNotification).toHaveBeenCalledWith(
         expect.not.stringContaining("doc-backup"),
       );

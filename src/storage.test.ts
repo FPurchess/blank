@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
-import { schema } from "prosemirror-markdown";
+import { schema } from "./editor/schema";
 import { Node } from "prosemirror-model";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -343,7 +343,7 @@ describe("storage", () => {
 
       const restored = await getDocumentFromStorage();
 
-      expect(restored?.eq(stored)).toBe(true);
+      expect(restored?.toJSON()).toEqual(stored.toJSON());
     });
   });
 

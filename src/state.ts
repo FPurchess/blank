@@ -100,6 +100,21 @@ export const languagePicker = new Observable<LanguagePickerState>({
   invalid: false,
 });
 
+export interface TablePickerState {
+  // the size of the table Enter inserts, the header row included
+  cols: number;
+  rows: number;
+  // where to show the picker, in viewport coordinates
+  anchor: { left: number; top: number; bottom: number };
+  // inserts a table of the given size
+  submit(cols: number, rows: number): void;
+  // closes the picker without inserting a table
+  cancel(): void;
+}
+
+// tablePicker is the open picker for the size of a new table, or null
+export const tablePicker = new Observable<TablePickerState | null>(null);
+
 // spellcheck is whether spelling is checked, which the user turns on and off
 export const spellcheck = new Observable<boolean>(false);
 

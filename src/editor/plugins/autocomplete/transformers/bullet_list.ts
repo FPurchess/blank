@@ -1,6 +1,6 @@
 import { EditorView } from "prosemirror-view";
 import { wrapInList } from "prosemirror-schema-list";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../../schema";
 
 import type { BlockTransformer } from "../types";
 import { applyBlockCommand } from "./util";
@@ -11,6 +11,7 @@ type Props = boolean;
 
 const _transformer: BlockTransformer<Props> = {
   trigger: "space",
+  inCells: true,
   activate: (line: string): Props | undefined =>
     cmds.includes(line) || undefined,
   transform: (view: EditorView, line: string): boolean =>

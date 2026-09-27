@@ -11,6 +11,7 @@ import {
   languagePicker,
   linkDialog,
   path,
+  tablePicker,
   theme,
   themes,
 } from "../../state";
@@ -26,6 +27,10 @@ import {
   p,
   pressKey,
   type StateOptions,
+  table,
+  td,
+  th,
+  tr,
   ul,
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
@@ -188,6 +193,42 @@ describe("plugin.keymap", () => {
     press("Enter");
 
     expect(view.state.doc.toJSON()).toEqual(doc(p("text"), p()).toJSON());
+  });
+
+  describe("in table cells", () => {
+    const inCell = () => doc(table(tr(th("head")), tr(td("text"))), p());
+    // the end of "text": table, header row, row, cell and paragraph open
+    const cursor = (node: Node) =>
+      node.firstChild!.firstChild!.nodeSize + 5 + 4;
+
+    it.each(["Mod-1", "Mod-6", "Mod-h"])("%s does nothing", (combo) => {
+      const node = inCell();
+      const { view, press } = setup(node, { cursor: cursor(node) });
+
+      expect(press(combo)).toBe(false);
+      expect(view.state.doc.eq(node)).toBe(true);
+    });
+
+    it("Mod-8 starts a list in the cell", () => {
+      const node = inCell();
+      const { view, press } = setup(node, { cursor: cursor(node) });
+
+      press("Mod-8");
+      const cell = view.state.doc.firstChild!.lastChild!.firstChild!;
+      expect(cell.firstChild!.type.name).toBe("bullet_list");
+    });
+  });
+
+  it("Mod-t opens the table picker", () => {
+    const { view, press } = setup(doc(p()), { cursor: 1 });
+    Object.assign(view, {
+      coordsAtPos: () => ({ left: 0, top: 0, bottom: 0 }),
+      focus: () => {},
+    });
+
+    expect(press("Mod-t")).toBe(true);
+    expect(tablePicker.value).toMatchObject({ cols: 3, rows: 3 });
+    tablePicker.value = null;
   });
 
   it("Mod-z undoes and Mod-Shift-z redoes", () => {

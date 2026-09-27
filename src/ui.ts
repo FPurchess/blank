@@ -19,6 +19,7 @@ import { languageName } from "./spellcheck/service";
 import { bootContextMenu } from "./contextMenu";
 import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
+import { bootTablePicker } from "./tablePicker";
 import { basename } from "./paths";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -188,6 +189,7 @@ export const bootUI = () => {
   bootLinkDialog();
   bootImageDialog();
   bootContextMenu();
+  bootTablePicker();
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);

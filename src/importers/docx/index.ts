@@ -1,5 +1,5 @@
 import { DOMParser as SchemaParser, type Node } from "prosemirror-model";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../../editor/schema";
 
 import { toDataUrl } from "../../images/dataUrl";
 import { optimizeForMarkdown } from "../../images/optimize";

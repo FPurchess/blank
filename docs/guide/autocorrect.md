@@ -35,6 +35,10 @@ Dashes follow LibreOffice: the dash is set once the word after it is complete, s
 
 The [block shortcuts](./writing#format-as-you-type) at the start of a line, like `#` or `-`, are the group `blocks`.
 
+## Tables
+
+Table cells often hold values rather than sentences, so the first word of a cell isn't capitalized, and `1. `, `- ` or `> ` at the start of a cell stay text instead of starting a list or quote. Lists in a list or quote inside a cell work as usual. See [Write in a cell](./tables#cells).
+
 ## Language
 
 Quotes, sentence capitalization and dashes follow the language shown at the bottom right. Blank picks your system language on first start.

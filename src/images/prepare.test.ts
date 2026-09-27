@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../editor/schema";
 
 import { readFile } from "@tauri-apps/plugin-fs";
 

@@ -18,6 +18,7 @@ const outDir = path.resolve(
 );
 // opened from a neutral path, since the app shows it in the top bar
 const sample = path.join(os.tmpdir(), "on-writing.md");
+const tableSample = path.join(os.tmpdir(), "fruit-stock.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 
 const shot = (name: string) =>
@@ -180,6 +181,15 @@ const showKeys = (keys: string[]) =>
     overlay.style.display = labels.length ? "flex" : "none";
   }, keys.map(keyLabel));
 
+/** hides the cursor while the body has `shots-no-caret` */
+const addCaretStyle = () =>
+  browser.execute(() => {
+    const style = document.createElement("style");
+    style.textContent =
+      ".shots-no-caret .ProseMirror { caret-color: transparent; }";
+    document.head.appendChild(style);
+  });
+
 const setCaret = (visible: boolean) =>
   browser.execute((visible) => {
     document.body.classList.toggle("shots-no-caret", !visible);
@@ -196,12 +206,7 @@ describe("docs screenshots", () => {
     await type("en");
     await type(Key.Enter);
     // the stills show no cursor, the GIF shows it blinking (see Recorder)
-    await browser.execute(() => {
-      const style = document.createElement("style");
-      style.textContent =
-        ".shots-no-caret .ProseMirror { caret-color: transparent; }";
-      document.head.appendChild(style);
-    });
+    await addCaretStyle();
   });
 
   it("captures every theme", async () => {
@@ -238,6 +243,24 @@ describe("docs screenshots", () => {
 
     await type(Key.Escape);
     await pressMod(Key.Alt, "s");
+  });
+
+  it("captures a table and the table picker", async () => {
+    fs.copyFileSync(path.join(dirname, "tables.md"), tableSample);
+    await restartApp([tableSample]);
+    await addCaretStyle();
+    await setCaret(false);
+    await shot("table");
+
+    // a new table after the last paragraph, one column wider than usual
+    await $(".ProseMirror > p:last-child").click();
+    await type(Key.End);
+    await type(Key.Enter);
+    await pressMod("t");
+    await type(Key.ArrowRight);
+    await shot("table-picker");
+    await type(Key.Escape);
+    fs.rmSync(tableSample, { force: true });
   });
 
   it("records the writing demo", async () => {

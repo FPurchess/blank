@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../editor/schema";
 import type { Node } from "prosemirror-model";
 
 import { blockquote, codeBlock, doc, li, p, ul } from "../test/editor";

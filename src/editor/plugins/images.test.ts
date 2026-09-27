@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../schema";
 import type { Node } from "prosemirror-model";
 import type { EditorView, NodeView } from "prosemirror-view";
 

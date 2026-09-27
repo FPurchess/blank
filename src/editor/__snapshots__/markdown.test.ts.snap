@@ -270,6 +270,290 @@ exports[`markdown > parses the welcome document 1`] = `
       },
       "content": [
         {
+          "text": "Tables that stay out of your way",
+          "type": "text",
+        },
+      ],
+      "type": "heading",
+    },
+    {
+      "content": [
+        {
+          "text": "Press ",
+          "type": "text",
+        },
+        {
+          "marks": [
+            {
+              "type": "code",
+            },
+          ],
+          "text": "Mod",
+          "type": "text",
+        },
+        {
+          "text": " ",
+          "type": "text",
+        },
+        {
+          "marks": [
+            {
+              "type": "code",
+            },
+          ],
+          "text": "T",
+          "type": "text",
+        },
+        {
+          "text": " and Enter for a table, or type the column titles between pipes, like ",
+          "type": "text",
+        },
+        {
+          "marks": [
+            {
+              "type": "code",
+            },
+          ],
+          "text": "| Name | Qty |",
+          "type": "text",
+        },
+        {
+          "text": ", and press Enter. ",
+          "type": "text",
+        },
+        {
+          "marks": [
+            {
+              "type": "code",
+            },
+          ],
+          "text": "Tab",
+          "type": "text",
+        },
+        {
+          "text": " takes you to the next cell and adds a row at the end.",
+          "type": "text",
+        },
+      ],
+      "type": "paragraph",
+    },
+    {
+      "attrs": {
+        "caption": null,
+      },
+      "content": [
+        {
+          "content": [
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "Press",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_header",
+            },
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "To",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_header",
+            },
+          ],
+          "type": "table_row",
+        },
+        {
+          "content": [
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "marks": [
+                        {
+                          "type": "code",
+                        },
+                      ],
+                      "text": "Mod",
+                      "type": "text",
+                    },
+                    {
+                      "text": " ",
+                      "type": "text",
+                    },
+                    {
+                      "marks": [
+                        {
+                          "type": "code",
+                        },
+                      ],
+                      "text": "T",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "insert a table",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+          ],
+          "type": "table_row",
+        },
+        {
+          "content": [
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "marks": [
+                        {
+                          "type": "code",
+                        },
+                      ],
+                      "text": "Tab",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "go to the next cell or add a row",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+          ],
+          "type": "table_row",
+        },
+        {
+          "content": [
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "Arrow keys",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+            {
+              "attrs": {
+                "align": null,
+                "colspan": 1,
+                "colwidth": null,
+                "rowspan": 1,
+              },
+              "content": [
+                {
+                  "content": [
+                    {
+                      "text": "move around and out of the table",
+                      "type": "text",
+                    },
+                  ],
+                  "type": "paragraph",
+                },
+              ],
+              "type": "table_cell",
+            },
+          ],
+          "type": "table_row",
+        },
+      ],
+      "type": "table",
+    },
+    {
+      "attrs": {
+        "level": 3,
+      },
+      "content": [
+        {
           "text": "Spell check when you want it",
           "type": "text",
         },
@@ -437,6 +721,16 @@ You might be in a hurry closing Blank without saving your changes. That's no pro
 Blank comes with a hand-picked list of very unobtrusive autocompletion patterns that support your content-creation process.
 
 Type \`##\` at the beginning of a line followed by a space to create a heading level 2. Type a dash \`-\` at the beginning of a line followed by a space to create a bullet list. Type \`-->\` followed by a space to create a right-arrow \`→\`. There are some more combinations waiting for you to be explored.
+
+### Tables that stay out of your way
+
+Press \`Mod\` \`T\` and Enter for a table, or type the column titles between pipes, like \`| Name | Qty |\`, and press Enter. \`Tab\` takes you to the next cell and adds a row at the end.
+
+| Press      | To                               |
+| ---------- | -------------------------------- |
+| \`Mod\` \`T\`  | insert a table                   |
+| \`Tab\`      | go to the next cell or add a row |
+| Arrow keys | move around and out of the table |
 
 ### Spell check when you want it
 

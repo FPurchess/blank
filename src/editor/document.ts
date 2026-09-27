@@ -5,7 +5,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
-import { defaultMarkdownParser } from "prosemirror-markdown";
+import { parser } from "./markdown";
 import { Node } from "prosemirror-model";
 
 import { path as _path, importedFrom, transaction } from "../state";
@@ -50,7 +50,7 @@ export function applyDocument(
  * @returns the new EditorState
  */
 export const setDefaultDocument = (state: EditorState): EditorState => {
-  const doc = defaultMarkdownParser.parse(welcomeMessage);
+  const doc = parser.parse(welcomeMessage);
   return applyDocument(state, doc);
 };
 
@@ -155,7 +155,7 @@ export const readDocumentFromFile = async (
   let doc: Node | undefined;
   try {
     const content = await readTextFile(resolvedPath);
-    doc = defaultMarkdownParser.parse(content);
+    doc = parser.parse(content);
   } catch (err) {
     console.error(`Failed to read file: ${errorMessage(err)}`);
     if (!silent) sendNotification(`Failed to read file: ${errorMessage(err)}`);

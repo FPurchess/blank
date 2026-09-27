@@ -149,6 +149,46 @@ body {
     cursor: pointer;
   }
 
+  // tables, see src/editor/plugins/tables/view.ts
+  .table-block {
+    position: relative;
+    margin: 0 0 1em;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid color-mix(in srgb, var(--color) 20%, transparent);
+  }
+
+  th {
+    background: color-mix(in srgb, var(--color) 6%, transparent);
+  }
+
+  tr:first-child > th {
+    border-bottom: 2px solid color-mix(in srgb, var(--color) 55%, transparent);
+  }
+
+  caption {
+    opacity: 0.8;
+  }
+
+  // a cell selection shows as tinted cells instead of the text selection
+  .selectedCell {
+    background: color-mix(in srgb, var(--color) 16%, transparent);
+  }
+
+  &.ProseMirror-hideselection {
+    caret-color: transparent;
+
+    *::selection {
+      background: transparent;
+    }
+  }
+
   code {
     display: inline-block;
     color: var(--color-inverted);
@@ -262,6 +302,55 @@ body {
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+// the size picker for a new table, see src/tablePicker.ts
+.table-picker {
+  position: fixed;
+  z-index: 20;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  color: var(--color);
+  background-color: var(--background-color);
+  border: 1px solid var(--color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  user-select: none;
+
+  .grid {
+    display: grid;
+    gap: 3px;
+    justify-content: start;
+  }
+
+  .cell {
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--color) 35%, transparent);
+    border-radius: 2px;
+
+    &.header {
+      border-bottom-width: 2px;
+    }
+
+    &.chosen {
+      background: color-mix(in srgb, var(--color) 70%, transparent);
+      border-color: var(--color);
+    }
+  }
+
+  .size {
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hint {
+    margin-top: 2px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    opacity: 0.6;
+  }
 }
 
 .context-menu {

@@ -13,7 +13,7 @@ import {
   wrapInList,
   splitListItem,
 } from "prosemirror-schema-list";
-import { schema } from "prosemirror-markdown";
+import { schema } from "../schema";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
@@ -29,44 +29,47 @@ import {
   goToMisspelling,
   openMenu,
   toggleSpellcheck,
+  tableKey,
 } from "../commands";
 
 import * as exporters from "../../exporters";
 import { CommandIdentifier, getKeyBinding } from "../../config";
 import { Command } from "prosemirror-state";
+import { inCell } from "./tables/util";
+
+/**
+ * outsideCells runs `command` only outside table cells, which can't hold
+ * headings or rules
+ */
+const outsideCells =
+  (command: Command): Command =>
+  (state, dispatch, view) =>
+    !inCell(state.selection.$from) && command(state, dispatch, view);
+
+const heading = (level: number) =>
+  outsideCells(setBlockType(schema.nodes.heading, { level }));
 
 const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.UNDO]: undo,
   [CommandIdentifier.REDO]: redo,
   [CommandIdentifier.BLOCKTYPE_PARAGRAPH]: setBlockType(schema.nodes.paragraph),
-  [CommandIdentifier.BLOCKTYPE_HEADING1]: setBlockType(schema.nodes.heading, {
-    level: 1,
-  }),
-  [CommandIdentifier.BLOCKTYPE_HEADING2]: setBlockType(schema.nodes.heading, {
-    level: 2,
-  }),
-  [CommandIdentifier.BLOCKTYPE_HEADING3]: setBlockType(schema.nodes.heading, {
-    level: 3,
-  }),
-  [CommandIdentifier.BLOCKTYPE_HEADING4]: setBlockType(schema.nodes.heading, {
-    level: 4,
-  }),
-  [CommandIdentifier.BLOCKTYPE_HEADING5]: setBlockType(schema.nodes.heading, {
-    level: 5,
-  }),
-  [CommandIdentifier.BLOCKTYPE_HEADING6]: setBlockType(schema.nodes.heading, {
-    level: 6,
-  }),
+  [CommandIdentifier.BLOCKTYPE_HEADING1]: heading(1),
+  [CommandIdentifier.BLOCKTYPE_HEADING2]: heading(2),
+  [CommandIdentifier.BLOCKTYPE_HEADING3]: heading(3),
+  [CommandIdentifier.BLOCKTYPE_HEADING4]: heading(4),
+  [CommandIdentifier.BLOCKTYPE_HEADING5]: heading(5),
+  [CommandIdentifier.BLOCKTYPE_HEADING6]: heading(6),
   [CommandIdentifier.BLOCKTYPE_BULLET_LIST]: wrapInList(
     schema.nodes.bullet_list,
   ),
   [CommandIdentifier.BLOCKTYPE_ORDERED_LIST]: wrapInList(
     schema.nodes.ordered_list,
   ),
-  [CommandIdentifier.INSERT_HORIZONTAL_RULE]: insertNode(
-    schema.nodes.horizontal_rule,
+  [CommandIdentifier.INSERT_HORIZONTAL_RULE]: outsideCells(
+    insertNode(schema.nodes.horizontal_rule),
   ),
   [CommandIdentifier.INSERT_IMAGE]: editImage(),
+  [CommandIdentifier.INSERT_TABLE]: tableKey(),
   [CommandIdentifier.FORMAT_INDENT]: sinkListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_UNINDENT]: liftListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
