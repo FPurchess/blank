@@ -1,12 +1,7 @@
 import { PAPER } from "./paper";
 import type { Layout } from "./resolve";
-import {
-  DEFAULT_PAGE,
-  type PaperSize,
-  readPageSettings,
-  SIDES,
-} from "./settings";
-import { paperUnit, sameLength, toUnit, type Unit } from "./units";
+import { NEW_PAGE_BEFORE, type PaperSize } from "./settings";
+import { paperUnit, toUnit, type Unit } from "./units";
 
 // How the page setup is put in words for the user.
 
@@ -27,46 +22,30 @@ export const paperName = (
   return `${toUnit(size.width, sizeUnit)} × ${length(size.height, sizeUnit)}`;
 };
 
+// the name of the paper of a layout
+const layoutPaper = ({ paper }: Layout, unit: Unit) =>
+  paperName(
+    paper.name === "custom"
+      ? { width: paper.width, height: paper.height }
+      : paper.name,
+    unit,
+  );
+
 /**
  * describePaper names the paper of a layout, e.g. "A4", "Letter landscape" or
  * "170 × 240 mm"
  */
 export const describePaper = (layout: Layout, unit: Unit = "cm") => {
-  const { name, width, height } = layout.paper;
-  const paper = paperName(name === "custom" ? { width, height } : name, unit);
+  const paper = layoutPaper(layout, unit);
   return layout.orientation === "landscape" ? `${paper} landscape` : paper;
 };
 
 /**
- * describePage sums up the page settings a frontmatter holds, for the line
- * above the text: e.g. "A5 landscape · margins 2 cm"
- * @param raw the `page` key of the frontmatter
- * @returns the summary, or null if it holds nothing Blank uses
+ * describePageSize names the paper of a layout with its orientation, e.g.
+ * "A4 (portrait)", for the button in the bottom bar
  */
-export const describePage = (raw: unknown, unit: Unit): string | null => {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return null;
-  }
-  const settings = readPageSettings(raw, DEFAULT_PAGE);
-  const has = (key: string) => Object.hasOwn(raw, key);
-
-  const paper =
-    has("size") && settings.size !== "auto"
-      ? paperName(settings.size, unit)
-      : null;
-  const orientation = has("orientation") ? settings.orientation : null;
-  const parts = [[paper, orientation].filter(Boolean).join(" ")];
-  if (has("margins")) {
-    const { margins } = settings;
-    parts.push(
-      SIDES.every((side) => sameLength(margins[side], margins.top))
-        ? `margins ${length(margins.top, unit)}`
-        : "custom margins",
-    );
-  }
-  const summary = parts.filter(Boolean).join(" · ");
-  return summary || null;
-};
+export const describePageSize = (layout: Layout, unit: Unit) =>
+  `${layoutPaper(layout, unit)} (${layout.orientation})`;
 
 // what the problems of resolveLayout mean to the user
 const PROBLEMS: Record<string, string> = {
@@ -75,6 +54,7 @@ const PROBLEMS: Record<string, string> = {
   "page.size": "its paper size is unknown",
   "page.orientation": "its orientation is neither portrait nor landscape",
   "page.margins": "its margins can't be used",
+  [`page.${NEW_PAGE_BEFORE}`]: "the headings to start new pages are unknown",
 };
 
 /**

@@ -37,13 +37,13 @@ import {
   QUOTE_BORDER,
   QUOTE_INDENT,
   STYLE,
-  STYLES,
   TABLE_BORDERS,
   TABLE_CELL_MARGINS,
   TABLE_HEADER_BORDER,
   TABLE_HEADER_SHADING,
   orderedLevels,
   pageProperties,
+  stylesFor,
   twips,
 } from "./template";
 
@@ -145,7 +145,29 @@ class Serializer {
 
   blocks(parent: Node, position: Position): Block[] {
     const blocks: Block[] = [];
-    parent.forEach((node) => blocks.push(...this.block(node, position)));
+    // A page break starts the page of the block after it, as Word's "Page
+    // break before": a paragraph that holds a break would start the next
+    // page with an empty line. Two breaks in a row leave an empty page, and
+    // a table, which can't start a page itself, gets an empty paragraph that
+    // does before it.
+    let pageBreak = false;
+    const newPage = () => ({ pageBreakBefore: true, ...this.indent(position) });
+    parent.forEach((node) => {
+      if (node.type.name === "page_break") {
+        if (pageBreak) blocks.push(newPage());
+        pageBreak = true;
+        return;
+      }
+      const converted = this.block(node, position);
+      if (pageBreak && converted.length) {
+        const [first] = converted;
+        if (this.isTable(first)) blocks.push(newPage());
+        else converted[0] = { ...first, pageBreakBefore: true };
+        pageBreak = false;
+      }
+      blocks.push(...converted);
+    });
+    if (pageBreak) blocks.push(newPage());
     return blocks;
   }
 
@@ -505,7 +527,7 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
     // IBM's unmodified font file; Word obfuscates embedded fonts as the
     // format requires. The type asks for a Buffer, but any bytes do.
     fonts: [{ name: FONT, data: fontData as unknown as Buffer }],
-    styles: STYLES,
+    styles: stylesFor(layout.newPageBefore),
     numbering: serializer.numbering(),
     sections: [
       {

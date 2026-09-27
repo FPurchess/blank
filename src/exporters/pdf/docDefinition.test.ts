@@ -28,6 +28,7 @@ import {
   BLOCKQUOTE_LAYOUT,
   HEADING_AFTER_HEADING_MARGIN_TOP,
   LIST_ITEM_BLOCK_MARGIN_TOP,
+  RULE_LAYOUT,
 } from "./template";
 import { FALLBACK_FONT } from "./fallback";
 import { tableLayout } from "./table";
@@ -111,6 +112,77 @@ describe("exporter.pdf document definition", () => {
       pageSize: { width: 792, height: 612 },
       pageOrientation: "landscape",
       pageMargins: [40, 10, 20, 30],
+    });
+  });
+
+  it("starts a new page after a page break", async () => {
+    const { definition } = await exportDoc(
+      doc(p("a"), schema.node("page_break"), schema.node("page_break"), p("b")),
+    );
+
+    expect(definition.content).toMatchObject([
+      { style: "paragraph" },
+      { style: "page_break", text: "", pageBreak: "after" },
+      { style: "page_break", text: "", pageBreak: "after" },
+      { style: "paragraph", pageBreak: undefined },
+    ]);
+  });
+
+  it("makes no empty first page for a page break at the start", async () => {
+    const { definition } = await exportDoc(
+      doc(schema.node("page_break"), schema.node("page_break"), p("b")),
+    );
+
+    expect(definition.content).toMatchObject([
+      { style: "page_break", pageBreak: "after", marginTop: 0 },
+      { style: "paragraph" },
+    ]);
+  });
+
+  it("starts headings of the chosen levels on a new page", async () => {
+    const { definition } = await exportDoc(
+      doc(
+        h(1, "Title"),
+        p("intro"),
+        h(1, "One"),
+        h(2, "Section"),
+        schema.node("page_break"),
+        h(1, "Two"),
+      ),
+      testLayout({ newPageBefore: [1] }),
+    );
+
+    expect(
+      (definition.content as { pageBreak?: string }[]).map(
+        (block) => block.pageBreak,
+      ),
+    ).toEqual([
+      // not the first block, nor after a page break: no empty pages
+      undefined,
+      undefined,
+      "before",
+      undefined,
+      "after",
+      undefined,
+    ]);
+  });
+
+  it("draws a horizontal rule as wide as the text", async () => {
+    const { definition } = await exportDoc(
+      doc(p("a"), schema.node("horizontal_rule"), p("b")),
+    );
+
+    const [, rule] = definition.content as unknown as object[];
+    expect(rule).toMatchObject({
+      style: "horizontal_rule",
+      table: { widths: ["*"] },
+      layout: RULE_LAYOUT,
+    });
+    expect([0, 1].map((index) => RULE_LAYOUT.hLineWidth(index))).toEqual([
+      0.75, 0,
+    ]);
+    expect(BASE_DOCUMENT.styles.horizontal_rule).toEqual({
+      margin: [0, 14, 0, 22],
     });
   });
 

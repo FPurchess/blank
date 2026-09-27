@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HEADING_OPTIONS,
   changesOf,
   choicesOf,
   MARGIN_PRESETS,
@@ -34,6 +35,15 @@ describe("paperOptions", () => {
   });
 });
 
+describe("HEADING_OPTIONS", () => {
+  it("offers every heading level to start a new page", () => {
+    expect(HEADING_OPTIONS.map(({ value }) => value)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
+    expect(HEADING_OPTIONS[0].label).toBe("Heading 1");
+  });
+});
+
 describe("choicesOf", () => {
   it("shows the defaults as the paper of the region and normal margins", () => {
     expect(choicesOf(DEFAULT_PAGE, "de-DE", "cm")).toEqual({
@@ -43,6 +53,7 @@ describe("choicesOf", () => {
       orientation: "portrait",
       margins: "normal",
       sides: { top: "2.5", right: "2.5", bottom: "2.5", left: "2.5" },
+      newPageBefore: [],
     });
   });
 
@@ -87,13 +98,31 @@ describe("settingsOf", () => {
 
   it("returns the settings of named choices", () => {
     expect(
-      of({ paper: "letter", orientation: "landscape", margins: "narrow" }),
+      of({
+        paper: "letter",
+        orientation: "landscape",
+        margins: "narrow",
+        newPageBefore: [2, 1],
+      }),
     ).toEqual({
       settings: {
         size: "letter",
         orientation: "landscape",
         margins: allMargins(cm(1.27)),
+        newPageBefore: [1, 2],
       },
+    });
+  });
+
+  it("shows the heading levels that start a new page", () => {
+    const choices = choicesOf(
+      settings({ newPageBefore: [1, 3] }),
+      "de-DE",
+      "cm",
+    );
+    expect(choices.newPageBefore).toEqual([1, 3]);
+    expect(settingsOf(choices, "de-DE", "cm")).toMatchObject({
+      settings: { newPageBefore: [1, 3] },
     });
   });
 
@@ -111,6 +140,7 @@ describe("settingsOf", () => {
         size: { width: mm(170), height: cm(24) },
         orientation: "portrait",
         margins: { top: cm(3), right: cm(2.5), bottom: 72, left: mm(20) },
+        newPageBefore: [],
       },
     });
   });

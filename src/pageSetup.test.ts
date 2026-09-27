@@ -12,7 +12,7 @@ const row = (name: string) =>
 const checked = (name: string) =>
   row(name).querySelector<HTMLButtonElement>('[aria-checked="true"]')!;
 const option = (name: string, label: string) =>
-  [...row(name).querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(
+  [...row(name).querySelectorAll<HTMLButtonElement>(".options button")].find(
     (button) => button.textContent === label,
   )!;
 const fields = (name: string) =>
@@ -185,6 +185,65 @@ describe("pageSetup dialog", () => {
       document.querySelector('label[for="page-setup-margins-top"]')
         ?.textContent,
     ).toBe("Top (in)");
+  });
+
+  describe("new page before", () => {
+    const toggles = () => [
+      ...row("newPageBefore").querySelectorAll<HTMLButtonElement>("button"),
+    ];
+    const pressed = () =>
+      toggles()
+        .filter((button) => button.getAttribute("aria-pressed") === "true")
+        .map((button) => button.textContent);
+
+    it("offers every heading level, none pressed by default", () => {
+      openDialog();
+
+      expect(row("newPageBefore").getAttribute("role")).toBe("group");
+      expect(toggles().map((button) => button.textContent)).toEqual([
+        "Heading 1",
+        "Heading 2",
+        "Heading 3",
+        "Heading 4",
+        "Heading 5",
+        "Heading 6",
+      ]);
+      expect(pressed()).toEqual([]);
+    });
+
+    it("starts the headings that are pressed on a new page", () => {
+      const request = openDialog({
+        settings: { ...DEFAULT_PAGE, newPageBefore: [2] },
+      });
+      expect(pressed()).toEqual(["Heading 2"]);
+
+      option("newPageBefore", "Heading 1").click();
+      option("newPageBefore", "Heading 2").click();
+      option("newPageBefore", "Heading 3").click();
+      button("Apply").click();
+
+      expect(request.apply).toHaveBeenCalledWith({
+        ...DEFAULT_PAGE,
+        newPageBefore: [1, 3],
+      });
+    });
+
+    it("moves with ←→ without switching, and stays a stop for ↑↓", () => {
+      openDialog();
+      checked("margins").focus();
+
+      keydown("ArrowDown");
+      expect(document.activeElement).toBe(toggles()[0]);
+      keydown("ArrowRight");
+      expect(document.activeElement).toBe(toggles()[1]);
+      expect(pressed()).toEqual([]);
+      // only the focused toggle is in the tab order
+      expect(toggles().map((button) => button.tabIndex)).toEqual([
+        -1, 0, -1, -1, -1, -1,
+      ]);
+      keydown("ArrowUp");
+      expect(document.activeElement).toBe(checked("margins"));
+    });
   });
 
   it("makes the settings the default", () => {

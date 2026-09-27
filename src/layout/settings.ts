@@ -16,6 +16,7 @@ import {
 //     size: a4              # auto, a3, a4, a5, b5, letter, legal or "W x H"
 //     orientation: portrait # or landscape
 //     margins: 2.5cm        # or { top, right, bottom, left }
+//     new-page-before: 1    # the heading levels that start a new page
 
 export type Orientation = "portrait" | "landscape";
 export const ORIENTATIONS: Orientation[] = ["portrait", "landscape"];
@@ -36,7 +37,13 @@ export interface PageSettings {
   orientation: Orientation;
   // in points
   margins: Margins;
+  // the levels of the headings that start a new page, sorted, e.g. [1] for
+  // chapters on new pages
+  newPageBefore: number[];
 }
+
+// the heading levels of markdown
+const LEVELS = [1, 2, 3, 4, 5, 6];
 
 export const allMargins = (length: number): Margins => ({
   top: length,
@@ -46,6 +53,7 @@ export const allMargins = (length: number): Margins => ({
 });
 
 export const DEFAULT_PAGE: PageSettings = {
+  newPageBefore: [],
   size: "auto",
   orientation: "portrait",
   margins: allMargins(parseLength("2.5cm") as number),
@@ -59,6 +67,9 @@ export const portrait = (width: number, height: number) => ({
   height: Math.max(width, height),
 });
 
+// the key of newPageBefore in the frontmatter and blank.json
+export const NEW_PAGE_BEFORE = "new-page-before";
+
 // a custom size, "176mm x 250mm"
 const SIZE = /^(.+?)\s*[x×]\s*(.+)$/i;
 
@@ -71,6 +82,15 @@ const readSize = (value: unknown): PaperSize | undefined => {
   const height = parseLength(match?.[2]);
   // whatever the order it was written in
   return width && height ? portrait(width, height) : undefined;
+};
+
+// one heading level or a list of them
+const readLevels = (value: unknown): number[] | undefined => {
+  const levels = Array.isArray(value) ? value : [value];
+  if (!levels.every((level) => LEVELS.includes(level as number))) {
+    return undefined;
+  }
+  return [...new Set(levels as number[])].sort((a, b) => a - b);
 };
 
 const readMargins = (value: unknown, base: Margins): Margins | undefined => {
@@ -110,7 +130,12 @@ export const readPageSettings = (
     return base;
   }
   const settings = { ...base };
-  const { size, orientation, margins } = raw as Record<string, unknown>;
+  const {
+    size,
+    orientation,
+    margins,
+    [NEW_PAGE_BEFORE]: newPageBefore,
+  } = raw as Record<string, unknown>;
   if (size !== undefined) {
     const read = readSize(size);
     if (read === undefined) problems.push(`${prefix}.size`);
@@ -127,6 +152,11 @@ export const readPageSettings = (
     const read = readMargins(margins, base.margins);
     if (read === undefined) problems.push(`${prefix}.margins`);
     else settings.margins = read;
+  }
+  if (newPageBefore !== undefined) {
+    const read = readLevels(newPageBefore);
+    if (read === undefined) problems.push(`${prefix}.${NEW_PAGE_BEFORE}`);
+    else settings.newPageBefore = read;
   }
   return settings;
 };
@@ -167,14 +197,25 @@ const writeMargins = (margins: Margins, unit: Unit) =>
         SIDES.map((side) => [side, formatLength(margins[side], unit)]),
       );
 
-// per key: whether two values mean the same, and how a value is written
+export const sameLevels = (a: number[], b: number[]) =>
+  a.length === b.length && a.every((level, index) => level === b[index]);
+
+// per setting: its key in the frontmatter, whether two values mean the same,
+// and how a value is written
 const KEYS = {
-  size: { same: sameSize, write: writeSize },
+  size: { name: "size", same: sameSize, write: writeSize },
   orientation: {
+    name: "orientation",
     same: (a: Orientation, b: Orientation) => a === b,
     write: (orientation: Orientation) => orientation,
   },
-  margins: { same: sameMargins, write: writeMargins },
+  margins: { name: "margins", same: sameMargins, write: writeMargins },
+  newPageBefore: {
+    name: NEW_PAGE_BEFORE,
+    same: sameLevels,
+    // a single level as a number, the way people write it
+    write: (levels: number[]) => (levels.length === 1 ? levels[0] : levels),
+  },
 } as const;
 
 type Key = keyof PageSettings;
@@ -183,6 +224,7 @@ const PAGE_KEYS = Object.keys(KEYS) as Key[];
 // KEYS[key] for a key that TypeScript can't narrow in a loop
 const handler = <K extends Key>(key: K) =>
   KEYS[key] as unknown as {
+    name: string;
     same: (a: PageSettings[K], b: PageSettings[K]) => boolean;
     write: (value: PageSettings[K], unit: Unit) => unknown;
   };
@@ -193,7 +235,10 @@ const handler = <K extends Key>(key: K) =>
  */
 export const pageSettingsJSON = (settings: PageSettings, unit: Unit) =>
   Object.fromEntries(
-    PAGE_KEYS.map((key) => [key, handler(key).write(settings[key], unit)]),
+    PAGE_KEYS.map((key) => [
+      handler(key).name,
+      handler(key).write(settings[key], unit),
+    ]),
   );
 
 export type PageChanges = {
@@ -222,13 +267,21 @@ export const writePageSettings = (
 
   for (const key of PAGE_KEYS) {
     const change = changes[key];
-    const present = document.hasIn(["page", key]);
+    const path = ["page", handler(key).name];
+    const present = document.hasIn(path);
     if (change === undefined) continue;
     if (change === null) {
-      if (present) document.deleteIn(["page", key]);
+      if (present) document.deleteIn(path);
       changed ||= present;
     } else if (!present || !handler(key).same(written[key], change)) {
-      document.setIn(["page", key], handler(key).write(change, unit));
+      const value = handler(key).write(change, unit);
+      // lists on one line, like [1, 2]
+      document.setIn(
+        path,
+        Array.isArray(value)
+          ? document.createNode(value, { flow: true })
+          : value,
+      );
       changed = true;
     }
   }

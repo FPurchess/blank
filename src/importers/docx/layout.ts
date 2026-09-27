@@ -8,13 +8,15 @@ import {
   type PageSettings,
   portrait,
 } from "../../layout/settings";
-import { child, parsePart, val, W } from "./xml";
+import { child, isOn, parsePart, val, W } from "./xml";
 
 // Reads the page setup of a Word document, which mammoth leaves out: the
-// paper, orientation and margins of its first section.
+// paper, orientation and margins of its first section, and the headings that
+// start a new page.
 
 const DOCUMENT = "word/document.xml";
 const SETTINGS = "word/settings.xml";
+const STYLES = "word/styles.xml";
 
 // Word measures pages in twentieths of a point
 const points = (twips: string | null) => {
@@ -42,7 +44,9 @@ const sections = (doc: Document) =>
       sectPr.parentElement?.localName === "body",
   );
 
-const readPage = (sectPr: Element): WordLayout["page"] => {
+type SectionPage = Omit<NonNullable<WordLayout["page"]>, "newPageBefore">;
+
+const readPage = (sectPr: Element): SectionPage | undefined => {
   const pgSz = child(sectPr, "pgSz");
   const pgMar = child(sectPr, "pgMar");
   const width = points(val(pgSz, "w"));
@@ -73,6 +77,26 @@ const sameSetup = (a: Element, b: Element) =>
   JSON.stringify(readPage(a)) === JSON.stringify(readPage(b));
 
 /**
+ * headingBreaks returns the levels of the heading styles that start a new
+ * page, e.g. [1] for Word's "Page break before" on Heading 1
+ */
+const headingBreaks = (styles: Document | null) => {
+  if (!styles) return [];
+  const levels = new Set<number>();
+  for (const style of styles.getElementsByTagNameNS(W, "style")) {
+    const id = val(style, "styleId") ?? "";
+    const name = val(child(style, "name")) ?? "";
+    const level =
+      /^heading ?([1-6])$/i.exec(id)?.[1] ??
+      /^heading ([1-6])$/i.exec(name)?.[1];
+    if (level && isOn(child(child(style, "pPr"), "pageBreakBefore"))) {
+      levels.add(Number(level));
+    }
+  }
+  return [...levels].sort((a, b) => a - b);
+};
+
+/**
  * readWordLayout reads the page setup of a Word document
  */
 export const readWordLayout = async (zip: JSZip): Promise<WordLayout> => {
@@ -91,11 +115,17 @@ export const readWordLayout = async (zip: JSZip): Promise<WordLayout> => {
     warnings.push("the binding margin was left out");
   }
   const settings = await parsePart(zip, SETTINGS);
-  const mirror = settings?.getElementsByTagNameNS(W, "mirrorMargins")[0];
-  if (mirror && !["0", "false", "off"].includes(val(mirror) ?? "")) {
+  if (isOn(settings?.getElementsByTagNameNS(W, "mirrorMargins")[0])) {
     warnings.push("mirrored margins became the same on every page");
   }
-  return { page: readPage(first), warnings };
+  const page = readPage(first);
+  return {
+    page: page && {
+      ...page,
+      newPageBefore: headingBreaks(await parsePart(zip, STYLES)),
+    },
+    warnings,
+  };
 };
 
 /**

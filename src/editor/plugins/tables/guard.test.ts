@@ -104,20 +104,23 @@ describe("tableGuard", () => {
     ).toBe(true);
   });
 
-  it("replaces a rule in a list in a cell", () => {
-    const rule = schema.nodes.horizontal_rule.create();
-    const withRule = doc(
-      p(),
-      table(tr(th("a")), tr(td(ul(li(p("one"), rule))))),
-      p(),
-    );
+  it.each(["horizontal_rule", "page_break"])(
+    "replaces a %s in a list in a cell",
+    (type) => {
+      const node = schema.nodes[type].create();
+      const withNode = doc(
+        p(),
+        table(tr(th("a")), tr(td(ul(li(p("one"), node))))),
+        p(),
+      );
 
-    expect(
-      guarded(withRule).eq(
-        doc(p(), table(tr(th("a")), tr(td(ul(li(p("one"), p()))))), p()),
-      ),
-    ).toBe(true);
-  });
+      expect(
+        guarded(withNode).eq(
+          doc(p(), table(tr(th("a")), tr(td(ul(li(p("one"), p()))))), p()),
+        ),
+      ).toBe(true);
+    },
+  );
 
   it("isn't undone on its own", () => {
     const state = EditorState.create({

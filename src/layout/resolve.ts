@@ -5,6 +5,7 @@ import {
   type Orientation,
   type PageSettings,
   readPageSettings,
+  sameLevels,
   sameMargins,
   sameSize,
   sizeOf,
@@ -27,6 +28,8 @@ export interface Layout {
   orientation: Orientation;
   // in points
   margins: Margins;
+  // the levels of the headings that start a new page
+  newPageBefore: number[];
 }
 
 export interface ResolvedLayout {
@@ -60,6 +63,7 @@ export const layoutOf = (
     paper: { name, auto: size === "auto", width, height },
     orientation: settings.orientation,
     margins: settings.margins,
+    newPageBefore: settings.newPageBefore,
   };
 };
 
@@ -107,6 +111,9 @@ export const differences = (
     ...(sameSize(paperA, paperB) ? [] : ["size" as const]),
     ...(a.orientation === b.orientation ? [] : ["orientation" as const]),
     ...(sameMargins(a.margins, b.margins) ? [] : ["margins" as const]),
+    ...(sameLevels(a.newPageBefore, b.newPageBefore)
+      ? []
+      : ["newPageBefore" as const]),
   ];
 };
 

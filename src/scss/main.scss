@@ -40,10 +40,18 @@ body {
   pointer-events: none;
 }
 
-#ui-spellcheck {
+// the right of the bar: the page, spell check and language
+#ui-page {
   pointer-events: auto;
   cursor: pointer;
   margin-left: auto;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+#ui-spellcheck {
+  pointer-events: auto;
+  cursor: pointer;
   font-size: 0.8rem;
   letter-spacing: 0.05em;
 
@@ -342,18 +350,19 @@ body {
     opacity: 0.7;
   }
 
-  // the options of a row look like one control, the checked one filled
+  // the options of a row look like one control, the chosen ones filled
   .options {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 
-    [role="radio"] {
+    button {
       padding: 3px 10px;
       font-size: 0.9rem;
       opacity: 0.75;
 
-      &[aria-checked="true"] {
+      &[aria-checked="true"],
+      &[aria-pressed="true"] {
         color: var(--background-color);
         background-color: var(--color);
         opacity: 1;

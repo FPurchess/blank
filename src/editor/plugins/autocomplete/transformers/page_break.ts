@@ -3,12 +3,13 @@ import { schema } from "../../../../markdown";
 import type { BlockTransformer } from "../types";
 import { replaceLineWith } from "./util";
 
-const reHorizontalRule = /^(---|\*\*\*|___)$/;
+// `+++` then Enter starts a new page
+const rePageBreak = /^\+\+\+$/;
 
 const _transformer: BlockTransformer<boolean> = {
   trigger: "enter",
-  activate: (line: string) => reHorizontalRule.test(line) || undefined,
-  transform: (view) => replaceLineWith(view, schema.nodes.horizontal_rule),
+  activate: (line: string) => rePageBreak.test(line) || undefined,
+  transform: (view) => replaceLineWith(view, schema.nodes.page_break),
 };
 
 export default _transformer;

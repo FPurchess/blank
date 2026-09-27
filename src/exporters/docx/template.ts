@@ -248,6 +248,27 @@ export const STYLES: IStylesOptions = {
   ],
 };
 
+/**
+ * stylesFor returns the styles of a document whose headings of the levels
+ * `newPageBefore` start a new page, which Word calls "Page break before"
+ */
+export const stylesFor = (newPageBefore: number[]): IStylesOptions => {
+  const defaults = STYLES.default as Record<
+    string,
+    { paragraph?: object } | undefined
+  >;
+  const headings = Object.fromEntries(
+    newPageBefore.map((level) => {
+      const style = defaults[`heading${level}`];
+      return [
+        `heading${level}`,
+        { ...style, paragraph: { ...style?.paragraph, pageBreakBefore: true } },
+      ];
+    }),
+  );
+  return { ...STYLES, default: { ...STYLES.default, ...headings } };
+};
+
 const BULLETS = ["•", "◦", "▪"];
 const LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 

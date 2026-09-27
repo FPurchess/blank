@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
-import { markdownParser, schema } from "../../markdown";
+import { markdownParser, parseMarkdown, schema } from "../../markdown";
 
 import { IMAGES, dataUrl } from "../../test/images";
 import toPDF, { hasMark } from "./index";
@@ -100,6 +100,26 @@ describe("exporters.pdf", () => {
 
       expect(warnings).toEqual([]);
       expect(decode(contents).trimEnd().endsWith("%%EOF")).toBe(true);
+    });
+
+    it("lays out page breaks, chapters and rules on real pages", async () => {
+      const pagesOf = async (markdown: string, newPageBefore: number[] = []) =>
+        (
+          await toPDF(
+            EditorState.create({ schema, doc: parseMarkdown(markdown) }),
+            { docPath: null, layout: testLayout({ newPageBefore }) },
+          )
+        ).pages;
+
+      expect(await pagesOf("a\n\n---\n\nb")).toBe(1);
+      expect(await pagesOf("a\n\n<!-- pagebreak -->\n\nb")).toBe(2);
+      // like Word, which ignores a page break before the first paragraph
+      expect(await pagesOf("<!-- pagebreak -->\n\na")).toBe(1);
+      expect(await pagesOf("# One\n\na\n\n# Two\n\nb", [1])).toBe(2);
+      // a page break before a chapter makes no empty page
+      expect(
+        await pagesOf("# One\n\na\n\n<!-- pagebreak -->\n\n# Two\n\nb", [1]),
+      ).toBe(2);
     });
 
     it("embeds the medium, bold, italic and fallback faces", async () => {

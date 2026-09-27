@@ -36,3 +36,9 @@ export const child = (parent: Element | undefined, name: string) =>
  */
 export const val = (element: Element | undefined, name = "val") =>
   element?.getAttributeNS(W, name) ?? null;
+
+/**
+ * isOn checks a switch like <w:pageBreakBefore/>, which w:val="0" turns off
+ */
+export const isOn = (element: Element | undefined) =>
+  element !== undefined && !["0", "false", "off"].includes(val(element) ?? "");

@@ -33,6 +33,8 @@ export interface PageChoices {
   margins: MarginPreset | "custom";
   // the custom margins as typed
   sides: Record<keyof Margins, string>;
+  // the levels of the headings that start a new page
+  newPageBefore: number[];
 }
 
 export interface Option<T> {
@@ -70,6 +72,11 @@ export const MARGIN_OPTIONS: Option<PageChoices["margins"]>[] = [
   { value: "custom", label: "Custom…" },
 ];
 
+// the headings that can start a new page
+export const HEADING_OPTIONS: Option<number>[] = [1, 2, 3, 4, 5, 6].map(
+  (level) => ({ value: level, label: `Heading ${level}` }),
+);
+
 /**
  * choicesOf returns what the dialog shows for page settings
  * @param settings the settings of the document
@@ -100,6 +107,7 @@ export const choicesOf = (
     sides: Object.fromEntries(
       SIDES.map((side) => [side, show(margins[side])]),
     ) as PageChoices["sides"],
+    newPageBefore: settings.newPageBefore,
   };
 };
 
@@ -144,7 +152,12 @@ export const settingsOf = (
   } else {
     margins = allMargins(MARGIN_PRESETS[choices.margins]);
   }
-  const settings = { size, orientation: choices.orientation, margins };
+  const settings = {
+    size,
+    orientation: choices.orientation,
+    margins,
+    newPageBefore: [...choices.newPageBefore].sort((a, b) => a - b),
+  };
   if (!errors.paper && !leavesRoom(layoutOf(settings, locale))) {
     errors.margins = "The margins leave no room for the text";
   }

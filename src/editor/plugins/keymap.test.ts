@@ -34,6 +34,7 @@ import {
   ul,
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
+import { schema } from "../../markdown";
 import { keymap, normalizeBinding } from "./keymap";
 
 /**
@@ -169,12 +170,46 @@ describe("plugin.keymap", () => {
     expect(types).toContain("horizontal_rule");
   });
 
-  it.each(["Shift-Enter", "Mod-Enter"])("%s inserts a hard break", (combo) => {
+  it("Shift-Enter inserts a hard break", () => {
     const { view, press } = setup(doc(p("text")));
 
-    expect(press(combo)).toBe(true);
+    expect(press("Shift-Enter")).toBe(true);
 
     expect(view.state.doc.firstChild?.lastChild?.type.name).toBe("hard_break");
+  });
+
+  it("Mod-Enter inserts a page break, splitting the paragraph", () => {
+    const { view, press } = setup(doc(p("before after")), { cursor: 8 });
+
+    expect(press("Mod-Enter")).toBe(true);
+
+    expect(view.state.doc.toJSON()).toEqual(
+      doc(p("before "), schema.node("page_break"), p("after")).toJSON(),
+    );
+  });
+
+  it("Backspace at the start of the next line removes a page break", () => {
+    const pageBreak = schema.node("page_break");
+    // the start of "b": after the paragraph "a" (3) and the break (1)
+    const { view, press } = setup(doc(p("a"), pageBreak, p("b")), {
+      cursor: 5,
+    });
+    // the cursor is at the start of its line, which the stub view can't tell
+    Object.assign(view, { endOfTextblock: () => true });
+
+    press("Backspace");
+
+    expect(view.state.doc.toJSON()).toEqual(doc(p("a"), p("b")).toJSON());
+  });
+
+  it("Mod-Enter leaves a code block, as before", () => {
+    const { view, press } = setup(doc(codeBlock("code")));
+
+    press("Mod-Enter");
+
+    expect(view.state.doc.toJSON()).toEqual(
+      doc(codeBlock("code"), p()).toJSON(),
+    );
   });
 
   it("Enter continues a list", () => {
@@ -201,13 +236,16 @@ describe("plugin.keymap", () => {
     const cursor = (node: Node) =>
       node.firstChild!.firstChild!.nodeSize + 5 + 4;
 
-    it.each(["Mod-1", "Mod-6", "Mod-h"])("%s does nothing", (combo) => {
-      const node = inCell();
-      const { view, press } = setup(node, { cursor: cursor(node) });
+    it.each(["Mod-1", "Mod-6", "Mod-h", "Mod-Enter"])(
+      "%s does nothing",
+      (combo) => {
+        const node = inCell();
+        const { view, press } = setup(node, { cursor: cursor(node) });
 
-      expect(press(combo)).toBe(false);
-      expect(view.state.doc.eq(node)).toBe(true);
-    });
+        expect(press(combo)).toBe(false);
+        expect(view.state.doc.eq(node)).toBe(true);
+      },
+    );
 
     it("Mod-8 starts a list in the cell", () => {
       const node = inCell();

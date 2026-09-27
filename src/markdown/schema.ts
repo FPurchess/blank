@@ -58,6 +58,17 @@ const table: NodeSpec = {
       : ["table", ["tbody", 0]],
 };
 
+// a page break, written `<!-- pagebreak -->`, which other markdown apps don't
+// show. It is an <hr> in HTML, so copying it within Blank keeps it.
+const pageBreak: NodeSpec = {
+  group: "block",
+  atom: true,
+  selectable: true,
+  // before the horizontal rule's `hr`
+  parseDOM: [{ tag: "hr[data-page-break]", priority: 60 }],
+  toDOM: () => ["hr", { class: "page-break", "data-page-break": "" }],
+};
+
 // Blank's markdown schema: the prosemirror-markdown schema with the table
 // nodes of prosemirror-tables, whose doc also keeps the file's frontmatter
 // (the YAML block at its top) as it was written, or null if the file has
@@ -69,6 +80,7 @@ export const schema = new Schema({
       ...base.spec.nodes.get("doc"),
       attrs: { frontmatter: { default: null } },
     })
+    .addBefore("image", "page_break", pageBreak)
     .append({
       table,
       table_row: cells.table_row,

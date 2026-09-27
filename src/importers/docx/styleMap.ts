@@ -1,8 +1,13 @@
+import { PAGE_BREAK_STYLE } from "./pageBreaks";
+
 // How the styles of Word, LibreOffice, pandoc and Blank's own Word export
 // (src/exporters/docx/template.ts) map to the HTML the markdown schema reads.
 // mammoth itself maps headings 1-6, lists, bold, italic, links and breaks.
 // Styles are matched by name, which LibreOffice translates to the language
 // of its user interface: only the English names are known here.
+
+// marks the paragraphs pageBreaks.ts puts where a new page starts
+export const PAGE_BREAK_CLASS = "blank-page-break";
 
 // marks the paragraphs of a horizontal line, which are empty and so need a
 // class to survive until src/importers/docx/cleanup.ts turns them into <hr>
@@ -46,6 +51,8 @@ export const STYLE_MAP = [
   ),
   // Blank and LibreOffice
   ...paragraphs(["Table Heading"], `p.${TABLE_HEADING_CLASS}:fresh`),
+  // matched by the style's id, since it is in no styles.xml
+  `p.${PAGE_BREAK_STYLE} => p.${PAGE_BREAK_CLASS}:fresh`,
   // renders comments, only to count them (see cleanup.ts)
   "comment-reference => sup",
 ];

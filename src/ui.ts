@@ -7,13 +7,20 @@ import {
   importedFrom,
   language,
   languagePicker,
+  pageSetupRequests,
   path,
   spellcheck,
   spellcheckMessage,
   spellcheckStatus,
   textContent,
+  transaction,
   type LanguagePickerState,
 } from "./state";
+import { CommandIdentifier, config, getKeyBinding } from "./config";
+import { describePageSize } from "./layout/describe";
+import { localeUnit } from "./layout/paper";
+import { resolveLayout } from "./layout/resolve";
+import type { PageSettings } from "./layout/settings";
 import type { SpellcheckStatus } from "./spellcheck/types";
 import { languageName } from "./spellcheck/service";
 import { bootContextMenu } from "./contextMenu";
@@ -148,6 +155,38 @@ export const bootUI = () => {
     },
     { immediate: true },
   );
+
+  // the paper of the document, which opens the page setup
+  const uiPage = document.createElement("span");
+  uiPage.id = "ui-page";
+  uiPage.setAttribute("role", "button");
+  uiBottom.appendChild(uiPage);
+  // keep the focus in the editor, which gets it back from the dialog
+  uiPage.addEventListener("mousedown", (event) => event.preventDefault());
+  uiPage.addEventListener("click", () => {
+    pageSetupRequests.value += 1;
+  });
+  let shownFor: { frontmatter: string | null; defaults: PageSettings } | null =
+    null;
+  const renderPage = () => {
+    const frontmatter = (transaction.value?.doc.attrs.frontmatter ?? null) as
+      string | null;
+    const defaults = config.value.layout.page;
+    // typing leaves both alone, so the frontmatter isn't read on every key
+    if (
+      shownFor?.frontmatter === frontmatter &&
+      shownFor.defaults === defaults
+    ) {
+      return;
+    }
+    shownFor = { frontmatter, defaults };
+    const { layout } = resolveLayout(frontmatter, defaults);
+    uiPage.textContent = describePageSize(layout, localeUnit());
+    uiPage.title = `Page setup (${getKeyBinding(CommandIdentifier.PAGE_SETUP)})`;
+  };
+  transaction.subscribe(renderPage);
+  config.subscribe(renderPage);
+  renderPage();
 
   const uiSpellcheck = document.createElement("span");
   uiSpellcheck.id = "ui-spellcheck";

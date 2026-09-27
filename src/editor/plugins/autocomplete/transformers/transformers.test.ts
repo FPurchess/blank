@@ -23,6 +23,7 @@ import type { BlockTransformer } from "../types";
 import code_block from "./code_block";
 import horizontal_rule from "./horizontal_rule";
 import ordered_list from "./ordered_list";
+import page_break from "./page_break";
 import table from "./table";
 
 /**
@@ -183,6 +184,11 @@ const withoutCursor: {
     text: "---",
   },
   {
+    name: "page_break",
+    transformer: page_break as BlockTransformer<unknown>,
+    text: "+++",
+  },
+  {
     name: "code_block",
     transformer: code_block as BlockTransformer<unknown>,
     text: "```",
@@ -247,19 +253,31 @@ describe("transformer.horizontal_rule", () => {
   it.each(["--", "----", "-*-", "a ---"])("ignores %j", (text) => {
     expect(horizontal_rule.activate(text)).toBeUndefined();
   });
+});
 
-  it.each(positions(p("---")))(
-    "replaces the $position block with a rule and an empty paragraph",
+describe("transformer.page_break", () => {
+  it("activates on Enter for +++", () => {
+    expect(page_break.trigger).toBe("enter");
+    expect(page_break.activate("+++")).toBe(true);
+  });
+
+  it.each(["++", "++++", "+ + +", "a +++"])("ignores %j", (text) => {
+    expect(page_break.activate(text)).toBeUndefined();
+  });
+});
+
+// a whole line that becomes a node of its own
+describe.each([
+  { transformer: horizontal_rule, text: "---", type: "horizontal_rule" },
+  { transformer: page_break, text: "+++", type: "page_break" },
+])("transformer.$type", ({ transformer, text, type }) => {
+  it.each(positions(p(text)))(
+    "replaces the $position block with the node and an empty paragraph",
     ({ node, index }) => {
-      const { view, result } = runTransformer(
-        horizontal_rule,
-        node,
-        index,
-        "---",
-      );
+      const { view, result } = runTransformer(transformer, node, index, text);
 
       expect(result).toBe(true);
-      expect(view.state.doc.child(index).type.name).toBe("horizontal_rule");
+      expect(view.state.doc.child(index).type.name).toBe(type);
       const next = view.state.doc.child(index + 1);
       expect(next.type.name).toBe("paragraph");
       expect(view.state.selection.$from.parent).toBe(next);
@@ -268,8 +286,8 @@ describe("transformer.horizontal_rule", () => {
   );
 
   it("leaves a heading alone", () => {
-    const node = doc(h(1, "---"));
-    const { view, result } = runTransformer(horizontal_rule, node, 0, "---");
+    const node = doc(h(1, text));
+    const { view, result } = runTransformer(transformer, node, 0, text);
 
     expect(result).toBe(false);
     expect(view.state.doc).toBe(node);

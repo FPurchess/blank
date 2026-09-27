@@ -23,6 +23,7 @@ import {
   exportAs,
   cycleTheme,
   chooseLanguage,
+  insertBlock,
   insertNode,
   editLink,
   editImage,
@@ -40,7 +41,7 @@ import { inCell } from "./tables/util";
 
 /**
  * outsideCells runs `command` only outside table cells, which can't hold
- * headings or rules
+ * headings, rules or page breaks
  */
 const outsideCells =
   (command: Command): Command =>
@@ -67,10 +68,13 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     schema.nodes.ordered_list,
   ),
   [CommandIdentifier.INSERT_HORIZONTAL_RULE]: outsideCells(
-    insertNode(schema.nodes.horizontal_rule),
+    insertBlock(schema.nodes.horizontal_rule),
   ),
   [CommandIdentifier.INSERT_IMAGE]: editImage(),
   [CommandIdentifier.INSERT_TABLE]: tableKey(),
+  [CommandIdentifier.INSERT_PAGE_BREAK]: outsideCells(
+    insertBlock(schema.nodes.page_break),
+  ),
   [CommandIdentifier.FORMAT_INDENT]: sinkListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_UNINDENT]: liftListItem(schema.nodes.list_item),
   [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
@@ -174,6 +178,5 @@ export const keymap = () =>
       splitListItem(schema.nodes.list_item),
       baseKeymap.Enter,
     ),
-    "Mod-Enter": insertNode(schema.nodes.hard_break),
     "Shift-Enter": insertNode(schema.nodes.hard_break),
   });

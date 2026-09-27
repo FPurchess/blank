@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import { FRONTMATTER_PROPERTY } from "../../exporters/docx/properties";
 import { readWordLayout, type WordLayout } from "./layout";
 import { normalizeNumbering } from "./numbering";
+import { markPageBreaks } from "./pageBreaks";
 import { parsePart } from "./xml";
 
 // Reads what mammoth leaves out of a .docx and rewrites what it would get
@@ -68,10 +69,17 @@ export interface PreparedDocx {
  */
 export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const zip = await JSZip.loadAsync(bytes);
-  const rewritten = await normalizeNumbering(zip);
+  // read before the rewrites, which split paragraphs with their properties
+  const properties = await readWordProperties(zip);
+  const layout = await readWordLayout(zip);
+  const numbering = await normalizeNumbering(zip);
+  const pageBreaks = await markPageBreaks(zip);
   return {
-    bytes: rewritten ? await zip.generateAsync({ type: "uint8array" }) : bytes,
-    properties: await readWordProperties(zip),
-    layout: await readWordLayout(zip),
+    bytes:
+      numbering || pageBreaks
+        ? await zip.generateAsync({ type: "uint8array" })
+        : bytes,
+    properties,
+    layout,
   };
 };

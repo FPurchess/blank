@@ -295,6 +295,16 @@ describe("docs screenshots", () => {
     await type(Key.Escape);
   });
 
+  it("captures a page break", async () => {
+    await pressMod("n");
+    await type("the end of the first chapter.");
+    await pressMod(Key.Enter);
+    await type("the second chapter starts on a new page.");
+    await setCaret(false);
+    await shot("page-break");
+    await setCaret(true);
+  });
+
   it("captures spell check", async () => {
     await pressMod("n");
     await pressMod(Key.Alt, "s");

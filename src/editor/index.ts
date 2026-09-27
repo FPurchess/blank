@@ -9,6 +9,7 @@ import {
   imageDialog,
   linkDialog,
   pageSetup,
+  pageSetupRequests,
   transaction,
 } from "../state";
 import {
@@ -26,6 +27,7 @@ import {
   tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
+import { openPageSetup } from "./commands/pageSetup";
 
 // the dialogs and the context menu take the focus while they are open
 const dialogOpen = () =>
@@ -33,6 +35,8 @@ const dialogOpen = () =>
   imageDialog.value !== null ||
   pageSetup.value !== null ||
   contextMenuState.value !== null;
+
+let unsubscribeRequests: (() => void) | undefined;
 
 export const bootEditor = async () => {
   const state = await applyInitialDocument(
@@ -78,5 +82,8 @@ export const bootEditor = async () => {
     },
   });
   transaction.value = view.state.tr;
+  // e.g. the button in the bottom bar asks for the page setup
+  unsubscribeRequests?.();
+  unsubscribeRequests = pageSetupRequests.subscribe(() => openPageSetup(view));
   window.setTimeout(() => view.focus(), 100);
 };

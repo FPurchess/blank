@@ -36,7 +36,8 @@ const changedDescendants = (old: Node, cur: Node, offset: number, f: Visit) => {
 
 /**
  * flattened returns what replaces a node a cell can't hold: a heading becomes
- * a paragraph, a rule an empty paragraph, a table one paragraph per row
+ * a paragraph, a rule or page break an empty paragraph, a table one
+ * paragraph per row
  */
 const flattened = (node: Node): Node[] => {
   const { paragraph } = schema.nodes;
@@ -55,7 +56,8 @@ const flattened = (node: Node): Node[] => {
 const outOfPlace = (node: Node) =>
   node.type === schema.nodes.table ||
   node.type === schema.nodes.heading ||
-  node.type === schema.nodes.horizontal_rule;
+  node.type === schema.nodes.horizontal_rule ||
+  node.type === schema.nodes.page_break;
 
 /**
  * cleanCells replaces the tables, headings and rules that got into cells,

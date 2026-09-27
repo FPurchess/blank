@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp } from "../helpers.ts";
+import { Key, pressMod, restartApp, type } from "../helpers.ts";
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
@@ -51,7 +51,11 @@ describe("page setup", () => {
     await browser.keys(Key.Enter);
 
     await expect($("#page-setup")).not.toExist();
-    await expect($(".ProseMirror .doc-properties")).toHaveText("landscape");
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/\(landscape\)$/),
+    );
+    // the page setup stays out of the way of the text
+    await expect($(".ProseMirror .doc-properties")).not.toExist();
 
     await pressMod("s");
     await browser.waitUntil(
@@ -67,12 +71,14 @@ describe("page setup", () => {
   it("undoes the page setup in one step", async () => {
     await pressMod("z");
 
-    await expect($(".ProseMirror .doc-properties")).not.toExist();
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/\(portrait\)$/),
+    );
   });
 
-  it("opens from the summary line and takes custom margins", async () => {
+  it("takes custom margins", async () => {
     await pressMod(Key.Shift, "z");
-    await $(".ProseMirror .doc-properties").click();
+    await pressMod(Key.Alt, "u");
     await expect($("#page-setup")).toBeDisplayed();
 
     await $('#page-setup [data-row="margins"] [data-value="custom"]').click();
@@ -82,9 +88,72 @@ describe("page setup", () => {
     await browser.keys(Key.Enter);
 
     await expect($("#page-setup")).not.toExist();
-    await expect($(".ProseMirror .doc-properties")).toHaveText(
-      "landscape · custom margins",
+    await pressMod(Key.Alt, "u");
+    await expect(checked("margins")).toHaveText("Custom…");
+    await expect(checked("orientation")).toHaveText("Landscape");
+    await browser.keys(Key.Escape);
+  });
+
+  it("starts headings of the levels turned on on a new page", async () => {
+    await pressMod(Key.Alt, "u");
+    const headings = '#page-setup [data-row="newPageBefore"] button';
+
+    // down to the headings (past the custom margins of the test before),
+    // then the second one, switched on with Space
+    const inHeadings = () =>
+      browser.execute(
+        () => !!document.activeElement?.closest('[data-row="newPageBefore"]'),
+      );
+    for (let stop = 0; stop < 10 && !(await inHeadings()); stop++) {
+      await browser.keys(Key.ArrowDown);
+    }
+    await browser.keys(Key.ArrowRight);
+    await browser.keys(Key.Space);
+    await expect($(`${headings}[aria-pressed="true"]`)).toHaveText("Heading 2");
+    await browser.keys(Key.Enter);
+
+    await expect($("#page-setup")).not.toExist();
+    await pressMod("s");
+    await browser.waitUntil(
+      () => fs.readFileSync(fixturePath, "utf8").includes("new-page-before: 2"),
+      { timeoutMsg: "the heading levels have not been saved" },
     );
+  });
+
+  // +++ is tested in the unit tests: WebKitWebDriver can't type a +
+  it("starts new pages with Mod+Enter, and saves them", async () => {
+    const breaksPath = path.join(fixtureDir, "breaks.md");
+    fs.writeFileSync(breaksPath, "one\n");
+    await restartApp([breaksPath]);
+
+    await $(".ProseMirror p").click();
+    await type(Key.End);
+    await pressMod(Key.Enter);
+    await type("two");
+    await pressMod(Key.Enter);
+    await type("three");
+    await expect($$(".ProseMirror hr.page-break")).toBeElementsArrayOfSize(2);
+
+    await pressMod("s");
+    const expected =
+      "one\n\n<!-- pagebreak -->\n\ntwo\n\n<!-- pagebreak -->\n\nthree";
+    await browser.waitUntil(
+      () => fs.readFileSync(breaksPath, "utf8") === expected,
+      {
+        timeoutMsg: `the file has not been saved, it contains: ${fs.readFileSync(breaksPath, "utf8")}`,
+      },
+    );
+  });
+
+  it("shows the paper in the bottom bar, which opens the page setup", async () => {
+    await expect($("#ui-page")).toHaveText(
+      expect.stringMatching(/^(A4|Letter) \(portrait\)$/),
+    );
+
+    await $("#ui-page").click();
+    await expect($("#page-setup")).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    await expect($("#page-setup")).not.toExist();
   });
 
   it("cancels with Escape", async () => {

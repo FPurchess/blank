@@ -4,6 +4,7 @@ import { isSavableUrl } from "../../url";
 import {
   CAPTION_CLASS,
   HORIZONTAL_LINE_CLASS,
+  PAGE_BREAK_CLASS,
   TABLE_HEADING_CLASS,
 } from "./styleMap";
 
@@ -173,13 +174,18 @@ const droppedImages = (doc: Document) => {
 };
 
 /**
- * emptyParagraphs turns the paragraphs of horizontal lines into <hr> and
- * removes other empty paragraphs, e.g. the ones Word documents use as space
+ * emptyParagraphs turns the paragraphs of horizontal lines and page breaks
+ * into <hr> and removes other empty paragraphs, e.g. the ones Word documents
+ * use as space
  */
 const emptyParagraphs = (doc: Document) => {
   doc.querySelectorAll("p").forEach((paragraph) => {
     if (paragraph.classList.contains(HORIZONTAL_LINE_CLASS)) {
       paragraph.replaceWith(doc.createElement("hr"));
+    } else if (paragraph.classList.contains(PAGE_BREAK_CLASS)) {
+      const pageBreak = doc.createElement("hr");
+      pageBreak.dataset.pageBreak = "";
+      paragraph.replaceWith(pageBreak);
     } else if (
       !paragraph.textContent?.trim() &&
       !paragraph.querySelector("img, br")

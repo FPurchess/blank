@@ -103,6 +103,11 @@ export interface PageSetupRequest {
 // it is closed
 export const pageSetup = new Observable<PageSetupRequest | null>(null);
 
+// pageSetupRequests counts the requests to open the page setup from outside
+// the editor, e.g. the button in the bottom bar. The editor opens it for its
+// document on each one.
+export const pageSetupRequests = new Observable<number>(0);
+
 // language is the language tag autocorrect and spell check follow: an ISO
 // 639-1 code like "de", or a regional tag like "de-CH"
 export const language = new Observable<string>("en");
