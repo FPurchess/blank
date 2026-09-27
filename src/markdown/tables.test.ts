@@ -7,6 +7,7 @@ import {
   columnPercents,
   displayWidth,
   gfmBlocker,
+  withColumnAlignment,
   withColumnPercents,
 } from "./tables";
 import {
@@ -517,6 +518,48 @@ describe("column widths", () => {
         parser.parse(html('<col span="2" style="width: 100%">')).firstChild!,
       ),
     ).toEqual([50, 50]);
+  });
+});
+
+describe("withColumnAlignment", () => {
+  const aligns = (node: Node) =>
+    node.children.map((row) => row.children.map((cell) => cell.attrs.align));
+
+  it("aligns a column the way all its body cells agree on", () => {
+    const pasted = table(
+      tr(th("Fruit", { align: "left" }), th("Qty", { align: "left" })),
+      tr(td("kiwi", { align: "left" }), td("10", { align: "right" })),
+      tr(td("pear"), td("2", { align: "right" })),
+    );
+    const aligned = withColumnAlignment(pasted);
+
+    // left is the default; the numbers are right-aligned, header included
+    expect(aligns(aligned)).toEqual([
+      [null, "right"],
+      [null, "right"],
+      [null, "right"],
+    ]);
+    expect(gfmBlocker(aligned)).toBeNull();
+  });
+
+  it("leaves a column whose cells disagree, and merged cells, unaligned", () => {
+    const pasted = table(
+      tr(th("a", { colspan: 2, align: "center" })),
+      tr(td("b", { align: "center" }), td("c", { align: "right" })),
+      tr(td("d", { align: "center" }), td("e", { align: "center" })),
+    );
+
+    expect(aligns(withColumnAlignment(pasted))).toEqual([
+      [null],
+      ["center", null],
+      ["center", null],
+    ]);
+  });
+
+  it("takes the header cells of a table without a body", () => {
+    const headers = table(tr(th("a", { align: "center" }), th("b")));
+
+    expect(aligns(withColumnAlignment(headers))).toEqual([["center", null]]);
   });
 });
 

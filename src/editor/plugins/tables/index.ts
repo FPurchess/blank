@@ -1,3 +1,4 @@
+export { tableClipboard } from "./clipboard";
 export { tableGuard } from "./guard";
 export { tableHandles } from "./handles";
 export { tableKeys } from "./keys";

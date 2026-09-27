@@ -189,13 +189,16 @@ export const tableHandles = () => {
 
   return new Plugin({
     props: {
-      handleKeyDown: () => {
-        // typing hides the handles, until the mouse moves again
-        if (!held) {
-          hidden = true;
-          clear();
-        }
-        return false;
+      handleDOMEvents: {
+        // typing hides the handles, until the mouse moves again; the DOM
+        // event, since plugins before this one handle keys like Tab
+        keydown: () => {
+          if (!held) {
+            hidden = true;
+            clear();
+          }
+          return false;
+        },
       },
     },
     view(view) {

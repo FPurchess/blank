@@ -84,4 +84,24 @@ export const type = async (text: string) => {
   }
 };
 
+/**
+ * pastes `data` (by type, e.g. text/plain) into the editor the way the
+ * keyboard's paste does: the system clipboard is out of the webview's reach
+ * in E2E
+ */
+export const paste = (data: Record<string, string>) =>
+  browser.execute((data: Record<string, string>) => {
+    const clipboard = new DataTransfer();
+    for (const [type, value] of Object.entries(data)) {
+      clipboard.setData(type, value);
+    }
+    document.querySelector(".ProseMirror")!.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: clipboard,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, data);
+
 export { Key };

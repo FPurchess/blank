@@ -18,6 +18,7 @@ import { dispatchCorrection } from "../plugins/autocomplete/history";
 import { tableActions } from "../commands/table/actions";
 import { insertTable } from "../commands/table/insert";
 import { tableKey } from "../commands/table/tableKey";
+import { pasteText } from "../plugins/tables/clipboard";
 import { performAction, setTools } from "../plugins/tables/tools";
 import { separated } from "../../separated";
 import { DEFAULT_SIZE } from "../commands/table/pickerSize";
@@ -69,13 +70,14 @@ export const changeAll = (view: EditorView, word: string, text: string) => {
 
 /**
  * copy copies the selection like the keyboard shortcut does, falling back to
- * plain text where the webview doesn't allow it
+ * its text where the webview doesn't allow it, which is tab-separated for
+ * table cells
  */
 export const copy = async (view: EditorView, cut = false) => {
   view.focus();
   if (document.execCommand(cut ? "cut" : "copy")) return;
-  const { from, to } = view.state.selection;
-  await writeText(view.state.doc.textBetween(from, to, "\n\n"));
+  const { text } = view.serializeForClipboard(view.state.selection.content());
+  await writeText(text);
   if (cut) deleteSelection(view.state, view.dispatch);
 };
 
@@ -99,7 +101,7 @@ export const paste = async (view: EditorView, plain = false) => {
     }
   }
   const text = await readText();
-  if (text) view.pasteText(text);
+  if (text) pasteText(view, text, plain);
 };
 
 const run = (view: EditorView, action: (view: EditorView) => unknown) => () =>
