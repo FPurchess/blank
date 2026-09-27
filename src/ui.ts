@@ -1,3 +1,4 @@
+import { onScopeDispose, watch } from "vue";
 import {
   isPermissionGranted,
   requestPermission,
@@ -32,6 +33,7 @@ import { bootPageSetup } from "./pageSetup";
 import { bootTableHandles } from "./tableHandles";
 import { bootTableToolbar } from "./tableToolbar";
 import { basename } from "./paths";
+import { bootScope } from "./scope";
 import { uiRoot } from "./uiRoot";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
@@ -91,9 +93,6 @@ const renderLanguage = (element: HTMLElement, picker: LanguagePickerState) => {
   if (picker.buffer) item(picker.buffer + "_", "buffer");
 };
 
-// how long a message like "No spelling errors" shows
-const MESSAGE_DURATION = 2000;
-
 /**
  * renderSpellcheck renders the spell check status, or `message` if there is one
  */
@@ -135,156 +134,135 @@ export const setupNotification = async () => {
  * @returns dispose, which stops rendering and removes the UI, e.g. between
  * tests
  */
-export const bootUI = () => {
-  const root = uiRoot();
-  // what dispose undoes: subscriptions, timers and the boots below
-  const disposers: (() => void)[] = [];
-  const uiTop = document.createElement("div");
-  uiTop.id = "ui-top";
-  root.append(uiTop);
-  const renderTitle = () => {
-    const source = importedFrom.value;
-    // textContent: the path is user controlled and must not be parsed as HTML
-    uiTop.textContent =
-      "» " +
-      (path.value ??
-        (source === null ? "Untitled" : `${basename(source)} (imported)`));
-  };
-  disposers.push(
-    path.subscribe(renderTitle, { immediate: true }),
-    importedFrom.subscribe(renderTitle),
-  );
+export const bootUI = () =>
+  bootScope(() => {
+    const root = uiRoot();
+    onScopeDispose(() => root.remove());
 
-  const uiBottom = document.createElement("div");
-  uiBottom.id = "ui-bottom";
-  root.append(uiBottom);
+    const uiTop = document.createElement("div");
+    uiTop.id = "ui-top";
+    root.append(uiTop);
+    watch(
+      [path, importedFrom],
+      ([file, source]) => {
+        // textContent: the path is user controlled and must not be parsed as
+        // HTML
+        uiTop.textContent =
+          "» " +
+          (file ??
+            (source === null ? "Untitled" : `${basename(source)} (imported)`));
+      },
+      { flush: "sync", immediate: true },
+    );
 
-  const uiStats = document.createElement("span");
-  uiStats.id = "ui-stats";
-  uiBottom.appendChild(uiStats);
-  disposers.push(
-    textContent.subscribe(
+    const uiBottom = document.createElement("div");
+    uiBottom.id = "ui-bottom";
+    root.append(uiBottom);
+
+    const uiStats = document.createElement("span");
+    uiStats.id = "ui-stats";
+    uiBottom.appendChild(uiStats);
+    watch(
+      textContent,
       (content) => {
         const charCount = content.length;
         const wordCount = content.length ? content.split(/\s/).length : 0;
         uiStats.textContent = `${wordCount} words ${charCount} chars`;
       },
-      { immediate: true },
-    ),
-  );
-
-  // the paper of the document, which opens the page setup
-  const uiPage = document.createElement("span");
-  uiPage.id = "ui-page";
-  uiPage.setAttribute("role", "button");
-  uiBottom.appendChild(uiPage);
-  // keep the focus in the editor, which gets it back from the dialog
-  uiPage.addEventListener("mousedown", (event) => event.preventDefault());
-  uiPage.addEventListener("click", () => {
-    pageSetupRequests.value += 1;
-  });
-  let shownFor: { frontmatter: string | null; defaults: PageSettings } | null =
-    null;
-  const renderPage = () => {
-    const frontmatter = (transaction.value?.doc.attrs.frontmatter ?? null) as
-      string | null;
-    const defaults = config.value.layout.page;
-    // typing leaves both alone, so the frontmatter isn't read on every key
-    if (
-      shownFor?.frontmatter === frontmatter &&
-      shownFor.defaults === defaults
-    ) {
-      return;
-    }
-    shownFor = { frontmatter, defaults };
-    const { layout } = resolveLayout(frontmatter, defaults);
-    uiPage.textContent = describePageSize(layout, localeUnit());
-    uiPage.title = `Page setup (${getKeyBinding(CommandIdentifier.PAGE_SETUP)})`;
-  };
-  disposers.push(
-    transaction.subscribe(renderPage),
-    config.subscribe(renderPage),
-  );
-  renderPage();
-
-  const uiSpellcheck = document.createElement("span");
-  uiSpellcheck.id = "ui-spellcheck";
-  uiBottom.appendChild(uiSpellcheck);
-  uiSpellcheck.addEventListener("mousedown", (event) => event.preventDefault());
-  uiSpellcheck.addEventListener("click", () => {
-    spellcheck.value = !spellcheck.value;
-  });
-  let messageTimer: number | undefined;
-  const renderStatus = () =>
-    renderSpellcheck(
-      uiSpellcheck,
-      spellcheckStatus.value,
-      spellcheckMessage.value,
+      { flush: "sync", immediate: true },
     );
-  disposers.push(
-    spellcheckStatus.subscribe(renderStatus),
-    spellcheckMessage.subscribe((message) => {
-      renderStatus();
-      window.clearTimeout(messageTimer);
-      if (message) {
-        messageTimer = window.setTimeout(() => {
-          spellcheckMessage.value = null;
-        }, MESSAGE_DURATION);
-      }
-    }),
-    () => window.clearTimeout(messageTimer),
-  );
-  renderStatus();
 
-  // what just happened, e.g. "2 rows added": shown for a moment and read out
-  // by screen readers, so it's always there, empty in between. It sits on the
-  // left, next to the counter, so it doesn't push the items on the right.
-  const uiAnnouncement = document.createElement("span");
-  uiAnnouncement.id = "ui-announcement";
-  uiAnnouncement.setAttribute("role", "status");
-  uiStats.after(uiAnnouncement);
-  let announcementTimer: number | undefined;
-  disposers.push(
-    announcement.subscribe((message) => {
-      uiAnnouncement.textContent = message ?? "";
-      window.clearTimeout(announcementTimer);
-      if (message) {
-        // long enough to read a longer message too
-        const duration = Math.max(MESSAGE_DURATION, message.length * 60);
-        announcementTimer = window.setTimeout(() => {
-          announcement.value = null;
-        }, duration);
-      }
-    }),
-    () => window.clearTimeout(announcementTimer),
-  );
+    // what just happened, e.g. "2 rows added": shown for a moment and read
+    // out by screen readers, so it's always there, empty in between. It sits
+    // on the left, next to the counter, so it doesn't push the items on the
+    // right.
+    const uiAnnouncement = document.createElement("span");
+    uiAnnouncement.id = "ui-announcement";
+    uiAnnouncement.setAttribute("role", "status");
+    uiBottom.appendChild(uiAnnouncement);
+    watch(
+      announcement,
+      (message) => {
+        uiAnnouncement.textContent = message?.text ?? "";
+      },
+      { flush: "sync", immediate: true },
+    );
 
-  const uiLanguage = document.createElement("span");
-  uiLanguage.id = "ui-language";
-  uiBottom.appendChild(uiLanguage);
-  // keep the focus in the editor, which handles the picker's keys
-  uiLanguage.addEventListener("mousedown", (event) => event.preventDefault());
-  uiLanguage.addEventListener("click", () => {
-    if (!languagePicker.value.open) openPicker();
+    // the paper of the document, which opens the page setup
+    const uiPage = document.createElement("span");
+    uiPage.id = "ui-page";
+    uiPage.setAttribute("role", "button");
+    uiBottom.appendChild(uiPage);
+    // keep the focus in the editor, which gets it back from the dialog
+    uiPage.addEventListener("mousedown", (event) => event.preventDefault());
+    uiPage.addEventListener("click", () => {
+      pageSetupRequests.value += 1;
+    });
+    let shownFor: {
+      frontmatter: string | null;
+      defaults: PageSettings;
+    } | null = null;
+    watch(
+      [transaction, config],
+      ([tx, { layout }]) => {
+        const frontmatter = (tx?.doc.attrs.frontmatter ?? null) as
+          string | null;
+        const defaults = layout.page;
+        // typing leaves both alone, so the frontmatter isn't read on every key
+        if (
+          shownFor?.frontmatter === frontmatter &&
+          shownFor.defaults === defaults
+        ) {
+          return;
+        }
+        shownFor = { frontmatter, defaults };
+        uiPage.textContent = describePageSize(
+          resolveLayout(frontmatter, defaults).layout,
+          localeUnit(),
+        );
+        uiPage.title = `Page setup (${getKeyBinding(CommandIdentifier.PAGE_SETUP)})`;
+      },
+      { flush: "sync", immediate: true },
+    );
+
+    const uiSpellcheck = document.createElement("span");
+    uiSpellcheck.id = "ui-spellcheck";
+    uiBottom.appendChild(uiSpellcheck);
+    uiSpellcheck.addEventListener("mousedown", (event) =>
+      event.preventDefault(),
+    );
+    uiSpellcheck.addEventListener("click", () => {
+      spellcheck.value = !spellcheck.value;
+    });
+    watch(
+      [spellcheckStatus, spellcheckMessage],
+      ([status, message]) =>
+        renderSpellcheck(uiSpellcheck, status, message?.text ?? null),
+      { flush: "sync", immediate: true },
+    );
+
+    const uiLanguage = document.createElement("span");
+    uiLanguage.id = "ui-language";
+    uiBottom.appendChild(uiLanguage);
+    // keep the focus in the editor, which handles the picker's keys
+    uiLanguage.addEventListener("mousedown", (event) => event.preventDefault());
+    uiLanguage.addEventListener("click", () => {
+      if (!languagePicker.value.open) openPicker();
+    });
+    watch(
+      [language, languagePicker],
+      ([, picker]) => renderLanguage(uiLanguage, picker),
+      { flush: "sync", immediate: true },
+    );
+
+    bootLinkDialog();
+    bootImageDialog();
+    bootPageSetup();
+    bootContextMenu();
+    bootTablePicker();
+    bootTableToolbar();
+    bootTableHandles();
+
+    // FIXME: better handling of permission errors
+    setupNotification().catch(console.error);
   });
-  const render = () => renderLanguage(uiLanguage, languagePicker.value);
-  disposers.push(
-    language.subscribe(render),
-    languagePicker.subscribe(render, { immediate: true }),
-    bootLinkDialog(),
-    bootImageDialog(),
-    bootPageSetup(),
-    bootContextMenu(),
-    bootTablePicker(),
-    bootTableToolbar(),
-    bootTableHandles(),
-  );
-
-  // FIXME: better handling of permission errors
-  setupNotification().catch(console.error);
-
-  return () => {
-    disposers.forEach((dispose) => dispose());
-    root.remove();
-  };
-};

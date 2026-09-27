@@ -1,6 +1,7 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { bootConfig } from "./config";
+import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
@@ -30,6 +31,7 @@ const showBootError = (error: unknown) => {
 (async () => {
   let editorReady = false;
   try {
+    bootState();
     await bootConfig();
     await bootStorage();
     await bootEditor();

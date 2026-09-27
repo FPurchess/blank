@@ -1,3 +1,5 @@
+import { onScopeDispose, watch } from "vue";
+
 import { roundPercent } from "./markdown/tables";
 import {
   type Point,
@@ -5,6 +7,7 @@ import {
   tableHandles,
   type TableHandlesState,
 } from "./state";
+import { bootScope, listenOnWindow } from "./scope";
 import { uiRoot } from "./uiRoot";
 
 // The handles of the table under the mouse, see
@@ -281,369 +284,375 @@ export const outcomeOf = (drag: Drag, table: TableHandlesState): Outcome => {
  * lets the mouse use them
  * @returns a function that removes them
  */
-export const bootTableHandles = () => {
-  const root = document.createElement("div");
-  root.id = HANDLES_ID;
-  root.className = "table-handles";
-  root.setAttribute("aria-hidden", "true");
-  uiRoot().append(root);
+export const bootTableHandles = () =>
+  bootScope(() => {
+    const root = document.createElement("div");
+    root.id = HANDLES_ID;
+    root.className = "table-handles";
+    root.setAttribute("aria-hidden", "true");
+    uiRoot().append(root);
 
-  const rowGrip = element(root, "div", "grip row");
-  const columnGrip = element(root, "div", "grip column");
-  const insert = element(root, "div", "insert");
-  const insertLine = element(root, "div", "insert-line");
-  const resizers = element(root, "div", "resizers");
-  const right = element(root, "div", "edge right");
-  const bottom = element(root, "div", "edge bottom");
-  const corner = element(root, "div", "edge corner");
-  const guide = element(root, "div", "guide");
-  const dragged = element(root, "div", "dragged");
-  const ghost = element(root, "div", "ghost");
-  const size = element(ghost, "span", "size");
+    const rowGrip = element(root, "div", "grip row");
+    const columnGrip = element(root, "div", "grip column");
+    const insert = element(root, "div", "insert");
+    const insertLine = element(root, "div", "insert-line");
+    const resizers = element(root, "div", "resizers");
+    const right = element(root, "div", "edge right");
+    const bottom = element(root, "div", "edge bottom");
+    const corner = element(root, "div", "edge corner");
+    const guide = element(root, "div", "guide");
+    const dragged = element(root, "div", "dragged");
+    const ghost = element(root, "div", "ghost");
+    const size = element(ghost, "span", "size");
 
-  const nothing: Hover = {
-    row: null,
-    column: null,
-    insertRow: null,
-    insertColumn: null,
-  };
-  let table: TableHandlesState | null = null;
-  let pointer: Point = { x: -1, y: -1 };
-  let hover = nothing;
-  let drag: Drag | null = null;
-  // the line between columns pressed last, for double clicks
-  let lastPress: { index: number; time: number } | null = null;
+    const nothing: Hover = {
+      row: null,
+      column: null,
+      insertRow: null,
+      insertColumn: null,
+    };
+    let table: TableHandlesState | null = null;
+    let pointer: Point = { x: -1, y: -1 };
+    let hover = nothing;
+    let drag: Drag | null = null;
+    // the line between columns pressed last, for double clicks
+    let lastPress: { index: number; time: number } | null = null;
 
-  /**
-   * selectedSpan returns the selected rows or columns if they are whole
-   * rows or columns and hold `index`
-   */
-  const selectedSpan = (axis: Axis, index: number): Span | null => {
-    if (!table?.selected) return null;
-    const [from, to] = table.selected[axis];
-    const [acrossFrom, acrossTo] =
-      table.selected[axis === "rows" ? "columns" : "rows"];
-    const across = (axis === "rows" ? table.columns : table.rows).length - 1;
-    const whole = acrossFrom === 0 && acrossTo === across;
-    return whole && index >= from && index < to ? [from, to] : null;
-  };
+    /**
+     * selectedSpan returns the selected rows or columns if they are whole
+     * rows or columns and hold `index`
+     */
+    const selectedSpan = (axis: Axis, index: number): Span | null => {
+      if (!table?.selected) return null;
+      const [from, to] = table.selected[axis];
+      const [acrossFrom, acrossTo] =
+        table.selected[axis === "rows" ? "columns" : "rows"];
+      const across = (axis === "rows" ? table.columns : table.rows).length - 1;
+      const whole = acrossFrom === 0 && acrossTo === across;
+      return whole && index >= from && index < to ? [from, to] : null;
+    };
 
-  /**
-   * spanOf returns the rows or columns the handle at `index` works on: the
-   * selected ones if it is among them, just its own otherwise
-   */
-  const spanOf = (axis: Axis, index: number): Span =>
-    selectedSpan(axis, index) ?? [index, index + 1];
+    /**
+     * spanOf returns the rows or columns the handle at `index` works on: the
+     * selected ones if it is among them, just its own otherwise
+     */
+    const spanOf = (axis: Axis, index: number): Span =>
+      selectedSpan(axis, index) ?? [index, index + 1];
 
-  const render = () => {
-    root.hidden = !table;
-    if (!table) return;
-    const { box, visible, rows, columns } = table;
-    const height = box.bottom - box.top;
-    const across = visible.right - visible.left;
+    const render = () => {
+      root.hidden = !table;
+      if (!table) return;
+      const { box, visible, rows, columns } = table;
+      const height = box.bottom - box.top;
+      const across = visible.right - visible.left;
 
-    // the handles of the row and column under the mouse; the "+" hides
-    // them, so it stands out
-    const inserting = hover.insertRow !== null || hover.insertColumn !== null;
-    const row = !drag && !inserting ? hover.row : null;
-    const column = !drag && !inserting ? hover.column : null;
-    place(
-      rowGrip,
-      row === null
-        ? null
-        : {
-            left: visible.left - 6,
-            top: rows[row] + 6,
-            width: 12,
-            height: Math.max(rows[row + 1] - rows[row] - 12, 8),
-          },
-    );
-    rowGrip.classList.toggle(
-      "selected",
-      row !== null && !!selectedSpan("rows", row),
-    );
-    const columnLeft =
-      column === null ? 0 : Math.max(columns[column], visible.left);
-    const columnRight =
-      column === null ? 0 : Math.min(columns[column + 1], visible.right);
-    place(
-      columnGrip,
-      column === null || columnRight - columnLeft <= 16
-        ? null
-        : {
-            left: columnLeft + 6,
-            top: box.top - 6,
-            width: columnRight - columnLeft - 12,
-            height: 12,
-          },
-    );
-    columnGrip.classList.toggle(
-      "selected",
-      column !== null && !!selectedSpan("columns", column),
-    );
-
-    // the "+" and the line where it inserts
-    const y = hover.insertRow === null ? null : rows[hover.insertRow];
-    const x = hover.insertColumn === null ? null : columns[hover.insertColumn];
-    const columnShown = x !== null && x >= visible.left && x <= visible.right;
-    if (!drag && y !== null) {
-      place(insert, {
-        left: visible.left - 9,
-        top: y - 9,
-        width: 18,
-        height: 18,
-      });
-      place(insertLine, {
-        left: visible.left,
-        top: y - 1,
-        width: across,
-        height: 2,
-      });
-    } else if (!drag && columnShown) {
-      place(insert, { left: x - 9, top: box.top - 9, width: 18, height: 18 });
-      place(insertLine, { left: x - 1, top: box.top, width: 2, height });
-    } else {
-      place(insert, null);
-      place(insertLine, null);
-    }
-
-    // the lines between columns, which resize them
-    const lines = columns.slice(1, -1);
-    while (resizers.children.length < lines.length) {
-      const resizer = element(resizers, "div", "resizer");
-      // the column after the line
-      resizer.dataset.index = String(resizers.children.length);
-    }
-    while (resizers.children.length > lines.length) {
-      resizers.lastElementChild!.remove();
-    }
-    lines.forEach((line, i) => {
-      const shown = !drag && line > visible.left && line < visible.right;
+      // the handles of the row and column under the mouse; the "+" hides
+      // them, so it stands out
+      const inserting = hover.insertRow !== null || hover.insertColumn !== null;
+      const row = !drag && !inserting ? hover.row : null;
+      const column = !drag && !inserting ? hover.column : null;
       place(
-        resizers.children[i] as HTMLElement,
-        shown ? { left: line - 4, top: box.top, width: 8, height } : null,
+        rowGrip,
+        row === null
+          ? null
+          : {
+              left: visible.left - 6,
+              top: rows[row] + 6,
+              width: 12,
+              height: Math.max(rows[row + 1] - rows[row] - 12, 8),
+            },
       );
-    });
+      rowGrip.classList.toggle(
+        "selected",
+        row !== null && !!selectedSpan("rows", row),
+      );
+      const columnLeft =
+        column === null ? 0 : Math.max(columns[column], visible.left);
+      const columnRight =
+        column === null ? 0 : Math.min(columns[column + 1], visible.right);
+      place(
+        columnGrip,
+        column === null || columnRight - columnLeft <= 16
+          ? null
+          : {
+              left: columnLeft + 6,
+              top: box.top - 6,
+              width: columnRight - columnLeft - 12,
+              height: 12,
+            },
+      );
+      columnGrip.classList.toggle(
+        "selected",
+        column !== null && !!selectedSpan("columns", column),
+      );
 
-    // the edges, which add and drop columns and rows
-    const rightShown = !drag && box.right <= visible.right + 1;
-    place(
-      right,
-      rightShown
-        ? { left: box.right - 3, top: box.top, width: 9, height: height - 6 }
-        : null,
-    );
-    place(
-      bottom,
-      drag
-        ? null
-        : {
-            left: visible.left,
-            top: box.bottom - 3,
-            width: across - 6,
-            height: 9,
-          },
-    );
-    place(
-      corner,
-      rightShown
-        ? { left: box.right - 5, top: box.bottom - 5, width: 12, height: 12 }
-        : null,
-    );
-  };
-
-  /**
-   * preview shows what the drag leads to: where rows or columns land, where
-   * the line between columns goes, or the table's new size
-   */
-  const preview = (current: Drag, now: TableHandlesState) => {
-    const { box, visible, rows, columns } = now;
-    const height = box.bottom - box.top;
-    const outcome = outcomeOf(current, now);
-    if (outcome.kind === "move" && current.kind === "move") {
-      const lines = current.axis === "rows" ? rows : columns;
-      const [from, to] = current.span;
-      if (current.axis === "rows") {
-        const across = visible.right - visible.left;
-        place(guide, {
-          left: visible.left,
-          top: lines[outcome.line] - 2,
-          width: across,
-          height: 4,
+      // the "+" and the line where it inserts
+      const y = hover.insertRow === null ? null : rows[hover.insertRow];
+      const x =
+        hover.insertColumn === null ? null : columns[hover.insertColumn];
+      const columnShown = x !== null && x >= visible.left && x <= visible.right;
+      if (!drag && y !== null) {
+        place(insert, {
+          left: visible.left - 9,
+          top: y - 9,
+          width: 18,
+          height: 18,
         });
-        place(dragged, {
+        place(insertLine, {
           left: visible.left,
-          top: lines[from],
+          top: y - 1,
           width: across,
-          height: lines[to] - lines[from],
+          height: 2,
         });
+      } else if (!drag && columnShown) {
+        place(insert, { left: x - 9, top: box.top - 9, width: 18, height: 18 });
+        place(insertLine, { left: x - 1, top: box.top, width: 2, height });
       } else {
-        const left = Math.max(lines[from], visible.left);
-        place(guide, {
-          left: lines[outcome.line] - 2,
-          top: box.top,
-          width: 4,
-          height,
-        });
-        place(dragged, {
-          left,
-          top: box.top,
-          width: Math.min(lines[to], visible.right) - left,
-          height,
-        });
+        place(insert, null);
+        place(insertLine, null);
       }
+
+      // the lines between columns, which resize them
+      const lines = columns.slice(1, -1);
+      while (resizers.children.length < lines.length) {
+        const resizer = element(resizers, "div", "resizer");
+        // the column after the line
+        resizer.dataset.index = String(resizers.children.length);
+      }
+      while (resizers.children.length > lines.length) {
+        resizers.lastElementChild!.remove();
+      }
+      lines.forEach((line, i) => {
+        const shown = !drag && line > visible.left && line < visible.right;
+        place(
+          resizers.children[i] as HTMLElement,
+          shown ? { left: line - 4, top: box.top, width: 8, height } : null,
+        );
+      });
+
+      // the edges, which add and drop columns and rows
+      const rightShown = !drag && box.right <= visible.right + 1;
+      place(
+        right,
+        rightShown
+          ? { left: box.right - 3, top: box.top, width: 9, height: height - 6 }
+          : null,
+      );
+      place(
+        bottom,
+        drag
+          ? null
+          : {
+              left: visible.left,
+              top: box.bottom - 3,
+              width: across - 6,
+              height: 9,
+            },
+      );
+      place(
+        corner,
+        rightShown
+          ? { left: box.right - 5, top: box.bottom - 5, width: 12, height: 12 }
+          : null,
+      );
+    };
+
+    /**
+     * preview shows what the drag leads to: where rows or columns land, where
+     * the line between columns goes, or the table's new size
+     */
+    const preview = (current: Drag, now: TableHandlesState) => {
+      const { box, visible, rows, columns } = now;
+      const height = box.bottom - box.top;
+      const outcome = outcomeOf(current, now);
+      if (outcome.kind === "move" && current.kind === "move") {
+        const lines = current.axis === "rows" ? rows : columns;
+        const [from, to] = current.span;
+        if (current.axis === "rows") {
+          const across = visible.right - visible.left;
+          place(guide, {
+            left: visible.left,
+            top: lines[outcome.line] - 2,
+            width: across,
+            height: 4,
+          });
+          place(dragged, {
+            left: visible.left,
+            top: lines[from],
+            width: across,
+            height: lines[to] - lines[from],
+          });
+        } else {
+          const left = Math.max(lines[from], visible.left);
+          place(guide, {
+            left: lines[outcome.line] - 2,
+            top: box.top,
+            width: 4,
+            height,
+          });
+          place(dragged, {
+            left,
+            top: box.top,
+            width: Math.min(lines[to], visible.right) - left,
+            height,
+          });
+        }
+        render();
+      } else if (outcome.kind === "resize" && current.kind === "resize") {
+        const before = outcome.widths
+          .slice(0, current.index)
+          .reduce((sum, width) => sum + width, 0);
+        const x = box.left + ((box.right - box.left) * before) / 100;
+        place(guide, { left: x - 1, top: box.top, width: 2, height });
+      } else if (outcome.kind === "edge") {
+        const width =
+          extent(columns, outcome.cols, growStep(columns, true)) - box.left;
+        const tall =
+          extent(rows, outcome.rows, growStep(rows, false)) - box.top;
+        place(ghost, { left: box.left, top: box.top, width, height: tall });
+        size.textContent = `${outcome.cols} × ${outcome.rows}`;
+      }
+    };
+
+    /**
+     * finish does what the drag led to
+     */
+    const finish = (current: Drag, now: TableHandlesState) => {
+      const outcome = outcomeOf(current, now);
+      if (current.kind === "move" && !current.moving) {
+        // a click on a handle
+        const grip = current.axis === "rows" ? rowGrip : columnGrip;
+        const rect = grip.getBoundingClientRect();
+        const anchor = { left: rect.left, top: rect.top, bottom: rect.bottom };
+        if (current.axis === "rows") now.selectRows(current.span, anchor);
+        else now.selectColumns(current.span, anchor);
+      } else if (outcome.kind === "move" && current.kind === "move") {
+        if (outcome.by === 0) return;
+        if (current.axis === "rows") now.moveRows(current.span, outcome.by);
+        else now.moveColumns(current.span, outcome.by);
+      } else if (outcome.kind === "resize") {
+        if (current.at.x !== current.start.x) now.setWidths(outcome.widths);
+      } else if (outcome.kind === "edge") {
+        const changed =
+          outcome.cols !== now.columns.length - 1 ||
+          outcome.rows !== now.rows.length - 1;
+        if (changed) now.resize(outcome.cols, outcome.rows);
+      }
+    };
+
+    const update = () => {
+      hover = table ? hoverAt(table, pointer) : nothing;
       render();
-    } else if (outcome.kind === "resize" && current.kind === "resize") {
-      const before = outcome.widths
-        .slice(0, current.index)
-        .reduce((sum, width) => sum + width, 0);
-      const x = box.left + ((box.right - box.left) * before) / 100;
-      place(guide, { left: x - 1, top: box.top, width: 2, height });
-    } else if (outcome.kind === "edge") {
-      const width =
-        extent(columns, outcome.cols, growStep(columns, true)) - box.left;
-      const tall = extent(rows, outcome.rows, growStep(rows, false)) - box.top;
-      place(ghost, { left: box.left, top: box.top, width, height: tall });
-      size.textContent = `${outcome.cols} × ${outcome.rows}`;
-    }
-  };
+    };
 
-  /**
-   * finish does what the drag led to
-   */
-  const finish = (current: Drag, now: TableHandlesState) => {
-    const outcome = outcomeOf(current, now);
-    if (current.kind === "move" && !current.moving) {
-      // a click on a handle
-      const grip = current.axis === "rows" ? rowGrip : columnGrip;
-      const rect = grip.getBoundingClientRect();
-      const anchor = { left: rect.left, top: rect.top, bottom: rect.bottom };
-      if (current.axis === "rows") now.selectRows(current.span, anchor);
-      else now.selectColumns(current.span, anchor);
-    } else if (outcome.kind === "move" && current.kind === "move") {
-      if (outcome.by === 0) return;
-      if (current.axis === "rows") now.moveRows(current.span, outcome.by);
-      else now.moveColumns(current.span, outcome.by);
-    } else if (outcome.kind === "resize") {
-      if (current.at.x !== current.start.x) now.setWidths(outcome.widths);
-    } else if (outcome.kind === "edge") {
-      const changed =
-        outcome.cols !== now.columns.length - 1 ||
-        outcome.rows !== now.rows.length - 1;
-      if (changed) now.resize(outcome.cols, outcome.rows);
-    }
-  };
-
-  const update = () => {
-    hover = table ? hoverAt(table, pointer) : nothing;
-    render();
-  };
-
-  const endDrag = () => {
-    drag = null;
-    place(guide, null);
-    place(dragged, null);
-    place(ghost, null);
-    table?.hold(false);
-    update();
-  };
-
-  const unsubscribe = tableHandles.subscribe(
-    (state) => {
-      table = state;
+    const endDrag = () => {
+      drag = null;
+      place(guide, null);
+      place(dragged, null);
+      place(ghost, null);
+      table?.hold(false);
       update();
-    },
-    { immediate: true },
-  );
+    };
 
-  const move = (event: MouseEvent) => {
-    pointer = { x: event.clientX, y: event.clientY };
-    if (!drag) update();
-  };
-  // Esc cancels a drag
-  const cancel = (event: KeyboardEvent) => {
-    if (drag && event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      endDrag();
-    }
-  };
-  window.addEventListener("mousemove", move);
-  window.addEventListener("keydown", cancel, true);
+    watch(
+      tableHandles,
+      (state) => {
+        table = state;
+        update();
+      },
+      { flush: "sync", immediate: true },
+    );
 
-  // pressing a handle keeps the focus in the editor
-  root.addEventListener("mousedown", (event) => event.preventDefault());
-
-  root.addEventListener("pointerdown", (event) => {
-    const target = event.target as HTMLElement;
-    if (!table || event.button !== 0) return;
-    const start = { x: event.clientX, y: event.clientY };
-    const at = start;
-    if (target === insert) {
-      if (hover.insertRow !== null) table.insertRow(hover.insertRow);
-      else if (hover.insertColumn !== null) {
-        table.insertColumn(hover.insertColumn);
+    const move = (event: MouseEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+      if (!drag) update();
+    };
+    // Esc cancels a drag
+    const cancel = (event: KeyboardEvent) => {
+      if (drag && event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        endDrag();
       }
-      return;
-    }
-    if (target === rowGrip && hover.row !== null) {
-      const span = spanOf("rows", hover.row);
-      drag = { kind: "move", axis: "rows", span, start, at, moving: false };
-    } else if (target === columnGrip && hover.column !== null) {
-      const span = spanOf("columns", hover.column);
-      drag = { kind: "move", axis: "columns", span, start, at, moving: false };
-    } else if (target.classList.contains("resizer")) {
-      // a double click sizes the columns by content again; told apart here,
-      // since the pointer capture sends the dblclick event to the root
-      const index = Number(target.dataset.index);
-      const now = Date.now();
-      if (lastPress?.index === index && now - lastPress.time < DOUBLE_CLICK) {
-        lastPress = null;
-        table.setWidths(null);
+    };
+    listenOnWindow("mousemove", move);
+    listenOnWindow("keydown", cancel, true);
+
+    // pressing a handle keeps the focus in the editor
+    root.addEventListener("mousedown", (event) => event.preventDefault());
+
+    root.addEventListener("pointerdown", (event) => {
+      const target = event.target as HTMLElement;
+      if (!table || event.button !== 0) return;
+      const start = { x: event.clientX, y: event.clientY };
+      const at = start;
+      if (target === insert) {
+        if (hover.insertRow !== null) table.insertRow(hover.insertRow);
+        else if (hover.insertColumn !== null) {
+          table.insertColumn(hover.insertColumn);
+        }
         return;
       }
-      lastPress = { index, time: now };
-      drag = { kind: "resize", index, start, at };
-    } else if (target.classList.contains("edge")) {
-      const horizontal = target !== bottom;
-      const vertical = target !== right;
-      drag = { kind: "edge", horizontal, vertical, start, at };
-    } else {
-      return;
-    }
-    // keeps the drag going while the mouse leaves the handle
-    root.setPointerCapture?.(event.pointerId);
-    table.hold(true);
+      if (target === rowGrip && hover.row !== null) {
+        const span = spanOf("rows", hover.row);
+        drag = { kind: "move", axis: "rows", span, start, at, moving: false };
+      } else if (target === columnGrip && hover.column !== null) {
+        const span = spanOf("columns", hover.column);
+        drag = {
+          kind: "move",
+          axis: "columns",
+          span,
+          start,
+          at,
+          moving: false,
+        };
+      } else if (target.classList.contains("resizer")) {
+        // a double click sizes the columns by content again; told apart here,
+        // since the pointer capture sends the dblclick event to the root
+        const index = Number(target.dataset.index);
+        const now = Date.now();
+        if (lastPress?.index === index && now - lastPress.time < DOUBLE_CLICK) {
+          lastPress = null;
+          table.setWidths(null);
+          return;
+        }
+        lastPress = { index, time: now };
+        drag = { kind: "resize", index, start, at };
+      } else if (target.classList.contains("edge")) {
+        const horizontal = target !== bottom;
+        const vertical = target !== right;
+        drag = { kind: "edge", horizontal, vertical, start, at };
+      } else {
+        return;
+      }
+      // keeps the drag going while the mouse leaves the handle
+      root.setPointerCapture?.(event.pointerId);
+      table.hold(true);
+    });
+
+    root.addEventListener("pointermove", (event) => {
+      if (!drag || !table) return;
+      drag.at = { x: event.clientX, y: event.clientY };
+      if (drag.kind === "move" && !drag.moving) {
+        const distance = Math.hypot(
+          drag.at.x - drag.start.x,
+          drag.at.y - drag.start.y,
+        );
+        if (distance < DRAG_AFTER) return;
+        drag.moving = true;
+      }
+      preview(drag, table);
+    });
+
+    root.addEventListener("pointerup", () => {
+      if (!drag || !table) return;
+      const current = drag;
+      const now = table;
+      endDrag();
+      finish(current, now);
+    });
+
+    root.addEventListener("pointercancel", endDrag);
+
+    onScopeDispose(() => root.remove());
   });
-
-  root.addEventListener("pointermove", (event) => {
-    if (!drag || !table) return;
-    drag.at = { x: event.clientX, y: event.clientY };
-    if (drag.kind === "move" && !drag.moving) {
-      const distance = Math.hypot(
-        drag.at.x - drag.start.x,
-        drag.at.y - drag.start.y,
-      );
-      if (distance < DRAG_AFTER) return;
-      drag.moving = true;
-    }
-    preview(drag, table);
-  });
-
-  root.addEventListener("pointerup", () => {
-    if (!drag || !table) return;
-    const current = drag;
-    const now = table;
-    endDrag();
-    finish(current, now);
-  });
-
-  root.addEventListener("pointercancel", endDrag);
-
-  return () => {
-    unsubscribe();
-    window.removeEventListener("mousemove", move);
-    window.removeEventListener("keydown", cancel, true);
-    root.remove();
-  };
-};

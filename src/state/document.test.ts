@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
-import { schema } from "./markdown";
+import { schema } from "../markdown";
 
-import { textContent, theme, transaction } from "./state";
-import { doc, h, li, p, ul } from "./test/editor";
+import { bootDocumentState, textContent, transaction } from "./document";
+import { doc, h, li, p, ul } from "../test/editor";
 
 /**
  * emit publishes a transaction that replaces the whole doc with `node`.
@@ -13,12 +13,19 @@ const emit = (node: ReturnType<typeof doc>) => {
   transaction.value = state.tr.replaceWith(0, state.doc.content.size, node);
 };
 
-describe("state.textContent", () => {
+describe("textContent", () => {
+  let dispose = () => {};
+
   beforeEach(() => {
     vi.useFakeTimers();
     transaction.value = null;
-    vi.runAllTimers();
     textContent.value = "";
+    dispose = bootDocumentState();
+  });
+
+  afterEach(() => {
+    dispose();
+    vi.useRealTimers();
   });
 
   it("updates 50ms after the last transaction", () => {
@@ -84,14 +91,14 @@ describe("state.textContent", () => {
 
     expect(textContent.value).toBe("text");
   });
-});
 
-describe("state.theme", () => {
-  it("applies the theme to the document body", () => {
-    theme.value = "red";
-    expect(document.body.dataset.theme).toBe("red");
+  it("stops following the transactions once disposed", () => {
+    emit(doc(p("first")));
+    dispose();
+    vi.runAllTimers();
+    emit(doc(p("second")));
+    vi.runAllTimers();
 
-    theme.value = "light";
-    expect(document.body.dataset.theme).toBe("light");
+    expect(textContent.value).toBe("");
   });
 });

@@ -1,3 +1,5 @@
+import { onScopeDispose, watch } from "vue";
+
 import {
   type ContextMenuRequest,
   contextMenu,
@@ -7,6 +9,7 @@ import {
 } from "./state";
 import { formatShortcut } from "./editor/keyBindings";
 import { place } from "./popup";
+import { bootScope, listenOnWindow } from "./scope";
 import { uiRoot } from "./uiRoot";
 
 const MENU_ID = "context-menu";
@@ -25,7 +28,8 @@ let request: ContextMenuRequest | null = null;
 let levels: Level[] = [];
 // the user moved the focus, so an update keeps it where it is
 let moved = false;
-let unsubscribers: (() => void)[] = [];
+// stops the booted menu, so booting again replaces it
+let disposeMenu: (() => void) | undefined;
 // opening the menu for the next misspelling scrolls to it, which mustn't
 // close the menu right away
 let openedAt = -Infinity;
@@ -350,49 +354,42 @@ const outside = (event: Event) =>
  * request, and keeps the webview's own menu from showing up elsewhere
  */
 export const bootContextMenu = () => {
-  unsubscribers.forEach((unsubscribe) => unsubscribe());
-  const listen = <K extends keyof WindowEventMap>(
-    type: K,
-    listener: (event: WindowEventMap[K]) => void,
-    capture = true,
-  ) => {
-    window.addEventListener(type, listener, capture);
-    return () => window.removeEventListener(type, listener, capture);
-  };
-  const closeOnChange = () => {
-    if (request) close();
-  };
-
-  unsubscribers = [
-    contextMenu.subscribe(render, { immediate: true }),
-    spellcheck.subscribe(closeOnChange),
-    language.subscribe(closeOnChange),
-    listen("mousedown", (event) => {
-      if (request && outside(event)) close();
-    }),
-    listen("scroll", (event) => {
-      const settled = Date.now() - openedAt > SCROLL_GRACE;
-      if (request && settled && outside(event)) close();
-    }),
-    listen("resize", closeOnChange),
-    listen("blur", closeOnChange, false),
+  disposeMenu?.();
+  disposeMenu = bootScope(() => {
+    const closeOnChange = () => {
+      if (request) close();
+    };
+    watch(contextMenu, render, { flush: "sync", immediate: true });
+    watch([spellcheck, language], closeOnChange, { flush: "sync" });
+    listenOnWindow(
+      "mousedown",
+      (event) => {
+        if (request && outside(event)) close();
+      },
+      true,
+    );
+    listenOnWindow(
+      "scroll",
+      (event) => {
+        const settled = Date.now() - openedAt > SCROLL_GRACE;
+        if (request && settled && outside(event)) close();
+      },
+      true,
+    );
+    listenOnWindow("resize", closeOnChange, true);
+    listenOnWindow("blur", closeOnChange);
     // the menus of the webview offer reload and back, which lose the text.
     // Text fields keep theirs, and Shift + right click shows it anyway.
     // in the bubble phase, since the editor ignores prevented events
-    listen(
-      "contextmenu",
-      (event) => {
-        const target = event.target instanceof Element ? event.target : null;
-        if (event.shiftKey || target?.closest("input, textarea")) return;
-        event.preventDefault();
-      },
-      false,
-    ),
-  ];
-  return () => {
-    unsubscribers.forEach((unsubscribe) => unsubscribe());
-    unsubscribers = [];
-    remove();
-    request = null;
-  };
+    listenOnWindow("contextmenu", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (event.shiftKey || target?.closest("input, textarea")) return;
+      event.preventDefault();
+    });
+    onScopeDispose(() => {
+      remove();
+      request = null;
+    });
+  });
+  return disposeMenu;
 };

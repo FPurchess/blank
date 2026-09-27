@@ -80,14 +80,14 @@ describe("tableTools", () => {
 
       expect(focus).toHaveBeenCalled();
       expect(cellTexts(view.state.doc)).toHaveLength(4);
-      expect(announcement.value).toBe("A row added");
+      expect(announcement.value?.text).toBe("A row added");
     });
 
     it("announces why an action can't be done", () => {
       setup();
       item("merge").run();
 
-      expect(announcement.value).toBe("Split cell isn't possible here");
+      expect(announcement.value?.text).toBe("Split cell isn't possible here");
     });
 
     it("hides the toolbar when the editor goes away", () => {
@@ -116,7 +116,7 @@ describe("tableTools", () => {
 
       expect(press("ArrowDown")).toBe(true);
       expect(cellTexts(view.state.doc)).toHaveLength(4);
-      expect(announcement.value).toBe("A row added");
+      expect(announcement.value?.text).toBe("A row added");
       expect(keys()).toBe(true);
     });
 
@@ -197,7 +197,7 @@ describe("tableTools", () => {
       toolbar().caption!.submit("  Stock ");
       expect(view.state.doc.child(1).attrs.caption).toBe("Stock");
       expect(toolbar().caption).toBeNull();
-      expect(announcement.value).toBe("Caption set");
+      expect(announcement.value?.text).toBe("Caption set");
     });
 
     it("removes the caption when the field is emptied, and can be cancelled", () => {
@@ -209,7 +209,7 @@ describe("tableTools", () => {
 
       toolbar().caption!.submit("");
       expect(view.state.doc.child(1).attrs.caption).toBeNull();
-      expect(announcement.value).toBe("Caption removed");
+      expect(announcement.value?.text).toBe("Caption removed");
 
       item("caption").run();
       toolbar().caption!.cancel();
@@ -225,32 +225,32 @@ describe("tableTools", () => {
         item("merge").run();
       };
       merge();
-      expect(announcement.value).toBe(
+      expect(announcement.value?.text).toBe(
         "Cells merged. This table has merged cells, so it's saved as an HTML table.",
       );
 
       // the split cell holds both paragraphs, so the table stays HTML
       select("kiwi");
       item("merge").run();
-      expect(announcement.value).toBe(
+      expect(announcement.value?.text).toBe(
         "Cell split. This table has lists or paragraphs in a cell, so it's saved as an HTML table.",
       );
 
       // each change is told once
       view.updateState(selectCells(view.state, "pear", "2"));
       item("merge").run();
-      expect(announcement.value).toBe("Cells merged");
+      expect(announcement.value?.text).toBe("Cells merged");
     });
 
     it("tells when a table is a markdown table again", () => {
       setup();
       item("header-row").run();
-      expect(announcement.value).toBe(
+      expect(announcement.value?.text).toBe(
         "Header row off. This table has no header row, so it's saved as an HTML table.",
       );
 
       item("header-row").run();
-      expect(announcement.value).toBe(
+      expect(announcement.value?.text).toBe(
         "Header row on. This table is saved as a markdown table again.",
       );
     });

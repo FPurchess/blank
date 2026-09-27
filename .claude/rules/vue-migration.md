@@ -24,11 +24,12 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 - Editor code never imports a UI module: shared helpers live in `src/editor/keyBindings.ts` (`formatShortcut`), `src/editor/commands/table/pickerSize.ts` (the table picker's sizes) and `src/popup.ts` (`place`, `placeToolbar`).
 - Keep every id, class, role, `data-*` and aria attribute that E2E, the docs shots or the unit tests use. The migration must not change what the user sees.
 - Modal dialogs boot through `bootDialog(requests, id, render)` (`src/dialog.ts`), which renders one dialog per request and returns `dispose`.
+- Shared state lives in `src/state/` as Vue `shallowRef`s. See `state.md` for its rules, and `ui-testing.md` for tests.
 
 ## Waiting to be ported
 
 These arrived or are arriving outside the plan's PRs:
-- `#table-handles` (`src/tableHandles.ts`, table mouse handles, #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
+- `#table-handles` (`src/tableHandles.ts`, table mouse handles, merged in #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
 - `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for.
 - UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests`, `bandRequests`. Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
 
@@ -36,8 +37,8 @@ These arrived or are arriving outside the plan's PRs:
 
 | PR | Scope | State |
 |---|---|---|
-| 0 | Prep, no Vue: helpers out of UI files, `uiRoot()`, `dispose` | in review |
-| A | `src/state/` with Vue refs replacing `observable.ts`, sync watchers | not started |
+| 0 | Prep, no Vue: helpers out of UI files, `uiRoot()`, `dispose` | done (#64) |
+| A | `src/state/` with Vue refs replacing `observable.ts`, sync watchers | in review (#67) |
 | B | SFC tooling, `App`, `useEditor`, table toolbar (go/no-go gate) | not started |
 | C | Table picker and context menu | not started |
 | D | Link and image dialogs, `surfaces.ts` registry | not started |

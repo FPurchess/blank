@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootUI, setupNotification } from "./ui";
 import {
+  announce,
+  announcement,
+  flashSpellcheckMessage,
   importedFrom,
   language,
   languagePicker,
@@ -251,6 +254,14 @@ describe("ui page button", () => {
     expect(uiPage().textContent).toBe("6.69 × 9.45 in (portrait)");
   });
 
+  it("leaves the label alone while typing keeps the page setup", () => {
+    transaction.value = withFrontmatter("page:\n  size: a4");
+    uiPage().textContent = "untouched";
+
+    transaction.value = withFrontmatter("page:\n  size: a4");
+    expect(uiPage().textContent).toBe("untouched");
+  });
+
   it("follows the user's default", () => {
     const before = config.value;
     try {
@@ -351,18 +362,6 @@ describe("ui spell check status", () => {
     );
   });
 
-  it("shows a message for a moment", () => {
-    vi.useFakeTimers();
-    spellcheckStatus.value = { state: "ready", tag: "de" };
-
-    spellcheckMessage.value = "No spelling errors";
-    expect(uiSpellcheck().textContent).toBe("No spelling errors");
-
-    vi.advanceTimersByTime(2000);
-    expect(spellcheckMessage.value).toBeNull();
-    expect(uiSpellcheck().textContent).toBe("Spelling");
-  });
-
   it("turns spell check on and off when clicked", () => {
     uiSpellcheck().click();
     expect(spellcheck.value).toBe(true);
@@ -376,5 +375,48 @@ describe("ui spell check status", () => {
     uiSpellcheck().dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("shows a message instead of the status until it's gone", () => {
+    spellcheckStatus.value = { state: "ready", tag: "de" };
+
+    flashSpellcheckMessage("No spelling errors");
+    expect(uiSpellcheck().textContent).toBe("No spelling errors");
+
+    spellcheckMessage.value = null;
+    expect(uiSpellcheck().textContent).toBe("Spelling");
+  });
+});
+
+describe("ui announcement", () => {
+  const uiAnnouncement = () =>
+    document.querySelector<HTMLElement>("#ui-announcement")!;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    announcement.value = null;
+    stubNotification("granted");
+    dispose = bootUI();
+  });
+
+  it("is always there as a status, empty in between", () => {
+    expect(uiAnnouncement().getAttribute("role")).toBe("status");
+    expect(uiAnnouncement().textContent).toBe("");
+  });
+
+  it("shows what just happened until it's gone", () => {
+    announce("A row added");
+    expect(uiAnnouncement().textContent).toBe("A row added");
+
+    announcement.value = null;
+    expect(uiAnnouncement().textContent).toBe("");
+  });
+
+  it("sits next to the counter, before the items on the right", () => {
+    const ids = [...document.querySelectorAll("#ui-bottom > *")].map(
+      (element) => element.id,
+    );
+
+    expect(ids.indexOf("ui-announcement")).toBe(ids.indexOf("ui-stats") + 1);
   });
 });

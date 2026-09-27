@@ -94,7 +94,7 @@ describe("tableHandles", () => {
     hover();
     state().insertRow(1);
     expect(cellTexts(view.state.doc)).toHaveLength(5);
-    expect(announcement.value).toBe("A row added");
+    expect(announcement.value?.text).toBe("A row added");
 
     state().insertColumn(2);
     expect(cellTexts(view.state.doc)[0]).toEqual(["Fruit", "Qty", ""]);
@@ -122,18 +122,18 @@ describe("tableHandles", () => {
       "kiwi",
       "",
     ]);
-    expect(announcement.value).toBe("Moved up");
+    expect(announcement.value?.text).toBe("Moved up");
 
     state().moveColumns([0, 1], 1);
     expect(cellTexts(view.state.doc)[0]).toEqual(["Qty", "Fruit"]);
-    expect(announcement.value).toBe("Moved right");
+    expect(announcement.value?.text).toBe("Moved right");
   });
 
   it("resizes the table", () => {
     hover();
     state().resize(3, 5);
     expect(cellTexts(view.state.doc)).toHaveLength(5);
-    expect(announcement.value).toBe("Table resized to 3 × 5");
+    expect(announcement.value?.text).toBe("Table resized to 3 × 5");
   });
 
   it("sets and resets the column widths, with the cursor in the table", () => {
@@ -145,13 +145,13 @@ describe("tableHandles", () => {
     expect(state().percents).toEqual([25, 75]);
     // the cursor went into the table, so the change of format is told
     expect(state().selected).not.toBeNull();
-    expect(announcement.value).toBe(
+    expect(announcement.value?.text).toBe(
       "Column widths set. This table has column widths you set, so it's saved as an HTML table.",
     );
 
     state().setWidths(null);
     expect(columnPercents(tableNode())).toBeNull();
-    expect(announcement.value).toBe(
+    expect(announcement.value?.text).toBe(
       "Column widths reset. This table is saved as a markdown table again.",
     );
   });

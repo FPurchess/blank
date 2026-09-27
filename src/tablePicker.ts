@@ -1,5 +1,8 @@
+import { onScopeDispose, watch } from "vue";
+
 import { place } from "./popup";
 import { tablePicker, type TablePickerState } from "./state";
+import { bootScope } from "./scope";
 import { uiRoot } from "./uiRoot";
 import {
   choosePickerSize,
@@ -100,33 +103,31 @@ const updatePicker = (element: HTMLElement, picker: TablePickerState) => {
 /**
  * bootTablePicker shows the table picker while it's open
  */
-export const bootTablePicker = () => {
-  let element: HTMLElement | null = null;
-  let anchor: TablePickerState["anchor"] | null = null;
-  const unsubscribe = tablePicker.subscribe(
-    (picker) => {
-      if (!picker) {
-        element?.remove();
-        element = anchor = null;
-        return;
-      }
-      if (!element) {
-        element = createPicker();
-        uiRoot().append(element);
-      }
-      const height = element.offsetHeight;
-      updatePicker(element, picker);
-      // placed when it opens and when the grid grows, so it stays in view
-      if (anchor !== picker.anchor || element.offsetHeight !== height) {
-        anchor = picker.anchor;
-        place(element, anchor);
-      }
-    },
-    { immediate: true },
-  );
-  return () => {
-    unsubscribe();
-    element?.remove();
-    element = anchor = null;
-  };
-};
+export const bootTablePicker = () =>
+  bootScope(() => {
+    let element: HTMLElement | null = null;
+    let anchor: TablePickerState["anchor"] | null = null;
+    watch(
+      tablePicker,
+      (picker) => {
+        if (!picker) {
+          element?.remove();
+          element = anchor = null;
+          return;
+        }
+        if (!element) {
+          element = createPicker();
+          uiRoot().append(element);
+        }
+        const height = element.offsetHeight;
+        updatePicker(element, picker);
+        // placed when it opens and when the grid grows, so it stays in view
+        if (anchor !== picker.anchor || element.offsetHeight !== height) {
+          anchor = picker.anchor;
+          place(element, anchor);
+        }
+      },
+      { flush: "sync", immediate: true },
+    );
+    onScopeDispose(() => element?.remove());
+  });

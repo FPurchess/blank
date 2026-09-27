@@ -2,17 +2,10 @@ import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { tableEditing } from "prosemirror-tables";
-import { schema } from "../markdown";
+import { watch } from "vue";
 
-import {
-  contextMenu as contextMenuState,
-  imageDialog,
-  linkDialog,
-  pageSetup,
-  pageSetupRequests,
-  tableToolbar,
-  transaction,
-} from "../state";
+import { schema } from "../markdown";
+import { pageSetupRequests, transaction, uiTakesFocus } from "../state";
 import {
   autocomplete,
   contextMenu,
@@ -32,16 +25,7 @@ import {
 import { applyInitialDocument } from "./document";
 import { openPageSetup } from "./commands/pageSetup";
 
-// the dialogs, the context menu and the caption field of the table toolbar
-// take the focus while they are open
-const dialogOpen = () =>
-  linkDialog.value !== null ||
-  imageDialog.value !== null ||
-  pageSetup.value !== null ||
-  contextMenuState.value !== null ||
-  !!tableToolbar.value?.caption;
-
-let unsubscribeRequests: (() => void) | undefined;
+let stopRequests: (() => void) | undefined;
 
 export const bootEditor = async () => {
   const state = await applyInitialDocument(
@@ -74,11 +58,11 @@ export const bootEditor = async () => {
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
         // the dialogs take the focus while they are open
-        if (dialogOpen()) return false;
+        if (uiTakesFocus.value) return false;
         e.preventDefault();
         e.stopPropagation();
         window.setTimeout(() => {
-          if (!dialogOpen() && !view.hasFocus()) view.focus();
+          if (!uiTakesFocus.value && !view.hasFocus()) view.focus();
         }, 100);
         return true;
       },
@@ -90,8 +74,10 @@ export const bootEditor = async () => {
   });
   transaction.value = view.state.tr;
   // e.g. the button in the bottom bar asks for the page setup
-  unsubscribeRequests?.();
-  unsubscribeRequests = pageSetupRequests.subscribe(() => openPageSetup(view));
+  stopRequests?.();
+  stopRequests = watch(pageSetupRequests, () => openPageSetup(view), {
+    flush: "sync",
+  });
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
     if (!view.hasFocus()) view.focus();

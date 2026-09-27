@@ -7,6 +7,7 @@ import {
 } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
+import { watch } from "vue";
 
 import { config } from "../../config";
 import { language, spellchecker } from "../../state";
@@ -310,14 +311,18 @@ export const spellcheck = () =>
         timer = window.setTimeout(run, delay);
       };
 
-      const unsubscribe = spellchecker.subscribe(() => {
-        view.dispatch(
-          view.state.tr
-            .setMeta(spellcheckKey, { type: "reset" } satisfies Meta)
-            .setMeta("addToHistory", false),
-        );
-        schedule(0);
-      });
+      const stop = watch(
+        spellchecker,
+        () => {
+          view.dispatch(
+            view.state.tr
+              .setMeta(spellcheckKey, { type: "reset" } satisfies Meta)
+              .setMeta("addToHistory", false),
+          );
+          schedule(0);
+        },
+        { flush: "sync" },
+      );
 
       // a spell checker that is already there checks the text right away
       if (spellchecker.value) schedule(0);
@@ -331,7 +336,7 @@ export const spellcheck = () =>
           if (changed) schedule();
         },
         destroy() {
-          unsubscribe();
+          stop();
           window.clearTimeout(timer);
         },
       };
