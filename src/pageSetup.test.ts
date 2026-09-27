@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { allMargins, DEFAULT_PAGE } from "./layout/settings";
 import { bootPageSetup } from "./pageSetup";
 import { pageSetup, type PageSetupRequest } from "./state";
 import { cm, mm } from "./test/layout";
+
+// stops what the last boot rendered, so boots don't pile up
+let dispose = () => {};
+afterEach(() => dispose());
 
 const dialog = () => document.querySelector<HTMLElement>("#page-setup");
 const form = () => dialog()?.querySelector("form") as HTMLFormElement;
@@ -61,7 +65,7 @@ describe("pageSetup dialog", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     pageSetup.value = null;
-    bootPageSetup();
+    dispose = bootPageSetup();
   });
 
   it("is hidden without a request", () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootUI, setupNotification } from "./ui";
 import {
@@ -20,6 +20,10 @@ import { schema } from "./markdown";
 import { createState } from "./test/editor";
 import { closePicker, move, openPicker, typeChar } from "./languagePicker";
 import { flushPromises } from "./test/async";
+
+// stops what the last boot rendered, so boots don't pile up
+let dispose = () => {};
+afterEach(() => dispose());
 
 /**
  * stubNotification replaces the browser Notification API that the Tauri
@@ -46,7 +50,7 @@ describe("ui", () => {
     language.value = "de";
     closePicker();
     stubNotification("granted");
-    bootUI();
+    dispose = bootUI();
   });
 
   it("renders the link dialog", () => {
@@ -55,6 +59,21 @@ describe("ui", () => {
 
     linkDialog.value = null;
     expect(document.querySelector("#link-dialog")).toBeNull();
+  });
+
+  it("puts the bars into the UI root after the editor", () => {
+    const root = document.getElementById("ui")!;
+    expect(root.querySelector("#ui-top")).not.toBeNull();
+    expect(root.querySelector("#ui-bottom")).not.toBeNull();
+  });
+
+  it("removes the UI and stops rendering when disposed", () => {
+    dispose();
+    dispose = () => {};
+    path.value = "/tmp/after.md";
+
+    expect(document.getElementById("ui")).toBeNull();
+    expect(document.getElementById("ui-top")).toBeNull();
   });
 
   describe("file path", () => {
@@ -117,7 +136,7 @@ describe("ui language chooser", () => {
     language.value = "de";
     closePicker();
     stubNotification("granted");
-    bootUI();
+    dispose = bootUI();
   });
 
   it("sits right of the counter and the spell check status in the footer", () => {
@@ -212,7 +231,7 @@ describe("ui page button", () => {
     document.body.innerHTML = "";
     transaction.value = null;
     stubNotification("granted");
-    bootUI();
+    dispose = bootUI();
   });
 
   it("shows the paper of the region and its orientation", () => {
@@ -281,7 +300,7 @@ describe("setupNotification", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
 
-    expect(() => bootUI()).not.toThrow();
+    expect(() => (dispose = bootUI())).not.toThrow();
     await flushPromises();
 
     expect(consoleError).toHaveBeenCalledWith(error);
@@ -298,7 +317,7 @@ describe("ui spell check status", () => {
     spellcheckMessage.value = null;
     spellcheckStatus.value = { state: "off", tag: "de" };
     stubNotification("granted");
-    bootUI();
+    dispose = bootUI();
   });
 
   it.each([

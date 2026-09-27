@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bootLinkDialog } from "./linkDialog";
 import { linkDialog, type LinkDialogRequest } from "./state";
+
+// stops what the last boot rendered, so boots don't pile up
+let dispose = () => {};
+afterEach(() => dispose());
 
 const dialog = () => document.querySelector<HTMLElement>("#link-dialog");
 const form = () => dialog()?.querySelector("form") as HTMLFormElement;
@@ -54,7 +58,7 @@ describe("linkDialog", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     linkDialog.value = null;
-    bootLinkDialog();
+    dispose = bootLinkDialog();
   });
 
   it("is hidden without a request", () => {
@@ -80,8 +84,18 @@ describe("linkDialog", () => {
     expect(dialog()?.querySelector("img")).toBeNull();
   });
 
+  it("removes the dialog and stops rendering when disposed", () => {
+    openDialog();
+    dispose();
+    dispose = () => {};
+
+    expect(dialog()).toBeNull();
+    openDialog();
+    expect(dialog()).toBeNull();
+  });
+
   it("renders a single dialog when booted twice", () => {
-    bootLinkDialog();
+    dispose = bootLinkDialog();
     openDialog();
 
     expect(document.querySelectorAll("#link-dialog")).toHaveLength(1);

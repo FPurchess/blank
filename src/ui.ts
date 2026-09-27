@@ -31,6 +31,7 @@ import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
 import { bootTableToolbar } from "./tableToolbar";
 import { basename } from "./paths";
+import { uiRoot } from "./uiRoot";
 import { confirm, openPicker, pickerLanguages, select } from "./languagePicker";
 import { hasOwnRules } from "./editor/plugins/autocomplete/languages/lookup";
 
@@ -128,9 +129,11 @@ export const setupNotification = async () => {
 };
 
 export const bootUI = () => {
+  const root = uiRoot();
+  const disposers: (() => void)[] = [];
   const uiTop = document.createElement("div");
   uiTop.id = "ui-top";
-  document.body.appendChild(uiTop);
+  root.append(uiTop);
   const renderTitle = () => {
     const source = importedFrom.value;
     // textContent: the path is user controlled and must not be parsed as HTML
@@ -139,17 +142,19 @@ export const bootUI = () => {
       (path.value ??
         (source === null ? "Untitled" : `${basename(source)} (imported)`));
   };
-  path.subscribe(renderTitle, { immediate: true });
-  importedFrom.subscribe(renderTitle);
+  disposers.push(
+    path.subscribe(renderTitle, { immediate: true }),
+    importedFrom.subscribe(renderTitle),
+  );
 
   const uiBottom = document.createElement("div");
   uiBottom.id = "ui-bottom";
-  document.body.appendChild(uiBottom);
+  root.append(uiBottom);
 
   const uiStats = document.createElement("span");
   uiStats.id = "ui-stats";
   uiBottom.appendChild(uiStats);
-  textContent.subscribe(
+  const unsubscribeStats = textContent.subscribe(
     (content) => {
       const charCount = content.length;
       const wordCount = content.length ? content.split(/\s/).length : 0;
@@ -157,6 +162,7 @@ export const bootUI = () => {
     },
     { immediate: true },
   );
+  disposers.push(unsubscribeStats);
 
   // the paper of the document, which opens the page setup
   const uiPage = document.createElement("span");
@@ -186,8 +192,10 @@ export const bootUI = () => {
     uiPage.textContent = describePageSize(layout, localeUnit());
     uiPage.title = `Page setup (${getKeyBinding(CommandIdentifier.PAGE_SETUP)})`;
   };
-  transaction.subscribe(renderPage);
-  config.subscribe(renderPage);
+  disposers.push(
+    transaction.subscribe(renderPage),
+    config.subscribe(renderPage),
+  );
   renderPage();
 
   const uiSpellcheck = document.createElement("span");
@@ -204,8 +212,8 @@ export const bootUI = () => {
       spellcheckStatus.value,
       spellcheckMessage.value,
     );
-  spellcheckStatus.subscribe(renderStatus);
-  spellcheckMessage.subscribe((message) => {
+  disposers.push(spellcheckStatus.subscribe(renderStatus));
+  const unsubscribeMessage = spellcheckMessage.subscribe((message) => {
     renderStatus();
     window.clearTimeout(messageTimer);
     if (message) {
@@ -214,6 +222,7 @@ export const bootUI = () => {
       }, MESSAGE_DURATION);
     }
   });
+  disposers.push(unsubscribeMessage, () => window.clearTimeout(messageTimer));
   renderStatus();
 
   // what just happened, e.g. "2 rows added": shown for a moment and read out
@@ -224,7 +233,7 @@ export const bootUI = () => {
   uiAnnouncement.setAttribute("role", "status");
   uiStats.after(uiAnnouncement);
   let announcementTimer: number | undefined;
-  announcement.subscribe((message) => {
+  const unsubscribeAnnouncement = announcement.subscribe((message) => {
     uiAnnouncement.textContent = message ?? "";
     window.clearTimeout(announcementTimer);
     if (message) {
@@ -236,6 +245,10 @@ export const bootUI = () => {
     }
   });
 
+  disposers.push(unsubscribeAnnouncement, () =>
+    window.clearTimeout(announcementTimer),
+  );
+
   const uiLanguage = document.createElement("span");
   uiLanguage.id = "ui-language";
   uiBottom.appendChild(uiLanguage);
@@ -245,16 +258,23 @@ export const bootUI = () => {
     if (!languagePicker.value.open) openPicker();
   });
   const render = () => renderLanguage(uiLanguage, languagePicker.value);
-  language.subscribe(render);
-  languagePicker.subscribe(render, { immediate: true });
-
-  bootLinkDialog();
-  bootImageDialog();
-  bootPageSetup();
-  bootContextMenu();
-  bootTablePicker();
-  bootTableToolbar();
+  disposers.push(
+    language.subscribe(render),
+    languagePicker.subscribe(render, { immediate: true }),
+    bootLinkDialog(),
+    bootImageDialog(),
+    bootPageSetup(),
+    bootContextMenu(),
+    bootTablePicker(),
+    bootTableToolbar(),
+  );
 
   // FIXME: better handling of permission errors
   setupNotification().catch(console.error);
+
+  // stops rendering and removes the UI, e.g. between tests
+  return () => {
+    disposers.forEach((dispose) => dispose());
+    root.remove();
+  };
 };

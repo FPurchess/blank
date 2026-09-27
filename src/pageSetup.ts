@@ -14,6 +14,7 @@ import { layoutOf } from "./layout/resolve";
 import { SIDES } from "./layout/settings";
 import { thumbnailSvg } from "./layout/thumbnail";
 import { type PageSetupRequest, pageSetup } from "./state";
+import { uiRoot } from "./uiRoot";
 
 // The page setup dialog: a row of choices for the paper, the orientation, the
 // margins and the headings that start a new page, which ↑↓ move between and ←→ change, with a picture of the
@@ -402,7 +403,7 @@ const renderDialog = (request: PageSetupRequest) => {
   );
 
   form.append(warnings, body, errors, hint, actions);
-  document.body.append(backdrop);
+  uiRoot().append(backdrop);
   update();
   const [first] = stops();
   first?.focus();
@@ -421,4 +422,9 @@ export const bootPageSetup = () => {
     },
     { immediate: true },
   );
+  return () => {
+    unsubscribe?.();
+    unsubscribe = undefined;
+    document.getElementById(DIALOG_ID)?.remove();
+  };
 };

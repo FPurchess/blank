@@ -1,6 +1,7 @@
 import { type LinkDialogRequest, linkDialog } from "./state";
 import { isAbsoluteUrl, isSavableUrl, normalizeUrl } from "./url";
 import { createButton, createDialog, createField } from "./dialog";
+import { uiRoot } from "./uiRoot";
 
 const DIALOG_ID = "link-dialog";
 
@@ -78,7 +79,7 @@ const renderDialog = (request: LinkDialogRequest) => {
   });
 
   form.append(url.label, url.input, hint, text.label, text.input, actions);
-  document.body.append(backdrop);
+  uiRoot().append(backdrop);
 
   validate();
   url.input.focus();
@@ -97,4 +98,9 @@ export const bootLinkDialog = () => {
     },
     { immediate: true },
   );
+  return () => {
+    unsubscribe?.();
+    unsubscribe = undefined;
+    document.getElementById(DIALOG_ID)?.remove();
+  };
 };

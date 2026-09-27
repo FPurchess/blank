@@ -1,4 +1,4 @@
-import type { Anchor } from "./state";
+import type { Anchor, TableToolbarState } from "./state";
 
 // space between a popup and the edges of the window
 const MARGIN = 4;
@@ -22,6 +22,35 @@ export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
   }
   left = Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
   top = Math.max(MARGIN, top);
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
+};
+
+// the space between a toolbar and its table, and the window's edges
+const TOOLBAR_GAP = 6;
+// the top bar with the file name, which the toolbar stays below
+const TOOLBAR_TOP = 36;
+
+type ToolbarAnchor = TableToolbarState["anchor"];
+
+/**
+ * placeToolbar puts the toolbar above the table's right end, where it rarely covers
+ * the text above, which starts on the left. It stays at the top of the window
+ * while the table's top is scrolled away, and hides while the table is out of
+ * view.
+ */
+export const placeToolbar = (element: HTMLElement, anchor: ToolbarAnchor) => {
+  // measured at the window's left edge, since where it stands now limits
+  // its width, e.g. while table mode makes it wider
+  element.style.left = "0px";
+  const { width, height } = element.getBoundingClientRect();
+  const top = Math.max(anchor.top - height - TOOLBAR_GAP, TOOLBAR_TOP);
+  element.hidden =
+    anchor.bottom < TOOLBAR_TOP + height || anchor.top > window.innerHeight;
+  const left = Math.max(
+    TOOLBAR_GAP,
+    Math.min(anchor.right - width, window.innerWidth - TOOLBAR_GAP - width),
+  );
   element.style.left = `${left}px`;
   element.style.top = `${top}px`;
 };

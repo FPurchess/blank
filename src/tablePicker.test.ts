@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { tablePicker, type TablePickerState } from "./state";
-import { bootTablePicker, resizePicker, sizeLabel } from "./tablePicker";
+import { bootTablePicker } from "./tablePicker";
+import { resizePicker, sizeLabel } from "./editor/commands/table/pickerSize";
 
 const open = (cols = 3, rows = 3): TablePickerState => {
   const picker: TablePickerState = {
@@ -23,10 +24,21 @@ const cellAt = (col: number, row: number) =>
   )!;
 
 describe("tablePicker", () => {
-  bootTablePicker();
+  let dispose = bootTablePicker();
 
   afterEach(() => {
     tablePicker.value = null;
+  });
+
+  it("removes the picker and stops rendering when disposed", () => {
+    open(3, 3);
+    dispose();
+
+    expect(document.getElementById("table-picker")).toBeNull();
+    open(3, 3);
+    expect(document.getElementById("table-picker")).toBeNull();
+    tablePicker.value = null;
+    dispose = bootTablePicker();
   });
 
   it("shows the chosen size in a grid of at least 10 × 8", () => {

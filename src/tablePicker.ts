@@ -1,40 +1,15 @@
 import { place } from "./popup";
+import { uiRoot } from "./uiRoot";
 import { tablePicker, type TablePickerState } from "./state";
+import {
+  choosePickerSize,
+  MAX_SIZE,
+  sizeLabel,
+} from "./editor/commands/table/pickerSize";
 
 const PICKER_ID = "table-picker";
-// the largest table the picker offers
-export const MAX_SIZE = 20;
-// the size the picker opens with: three columns, a header row and two rows
-export const DEFAULT_SIZE = { cols: 3, rows: 3 };
 // the grid shows at least this many columns and rows, like Word's
 const MIN_SHOWN = { cols: 10, rows: 8 };
-
-/**
- * resizePicker changes the size the open picker would insert by `cols` and
- * `rows`, between 1×1 and MAX_SIZE×MAX_SIZE
- */
-export const resizePicker = (cols: number, rows: number) => {
-  const picker = tablePicker.value;
-  if (!picker) return;
-  choose(picker.cols + cols, picker.rows + rows);
-};
-
-/**
- * choose sets the size the open picker would insert
- */
-const choose = (cols: number, rows: number) => {
-  const picker = tablePicker.value;
-  const clamp = (n: number) => Math.min(Math.max(n, 1), MAX_SIZE);
-  if (!picker || (picker.cols === clamp(cols) && picker.rows === clamp(rows))) {
-    return;
-  }
-  tablePicker.value = { ...picker, cols: clamp(cols), rows: clamp(rows) };
-};
-
-/**
- * sizeLabel describes a table size for the picker and screen readers
- */
-export const sizeLabel = (cols: number, rows: number) => `${cols} × ${rows}`;
 
 /**
  * shown returns how many columns and rows the grid shows for `picker`: at
@@ -65,7 +40,8 @@ const createPicker = (): HTMLElement => {
     (event.target as HTMLElement).closest<HTMLElement>(".cell");
   grid.addEventListener("mouseover", (event) => {
     const cell = cellAt(event);
-    if (cell) choose(Number(cell.dataset.col), Number(cell.dataset.row));
+    if (cell)
+      choosePickerSize(Number(cell.dataset.col), Number(cell.dataset.row));
   });
   grid.addEventListener("click", (event) => {
     const cell = cellAt(event);
@@ -126,7 +102,7 @@ const updatePicker = (element: HTMLElement, picker: TablePickerState) => {
 export const bootTablePicker = () => {
   let element: HTMLElement | null = null;
   let anchor: TablePickerState["anchor"] | null = null;
-  tablePicker.subscribe(
+  const unsubscribe = tablePicker.subscribe(
     (picker) => {
       if (!picker) {
         element?.remove();
@@ -135,7 +111,7 @@ export const bootTablePicker = () => {
       }
       if (!element) {
         element = createPicker();
-        document.body.appendChild(element);
+        uiRoot().append(element);
       }
       const height = element.offsetHeight;
       updatePicker(element, picker);
@@ -147,4 +123,9 @@ export const bootTablePicker = () => {
     },
     { immediate: true },
   );
+  return () => {
+    unsubscribe();
+    element?.remove();
+    element = anchor = null;
+  };
 };

@@ -1,6 +1,7 @@
 import { type ImageDialogRequest, imageDialog } from "./state";
 import { createButton, createDialog, createField } from "./dialog";
 import { isSavableUrl, normalizeUrl } from "./url";
+import { uiRoot } from "./uiRoot";
 
 const DIALOG_ID = "image-dialog";
 
@@ -123,7 +124,7 @@ const renderDialog = (request: ImageDialogRequest) => {
   sourceRow.className = "row";
   sourceRow.append(source.input, choose);
   form.append(source.label, sourceRow, hint, alt.label, alt.input, actions);
-  document.body.append(backdrop);
+  uiRoot().append(backdrop);
 
   validate();
   source.input.focus();
@@ -142,4 +143,9 @@ export const bootImageDialog = () => {
     },
     { immediate: true },
   );
+  return () => {
+    unsubscribe?.();
+    unsubscribe = undefined;
+    document.getElementById(DIALOG_ID)?.remove();
+  };
 };

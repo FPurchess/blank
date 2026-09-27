@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bootContextMenu, formatShortcut } from "./contextMenu";
+import { bootContextMenu } from "./contextMenu";
+import { formatShortcut } from "./editor/keyBindings";
 import {
   type ContextMenuRequest,
   contextMenu,
@@ -71,6 +72,7 @@ const open = (keyboard = true, list = items()): ContextMenuRequest => {
 };
 
 describe("contextMenu", () => {
+  let dispose = () => {};
   beforeEach(() => {
     runs = [];
     close = vi.fn<() => void>(() => {
@@ -78,11 +80,22 @@ describe("contextMenu", () => {
     });
     document.body.replaceChildren();
     contextMenu.value = null;
-    bootContextMenu();
+    dispose = bootContextMenu();
   });
 
   afterEach(() => {
     contextMenu.value = null;
+    dispose();
+  });
+
+  it("removes the menu and stops listening when disposed", () => {
+    open();
+    dispose();
+    dispose = () => {};
+
+    expect(menu()).toBeNull();
+    open();
+    expect(menu()).toBeNull();
   });
 
   it("renders a menu with items, separators and shortcuts", () => {
