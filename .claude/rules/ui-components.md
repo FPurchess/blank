@@ -21,9 +21,10 @@ The UI around the editor is moving to Vue 3.5 (see `vue-migration.md` for what's
 ## Rendering rules
 
 - **Placement is imperative.** A popup or toolbar places itself with `place()` / `placeToolbar()` (`src/popup.ts`) in `onMounted` and `onUpdated`, after every render, so it follows its anchor and stays in view when it grows. These write `left`, `top` and `hidden`, so the template must never bind `style`, `left`, `top` or `hidden` on that element, or Vue's next patch would overwrite them. Bind the classes that change the size (like `.keys`), since they apply before `onUpdated` measures.
-- **Inputs that are typed into aren't bound** when their component re-renders while the user types (e.g. the toolbar follows the scrolling). Set the value once in `onMounted`, as `CaptionField.vue` does. A bound `:value` would undo what was typed on the next render.
+- **Fields the user types into** hold their value in the component (`v-model` on a local ref, as `TextField` in the dialogs does), never in a prop that comes back from state. A field whose value is only a prop that the parent re-sends while the user types (the toolbar follows the scrolling) sets it once in `onMounted` instead, as `CaptionField.vue` and `MenuEditField.vue` do: a bound `:value` would undo what was typed on the next render.
+- **Buttons and text in templates:** Vue keeps one space around text that stands on its own lines, so tests compare a button's trimmed text (`textContent?.trim()`).
 - **Keep updates cheap for state that changes on every transaction or scroll.** Key lists by id (`:key="item.id"`) so elements stay the same. Pass each child the item itself as a prop, not a new wrapper, an inline closure or slot content that uses the loop variable, so Vue skips children that didn't change. Compare `ToolbarButton.vue`: with inline handlers in the `v-for`, every button re-rendered on every scroll event, and an update cost twice as much.
-- **A popup that is updated in place, not replaced** (the context menu, whose suggestions arrive after it opens) is keyed in `App.vue` by what makes it the same (`menuKey(request.close)`). A new key mounts a new one with fresh state; the same key patches it, and a `watch` on the prop carries over what should stay (the focused item).
+- **Key each part in `App.vue` with `keyOf` by what makes it the same.** A dialog by its request (`keyOf(request)`): a new request mounts a new dialog with fresh fields. The context menu by `keyOf(request.close)`: its suggestions arrive after it opens, and a request with the same `close` patches the open menu, while a `watch` on the prop carries over what should stay (the focused item).
 - **Presses keep the focus where it is** (in the editor, or in a menu) with `preventDefault` on `mousedown`, except in text fields: `(event.target as Element).closest("input, textarea")`, as `TableToolbar.vue` and `MenuList.vue` do.
 - **Focus after rendering.** A component that moves the focus does it once its DOM exists, in `onMounted` or in `nextTick` after changing its state (`ContextMenu.vue`'s `focusCurrent`). Listeners that only matter while it's open go through `listenOnWindow` in its setup, which removes them when it unmounts.
 - **Keep every id, class, role, `data-*` and aria attribute** that E2E, the docs shots and the tests use.
@@ -37,6 +38,9 @@ The UI around the editor is moving to Vue 3.5 (see `vue-migration.md` for what's
 | `TableToolbar.vue`, `ToolbarButton.vue`, `CaptionField.vue` | the table toolbar |
 | `TablePicker.vue` | the size picker for a new table |
 | `ContextMenu.vue`, `MenuList.vue`, `MenuEditField.vue` | the context menu: the open levels and the focus, one level, an item being edited |
+| `LinkDialog.vue`, `ImageDialog.vue` | the link and image dialogs, their checks in `linkDialogModel.ts` and `imageDialogModel.ts` |
+| `components/BaseDialog.vue` | a modal dialog: backdrop, titled form, Esc and backdrop cancel, Tab kept inside, `actions` slot for its buttons |
+| `components/TextField.vue` | a labelled text field with an optional hint, `v-model`, and a slot for a button next to it |
 | `components/IconGlyph.vue` | an icon of `src/icons.ts` |
 
-Add reusable components to `src/ui/components/` when a second place needs them (e.g. a button, a text field, a dialog frame when the dialogs are ported), not before.
+Add reusable components to `src/ui/components/` when a second place needs them, not before: `BaseDialog` and `TextField` came with the second dialog.
