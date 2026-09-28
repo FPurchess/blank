@@ -483,16 +483,23 @@ describe("band strips", () => {
       expect(strip()).toBeNull();
     });
 
-    it("stays open for clicks on itself and its menu", () => {
+    it("stays open for clicks on itself and its menu, submenus included", () => {
       const request = open();
+      // the context menu's levels, as src/ui/ContextMenu.vue renders them
+      const menus = document.createElement("div");
+      menus.className = "context-menus";
       const menu = document.createElement("div");
       menu.id = "context-menu";
-      document.body.append(menu);
+      const submenu = document.createElement("div");
+      submenu.className = "context-menu submenu";
+      menus.append(menu, submenu);
+      document.body.append(menus);
 
       slot("left").dispatchEvent(
         new MouseEvent("mousedown", { bubbles: true }),
       );
       menu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      submenu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
       expect(request.apply).not.toHaveBeenCalled();
     });

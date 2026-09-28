@@ -13,6 +13,8 @@ paths:
   - "src/ui/ToolbarButton.vue"
   - "src/ui/CaptionField.vue"
   - "src/ui/tableToolbarModel.ts"
+  - "src/ui/TablePicker.vue"
+  - "src/ui/tablePickerModel.ts"
 ---
 
 # Tables

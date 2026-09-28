@@ -8,9 +8,9 @@ paths:
   - "src/spellcheck/**"
   - "src/ui.ts"
   - "src/ui/**"
+  - "src/nativeMenu.ts"
   - "src/*Dialog.ts"
   - "src/pageSetup.ts"
-  - "src/contextMenu.ts"
   - "src/table*.ts"
 ---
 
@@ -36,7 +36,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 
 ## Rules
 
-- **Every shared value is a `shallowRef`, and it is replaced whole.** Never change it in place (`x.value.foo = …` or `push`), because a shallow ref doesn't see that. Shallow refs keep ProseMirror objects (`Transaction`, `EditorView` in closures), the spell checker and `config` out of Vue's proxies. They also keep identity checks working, like `next.close === request.close` in the context menu.
+- **Every shared value is a `shallowRef`, and it is replaced whole.** Never change it in place (`x.value.foo = …` or `push`), because a shallow ref doesn't see that. Shallow refs keep ProseMirror objects (`Transaction`, `EditorView` in closures), the spell checker and `config` out of Vue's proxies. They also keep identity checks working, like `contextMenu.value?.close === close` in `src/editor/plugins/contextMenu.ts`, or `menuKey(request.close)`, which tells the requests of one open menu apart from a new menu.
 - **Derived state is a `computed`** (e.g. `uiTakesFocus`). It's lazy and only notifies when its result changes, which matters for state that changes on every key.
 - **State with rules of its own is written through a function in its module:** `announce()`, `flashSpellcheckMessage()`, and the language picker's functions in `src/languagePicker.ts`. Plain values (`theme`, `language`, `spellcheck`, `path`) are assigned directly.
 - **A ref doesn't notify when the new value is `Object.is`-equal to the old one.** That is usually what you want: confirming the current language doesn't reload the dictionary. For events that may repeat (the same message twice), write a new object each time, like `Message` (`{ text, id }`) in `messages.ts`. For requests the editor handles (`pageSetupRequests`, a counter), make each write differ, or set the ref back to null once it's handled and return early on null.

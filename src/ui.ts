@@ -23,10 +23,9 @@ import { describePageSize } from "./layout/describe";
 import { localeUnit } from "./layout/paper";
 import type { SpellcheckStatus } from "./spellcheck/types";
 import { languageName } from "./spellcheck/service";
-import { bootContextMenu } from "./contextMenu";
+import { bootNativeMenuGuard } from "./nativeMenu";
 import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
-import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
 import { bootBandStrips } from "./bandStrips";
 import { bootTableHandles } from "./tableHandles";
@@ -244,8 +243,7 @@ export const bootUI = (editor: EditorHandle) =>
     bootImageDialog();
     bootPageSetup();
     bootBandStrips(editor);
-    bootContextMenu();
-    bootTablePicker();
+    bootNativeMenuGuard();
     bootApp(editor);
     bootTableHandles();
 

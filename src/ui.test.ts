@@ -64,6 +64,22 @@ describe("ui", () => {
     expect(document.querySelector("#link-dialog")).toBeNull();
   });
 
+  it("keeps the webview's own menu away until disposed", () => {
+    const contextmenu = () => {
+      const event = new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+      });
+      document.body.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(contextmenu()).toBe(true);
+
+    dispose();
+    dispose = () => {};
+    expect(contextmenu()).toBe(false);
+  });
+
   it("mounts the Vue app into the UI root until disposed", () => {
     expect(document.querySelector("#ui > #ui-app")).not.toBeNull();
 

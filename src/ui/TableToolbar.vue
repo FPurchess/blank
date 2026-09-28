@@ -31,7 +31,9 @@ onUpdated(place);
  * except in the caption field
  */
 const keepFocus = (event: MouseEvent) => {
-  if (!(event.target as Element).closest("form")) event.preventDefault();
+  if (!(event.target as Element).closest("input, textarea")) {
+    event.preventDefault();
+  }
 };
 </script>
 

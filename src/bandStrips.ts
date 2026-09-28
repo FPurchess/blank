@@ -50,7 +50,8 @@ import {
 const BANDS: Band[] = ["header", "footer"];
 const NAMES: Record<Band, string> = { header: "Header", footer: "Footer" };
 const EDITOR_ID = "band-editor";
-const MENU_ID = "context-menu";
+// the context menu with its submenus, see src/ui/ContextMenu.vue
+const MENUS = ".context-menus";
 
 // the placeholders the strips insert, see tokens.ts
 const INSERTS = [
@@ -355,7 +356,7 @@ const renderEditor = (request: BandEditorRequest) => {
     "mousedown",
     (event) => {
       const target = event.target as Element | null;
-      if (!target?.closest(`#${EDITOR_ID}, #${MENU_ID}`)) done();
+      if (!target?.closest(`#${EDITOR_ID}, ${MENUS}`)) done();
     },
     true,
   );
