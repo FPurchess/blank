@@ -23,7 +23,7 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 - Every `boot…()` of the UI returns a `dispose` function, and tests call it in `afterEach`, so boots don't pile up.
 - Editor code never imports a UI module: shared helpers live in `src/editor/keyBindings.ts` (`formatShortcut`), `src/editor/commands/table/pickerSize.ts` (the table picker's sizes) and `src/popup.ts` (`place`, `placeToolbar`).
 - Keep every id, class, role, `data-*` and aria attribute that E2E, the docs shots or the unit tests use. The migration must not change what the user sees.
-- The page setup boots through `bootDialog(requests, id, render)` (`src/dialog.ts`) until PR E. The Vue dialogs are rendered by `App.vue`, keyed by `keyOf(request)`.
+- Every dialog is a Vue component on `BaseDialog`, rendered by `App.vue` and keyed by `keyOf(request)`. `src/dialog.ts` is gone (PR E).
 - Shared state lives in `src/state/` as Vue `shallowRef`s. See `state.md` for its rules, and `ui-testing.md` for tests.
 
 ## Waiting to be ported
@@ -33,7 +33,7 @@ These arrived or are arriving outside the plan's PRs:
 - `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for. The open strip's logic is DOM-free in `src/bandStrip.ts`, so porting it is a template over that module. The strips already call the editor through its handle. z-index: `.band-edge` 5, `.band-editor` 8.
 - UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests` (a counter). Until then, write a new value each time, since from PR A on an equal write doesn't notify.
 - No `surfaces.ts` registry: `App.vue` lists each part of the UI in one line, keyed by `keyOf` (`src/ui/keyOf.ts`), which is as short and easier to read. Dialogs close through `closeDialog` (`src/ui/closeDialog.ts`), a plain function, not a `useDialogRequest` composable.
-- Composables so far: none. The focus trap planned as `useFocusTrap` lives in `BaseDialog.vue`, which the page setup will reuse. `usePopupPlacement` would only wrap `onMounted(place); onUpdated(place)`, and roving focus has one user (the context menu), so both wait for a second real use. The dialogs' fields use `TextField.vue` (PR D). `CaptionField.vue` and `MenuEditField.vue` stay separate: their values come back as props while the user types, so they set them once.
+- Composables so far: none. The focus trap planned as `useFocusTrap` lives in `BaseDialog.vue`, which all three dialogs use. `usePopupPlacement` would only wrap `onMounted(place); onUpdated(place)`. Roving focus is a component, `OptionGroup.vue` (PR E), for the page setup's rows; the context menu keeps its own, which skips disabled items, opens submenus and has typeahead, so the two share no code worth a composable. The dialogs' fields use `TextField.vue` (PR D). `CaptionField.vue` and `MenuEditField.vue` stay separate: their values come back as props while the user types, so they set them once.
 - Context menu (PR C): #68's paste fallback `pasteText(view, text, plain)` and copy fallback `view.serializeForClipboard` stay in `src/editor/contextMenu/model.ts`, which PR C doesn't change. #66's radio items (`MenuItem.radio`: `menuitemradio` with `aria-checked`, used by the strips' First Page and page number menus) render through `roleOf` in `src/ui/menuModel.ts`.
 
 ## Status
@@ -44,8 +44,8 @@ These arrived or are arriving outside the plan's PRs:
 | A | `src/state/` with Vue refs replacing `observable.ts`, sync watchers | done (#67) |
 | B | SFC tooling, `App`, `useEditor`, table toolbar (go/no-go gate) | done (#69) |
 | C | Table picker and context menu | done (#70) |
-| D | Link and image dialogs | in review (#71) |
-| E | Page setup, delete `dialog.ts` | not started |
+| D | Link and image dialogs | done (#71) |
+| E | Page setup, delete `dialog.ts` | in review |
 | F | Status bars, drop `pageSetupRequests` | not started |
 | G | Default flush for non-UI watchers, finish the rule files, delete this file | not started |
 

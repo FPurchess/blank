@@ -13,6 +13,8 @@ const props = defineProps<{
   // "link-dialog-hint", and its text, "" for nothing
   hint?: { id: string; text: string };
   placeholder?: string;
+  // the keyboard a touch screen shows, e.g. "decimal" for lengths
+  inputmode?: "decimal";
 }>();
 const value = defineModel<string>({ required: true });
 const emit = defineEmits<{ input: [] }>();
@@ -25,6 +27,7 @@ const attributes = computed(() => ({
   autocomplete: "off",
   spellcheck: false,
   placeholder: props.placeholder,
+  inputmode: props.inputmode,
   "aria-describedby": props.hint?.id,
 }));
 

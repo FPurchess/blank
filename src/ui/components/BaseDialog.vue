@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { useTemplateRef } from "vue";
 
+import { shownIn } from "../../dom";
+
 // A modal dialog: a backdrop with a form, titled `title`. Esc and a press on
 // the backdrop cancel it, Tab keeps the focus inside, and Enter submits the
 // form. The default slot holds its fields, `actions` its buttons.
-defineProps<{ id: string; title: string }>();
+defineProps<{
+  id: string;
+  title: string;
+  // a class of the form besides `dialog`, for a dialog's own styles
+  formClass?: string;
+}>();
 const emit = defineEmits<{ submit: []; cancel: [] }>();
 
 const form = useTemplateRef<HTMLFormElement>("form");
@@ -15,11 +22,10 @@ const form = useTemplateRef<HTMLFormElement>("form");
  * options of a radio group, nor what is hidden.
  */
 const trapFocus = (event: KeyboardEvent) => {
-  const focusable = [
-    ...form.value!.querySelectorAll<HTMLElement>(
-      'input, textarea, button:not(:disabled):not([tabindex="-1"])',
-    ),
-  ].filter((element) => !element.closest("[hidden]"));
+  const focusable = shownIn(
+    form.value!,
+    'input, textarea, button:not(:disabled):not([tabindex="-1"])',
+  );
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   if (event.shiftKey && document.activeElement === first) {
@@ -43,7 +49,7 @@ const cancelOnBackdrop = (event: MouseEvent) => {
   <div :id="id" class="dialog-backdrop" @mousedown="cancelOnBackdrop">
     <form
       ref="form"
-      class="dialog"
+      :class="['dialog', formClass]"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="`${id}-title`"

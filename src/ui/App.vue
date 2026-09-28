@@ -3,6 +3,7 @@ import {
   contextMenu,
   imageDialog,
   linkDialog,
+  pageSetup,
   tablePicker,
   tableToolbar,
 } from "../state";
@@ -10,6 +11,7 @@ import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
+import PageSetupDialog from "./PageSetupDialog.vue";
 import TablePicker from "./TablePicker.vue";
 import TableToolbar from "./TableToolbar.vue";
 
@@ -30,6 +32,11 @@ import TableToolbar from "./TableToolbar.vue";
     v-if="imageDialog"
     :key="keyOf(imageDialog)"
     :request="imageDialog"
+  />
+  <PageSetupDialog
+    v-if="pageSetup"
+    :key="keyOf(pageSetup)"
+    :request="pageSetup"
   />
   <ContextMenu
     v-if="contextMenu"

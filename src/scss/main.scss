@@ -319,7 +319,7 @@ body {
   }
 }
 
-// the page setup dialog, see src/pageSetup.ts
+// the page setup dialog, see src/ui/PageSetupDialog.vue
 .dialog.page-setup {
   max-width: min(640px, calc(100% - 32px));
 
@@ -415,6 +415,11 @@ body {
     gap: 6px;
     width: 140px;
     margin: 18px 0 0;
+
+    // holds the SVG, which lays out as if it were the figure's own child
+    .picture {
+      display: contents;
+    }
 
     .paper {
       fill: var(--background-color);
