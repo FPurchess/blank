@@ -9,3 +9,6 @@ pub mod text;
 pub mod engine;
 pub mod items;
 pub mod pdf;
+
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;

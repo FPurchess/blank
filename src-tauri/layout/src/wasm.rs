@@ -1,0 +1,265 @@
+//! The engine for the webview, see src/engine/engine.ts. Everything crosses
+//! as JSON strings and plain number arrays.
+
+use std::collections::HashMap;
+use std::fmt::Write;
+
+use wasm_bindgen::prelude::*;
+
+use crate::engine::{Engine, Hit, Op};
+use crate::fonts::Fonts;
+use crate::model::{Item, Settings};
+use crate::pdf::{self, ImageData, Info};
+
+#[wasm_bindgen]
+pub struct LayoutEngine {
+    engine: Engine,
+    images: HashMap<String, ImageData>,
+}
+
+fn error(message: impl std::fmt::Display) -> JsError {
+    JsError::new(&message.to_string())
+}
+
+fn hit(hit: Option<Hit>) -> Vec<f64> {
+    match hit {
+        Some(Hit::Text(pos)) => vec![0.0, pos as f64],
+        Some(Hit::Node(pos)) => vec![1.0, pos as f64],
+        None => vec![],
+    }
+}
+
+/// a number with at most three decimals, which is finer than any screen
+fn number(out: &mut String, value: f32) {
+    let rounded = (value * 1000.0).round() / 1000.0;
+    let _ = write!(out, "{rounded}");
+}
+
+fn string(out: &mut String, value: &str) {
+    out.push_str(&serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into()));
+}
+
+#[wasm_bindgen]
+impl LayoutEngine {
+    /// the fonts' files one after the other, with their lengths
+    #[wasm_bindgen(constructor)]
+    pub fn new(bytes: &[u8], lengths: &[u32]) -> LayoutEngine {
+        let mut files = vec![];
+        let mut start = 0usize;
+        for length in lengths {
+            let end = start + *length as usize;
+            files.push(bytes[start..end].to_vec());
+            start = end;
+        }
+        LayoutEngine {
+            engine: Engine::new(Fonts::new(files)),
+            images: HashMap::new(),
+        }
+    }
+
+    #[wasm_bindgen(js_name = setSettings)]
+    pub fn set_settings(&mut self, json: &str) -> Result<(), JsError> {
+        let settings: Settings = serde_json::from_str(json).map_err(error)?;
+        self.engine.set_settings(settings);
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = setItems)]
+    pub fn set_items(&mut self, json: &str) -> Result<(), JsError> {
+        let items: Vec<Item> = serde_json::from_str(json).map_err(error)?;
+        self.engine.set_items(items);
+        Ok(())
+    }
+
+    pub fn update(&mut self, start: u32, delete: u32, json: &str, shift: i32) -> Result<(), JsError> {
+        let items: Vec<Item> = serde_json::from_str(json).map_err(error)?;
+        self.engine
+            .update(start as usize, delete as usize, items, shift as i64);
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = pageCount)]
+    pub fn page_count(&self) -> u32 {
+        self.engine.pages.len() as u32
+    }
+
+    /// what each page shows changes with its version
+    pub fn versions(&self) -> Vec<u32> {
+        self.engine.pages.iter().map(|page| page.version).collect()
+    }
+
+    /// where the text of each page ends, from its top edge
+    pub fn bottoms(&self) -> Vec<f32> {
+        self.engine.pages.iter().map(|page| page.bottom).collect()
+    }
+
+    /// what a page shows: rectangles, images, links and glyph runs
+    pub fn page(&mut self, page: u32) -> String {
+        let ops = self.engine.page_ops(page as usize, true);
+        let mut rects = String::new();
+        let mut images = String::new();
+        let mut links = String::new();
+        let mut glyphs = String::new();
+        let separate = |out: &mut String| {
+            if !out.is_empty() {
+                out.push(',');
+            }
+        };
+        for op in ops {
+            match op {
+                Op::Rect { x, y, w, h, role } => {
+                    separate(&mut rects);
+                    rects.push('[');
+                    for value in [x, y, w, h] {
+                        number(&mut rects, value);
+                        rects.push(',');
+                    }
+                    let _ = write!(rects, "{}]", role as u8);
+                }
+                Op::Image { src, x, y, w, h } => {
+                    separate(&mut images);
+                    images.push('[');
+                    string(&mut images, &src);
+                    for value in [x, y, w, h] {
+                        images.push(',');
+                        number(&mut images, value);
+                    }
+                    images.push(']');
+                }
+                Op::Link { href, x, y, w, h } => {
+                    separate(&mut links);
+                    links.push('[');
+                    string(&mut links, &href);
+                    for value in [x, y, w, h] {
+                        links.push(',');
+                        number(&mut links, value);
+                    }
+                    links.push(']');
+                }
+                Op::Glyphs { run, role, .. } => {
+                    separate(&mut glyphs);
+                    let _ = write!(glyphs, "[{},", run.font);
+                    number(&mut glyphs, run.size);
+                    let _ = write!(glyphs, ",{}", role as u8);
+                    for glyph in &run.glyphs {
+                        let _ = write!(glyphs, ",{},", glyph.id);
+                        number(&mut glyphs, glyph.x);
+                        glyphs.push(',');
+                        number(&mut glyphs, glyph.y);
+                    }
+                    glyphs.push(']');
+                }
+            }
+        }
+        format!("{{\"r\":[{rects}],\"i\":[{images}],\"l\":[{links}],\"g\":[{glyphs}]}}")
+    }
+
+    /// a glyph's outline as an SVG path, in font units with y up
+    #[wasm_bindgen(js_name = glyphPath)]
+    pub fn glyph_path(&self, font: u32, glyph: u32) -> String {
+        self.engine.fonts.glyph_path(font as usize, glyph)
+    }
+
+    #[wasm_bindgen(js_name = unitsPerEm)]
+    pub fn units_per_em(&self, font: u32) -> f32 {
+        self.engine
+            .fonts
+            .files
+            .get(font as usize)
+            .map(|file| file.upem)
+            .unwrap_or(1000.0)
+    }
+
+    /// page, x, y and height of the caret at a position, or nothing
+    pub fn caret(&self, pos: u32, after: bool) -> Vec<f32> {
+        match self.engine.caret(pos, after) {
+            Some((page, x, y, height)) => vec![page as f32, x, y, height],
+            None => vec![],
+        }
+    }
+
+    /// what a point of a page hits: [0, pos] for text, [1, pos] for a node
+    pub fn hit(&self, page: u32, x: f32, y: f32) -> Vec<f64> {
+        hit(self.engine.hit(page as usize, x, y))
+    }
+
+    pub fn word(&self, page: u32, x: f32, y: f32) -> Vec<u32> {
+        match self.engine.word(page as usize, x, y) {
+            Some((from, to)) => vec![from, to],
+            None => vec![],
+        }
+    }
+
+    pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Vec<f64> {
+        hit(self.engine.vertical(pos, down, goal))
+    }
+
+    /// the start or end of the line a position is on, -1 for none
+    #[wasm_bindgen(js_name = lineEdge)]
+    pub fn line_edge(&self, pos: u32, end: bool) -> f64 {
+        self.engine
+            .line_edge(pos, end)
+            .map(|pos| pos as f64)
+            .unwrap_or(-1.0)
+    }
+
+    /// the selection's rectangles: page, x, y, width and height each
+    pub fn selection(&self, from: u32, to: u32) -> Vec<f32> {
+        self.engine
+            .selection(from, to)
+            .into_iter()
+            .flat_map(|(page, x, y, w, h)| [page as f32, x, y, w, h])
+            .collect()
+    }
+
+    /// how much the last change laid out: items, the page it paginated
+    /// from, and the page it settled at (-1 for none)
+    pub fn stats(&self) -> Vec<i32> {
+        let stats = self.engine.stats;
+        vec![
+            stats.laid_out as i32,
+            stats.paginated_from as i32,
+            stats.settled_at.map(|page| page as i32).unwrap_or(-1),
+        ]
+    }
+
+    /// the words as laid out, for checking the PDF against the layout
+    pub fn words(&mut self) -> String {
+        let words: Vec<_> = self
+            .engine
+            .words()
+            .into_iter()
+            .map(|word| {
+                serde_json::json!({
+                    "page": word.page,
+                    "left": word.left,
+                    "right": word.right,
+                    "baseline": word.baseline,
+                    "size": word.size,
+                    "font": word.font,
+                    "text": word.text,
+                })
+            })
+            .collect();
+        serde_json::to_string(&words).unwrap_or_default()
+    }
+
+    #[wasm_bindgen(js_name = addImage)]
+    pub fn add_image(&mut self, src: &str, bytes: Vec<u8>, jpeg: bool) {
+        self.images.insert(src.to_string(), ImageData { bytes, jpeg });
+    }
+
+    #[wasm_bindgen(js_name = clearImages)]
+    pub fn clear_images(&mut self) {
+        self.images.clear();
+    }
+
+    /// the document as a PDF
+    pub fn pdf(&mut self, title: &str, author: &str) -> Result<Vec<u8>, JsError> {
+        let info = Info {
+            title: title.to_string(),
+            author: author.to_string(),
+        };
+        pdf::write(&mut self.engine, &self.images, &info).map_err(error)
+    }
+}

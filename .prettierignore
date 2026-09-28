@@ -2,3 +2,4 @@ src-tauri
 dist
 pdfmake-vfs.ts
 .claude
+src/engine/wasm
