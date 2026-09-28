@@ -16,7 +16,7 @@ import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
 import type { EditorHandle } from "./handle";
 
-const editor = () => document.querySelector<HTMLElement>(".ProseMirror");
+const editor = () => document.querySelector<HTMLElement>("#editor");
 
 describe("bootEditor", () => {
   let handle: EditorHandle;
@@ -59,6 +59,7 @@ describe("bootEditor", () => {
   });
 
   it("mounts the editor with the welcome document", () => {
+    expect(editor()?.classList).toContain("ProseMirror");
     expect(editor()?.textContent).toContain("Welcome to Blank");
     expect(transaction.value?.doc.textContent).toContain("Welcome to Blank");
   });

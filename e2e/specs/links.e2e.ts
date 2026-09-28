@@ -31,14 +31,14 @@ describe("links", () => {
     await type(Key.Enter);
 
     await expect(dialog()).not.toBeExisting();
-    await expect($(".ProseMirror a")).toHaveAttribute("href", BLANK);
-    await expect($(".ProseMirror a")).toHaveText("Blank");
+    await expect($("#editor a")).toHaveAttribute("href", BLANK);
+    await expect($("#editor a")).toHaveText("Blank");
   });
 
   it("returns the focus to the editor", async () => {
     await type(" rocks");
 
-    await expect($(".ProseMirror p")).toHaveText("Blank rocks");
+    await expect($("#editor p")).toHaveText("Blank rocks");
   });
 
   it("cancels the dialog on Escape", async () => {
@@ -49,7 +49,7 @@ describe("links", () => {
 
     await expect(dialog()).not.toBeExisting();
     await type("!");
-    await expect($(".ProseMirror p")).toHaveText("Blank rocks!");
+    await expect($("#editor p")).toHaveText("Blank rocks!");
   });
 
   it("edits the link at the cursor and converts it to text", async () => {
@@ -66,8 +66,8 @@ describe("links", () => {
     await type(Key.Enter);
 
     await expect(dialog()).not.toBeExisting();
-    await expect($(".ProseMirror a")).not.toBeExisting();
-    await expect($(".ProseMirror p")).toHaveText("Blank rocks!");
+    await expect($("#editor a")).not.toBeExisting();
+    await expect($("#editor p")).toHaveText("Blank rocks!");
   });
 
   it("links markdown typed as [title](url)", async () => {
@@ -75,7 +75,7 @@ describe("links", () => {
     await type(Key.Enter);
     await type(`[Docs](${DOCS}) `);
 
-    await expect($(".ProseMirror a")).toHaveAttribute("href", DOCS);
-    await expect($(".ProseMirror a")).toHaveText("Docs");
+    await expect($("#editor a")).toHaveAttribute("href", DOCS);
+    await expect($("#editor a")).toHaveText("Docs");
   });
 });

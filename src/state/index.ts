@@ -11,6 +11,7 @@ export * from "./document";
 export * from "./focus";
 export * from "./language";
 export * from "./messages";
+export * from "./page";
 export * from "./popups";
 export * from "./spellcheck";
 

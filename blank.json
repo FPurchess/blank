@@ -34,7 +34,9 @@
     "spellcheck.next": "Mod-Alt-n",
     "spellcheck.previous": "Mod-Alt-Shift-n",
     "menu.context": "Shift-F10",
-    "page.setup": "Mod-Alt-u"
+    "page.setup": "Mod-Alt-u",
+    "edit.header": "Mod-Alt-h",
+    "edit.footer": "Mod-Alt-f"
   },
   "autocorrect": {
     "arrows": true,

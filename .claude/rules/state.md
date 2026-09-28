@@ -26,9 +26,10 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | `appearance.ts` | `themes`, `theme` |
 | `language.ts` | `language`, `languagePicker` |
 | `spellcheck.ts` | `spellcheck`, `spellcheckStatus`, `spellchecker` |
-| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and `pageSetupRequests` |
+| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and of the open header or footer strip (`bandEditor`), and `pageSetupRequests` |
 | `popups.ts` | `tablePicker`, `tableToolbar`, `tableHandles` (with `Point`, `Span`), `contextMenu`, `MenuItem`, `Anchor` |
 | `messages.ts` | `announcement` and `spellcheckMessage`, written through `announce()` and `flashSpellcheckMessage()`; `bootMessages()` clears each after a moment |
+| `page.ts` | `frontmatter` (of the document, notifying only when it changes), `pageLayout` (its `resolveLayout` over `config`'s defaults, resolved again only when either changes) and `pageFields` (what the placeholders of headers and footers show, the same object while they stay the same) |
 | `focus.ts` | `uiTakesFocus`, whether a dialog, the context menu or the caption field holds the focus |
 
 `config` (blank.json over the defaults) stays in `src/config.ts`, next to its loader.

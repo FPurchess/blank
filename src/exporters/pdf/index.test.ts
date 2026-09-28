@@ -173,5 +173,49 @@ describe("exporters.pdf", () => {
       expect(text).toMatch(/\/Subtype \/Image/);
       expect(text).toMatch(/\/Width 3\b/);
     });
+
+    it("heads each page with its chapter, as pdfmake laid it out", async () => {
+      const pdfmake = (await import("pdfmake")).default;
+      const createPdf = pdfmake.createPdf.bind(pdfmake);
+      // what the header shows on each page, as pdfmake draws it
+      const drawn = new Map<number, string>();
+      const spy = vi
+        .spyOn(pdfmake, "createPdf")
+        .mockImplementation((definition) => {
+          const header = definition.header as unknown as (
+            page: number,
+            pages: number,
+          ) => { columns: { text: string }[] } | null;
+          return createPdf({
+            ...definition,
+            header: ((page: number, pages: number) => {
+              const block = header(page, pages);
+              drawn.set(page, block?.columns.map((c) => c.text).join("") ?? "");
+              return block;
+            }) as unknown as typeof definition.header,
+          });
+        });
+      const state = EditorState.create({
+        doc: parseMarkdown(
+          "# Tides\n\nOne.\n\n<!-- pagebreak -->\n\nStill tides.\n\n# Harbours\n\nTwo.",
+        ),
+      });
+
+      const { pages } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout({
+          header: { left: "", center: "{chapter}", right: "" },
+          newPageBefore: [1],
+        }),
+      });
+      spy.mockRestore();
+
+      expect(pages).toBe(3);
+      expect([...drawn.entries()].sort()).toEqual([
+        [1, "Tides"],
+        [2, "Tides"],
+        [3, "Harbours"],
+      ]);
+    });
   });
 });

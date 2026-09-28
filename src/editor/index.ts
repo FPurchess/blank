@@ -66,6 +66,9 @@ export const bootEditor = async () => {
   const view = new EditorView(document.body, {
     state,
     plugins: [syncPlugin(() => sync())],
+    // the main text, which the slot editors of the header and footer strips
+    // share the .ProseMirror class with
+    attributes: { id: "editor" },
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
         // the dialogs take the focus while they are open

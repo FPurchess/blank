@@ -7,7 +7,12 @@ import {
   pageGeometry,
   resolveLayout,
 } from "./resolve";
-import { allMargins, DEFAULT_PAGE, type PageSettings } from "./settings";
+import {
+  allMargins,
+  DEFAULT_PAGE,
+  NO_SLOTS,
+  type PageSettings,
+} from "./settings";
 import { cm } from "../test/layout";
 
 describe("resolveLayout", () => {
@@ -18,6 +23,12 @@ describe("resolveLayout", () => {
         orientation: "portrait",
         margins: allMargins(cm(2.5)),
         newPageBefore: [],
+        header: NO_SLOTS,
+        footer: NO_SLOTS,
+        firstPage: "same",
+        evenPages: null,
+        numberStyle: "1",
+        startNumber: 1,
       },
       settings: DEFAULT_PAGE,
       problems: [],
@@ -83,14 +94,44 @@ describe("resolveLayout", () => {
   });
 });
 
+describe("resolveLayout room for the header and footer", () => {
+  it("warns about a margin too small for its band, and keeps it", () => {
+    const { settings, problems } = resolveLayout(
+      'page:\n  margins: 1cm\n  header: { left: "x" }\n  footer: { center: "{page}" }',
+      DEFAULT_PAGE,
+    );
+    expect(settings.margins).toEqual(allMargins(cm(1)));
+    expect(problems).toEqual(["page.header-room", "page.footer-room"]);
+  });
+
+  it("warns for the bands of the first and even pages too", () => {
+    expect(
+      resolveLayout(
+        'page:\n  margins: 1cm\n  first-page:\n    header: { left: "x" }\n  even-pages:\n    footer: { right: "{page}" }',
+        DEFAULT_PAGE,
+      ).problems,
+    ).toEqual(["page.header-room", "page.footer-room"]);
+  });
+
+  it("is quiet for enough margin, or no band", () => {
+    expect(
+      resolveLayout('page:\n  footer: { center: "{page}" }', DEFAULT_PAGE)
+        .problems,
+    ).toEqual([]);
+    expect(
+      resolveLayout("page:\n  margins: 1cm", DEFAULT_PAGE).problems,
+    ).toEqual([]);
+  });
+});
+
 describe("pageGeometry", () => {
   it("turns the page for landscape and leaves the margins for the text", () => {
     const layout = layoutOf(
       {
+        ...DEFAULT_PAGE,
         size: "a4",
         orientation: "landscape",
         margins: { top: 10, right: 20, bottom: 30, left: 40 },
-        newPageBefore: [],
       },
       "de-DE",
     );
@@ -137,9 +178,26 @@ describe("differences", () => {
           orientation: "landscape",
           margins: allMargins(72),
           newPageBefore: [1],
+          header: { ...NO_SLOTS, left: "{title}" },
+          footer: { ...NO_SLOTS, center: "{page}" },
+          firstPage: "plain",
+          evenPages: { header: NO_SLOTS, footer: NO_SLOTS },
+          numberStyle: "i",
+          startNumber: 0,
         },
         "de-DE",
       ),
-    ).toEqual(["size", "orientation", "margins", "newPageBefore"]);
+    ).toEqual([
+      "size",
+      "orientation",
+      "margins",
+      "newPageBefore",
+      "header",
+      "footer",
+      "firstPage",
+      "evenPages",
+      "numberStyle",
+      "startNumber",
+    ]);
   });
 });

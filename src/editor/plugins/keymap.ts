@@ -32,6 +32,7 @@ import {
   toggleSpellcheck,
   tableKey,
   pageSetup,
+  editBand,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -102,6 +103,8 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.SPELLCHECK_PREVIOUS]: goToMisspelling(-1),
   [CommandIdentifier.CONTEXT_MENU]: openMenu(),
   [CommandIdentifier.PAGE_SETUP]: pageSetup(),
+  [CommandIdentifier.EDIT_HEADER]: editBand("header"),
+  [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
 };
 
 /**

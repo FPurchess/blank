@@ -10,7 +10,7 @@ describe("editing", () => {
   it("creates a new file", async () => {
     await pressMod("n");
 
-    await expect($(".ProseMirror")).toHaveText("");
+    await expect($("#editor")).toHaveText("");
     await expect($("#ui-top")).toHaveText("» Untitled");
     await expect($("#ui-stats")).toHaveText("0 words 0 chars");
   });
@@ -18,14 +18,14 @@ describe("editing", () => {
   it("counts words and chars while typing", async () => {
     await type("Hello world");
 
-    await expect($(".ProseMirror p")).toHaveText("Hello world");
+    await expect($("#editor p")).toHaveText("Hello world");
     await expect($("#ui-stats")).toHaveText("2 words 11 chars");
   });
 
   it("autocompletes arrows", async () => {
     await type(" --> ");
 
-    await expect($(".ProseMirror p")).toHaveText("Hello world →");
+    await expect($("#editor p")).toHaveText("Hello world →");
   });
 
   it("autocompletes arrows in the middle of the text", async () => {
@@ -34,7 +34,7 @@ describe("editing", () => {
     for (let i = 0; i < 3; i++) await type(Key.ArrowLeft);
     await type("--> ");
 
-    await expect($(".ProseMirror p:last-child")).toHaveText("The → end");
+    await expect($("#editor p:last-child")).toHaveText("The → end");
     await type(Key.End);
   });
 
@@ -42,19 +42,19 @@ describe("editing", () => {
     await type(Key.Enter);
     await type("## Heading");
 
-    await expect($(".ProseMirror h2")).toHaveText("Heading");
+    await expect($("#editor h2")).toHaveText("Heading");
   });
 
   it("undoes a block shortcut with a single undo", async () => {
     await type(Key.Enter);
     await type("- ");
-    await expect($(".ProseMirror ul")).toExist();
+    await expect($("#editor ul")).toExist();
 
     await pressMod("z");
 
-    await expect($(".ProseMirror ul")).not.toExist();
-    await expect($(".ProseMirror p:last-child")).toHaveText("-");
-    await expect($(".ProseMirror h2")).toHaveText("Heading");
+    await expect($("#editor ul")).not.toExist();
+    await expect($("#editor p:last-child")).toHaveText("-");
+    await expect($("#editor h2")).toHaveText("Heading");
   });
 
   it("toggles bold via keyboard shortcut", async () => {
@@ -62,7 +62,7 @@ describe("editing", () => {
     await pressMod("b");
     await type("bold");
 
-    await expect($(".ProseMirror strong")).toHaveText("bold");
+    await expect($("#editor strong")).toHaveText("bold");
   });
 
   it("chooses the language via keyboard shortcut", async () => {

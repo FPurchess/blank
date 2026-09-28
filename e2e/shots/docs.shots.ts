@@ -12,6 +12,7 @@ import {
   pressMod,
   restartApp,
   type,
+  hoverEdge,
 } from "../helpers.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -130,7 +131,9 @@ class Recorder {
     await showKeys([]);
   }
 
-  private at: Point = { x: 400, y: 20 };
+  // where filmNew puts the mouse: in the middle of the text, away from
+  // the bars and the hints there
+  private at: Point = { x: 400, y: 300 };
   private down = false;
 
   /**
@@ -186,6 +189,24 @@ class Recorder {
   async enter(pause = 0.6) {
     await type(Key.Enter);
     await this.frame(pause);
+  }
+
+  /** move the mouse onto `element` and click it */
+  async clickOn(element: ReturnType<typeof $>, seconds = 0.6, move = 0.5) {
+    const { x, y } = await element.getLocation();
+    const { width, height } = await element.getSize();
+    await this.moveTo(
+      { x: Math.round(x + width / 2), y: Math.round(y + height / 2) },
+      move,
+    );
+    await this.click(seconds);
+  }
+
+  /** move the mouse onto the top or bottom bar, which shows the hints there */
+  async hover(edge: "top" | "bottom", seconds = 0.8) {
+    const height = await browser.execute(() => window.innerHeight);
+    await this.moveTo({ x: 400, y: edge === "top" ? 20 : height - 20 }, 0.6);
+    await this.frame(seconds);
   }
 
   /** press `key`, shown as a keycap labelled `label`, e.g. Tab or an arrow */
@@ -363,8 +384,12 @@ const filmNew = async () => {
   recordings.push(frames);
   await pressMod("n");
   await expect($("#ui-top")).toHaveText("» Untitled");
-  // the pointer out of the way, so no button looks hovered
-  await $("#ui-top").moveTo();
+  // the pointer in the middle of the text, so no button looks hovered and
+  // no hint shows at the edges
+  await browser
+    .action("pointer")
+    .move({ x: 400, y: 300, origin: "viewport" })
+    .perform();
   const film = new Recorder(frames);
   await film.pause(0.8);
   return film;
@@ -414,6 +439,60 @@ describe("docs screenshots", () => {
     await browser.keys(Key.ArrowRight);
     await shot("page-setup");
     await type(Key.Escape);
+  });
+
+  it("records adding page numbers and a header", async () => {
+    const film = await filmNew();
+    await film.type("# The Lighthouse");
+    await film.enter(0.4);
+    await film.type("It was a dark and stormy night.");
+    await film.pause(0.6);
+
+    // page numbers in one click, from the hint at the bottom edge
+    await film.hover("bottom");
+    await film.clickOn($("#band-footer").$("button=# Page numbers"), 1.2);
+    await film.clickOn($("#band-editor").$("button=Done"), 1);
+
+    // the header: the chapter on the left, the page on the right
+    await film.shortcut(["Mod", "Alt", "H"], () => pressMod(Key.Alt, "h"), 1);
+    await film.clickOn($("#band-editor .slot.left .ProseMirror"), 0.3);
+    await film.clickOn($("#band-editor").$("button=Chapter"), 0.8);
+    await film.clickOn($("#band-editor .slot.right .ProseMirror"), 0.3);
+    await film.clickOn($("#band-editor").$("button=# Page number ▾"), 1);
+    await film.clickOn(
+      $("#context-menu").$('[data-id="Page {page} of {pages}"]'),
+      1,
+    );
+    // a title page without them
+    await film.clickOn($("#band-editor").$("button=First Page ▾"), 1);
+    await film.clickOn(
+      $("#context-menu").$('[data-id="first-page:plain"]'),
+      0.8,
+    );
+    await film.clickOn($("#band-editor").$("button=Done"), 0.6);
+    await film.clickOn($("#editor p"), 0.3);
+    await film.pause(2.5);
+    film.save(path.join(outDir, "header-footer.gif"), 545);
+  });
+
+  it("records different even pages", async () => {
+    const film = await filmNew();
+    await film.type("# The Lighthouse");
+    await film.enter(0.4);
+    await film.type("It was a dark and stormy night.");
+    await film.shortcut(["Mod", "Alt", "F"], () => pressMod(Key.Alt, "f"), 0.8);
+    await film.clickOn($("#band-editor").$("button=Title"), 0.6);
+    await film.clickOn($("#band-editor .slot.right .ProseMirror"), 0.3);
+    await film.clickOn($("#band-editor").$("button=# Page number ▾"), 0.8);
+    await film.clickOn($("#context-menu").$('[data-id="{page}"]'), 0.8);
+    // the even pages start mirrored: the page number on the outside
+    await film.clickOn($("#band-editor").$("button=Odd & Even Pages"), 1.6);
+    await film.clickOn($("#band-editor").$("button=Odd Pages"), 1.2);
+    await film.clickOn($("#band-editor").$("button=Even Pages"), 1.2);
+    await film.clickOn($("#band-editor").$("button=Done"), 0.6);
+    await film.clickOn($("#editor p"), 0.3);
+    await film.pause(2);
+    film.save(path.join(outDir, "even-pages.gif"), 545);
   });
 
   it("captures a page break", async () => {
@@ -551,7 +630,7 @@ describe("docs screenshots", () => {
     // Tab in the last cell adds a row, where two more rows get pasted
     const lastCell = await browser.execute(() => {
       const cell = document.querySelector(
-        ".ProseMirror tr:last-child td:last-child",
+        "#editor tr:last-child td:last-child",
       )!;
       const rect = cell.getBoundingClientRect();
       return {
@@ -592,7 +671,7 @@ describe("docs screenshots", () => {
     await film.pause(0.8);
     const layout = () =>
       browser.execute(() => {
-        const table = document.querySelector(".ProseMirror table")!;
+        const table = document.querySelector("#editor table")!;
         const box = table.getBoundingClientRect();
         const rows = [...table.querySelectorAll("tr")].map(
           (row) => row.getBoundingClientRect().top,

@@ -169,6 +169,27 @@ describe("command.pageSetup", () => {
       );
     });
 
+    it("saves what the dialog shows, and keeps the document's header", async () => {
+      saveDefaultPage.mockResolvedValue(undefined);
+      mount(
+        docWithFrontmatter(
+          'page:\n  new-page-before: 1\n  footer: { center: "{page}" }',
+          p("text"),
+        ),
+      );
+      openPageSetup(view);
+      const { settings, makeDefault } = request();
+
+      makeDefault(settings);
+      await flushPromises();
+
+      const [saved] = saveDefaultPage.mock.calls[0];
+      expect(saved.newPageBefore).toEqual([1]);
+      expect(saved.footer).toEqual(DEFAULT_PAGE.footer);
+      // the document follows the new default, and keeps its own footer
+      expect(frontmatter()).toBe('page:\n  footer: {center: "{page}"}');
+    });
+
     it("tells when the default can't be saved, and keeps the document", async () => {
       saveDefaultPage.mockRejectedValue(
         new Error("blank.json holds no settings"),

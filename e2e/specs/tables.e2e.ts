@@ -46,7 +46,7 @@ describe("tables", () => {
 
   it("inserts a table with the picker and fills it with Tab", async () => {
     await open("# Stock\n\nwhat we have:\n");
-    await clickInto(".ProseMirror p");
+    await clickInto("#editor p");
     await type(Key.End);
     await type(Key.Enter);
 
@@ -63,7 +63,7 @@ describe("tables", () => {
       await type(text);
       await type(Key.Tab);
     }
-    await expect($$(".ProseMirror tr")).toBeElementsArrayOfSize(4);
+    await expect($$("#editor tr")).toBeElementsArrayOfSize(4);
 
     await pressMod("s");
     const saved = await waitForSaved(file, "| pears");
@@ -80,20 +80,20 @@ describe("tables", () => {
 
   it("turns a typed header into a table", async () => {
     await open("start\n");
-    await clickInto(".ProseMirror p");
+    await clickInto("#editor p");
     await type(Key.End);
     await type(Key.Enter);
     await type("| name | qty |");
     await type(Key.Enter);
 
-    await expect($$(".ProseMirror th")).toBeElementsArrayOfSize(2);
+    await expect($$("#editor th")).toBeElementsArrayOfSize(2);
     await type("x");
-    await expect($$(".ProseMirror td")[0]).toHaveText("x");
+    await expect($$("#editor td")[0]).toHaveText("x");
   });
 
   it("saves a line break in a cell as <br>", async () => {
     await open("| a |\n| - |\n| b |\n");
-    await clickInto(".ProseMirror td");
+    await clickInto("#editor td");
     await type(Key.End);
     await type(Key.Enter);
     await type("c");
@@ -120,9 +120,9 @@ describe("tables", () => {
       "</table>",
     ].join("\n");
     await open(`intro\n\n${html}\n`);
-    await expect($(".ProseMirror th")).toHaveAttribute("colspan", "2");
+    await expect($("#editor th")).toHaveAttribute("colspan", "2");
 
-    await clickInto(".ProseMirror p");
+    await clickInto("#editor p");
     await type(Key.End);
     await type("!");
     await pressMod("s");
@@ -132,7 +132,7 @@ describe("tables", () => {
 
   it("leaves a table at the end of the document with the arrow keys", async () => {
     await open("intro\n\n| a |\n| - |\n| b |\n");
-    await clickInto(".ProseMirror td");
+    await clickInto("#editor td");
     await type(Key.End);
     await type(Key.ArrowDown);
     await type("after");
@@ -144,7 +144,7 @@ describe("tables", () => {
 
   it("changes a table in table mode", async () => {
     await open("| name | qty |\n| - | - |\n| pear | 12 |\n| kiwi | 3 |\n");
-    await clickInto(".ProseMirror td", 1);
+    await clickInto("#editor td", 1);
 
     await pressMod("t");
     await expect($("#table-toolbar")).toHaveElementClass("keys");
@@ -170,7 +170,7 @@ describe("tables", () => {
 
   it("writes a caption from table mode", async () => {
     await open("| a |\n| - |\n| b |\n");
-    await clickInto(".ProseMirror td");
+    await clickInto("#editor td");
     await pressMod("t");
     await type("t");
     await expect($("#table-toolbar .caption input")).toBeFocused();
@@ -184,7 +184,7 @@ describe("tables", () => {
 
   it("writes a caption from the toolbar", async () => {
     await open("| a |\n| - |\n| b |\n");
-    await clickInto(".ProseMirror td");
+    await clickInto("#editor td");
     await $('#table-toolbar button[data-id="caption"]').click();
     await expect($("#table-toolbar .caption input")).toBeFocused();
     await type("stock");
@@ -197,7 +197,7 @@ describe("tables", () => {
 
   it("switches a header column on from the toolbar", async () => {
     await open("| a | b |\n| - | - |\n| c | d |\n");
-    await clickInto(".ProseMirror td");
+    await clickInto("#editor td");
     await $('#table-toolbar button[data-id="header-column"]').click();
 
     await pressMod("s");
@@ -208,7 +208,7 @@ describe("tables", () => {
   describe("with the clipboard", () => {
     it("pastes cells copied from a spreadsheet as a table", async () => {
       await open("Start\n");
-      await clickInto(".ProseMirror p");
+      await clickInto("#editor p");
       await type(Key.End);
       await type(Key.Enter);
       await paste({ "text/plain": "fruit\tqty\nkiwi\t10\n" });
@@ -222,7 +222,7 @@ describe("tables", () => {
 
     it("pastes a table from a web page with a header row", async () => {
       await open("Start\n");
-      await clickInto(".ProseMirror p");
+      await clickInto("#editor p");
       await type(Key.End);
       await type(Key.Enter);
       await paste({
@@ -240,13 +240,13 @@ describe("tables", () => {
 
     it("copies cells as tab-separated text", async () => {
       await open("| fruit | qty |\n| - | - |\n| kiwi | 10 |\n");
-      await clickInto(".ProseMirror td");
+      await clickInto("#editor td");
       // the cell, then the whole table
       await pressMod("a");
       await pressMod("a");
       const copied = await browser.execute(() => {
         const clipboard = new DataTransfer();
-        document.querySelector(".ProseMirror")!.dispatchEvent(
+        document.querySelector("#editor")!.dispatchEvent(
           new ClipboardEvent("copy", {
             clipboardData: clipboard,
             bubbles: true,
@@ -267,7 +267,7 @@ describe("tables", () => {
      */
     const layout = () =>
       browser.execute(() => {
-        const table = document.querySelector(".ProseMirror table")!;
+        const table = document.querySelector("#editor table")!;
         const box = table.getBoundingClientRect();
         const rows = [...table.querySelectorAll("tr")].map(
           (row) => row.getBoundingClientRect().top,
@@ -395,7 +395,7 @@ describe("tables", () => {
 
   it("deletes a row from the table menu", async () => {
     await open("| a |\n| - |\n| b |\n| c |\n");
-    await $$(".ProseMirror td")[0].click({ button: "right" });
+    await $$("#editor td")[0].click({ button: "right" });
     await $('[data-id="table"]').click();
     await $('[data-id="table-row-delete"]').click();
 

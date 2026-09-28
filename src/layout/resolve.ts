@@ -1,21 +1,23 @@
 import { readFrontmatter } from "../markdown";
 import { localePaper, matchPaper, type PaperName, systemLocale } from "./paper";
 import {
-  type Margins,
-  type Orientation,
+  PAGE_KEYS,
+  type PageKey,
   type PageSettings,
   readPageSettings,
-  sameLevels,
-  sameMargins,
+  sameSetting,
   sameSize,
   sizeOf,
 } from "./settings";
+import { type Band, BAND_ROOM, hasText, variantsOf } from "./bands";
 import { parseLength } from "./units";
 
 // The page a document is laid out on: its frontmatter over the user's
 // defaults in blank.json, over Blank's.
 
-export interface Layout {
+// the settings with the paper they print on: "auto" is the paper of the
+// user's region
+export type Layout = Omit<PageSettings, "size"> & {
   paper: {
     // "custom" for a size that is none of PAPER
     name: PaperName | "custom";
@@ -25,12 +27,7 @@ export interface Layout {
     width: number;
     height: number;
   };
-  orientation: Orientation;
-  // in points
-  margins: Margins;
-  // the levels of the headings that start a new page
-  newPageBefore: number[];
-}
+};
 
 export interface ResolvedLayout {
   layout: Layout;
@@ -52,19 +49,14 @@ export const layoutOf = (
   settings: PageSettings,
   locale = systemLocale(),
 ): Layout => {
-  const { size } = settings;
+  const { size, ...rest } = settings;
   const own = localePaper(locale);
   const { width, height } = sizeOf(size, own);
   let name: Layout["paper"]["name"];
   if (size === "auto") name = own;
   else if (typeof size === "string") name = size;
   else name = matchPaper(width, height) ?? "custom";
-  return {
-    paper: { name, auto: size === "auto", width, height },
-    orientation: settings.orientation,
-    margins: settings.margins,
-    newPageBefore: settings.newPageBefore,
-  };
+  return { ...rest, paper: { name, auto: size === "auto", width, height } };
 };
 
 /**
@@ -102,19 +94,16 @@ export const differences = (
   a: PageSettings,
   b: PageSettings,
   locale = systemLocale(),
-): (keyof PageSettings)[] => {
+): PageKey[] => {
   const [paperA, paperB] = [
     layoutOf(a, locale).paper,
     layoutOf(b, locale).paper,
   ];
-  return [
-    ...(sameSize(paperA, paperB) ? [] : ["size" as const]),
-    ...(a.orientation === b.orientation ? [] : ["orientation" as const]),
-    ...(sameMargins(a.margins, b.margins) ? [] : ["margins" as const]),
-    ...(sameLevels(a.newPageBefore, b.newPageBefore)
-      ? []
-      : ["newPageBefore" as const]),
-  ];
+  return PAGE_KEYS.filter((key) =>
+    key === "size"
+      ? !sameSize(paperA, paperB)
+      : !sameSetting(key, a[key], b[key]),
+  );
 };
 
 /**
@@ -135,6 +124,17 @@ export const resolveLayout = (
   if (!leavesRoom(layoutOf(settings, locale))) {
     problems.push("page.margins");
     settings = { ...settings, margins: defaults.margins };
+  }
+  // a header or footer in a margin too small for it: Word moves the text
+  // down, the PDF lets them touch
+  const variants = variantsOf(settings);
+  const cramped = (band: Band, margin: number) =>
+    variants.some((bands) => hasText(bands[band])) && margin < BAND_ROOM;
+  if (cramped("header", settings.margins.top)) {
+    problems.push("page.header-room");
+  }
+  if (cramped("footer", settings.margins.bottom)) {
+    problems.push("page.footer-room");
   }
   return { layout: layoutOf(settings, locale), settings, problems };
 };

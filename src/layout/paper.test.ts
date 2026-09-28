@@ -1,6 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { localePaper, localeUnit, matchPaper, regionOf } from "./paper";
+import {
+  localePaper,
+  localeUnit,
+  matchPaper,
+  regionOf,
+  systemLocale,
+} from "./paper";
+
+describe("systemLocale", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const withLanguage = (language: string) =>
+    vi.stubGlobal("navigator", { ...navigator, language });
+
+  it("takes the webview's language, in its canonical form", () => {
+    withLanguage("de-de");
+    expect(systemLocale()).toBe("de-DE");
+  });
+
+  it("asks Intl for a language Intl refuses, like C on Linux", () => {
+    const own = Intl.DateTimeFormat().resolvedOptions().locale;
+    for (const language of ["C", "C.UTF-8", ""]) {
+      withLanguage(language);
+      expect(systemLocale()).toBe(own);
+    }
+    // which the date formats take
+    expect(() => new Intl.DateTimeFormat(systemLocale())).not.toThrow();
+  });
+});
 
 describe("regionOf", () => {
   it.each([

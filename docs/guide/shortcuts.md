@@ -13,6 +13,8 @@
 | Export as PDF   | `Mod` `Alt` `P`   |
 | Export as Word  | `Mod` `Alt` `W`   |
 | Page setup      | `Mod` `Alt` `U`   |
+| Edit header     | `Mod` `Alt` `H`   |
+| Edit footer     | `Mod` `Alt` `F`   |
 | Cycle themes    | `Mod` `Alt` `T`   |
 | Choose language | `Mod` `Alt` `L`   |
 

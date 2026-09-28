@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  bandEditor,
+  type BandEditorRequest,
   imageDialog,
   type ImageDialogRequest,
   linkDialog,
@@ -28,6 +30,7 @@ describe("uiTakesFocus", () => {
     linkDialog.value = null;
     imageDialog.value = null;
     pageSetup.value = null;
+    bandEditor.value = null;
     contextMenu.value = null;
     tableToolbar.value = null;
   });
@@ -40,6 +43,7 @@ describe("uiTakesFocus", () => {
     ["the link dialog", () => (linkDialog.value = {} as LinkDialogRequest)],
     ["the image dialog", () => (imageDialog.value = {} as ImageDialogRequest)],
     ["the page setup", () => (pageSetup.value = {} as PageSetupRequest)],
+    ["a header strip", () => (bandEditor.value = {} as BandEditorRequest)],
     ["the context menu", () => (contextMenu.value = {} as ContextMenuRequest)],
     [
       "the caption field",

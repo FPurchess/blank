@@ -9,7 +9,12 @@ import {
   paperOptions,
   settingsOf,
 } from "./choices";
-import { allMargins, DEFAULT_PAGE, type PageSettings } from "./settings";
+import {
+  allMargins,
+  DEFAULT_PAGE,
+  NO_SLOTS,
+  type PageSettings,
+} from "./settings";
 import { cm, mm } from "../test/layout";
 
 const settings = (changes: Partial<PageSettings> = {}): PageSettings => ({
@@ -54,6 +59,14 @@ describe("choicesOf", () => {
       margins: "normal",
       sides: { top: "2.5", right: "2.5", bottom: "2.5", left: "2.5" },
       newPageBefore: [],
+      bands: {
+        header: NO_SLOTS,
+        footer: NO_SLOTS,
+        firstPage: "same",
+        evenPages: null,
+        numberStyle: "1",
+        startNumber: 1,
+      },
     });
   });
 
@@ -106,11 +119,26 @@ describe("settingsOf", () => {
       }),
     ).toEqual({
       settings: {
+        ...DEFAULT_PAGE,
         size: "letter",
         orientation: "landscape",
         margins: allMargins(cm(1.27)),
         newPageBefore: [1, 2],
       },
+    });
+  });
+
+  it("keeps the header and footer, which the strips set", () => {
+    const bands = {
+      header: { ...NO_SLOTS, left: "{title}" },
+      footer: { ...NO_SLOTS, center: "{page}" },
+      firstPage: "plain" as const,
+      startNumber: 3,
+    };
+    const choices = choicesOf(settings(bands), "de-DE", "cm");
+
+    expect(settingsOf(choices, "de-DE", "cm")).toMatchObject({
+      settings: bands,
     });
   });
 
@@ -137,6 +165,7 @@ describe("settingsOf", () => {
       }),
     ).toEqual({
       settings: {
+        ...DEFAULT_PAGE,
         size: { width: mm(170), height: cm(24) },
         orientation: "portrait",
         margins: { top: cm(3), right: cm(2.5), bottom: 72, left: mm(20) },

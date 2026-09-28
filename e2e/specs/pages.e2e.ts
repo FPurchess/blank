@@ -26,7 +26,7 @@ describe("page setup", () => {
   });
 
   it("opens with Mod+Alt+U on the paper of the region", async () => {
-    await $(".ProseMirror p").click();
+    await $("#editor p").click();
     await pressMod(Key.Alt, "u");
 
     await expect($("#page-setup")).toBeDisplayed();
@@ -55,7 +55,7 @@ describe("page setup", () => {
       expect.stringMatching(/\(landscape\)$/),
     );
     // the page setup stays out of the way of the text
-    await expect($(".ProseMirror .doc-properties")).not.toExist();
+    await expect($("#editor .doc-properties")).not.toExist();
 
     await pressMod("s");
     await browser.waitUntil(
@@ -126,13 +126,13 @@ describe("page setup", () => {
     fs.writeFileSync(breaksPath, "one\n");
     await restartApp([breaksPath]);
 
-    await $(".ProseMirror p").click();
+    await $("#editor p").click();
     await type(Key.End);
     await pressMod(Key.Enter);
     await type("two");
     await pressMod(Key.Enter);
     await type("three");
-    await expect($$(".ProseMirror hr.page-break")).toBeElementsArrayOfSize(2);
+    await expect($$("#editor hr.page-break")).toBeElementsArrayOfSize(2);
 
     await pressMod("s");
     const expected =

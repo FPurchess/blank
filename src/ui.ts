@@ -8,6 +8,7 @@ import {
   importedFrom,
   language,
   languagePicker,
+  pageLayout,
   pageSetupRequests,
   path,
   spellcheck,
@@ -15,14 +16,11 @@ import {
   announcement,
   spellcheckStatus,
   textContent,
-  transaction,
   type LanguagePickerState,
 } from "./state";
-import { CommandIdentifier, config, getKeyBinding } from "./config";
+import { CommandIdentifier, getKeyBinding } from "./config";
 import { describePageSize } from "./layout/describe";
 import { localeUnit } from "./layout/paper";
-import { resolveLayout } from "./layout/resolve";
-import type { PageSettings } from "./layout/settings";
 import type { SpellcheckStatus } from "./spellcheck/types";
 import { languageName } from "./spellcheck/service";
 import { bootContextMenu } from "./contextMenu";
@@ -30,6 +28,7 @@ import { bootLinkDialog } from "./linkDialog";
 import { bootImageDialog } from "./imageDialog";
 import { bootTablePicker } from "./tablePicker";
 import { bootPageSetup } from "./pageSetup";
+import { bootBandStrips } from "./bandStrips";
 import { bootTableHandles } from "./tableHandles";
 import { basename } from "./paths";
 import { bootScope } from "./scope";
@@ -200,28 +199,12 @@ export const bootUI = (editor: EditorHandle) =>
     uiPage.addEventListener("click", () => {
       pageSetupRequests.value += 1;
     });
-    let shownFor: {
-      frontmatter: string | null;
-      defaults: PageSettings;
-    } | null = null;
+    // pageLayout only changes with the frontmatter or the defaults, not
+    // while typing
     watch(
-      [transaction, config],
-      ([tx, { layout }]) => {
-        const frontmatter = (tx?.doc.attrs.frontmatter ?? null) as
-          string | null;
-        const defaults = layout.page;
-        // typing leaves both alone, so the frontmatter isn't read on every key
-        if (
-          shownFor?.frontmatter === frontmatter &&
-          shownFor.defaults === defaults
-        ) {
-          return;
-        }
-        shownFor = { frontmatter, defaults };
-        uiPage.textContent = describePageSize(
-          resolveLayout(frontmatter, defaults).layout,
-          localeUnit(),
-        );
+      pageLayout,
+      ({ layout }) => {
+        uiPage.textContent = describePageSize(layout, localeUnit());
         uiPage.title = `Page setup (${getKeyBinding(CommandIdentifier.PAGE_SETUP)})`;
       },
       { flush: "sync", immediate: true },
@@ -260,6 +243,7 @@ export const bootUI = (editor: EditorHandle) =>
     bootLinkDialog();
     bootImageDialog();
     bootPageSetup();
+    bootBandStrips(editor);
     bootContextMenu();
     bootTablePicker();
     bootApp(editor);

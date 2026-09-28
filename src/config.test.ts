@@ -424,12 +424,8 @@ describe("config", () => {
         keymap: { undo: "Mod-u" },
         layout: {
           other: 1,
-          page: {
-            size: "a5",
-            orientation: "portrait",
-            margins: "1in",
-            "new-page-before": [],
-          },
+          // only what differs from Blank's defaults
+          page: { size: "a5", margins: "1in" },
         },
       });
       expect(config.value.layout.page).toEqual(page);
@@ -443,12 +439,7 @@ describe("config", () => {
       const [, written] = vi.mocked(writeTextFile).mock.calls[0];
       expect(JSON.parse(written as string)).toEqual({
         layout: {
-          page: {
-            size: "a5",
-            orientation: "portrait",
-            margins: "2.54cm",
-            "new-page-before": [],
-          },
+          page: { size: "a5", margins: "2.54cm" },
         },
       });
     });
