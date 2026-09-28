@@ -14,7 +14,7 @@ paths:
   - "src/editor/commands/editBand.ts"
   - "src/editor/commands/frontmatter.ts"
   - "src/editor/commands/pageSetup.ts"
-  - "src/pageSetup.ts"
+  - "src/ui/PageSetupDialog.vue"
 ---
 
 # Headers, footers and page numbers

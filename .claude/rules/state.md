@@ -9,7 +9,6 @@ paths:
   - "src/ui.ts"
   - "src/ui/**"
   - "src/nativeMenu.ts"
-  - "src/pageSetup.ts"
   - "src/table*.ts"
 ---
 

@@ -24,7 +24,6 @@ import { localeUnit } from "./layout/paper";
 import type { SpellcheckStatus } from "./spellcheck/types";
 import { languageName } from "./spellcheck/service";
 import { bootNativeMenuGuard } from "./nativeMenu";
-import { bootPageSetup } from "./pageSetup";
 import { bootBandStrips } from "./bandStrips";
 import { bootTableHandles } from "./tableHandles";
 import { basename } from "./paths";
@@ -237,7 +236,6 @@ export const bootUI = (editor: EditorHandle) =>
       { flush: "sync", immediate: true },
     );
 
-    bootPageSetup();
     bootBandStrips(editor);
     bootNativeMenuGuard();
     bootApp(editor);

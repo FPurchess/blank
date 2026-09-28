@@ -19,7 +19,7 @@ import {
 import { CommandIdentifier, getKeyBinding } from "./config";
 import { editBand } from "./editor/commands/editBand";
 import type { EditorHandle } from "./editor/handle";
-import { createButton } from "./dialog";
+import { shownIn } from "./dom";
 import {
   type Band,
   type DocumentFields,
@@ -81,7 +81,10 @@ let booted: (() => void) | undefined;
  * e.g. in a slot, whose cursor then gets what the button inserts
  */
 const button = (text: string, onClick: () => void) => {
-  const element = createButton(text, "button", onClick);
+  const element = document.createElement("button");
+  element.type = "button";
+  element.textContent = text;
+  element.addEventListener("click", onClick);
   element.addEventListener("mousedown", (event) => event.preventDefault());
   return element;
 };
@@ -195,9 +198,7 @@ const renderEditor = (request: BandEditorRequest) => {
 
   // Tab goes around the buttons and slots in the order they are shown
   const move = (by: number) => {
-    const all = [
-      ...element.querySelectorAll<HTMLElement>("button, .ProseMirror"),
-    ].filter((node) => !node.closest("[hidden]"));
+    const all = shownIn(element, "button, .ProseMirror");
     const index = all.indexOf(document.activeElement as HTMLElement);
     all[(index + by + all.length) % all.length].focus();
     return true;
