@@ -186,12 +186,105 @@ describe("exporter.pdf document definition", () => {
     });
   });
 
-  it("draws no footer", async () => {
+  it("draws no header or footer without text", async () => {
     const { definition } = await exportDoc(doc(p("text")));
+    const band = (name: "header" | "footer") =>
+      (definition[name] as (page: number, pages: number) => unknown)(1, 3);
 
-    expect(
-      (definition.footer as (page: number, pages: number) => unknown)(1, 3),
-    ).toBeNull();
+    expect(band("header")).toBeNull();
+    expect(band("footer")).toBeNull();
+  });
+
+  describe("header and footer", () => {
+    type Band = {
+      columns: { text: unknown; alignment: string }[];
+      margin: number[];
+      fontSize: number;
+      color: string;
+    } | null;
+    const bandsOf = async (layout: Layout, node = doc(h(1, "Report"))) => {
+      const { definition } = await exportDoc(node, layout);
+      return (name: "header" | "footer", page: number, pages = 12) =>
+        (definition[name] as (page: number, pages: number) => Band)(
+          page,
+          pages,
+        );
+    };
+    const texts = (band: Band) =>
+      band?.columns.map(({ text }) =>
+        Array.isArray(text) ? text.map((run) => run.text).join("") : text,
+      );
+
+    it("writes the three slots with the values of each page", async () => {
+      const band = await bandsOf(
+        testLayout({
+          header: { left: "{title}", center: "", right: "draft" },
+          footer: { left: "", center: "Page {page} of {pages}", right: "" },
+          startNumber: 3,
+        }),
+      );
+
+      expect(texts(band("header", 1))).toEqual(["Report", "", "draft"]);
+      expect(texts(band("footer", 2))).toEqual(["", "Page 4 of 12", ""]);
+      expect(band("footer", 2)?.columns.map((c) => c.alignment)).toEqual([
+        "left",
+        "center",
+        "right",
+      ]);
+    });
+
+    it("sits in the margins, Word's distance from the edge, small and grey", async () => {
+      const layout = testLayout({
+        margins: { top: 72, right: 50, bottom: 80, left: 40 },
+        header: { left: "x", center: "", right: "" },
+        footer: { left: "", center: "{page}", right: "" },
+      });
+      const band = await bandsOf(layout);
+
+      expect(band("header", 1)).toMatchObject({
+        margin: [40, 36, 50, 0],
+        fontSize: 11 / 1.25,
+        color: "#666666",
+      });
+      // its line ends 36pt above the bottom edge
+      const line = (11 / 1.25) * 1.3;
+      expect(band("footer", 1)?.margin[1]).toBeCloseTo(80 - 36 - line);
+    });
+
+    it("leaves a plain first page without them", async () => {
+      const band = await bandsOf(
+        testLayout({
+          footer: { left: "", center: "{page}", right: "" },
+          firstPage: "plain",
+        }),
+      );
+
+      expect(band("footer", 1)).toBeNull();
+      expect(texts(band("footer", 2))).toEqual(["", "2", ""]);
+    });
+
+    it("gives the first and even pages theirs, in roman numerals", async () => {
+      const band = await bandsOf(
+        testLayout({
+          footer: { left: "", center: "", right: "{page}" },
+          firstPage: {
+            header: { left: "ACME", center: "", right: "" },
+            footer: { left: "", center: "Main St 1", right: "" },
+          },
+          evenPages: {
+            header: { left: "", center: "", right: "" },
+            footer: { left: "{page}", center: "", right: "" },
+          },
+          numberStyle: "i",
+        }),
+      );
+
+      expect(texts(band("header", 1))).toEqual(["ACME", "", ""]);
+      expect(texts(band("footer", 1))).toEqual(["", "Main St 1", ""]);
+      expect(texts(band("footer", 2))).toEqual(["ii", "", ""]);
+      expect(texts(band("footer", 3))).toEqual(["", "", "iii"]);
+      expect(band("header", 3)).toBeNull();
+    });
   });
 
   it("uses the base document styles", async () => {

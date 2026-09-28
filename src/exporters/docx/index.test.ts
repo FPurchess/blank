@@ -8,6 +8,8 @@ import { IMAGES, dataUrl } from "../../test/images";
 import toDOCX from ".";
 import { pageGeometry } from "../../layout/resolve";
 import { testLayout } from "../../test/layout";
+import { NO_SLOTS } from "../../layout/settings";
+import { datePicture } from "./bands";
 
 vi.mock("../pdf/pdfmake-vfs", () => ({
   default: { "IBMPlexSans-Regular.ttf": btoa("not really a font") },
@@ -423,6 +425,158 @@ describe("exporter.docx", () => {
 
       expect(await headingBreaks(exported)).toEqual(["Heading1", "Heading3"]);
       expect(await headingBreaks(await exportMarkdown("# One"))).toEqual([]);
+    });
+  });
+
+  describe("header and footer", () => {
+    const partsOf = async (exported: Exported) => {
+      const names = files(exported, "word/").filter((name) =>
+        /word\/(header|footer)\d+\.xml$/.test(name),
+      );
+      return Promise.all(names.map((name) => exported.text(name)));
+    };
+    const exportWith = (settings: Parameters<typeof testLayout>[0]) =>
+      exportDoc(
+        parseMarkdown("---\ntitle: The Lighthouse\n---\n\ntext"),
+        null,
+        testLayout(settings),
+      );
+
+    it("writes none without text", async () => {
+      const exported = await exportMarkdown("text");
+
+      expect(await partsOf(exported)).toEqual([]);
+      const sectPr = all(await exported.xml("word/document.xml"), "sectPr")[0];
+      expect(child(sectPr, "titlePg")).toBeUndefined();
+    });
+
+    it("writes Word's fields between tab stops", async () => {
+      const exported = await exportWith({
+        header: { left: "{title}", center: "", right: "by {author}" },
+        footer: { left: "", center: "Page {page} of {pages}", right: "" },
+      });
+      const document = await exported.xml("word/document.xml");
+      const [sectPr] = all(document, "sectPr");
+
+      expect(
+        all(sectPr, "headerReference").map((r) => attr(r, "type")),
+      ).toEqual(["default"]);
+      const [header, footer] = (await partsOf(exported)).sort();
+      const parse = (xml: string) =>
+        new DOMParser().parseFromString(xml, "application/xml");
+      const footerXml = parse(footer.includes("w:ftr") ? footer : header);
+      const headerXml = parse(footer.includes("w:ftr") ? header : footer);
+
+      // the header: the title as a TITLE field, then two tabs to the right
+      expect(attr(all(headerXml, "pStyle")[0], "val")).toBe("Header");
+      expect(all(headerXml, "fldSimple").map((f) => attr(f, "instr"))).toEqual([
+        "TITLE",
+        "AUTHOR",
+      ]);
+      expect(
+        all(headerXml, "tab").filter((t) => t.parentElement?.localName === "r"),
+      ).toHaveLength(2);
+      expect(
+        all(headerXml, "tab")
+          .filter((t) => t.parentElement?.localName === "tabs")
+          .map((t) => attr(t, "val")),
+      ).toEqual(["center", "right"]);
+      expect(
+        all(headerXml, "t")
+          .map((t) => t.textContent)
+          .join(""),
+      ).toContain("The Lighthouse");
+      // the footer: PAGE and NUMPAGES fields in the center
+      const instructions = all(footerXml, "instrText").map((t) =>
+        t.textContent?.trim(),
+      );
+      expect(instructions).toEqual(["PAGE", "NUMPAGES"]);
+      expect(attr(all(footerXml, "pStyle")[0], "val")).toBe("Footer");
+    });
+
+    it("styles headers and footers small and grey, like the PDF", async () => {
+      const exported = await exportWith({
+        footer: { left: "", center: "{page}", right: "" },
+      });
+      const style = all(await exported.xml("word/styles.xml"), "style").find(
+        (s) => attr(s, "styleId") === "Footer",
+      )!;
+
+      expect(attr(child(style, "sz"), "val")).toBe("18");
+      expect(attr(child(style, "color"), "val")).toBe("666666");
+    });
+
+    it("leaves a plain first page empty, and starts the numbers where asked", async () => {
+      const exported = await exportWith({
+        footer: { left: "", center: "{page}", right: "" },
+        firstPage: "plain",
+        startNumber: 3,
+      });
+      const [sectPr] = all(await exported.xml("word/document.xml"), "sectPr");
+
+      expect(child(sectPr, "titlePg")).toBeDefined();
+      expect(
+        all(sectPr, "footerReference")
+          .map((r) => attr(r, "type"))
+          .sort(),
+      ).toEqual(["default", "first"]);
+      expect(attr(child(sectPr, "pgNumType"), "start")).toBe("3");
+    });
+
+    it("writes the chapter, date and file as Word's fields", async () => {
+      const exported = await exportWith({
+        header: { left: "{chapter}", center: "{date}", right: "{file}" },
+      });
+      const [header] = await partsOf(exported);
+      const xml = new DOMParser().parseFromString(header, "application/xml");
+
+      expect(all(xml, "fldSimple").map((f) => attr(f, "instr"))).toEqual([
+        'STYLEREF "Heading 1"',
+        `DATE \\@ "${datePicture()}"`,
+        "FILENAME",
+      ]);
+    });
+
+    it("gives the first and even pages their own parts", async () => {
+      const exported = await exportWith({
+        footer: { left: "", center: "", right: "{page}" },
+        firstPage: {
+          header: { left: "ACME", center: "", right: "" },
+          footer: NO_SLOTS,
+        },
+        evenPages: {
+          header: NO_SLOTS,
+          footer: { left: "{page}", center: "", right: "" },
+        },
+        numberStyle: "i",
+      });
+      const [sectPr] = all(await exported.xml("word/document.xml"), "sectPr");
+      const types = (name: string) =>
+        all(sectPr, name)
+          .map((r) => attr(r, "type"))
+          .sort();
+
+      // every band has a part for each of the pages, with a paragraph
+      expect(types("headerReference")).toEqual(["default", "even", "first"]);
+      expect(types("footerReference")).toEqual(["default", "even", "first"]);
+      for (const part of await partsOf(exported)) {
+        expect(part).toMatch(/<w:p\b/);
+      }
+      expect(child(sectPr, "titlePg")).toBeDefined();
+      expect(attr(child(sectPr, "pgNumType"), "fmt")).toBe("lowerRoman");
+      const settings = await exported.xml("word/settings.xml");
+      expect(all(settings, "evenAndOddHeaders")).toHaveLength(1);
+    });
+
+    it("writes no header for a band without text", async () => {
+      const exported = await exportWith({
+        footer: { left: "", center: "{page}", right: "" },
+        firstPage: "plain",
+      });
+      const [sectPr] = all(await exported.xml("word/document.xml"), "sectPr");
+
+      expect(all(sectPr, "headerReference")).toEqual([]);
+      expect(files(exported, "word/header")).toEqual([]);
     });
   });
 

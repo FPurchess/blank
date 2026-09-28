@@ -44,17 +44,13 @@ describe("images", () => {
   });
 
   it("shows relative, absolute and data: images", async () => {
-    await expect($$(".ProseMirror .image img")).toBeElementsArrayOfSize(3);
+    await expect($$("#editor .image img")).toBeElementsArrayOfSize(3);
 
     // the images decoded, i.e. the asset protocol served the local files
     await browser.waitUntil(
       () =>
         browser.execute(() =>
-          [
-            ...document.querySelectorAll<HTMLImageElement>(
-              ".ProseMirror .image img",
-            ),
-          ]
+          [...document.querySelectorAll<HTMLImageElement>("#editor .image img")]
             .map((img) => img.complete && img.naturalWidth === 3)
             .every(Boolean),
         ),
@@ -63,8 +59,8 @@ describe("images", () => {
   });
 
   it("inserts, edits and removes an image with the dialog", async () => {
-    const images = () => $$(".ProseMirror .image img");
-    await $(".ProseMirror h1").click();
+    const images = () => $$("#editor .image img");
+    await $("#editor h1").click();
     await type(Key.End);
 
     await pressMod(Key.Alt, "i");
@@ -78,15 +74,14 @@ describe("images", () => {
 
     await expect($("#image-dialog")).not.toBeExisting();
     await expect(images()).toBeElementsArrayOfSize(4);
-    const inserted = $(".ProseMirror h1 .image img");
+    const inserted = $("#editor h1 .image img");
     await expect(inserted).toHaveAttribute("alt", "Pixel");
     await browser.waitUntil(
       () =>
         browser.execute(
           () =>
-            document.querySelector<HTMLImageElement>(
-              ".ProseMirror h1 .image img",
-            )?.naturalWidth === 3,
+            document.querySelector<HTMLImageElement>("#editor h1 .image img")
+              ?.naturalWidth === 3,
         ),
       { timeoutMsg: "the inserted image didn't load" },
     );
@@ -99,6 +94,6 @@ describe("images", () => {
 
     await expect($("#image-dialog")).not.toBeExisting();
     await expect(images()).toBeElementsArrayOfSize(3);
-    await expect($(".ProseMirror h1")).toHaveText("Images");
+    await expect($("#editor h1")).toHaveText("Images");
   });
 });

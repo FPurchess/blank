@@ -12,7 +12,7 @@ export const waitForAppReady = async () => {
     async () => {
       try {
         return (
-          (await $(".ProseMirror").isExisting()) &&
+          (await $("#editor").isExisting()) &&
           (await $("#ui-bottom").isExisting())
         );
       } catch {
@@ -62,7 +62,7 @@ export const clickInto = async (selector: string, index = 0) => {
 };
 
 export const focusEditor = async () => {
-  await $(".ProseMirror").click();
+  await $("#editor").click();
 };
 
 /**
@@ -95,7 +95,7 @@ export const paste = (data: Record<string, string>) =>
     for (const [type, value] of Object.entries(data)) {
       clipboard.setData(type, value);
     }
-    document.querySelector(".ProseMirror")!.dispatchEvent(
+    document.querySelector("#editor")!.dispatchEvent(
       new ClipboardEvent("paste", {
         clipboardData: clipboard,
         bubbles: true,
@@ -103,5 +103,18 @@ export const paste = (data: Record<string, string>) =>
       }),
     );
   }, data);
+
+/**
+ * moves the mouse to the middle of the top or bottom edge of the window,
+ * where the hints to add a header or footer show
+ */
+export const hoverEdge = async (edge: "top" | "bottom") => {
+  const { width, height } = await browser.getWindowSize();
+  const y = edge === "top" ? 20 : height - 20;
+  await browser
+    .action("pointer")
+    .move({ x: Math.round(width / 2), y: Math.round(y), origin: "viewport" })
+    .perform();
+};
 
 export { Key };

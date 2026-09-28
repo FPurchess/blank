@@ -8,7 +8,7 @@ import { restartApp } from "../helpers.ts";
 
 describe("launch", () => {
   it("shows the welcome document", async () => {
-    await expect($(".ProseMirror h1")).toHaveText("Welcome to Blank");
+    await expect($("#editor h1")).toHaveText("Welcome to Blank");
   });
 
   it("shows an untitled document", async () => {
@@ -43,9 +43,9 @@ describe("launch", () => {
       // the CLI plugin rejects a second path, see readDocumentFromCliArgs
       await restartApp([fileA, fileB]);
 
-      await expect($(".ProseMirror")).toBeExisting();
+      await expect($("#editor")).toBeExisting();
       await expect($(".boot-error")).not.toBeExisting();
-      await expect($(".ProseMirror h1")).toHaveText("Welcome to Blank");
+      await expect($("#editor h1")).toHaveText("Welcome to Blank");
     });
   });
 });

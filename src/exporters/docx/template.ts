@@ -1,6 +1,8 @@
 import type { ILevelsOptions, IStylesOptions } from "docx";
 
 import { type Layout } from "../../layout/resolve";
+import { BAND } from "../../layout/bands";
+import { WORD_NUMBER_FORMATS } from "./fields";
 import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
 // Mirrors the PDF styles in ../pdf/template.ts (and so the editor typography
@@ -82,7 +84,13 @@ export const TABLE_HEADER_SHADING = {
  * swaps the width and height of landscape pages itself, so it gets the
  * portrait size.
  */
-export const pageProperties = ({ paper, orientation, margins }: Layout) => ({
+export const pageProperties = ({
+  paper,
+  orientation,
+  margins,
+  startNumber,
+  numberStyle,
+}: Layout) => ({
   size: {
     width: twips(paper.width),
     height: twips(paper.height),
@@ -93,11 +101,21 @@ export const pageProperties = ({ paper, orientation, margins }: Layout) => ({
     right: twips(margins.right),
     bottom: twips(margins.bottom),
     left: twips(margins.left),
-    // Word's own distance of headers and footers from the edge
-    header: 720,
-    footer: 720,
+    // the distance of headers and footers from the edge, like the PDF's
+    header: twips(BAND.distance),
+    footer: twips(BAND.distance),
     gutter: 0,
   },
+  ...(startNumber === 1 && numberStyle === "1"
+    ? {}
+    : {
+        pageNumbers: {
+          ...(startNumber === 1 ? {} : { start: startNumber }),
+          ...(numberStyle === "1"
+            ? {}
+            : { formatType: WORD_NUMBER_FORMATS[numberStyle] }),
+        },
+      }),
 });
 
 // Only the regular face of IBM Plex Sans is embedded, so the large headings
@@ -136,6 +154,8 @@ const BODY_LINE_HEIGHT = 1.12;
 // the style names are what the Word import maps back, see
 // src/importers/docx/styleMap.ts
 export const STYLE = {
+  header: "Header",
+  footer: "Footer",
   quote: "Quote",
   codeBlock: "CodeBlock",
   horizontalLine: "HorizontalLine",
@@ -176,6 +196,16 @@ export const STYLES: IStylesOptions = {
     heading6: heading(6, BODY_SIZE, BODY_LINE_HEIGHT, { italics: true }),
   },
   paragraphStyles: [
+    // Word's own names, see ../bands.ts
+    ...[STYLE.header, STYLE.footer].map((id) => ({
+      id,
+      name: id.toLowerCase(),
+      basedOn: "Normal",
+      run: { size: halfPoints(BAND.size), color: BAND.color.slice(1) },
+      paragraph: {
+        spacing: { after: 0, line: 240, lineRule: "auto" as const },
+      },
+    })),
     {
       // docx doesn't write the style everything is based on, which other
       // readers need, e.g. pandoc to find headings. See fixups.ts for why

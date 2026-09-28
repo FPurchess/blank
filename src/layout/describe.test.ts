@@ -55,4 +55,14 @@ describe("layoutWarnings", () => {
     ]);
     expect(layoutWarnings([])).toEqual([]);
   });
+
+  it("says the margin is small for the band, which was kept", () => {
+    expect(
+      layoutWarnings(["page.size", "page.header-room", "page.footer-room"]),
+    ).toEqual([
+      "Blank used the default page setup where its paper size is unknown",
+      "The top margin is small for the header",
+      "The bottom margin is small for the footer",
+    ]);
+  });
 });

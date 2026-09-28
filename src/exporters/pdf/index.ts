@@ -4,7 +4,6 @@ import { Node, Mark } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 
 import { type exporterFunc } from "../../exporters";
-import { firstHeading, readProperties } from "../../markdown";
 import { toDataUrl } from "../../images/dataUrl";
 import { fitBox } from "../../images/fit";
 import { failureWarning, prepareImages } from "../../images/prepare";
@@ -19,6 +18,14 @@ import {
   RULE_LAYOUT,
 } from "./template";
 import { withFallback } from "./fallback";
+import { bandBlock } from "./bands";
+import {
+  bandsOn,
+  type Chapter,
+  chapterOn,
+  documentFields,
+  fieldValues,
+} from "../../layout/bands";
 import { tableBlock } from "./table";
 
 let fontsRegistered: Promise<void> | undefined;
@@ -324,6 +331,29 @@ const embedImages = async (
 };
 
 /**
+ * chapterPages returns where the headings 1 of the document start, for
+ * {chapter}: pdfmake keeps the positions of each block it lays out on the
+ * block itself, and lays out the text before it draws the headers and
+ * footers, so they can ask
+ * @param content the blocks of the document as pdfmake gets them
+ */
+const chapterPages = (doc: Node, content: Block[]) => {
+  const texts: string[] = [];
+  doc.forEach((node) => {
+    if (node.type.name === "heading" && node.attrs.level === 1) {
+      texts.push(node.textContent);
+    }
+  });
+  const headings = content.filter((block) => block.headlineLevel === 1);
+  return (): Chapter[] =>
+    headings.flatMap((block, index) => {
+      const { positions } = block as { positions?: { pageNumber: number }[] };
+      const page = positions?.[0]?.pageNumber;
+      return page ? [{ page, text: texts[index] ?? "" }] : [];
+    });
+};
+
+/**
  * pageDefinition returns the page of the pdfmake document for `layout`
  */
 export const pageDefinition = (layout: Layout) => {
@@ -357,7 +387,15 @@ const toPDF: exporterFunc = async (state: EditorState, { docPath, layout }) => {
     ),
     layout.newPageBefore,
   );
-  const { title, author } = readProperties(state.doc.attrs.frontmatter);
+  const fields = documentFields(state.doc, docPath);
+  const chapters = chapterPages(state.doc, content);
+  const bands = (where: "header" | "footer") => (page: number, count: number) =>
+    bandBlock(
+      bandsOn(layout, page)[where],
+      fieldValues(layout, page, count, fields, chapterOn(chapters(), page)),
+      geometry,
+      where,
+    );
   // pdfmake tells the footer how many pages there are
   let pages = 0;
   const docDefinition = Object.assign(
@@ -368,14 +406,15 @@ const toPDF: exporterFunc = async (state: EditorState, { docPath, layout }) => {
       pageBreakBefore: pageBreakBefore(
         geometry.height - geometry.margins.bottom,
       ),
-      footer: (_: number, pageCount: number) => {
-        pages = pageCount;
-        return null;
+      header: bands("header"),
+      footer: (page: number, count: number) => {
+        pages = count;
+        return bands("footer")(page, count);
       },
       // shown by PDF viewers and read by search engines and screen readers
       info: {
-        title: title ?? firstHeading(state.doc),
-        ...(author ? { author } : {}),
+        title: fields.title,
+        ...(fields.author ? { author: fields.author } : {}),
         creator: "Blank",
       },
       content,

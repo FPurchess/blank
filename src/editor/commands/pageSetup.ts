@@ -9,9 +9,16 @@ import { changesOf } from "../../layout/choices";
 import { layoutWarnings } from "../../layout/describe";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { resolveLayout } from "../../layout/resolve";
-import { type PageChanges, writePageSettings } from "../../layout/settings";
-import { frontmatterError, updateFrontmatter } from "../../markdown";
+import { BAND_KEYS, PAGE_KEYS, type PageKey } from "../../layout/settings";
+import { frontmatterError } from "../../markdown";
 import { pageSetup } from "../../state";
+import { setFrontmatter, writePage } from "./frontmatter";
+
+// the settings the page setup dialog sets: all but those of the header and
+// footer strips
+const DIALOG_KEYS = PAGE_KEYS.filter(
+  (key) => !(BAND_KEYS as readonly PageKey[]).includes(key),
+);
 
 /**
  * openPageSetup opens the page setup dialog for the document of `view`
@@ -24,40 +31,37 @@ export const openPageSetup = (view: EditorView) => {
   const frontmatter = view.state.doc.attrs.frontmatter as string | null;
   const { settings, problems } = resolveLayout(frontmatter, defaults, locale);
 
-  // one undo step, which also undoes nothing when nothing changed
-  const setFrontmatter = (next: string | null) => {
-    if (next !== view.state.doc.attrs.frontmatter) {
-      view.dispatch(view.state.tr.setDocAttribute("frontmatter", next));
-    }
-    view.focus();
-  };
-  const withPage = (changes: PageChanges): string | null =>
-    updateFrontmatter(
-      view.state.doc.attrs.frontmatter as string | null,
-      (document) => writePageSettings(document, changes, unit),
-    );
-
   pageSetup.value = {
     settings,
     locale,
     unit,
     frontmatter,
     warnings: layoutWarnings(problems),
-    apply: (chosen) =>
-      setFrontmatter(withPage(changesOf(settings, chosen, defaults, locale))),
+    apply: (chosen) => {
+      writePage(view, changesOf(settings, chosen, defaults, locale), unit);
+      view.focus();
+    },
     applyText: (text) => {
       const error = frontmatterError(text);
       if (error !== null) return error;
-      setFrontmatter(text.trim() === "" ? null : text.replace(/\s+$/, ""));
+      setFrontmatter(
+        view,
+        text.trim() === "" ? null : text.replace(/\s+$/, ""),
+      );
+      view.focus();
       return null;
     },
     makeDefault: (chosen) => {
       view.focus();
-      saveDefaultPage(chosen, unit)
+      // what the dialog shows; the header and footer stay the document's
+      const shown = DIALOG_KEYS.map((key) => [key, chosen[key]]);
+      saveDefaultPage({ ...defaults, ...Object.fromEntries(shown) }, unit)
         .then(() => {
           // the document follows the new default instead of its own settings
-          setFrontmatter(
-            withPage({ size: null, orientation: null, margins: null }),
+          writePage(
+            view,
+            Object.fromEntries(DIALOG_KEYS.map((key) => [key, null])),
+            unit,
           );
           sendNotification(
             "New documents and documents without their own page setup are laid out like this now",

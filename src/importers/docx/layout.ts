@@ -8,11 +8,12 @@ import {
   type PageSettings,
   portrait,
 } from "../../layout/settings";
+import { readBands } from "./bands";
 import { child, isOn, parsePart, val, W } from "./xml";
 
 // Reads the page setup of a Word document, which mammoth leaves out: the
-// paper, orientation and margins of its first section, and the headings that
-// start a new page.
+// paper, orientation, margins, header and footer of its first section, and
+// the headings that start a new page.
 
 const DOCUMENT = "word/document.xml";
 const SETTINGS = "word/settings.xml";
@@ -44,7 +45,11 @@ const sections = (doc: Document) =>
       sectPr.parentElement?.localName === "body",
   );
 
-type SectionPage = Omit<NonNullable<WordLayout["page"]>, "newPageBefore">;
+// the paper, orientation and margins of a section
+type SectionPage = Pick<
+  NonNullable<WordLayout["page"]>,
+  "size" | "orientation" | "margins"
+>;
 
 const readPage = (sectPr: Element): SectionPage | undefined => {
   const pgSz = child(sectPr, "pgSz");
@@ -119,12 +124,15 @@ export const readWordLayout = async (zip: JSZip): Promise<WordLayout> => {
     warnings.push("mirrored margins became the same on every page");
   }
   const page = readPage(first);
+  if (!page) return { warnings };
+  const { warnings: bandWarnings, ...bands } = await readBands(zip, first);
   return {
-    page: page && {
+    page: {
       ...page,
       newPageBefore: headingBreaks(await parsePart(zip, STYLES)),
+      ...bands,
     },
-    warnings,
+    warnings: [...warnings, ...bandWarnings],
   };
 };
 

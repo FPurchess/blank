@@ -30,9 +30,9 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 
 These arrived or are arriving outside the plan's PRs:
 - `#table-handles` (`src/tableHandles.ts`, table mouse handles, merged in #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
-- `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for.
-- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests` (a counter) and `bandRequests` (#66, `{ band, insert? } | null`, set back to null once handled). Until then, reset them after handling, or write a new object each time, since from PR A on an equal write doesn't notify.
-- Context menu (PR C): keep #68's paste fallback `pasteText(view, text, plain)` and its copy fallback `view.serializeForClipboard` in `src/editor/contextMenu/model.ts`.
+- `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for. The open strip's logic is DOM-free in `src/bandStrip.ts`, so porting it is a template over that module. The strips already call the editor through its handle. z-index: `.band-edge` 5, `.band-editor` 8.
+- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests` (a counter). Until then, write a new value each time, since from PR A on an equal write doesn't notify.
+- Context menu (PR C): keep #68's paste fallback `pasteText(view, text, plain)` and its copy fallback `view.serializeForClipboard` in `src/editor/contextMenu/model.ts`. #66 adds radio items (`MenuItem.radio`: `menuitemradio` with `aria-checked`), which the strips' First Page and page number menus use.
 
 ## Status
 

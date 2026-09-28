@@ -52,6 +52,7 @@ The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 - set in IBM Plex Sans on the paper of your region, or the [page setup](./pages) you chose,
 - a heading never ends a page on its own; it moves to the next page with its text,
 - [page breaks](./pages#page-breaks) start a new page, and horizontal lines are drawn across the text,
+- your [page numbers, header and footer](./pages#headers-and-footers) are on every page,
 - quotes keep their bar on the left and everything inside them,
 - line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3,
 - [tables](./tables#export) look like in the editor, repeat their header row on every page, and keep their rows whole,
@@ -65,7 +66,7 @@ Images come along at the size they have in Blank, up to the width of the page. I
 
 When someone needs your text in Word, press `Mod` `Alt` `W`. Blank suggests your document's name with `.docx`.
 
-The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, and links and images come along. Tables become real Word tables, with their header row repeated on every page, merged cells and their caption in Word's caption style. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
+The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, links and images come along, and headers, footers and page numbers are Word's own, so they stay right however the document grows. Tables become real Word tables, with their header row repeated on every page, merged cells and their caption in Word's caption style. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
 
 Your markdown file stays exactly as it is. The document's title and author come along, and so do the [properties](#frontmatter) at the top of your file: open the Word document in Blank again and they're back, including the ones Word has no place for. If someone changed the title or author in Word, you get their version.
 
@@ -81,14 +82,14 @@ Blank never writes to the Word document you opened. It won't even save markdown 
 
 ### What comes along {#what-comes-along}
 
-Headings, bold and italic text, links, lists, quotes, code, line breaks, page breaks, images and tables make it into your document. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
+Headings, bold and italic text, links, lists, quotes, code, line breaks, page breaks, images and tables make it into your document, and so do the header, the footer and the page numbers. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
 
 Word can do more than markdown, so a few things change on the way:
 
 - a table inside a table cell becomes text, one line per row with the cells separated by `|`,
 - the alignment of table columns is left out,
 - footnotes move to the end of the document,
-- comments, headers and footers, underlining and colours are left out,
+- comments, underlining and colours are left out,
 - tracked changes count as accepted,
 - charts and drawings Blank can't show are replaced by their description,
 - numbered lists start at 1.

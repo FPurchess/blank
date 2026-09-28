@@ -242,6 +242,27 @@ describe("importers.docx", () => {
       expect(await roundTrip(markdown)).toBe(markdown);
     });
 
+    it("keeps the header, footer, plain first page and start number", async () => {
+      const markdown =
+        '---\ntitle: The Lighthouse\nauthor: Ada\npage:\n  header: {left: "{title}", right: "by {author}"}\n  footer: {center: "Page {page} of {pages}"}\n  first-page: plain\n  start-number: 0\n---\n\n# Chapter 1';
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps the first and even pages' own, the fields and roman numbers", async () => {
+      const markdown =
+        '---\npage:\n  header: {left: "{chapter}", right: "{date}"}\n  footer: {right: "{page}"}\n  first-page:\n    header: {left: ACME, right: "{file}"}\n  even-pages:\n    header: {left: "{date}", right: "{chapter}"}\n    footer: {left: "{page}"}\n  number-style: i\n---\n\n# Chapter 1';
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keeps braces typed in a header", async () => {
+      const markdown =
+        '---\npage:\n  header: {left: "{{draft} {page}"}\n---\n\ntext';
+
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
     it("keeps a page break before a table", async () => {
       const markdown =
         "a\n\n<!-- pagebreak -->\n\n| b   | c   |\n| --- | --- |\n| d   | e   |";

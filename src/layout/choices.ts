@@ -3,6 +3,8 @@ import { localePaper, matchPaper, PAPER_NAMES, type PaperName } from "./paper";
 import { differences, layoutOf, leavesRoom } from "./resolve";
 import {
   allMargins,
+  type BandSettings,
+  bandSettings,
   type Margins,
   type Orientation,
   type PageChanges,
@@ -35,6 +37,8 @@ export interface PageChoices {
   sides: Record<keyof Margins, string>;
   // the levels of the headings that start a new page
   newPageBefore: number[];
+  // what the header and footer strips set, which the dialog keeps as it is
+  bands: BandSettings;
 }
 
 export interface Option<T> {
@@ -108,6 +112,7 @@ export const choicesOf = (
       SIDES.map((side) => [side, show(margins[side])]),
     ) as PageChoices["sides"],
     newPageBefore: settings.newPageBefore,
+    bands: bandSettings(settings),
   };
 };
 
@@ -152,11 +157,12 @@ export const settingsOf = (
   } else {
     margins = allMargins(MARGIN_PRESETS[choices.margins]);
   }
-  const settings = {
+  const settings: PageSettings = {
     size,
     orientation: choices.orientation,
     margins,
     newPageBefore: [...choices.newPageBefore].sort((a, b) => a - b),
+    ...choices.bands,
   };
   if (!errors.paper && !leavesRoom(layoutOf(settings, locale))) {
     errors.margins = "The margins leave no room for the text";

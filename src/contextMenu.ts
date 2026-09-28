@@ -185,7 +185,10 @@ const renderLevel = (items: MenuItem[], depth: number): Level => {
     if (item.checked === undefined) {
       row.setAttribute("role", "menuitem");
     } else {
-      row.setAttribute("role", "menuitemcheckbox");
+      row.setAttribute(
+        "role",
+        item.radio ? "menuitemradio" : "menuitemcheckbox",
+      );
       row.setAttribute("aria-checked", String(item.checked));
     }
     row.dataset.id = item.id;

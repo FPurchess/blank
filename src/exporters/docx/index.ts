@@ -8,7 +8,6 @@ import type {
 import type { Mark, Node } from "prosemirror-model";
 
 import { type exporterFunc } from "../../exporters";
-import { firstHeading, readProperties } from "../../markdown";
 import { fitBox } from "../../images/fit";
 import {
   type PreparedImage,
@@ -24,6 +23,8 @@ import {
   type GridCell,
   type TableGrid,
 } from "../table";
+import { documentFields } from "../../layout/bands";
+import { bandSections } from "./bands";
 import { fixPackage } from "./fixups";
 import { FRONTMATTER_PROPERTY } from "./properties";
 import {
@@ -509,12 +510,19 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP), serializer);
 
   const frontmatter = state.doc.attrs.frontmatter as string | null;
-  const { title, author } = readProperties(frontmatter);
+  const fields = documentFields(state.doc, docPath);
+  const { titlePage, evenAndOddHeaderAndFooters, ...bands } = bandSections(
+    docx,
+    layout,
+    twips(contentWidth),
+    fields,
+  );
   const document = new docx.Document({
     // Word shows the creator as the author of the document
-    creator: author ?? "",
-    lastModifiedBy: author ?? "",
-    title: title ?? firstHeading(state.doc),
+    creator: fields.author,
+    lastModifiedBy: fields.author,
+    title: fields.title,
+    evenAndOddHeaderAndFooters,
     // the frontmatter as it was written, so importing the document again
     // restores what Word has no place for, see src/importers/docx/prepare.ts
     ...(frontmatter === null
@@ -531,7 +539,11 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
     numbering: serializer.numbering(),
     sections: [
       {
-        properties: { page: pageProperties(layout) },
+        properties: {
+          page: pageProperties(layout),
+          ...(titlePage ? { titlePage } : {}),
+        },
+        ...bands,
         children: blocks.map((block) =>
           serializer.isTable(block) ? block : new docx.Paragraph(block),
         ),

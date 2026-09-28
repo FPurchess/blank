@@ -434,6 +434,12 @@ body {
       opacity: 0.3;
     }
 
+    // the header and footer, as they read on the page
+    .band {
+      fill: var(--color);
+      opacity: 0.8;
+    }
+
     figcaption {
       font-size: 0.8rem;
       opacity: 0.7;
@@ -470,6 +476,318 @@ body {
       margin: 0;
     }
   }
+}
+
+// the header and footer strips, see src/bandStrips.ts: pinned below the top
+// bar and above the bottom bar, lined up with the text column
+$band-height: 28px;
+$bar-height: 44px;
+
+.band-edge,
+.band-editor {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  pointer-events: none;
+  color: var(--color);
+  user-select: none;
+
+  &.header {
+    top: $bar-height;
+  }
+
+  &.footer {
+    bottom: $bar-height;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+// as wide as the text of .ProseMirror
+.band-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.slot-text,
+.slot {
+  &.left {
+    text-align: left;
+  }
+
+  &.center {
+    text-align: center;
+  }
+
+  &.right {
+    text-align: right;
+  }
+}
+
+// a header or footer at rest: one faint line, like it prints
+.band-line {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  min-height: $band-height;
+  align-items: center;
+  font-size: 0.75rem;
+  opacity: 0.45;
+  background-color: var(--background-color);
+  cursor: pointer;
+  transition: opacity 150ms;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+// where there is none, a hint shows in the middle of the top or bottom bar
+// while the mouse is near; only its buttons take clicks
+.band-edge.empty {
+  &.header {
+    top: 0;
+  }
+
+  &.footer {
+    bottom: 0;
+  }
+
+  .band-inner {
+    pointer-events: none;
+  }
+}
+
+.band-hint {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  height: $bar-height;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 150ms;
+
+  body.near-top .header &,
+  body.near-bottom .footer & {
+    opacity: 0.6;
+  }
+
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: 0.75rem;
+    color: inherit;
+    background: transparent;
+    border: 1px dashed var(--color);
+    border-radius: 3px;
+    padding: 1px 8px;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// the placeholders in the text: the page number, the title, ...
+.chip {
+  padding: 0 4px;
+  border-radius: 3px;
+  background-color: color-mix(in srgb, var(--color) 12%, transparent);
+  white-space: nowrap;
+
+  // the page numbers, which are named rather than shown
+  &[data-field="page"],
+  &[data-field="pages"] {
+    font-variant: small-caps;
+  }
+
+  &.ProseMirror-selectednode {
+    outline: 1px solid var(--color);
+  }
+}
+
+// the strip being edited, with its toolbar
+.band-editor {
+  z-index: 8;
+  user-select: auto;
+  animation: band-open 150ms ease-out;
+
+  .band-inner {
+    padding-top: 4px;
+    padding-bottom: 6px;
+    background-color: var(--background-color);
+    border-bottom: 1px dashed var(--color);
+  }
+
+  &.footer .band-inner {
+    border-top: 1px dashed var(--color);
+    border-bottom: 0;
+    padding-top: 6px;
+    padding-bottom: 4px;
+  }
+
+  .slots {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    font-size: 0.85rem;
+  }
+
+  .slot {
+    position: relative;
+    border-radius: 3px;
+
+    .ProseMirror {
+      min-height: 1.6em;
+      padding: 2px 6px;
+      outline: none;
+      white-space: pre-wrap;
+      border-radius: 3px;
+      font-size: inherit;
+      max-width: none;
+      min-width: 0;
+      margin: 0;
+    }
+
+    &:hover .ProseMirror,
+    .ProseMirror:focus {
+      background-color: color-mix(in srgb, var(--color) 6%, transparent);
+    }
+
+    // Left, Center, Right where a slot is empty
+    &[data-empty="true"]::before {
+      content: attr(data-placeholder);
+      position: absolute;
+      inset: 2px 6px auto;
+      opacity: 0.35;
+      pointer-events: none;
+    }
+  }
+
+  // which pages above the slots, what to insert below them
+  .band-pages,
+  .band-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+
+    .band-label {
+      opacity: 0.6;
+      margin-right: 6px;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      padding: 1px 8px;
+      cursor: pointer;
+      opacity: 0.75;
+
+      &:hover,
+      &:focus-visible {
+        border-color: var(--color);
+        opacity: 1;
+      }
+
+      &[aria-pressed="true"],
+      &.done {
+        color: var(--background-color);
+        background-color: var(--color);
+        opacity: 1;
+      }
+
+      &[hidden] {
+        display: none;
+      }
+    }
+  }
+
+  .band-pages {
+    margin-bottom: 4px;
+  }
+
+  .band-tools {
+    margin-top: 4px;
+  }
+
+  // the pages that have a band of their own
+  .band-tabs {
+    display: flex;
+    gap: 2px;
+
+    &[hidden] {
+      display: none;
+    }
+
+    button[aria-selected="true"] {
+      border-color: var(--color);
+      opacity: 1;
+    }
+  }
+}
+
+@keyframes band-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.band-editor.footer {
+  animation-name: band-open-footer;
+}
+
+@keyframes band-open-footer {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+// the text fades while a strip is edited, and makes room for the strips; the
+// strips' own editors are ProseMirror editors too, so it goes by its id
+body.band-editing #editor {
+  opacity: 0.3;
+  transition: opacity 150ms;
+}
+
+body.has-header #editor {
+  padding-top: calc(48px + #{$band-height});
+}
+
+body.has-footer #editor {
+  padding-bottom: calc(48px + #{$band-height});
+}
+
+// the open strip takes room of its own, so it covers none of the text
+$strip-height: 90px;
+
+body.editing-header #editor {
+  padding-top: calc(48px + #{$strip-height});
+}
+
+body.editing-footer #editor {
+  padding-bottom: calc(48px + #{$strip-height});
 }
 
 .boot-error {
@@ -823,7 +1141,8 @@ body {
   outline: none;
 
   [role="menuitem"],
-  [role="menuitemcheckbox"] {
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"] {
     display: flex;
     align-items: baseline;
     gap: 24px;

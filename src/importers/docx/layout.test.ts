@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 
-import { DEFAULT_PAGE, allMargins } from "../../layout/settings";
+import { DEFAULT_PAGE, NO_SLOTS, allMargins } from "../../layout/settings";
 import { pageChanges, readWordLayout } from "./layout";
 import { W } from "./xml";
-import { cm } from "../../test/layout";
 
 // the section properties as Word writes them, in twentieths of a point
 const sectPr = ({
@@ -49,6 +48,12 @@ describe("importers.docx.readWordLayout", () => {
         orientation: "portrait",
         margins: allMargins(1417 / 20),
         newPageBefore: [],
+        header: NO_SLOTS,
+        footer: NO_SLOTS,
+        firstPage: "same",
+        evenPages: null,
+        numberStyle: "1",
+        startNumber: 1,
       },
       warnings: [],
     });
@@ -141,12 +146,7 @@ describe("importers.docx.readWordLayout", () => {
 });
 
 describe("importers.docx.pageChanges", () => {
-  const a4 = {
-    size: "a4" as const,
-    orientation: "portrait" as const,
-    margins: allMargins(cm(2.5)),
-    newPageBefore: [],
-  };
+  const a4 = { ...DEFAULT_PAGE, size: "a4" as const };
   const onA4 = { ...DEFAULT_PAGE, size: "a4" as const };
 
   it("writes nothing for the page the frontmatter and defaults give", () => {
@@ -165,10 +165,14 @@ describe("importers.docx.pageChanges", () => {
       pageChanges(
         null,
         {
+          ...DEFAULT_PAGE,
           size: "letter",
           orientation: "landscape",
           margins: allMargins(72),
           newPageBefore: [1],
+          footer: { ...NO_SLOTS, center: "{page}" },
+          firstPage: "plain",
+          startNumber: 3,
         },
         onA4,
       ),
@@ -177,6 +181,9 @@ describe("importers.docx.pageChanges", () => {
       orientation: "landscape",
       margins: allMargins(72),
       newPageBefore: [1],
+      footer: { ...NO_SLOTS, center: "{page}" },
+      firstPage: "plain",
+      startNumber: 3,
     });
   });
 

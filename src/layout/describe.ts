@@ -1,6 +1,6 @@
 import { PAPER } from "./paper";
 import type { Layout } from "./resolve";
-import { NEW_PAGE_BEFORE, type PaperSize } from "./settings";
+import { keyName, PAGE_KEYS, type PageKey, type PaperSize } from "./settings";
 import { paperUnit, toUnit, type Unit } from "./units";
 
 // How the page setup is put in words for the user.
@@ -47,25 +47,52 @@ export const describePaper = (layout: Layout, unit: Unit = "cm") => {
 export const describePageSize = (layout: Layout, unit: Unit) =>
   `${layoutPaper(layout, unit)} (${layout.orientation})`;
 
-// what the problems of resolveLayout mean to the user
+// what a setting that can't be used means to the user
+const SETTING_PROBLEMS: Record<PageKey, string> = {
+  size: "its paper size is unknown",
+  orientation: "its orientation is neither portrait nor landscape",
+  margins: "its margins can't be used",
+  newPageBefore: "the headings to start new pages are unknown",
+  header: "its header can't be read",
+  footer: "its footer can't be read",
+  firstPage: "its first page's header and footer can't be read",
+  evenPages: "the header and footer of its even pages can't be read",
+  numberStyle: "its page numbers are neither 1, i nor I",
+  startNumber: "its first page number isn't a number",
+};
+
+// what the problems of resolveLayout mean to the user, by the key of the
+// frontmatter they are about
 const PROBLEMS: Record<string, string> = {
   frontmatter: "the properties at the top of the file can't be read",
   page: "its page setup can't be read",
-  "page.size": "its paper size is unknown",
-  "page.orientation": "its orientation is neither portrait nor landscape",
-  "page.margins": "its margins can't be used",
-  [`page.${NEW_PAGE_BEFORE}`]: "the headings to start new pages are unknown",
+  ...Object.fromEntries(
+    PAGE_KEYS.map((key) => [`page.${keyName(key)}`, SETTING_PROBLEMS[key]]),
+  ),
+};
+
+// what the room problems of resolveLayout mean, which keep the setting
+const ROOM: Record<string, string> = {
+  "page.header-room": "The top margin is small for the header",
+  "page.footer-room": "The bottom margin is small for the footer",
 };
 
 /**
  * layoutWarnings explains the problems of resolveLayout, e.g. for the
  * notification after an export
  */
-export const layoutWarnings = (problems: string[]) =>
-  problems.length
-    ? [
-        `Blank used the default page setup where ${problems
-          .map((problem) => PROBLEMS[problem] ?? problem)
-          .join(", ")}`,
-      ]
-    : [];
+export const layoutWarnings = (problems: string[]) => {
+  const replaced = problems.filter((problem) => !ROOM[problem]);
+  return [
+    ...(replaced.length
+      ? [
+          `Blank used the default page setup where ${replaced
+            .map((problem) => PROBLEMS[problem] ?? problem)
+            .join(", ")}`,
+        ]
+      : []),
+    ...problems
+      .filter((problem) => ROOM[problem])
+      .map((problem) => ROOM[problem]),
+  ];
+};

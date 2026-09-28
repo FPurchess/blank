@@ -108,8 +108,10 @@ export type MenuItem =
       // the key binding, e.g. "Mod-z"
       shortcut?: string;
       disabled?: boolean;
-      // whether it's switched on, for items that switch something on and off
+      // whether it's switched on, for items that switch something on and off,
+      // or with `radio` whether it's the chosen one of a set of choices
       checked?: boolean;
+      radio?: boolean;
       // the items of a submenu
       children?: MenuItem[];
       run?: () => void;

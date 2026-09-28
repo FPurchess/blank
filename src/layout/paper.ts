@@ -42,9 +42,16 @@ const LETTER_REGIONS = new Set([
  * takes it from the system's settings (LANG on Linux); jsdom, which runs the
  * tests, always says "en-US". Scripts run by Bun ask Intl.
  */
-export const systemLocale = () =>
-  globalThis.navigator?.language ||
-  Intl.DateTimeFormat().resolvedOptions().locale;
+export const systemLocale = (): string => {
+  const language = globalThis.navigator?.language;
+  // a system without a language says "C", which Intl refuses
+  try {
+    if (language) return Intl.getCanonicalLocales(language)[0];
+  } catch {
+    // Intl's own locale below
+  }
+  return Intl.DateTimeFormat().resolvedOptions().locale;
+};
 
 /**
  * regionOf returns the region of a locale, e.g. "US" for "en-US" or for "en",

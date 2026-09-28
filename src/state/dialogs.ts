@@ -1,6 +1,7 @@
 import { shallowRef } from "vue";
 
-import type { PageSettings } from "../layout/settings";
+import type { Band, DocumentFields } from "../layout/bands";
+import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
 
 export interface LinkDialogRequest {
@@ -64,3 +65,20 @@ export const pageSetup = shallowRef<PageSetupRequest | null>(null);
 // the editor, e.g. the button in the bottom bar. The editor opens it for its
 // document on each one.
 export const pageSetupRequests = shallowRef<number>(0);
+
+export interface BandEditorRequest {
+  band: Band;
+  // the headers, footers and page numbers as they are
+  bands: BandSettings;
+  // what the placeholders show
+  fields: DocumentFields;
+  // text with placeholders to put into the center once the strip opens,
+  // e.g. "{page}" for "# Page numbers"
+  insert?: string;
+  // keeps what was edited, as one undo step
+  apply(bands: BandSettings): void;
+}
+
+// bandEditor holds the request of the open header or footer strip, or null
+// while none is open
+export const bandEditor = shallowRef<BandEditorRequest | null>(null);

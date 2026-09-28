@@ -2,7 +2,7 @@ import { $, $$, browser, expect } from "@wdio/globals";
 
 import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
 
-const errors = () => $$(".ProseMirror .spelling-error");
+const errors = () => $$("#editor .spelling-error");
 const menu = () => $("#context-menu");
 const item = (label: string) =>
   $(`//*[@role="menuitem"][.//*[@class="label" and text()="${label}"]]`);
@@ -42,7 +42,7 @@ const rightClick = async (word: string) => {
  */
 const contextMenuOn = async (word: string) => {
   await browser.execute((word: string) => {
-    const editor = document.querySelector(".ProseMirror")!;
+    const editor = document.querySelector("#editor")!;
     const open = (x: number, y: number) => {
       const init = {
         bubbles: true,
@@ -114,10 +114,10 @@ describe("spell check", () => {
     await item("wrong").click();
 
     await expect(menu()).not.toBeExisting();
-    await expect($(".ProseMirror p")).toHaveText("Thiss is wrong anothr");
+    await expect($("#editor p")).toHaveText("Thiss is wrong anothr");
 
     await pressMod("z");
-    await expect($(".ProseMirror p")).toHaveText("Thiss is wrng anothr");
+    await expect($("#editor p")).toHaveText("Thiss is wrng anothr");
   });
 
   it("adds a word to the dictionary, which lasts", async () => {
@@ -168,7 +168,7 @@ describe("spell check", () => {
     // the editor has the focus again
     await type(Key.ArrowRight);
     await type("x");
-    await expect($(".ProseMirror p")).toHaveText(/x/);
+    await expect($("#editor p")).toHaveText(/x/);
     await pressMod("z");
   });
 
@@ -214,7 +214,7 @@ describe("spell check", () => {
     await contextMenuOn("");
     await item("Paste").click();
 
-    await expect($(".ProseMirror p")).toHaveText("Wrng und unnd");
+    await expect($("#editor p")).toHaveText("Wrng und unnd");
   });
 
   it("turns off from the menu", async () => {

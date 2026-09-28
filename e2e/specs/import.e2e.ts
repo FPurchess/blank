@@ -37,14 +37,14 @@ describe("Word import", () => {
   });
 
   it("imports the Word document as an untitled document", async () => {
-    await expect($(".ProseMirror h1")).toHaveText("Fixture");
-    await expect($(".ProseMirror h2")).toHaveText("Formatting");
+    await expect($("#editor h1")).toHaveText("Fixture");
+    await expect($("#editor h2")).toHaveText("Formatting");
     // seven list items and the footnote at the end
-    await expect($$(".ProseMirror li")).toBeElementsArrayOfSize(8);
-    await expect($(".ProseMirror pre")).toHaveText(
+    await expect($$("#editor li")).toBeElementsArrayOfSize(8);
+    await expect($("#editor pre")).toHaveText(
       'function hello() {\n  return "world";\n}',
     );
-    const [chart] = await $$(".ProseMirror .image img");
+    const [chart] = await $$("#editor .image img");
     await expect(chart).toHaveAttribute(
       "src",
       expect.stringMatching(/^data:image\/png;base64,/),
@@ -53,10 +53,10 @@ describe("Word import", () => {
   });
 
   it("never writes to the Word document", async () => {
-    await $(".ProseMirror h1").click();
+    await $("#editor h1").click();
     await type(Key.End);
     await type(" edited");
-    await expect($(".ProseMirror h1")).toHaveText("Fixture edited");
+    await expect($("#editor h1")).toHaveText("Fixture edited");
 
     expect(sha256(docxPath)).toBe(original);
   });
@@ -66,7 +66,7 @@ describe("Word import", () => {
     await browser.pause(2000);
     await restartApp();
 
-    await expect($(".ProseMirror h1")).toHaveText("Fixture edited");
+    await expect($("#editor h1")).toHaveText("Fixture edited");
     await expect($("#ui-top")).toHaveText("» report.docx (imported)");
   });
 });

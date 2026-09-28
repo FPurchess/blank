@@ -7,6 +7,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 
 import { CommandIdentifier, config } from "../../config";
 import {
+  bandEditor,
   imageDialog,
   languagePicker,
   linkDialog,
@@ -301,6 +302,18 @@ describe("plugin.keymap", () => {
       expect(press("Mod-Alt-l")).toBe(true);
 
       expect(languagePicker.value.open).toBe(true);
+    });
+
+    it.each([
+      ["Mod-Alt-h", "header"],
+      ["Mod-Alt-f", "footer"],
+    ])("%s opens the %s strip", (combo, band) => {
+      const { press } = setup(doc(p("text")));
+
+      expect(press(combo)).toBe(true);
+
+      expect(bandEditor.value).toMatchObject({ band });
+      bandEditor.value = null;
     });
 
     it("Mod-Alt-i opens the image dialog", () => {

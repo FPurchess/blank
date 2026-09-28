@@ -34,15 +34,15 @@ describe("frontmatter", () => {
   });
 
   it("shows the properties above the text instead of the YAML", async () => {
-    await expect($(".ProseMirror .doc-properties")).toHaveText(
+    await expect($("#editor .doc-properties")).toHaveText(
       "The Lighthouse · by Ada, Grace · tags",
     );
-    await expect($(".ProseMirror h1")).toHaveText("Chapter");
-    await expect($(".ProseMirror hr")).not.toExist();
+    await expect($("#editor h1")).toHaveText("Chapter");
+    await expect($("#editor hr")).not.toExist();
   });
 
   it("saves the frontmatter unchanged", async () => {
-    await $(".ProseMirror p").click();
+    await $("#editor p").click();
     await type(Key.End);
     await type(" more");
     await pressMod("s");
@@ -61,7 +61,7 @@ describe("frontmatter", () => {
     await browser.pause(2000);
     await restartApp();
 
-    await expect($(".ProseMirror .doc-properties")).toHaveText(
+    await expect($("#editor .doc-properties")).toHaveText(
       "The Lighthouse · by Ada, Grace · tags",
     );
   });

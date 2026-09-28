@@ -12,7 +12,9 @@ import {
 const menu = () => document.querySelector<HTMLElement>("#context-menu");
 const submenu = () => document.querySelector<HTMLElement>(".submenu");
 const rows = (element = menu()) => [
-  ...element!.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+  ...element!.querySelectorAll<HTMLElement>(
+    '[role="menuitem"], [role="menuitemradio"]',
+  ),
 ];
 const row = (id: string) =>
   document.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
@@ -115,6 +117,21 @@ describe("contextMenu", () => {
     expect(row("undo").querySelector("kbd")!.textContent).toBe("Ctrl+Z");
     expect(menu()!.style.left).toBe("10px");
     expect(menu()!.style.top).toBe("42px");
+  });
+
+  it("marks the chosen one of a set of choices as a radio item", () => {
+    open(true, [
+      { id: "one", label: "1, 2, 3", checked: true, radio: true },
+      { id: "roman", label: "i, ii, iii", checked: false, radio: true },
+    ]);
+
+    expect(rows().map((r) => r.getAttribute("role"))).toEqual([
+      "menuitemradio",
+      "menuitemradio",
+    ]);
+    expect(row("one").getAttribute("aria-checked")).toBe("true");
+    expect(row("one").querySelector(".check")!.textContent).toBe("✓");
+    expect(row("roman").getAttribute("aria-checked")).toBe("false");
   });
 
   it("focuses the first item when opened with the keyboard", () => {
