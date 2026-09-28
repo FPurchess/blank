@@ -37,6 +37,7 @@ The UI around the editor is moving to Vue 3.5 (see `vue-migration.md` for what's
 | Component | What |
 |---|---|
 | `App.vue` | the Vue part of the UI |
+| `TopBar.vue`, `BottomBar.vue`, `PageButton.vue`, `SpellcheckStatus.vue`, `LanguageChooser.vue` | the bars at the top and bottom of the window and the items on the right of the bottom one, their text in `statusBarModel.ts`. Each item is its own component, so typing only updates the counter |
 | `TableToolbar.vue`, `ToolbarButton.vue`, `CaptionField.vue` | the table toolbar |
 | `TablePicker.vue` | the size picker for a new table |
 | `ContextMenu.vue`, `MenuList.vue`, `MenuEditField.vue` | the context menu: the open levels and the focus, one level, an item being edited |

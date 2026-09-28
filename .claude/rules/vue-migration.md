@@ -31,7 +31,8 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 These arrived or are arriving outside the plan's PRs:
 - `#table-handles` (`src/tableHandles.ts`, table mouse handles, merged in #65): its own surface, ported after the toolbar. z-index 4, below the toolbar. The plugin publishes only when the table, document, selection, scrolling or window changes, and the overlay tracks the pointer itself. Stable: `.grip.row`, `.grip.column` (`.selected`), `.insert`, `.insert-line`, `.resizers > .resizer[data-index]`, `.edge.right`/`.bottom`/`.corner`, `.guide`, `.dragged`, `.ghost > .size`.
 - `#band-header`/`#band-footer`/`#band-editor` (`src/bandStrips.ts`, headers and footers) and `slotEditor`: a surface, plus one editor per slot. That's the multi-editor case `useEditor()` is provided for. The open strip's logic is DOM-free in `src/bandStrip.ts`, so porting it is a template over that module. The strips already call the editor through its handle. z-index: `.band-edge` 5, `.band-editor` 8.
-- UI → editor trigger refs to replace with `useEditor()` in PR F: `pageSetupRequests` (a counter). Until then, write a new value each time, since from PR A on an equal write doesn't notify.
+- No UI → editor trigger refs are left: `pageSetupRequests` went in PR F, and the bottom bar opens the page setup through `useEditor()`.
+- The bars are Vue (PR F), first in `App.vue`, so they now sit in `#ui-app`. `bootUI` (`src/ui.ts`, now only the boot) mounts the app after the header and footer strips and before the table handles: all of them are fixed, and at the same z-index the later one paints on top, so the table toolbar (5) stays above a strip (5) it overlaps.
 - No `surfaces.ts` registry: `App.vue` lists each part of the UI in one line, keyed by `keyOf` (`src/ui/keyOf.ts`), which is as short and easier to read. Dialogs close through `closeDialog` (`src/ui/closeDialog.ts`), a plain function, not a `useDialogRequest` composable.
 - Composables so far: none. The focus trap planned as `useFocusTrap` lives in `BaseDialog.vue`, which all three dialogs use. `usePopupPlacement` would only wrap `onMounted(place); onUpdated(place)`. Roving focus is a component, `OptionGroup.vue` (PR E), for the page setup's rows; the context menu keeps its own, which skips disabled items, opens submenus and has typeahead, so the two share no code worth a composable. The dialogs' fields use `TextField.vue` (PR D). `CaptionField.vue` and `MenuEditField.vue` stay separate: their values come back as props while the user types, so they set them once.
 - Context menu (PR C): #68's paste fallback `pasteText(view, text, plain)` and copy fallback `view.serializeForClipboard` stay in `src/editor/contextMenu/model.ts`, which PR C doesn't change. #66's radio items (`MenuItem.radio`: `menuitemradio` with `aria-checked`, used by the strips' First Page and page number menus) render through `roleOf` in `src/ui/menuModel.ts`.
@@ -45,8 +46,8 @@ These arrived or are arriving outside the plan's PRs:
 | B | SFC tooling, `App`, `useEditor`, table toolbar (go/no-go gate) | done (#69) |
 | C | Table picker and context menu | done (#70) |
 | D | Link and image dialogs | done (#71) |
-| E | Page setup, delete `dialog.ts` | in review |
-| F | Status bars, drop `pageSetupRequests` | not started |
+| E | Page setup, delete `dialog.ts` | done (#72) |
+| F | Status bars, drop `pageSetupRequests` | in review |
 | G | Default flush for non-UI watchers, finish the rule files, delete this file | not started |
 
 ## Gate after PR B

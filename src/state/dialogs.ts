@@ -61,11 +61,6 @@ export interface PageSetupRequest {
 // it is closed
 export const pageSetup = shallowRef<PageSetupRequest | null>(null);
 
-// pageSetupRequests counts the requests to open the page setup from outside
-// the editor, e.g. the button in the bottom bar. The editor opens it for its
-// document on each one.
-export const pageSetupRequests = shallowRef<number>(0);
-
 export interface BandEditorRequest {
   band: Band;
   // the headers, footers and page numbers as they are
