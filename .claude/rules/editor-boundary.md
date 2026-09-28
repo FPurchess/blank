@@ -4,7 +4,6 @@ paths:
   - "src/ui/**"
   - "src/ui.ts"
   - "src/table*.ts"
-  - "src/contextMenu.ts"
   - "src/*Dialog.ts"
   - "src/pageSetup.ts"
   - "src/state/focus.ts"

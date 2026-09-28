@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScript + ProseMirror frontend in `src/`, whose UI around the editor is moving to Vue 3 (the table toolbar so far, see `.claude/rules/vue-migration.md`). The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries.
+Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScript + ProseMirror frontend in `src/`, whose UI around the editor is moving to Vue 3 (the table toolbar, the table picker and the context menu so far, see `.claude/rules/vue-migration.md`). The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries.
 
 ## Commands
 
@@ -34,7 +34,7 @@ Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScrip
 - Word documents are imported, never edited: `readDocumentFromFile` (`src/editor/document.ts`) converts a .docx with `importDocx` (`src/importers/docx/`) into an untitled document and sets `importedFrom`. Saving never writes markdown into a .docx (`saveFile.ts`).
 - `language` holds an ISO 639-1 code (`de`) or a regional tag of a spell check dictionary (`de-CH`). Autocorrect uses the rules of `baseLanguage(tag)`.
 - Spell check: `src/spellcheck/service.ts` loads the dictionary for `language` while `spellcheck` is on and publishes a `Spellchecker` in `spellchecker`. The `spellcheck` plugin (`src/editor/plugins/spellcheck.ts`) tokenizes changed textblocks (`src/spellcheck/tokenize.ts`), asks it in batches and underlines misspellings with decorations. All Rust calls go through `src/spellcheck/ipc.ts`. Personal dictionaries are text files in `<app config>/dictionaries/`, see `userDictionary.ts`.
-- The context menu replaces the webview's: `src/editor/plugins/contextMenu.ts` opens it, `src/editor/contextMenu/model.ts` builds the items and runs them, and `src/contextMenu.ts` renders it (ARIA menu, keyboard, submenus). New items go into `buildMenu`.
+- The context menu replaces the webview's: `src/editor/plugins/contextMenu.ts` opens it, `src/editor/contextMenu/model.ts` builds the items and runs them, and `src/ui/ContextMenu.vue` renders it: it holds the open levels, the keys and the focus, with one `MenuList.vue` per level and the navigation helpers in `src/ui/menuModel.ts`. `src/nativeMenu.ts` keeps the webview's own menu away. New items go into `buildMenu`.
 
 ## Adding things
 
