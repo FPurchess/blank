@@ -1,5 +1,6 @@
-// Building blocks of the modal dialogs (link, image, page setup): a backdrop
-// with a form that keeps the focus inside and closes on Escape.
+// Building blocks of the page setup dialog, the last one built without Vue:
+// a backdrop with a form that keeps the focus inside and closes on Escape.
+// The other dialogs use src/ui/components/BaseDialog.vue.
 
 import { onScopeDispose, type Ref, watch } from "vue";
 

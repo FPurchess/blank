@@ -106,21 +106,3 @@ export const indexAfterUpdate = (
   }
   return enabledAt(next.items, found) ? found : -1;
 };
-
-// menus, e.g. the one of a misspelling, are opened again once their
-// suggestions are known: a request with the same `close` updates the open
-// menu, another one replaces it. menuKey tells the two apart.
-const keys = new WeakMap<() => void, number>();
-let lastKey = 0;
-
-/**
- * menuKey returns the same number for every request of one open menu
- */
-export const menuKey = (close: () => void) => {
-  let key = keys.get(close);
-  if (key === undefined) {
-    key = ++lastKey;
-    keys.set(close, key);
-  }
-  return key;
-};

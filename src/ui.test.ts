@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 
 import { bootUI, setupNotification } from "./ui";
 import {
@@ -49,6 +50,7 @@ describe("ui", () => {
     document.body.innerHTML = "";
     path.value = null;
     importedFrom.value = null;
+    linkDialog.value = null;
     textContent.value = "";
     language.value = "de";
     closePicker();
@@ -56,11 +58,13 @@ describe("ui", () => {
     dispose = bootUI(createTestHandle());
   });
 
-  it("renders the link dialog", () => {
+  it("renders the link dialog", async () => {
     linkDialog.value = { url: "", text: "" } as LinkDialogRequest;
+    await nextTick();
     expect(document.querySelector("#link-dialog")).not.toBeNull();
 
     linkDialog.value = null;
+    await nextTick();
     expect(document.querySelector("#link-dialog")).toBeNull();
   });
 

@@ -8,7 +8,6 @@ import {
   indexAfterUpdate,
   isEntry,
   lastEnabled,
-  menuKey,
   roleOf,
   step,
   typeahead,
@@ -80,14 +79,6 @@ describe("menuModel", () => {
     );
     // radio only counts for items with a check
     expect(roleOf({ id: "a", label: "A", radio: true })).toBe("menuitem");
-  });
-
-  it("keys the requests of one menu alike, and another menu apart", () => {
-    const close = () => {};
-    const other = () => {};
-
-    expect(menuKey(close)).toBe(menuKey(close));
-    expect(menuKey(other)).not.toBe(menuKey(close));
   });
 
   describe("indexAfterUpdate", () => {
