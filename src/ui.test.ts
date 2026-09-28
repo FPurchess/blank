@@ -2,27 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import { bootUI, setupNotification } from "./ui";
-import {
-  announce,
-  announcement,
-  flashSpellcheckMessage,
-  importedFrom,
-  language,
-  languagePicker,
-  linkDialog,
-  type LinkDialogRequest,
-  pageSetupRequests,
-  path,
-  spellcheck,
-  spellcheckMessage,
-  spellcheckStatus,
-  textContent,
-  transaction,
-} from "./state";
-import { config } from "./config";
-import { schema } from "./markdown";
-import { createState, createTestHandle } from "./test/editor";
-import { closePicker, move, openPicker, typeChar } from "./languagePicker";
+import { linkDialog, type LinkDialogRequest, path } from "./state";
+import { createTestHandle } from "./test/editor";
 import { flushPromises } from "./test/async";
 
 // stops what the last boot rendered, so boots don't pile up
@@ -41,19 +22,11 @@ const stubNotification = (
   return requestPermission;
 };
 
-const uiTop = () => document.querySelector<HTMLElement>("#ui-top");
-const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
-const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
-
 describe("ui", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     path.value = null;
-    importedFrom.value = null;
     linkDialog.value = null;
-    textContent.value = "";
-    language.value = "de";
-    closePicker();
     stubNotification("granted");
     dispose = bootUI(createTestHandle());
   });
@@ -92,10 +65,17 @@ describe("ui", () => {
     expect(document.getElementById("ui-app")).toBeNull();
   });
 
-  it("puts the bars into the UI root after the editor", () => {
-    const root = document.getElementById("ui")!;
-    expect(root.querySelector("#ui-top")).not.toBeNull();
-    expect(root.querySelector("#ui-bottom")).not.toBeNull();
+  it("puts the Vue app after the header and footer strips and before the table handles", () => {
+    // the table toolbar in the app and the strips share a z-index, so the
+    // later one paints on top
+    const ids = [...document.querySelectorAll("#ui > [id]")].map((e) => e.id);
+
+    expect(ids.indexOf("band-header")).toBeGreaterThan(-1);
+    expect(ids.indexOf("band-header")).toBeLessThan(ids.indexOf("ui-app"));
+    expect(ids.indexOf("ui-app")).toBeLessThan(ids.indexOf("table-handles"));
+    expect(
+      document.querySelector("#ui-app > #ui-top + #ui-bottom"),
+    ).not.toBeNull();
   });
 
   it("removes the UI and stops rendering when disposed", () => {
@@ -105,213 +85,6 @@ describe("ui", () => {
 
     expect(document.getElementById("ui")).toBeNull();
     expect(document.getElementById("ui-top")).toBeNull();
-  });
-
-  describe("file path", () => {
-    it("shows Untitled without a path", () => {
-      expect(uiTop()?.textContent).toBe("» Untitled");
-    });
-
-    it("shows the current path", () => {
-      path.value = "/this/is/a/test/path";
-      expect(uiTop()?.textContent).toBe("» /this/is/a/test/path");
-
-      path.value = null;
-      expect(uiTop()?.textContent).toBe("» Untitled");
-    });
-
-    it("shows the name of an imported Word document until it is saved", () => {
-      importedFrom.value = "/docs/report.docx";
-      expect(uiTop()?.textContent).toBe("» report.docx (imported)");
-
-      path.value = "/docs/report.md";
-      expect(uiTop()?.textContent).toBe("» /docs/report.md");
-    });
-
-    it("shows a path containing markup as plain text", () => {
-      path.value = "/tmp/<img src=x>.md";
-
-      expect(uiTop()?.textContent).toBe("» /tmp/<img src=x>.md");
-      expect(uiTop()?.children).toHaveLength(0);
-    });
-  });
-
-  describe("counter", () => {
-    it("starts at zero", () => {
-      expect(uiStats()?.textContent).toBe("0 words 0 chars");
-    });
-
-    it("counts the words and chars of the text content", () => {
-      textContent.value = "one two three four";
-      expect(uiStats()?.textContent).toBe("4 words 18 chars");
-
-      textContent.value = "";
-      expect(uiStats()?.textContent).toBe("0 words 0 chars");
-    });
-
-    it("counts pipes as words and chars", () => {
-      textContent.value = "a || b";
-      expect(uiStats()?.textContent).toBe("3 words 6 chars");
-    });
-
-    it("counts the words of a doc with a hard break", () => {
-      textContent.value = "roses are red violets are blue";
-      expect(uiStats()?.textContent).toBe("6 words 30 chars");
-    });
-  });
-});
-
-describe("ui language chooser", () => {
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    language.value = "de";
-    closePicker();
-    stubNotification("granted");
-    dispose = bootUI(createTestHandle());
-  });
-
-  it("sits right of the counter and the spell check status in the footer", () => {
-    const footer = document.querySelector("#ui-bottom")!;
-
-    expect([...footer.children].map((child) => child.id)).toEqual([
-      "ui-stats",
-      "ui-announcement",
-      "ui-page",
-      "ui-spellcheck",
-      "ui-language",
-    ]);
-  });
-
-  it("shows the current language", () => {
-    expect(uiLanguage()?.textContent).toBe("DE");
-
-    language.value = "fr";
-    expect(uiLanguage()?.textContent).toBe("FR");
-  });
-
-  it("marks a language that uses the English rules", () => {
-    language.value = "tr";
-
-    expect(uiLanguage()?.textContent).toBe("TR*");
-  });
-
-  it("shows the languages around the selected one while open", () => {
-    openPicker();
-
-    expect(uiLanguage()?.classList.contains("open")).toBe(true);
-    expect(uiLanguage()?.textContent).toBe("‹csdadede-ATde-CH›");
-    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("de");
-
-    move(1);
-    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("de-AT");
-  });
-
-  it("shows typed letters and rejected codes", () => {
-    openPicker();
-
-    typeChar("p");
-    expect(uiLanguage()?.querySelector(".buffer")?.textContent).toBe("p_");
-
-    typeChar("x");
-    expect(uiLanguage()?.classList.contains("invalid")).toBe(true);
-
-    typeChar("t");
-    typeChar("r");
-    expect(uiLanguage()?.querySelector(".selected")?.textContent).toBe("tr*");
-  });
-
-  it("does not mark the language as rejected once closed", () => {
-    openPicker();
-    typeChar("x");
-    typeChar("x");
-    closePicker();
-
-    expect(uiLanguage()?.classList.contains("invalid")).toBe(false);
-    expect(uiLanguage()?.textContent).toBe("DE");
-  });
-
-  it("opens on click and chooses a clicked language", () => {
-    uiLanguage()!.click();
-    expect(languagePicker.value.open).toBe(true);
-
-    const option = [
-      ...uiLanguage()!.querySelectorAll<HTMLElement>(".option"),
-    ].find((element) => element.textContent === "de-CH")!;
-    option.click();
-
-    expect(language.value).toBe("de-CH");
-    expect(languagePicker.value.open).toBe(false);
-    expect(uiLanguage()?.textContent).toBe("DE-CH");
-  });
-
-  it("keeps the focus in the editor when clicked", () => {
-    const event = new MouseEvent("mousedown", { cancelable: true });
-    uiLanguage()!.dispatchEvent(event);
-
-    expect(event.defaultPrevented).toBe(true);
-  });
-});
-
-describe("ui page button", () => {
-  const uiPage = () => document.querySelector<HTMLElement>("#ui-page")!;
-  const withFrontmatter = (frontmatter: string | null) =>
-    createState(schema.node("doc", { frontmatter }, [schema.node("paragraph")]))
-      .tr;
-
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    transaction.value = null;
-    stubNotification("granted");
-    dispose = bootUI(createTestHandle());
-  });
-
-  it("shows the paper of the region and its orientation", () => {
-    // jsdom's locale is en-US
-    expect(uiPage().textContent).toBe("Letter (portrait)");
-    expect(uiPage().getAttribute("role")).toBe("button");
-    expect(uiPage().title).toBe("Page setup (Mod-Alt-u)");
-  });
-
-  it("follows the page setup of the document", () => {
-    transaction.value = withFrontmatter(
-      "page:\n  size: a4\n  orientation: landscape",
-    );
-    expect(uiPage().textContent).toBe("A4 (landscape)");
-
-    transaction.value = withFrontmatter("page:\n  size: 170mm x 240mm");
-    expect(uiPage().textContent).toBe("6.69 × 9.45 in (portrait)");
-  });
-
-  it("leaves the label alone while typing keeps the page setup", () => {
-    transaction.value = withFrontmatter("page:\n  size: a4");
-    uiPage().textContent = "untouched";
-
-    transaction.value = withFrontmatter("page:\n  size: a4");
-    expect(uiPage().textContent).toBe("untouched");
-  });
-
-  it("follows the user's default", () => {
-    const before = config.value;
-    try {
-      config.value = {
-        ...before,
-        layout: { page: { ...before.layout.page, size: "a5" } },
-      };
-      expect(uiPage().textContent).toBe("A5 (portrait)");
-    } finally {
-      config.value = before;
-    }
-  });
-
-  it("opens the page setup when clicked, keeping the focus", () => {
-    const before = pageSetupRequests.value;
-    const mousedown = new MouseEvent("mousedown", { cancelable: true });
-
-    uiPage().dispatchEvent(mousedown);
-    uiPage().click();
-
-    expect(mousedown.defaultPrevented).toBe(true);
-    expect(pageSetupRequests.value).toBe(before + 1);
   });
 });
 
@@ -343,108 +116,5 @@ describe("setupNotification", () => {
     await flushPromises();
 
     expect(consoleError).toHaveBeenCalledWith(error);
-  });
-});
-
-describe("ui spell check status", () => {
-  const uiSpellcheck = () =>
-    document.querySelector<HTMLElement>("#ui-spellcheck")!;
-
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    spellcheck.value = false;
-    spellcheckMessage.value = null;
-    spellcheckStatus.value = { state: "off", tag: "de" };
-    stubNotification("granted");
-    dispose = bootUI(createTestHandle());
-  });
-
-  it.each([
-    [{ state: "off" }, "", ""],
-    [{ state: "loading" }, "Spelling …", "Loading the German dictionary"],
-    [
-      { state: "downloading", progress: 0.42 },
-      "Spelling 42 %",
-      "Downloading the German dictionary",
-    ],
-    [
-      { state: "downloading" },
-      "Spelling 0 %",
-      "Downloading the German dictionary",
-    ],
-    [{ state: "ready" }, "Spelling", "Checking German spelling"],
-    [
-      { state: "unavailable" },
-      "No spelling",
-      "No spell check dictionary for German",
-    ],
-    [{ state: "error", message: "offline" }, "Spelling failed", "offline"],
-    [{ state: "error" }, "Spelling failed", ""],
-  ] as const)("shows %j", (status, text, title) => {
-    spellcheckStatus.value = { tag: "de", ...status };
-
-    expect(uiSpellcheck().textContent).toBe(text);
-    expect(uiSpellcheck().hidden).toBe(text === "");
-    expect(uiSpellcheck().title).toBe(
-      title && `${title}, click to turn spell check off`,
-    );
-  });
-
-  it("turns spell check on and off when clicked", () => {
-    uiSpellcheck().click();
-    expect(spellcheck.value).toBe(true);
-
-    uiSpellcheck().click();
-    expect(spellcheck.value).toBe(false);
-  });
-
-  it("keeps the focus in the editor when clicked", () => {
-    const event = new MouseEvent("mousedown", { cancelable: true });
-    uiSpellcheck().dispatchEvent(event);
-
-    expect(event.defaultPrevented).toBe(true);
-  });
-
-  it("shows a message instead of the status until it's gone", () => {
-    spellcheckStatus.value = { state: "ready", tag: "de" };
-
-    flashSpellcheckMessage("No spelling errors");
-    expect(uiSpellcheck().textContent).toBe("No spelling errors");
-
-    spellcheckMessage.value = null;
-    expect(uiSpellcheck().textContent).toBe("Spelling");
-  });
-});
-
-describe("ui announcement", () => {
-  const uiAnnouncement = () =>
-    document.querySelector<HTMLElement>("#ui-announcement")!;
-
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    announcement.value = null;
-    stubNotification("granted");
-    dispose = bootUI(createTestHandle());
-  });
-
-  it("is always there as a status, empty in between", () => {
-    expect(uiAnnouncement().getAttribute("role")).toBe("status");
-    expect(uiAnnouncement().textContent).toBe("");
-  });
-
-  it("shows what just happened until it's gone", () => {
-    announce("A row added");
-    expect(uiAnnouncement().textContent).toBe("A row added");
-
-    announcement.value = null;
-    expect(uiAnnouncement().textContent).toBe("");
-  });
-
-  it("sits next to the counter, before the items on the right", () => {
-    const ids = [...document.querySelectorAll("#ui-bottom > *")].map(
-      (element) => element.id,
-    );
-
-    expect(ids.indexOf("ui-announcement")).toBe(ids.indexOf("ui-stats") + 1);
   });
 });

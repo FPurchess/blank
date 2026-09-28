@@ -2,10 +2,9 @@ import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history } from "prosemirror-history";
 import { tableEditing } from "prosemirror-tables";
-import { watch } from "vue";
 
 import { schema } from "../markdown";
-import { pageSetupRequests, transaction, uiTakesFocus } from "../state";
+import { transaction, uiTakesFocus } from "../state";
 import {
   autocomplete,
   contextMenu,
@@ -25,9 +24,6 @@ import {
 } from "./plugins";
 import { applyInitialDocument } from "./document";
 import { createEditorHandle, syncPlugin } from "./handle";
-import { openPageSetup } from "./commands/pageSetup";
-
-let stopRequests: (() => void) | undefined;
 
 /**
  * bootEditor mounts the editor with the first document
@@ -89,11 +85,6 @@ export const bootEditor = async () => {
   const editor = createEditorHandle(view);
   sync = editor.sync;
   transaction.value = view.state.tr;
-  // e.g. the button in the bottom bar asks for the page setup
-  stopRequests?.();
-  stopRequests = watch(pageSetupRequests, () => openPageSetup(view), {
-    flush: "sync",
-  });
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
     if (!view.hasFocus()) view.focus();

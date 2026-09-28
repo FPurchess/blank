@@ -9,11 +9,11 @@ import {
   linkDialog,
   type LinkDialogRequest,
   pageSetup,
-  pageSetupRequests,
   transaction,
 } from "../state";
 import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
+import { pageSetup as openPageSetup } from "./commands";
 import type { EditorHandle } from "./handle";
 
 const editor = () => document.querySelector<HTMLElement>("#editor");
@@ -126,10 +126,10 @@ describe("bootEditor", () => {
     expect(document.activeElement).not.toBe(editor());
   });
 
-  it("opens the page setup when asked from outside, e.g. the bottom bar", () => {
+  it("opens the page setup for its document through its handle, e.g. from the bottom bar", () => {
     pageSetup.value = null;
 
-    pageSetupRequests.value += 1;
+    handle.run(openPageSetup());
 
     // the welcome document has no frontmatter
     expect(pageSetup.value).toMatchObject({ frontmatter: null });
