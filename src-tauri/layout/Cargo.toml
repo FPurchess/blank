@@ -1,0 +1,21 @@
+[package]
+name = "blank-layout"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Blank's page layout engine: lays out a document once, for the screen and the PDF"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# no system fonts: the engine only knows the fonts it is given, so it lays out
+# the same everywhere, natively and in the webview
+parley = { version = "0.11", default-features = false, features = ["std"] }
+krilla = { version = "0.8", default-features = false, features = ["raster-images"] }
+skrifa = { version = "0.44", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
