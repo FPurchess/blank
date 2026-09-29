@@ -68,6 +68,8 @@ describe("page view", () => {
     dispose = bootApp(handle);
     await nextTick();
     expect(view().classList.contains("page-ends")).toBe(true);
+    // screen readers read the editor behind it
+    expect(view().getAttribute("aria-hidden")).toBe("true");
     expect(frames().length).toBeGreaterThan(0);
     expect(frames().length).toBeLessThanOrEqual(engine.pages());
     expect(frames()[0].querySelector(".page-end")).not.toBeNull();

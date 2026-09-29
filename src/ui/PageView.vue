@@ -150,11 +150,18 @@ const alignSoon = () => {
   alignTimer = setTimeout(align, ALIGN_DELAY);
 };
 watch([pageCaret, layout], alignSoon, { flush: "post" });
-// a test view has no DOM
-onMounted(() => editor.view.dom?.addEventListener("compositionstart", align));
+// the input method places its window at the hidden caret when composing
+// starts, and moves it along as the composed text grows; a test view has
+// no DOM
+const COMPOSING = ["compositionstart", "compositionupdate"];
+onMounted(() =>
+  COMPOSING.forEach((type) => editor.view.dom?.addEventListener(type, align)),
+);
 onUnmounted(() => {
   clearTimeout(alignTimer);
-  editor.view.dom?.removeEventListener("compositionstart", align);
+  COMPOSING.forEach((type) =>
+    editor.view.dom?.removeEventListener(type, align),
+  );
 });
 
 const onScroll = () => {
@@ -276,9 +283,12 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- screen readers read the editor behind the pages, which holds the same
+  text in the order of the document -->
   <div
     id="page-view"
     ref="scroller"
+    aria-hidden="true"
     :class="[pageView, { 'follow-links': hoverLink && opening }]"
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"

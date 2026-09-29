@@ -150,13 +150,34 @@ step.
     the text, the list numbers, the alt text, the image, the link, the
     metadata), `exact.test.ts`, the Rust tests.
 
+- 7. **IME and accessibility:**
+  - The hidden editor moves its caret under the painted one 80 ms after the
+    caret rests, and at every `compositionstart` and `compositionupdate`, so
+    the candidate window opens at the painted caret and follows the text
+    being composed. The composed text is underlined on the pages
+    (`pageComposition`, step 2).
+  - `#page-view` is `aria-hidden`, as are its canvases and marks: screen
+    readers read the focused hidden editor, whose DOM is the document in
+    order (the frontmatter summary included, as the editor's widget).
+  - Verified: `ime.e2e.ts` composes "é" with GTK's own input method
+    (Ctrl+Shift+U e9 Space, the only composing input method under xvfb here:
+    ibus has no composing engine installed, and xdotool is missing) and
+    checks it lands where the pages were clicked; and it checks what a
+    screen reader gets (focus, editable, not hidden, the pages hidden, the
+    order).
+  - **Not verifiable here:** WebKitWebDriver only hands the webview the end
+    of a composition, so the underline while composing and the candidate
+    window's place were not seen with a real input method; Orca's speech
+    (no AT-SPI session under xvfb); macOS and Windows input methods. Orca
+    reads lines as the hidden editor breaks them (640 px wide, the webview's
+    font), which are not the painted lines.
+
 ### In progress
 
-- 7. IME and accessibility.
+- 8. Performance.
 
 ### Open
 
-- 7. IME and accessibility.
 - 8. Performance: start-up, work per key on 100 pages.
 - 9. E2E, docs shots, CI, coverage, user docs.
 
