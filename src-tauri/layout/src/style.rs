@@ -8,6 +8,8 @@ pub const BODY: f32 = 11.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextStyle {
+    /// set in the monospaced font, like code
+    pub mono: bool,
     pub size: f32,
     /// the height of a line, in points
     pub line: f32,
@@ -18,6 +20,7 @@ pub struct TextStyle {
 
 const fn style(size: f32, factor: f32, weight: f32, italic: bool, tracking: f32) -> TextStyle {
     TextStyle {
+        mono: false,
         size,
         line: size * NATURAL * factor,
         weight,
@@ -42,12 +45,20 @@ pub fn text_style(name: &str) -> TextStyle {
         "alt" => style(BODY, 1.12, REGULAR, true, 0.0),
         "caption" => style(BODY / 1.25, 1.12, REGULAR, true, 0.0),
         "th" => style(BODY, 1.12, BOLD, false, 0.0),
+        // code blocks in IBM Plex Mono, a step smaller, on the body's lines
+        "code" => TextStyle {
+            mono: true,
+            ..style(CODE_SIZE, BODY * 1.12 / CODE_SIZE, REGULAR, false, 0.0)
+        },
         "band" => style(crate::bands::BAND_SIZE, 1.0, REGULAR, false, 0.0),
         _ => style(BODY, 1.12, REGULAR, false, 0.0),
     }
 }
 
-pub const FONT_STACK: &str = "IBM Plex Sans, DejaVu Sans";
+/// code, which IBM Plex Mono sets wider than the text
+pub const CODE_SIZE: f32 = 10.0;
+/// inline code, as much smaller than the text around it
+pub const CODE_SCALE: f32 = 0.9;
 
 /// the gap between a list marker and the text
 pub const MARKER_GAP: f32 = 6.0;

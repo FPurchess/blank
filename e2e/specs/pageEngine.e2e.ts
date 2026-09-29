@@ -358,6 +358,30 @@ describe("page view", () => {
     await pressMod(Key.Alt, "v");
   });
 
+  it("shows code in Plex Mono, emoji and Chinese", async () => {
+    const file = path.join(dir, "coverage.md");
+    fs.writeFileSync(
+      file,
+      [
+        "# Coverage",
+        "",
+        "Run `npm install` and then `bun run dev` here.",
+        "",
+        "```",
+        "const answer = 42;",
+        "console.log(answer);",
+        "```",
+        "",
+        "Emoji 😀 🎉 👍 and Chinese 中文字 and Japanese かな in the text.",
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    // the fonts are found and the text laid out again with them
+    await browser.pause(1500);
+    await browser.saveScreenshot(path.join(SHOTS, "engine-coverage.png"));
+  });
+
   // two chapters of four paragraphs fill about a page
   for (const [name, chapters] of [
     ["1", 1],

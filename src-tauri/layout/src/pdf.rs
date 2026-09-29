@@ -62,7 +62,7 @@ pub fn write(
         .fonts
         .files
         .iter()
-        .map(|file| Font::new(file.data.clone().into(), 0))
+        .map(|file| Font::new(file.data.clone().into(), file.index))
         .collect();
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let (width, height) = (engine.settings.width, engine.settings.height);

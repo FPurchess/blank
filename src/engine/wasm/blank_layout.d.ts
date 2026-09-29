@@ -4,6 +4,11 @@
 export class LayoutEngine {
     free(): void;
     [Symbol.dispose](): void;
+    /**
+     * adds a font for what the others lack, e.g. a system font for Chinese,
+     * as the last fallback of `family`, and lays out again
+     */
+    addFont(bytes: Uint8Array, family: string): void;
     addImage(src: string, bytes: Uint8Array, jpeg: boolean): void;
     /**
      * the text of a page's header and footer slots: left, center and right
@@ -36,6 +41,10 @@ export class LayoutEngine {
      * the start or end of the line a position is on, -1 for none
      */
     lineEdge(pos: number, end: boolean): number;
+    /**
+     * the characters of the document no font has a glyph for
+     */
+    missing(): string;
     /**
      * the fonts' files one after the other, with their lengths
      */
@@ -89,6 +98,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_layoutengine_free: (a: number, b: number) => void;
+    readonly layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly layoutengine_bands: (a: number, b: number) => [number, number];
     readonly layoutengine_bottoms: (a: number) => [number, number];
@@ -98,6 +108,7 @@ export interface InitOutput {
     readonly layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineEdge: (a: number, b: number, c: number) => number;
+    readonly layoutengine_missing: (a: number) => [number, number];
     readonly layoutengine_new: (a: number, b: number, c: number, d: number) => number;
     readonly layoutengine_page: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;

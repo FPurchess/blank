@@ -8,7 +8,7 @@ use parley::{
 
 use crate::fonts::{ink_link, Fonts, Ink, INK_CODE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
-use crate::style::{text_style, TextStyle, BOLD, FONT_STACK, MEDIUM};
+use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, MEDIUM};
 
 /// A laid out textblock and where it stands in its item.
 pub struct TextBox {
@@ -26,6 +26,8 @@ pub struct TextBox {
     pub y: f32,
     pub width: f32,
     pub style: TextStyle,
+    /// the characters no font had a glyph for, see Engine::missing
+    pub missing: Vec<char>,
 }
 
 /// one glyph, positioned on the page
@@ -85,10 +87,17 @@ impl TextBox {
         };
         let mut links: Vec<String> = vec![];
         let layout = {
-            let Fonts { fcx, lcx, .. } = fonts;
+            let Fonts {
+                fcx,
+                lcx,
+                stack,
+                mono_stack,
+                ..
+            } = fonts;
             let mut builder = lcx.ranged_builder(fcx, &laid_text, 1.0, false);
+            let family = if style.mono { &*mono_stack } else { &*stack };
             builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
-                FONT_STACK.into(),
+                family.to_string().into(),
             )));
             builder.push_default(StyleProperty::FontSize(style.size));
             builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(style.line)));
@@ -109,7 +118,7 @@ impl TextBox {
                     if range.is_empty() {
                         continue;
                     }
-                    push_span(&mut builder, span, range, &style, &mut links);
+                    push_span(&mut builder, span, range, &style, mono_stack, &mut links);
                 }
             }
             builder.build(&laid_text)
@@ -124,6 +133,7 @@ impl TextBox {
             y: 0.0,
             width,
             style,
+            missing: vec![],
         };
         boxed.layout.break_all_lines(Some(width));
         boxed.layout.align(
@@ -132,7 +142,37 @@ impl TextBox {
                 align_when_overflowing: false,
             },
         );
+        boxed.missing = boxed.notdef();
         boxed
+    }
+
+    /// the characters laid out as the missing glyph, which no font has
+    fn notdef(&self) -> Vec<char> {
+        let mut missing: Vec<char> = vec![];
+        if self.empty() {
+            return missing;
+        }
+        for line in self.layout.lines() {
+            for item in line.items() {
+                let PositionedLayoutItem::GlyphRun(run) = item else {
+                    continue;
+                };
+                for cluster in run.run().visual_clusters() {
+                    if cluster.glyphs().any(|glyph| glyph.id == 0) {
+                        let range = cluster.text_range();
+                        for char in self.text[range].chars() {
+                            if !char.is_whitespace()
+                                && !char.is_control()
+                                && !missing.contains(&char)
+                            {
+                                missing.push(char);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        missing
     }
 
     pub fn empty(&self) -> bool {
@@ -356,8 +396,20 @@ fn push_span(
     span: &Span,
     range: std::ops::Range<usize>,
     style: &TextStyle,
+    mono_stack: &str,
     links: &mut Vec<String>,
 ) {
+    // inline code in IBM Plex Mono, a little smaller than the text around it
+    if span.code && !style.mono {
+        builder.push(
+            StyleProperty::FontFamily(FontFamily::Source(mono_stack.to_string().into())),
+            range.clone(),
+        );
+        builder.push(
+            StyleProperty::FontSize(style.size * CODE_SCALE),
+            range.clone(),
+        );
+    }
     if span.bold {
         builder.push(
             StyleProperty::FontWeight(FontWeight::new(weight(true, style))),

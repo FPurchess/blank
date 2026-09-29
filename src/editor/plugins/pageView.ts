@@ -15,6 +15,7 @@ import { caretBox, hitAt, viewBox } from "../../engine/geometry";
 import { imageSizes, imagesLoaded } from "../../engine/images";
 import { timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
+import { fallbackFonts, findFonts } from "../../engine/fallback";
 import { summarize } from "./properties";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
@@ -24,6 +25,7 @@ import { TableMap } from "prosemirror-tables";
 import { pageGeometry } from "../../layout/resolve";
 import {
   frontmatter,
+  language,
   pageCaret,
   pageComposition,
   pageFields,
@@ -164,7 +166,12 @@ const sync = (
     height: contentHeight,
   });
   const laidOut = engine.sync(state.doc, sizes, force || changed, frozen);
-  if (laidOut || changed || !pageLayoutState.value) publishLayout(engine);
+  if (laidOut || changed || !pageLayoutState.value) {
+    publishLayout(engine);
+    // fonts for what Blank's fonts lack, which lay out again once found
+    const missing = engine.missing();
+    if (missing) void findFonts(missing, language.value);
+  }
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
@@ -200,6 +207,16 @@ export const pageSync = () => {
       if (!engine) return {};
       sync(engine, view.state, frozen);
       publishSelection(engine, view.state, false);
+      // fonts found for what Blank's fonts lack
+      const stopFonts = watch(
+        fallbackFonts,
+        (fonts) => {
+          if (!engine.addFonts(fonts)) return;
+          timed("layout", () => sync(engine, view.state, frozen, true));
+          publishSelection(engine, view.state, false);
+        },
+        { flush: "sync" },
+      );
       // the page setup, the fields of headers and footers, loaded images
       const stop = watch(
         [pageLayout, pageFields, imagesLoaded],
@@ -236,6 +253,7 @@ export const pageSync = () => {
         },
         destroy() {
           stop();
+          stopFonts();
           pageLayoutState.value = null;
           pageCaret.value = null;
           pageSelection.value = [];

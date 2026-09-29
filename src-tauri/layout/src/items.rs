@@ -7,9 +7,7 @@ use parley::Alignment;
 
 use crate::fonts::Fonts;
 use crate::model::{Content, Item, Text};
-use crate::style::{
-    CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, RULE, TABLE_LINE,
-};
+use crate::style::{CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, RULE, TABLE_LINE};
 use crate::text::TextBox;
 
 /// what the colours of the screen and the PDF stand for
@@ -166,7 +164,11 @@ impl Laid {
                     // or else its src, in italics
                     let text = Text {
                         pos: 0,
-                        text: if alt.is_empty() { src.clone() } else { alt.clone() },
+                        text: if alt.is_empty() {
+                            src.clone()
+                        } else {
+                            alt.clone()
+                        },
                         style: "alt".into(),
                         ..Default::default()
                     };
@@ -299,13 +301,7 @@ struct PlacedCell {
 /// of their columns, merged cells spanning columns and rows. Rows that
 /// merged cells join stay together, and rows taller than `room` are sliced
 /// between lines.
-fn table_units(
-    fonts: &mut Fonts,
-    table: TableSpec,
-    indent: f32,
-    width: f32,
-    room: f32,
-) -> Laid {
+fn table_units(fonts: &mut Fonts, table: TableSpec, indent: f32, width: f32, room: f32) -> Laid {
     let rows = table.rows;
     let columns = rows
         .iter()
@@ -451,7 +447,10 @@ fn table_units(
             .collect();
         let mut decos = vec![];
         for cell in &group {
-            let (x, w) = (edge(cell.col), edge(cell.col + cell.colspan) - edge(cell.col));
+            let (x, w) = (
+                edge(cell.col),
+                edge(cell.col + cell.colspan) - edge(cell.col),
+            );
             let (y0, y1) = (tops[cell.row], tops[cell.row + cell.rowspan]);
             if cell.header {
                 decos.push(Deco::Rect {
@@ -472,11 +471,7 @@ fn table_units(
                 });
             }
             let header_line = header_rows > 0 && cell.row + cell.rowspan == header_rows;
-            let thickness = if header_line {
-                HEADER_LINE
-            } else {
-                TABLE_LINE
-            };
+            let thickness = if header_line { HEADER_LINE } else { TABLE_LINE };
             decos.push(Deco::Rect {
                 x,
                 y: y1 - thickness,
@@ -495,8 +490,9 @@ fn table_units(
             .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
             .unwrap_or(0..0);
         let header = end <= header_rows;
-        let row_edges: Vec<(usize, f32, f32)> =
-            (start..end).map(|row| (row, tops[row], tops[row + 1])).collect();
+        let row_edges: Vec<(usize, f32, f32)> = (start..end)
+            .map(|row| (row, tops[row], tops[row + 1]))
+            .collect();
         let (y0, y1) = (tops[start], tops[end]);
         if room <= 0.0 || y1 - y0 <= room + 0.01 {
             units.push(Unit {
@@ -535,9 +531,9 @@ fn table_units(
                         .filter(|cut| {
                             *cut > from + 0.01
                                 && *cut <= limit + 0.01
-                                && lines
-                                    .iter()
-                                    .all(|(top, bottom)| *cut <= top + 0.01 || *cut >= bottom - 0.01)
+                                && lines.iter().all(|(top, bottom)| {
+                                    *cut <= top + 0.01 || *cut >= bottom - 0.01
+                                })
                         })
                         .fold(f32::NAN, f32::min)
                 };
@@ -553,7 +549,10 @@ fn table_units(
                         .filter(|(_, top, bottom)| *bottom > from && *top < to)
                         .map(|(row, top, bottom)| (*row, top.max(from), bottom.min(to)))
                         .collect(),
-                    decos: decos.iter().filter_map(|deco| clipped(deco, from, to)).collect(),
+                    decos: decos
+                        .iter()
+                        .filter_map(|deco| clipped(deco, from, to))
+                        .collect(),
                     ..Default::default()
                 });
                 from = to;

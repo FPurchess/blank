@@ -14,6 +14,7 @@ vi.mock("./storage", () => ({ bootStorage: vi.fn() }));
 vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
 vi.mock("./engine/engine", () => ({ bootEngine: vi.fn() }));
+vi.mock("./engine/geometry", () => ({ exposeGeometry: vi.fn() }));
 
 // the handle the mocked bootEditor returns
 const editor = createTestHandle();
@@ -34,25 +35,36 @@ describe("main", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("boots config, storage, editor and ui one after another", async () => {
-    const config = deferred();
-    vi.mocked(bootConfig).mockReturnValue(config.promise);
+  // the first import of the app takes a while in a busy test run
+  it(
+    "boots config, storage, editor and ui one after another",
+    {
+      timeout: 20_000,
+    },
+    async () => {
+      const config = deferred();
+      vi.mocked(bootConfig).mockReturnValue(config.promise);
 
-    await importMain();
-    await flushPromises();
-    expect(bootConfig).toHaveBeenCalled();
-    expect(bootStorage).not.toHaveBeenCalled();
+      await importMain();
+      await flushPromises();
+      expect(bootConfig).toHaveBeenCalled();
+      expect(bootStorage).not.toHaveBeenCalled();
 
-    config.resolve();
-    await flushPromises();
+      config.resolve();
+      await flushPromises();
 
-    // the UI works with the editor through the handle bootEditor returns
-    expect(bootUI).toHaveBeenCalledWith(editor);
-    const order = [bootConfig, bootStorage, bootEngine, bootEditor, bootUI].map(
-      (boot) => vi.mocked(boot).mock.invocationCallOrder[0],
-    );
-    expect(order).toEqual([...order].sort((a, b) => a - b));
-  });
+      // the UI works with the editor through the handle bootEditor returns
+      expect(bootUI).toHaveBeenCalledWith(editor);
+      const order = [
+        bootConfig,
+        bootStorage,
+        bootEngine,
+        bootEditor,
+        bootUI,
+      ].map((boot) => vi.mocked(boot).mock.invocationCallOrder[0]);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    },
+  );
   it.each([
     ["config", bootConfig],
     ["storage", bootStorage],

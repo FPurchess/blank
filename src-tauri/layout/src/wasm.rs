@@ -238,6 +238,18 @@ impl LayoutEngine {
             .collect()
     }
 
+    /// adds a font for what the others lack, e.g. a system font for Chinese,
+    /// as the last fallback of `family`, and lays out again
+    #[wasm_bindgen(js_name = addFont)]
+    pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) {
+        self.engine.add_font(bytes, family);
+    }
+
+    /// the characters of the document no font has a glyph for
+    pub fn missing(&self) -> String {
+        self.engine.missing().into_iter().collect()
+    }
+
     /// the positions the blocks on a page start and end at, or nothing
     #[wasm_bindgen(js_name = pageSpan)]
     pub fn page_span(&self, page: u32) -> Vec<u32> {

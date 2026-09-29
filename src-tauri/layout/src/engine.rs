@@ -176,6 +176,31 @@ impl Engine {
         self.paginate_from(0, None);
     }
 
+    /// adds a font for what the others lack, see Fonts::add, and lays out
+    /// everything again with it
+    pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) {
+        self.fonts.add(bytes, family);
+        let items = std::mem::take(&mut self.items);
+        self.laid = items.iter().map(|item| self.lay_out(item)).collect();
+        self.items = items;
+        self.paginate_from(0, None);
+    }
+
+    /// the characters of the document no font has a glyph for
+    pub fn missing(&self) -> Vec<char> {
+        let mut missing: Vec<char> = vec![];
+        for laid in &self.laid {
+            for boxed in laid.texts.iter().chain(&laid.label).chain(&laid.marker) {
+                for char in &boxed.missing {
+                    if !missing.contains(char) {
+                        missing.push(*char);
+                    }
+                }
+            }
+        }
+        missing
+    }
+
     /// replaces all items
     pub fn set_items(&mut self, items: Vec<Item>) {
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
@@ -862,11 +887,14 @@ impl Engine {
                 words.extend(current.take());
             }
         }
-        // a word in two runs, e.g. bold then a comma, is one word
+        // a word in two runs, e.g. bold then a comma, is one word, unless
+        // the size changes, e.g. from inline code to the text, where
+        // pdftotext starts a new word too
         let mut merged: Vec<Word> = vec![];
         for word in words {
             if let Some(last) = merged.last_mut() {
                 if last.page == word.page
+                    && (last.size - word.size).abs() < 0.01
                     && (last.baseline - word.baseline).abs() < 0.01
                     && (last.right - word.left).abs() < 0.01
                 {
@@ -1217,9 +1245,7 @@ impl Paginator<'_> {
                     y = self.y;
                 }
                 let last_header = headers.last().copied();
-                if self.empty
-                    && unit_index > 0
-                    && last_header.is_some_and(|last| unit_index > last)
+                if self.empty && unit_index > 0 && last_header.is_some_and(|last| unit_index > last)
                 {
                     // the table goes on: its header rows first
                     for &header in &headers {
@@ -1730,7 +1756,9 @@ mod tests {
         let caption = ops
             .iter()
             .find_map(|op| match op {
-                Op::Glyphs { run, text, .. } if text.starts_with("The caption") => Some(run.baseline),
+                Op::Glyphs { run, text, .. } if text.starts_with("The caption") => {
+                    Some(run.baseline)
+                }
                 _ => None,
             })
             .unwrap();
@@ -1742,7 +1770,9 @@ mod tests {
         let settings = engine.settings.clone();
         let line = crate::style::text_style("p").line;
         let fill = ((settings.content_bottom() - settings.content_top()) / line) as usize - 3;
-        let mut items: Vec<Item> = (0..fill).map(|index| paragraph(index as u32 * 3 + 1, "x")).collect();
+        let mut items: Vec<Item> = (0..fill)
+            .map(|index| paragraph(index as u32 * 3 + 1, "x"))
+            .collect();
         for item in &mut items {
             item.after = 0.0;
         }
@@ -1824,6 +1854,83 @@ mod tests {
         // one row on each page it is on, besides the header rows
         let body: Vec<_> = grid.rows.iter().filter(|row| row.row == 1).collect();
         assert_eq!(body.len(), after.pages.len());
+    }
+
+    #[test]
+    fn sets_code_in_plex_mono() {
+        let mut code = paragraph(1, "let x = 1;");
+        if let Content::Text(text) = &mut code.content {
+            text.style = "code".into();
+        }
+        let mut inline = paragraph(20, "run npm now");
+        if let Content::Text(text) = &mut inline.content {
+            text.spans = vec![crate::model::Span {
+                from: 4,
+                to: 7,
+                code: true,
+                ..Default::default()
+            }];
+        }
+        let mut engine = engine(vec![code, inline]);
+        let fonts: Vec<(usize, f32)> = engine
+            .page_ops(0, false)
+            .iter()
+            .filter_map(|op| match op {
+                Op::Glyphs {
+                    run,
+                    role: Role::Text,
+                    ..
+                } => Some((run.font, run.size)),
+                _ => None,
+            })
+            .collect();
+        // the code block, then plain text, inline code, plain text
+        assert_eq!(fonts[0], (10, crate::style::CODE_SIZE));
+        assert!(fonts.contains(&(10, 11.0 * crate::style::CODE_SCALE)));
+        assert!(fonts.contains(&(0, 11.0)));
+        // every glyph of a monospaced font is as wide
+        assert!(engine.missing().is_empty());
+    }
+
+    #[test]
+    fn tells_what_no_font_has_and_takes_fonts_for_it() {
+        let mut engine = engine(document(&["plain 中文 text"]));
+        assert_eq!(engine.missing(), vec!['中', '文']);
+        let path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
+        let Ok(bytes) = std::fs::read(path) else {
+            // no Chinese font on this system
+            return;
+        };
+        let pages = engine.pages[0].version;
+        engine.add_font(bytes, "Noto Sans CJK SC");
+        assert!(engine.missing().is_empty(), "{:?}", engine.missing());
+        assert_ne!(engine.pages[0].version, pages);
+        // every face of the collection, apart
+        assert!(engine.fonts.files.len() > crate::fonts::FONT_FILES.len() + 1);
+        let face = engine
+            .page_ops(0, false)
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs { run, text, .. }
+                    if text[run.glyphs[0].start as usize..].starts_with('中') =>
+                {
+                    Some((run.font, run.glyphs[0].id))
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert!(!engine.fonts.glyph_path(face.0, face.1).is_empty());
+        // and the PDF embeds it
+        let pdf = crate::pdf::write(
+            &mut engine,
+            &Default::default(),
+            &crate::pdf::Info {
+                title: String::new(),
+                author: String::new(),
+            },
+        )
+        .unwrap();
+        assert!(pdf.len() > 1000);
     }
 
     #[test]

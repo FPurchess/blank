@@ -9,6 +9,7 @@ import {
   type FrozenWidths,
   type ImageSizes,
 } from "./flatten";
+import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
@@ -113,7 +114,34 @@ export class PageEngine {
   private paths = new Map<number, Path2D>();
   private upems = new Map<number, number>();
 
+  // the fallback fonts added, see fallback.ts
+  private added = new Set<FallbackFont>();
+
   constructor(readonly raw: LayoutEngine) {}
+
+  /**
+   * addFonts adds the fallback fonts it hasn't got yet, and lays out again
+   * with them
+   * @returns whether it added any
+   */
+  addFonts(fonts: readonly FallbackFont[]) {
+    let added = false;
+    for (const font of fonts) {
+      if (this.added.has(font)) continue;
+      this.added.add(font);
+      this.raw.addFont(font.bytes, font.family);
+      added = true;
+    }
+    if (added) this.displays.clear();
+    return added;
+  }
+
+  /**
+   * missing returns the characters of the document no font has
+   */
+  missing() {
+    return this.raw.missing();
+  }
 
   /**
    * setSettings sets the page, and lays out again if it changed
@@ -294,7 +322,9 @@ export const createEngine = (fonts: Uint8Array[]) => {
     bytes.set(font, offset);
     offset += font.length;
   }
-  return new PageEngine(new LayoutEngine(bytes, lengths));
+  const engine = new PageEngine(new LayoutEngine(bytes, lengths));
+  engine.addFonts(fallbackFonts.value);
+  return engine;
 };
 
 /**

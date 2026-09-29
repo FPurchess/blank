@@ -22,9 +22,12 @@ pub fn ink_link(ink: Ink) -> Option<usize> {
     (link > 0).then(|| link - 1)
 }
 
+/// a face of a font file: a collection (.ttc) has several
 pub struct FontFile {
     pub data: Arc<Vec<u8>>,
     pub blob: u64,
+    /// which face of the file it is
+    pub index: u32,
     pub upem: f32,
     /// the underline's offset below the baseline and its thickness, in em
     pub underline: (f32, f32),
@@ -34,6 +37,47 @@ pub struct Fonts {
     pub files: Vec<FontFile>,
     pub fcx: FontContext,
     pub lcx: LayoutContext<Ink>,
+    /// the families text is set in, in order, with the fallbacks added for
+    /// what they lack; and the same for code
+    pub stack: String,
+    pub mono_stack: String,
+}
+
+/// reads the faces of a font file: their units per em and underlines
+fn faces_of(fcx: &mut FontContext, bytes: Vec<u8>) -> Vec<FontFile> {
+    let data = Arc::new(bytes);
+    let blob = Blob::new(data.clone());
+    let id = blob.id();
+    fcx.collection.register_fonts(blob, None);
+    let count = match skrifa::raw::FileRef::new(&data) {
+        Ok(skrifa::raw::FileRef::Collection(collection)) => collection.len(),
+        _ => 1,
+    };
+    (0..count)
+        .map(|index| face_of(data.clone(), id, index))
+        .collect()
+}
+
+fn face_of(data: Arc<Vec<u8>>, blob: u64, index: u32) -> FontFile {
+    let (upem, underline) = match FontRef::from_index(&data, index) {
+        Ok(font) => {
+            let upem = font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
+            let metrics = font.metrics(Size::unscaled(), LocationRef::default());
+            let underline = metrics
+                .underline
+                .map(|line| (-line.offset / upem, line.thickness / upem))
+                .unwrap_or((0.1, 0.05));
+            (upem, underline)
+        }
+        Err(_) => (1000.0, (0.1, 0.05)),
+    };
+    FontFile {
+        data,
+        blob,
+        index,
+        upem,
+        underline,
+    }
 }
 
 impl Fonts {
@@ -47,36 +91,26 @@ impl Fonts {
         };
         let files = files
             .into_iter()
-            .map(|bytes| {
-                let data = Arc::new(bytes);
-                let blob = Blob::new(data.clone());
-                let id = blob.id();
-                fcx.collection.register_fonts(blob, None);
-                let (upem, underline) = match FontRef::new(&data) {
-                    Ok(font) => {
-                        let upem =
-                            font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
-                        let metrics = font.metrics(Size::unscaled(), LocationRef::default());
-                        let underline = metrics
-                            .underline
-                            .map(|line| (-line.offset / upem, line.thickness / upem))
-                            .unwrap_or((0.1, 0.05));
-                        (upem, underline)
-                    }
-                    Err(_) => (1000.0, (0.1, 0.05)),
-                };
-                FontFile {
-                    data,
-                    blob: id,
-                    upem,
-                    underline,
-                }
-            })
+            .flat_map(|bytes| faces_of(&mut fcx, bytes))
             .collect();
         Fonts {
             files,
             fcx,
             lcx: LayoutContext::new(),
+            stack: FONT_STACK.into(),
+            mono_stack: MONO_STACK.into(),
+        }
+    }
+
+    /// adds a font for what the others lack, e.g. a system font for Chinese
+    /// or an emoji font, as the last fallback of text and code
+    pub fn add(&mut self, bytes: Vec<u8>, family: &str) {
+        let faces = faces_of(&mut self.fcx, bytes);
+        self.files.extend(faces);
+        let family = family.replace(',', " ");
+        if !self.stack.split(", ").any(|known| known == family) {
+            self.stack = format!("{}, {family}", self.stack);
+            self.mono_stack = format!("{}, {family}", self.mono_stack);
         }
     }
 
@@ -85,7 +119,7 @@ impl Fonts {
         let id = font.data.id();
         self.files
             .iter()
-            .position(|file| file.blob == id)
+            .position(|file| file.blob == id && file.index == font.index)
             .unwrap_or(0)
     }
 
@@ -93,7 +127,7 @@ impl Fonts {
     pub fn glyph_path(&self, font: usize, glyph: u32) -> String {
         let mut pen = SvgPen(String::new());
         if let Some(file) = self.files.get(font) {
-            if let Ok(font) = FontRef::new(&file.data) {
+            if let Ok(font) = FontRef::from_index(&file.data, file.index) {
                 if let Some(outline) = font.outline_glyphs().get(GlyphId::new(glyph)) {
                     let settings = DrawSettings::unhinted(Size::unscaled(), LocationRef::default());
                     let _ = outline.draw(settings, &mut pen);
@@ -136,8 +170,13 @@ pub fn repository_fonts() -> Fonts {
     )
 }
 
+/// the families text is set in: IBM Plex Sans, and DejaVu Sans for what it
+/// lacks, e.g. arrows; and code in IBM Plex Mono
+pub const FONT_STACK: &str = "IBM Plex Sans, DejaVu Sans";
+pub const MONO_STACK: &str = "IBM Plex Mono, IBM Plex Sans, DejaVu Sans";
+
 /// the font files, in the order src/engine/fonts.ts loads them
-pub const FONT_FILES: [&str; 10] = [
+pub const FONT_FILES: [&str; 14] = [
     "IBMPlexSans-Regular.ttf",
     "IBMPlexSans-Italic.ttf",
     "IBMPlexSans-Medium.ttf",
@@ -148,4 +187,8 @@ pub const FONT_FILES: [&str; 10] = [
     "dejavu-sans-oblique.ttf",
     "dejavu-sans-bold.ttf",
     "dejavu-sans-bold-oblique.ttf",
+    "IBMPlexMono-Regular.ttf",
+    "IBMPlexMono-Italic.ttf",
+    "IBMPlexMono-Bold.ttf",
+    "IBMPlexMono-BoldItalic.ttf",
 ];

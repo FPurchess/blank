@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -10,6 +16,11 @@ import { resolveLayout } from "../layout/resolve";
 import { DEFAULT_PAGE } from "../layout/settings";
 import { parseMarkdown } from "../markdown";
 import { testEngine } from "../test/engine";
+import type { FallbackFont } from "./fallback";
+import { EMOJI_FAMILY, EMOJI_FILE } from "./fonts";
+
+// a Chinese font many Linux systems have, which the test uses if it's there
+const CJK = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
 
 // The PDF holds what the page view paints: both come from one layout. This
 // lays out real documents the way the editor does (flatten, the wasm
@@ -82,8 +93,13 @@ const readWords = (pdf: Uint8Array, name: string) => {
  * layout against the PDF
  * @returns how many words and pages there are
  */
-const compare = (markdown: string, name: string) => {
+const compare = (
+  markdown: string,
+  name: string,
+  fonts: FallbackFont[] = [],
+) => {
   const engine = testEngine();
+  engine.addFonts(fonts);
   const doc = parseMarkdown(markdown);
   const { layout } = resolveLayout(
     doc.attrs.frontmatter as string | null,
@@ -154,6 +170,40 @@ describe.runIf(hasPdftotext)("the PDF holds the layout", () => {
   it("of the welcome document", () => {
     const { words } = compare(welcome, "welcome");
     expect(words).toBeGreaterThan(300);
+  });
+
+  it("with code, emoji and Chinese in the fonts found for them", () => {
+    const markdown = [
+      "# Code",
+      "",
+      "Run `npm install` and then `bun run dev` here.",
+      "",
+      "```",
+      "const answer = 42;",
+      "console.log(answer);",
+      "```",
+      "",
+      "Emoji 😀 and 🎉 and Chinese 中文字 in the text.",
+    ].join("\n");
+    const fonts: FallbackFont[] = [
+      {
+        family: EMOJI_FAMILY,
+        bytes: readFileSync(
+          resolve(import.meta.dirname, "../../fonts", EMOJI_FILE),
+        ),
+      },
+    ];
+    if (existsSync(CJK)) {
+      fonts.push({ family: "Noto Sans CJK SC", bytes: readFileSync(CJK) });
+    }
+    const engine = testEngine();
+    engine.addFonts(fonts);
+    const doc = parseMarkdown(markdown);
+    engine.sync(doc, () => undefined);
+    // nothing is left without a glyph, but what the system lacks
+    expect(engine.missing()).toBe(existsSync(CJK) ? "" : "中文字");
+    const { words } = compare(markdown, "coverage", fonts);
+    expect(words).toBeGreaterThan(20);
   });
 
   it("with headers, footers, chapters on new pages and another paper", () => {

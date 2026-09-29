@@ -1,3 +1,4 @@
+pub mod fonts;
 pub mod spellcheck;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,6 +19,7 @@ pub fn run() {
                 .build(),
         )
         .manage(spellcheck::SpellState::default())
+        .manage(fonts::FontState::default())
         .invoke_handler(tauri::generate_handler![
             spellcheck::spellcheck_status,
             spellcheck::spellcheck_install,
@@ -27,6 +29,7 @@ pub fn run() {
             spellcheck::spellcheck_suggest,
             spellcheck::spellcheck_add,
             spellcheck::spellcheck_remove,
+            fonts::fallback_fonts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

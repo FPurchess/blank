@@ -2,6 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_layoutengine_free: (a: number, b: number) => void;
+export const layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
 export const layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const layoutengine_bands: (a: number, b: number) => [number, number];
 export const layoutengine_bottoms: (a: number) => [number, number];
@@ -11,6 +12,7 @@ export const layoutengine_clearImages: (a: number) => void;
 export const layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_lineEdge: (a: number, b: number, c: number) => number;
+export const layoutengine_missing: (a: number) => [number, number];
 export const layoutengine_new: (a: number, b: number, c: number, d: number) => number;
 export const layoutengine_page: (a: number, b: number) => [number, number];
 export const layoutengine_pageCount: (a: number) => number;

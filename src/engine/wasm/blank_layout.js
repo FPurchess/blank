@@ -12,6 +12,19 @@ export class LayoutEngine {
         wasm.__wbg_layoutengine_free(ptr, 0);
     }
     /**
+     * adds a font for what the others lack, e.g. a system font for Chinese,
+     * as the last fallback of `family`, and lays out again
+     * @param {Uint8Array} bytes
+     * @param {string} family
+     */
+    addFont(bytes, family) {
+        const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(family, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.layoutengine_addFont(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+    }
+    /**
      * @param {string} src
      * @param {Uint8Array} bytes
      * @param {boolean} jpeg
@@ -119,6 +132,22 @@ export class LayoutEngine {
     lineEdge(pos, end) {
         const ret = wasm.layoutengine_lineEdge(this.__wbg_ptr, pos, end);
         return ret;
+    }
+    /**
+     * the characters of the document no font has a glyph for
+     * @returns {string}
+     */
+    missing() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_missing(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
     }
     /**
      * the fonts' files one after the other, with their lengths

@@ -99,13 +99,31 @@ step.
   - Not yet: images, lists and quotes inside cells are laid out as plain
     paragraphs (an image shows as a placeholder character).
 
+- 4. **Text coverage:**
+  - Code in IBM Plex Mono (IBM's official files of 2.5.0, unmodified, in
+    `fonts/`): code blocks at 10 pt on the body's lines, inline code at 0.9
+    of the text around it, on the screen and in the PDF.
+  - Emoji: the monochrome Noto Emoji (2 MB, OFL, loaded only for a document
+    with emoji), painted in the text's colour and embedded in the PDF.
+  - Other scripts: the engine reports the characters it laid out as missing
+    glyphs (`missing`); `src/engine/fallback.ts` asks the Rust side
+    (`fallback_fonts` in `src-tauri/src/fonts.rs`, fontique's system
+    fallback by script and the document's language) for the system's fonts,
+    reads them and adds them to every engine (`addFont`, each face of a
+    `.ttc` apart), which lays out again. The screen and the PDF use the same
+    files, so they stay identical.
+  - Verified: Rust tests (code in Plex Mono, missing characters, a `.ttc`
+    added and embedded in the PDF), `fallback.test.ts`, `exact.test.ts` with
+    code, emoji and Chinese (0.05 pt), and `pageEngine.e2e.ts` ("shows code
+    in Plex Mono, emoji and Chinese", looked at in the screenshot).
+  - Open decisions, see "Decisions for the owner" below.
+
 ### In progress
 
-- 4. Text coverage.
+- 5. The header and footer strips.
 
 ### Open
 
-- 4. Text coverage: code in IBM Plex Mono, emoji and CJK.
 - 5. Header and footer strips: none where "pages" shows the bands, a click
   on a band or page-end mark opens its strip.
 - 6. PDF parity with pdfmake, then remove pdfmake.
@@ -260,6 +278,22 @@ step.
     widow/orphan control, the same as pdfmake.
 - The header/footer strips at the window edges still show, as before, and in
   "pages" they repeat what the sheet already shows.
+
+## Decisions for the owner
+
+- **Colour emoji.** The pages and the PDF show emoji in the monochrome Noto
+  Emoji, in the text's colour. Colour emoji would need a colour font (Noto
+  Color Emoji is 10 MB of bitmaps on Linux, COLRv1 elsewhere) and a painter
+  for colour glyphs on the canvas; krilla could embed them in the PDF.
+  Default: monochrome, identical on screen and paper.
+- **System fonts for other scripts.** Chinese, Japanese, Korean and other
+  scripts use the fonts of the system the document is opened on. The screen
+  and the PDF are the same there, but another system may lay the same
+  document out with another font (other line breaks), and a system without
+  such a font shows missing glyphs (boxes), on screen and in the PDF alike.
+  Bundling Noto Sans CJK instead would add about 16 MB per weight.
+- **Word export:** it keeps its own fonts (Plex Sans embedded, code in
+  Courier New) and its own layout; only the PDF is the engine's.
 
 ## Measurements
 
