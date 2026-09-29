@@ -7,6 +7,42 @@ DOM is hidden but keeps the focus, and screen readers read it. Parley does the
 text layout and krilla writes the PDF. The engine runs in the webview as wasm,
 so laying out needs no IPC.
 
+## Parity checklist
+
+The goal: everything today's Blank (origin/main) does works at least as well
+with the engine, and the pages stay exact with the PDF. The steps are done in
+order, and each is committed. Resume at "In progress", then the first open
+step.
+
+### Done
+
+- 0. Rebased onto origin/main (#75, the Vue bars). "Page N of M" is
+  `PageStatus.vue` in `BottomBar.vue`, before the paper.
+
+### In progress
+
+- 1. One geometry service backed by the engine.
+
+### Open
+
+- 1. Geometry: caret box, range rectangles, block boxes, hit test; replace
+  `coordsAtPos`, `nodeDOM().getBoundingClientRect()` and `posAtCoords` in the
+  table toolbar, handles, picker, context menu; caret kept in view, Page
+  Up/Down, drag scrolling at the edges.
+- 2. Paint what the editor shows: spell check underlines and right-click
+  menu, links (colour, Mod+click, pointer), image placeholder and alt text,
+  the frontmatter summary, the page break label, node selection outline,
+  `CellSelection`, IME underline, focus ring, all six themes.
+- 3. Tables: mouse handles, captions, rowspan/colspan, header column, rows
+  split across pages, column widths frozen while editing.
+- 4. Text coverage: code in IBM Plex Mono, emoji and CJK.
+- 5. Header and footer strips: none where "pages" shows the bands, a click
+  on a band or page-end mark opens its strip.
+- 6. PDF parity with pdfmake, then remove pdfmake.
+- 7. IME and accessibility.
+- 8. Performance: start-up, work per key on 100 pages.
+- 9. E2E, docs shots, CI, coverage, user docs.
+
 ## How to try it
 
 1. `bun install`, then `bun run tauri dev`. The built wasm is committed in
