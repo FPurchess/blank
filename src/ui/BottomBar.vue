@@ -4,11 +4,12 @@ import { computed } from "vue";
 import { announcement, textContent } from "../state";
 import LanguageChooser from "./LanguageChooser.vue";
 import PageButton from "./PageButton.vue";
+import PageStatus from "./PageStatus.vue";
 import SpellcheckStatus from "./SpellcheckStatus.vue";
 import { countOf } from "./statusBarModel";
 
 // The bar at the bottom of the window: the counter and what just happened on
-// the left, the page, spell check and language on the right. Each item on the
+// the left, the page of the caret, the paper, spell check and language on the right. Each item on the
 // right is a component of its own, so typing only updates the counter.
 const count = computed(() => countOf(textContent.value));
 </script>
@@ -22,6 +23,7 @@ const count = computed(() => countOf(textContent.value));
     <span id="ui-announcement" role="status">{{
       announcement?.text ?? ""
     }}</span>
+    <PageStatus />
     <PageButton />
     <SpellcheckStatus />
     <LanguageChooser />

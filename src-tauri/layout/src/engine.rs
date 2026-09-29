@@ -3,9 +3,7 @@
 
 use parley::Alignment;
 
-use crate::bands::{
-    bands_on, chapter_on, expand_slots, Chapter, Values, BAND_DISTANCE, BAND_LINE,
-};
+use crate::bands::{bands_on, chapter_on, expand_slots, Chapter, Values, BAND_DISTANCE, BAND_LINE};
 use crate::fonts::{Fonts, INK_CODE};
 use crate::items::{Deco, Laid, Role};
 use crate::model::{Content, Item, Settings, Text};
@@ -239,7 +237,11 @@ impl Engine {
             .get(from)
             .and_then(|page| page.first)
             .unwrap_or((0, 0));
-        let from = if start_item == 0 && start_unit == 0 { 0 } else { from };
+        let from = if start_item == 0 && start_unit == 0 {
+            0
+        } else {
+            from
+        };
         let keep_frags = old_pages.get(from).map(|page| page.start).unwrap_or(0);
         let mut paginator = Paginator {
             items: &self.items,
@@ -376,7 +378,14 @@ impl Engine {
     }
 
     /// the page and the point on it of a spot in an item's text box
-    fn to_page(&self, item: usize, text: usize, line: usize, x: f32, y: f32) -> Option<(usize, f32, f32)> {
+    fn to_page(
+        &self,
+        item: usize,
+        text: usize,
+        line: usize,
+        x: f32,
+        y: f32,
+    ) -> Option<(usize, f32, f32)> {
         let unit_index = self.unit_of_text(item, text, line);
         let frag_index = self.frag_of(item, unit_index)?;
         let unit = &self.laid[item].units[unit_index];
@@ -420,7 +429,11 @@ impl Engine {
                 Some((
                     self.page_of_frag(frag_index),
                     self.settings.margins.left
-                        + if at_end { width } else { self.items[item].indent },
+                        + if at_end {
+                            width
+                        } else {
+                            self.items[item].indent
+                        },
                     frag.y,
                     height,
                 ))
@@ -535,11 +548,7 @@ impl Engine {
         };
         let mut next = frag_index;
         loop {
-            next = if down {
-                next + 1
-            } else {
-                next.checked_sub(1)?
-            };
+            next = if down { next + 1 } else { next.checked_sub(1)? };
             let frag = *self.frags.get(next)?;
             let unit = &self.laid[frag.item].units[frag.unit];
             if frag.repeat || (unit.height == 0.0 && unit.texts.is_empty()) {
@@ -573,7 +582,9 @@ impl Engine {
                 None => lines.len() - 1,
             };
             let info = &lines[line];
-            return Some(Hit::Text(boxed.hit(item_x - boxed.x, (info.top + info.bottom) / 2.0)));
+            return Some(Hit::Text(
+                boxed.hit(item_x - boxed.x, (info.top + info.bottom) / 2.0),
+            ));
         }
     }
 
@@ -631,7 +642,11 @@ impl Engine {
                     }
                 }
                 for (line, x, y, w, h) in pieces {
-                    let w = if spans_end && line + 1 == boxed.line_count() { w + 4.0 } else { w };
+                    let w = if spans_end && line + 1 == boxed.line_count() {
+                        w + 4.0
+                    } else {
+                        w
+                    };
                     if let Some((page, x, y)) = self.to_page(item, index, line, x, y) {
                         rects.push((page, x, y, w, h));
                     }
@@ -647,7 +662,12 @@ impl Engine {
         let mut lines = vec![];
         for page in 0..self.pages.len() {
             for op in self.page_ops(page, false) {
-                if let Op::Glyphs { run, role: Role::Text, text } = op {
+                if let Op::Glyphs {
+                    run,
+                    role: Role::Text,
+                    text,
+                } = op
+                {
                     let Some(first) = run.glyphs.first() else {
                         continue;
                     };
@@ -695,7 +715,22 @@ impl Engine {
                 words.extend(current.take());
             }
         }
-        words
+        // a word in two runs, e.g. bold then a comma, is one word
+        let mut merged: Vec<Word> = vec![];
+        for word in words {
+            if let Some(last) = merged.last_mut() {
+                if last.page == word.page
+                    && (last.baseline - word.baseline).abs() < 0.01
+                    && (last.right - word.left).abs() < 0.01
+                {
+                    last.right = word.right;
+                    last.text.push_str(&word.text);
+                    continue;
+                }
+            }
+            merged.push(word);
+        }
+        merged
     }
 
     // painting
@@ -787,7 +822,11 @@ impl Engine {
                 ..Default::default()
             };
             let boxed = TextBox::new(&mut self.fonts, &text, width, alignments[slot]);
-            boxes.push((boxed, settings.margins.left + width * slot as f32, tops[band]));
+            boxes.push((
+                boxed,
+                settings.margins.left + width * slot as f32,
+                tops[band],
+            ));
         }
         boxes
     }
@@ -907,8 +946,12 @@ impl Paginator<'_> {
             if let Some((tail, old_pages, _)) = self.old {
                 if item >= tail.start {
                     let old = ((item as i64 - tail.delta) as usize, unit);
-                    let index = old_pages.partition_point(|page| page.first.is_some_and(|first| first < old));
-                    if old_pages.get(index).is_some_and(|page| page.first == Some(old)) {
+                    let index = old_pages
+                        .partition_point(|page| page.first.is_some_and(|first| first < old));
+                    if old_pages
+                        .get(index)
+                        .is_some_and(|page| page.first == Some(old))
+                    {
                         // the rest is as before: drop this page, the old
                         // ones follow from here
                         let page = self.pages.pop().unwrap();
@@ -922,7 +965,12 @@ impl Paginator<'_> {
                 }
             }
         }
-        self.frags.push(Frag { item, unit, y, repeat });
+        self.frags.push(Frag {
+            item,
+            unit,
+            y,
+            repeat,
+        });
         self.y = y + height;
         self.empty = false;
         let page = self.pages.last_mut().unwrap();
@@ -1085,7 +1133,11 @@ mod tests {
             assert!((first.y - engine.settings.content_top()).abs() < 0.01);
         }
         // a page breaks inside a paragraph, not only between them
-        assert!(engine.pages.iter().skip(1).any(|page| page.first.unwrap().1 > 0));
+        assert!(engine
+            .pages
+            .iter()
+            .skip(1)
+            .any(|page| page.first.unwrap().1 > 0));
     }
 
     #[test]
@@ -1133,7 +1185,12 @@ mod tests {
 
     #[test]
     fn starts_chapters_on_new_pages() {
-        let mut items = vec![heading(0, 1, "One"), paragraph(10, "text"), heading(20, 1, "Two"), paragraph(30, "more")];
+        let mut items = vec![
+            heading(0, 1, "One"),
+            paragraph(10, "text"),
+            heading(20, 1, "Two"),
+            paragraph(30, "more"),
+        ];
         items[0].before = 0.0;
         let mut engine = Engine::new(repository_fonts());
         engine.set_settings(Settings {
@@ -1142,7 +1199,10 @@ mod tests {
         });
         engine.set_items(items);
         assert_eq!(engine.pages.len(), 2);
-        assert_eq!(engine.chapters.iter().map(|c| c.page).collect::<Vec<_>>(), vec![1, 2]);
+        assert_eq!(
+            engine.chapters.iter().map(|c| c.page).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
     }
 
     #[test]
@@ -1162,7 +1222,13 @@ mod tests {
         assert_eq!(engine.pages[1].bands[4], format!("2 of {pages}"));
         assert_eq!(engine.pages[1].bands[0], "Intro");
         let ops = engine.page_ops(1, true);
-        assert!(ops.iter().any(|op| matches!(op, Op::Glyphs { role: Role::Band, .. })));
+        assert!(ops.iter().any(|op| matches!(
+            op,
+            Op::Glyphs {
+                role: Role::Band,
+                ..
+            }
+        )));
     }
 
     #[test]
@@ -1179,7 +1245,11 @@ mod tests {
         }
         engine.update(index, 1, vec![changed.clone()], 1);
         let settled = engine.stats.settled_at.expect("settles");
-        assert!(settled <= engine.stats.paginated_from + 2, "{:?}", engine.stats);
+        assert!(
+            settled <= engine.stats.paginated_from + 2,
+            "{:?}",
+            engine.stats
+        );
         assert_eq!(engine.pages.len(), pages.len());
         // the result is what a full pagination gives
         let mut full_items = items.clone();
@@ -1190,8 +1260,15 @@ mod tests {
         let full = super::tests::engine(full_items);
         assert_eq!(engine.frags, full.frags);
         assert_eq!(
-            engine.pages.iter().map(|page| (page.start, page.end, page.first)).collect::<Vec<_>>(),
-            full.pages.iter().map(|page| (page.start, page.end, page.first)).collect::<Vec<_>>()
+            engine
+                .pages
+                .iter()
+                .map(|page| (page.start, page.end, page.first))
+                .collect::<Vec<_>>(),
+            full.pages
+                .iter()
+                .map(|page| (page.start, page.end, page.first))
+                .collect::<Vec<_>>()
         );
         // pages after the change keep their versions, so they aren't
         // painted again
@@ -1205,7 +1282,15 @@ mod tests {
         let items = document(&[LONG; 60]);
         let mut engine = engine(items.clone());
         // split a paragraph into two
-        engine.update(10, 1, vec![paragraph(items[10].from(), "short"), paragraph(items[10].from() + 7, LONG)], 7);
+        engine.update(
+            10,
+            1,
+            vec![
+                paragraph(items[10].from(), "short"),
+                paragraph(items[10].from() + 7, LONG),
+            ],
+            7,
+        );
         let mut expected = items.clone();
         let tail: Vec<Item> = expected
             .drain(11..)
@@ -1244,7 +1329,10 @@ mod tests {
         }
         // a click beside the text finds the nearest line
         let (page, _, y, _) = engine.caret(items[5].from(), false).unwrap();
-        assert_eq!(engine.hit(page, -50.0, y + 4.0), Some(Hit::Text(items[5].from())));
+        assert_eq!(
+            engine.hit(page, -50.0, y + 4.0),
+            Some(Hit::Text(items[5].from()))
+        );
     }
 
     #[test]
@@ -1271,7 +1359,9 @@ mod tests {
             let boxed = &engine.laid[previous.item].texts[0];
             boxed.line_bounds(previous.unit).0
         };
-        let Some(Hit::Text(next)) = engine.vertical(last_line_pos, true, engine.settings.margins.left) else {
+        let Some(Hit::Text(next)) =
+            engine.vertical(last_line_pos, true, engine.settings.margins.left)
+        else {
             panic!()
         };
         assert_eq!(engine.caret(next, false).unwrap().0, 1, "{frag}");

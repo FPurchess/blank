@@ -15,6 +15,7 @@
 | Page setup      | `Mod` `Alt` `U`   |
 | Edit header     | `Mod` `Alt` `H`   |
 | Edit footer     | `Mod` `Alt` `F`   |
+| Pages or page ends | `Mod` `Alt` `V` |
 | Cycle themes    | `Mod` `Alt` `T`   |
 | Choose language | `Mod` `Alt` `L`   |
 

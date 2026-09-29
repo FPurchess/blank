@@ -71,7 +71,13 @@ impl LayoutEngine {
         Ok(())
     }
 
-    pub fn update(&mut self, start: u32, delete: u32, json: &str, shift: i32) -> Result<(), JsError> {
+    pub fn update(
+        &mut self,
+        start: u32,
+        delete: u32,
+        json: &str,
+        shift: i32,
+    ) -> Result<(), JsError> {
         let items: Vec<Item> = serde_json::from_str(json).map_err(error)?;
         self.engine
             .update(start as usize, delete as usize, items, shift as i64);
@@ -91,6 +97,16 @@ impl LayoutEngine {
     /// where the text of each page ends, from its top edge
     pub fn bottoms(&self) -> Vec<f32> {
         self.engine.pages.iter().map(|page| page.bottom).collect()
+    }
+
+    /// the text of a page's header and footer slots: left, center and right
+    /// of the header, then of the footer
+    pub fn bands(&self, page: u32) -> String {
+        self.engine
+            .pages
+            .get(page as usize)
+            .map(|page| serde_json::to_string(&page.bands).unwrap_or_default())
+            .unwrap_or_else(|| "[]".into())
     }
 
     /// what a page shows: rectangles, images, links and glyph runs
@@ -246,7 +262,8 @@ impl LayoutEngine {
 
     #[wasm_bindgen(js_name = addImage)]
     pub fn add_image(&mut self, src: &str, bytes: Vec<u8>, jpeg: bool) {
-        self.images.insert(src.to_string(), ImageData { bytes, jpeg });
+        self.images
+            .insert(src.to_string(), ImageData { bytes, jpeg });
     }
 
     #[wasm_bindgen(js_name = clearImages)]

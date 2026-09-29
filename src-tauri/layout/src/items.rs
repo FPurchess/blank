@@ -7,9 +7,7 @@ use parley::Alignment;
 
 use crate::fonts::Fonts;
 use crate::model::{Content, Item, Text};
-use crate::style::{
-    text_style, CELL_LINE, CELL_PADDING_X, CELL_PADDING_Y, MARKER_GAP, RULE,
-};
+use crate::style::{text_style, CELL_LINE, CELL_PADDING_X, CELL_PADDING_Y, MARKER_GAP, RULE};
 use crate::text::TextBox;
 
 /// what the colours of the screen and the PDF stand for
@@ -138,7 +136,9 @@ impl Laid {
                     )
                 }
             }
-            Content::Table { rows, widths, .. } => table_units(fonts, rows, widths, item.indent, inner),
+            Content::Table { rows, widths, .. } => {
+                table_units(fonts, rows, widths, item.indent, inner)
+            }
         };
         if let (Some(marker), Some(first)) = (&item.marker, laid.units.first()) {
             let text = Text {
@@ -227,7 +227,12 @@ fn table_units(
     indent: f32,
     width: f32,
 ) -> Laid {
-    let columns = rows.iter().map(|row| row.cells.len()).max().unwrap_or(1).max(1);
+    let columns = rows
+        .iter()
+        .map(|row| row.cells.len())
+        .max()
+        .unwrap_or(1)
+        .max(1);
     let shares: Vec<f32> = if widths.len() == columns {
         let total: f32 = widths.iter().sum::<f32>().max(f32::EPSILON);
         widths.iter().map(|share| share / total).collect()
@@ -296,9 +301,18 @@ fn table_units(
         let header_line = header_rows > 0 && row_index + 1 == header_rows;
         decos.push(Deco::Rect {
             x: indent,
-            y: top + height - if header_line { 2.0 * CELL_LINE } else { CELL_LINE },
+            y: top + height
+                - if header_line {
+                    2.0 * CELL_LINE
+                } else {
+                    CELL_LINE
+                },
             w: width,
-            h: if header_line { 2.0 * CELL_LINE } else { CELL_LINE },
+            h: if header_line {
+                2.0 * CELL_LINE
+            } else {
+                CELL_LINE
+            },
             role: if header_line {
                 Role::HeaderLine
             } else {

@@ -105,6 +105,29 @@ describe("storage", () => {
     });
   });
 
+  describe("page view", () => {
+    it("shows the page ends on first start and keeps the choice", async () => {
+      const { pageView } = await bootFresh();
+      expect(pageView.value).toBe("page-ends");
+
+      pageView.value = "pages";
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("pageView")).toBe("pages"),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.pageView.value).toBe("pages");
+    });
+
+    it("ignores a stored value it doesn't know", async () => {
+      await localforage.setItem("pageView", "scroll");
+
+      const { pageView } = await bootFresh();
+
+      expect(pageView.value).toBe("page-ends");
+    });
+  });
+
   describe("language", () => {
     it("restores a stored regional language", async () => {
       await localforage.setItem("language", "de-CH");

@@ -5,6 +5,7 @@ import { bootConfig } from "./config";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
+import { bootEngine } from "./engine/engine";
 import { deferred, flushPromises } from "./test/async";
 import { createTestHandle } from "./test/editor";
 
@@ -12,6 +13,7 @@ vi.mock("./config", () => ({ bootConfig: vi.fn() }));
 vi.mock("./storage", () => ({ bootStorage: vi.fn() }));
 vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
+vi.mock("./engine/engine", () => ({ bootEngine: vi.fn() }));
 
 // the handle the mocked bootEditor returns
 const editor = createTestHandle();
@@ -27,6 +29,7 @@ describe("main", () => {
     vi.mocked(bootConfig).mockResolvedValue(undefined);
     vi.mocked(bootStorage).mockResolvedValue(undefined);
     vi.mocked(bootEditor).mockResolvedValue(editor);
+    vi.mocked(bootEngine).mockResolvedValue(null as never);
     document.body.replaceChildren();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -45,7 +48,7 @@ describe("main", () => {
 
     // the UI works with the editor through the handle bootEditor returns
     expect(bootUI).toHaveBeenCalledWith(editor);
-    const order = [bootConfig, bootStorage, bootEditor, bootUI].map(
+    const order = [bootConfig, bootStorage, bootEngine, bootEditor, bootUI].map(
       (boot) => vi.mocked(boot).mock.invocationCallOrder[0],
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));

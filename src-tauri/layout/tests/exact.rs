@@ -34,19 +34,55 @@ pub fn sample() -> Vec<Item> {
                 on the screen and in the PDF alike, whatever the width of the page.";
     let mut items = vec![];
     let mut pos = 0u32;
-    fn push(pos: &mut u32, text: &str, style: &str, level: u8, spans: Vec<Span>, items: &mut Vec<Item>) {
+    fn push(
+        pos: &mut u32,
+        text: &str,
+        style: &str,
+        level: u8,
+        spans: Vec<Span>,
+        items: &mut Vec<Item>,
+    ) {
         items.push(text_item(*pos + 1, text, style, level, spans));
         *pos += text.encode_utf16().count() as u32 + 2;
     }
     for chapter in 1..=6 {
-        push(&mut pos, &format!("Chapter {chapter}"), "h1", 1, vec![], &mut items);
+        push(
+            &mut pos,
+            &format!("Chapter {chapter}"),
+            "h1",
+            1,
+            vec![],
+            &mut items,
+        );
         for paragraph in 0..8 {
             let spans = vec![
-                Span { from: 0, to: 7, bold: true, ..Default::default() },
-                Span { from: 11, to: 19, italic: true, ..Default::default() },
-                Span { from: 30, to: 39, link: Some("https://example.com".into()), ..Default::default() },
+                Span {
+                    from: 0,
+                    to: 7,
+                    bold: true,
+                    ..Default::default()
+                },
+                Span {
+                    from: 11,
+                    to: 19,
+                    italic: true,
+                    ..Default::default()
+                },
+                Span {
+                    from: 30,
+                    to: 39,
+                    link: Some("https://example.com".into()),
+                    ..Default::default()
+                },
             ];
-            push(&mut pos, &format!("{body} ({chapter}.{paragraph})"), "p", 0, spans, &mut items);
+            push(
+                &mut pos,
+                &format!("{body} ({chapter}.{paragraph})"),
+                "p",
+                0,
+                spans,
+                &mut items,
+            );
         }
         push(&mut pos, "A section", "h2", 2, vec![], &mut items);
         let mut item = text_item(pos + 1, body, "p", 0, vec![]);
@@ -55,7 +91,10 @@ pub fn sample() -> Vec<Item> {
         items.push(item);
         pos += body.len() as u32 + 4;
         if chapter == 3 {
-            items.push(Item { content: Content::Break { pos }, ..text_item(0, "", "p", 0, vec![]) });
+            items.push(Item {
+                content: Content::Break { pos },
+                ..text_item(0, "", "p", 0, vec![])
+            });
             pos += 1;
         }
     }
@@ -75,7 +114,12 @@ fn settings() -> Settings {
 /// the words pdftotext finds in a PDF: page, xMin, yMin, xMax, yMax, text
 fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, String)>> {
     let out = pdf.with_extension("html");
-    let status = Command::new("pdftotext").arg("-bbox").arg(pdf).arg(&out).status().ok()?;
+    let status = Command::new("pdftotext")
+        .arg("-bbox")
+        .arg(pdf)
+        .arg(&out)
+        .status()
+        .ok()?;
     assert!(status.success());
     let html = std::fs::read_to_string(&out).unwrap();
     let mut words = vec![];
@@ -85,7 +129,9 @@ fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, S
         if line.starts_with("<page") {
             page += 1;
         }
-        let Some(rest) = line.strip_prefix("<word ") else { continue };
+        let Some(rest) = line.strip_prefix("<word ") else {
+            continue;
+        };
         let attr = |name: &str| -> f32 {
             let start = rest.find(&format!("{name}=\"")).unwrap() + name.len() + 2;
             let end = start + rest[start..].find('"').unwrap();
@@ -93,19 +139,41 @@ fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, S
         };
         let text_start = rest.find('>').unwrap() + 1;
         let text_end = rest.find("</word>").unwrap();
-        let text = rest[text_start..text_end].replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">");
-        words.push((page - 1, attr("xMin"), attr("yMin"), attr("xMax"), attr("yMax"), text));
+        let text = rest[text_start..text_end]
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">");
+        words.push((
+            page - 1,
+            attr("xMin"),
+            attr("yMin"),
+            attr("xMax"),
+            attr("yMax"),
+            text,
+        ));
     }
     Some(words)
 }
 
 pub fn compare(engine: &mut Engine, name: &str) -> Option<usize> {
-    let pdf = write(engine, &Default::default(), &Info { title: "Sample".into(), author: "".into() }).unwrap();
+    let pdf = write(
+        engine,
+        &Default::default(),
+        &Info {
+            title: "Sample".into(),
+            author: "".into(),
+        },
+    )
+    .unwrap();
     let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
     std::fs::write(&path, pdf).unwrap();
     let found = read_words(&path)?;
     let laid: Vec<Word> = engine.words();
-    assert_eq!(found.len(), laid.len(), "as many words in the PDF as laid out");
+    assert_eq!(
+        found.len(),
+        laid.len(),
+        "as many words in the PDF as laid out"
+    );
     // every word laid out is in the PDF, on its page and at its spot
     let mut unmatched = found.clone();
     // pdftotext boxes a word by the ascent and descent the PDF gives its
@@ -114,10 +182,14 @@ pub fn compare(engine: &mut Engine, name: &str) -> Option<usize> {
     for word in &laid {
         let near = |a: f32, b: f32| (a - b).abs() < 0.05;
         let known = metrics.get(&word.font).copied();
-        let index = unmatched.iter().position(|(page, x_min, y_min, x_max, y_max, text)| {
-            let (ascent, descent) =
-                known.unwrap_or(((word.baseline - y_min) / word.size, (y_max - word.baseline) / word.size));
-            *page == word.page
+        let index = unmatched
+            .iter()
+            .position(|(page, x_min, y_min, x_max, y_max, text)| {
+                let (ascent, descent) = known.unwrap_or((
+                    (word.baseline - y_min) / word.size,
+                    (y_max - word.baseline) / word.size,
+                ));
+                *page == word.page
                 && *text == word.text
                 && near(*x_min, word.left)
                 // the last glyph's width without the letter spacing
@@ -125,17 +197,27 @@ pub fn compare(engine: &mut Engine, name: &str) -> Option<usize> {
                 && near(*y_min, word.baseline - ascent * word.size)
                 && near(*y_max, word.baseline + descent * word.size)
                 && (known.is_some() || (ascent > 0.5 && ascent < 1.2))
-        });
+            });
         if let (None, Some(index)) = (known, index) {
             let (_, _, y_min, _, y_max, _) = unmatched[index];
-            metrics.insert(word.font, ((word.baseline - y_min) / word.size, (y_max - word.baseline) / word.size));
+            metrics.insert(
+                word.font,
+                (
+                    (word.baseline - y_min) / word.size,
+                    (y_max - word.baseline) / word.size,
+                ),
+            );
         }
         match index {
             Some(index) => {
                 unmatched.swap_remove(index);
             }
             None => {
-                let close: Vec<_> = unmatched.iter().filter(|w| w.5 == word.text && w.0 == word.page).take(3).collect();
+                let close: Vec<_> = unmatched
+                    .iter()
+                    .filter(|w| w.5 == word.text && w.0 == word.page)
+                    .take(3)
+                    .collect();
                 panic!("{word:?} is not in the PDF where it was laid out; nearby: {close:?}");
             }
         }

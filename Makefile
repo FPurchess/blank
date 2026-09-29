@@ -5,7 +5,7 @@
 
 .PHONY: help install install-e2e dev dev-web build build-debug lint lint-fix \
 	format format-check test test-coverage test-rust test-e2e test-e2e-headless check clean \
-	dictionaries \
+	dictionaries engine \
 	install-docs docs-dev docs-build docs-screenshots bump release
 
 help: ## List all targets
@@ -36,6 +36,9 @@ build-debug: ## Build the debug binary without installers, as used by the e2e te
 
 dictionaries: ## Update the spell check dictionaries and their catalog
 	bun run dictionaries:update
+
+engine: ## Build the layout engine for the webview into src/engine/wasm
+	bun run engine:build
 
 clean: ## Remove build output and coverage, incl. the Rust target dir (full rebuild)
 	rm -rf dist coverage e2e/screenshots

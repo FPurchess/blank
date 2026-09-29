@@ -1,0 +1,32 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_layoutengine_free: (a: number, b: number) => void;
+export const layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const layoutengine_bands: (a: number, b: number) => [number, number];
+export const layoutengine_bottoms: (a: number) => [number, number];
+export const layoutengine_caret: (a: number, b: number, c: number) => [number, number];
+export const layoutengine_clearImages: (a: number) => void;
+export const layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
+export const layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
+export const layoutengine_lineEdge: (a: number, b: number, c: number) => number;
+export const layoutengine_new: (a: number, b: number, c: number, d: number) => number;
+export const layoutengine_page: (a: number, b: number) => [number, number];
+export const layoutengine_pageCount: (a: number) => number;
+export const layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+export const layoutengine_selection: (a: number, b: number, c: number) => [number, number];
+export const layoutengine_setItems: (a: number, b: number, c: number) => [number, number];
+export const layoutengine_setSettings: (a: number, b: number, c: number) => [number, number];
+export const layoutengine_stats: (a: number) => [number, number];
+export const layoutengine_unitsPerEm: (a: number, b: number) => number;
+export const layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+export const layoutengine_versions: (a: number) => [number, number];
+export const layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
+export const layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
+export const layoutengine_words: (a: number) => [number, number];
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_start: () => void;

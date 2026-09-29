@@ -54,7 +54,8 @@ impl Fonts {
                 fcx.collection.register_fonts(blob, None);
                 let (upem, underline) = match FontRef::new(&data) {
                     Ok(font) => {
-                        let upem = font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
+                        let upem =
+                            font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
                         let metrics = font.metrics(Size::unscaled(), LocationRef::default());
                         let underline = metrics
                             .underline

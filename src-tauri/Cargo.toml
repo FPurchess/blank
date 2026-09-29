@@ -59,3 +59,8 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+
+# the same, optimized for size, see SPIKE.md for how they compare
+[profile.wasm-small]
+inherits = "wasm"
+opt-level = "s"

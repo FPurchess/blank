@@ -26,7 +26,9 @@ export const QUOTE_INDENT = 2.25 + 11;
 const BULLETS = ["•", "◦", "▪"];
 
 // an image's size before the engine fits it into the room it has, in points
-export type ImageSizes = (src: string) => { width: number; height: number } | undefined;
+export type ImageSizes = (
+  src: string,
+) => { width: number; height: number } | undefined;
 
 // where a block stands, which the item gets
 interface Context {
@@ -57,7 +59,9 @@ export interface FlatRecord {
  * spansOf returns the text of a textblock (hard breaks as "\n") and its
  * marked runs, counted in ProseMirror positions from its start
  */
-export const spansOf = (children: Node[]): { text: string; spans: EngineSpan[] } => {
+export const spansOf = (
+  children: readonly Node[],
+): { text: string; spans: EngineSpan[] } => {
   let text = "";
   const spans: EngineSpan[] = [];
   for (const child of children) {
@@ -77,7 +81,11 @@ export const spansOf = (children: Node[]): { text: string; spans: EngineSpan[] }
   return { text, spans };
 };
 
-const spanOf = (marks: readonly Mark[], from: number, to: number): EngineSpan | null => {
+const spanOf = (
+  marks: readonly Mark[],
+  from: number,
+  to: number,
+): EngineSpan | null => {
   const span: EngineSpan = { from, to };
   for (const mark of marks) {
     if (mark.type.name === "strong") span.bold = true;
@@ -103,7 +111,12 @@ const styleOf = (node: Node) => {
 /**
  * textOf builds the text of a textblock's children, which start at `pos`
  */
-const textOf = (node: Node, children: Node[], pos: number, top: boolean): EngineText => {
+const textOf = (
+  node: Node,
+  children: readonly Node[],
+  pos: number,
+  top: boolean,
+): EngineText => {
   const { text, spans } = spansOf(children);
   const level = node.type.name === "heading" ? (node.attrs.level as number) : 0;
   return { kind: "text", pos, text, spans, style: styleOf(node), level, top };
@@ -218,7 +231,13 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
     );
   };
 
-  const block = (node: Node, pos: number, context: Context, space: Space, marker?: string) => {
+  const block = (
+    node: Node,
+    pos: number,
+    context: Context,
+    space: Space,
+    marker?: string,
+  ) => {
     const name = node.type.name;
     if (name === "page_break") {
       push(node, pos, context, space, () => ({ kind: "break", pos }));
@@ -250,7 +269,14 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
         quotes: [...context.quotes, pos],
         top: false,
       };
-      children(node, pos, inner, space, () => ({ before: 0, after: 0 }), marker);
+      children(
+        node,
+        pos,
+        inner,
+        space,
+        () => ({ before: 0, after: 0 }),
+        marker,
+      );
       return;
     }
     if (name === "bullet_list" || name === "ordered_list") {
@@ -277,14 +303,24 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
           pos + 1 + offset,
           inner,
           itemSpace,
-          (childIndex) => ({ before: childIndex > 0 ? ITEM_SPACE : 0, after: 0 }),
+          (childIndex) => ({
+            before: childIndex > 0 ? ITEM_SPACE : 0,
+            after: 0,
+          }),
           bullet,
         );
       });
       return;
     }
     // anything else holding blocks
-    children(node, pos, context, space, () => ({ before: 0, after: 0 }), marker);
+    children(
+      node,
+      pos,
+      context,
+      space,
+      () => ({ before: 0, after: 0 }),
+      marker,
+    );
   };
 
   // the blocks of a container: the first gets the space above it, the last
@@ -313,7 +349,13 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
   };
 
   // a textblock, split around its images, which stand on lines of their own
-  const textblock = (node: Node, pos: number, context: Context, space: Space, marker?: string) => {
+  const textblock = (
+    node: Node,
+    pos: number,
+    context: Context,
+    space: Space,
+    marker?: string,
+  ) => {
     const runs: { children: Node[]; pos: number; image?: Node }[] = [];
     let run: Node[] = [];
     let runPos = pos + 1;
@@ -327,7 +369,8 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
       }
       run.push(child);
     });
-    if (run.length || runs.length === 0) runs.push({ children: run, pos: runPos });
+    if (run.length || runs.length === 0)
+      runs.push({ children: run, pos: runPos });
     runs.forEach((piece, index) => {
       const pieceSpace = {
         before: index === 0 ? space.before : 0,
@@ -351,7 +394,10 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
             height: size?.height ?? 0,
             alt: (image.attrs.alt as string | null) ?? "",
           }),
-          { marker: pieceMarker, key: size ? `${size.width}x${size.height}` : "?" },
+          {
+            marker: pieceMarker,
+            key: size ? `${size.width}x${size.height}` : "?",
+          },
         );
         return;
       }
@@ -380,7 +426,11 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
             ? HEADING_AFTER_HEADING
             : HEADING_BEFORE
           : 0;
-    const after = heading ? HEADING_AFTER : node.type.name === "page_break" ? 0 : BLOCK_AFTER;
+    const after = heading
+      ? HEADING_AFTER
+      : node.type.name === "page_break"
+        ? 0
+        : BLOCK_AFTER;
     block(node, offset, top, { before, after });
     previous = node;
   });
@@ -398,7 +448,8 @@ export interface Change {
   shift: number;
 }
 
-const same = (a: FlatRecord, b: FlatRecord) => a.node === b.node && a.key === b.key;
+const same = (a: FlatRecord, b: FlatRecord) =>
+  a.node === b.node && a.key === b.key;
 
 /**
  * diff returns what changed between the records of two documents: the
@@ -406,17 +457,26 @@ const same = (a: FlatRecord, b: FlatRecord) => a.node === b.node && a.key === b.
  * nodes that didn't change, so comparing them is enough.
  * @param shift how many positions the document grew by
  */
-export const diff = (before: FlatRecord[], after: FlatRecord[], shift: number): Change => {
+export const diff = (
+  before: FlatRecord[],
+  after: FlatRecord[],
+  shift: number,
+): Change => {
   let start = 0;
   const shortest = Math.min(before.length, after.length);
-  while (start < shortest && same(before[start], after[start]) && before[start].pos === after[start].pos) {
+  while (
+    start < shortest &&
+    same(before[start], after[start]) &&
+    before[start].pos === after[start].pos
+  ) {
     start++;
   }
   let end = 0;
   while (
     end < shortest - start &&
     same(before[before.length - 1 - end], after[after.length - 1 - end]) &&
-    before[before.length - 1 - end].pos + shift === after[after.length - 1 - end].pos
+    before[before.length - 1 - end].pos + shift ===
+      after[after.length - 1 - end].pos
   ) {
     end++;
   }

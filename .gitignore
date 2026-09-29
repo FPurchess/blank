@@ -40,5 +40,3 @@ scripts/.cache
 # dictionaries served to the app by the e2e tests
 e2e/.cache
 
-# built by scripts/build-engine.sh
-src/engine/wasm/

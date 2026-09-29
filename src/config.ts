@@ -54,6 +54,7 @@ export enum CommandIdentifier {
   PAGE_SETUP = "page.setup",
   EDIT_HEADER = "edit.header",
   EDIT_FOOTER = "edit.footer",
+  VIEW_PAGES = "view.pages",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -130,6 +131,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.PAGE_SETUP]: "Mod-Alt-u",
     [CommandIdentifier.EDIT_HEADER]: "Mod-Alt-h",
     [CommandIdentifier.EDIT_FOOTER]: "Mod-Alt-f",
+    [CommandIdentifier.VIEW_PAGES]: "Mod-Alt-v",
   },
   autocorrect: {
     arrows: true,

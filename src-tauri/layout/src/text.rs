@@ -87,7 +87,9 @@ impl TextBox {
         let layout = {
             let Fonts { fcx, lcx, .. } = fonts;
             let mut builder = lcx.ranged_builder(fcx, &laid_text, 1.0, false);
-            builder.push_default(StyleProperty::FontFamily(FontFamily::Source(FONT_STACK.into())));
+            builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
+                FONT_STACK.into(),
+            )));
             builder.push_default(StyleProperty::FontSize(style.size));
             builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(style.line)));
             builder.push_default(StyleProperty::FontWeight(FontWeight::new(style.weight)));
@@ -102,7 +104,8 @@ impl TextBox {
             builder.push_default(StyleProperty::FontFeatures("\"liga\" 0, \"clig\" 0".into()));
             if !text.text.is_empty() {
                 for span in &text.spans {
-                    let range = byte_of_utf16(&laid_text, span.from)..byte_of_utf16(&laid_text, span.to);
+                    let range =
+                        byte_of_utf16(&laid_text, span.from)..byte_of_utf16(&laid_text, span.to);
                     if range.is_empty() {
                         continue;
                     }
@@ -275,7 +278,12 @@ impl TextBox {
         let cursor = Cursor::from_byte_index(&self.layout, byte, affinity);
         let rect = cursor.geometry(&self.layout, 0.0);
         let line = self.line_at((rect.y0 + rect.y1) as f32 / 2.0);
-        (line, rect.x0 as f32, rect.y0 as f32, (rect.y1 - rect.y0) as f32)
+        (
+            line,
+            rect.x0 as f32,
+            rect.y0 as f32,
+            (rect.y1 - rect.y0) as f32,
+        )
     }
 
     /// the line at a height, or the nearest
@@ -351,7 +359,10 @@ fn push_span(
     links: &mut Vec<String>,
 ) {
     if span.bold {
-        builder.push(StyleProperty::FontWeight(FontWeight::new(weight(true, style))), range.clone());
+        builder.push(
+            StyleProperty::FontWeight(FontWeight::new(weight(true, style))),
+            range.clone(),
+        );
     } else if style.weight == MEDIUM {
         // medium headings stay medium
     }
@@ -438,7 +449,11 @@ mod tests {
         let mut fonts = repository_fonts();
         let boxed = TextBox::new(&mut fonts, &text("a ⇒ b"), 300.0, Alignment::Start);
         let runs = boxed.glyph_runs(&fonts, 0);
-        assert!(runs.iter().any(|run| run.font == 6), "{:?}", runs.iter().map(|r| r.font).collect::<Vec<_>>());
+        assert!(
+            runs.iter().any(|run| run.font == 6),
+            "{:?}",
+            runs.iter().map(|r| r.font).collect::<Vec<_>>()
+        );
         assert!(runs.iter().any(|run| run.font == 0));
     }
 

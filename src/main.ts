@@ -4,6 +4,7 @@ import { bootConfig } from "./config";
 import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
+import { bootEngine } from "./engine/engine";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
@@ -34,6 +35,8 @@ const showBootError = (error: unknown) => {
     bootState();
     await bootConfig();
     await bootStorage();
+    // the page view's layout engine, which lays out the first document
+    await bootEngine();
     const editor = await bootEditor();
     editorReady = true;
     bootUI(editor);

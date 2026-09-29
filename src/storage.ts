@@ -6,6 +6,9 @@ import { type Ref, watch } from "vue";
 import {
   importedFrom,
   language,
+  PAGE_VIEW_MODES,
+  pageView,
+  type PageViewMode,
   path,
   spellcheck,
   transaction,
@@ -141,6 +144,13 @@ export const bootStorage = async () => {
   // off until the user turns it on
   spellcheck.value = (await localforage.getItem("spellcheck")) === true;
   persist(spellcheck, "spellcheck");
+
+  // the page view the user chose last, "page ends" at first
+  const _pageView = await localforage.getItem("pageView");
+  pageView.value = PAGE_VIEW_MODES.includes(_pageView as PageViewMode)
+    ? (_pageView as PageViewMode)
+    : "page-ends";
+  persist(pageView, "pageView");
 
   watch(
     transaction,

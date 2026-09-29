@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::action::{Action, LinkAction};
+use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
@@ -50,7 +50,11 @@ fn fill(role: Role) -> Fill {
 }
 
 /// writes the document's pages as a PDF
-pub fn write(engine: &mut Engine, images: &HashMap<String, ImageData>, info: &Info) -> Result<Vec<u8>, String> {
+pub fn write(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+) -> Result<Vec<u8>, String> {
     let mut document = Document::new();
     let fonts: Vec<Option<Font>> = engine
         .fonts
@@ -138,7 +142,10 @@ pub fn write(engine: &mut Engine, images: &HashMap<String, ImageData>, info: &In
         for (href, x, y, w, h) in links {
             if let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) {
                 let target = Target::Action(Action::Link(LinkAction::new(href)));
-                page.add_annotation(Annotation::new_link(LinkAnnotation::new(rect, target), None));
+                page.add_annotation(Annotation::new_link(
+                    LinkAnnotation::new(rect, target),
+                    None,
+                ));
             }
         }
         page.finish();

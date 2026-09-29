@@ -69,9 +69,13 @@ pub struct Row {
 pub enum Content {
     Text(Text),
     /// a page break: what follows starts on a new page
-    Break { pos: u32 },
+    Break {
+        pos: u32,
+    },
     /// a horizontal rule
-    Rule { pos: u32 },
+    Rule {
+        pos: u32,
+    },
     Image {
         pos: u32,
         src: String,
@@ -274,7 +278,9 @@ impl Item {
         let moved = |pos: &mut u32| *pos = (*pos as i64 + delta).max(0) as u32;
         match &mut self.content {
             Content::Text(text) => moved(&mut text.pos),
-            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => moved(pos),
+            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => {
+                moved(pos)
+            }
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
                 moved(end);

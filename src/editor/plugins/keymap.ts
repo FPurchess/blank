@@ -33,6 +33,7 @@ import {
   tableKey,
   pageSetup,
   editBand,
+  togglePageView,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -105,6 +106,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.PAGE_SETUP]: pageSetup(),
   [CommandIdentifier.EDIT_HEADER]: editBand("header"),
   [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
+  [CommandIdentifier.VIEW_PAGES]: togglePageView(),
 };
 
 /**

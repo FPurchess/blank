@@ -12,6 +12,7 @@ import {
   keymap,
   languagePicker,
   openLink,
+  pageView,
   properties,
   spellcheck,
   tableGuard,
@@ -24,6 +25,7 @@ import {
 } from "./plugins";
 import { applyInitialDocument } from "./document";
 import { createEditorHandle, syncPlugin } from "./handle";
+import { timed } from "../engine/perf";
 
 /**
  * bootEditor mounts the editor with the first document
@@ -44,6 +46,8 @@ export const bootEditor = async () => {
         spellcheck(),
         autocomplete(),
         tableKeys(),
+        // moves by the lines the page view shows, before the keymap
+        pageView(),
         keymap(),
         openLink(),
         images(),
@@ -78,8 +82,11 @@ export const bootEditor = async () => {
       },
     },
     dispatchTransaction(tx) {
-      transaction.value = tx;
-      view.updateState(view.state.apply(tx));
+      // the editor's whole update, for the page view's measurements
+      timed("dispatch", () => {
+        transaction.value = tx;
+        view.updateState(view.state.apply(tx));
+      });
     },
   });
   const editor = createEditorHandle(view);
