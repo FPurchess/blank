@@ -1,4 +1,7 @@
+import { CommandIdentifier, getKeyBinding } from "../config";
+import { formatShortcut } from "../editor/keyBindings";
 import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
+import type { Band } from "../layout/bands";
 
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
@@ -57,3 +60,16 @@ export const propertiesPlace = (layout: FrameLayout) => {
     width: first.width - 2 * inset,
   };
 };
+
+/**
+ * bandTitle returns the tooltip of a header or footer on the pages, which
+ * opens its strip
+ */
+export const bandTitle = (band: Band) =>
+  `Edit the ${band} (${formatShortcut(
+    getKeyBinding(
+      band === "header"
+        ? CommandIdentifier.EDIT_HEADER
+        : CommandIdentifier.EDIT_FOOTER,
+    ),
+  )})`;

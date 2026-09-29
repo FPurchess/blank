@@ -805,29 +805,9 @@ $bar-height: 44px;
 
 // the text fades while a strip is edited, and makes room for the strips; the
 // strips' own editors are ProseMirror editors too, so it goes by its id
-body.band-editing #editor {
-  opacity: 0.3;
-  transition: opacity 150ms;
-}
-
-body.has-header #editor {
-  padding-top: calc(48px + #{$band-height});
-}
-
-body.has-footer #editor {
-  padding-bottom: calc(48px + #{$band-height});
-}
-
-// the open strip takes room of its own, so it covers none of the text
+// the open strip takes room of its own, so it covers none of the text (see
+// #page-view below)
 $strip-height: 90px;
-
-body.editing-header #editor {
-  padding-top: calc(48px + #{$strip-height});
-}
-
-body.editing-footer #editor {
-  padding-bottom: calc(48px + #{$strip-height});
-}
 
 .boot-error {
   max-width: 720px;
@@ -1335,6 +1315,51 @@ body.editing-footer #editor {
       background-color: var(--background-color);
     }
   }
+}
+
+// the header and footer margins of a sheet, and the bands where a page
+// ends: a click opens the strip of the band
+.page-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+
+  &.header {
+    top: 0;
+  }
+
+  &.footer {
+    bottom: 0;
+  }
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 4%, transparent);
+  }
+}
+
+.page-end .band {
+  pointer-events: auto;
+  cursor: pointer;
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 8%, transparent);
+  }
+}
+
+// the open strip of a header or footer takes room of its own at the top or
+// bottom of the window, so it covers none of the pages
+body.editing-header #page-view {
+  top: $strip-height;
+}
+
+body.editing-footer #page-view {
+  bottom: $strip-height;
+}
+
+body.band-editing #page-view {
+  opacity: 0.3;
+  transition: opacity 150ms;
 }
 
 .page-selection {

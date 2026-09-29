@@ -118,14 +118,26 @@ step.
     in Plex Mono, emoji and Chinese", looked at in the screenshot).
   - Open decisions, see "Decisions for the owner" below.
 
+- 5. **The header and footer strips:**
+  - The edges no longer show a band's line: the pages show it, on the
+    sheets in "pages" and in the page-end marks in "page ends". They still
+    offer "+ Header", "+ Footer" and "# Page numbers" near the bars.
+  - A click on a sheet's header or footer margin, or on the footer or header
+    of a page-end mark, opens its strip (`editBand` through the handle).
+  - An open strip takes room at the edge of the window, and the pages fade
+    behind it (the hidden editor no longer shows through).
+  - Verified: `bandStrips.test.ts`, `PageView.test.ts`, and `bands.e2e.ts`,
+    ported to the pages (8/8, two new: a strip from a page end and from a
+    sheet's margin; screenshot `engine-strip.png`).
+  - E2E helpers for the pages: `clickText`, `textBox`, `editorText` and
+    `focusEditor` (`e2e/helpers.ts`), on `window.blankGeometry.find`.
+
 ### In progress
 
-- 5. The header and footer strips.
+- 6. PDF parity with pdfmake.
 
 ### Open
 
-- 5. Header and footer strips: none where "pages" shows the bands, a click
-  on a band or page-end mark opens its strip.
 - 6. PDF parity with pdfmake, then remove pdfmake.
 - 7. IME and accessibility.
 - 8. Performance: start-up, work per key on 100 pages.

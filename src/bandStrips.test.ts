@@ -123,6 +123,10 @@ describe("band strips", () => {
       expect(edge("header").classList).not.toContain("empty");
       expect(document.body.classList).toContain("has-header");
       expect(document.body.classList).not.toContain("has-footer");
+      // the pages show it, on the sheets or where each page ends; the edge
+      // only offers to add a footer
+      expect(edge("header").hidden).toBe(true);
+      expect(edge("footer").hidden).toBe(false);
     });
 
     it("shows a band only the first or even pages have", () => {

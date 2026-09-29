@@ -61,9 +61,99 @@ export const clickInto = async (selector: string, index = 0) => {
   });
 };
 
+/**
+ * focusEditor gives the editor the focus, as a click on the pages does
+ */
 export const focusEditor = async () => {
-  await $("#editor").click();
+  await browser.execute(() =>
+    document.querySelector<HTMLElement>("#editor")!.focus(),
+  );
 };
+
+// the geometry of what the page view paints, see src/engine/geometry.ts
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * textBox returns where the `index`th occurrence of `text` is painted, as
+ * the caret before its `offset`th character, in viewport px, scrolling it
+ * into view first
+ */
+export const textBox = async (text: string, offset = 0, index = 0) => {
+  const box = await browser.execute(
+    (text: string, offset: number, index: number) => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            find: (text: string, index: number) => number;
+            caretBox: (pos: number) => Box | null;
+          };
+        }
+      ).blankGeometry;
+      const pos = geometry.find(text, index);
+      if (pos < 0) return null;
+      const view = document.getElementById("page-view")!;
+      let caret = geometry.caretBox(pos + offset);
+      if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
+        view.scrollTop += caret.top - view.clientHeight / 2;
+        view.dispatchEvent(new Event("scroll"));
+        caret = geometry.caretBox(pos + offset);
+      }
+      return caret;
+    },
+    text,
+    offset,
+    index,
+  );
+  if (!box) throw new Error(`"${text}" isn't painted on the pages`);
+  return box;
+};
+
+/**
+ * clickText clicks on the painted pages where the `offset`th character of
+ * `text` starts (the right button with `button: 2`), and waits until the
+ * editor took it in
+ */
+export const clickText = async (
+  text: string,
+  {
+    offset = 0,
+    index = 0,
+    button = 0,
+  }: { offset?: number; index?: number; button?: 0 | 1 | 2 } = {},
+) => {
+  const box = await textBox(text, offset, index);
+  await browser
+    .action("pointer")
+    .move({
+      x: Math.round(box.left + 1),
+      y: Math.round((box.top + box.bottom) / 2),
+      origin: "viewport",
+    })
+    .down({ button })
+    .up({ button })
+    .perform();
+  await browser.executeAsync((done: () => void) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => done()));
+  });
+};
+
+/**
+ * editorText returns the text of the editor's elements at `selector`, which
+ * are hidden behind the pages: WebDriver's getText only reads what is shown
+ */
+export const editorText = (selector = "#editor") =>
+  browser.execute(
+    (selector: string) =>
+      [...document.querySelectorAll(selector)].map(
+        (element) => element.textContent ?? "",
+      ),
+    selector,
+  );
 
 /**
  * presses a keyboard shortcut using `Mod`, which translates to Ctrl on Linux

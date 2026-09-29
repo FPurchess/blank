@@ -239,8 +239,43 @@ export const exposeGeometry = (doc: () => Node) => {
       blockBoxes,
       hitAt,
       tables: () => tablePositions(doc()).map(({ pos }) => tableGeometry(pos)),
+      find: (text: string, index = 0) => findText(doc(), text, index),
     },
   });
+};
+
+/**
+ * findText returns the position where the `index`th occurrence of `text`
+ * starts within a textblock of `doc`, or -1
+ */
+export const findText = (doc: Node, text: string, index = 0) => {
+  let found = -1;
+  let seen = 0;
+  doc.descendants((node, pos) => {
+    if (found >= 0) return false;
+    if (!node.isTextblock) return true;
+    // the block's text, and the position of each of its characters
+    let content = "";
+    const positions: number[] = [];
+    node.forEach((child, offset) => {
+      if (!child.isText) return;
+      content += child.text;
+      for (let i = 0; i < child.text!.length; i++)
+        positions.push(pos + 1 + offset + i);
+    });
+    for (
+      let at = content.indexOf(text);
+      at >= 0;
+      at = content.indexOf(text, at + 1)
+    ) {
+      if (seen++ === index) {
+        found = positions[at];
+        break;
+      }
+    }
+    return false;
+  });
+  return found;
 };
 
 /**

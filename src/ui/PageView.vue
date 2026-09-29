@@ -89,7 +89,17 @@ const frames = computed(() => {
 const shownPages = computed(() => frames.value.map((frame) => frame.page));
 
 onMounted(measure);
-onUnmounted(() => (pageViewport.value = null));
+// e.g. when an open strip of a header or footer takes room of the window
+let resized: ResizeObserver | undefined;
+onMounted(() => {
+  if (typeof ResizeObserver === "undefined" || !scroller.value) return;
+  resized = new ResizeObserver(() => measure());
+  resized.observe(scroller.value);
+});
+onUnmounted(() => {
+  resized?.disconnect();
+  pageViewport.value = null;
+});
 listenOnWindow("resize", measure);
 
 // the view keeps its place on the page when it switches or resizes

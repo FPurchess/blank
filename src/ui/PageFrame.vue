@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, useTemplateRef, watch } from "vue";
 
+import { editBand } from "../editor/commands/editBand";
+import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
+import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { record } from "../engine/perf";
-import { path, theme } from "../state";
+import { pageLayoutState, path, theme } from "../state";
 import { paintPage } from "./paintPage";
-import { endMark } from "./pageViewModel";
+import { bandTitle, endMark } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends. Its props
@@ -27,6 +30,20 @@ const props = defineProps<{
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
+const editor = useEditor();
+
+// a click on a header or footer opens its strip, which takes the focus
+const openBand = (band: Band) => editor.run(editBand(band), { focus: false });
+
+// the header and footer margins of a sheet, in pixels
+const margins = computed(() => {
+  const state = pageLayoutState.value;
+  if (!props.sheet || !state) return null;
+  return {
+    top: state.margins.top * props.scale,
+    bottom: state.margins.bottom * props.scale,
+  };
+});
 
 const paint = () => {
   const element = canvas.value;
@@ -98,8 +115,31 @@ const mark = computed(() => {
       aria-hidden="true"
       :style="{ width: `${width}px`, height: `${height}px` }"
     />
+    <template v-if="margins">
+      <div
+        class="page-band header"
+        :title="bandTitle('header')"
+        aria-hidden="true"
+        :style="{ height: `${margins.top}px` }"
+        @mousedown.prevent.stop
+        @click="openBand('header')"
+      />
+      <div
+        class="page-band footer"
+        :title="bandTitle('footer')"
+        aria-hidden="true"
+        :style="{ height: `${margins.bottom}px` }"
+        @mousedown.prevent.stop
+        @click="openBand('footer')"
+      />
+    </template>
     <div v-if="mark" class="page-end" aria-hidden="true">
-      <div class="band footer">
+      <div
+        class="band footer"
+        :title="bandTitle('footer')"
+        @mousedown.prevent.stop
+        @click="openBand('footer')"
+      >
         <span v-for="(slot, index) in mark.footer" :key="index">{{
           slot
         }}</span>
@@ -107,7 +147,13 @@ const mark = computed(() => {
       <div class="line">
         <span v-if="mark.number" class="number">{{ mark.number }}</span>
       </div>
-      <div v-if="nextVersion >= 0" class="band header">
+      <div
+        v-if="nextVersion >= 0"
+        class="band header"
+        :title="bandTitle('header')"
+        @mousedown.prevent.stop
+        @click="openBand('header')"
+      >
         <span v-for="(slot, index) in mark.header" :key="index">{{
           slot
         }}</span>

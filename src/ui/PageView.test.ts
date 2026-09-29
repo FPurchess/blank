@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import { setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
 import {
+  bandEditor,
   contextMenu,
   pageCaret,
   pageLayoutState,
@@ -147,6 +148,29 @@ describe("page view", () => {
     // the caret went where the click was
     expect(Math.abs(editor.state.selection.head - 20)).toBeLessThan(2);
     contextMenu.value = null;
+    editor.destroy();
+  });
+
+  it("opens the strip of a band clicked on a sheet or where a page ends", async () => {
+    layOut();
+    const editor = new EditorView(document.createElement("div"), {
+      state: createState(node, { cursor: 3 }),
+    });
+    dispose = bootApp(createEditorHandle(editor).handle);
+    pageView.value = "pages";
+    await nextTick();
+    frames()[0]
+      .querySelector<HTMLElement>(".page-band.footer")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "footer" });
+    bandEditor.value = null;
+    pageView.value = "page-ends";
+    await nextTick();
+    frames()[0]
+      .querySelector<HTMLElement>(".page-end .band.header")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "header" });
+    bandEditor.value = null;
     editor.destroy();
   });
 

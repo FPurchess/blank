@@ -450,8 +450,18 @@ export const bootBandStrips = (editor: EditorHandle) => {
           scope.run(() => renderEditor(request));
           closeEditor = () => scope.stop();
         }
+      },
+      { flush: "sync", immediate: true },
+    );
+    // the pages show the bands themselves, on the sheets or where each page
+    // ends (src/ui/PageFrame.vue), and open their strips on a click; the
+    // edges only offer to add one, near the bars
+    watch(
+      [bandEditor, atRest],
+      ([request, bands]) => {
         for (const band of BANDS) {
-          edges[band].element.hidden = request?.band === band;
+          edges[band].element.hidden =
+            request?.band === band || bands[band] !== undefined;
         }
       },
       { flush: "sync", immediate: true },

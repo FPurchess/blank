@@ -46,7 +46,8 @@ paths:
   - It maps the fields back, and keeps the shown text of other fields.
   - It warns about pictures, tables, several lines and number styles Blank lacks.
 - The strips (`src/bandStrips.ts`) are edited at the top and bottom of the window, not in the dialog.
-  - At rest they show the band faintly, or a hint while the pointer is on the bar.
+  - At rest the page view shows the bands: on the sheets in "pages", and where each page ends in "page ends" (`src/ui/PageFrame.vue`). A click on a sheet's top or bottom margin, or on the footer or header of a page-end mark, runs `editBand` through the editor's handle. The edges only show a hint to add a band that has no text, while the pointer is on the bar; the line of a band with text is kept, hidden, for tests.
+  - While a strip is open, the page view makes room for it (`body.editing-header #page-view`) and fades.
   - They show what `pageLayout` resolves and `pageFields` fills in (`src/state/page.ts`). Both stay the same while typing leaves the frontmatter, the first heading and the file alone, so the strips render again only then.
   - A click on a band runs `editBand(band, insert?)` (`src/editor/commands/editBand.ts`) through the editor's handle, which `bootUI` gives `bootBandStrips(editor)` (see `editor-boundary.md`). `insert` is what the strip puts into its center, `{page}` for **# Page numbers**.
   - `openBand` publishes a `bandEditor` request, whose `apply` writes all band settings as one undo step.

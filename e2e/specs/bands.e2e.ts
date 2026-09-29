@@ -4,10 +4,21 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type, hoverEdge } from "../helpers.ts";
+import {
+  clickText,
+  editorText,
+  hoverEdge,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 const strip = () => $("#band-editor");
 const tool = (label: string) => strip().$(`button=${label}`);
+// what a band says, kept in the edge behind the pages, which show it
+const bandText = (band: string, slot: string) =>
+  editorText(`#band-${band} .band-line .${slot}`).then((texts) => texts[0]);
 
 describe("header and footer", () => {
   let fixtureDir: string;
@@ -38,7 +49,9 @@ describe("header and footer", () => {
     await tool("Done").click();
 
     await expect(strip()).not.toExist();
-    await expect($("#band-footer .band-line .center")).toHaveText("page");
+    await expect(bandText("footer", "center")).resolves.toBe("page");
+    // where the page ends, the footer shows its number
+    await expect($(".page-end .band.footer")).toHaveText("1");
     await pressMod("s");
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n---\n\n# report\n\ntext.',
@@ -63,7 +76,7 @@ describe("header and footer", () => {
     await browser.keys(Key.Escape);
 
     await expect(strip()).not.toExist();
-    await expect($("#band-header .band-line .left")).toHaveText("report");
+    await expect(bandText("header", "left")).resolves.toBe("report");
     await pressMod("s");
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n---\n\n# report\n\ntext.',
@@ -71,12 +84,34 @@ describe("header and footer", () => {
   });
 
   it("undoes a strip's changes in one step", async () => {
-    await $("#editor p").click();
+    await clickText("text.");
     await pressMod("z");
 
     await expect($("#band-header .band-line")).not.toExist();
     await pressMod(Key.Shift, "z");
     await expect($("#band-header .band-line")).toExist();
+  });
+
+  it("opens a strip from where the page ends", async () => {
+    await $(".page-end .band.footer").click();
+    await expect(strip()).toBeDisplayed();
+    await expect(strip()).toHaveElementClass("footer");
+    await browser.keys(Key.Escape);
+    await expect(strip()).not.toExist();
+  });
+
+  it("opens a strip from the margin of a sheet", async () => {
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    await $(".page-band.header").click();
+    await expect(strip()).toBeDisplayed();
+    await expect(strip()).toHaveElementClass("header");
+    await browser.saveScreenshot(
+      path.resolve(import.meta.dirname, "../screenshots/engine-strip.png"),
+    );
+    await browser.keys(Key.Escape);
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
   });
 
   it("opens the strips with the keyboard too, and fades the text", async () => {
@@ -94,7 +129,7 @@ describe("header and footer", () => {
     await type("x");
 
     // the slots are ProseMirror editors too; #editor is the text
-    await expect($("#editor p")).toHaveText("text.");
+    await expect(editorText("#editor p")).resolves.toEqual(["text."]);
     await expect($$("#editor")).toBeElementsArrayOfSize(1);
     await expect(strip().$(".slot.center .ProseMirror")).toHaveText("x");
     // left as it was, so closing changes nothing

@@ -11,6 +11,7 @@ import {
   blockBoxes,
   caretBox,
   caretPage,
+  findText,
   hitAt,
   rangeRects,
   tableGeometry,
@@ -93,5 +94,24 @@ describe("geometry", () => {
     expect(tableGeometry(7)).toBeNull();
     expect(hitAt(10, 10)).toBeNull();
     expect(viewBox()).toBeNull();
+  });
+});
+
+describe("findText", () => {
+  it("finds where a text starts, counting leaves as positions", () => {
+    const image = schema.nodes.image.create({ src: "a.png" });
+    const node = doc(
+      p("intro"),
+      schema.node("paragraph", null, [
+        schema.text("ab"),
+        image,
+        schema.text("cd cd"),
+      ]),
+    );
+    expect(findText(node, "intro")).toBe(1);
+    // the second paragraph's text starts at 8; the image takes 10
+    expect(findText(node, "cd")).toBe(11);
+    expect(findText(node, "cd", 1)).toBe(14);
+    expect(findText(node, "nothing")).toBe(-1);
   });
 });
