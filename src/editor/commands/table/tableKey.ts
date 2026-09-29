@@ -1,6 +1,7 @@
 import type { Command } from "prosemirror-state";
 import { isInTable } from "prosemirror-tables";
 
+import { caretBox } from "../../../engine/geometry";
 import { tablePicker } from "../../../state";
 import { DEFAULT_SIZE } from "./pickerSize";
 import { toolsKey } from "../../plugins/tables/tools";
@@ -24,14 +25,17 @@ export const tableKey = (): Command => (state, dispatch, view) => {
   if (!insertTable(DEFAULT_SIZE.cols, DEFAULT_SIZE.rows)(state)) return false;
   if (!dispatch || !view) return true;
 
-  const coords = view.coordsAtPos(state.selection.head);
+  const caret = caretBox(state.selection.head);
+  const anchor = caret
+    ? { left: caret.left, top: caret.top, bottom: caret.bottom }
+    : { left: 0, top: 0, bottom: 0 };
   const close = () => {
     tablePicker.value = null;
     view.focus();
   };
   tablePicker.value = {
     ...DEFAULT_SIZE,
-    anchor: { left: coords.left, top: coords.top, bottom: coords.bottom },
+    anchor,
     submit: (cols, rows) => {
       close();
       insertTable(cols, rows)(view.state, view.dispatch);

@@ -18,23 +18,45 @@ step.
 
 - 0. Rebased onto origin/main (#75, the Vue bars). "Page N of M" is
   `PageStatus.vue` in `BottomBar.vue`, before the paper.
+- 1. **One geometry service**, `src/engine/geometry.ts`: `caretBox`,
+  `rangeRects`, `blockBoxes`, `tableGeometry` (rows and columns per page) and
+  `hitAt`, in window coordinates, from the engine's layout (new wasm calls
+  `boxes` and `tableGrid`) and `pageViewport`, which `PageView.vue` publishes
+  on scroll and resize. The frame math moved to `src/engine/frames.ts`.
+  - The table toolbar (`tools.ts`), the handles (`handles.ts`,
+    `src/tableHandles.ts`, with a table's piece per page: `firstRow`,
+    `rowCount`), the table picker (`tableKey.ts`) and the context menu
+    measure through it. No plugin calls `coordsAtPos`, `posAtCoords` or
+    `nodeDOM().getBoundingClientRect()` any more; only `hidden.ts` measures
+    the hidden DOM, on purpose. The language picker and the dialogs have no
+    anchor at the text (they sit in the bar or in the middle).
+  - Presses and right clicks on the pages reach the plugins as `PAGE_PRESS`
+    and `PAGE_MENU` events (`src/editor/pagePointer.ts`): the pickers and
+    table mode close, the context menu opens where it's right clicked, with
+    the suggestions prefetched on the press.
+  - `pageSync` is the first plugin, so the others measure the new layout.
+  - Page Up/Down move a view's height and scroll as far, in the same column
+    (Shift selects). A drag beyond the top or bottom edge scrolls, the
+    farther the faster. The caret stays in view while typing (as before).
+  - Verified: unit tests on a real layout (`geometry.test.ts`,
+    `handles.test.ts`, `pageView.test.ts`, `PageView.test.ts`,
+    `pagePointer.test.ts`), and `pageEngine.e2e.ts` (Page Down/Up, right
+    click, the toolbar on the painted table). Drag scrolling is unit tested
+    for its speed only, not in E2E.
 
 ### In progress
 
-- 1. One geometry service backed by the engine.
+- 2. Paint what the editor shows.
 
 ### Open
 
-- 1. Geometry: caret box, range rectangles, block boxes, hit test; replace
-  `coordsAtPos`, `nodeDOM().getBoundingClientRect()` and `posAtCoords` in the
-  table toolbar, handles, picker, context menu; caret kept in view, Page
-  Up/Down, drag scrolling at the edges.
 - 2. Paint what the editor shows: spell check underlines and right-click
   menu, links (colour, Mod+click, pointer), image placeholder and alt text,
   the frontmatter summary, the page break label, node selection outline,
   `CellSelection`, IME underline, focus ring, all six themes.
-- 3. Tables: mouse handles, captions, rowspan/colspan, header column, rows
-  split across pages, column widths frozen while editing.
+- 3. Tables: mouse handles (now placed through the engine; E2E open),
+  captions, rowspan/colspan, header column, rows split across pages, column
+  widths as `tableGrid` and frozen while editing.
 - 4. Text coverage: code in IBM Plex Mono, emoji and CJK.
 - 5. Header and footer strips: none where "pages" shows the bands, a click
   on a band or page-end mark opens its strip.

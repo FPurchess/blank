@@ -11,6 +11,7 @@ import type { EditorView } from "prosemirror-view";
 import { watch } from "vue";
 
 import { pageEngine, type Hit, type PageEngine } from "../../engine/engine";
+import { caretBox, hitAt, viewBox } from "../../engine/geometry";
 import { imageSizes, imagesLoaded } from "../../engine/images";
 import { timed } from "../../engine/perf";
 import { pageGeometry } from "../../layout/resolve";
@@ -31,11 +32,13 @@ import {
 
 // set on a transaction whose selection came from the pointer, which needs
 // no scrolling
-export const POINTER = "pointer";
+export const POINTER = "pointer" as const;
 
-interface PageViewState {
+export interface PageViewState {
   // how the last transaction moved the selection
-  by: "pointer" | "vertical" | null;
+  by: "pointer" | "vertical" | "page" | null;
+  // for "page": how far below the top of the view the head stays, in px
+  at?: number;
 }
 
 export const pageViewKey = new PluginKey<PageViewState>("pageView");
@@ -85,20 +88,19 @@ const publishSelection = (
   engine: PageEngine,
   state: EditorState,
   scroll: boolean,
+  at?: number,
 ) => {
   const { selection } = state;
-  if (selection.empty) {
-    const caret = engine.caret(selection.head);
-    pageCaret.value = caret;
-    pageSelection.value = [];
-    if (scroll && caret) pageScrollRequest.value = { ...caret };
-    return;
-  }
-  pageCaret.value = null;
-  const rects = engine.selection(selection.from, selection.to);
-  pageSelection.value = rects;
   const head = engine.caret(selection.head);
-  if (scroll && head) pageScrollRequest.value = { ...head };
+  if (selection.empty) {
+    pageCaret.value = head;
+    pageSelection.value = [];
+  } else {
+    pageCaret.value = null;
+    pageSelection.value = engine.selection(selection.from, selection.to);
+  }
+  if (scroll && head)
+    pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
 };
 
 /**
@@ -118,33 +120,16 @@ const sync = (engine: PageEngine, state: EditorState, force = false) => {
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
+// how much of the view's height Page Up and Down move
+const PAGE_STEP = 0.85;
 
-export const pageView = () => {
-  // the x the caret keeps while it moves up and down, in points
-  let goal: number | null = null;
-
-  const move = (
-    view: EditorView,
-    selection: Selection,
-    by: PageViewState["by"],
-  ) => {
-    view.dispatch(
-      view.state.tr
-        .setSelection(selection)
-        .setMeta(pageViewKey, by)
-        .scrollIntoView(),
-    );
-  };
-
-  return new Plugin<PageViewState>({
-    key: pageViewKey,
-    state: {
-      init: () => ({ by: null }),
-      apply: (tr: Transaction) => ({
-        by:
-          (tr.getMeta(pageViewKey) as PageViewState["by"] | undefined) ?? null,
-      }),
-    },
+/**
+ * pageSync keeps the layout engine in step with the editor, and publishes
+ * the pages, the caret and the selection. It comes first of the plugins, so
+ * the views of the others measure the new layout when they update.
+ */
+export const pageSync = () =>
+  new Plugin({
     view(view) {
       const engine = pageEngine;
       if (!engine) return {};
@@ -164,10 +149,14 @@ export const pageView = () => {
           const docChanged = view.state.doc !== previous.doc;
           if (docChanged) timed("layout", () => sync(engine, view.state));
           if (docChanged || !view.state.selection.eq(previous.selection)) {
-            const by = pageViewKey.getState(view.state)?.by ?? null;
-            if (by !== "vertical") goal = null;
+            const moved = pageViewKey.getState(view.state);
             timed("caret", () =>
-              publishSelection(engine, view.state, by !== "pointer"),
+              publishSelection(
+                engine,
+                view.state,
+                moved?.by !== "pointer",
+                moved?.at,
+              ),
             );
           }
         },
@@ -179,6 +168,73 @@ export const pageView = () => {
         },
       };
     },
+  });
+
+export const pageView = () => {
+  // the x the caret keeps while it moves up and down, in points
+  let goal: number | null = null;
+
+  const move = (
+    view: EditorView,
+    selection: Selection,
+    by: PageViewState["by"],
+    at?: number,
+  ) => {
+    view.dispatch(
+      view.state.tr
+        .setSelection(selection)
+        .setMeta(pageViewKey, { by, at } satisfies PageViewState)
+        .scrollIntoView(),
+    );
+  };
+
+  /**
+   * page moves the head a view's height up or down, and scrolls as far, so
+   * it stays where it is in the view
+   */
+  const page = (view: EditorView, down: boolean, extend: boolean) => {
+    const { selection, doc } = view.state;
+    const caret = caretBox(selection.head);
+    const box = viewBox();
+    if (!caret || !box) return false;
+    const step = Math.max(40, (box.bottom - box.top) * PAGE_STEP);
+    const middle = (caret.top + caret.bottom) / 2;
+    const hit = hitAt(goal ?? caret.left, middle + (down ? step : -step));
+    const edge = down ? Selection.atEnd(doc).to : 0;
+    const target =
+      hit && hit.pos !== selection.head ? hit : { node: false, pos: edge };
+    const current = goal ?? caret.left;
+    move(
+      view,
+      selectionAt(view.state, target, extend ? selection.anchor : undefined),
+      "page",
+      caret.top - box.top,
+    );
+    goal = current;
+    return true;
+  };
+
+  return new Plugin<PageViewState>({
+    key: pageViewKey,
+    state: {
+      init: () => ({ by: null }),
+      apply: (tr: Transaction) =>
+        (tr.getMeta(pageViewKey) as PageViewState | undefined) ?? {
+          by: null,
+        },
+    },
+    view: () => ({
+      update(view, previous) {
+        const by = pageViewKey.getState(view.state)?.by;
+        // a move by the mouse or a key other than ↑↓ forgets the column
+        if (
+          by !== "vertical" &&
+          by !== "page" &&
+          !view.state.selection.eq(previous.selection)
+        )
+          goal = null;
+      },
+    }),
     props: {
       handleKeyDown(view, event) {
         const engine = pageEngine;
@@ -210,6 +266,9 @@ export const pageView = () => {
           );
           goal = current;
           return true;
+        }
+        if (event.key === "PageUp" || event.key === "PageDown") {
+          return page(view, event.key === "PageDown", event.shiftKey);
         }
         if (event.key === "Home" || event.key === "End") {
           const edge = engine.lineEdge(selection.head, event.key === "End");

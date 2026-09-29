@@ -9,8 +9,11 @@ import {
   contextMenu,
   tableHandles as handles,
 } from "../../../state";
+import { tableGeometry } from "../../../engine/geometry";
 import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
+import { hidePages, showPages } from "../../../test/engine";
 import { cellTexts, selectedText } from "../../../test/tables";
+import { pageSync } from "../pageView";
 import { tableHandles } from "./handles";
 import { tableTools } from "./tools";
 import { tableView } from "./view";
@@ -30,26 +33,45 @@ const grid = () =>
 let view: EditorView;
 const anchor = { left: 0, top: 0, bottom: 0 };
 const state = () => handles.value!;
-// jsdom lays nothing out, so every box is at 0, 0 and the mouse there is
-// over the table
-const hover = (x = 0, y = 0) =>
+// the table after "intro", as the page view shows it
+const TABLE = 7;
+const middle = () => {
+  const { box } = tableGeometry(TABLE)!.pieces[0];
+  return { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+};
+// the mouse over the table, or at a point
+const hover = (x = middle().x, y = middle().y) =>
   window.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y }));
+// far from any table
+const AWAY = 5000;
+
+const editor = (node = grid(), plugins: Plugin[] = []) =>
+  new EditorView(document.createElement("div"), {
+    state: createState(node, {
+      cursor: 2,
+      // the engine lays out first; the tools tell when a table changes how
+      // it is saved
+      plugins: [
+        pageSync(),
+        ...plugins,
+        tableView(),
+        tableTools(),
+        tableHandles(),
+      ],
+    }),
+  });
 
 describe("tableHandles", () => {
   beforeEach(() => {
     announcement.value = null;
     contextMenu.value = null;
-    view = new EditorView(document.createElement("div"), {
-      state: createState(grid(), {
-        cursor: 2,
-        // the tools tell when a table changes how it is saved
-        plugins: [tableView(), tableTools(), tableHandles()],
-      }),
-    });
+    showPages();
+    view = editor();
   });
 
   afterEach(() => {
     view.destroy();
+    hidePages();
   });
 
   it("shows the handles of the table under the mouse, with its layout", () => {
@@ -65,25 +87,46 @@ describe("tableHandles", () => {
     expect(state().rows).toHaveLength(5);
     expect(state().columns).toHaveLength(3);
 
-    hover(500, 500);
+    hover(AWAY, AWAY);
     expect(handles.value).toBeNull();
   });
 
-  it("measures the rows without the caption above them", () => {
-    const element = view.dom.querySelector("table")!;
-    element.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, right: 300, bottom: 200 }) as DOMRect;
-    element.tBodies[0].getBoundingClientRect = () =>
-      ({ left: 0, top: 30, right: 300, bottom: 200 }) as DOMRect;
-    hover(10, 10);
+  it("measures the rows and columns as the pages show them", () => {
+    hover();
+    const { box, rows, columns, firstRow, rowCount } = state();
+    expect({ firstRow, rowCount }).toEqual({ firstRow: 0, rowCount: 4 });
+    expect(rows[0]).toBe(box.top);
+    expect(rows[4]).toBe(box.bottom);
+    expect(columns[0]).toBe(box.left);
+    expect(columns[2]).toBe(box.right);
+    for (let row = 1; row < rows.length; row++) {
+      expect(rows[row]).toBeGreaterThan(rows[row - 1]);
+    }
+    // columns sized by content: the first is wider than the second
+    expect(state().percents[0]).toBeGreaterThan(state().percents[1]);
+  });
 
-    expect(state().box).toEqual({ left: 0, top: 30, right: 300, bottom: 200 });
+  it("shows the rows of the page under the mouse of a longer table", () => {
+    view.destroy();
+    const rows = Array.from({ length: 80 }, (_, row) =>
+      tr(td(`r${row}`), td()),
+    );
+    view = editor(doc(p("intro"), table(tr(th("a"), th("b")), ...rows), p()));
+    const { pieces, rowCount } = tableGeometry(TABLE)!;
+    expect(rowCount).toBe(81);
+    expect(pieces.length).toBeGreaterThan(1);
+    const second = pieces[1];
+    hover(second.box.left + 5, second.box.top + 5);
+
+    expect(state().firstRow).toBe(second.firstRow);
+    expect(state().firstRow).toBeGreaterThan(0);
+    expect(state().rows).toEqual(second.rows);
   });
 
   it("measures the table again only when the mouse gets to another one", () => {
     hover();
     const first = handles.value;
-    hover(1, 1);
+    hover(middle().x + 1, middle().y + 1);
     expect(handles.value).toBe(first);
 
     // a change to the document measures it again
@@ -160,7 +203,7 @@ describe("tableHandles", () => {
   it("keeps the handles while a drag holds them, wherever the mouse goes", () => {
     hover();
     state().hold(true);
-    hover(500, 500);
+    hover(AWAY, AWAY);
     expect(handles.value).not.toBeNull();
 
     state().hold(false);
@@ -171,12 +214,7 @@ describe("tableHandles", () => {
     // the keys a plugin before them handles, like Tab in a table, too
     view.destroy();
     const keys = new Plugin({ props: { handleKeyDown: () => true } });
-    view = new EditorView(document.createElement("div"), {
-      state: createState(grid(), {
-        cursor: 2,
-        plugins: [keys, tableView(), tableHandles()],
-      }),
-    });
+    view = editor(grid(), [keys]);
     hover();
     view.dom.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),

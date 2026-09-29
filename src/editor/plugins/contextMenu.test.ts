@@ -15,6 +15,8 @@ import {
   spellcheckStatus,
 } from "../../state";
 import type { Spellchecker } from "../../spellcheck/types";
+import { caretBox } from "../../engine/geometry";
+import { PAGE_MENU, PAGE_PRESS, sendPagePointer } from "../pagePointer";
 import { spellcheck as spellcheckPlugin } from "./spellcheck";
 import {
   contextMenuPlugin,
@@ -23,6 +25,8 @@ import {
   prefetch,
   SUGGESTION_WAIT,
 } from "./contextMenu";
+
+vi.mock("../../engine/geometry", () => ({ caretBox: vi.fn() }));
 
 const checker = (overrides: Partial<Spellchecker> = {}): Spellchecker => ({
   tag: "en",
@@ -39,8 +43,9 @@ const checker = (overrides: Partial<Spellchecker> = {}): Spellchecker => ({
 let view: EditorView;
 
 /**
- * setup renders "blank wrng text" with a flagged "wrng" at 7..11. Clicks land
- * at the doc position given as clientX.
+ * setup renders "blank wrng text" with a flagged "wrng" at 7..11. Clicks on
+ * the pages land at the doc position given, and the caret at a position is
+ * 10 px per position from the left.
  */
 const setup = async (spell = checker()) => {
   spellchecker.value = spell;
@@ -54,10 +59,7 @@ const setup = async (spell = checker()) => {
       }),
     },
   );
-  vi.spyOn(view, "posAtCoords").mockImplementation(({ left }) =>
-    left < 0 ? null : { pos: left, inside: -1 },
-  );
-  vi.spyOn(view, "coordsAtPos").mockImplementation((pos) => ({
+  vi.mocked(caretBox).mockImplementation((pos) => ({
     left: pos * 10,
     right: pos * 10,
     top: 20,
@@ -82,8 +84,22 @@ const fire = (type: string, init: MouseEventInit) => {
   return event;
 };
 
-const rightClick = (pos: number, init: MouseEventInit = {}) =>
-  fire("contextmenu", { button: 2, clientX: pos, clientY: 5, ...init });
+// what the page view sends for a press or right click at `pos`, -1 for off
+// the text
+const pointer = (pos: number, button = 2) => ({
+  pos: pos < 0 ? null : pos,
+  link: null,
+  x: pos,
+  y: 5,
+  button,
+  shiftKey: false,
+  ctrlKey: false,
+  metaKey: false,
+  altKey: false,
+});
+
+const rightClick = (pos: number) =>
+  sendPagePointer(view, PAGE_MENU, pointer(pos));
 
 describe("plugin.contextMenu", () => {
   beforeEach(() => {
@@ -103,9 +119,7 @@ describe("plugin.contextMenu", () => {
   it("opens with the suggestions for a misspelled word", async () => {
     await setup();
 
-    const event = rightClick(8);
-
-    expect(event.defaultPrevented).toBe(true);
+    expect(rightClick(8)).toBe(true);
     expect(view.state.selection.from).toBe(8);
     // waits for the suggestions, so the items don't move once it's open
     expect(contextMenu.value).toBeNull();
@@ -186,10 +200,10 @@ describe("plugin.contextMenu", () => {
     expect(view.state.selection.to).toBe(6);
   });
 
-  it("leaves Shift + right click to the webview", async () => {
+  it("leaves the webview's menu to Shift", async () => {
     await setup();
 
-    const event = rightClick(8, { shiftKey: true });
+    const event = fire("contextmenu", { button: 0, shiftKey: true });
 
     expect(event.defaultPrevented).toBe(false);
     expect(contextMenu.value).toBeNull();
@@ -198,9 +212,7 @@ describe("plugin.contextMenu", () => {
   it("opens nowhere outside the text", async () => {
     await setup();
 
-    const event = rightClick(-1);
-
-    expect(event.defaultPrevented).toBe(true);
+    expect(rightClick(-1)).toBe(true);
     expect(contextMenu.value).toBeNull();
   });
 
@@ -229,7 +241,7 @@ describe("plugin.contextMenu", () => {
 
     // the webview's own event for the same key press is ignored
     const first = contextMenu.value;
-    rightClick(3);
+    fire("contextmenu", { button: 0, clientX: 0, clientY: 0 });
     expect(contextMenu.value).toBe(first);
   });
 
@@ -246,13 +258,13 @@ describe("plugin.contextMenu", () => {
     const spell = checker();
     await setup(spell);
 
-    fire("mousedown", { button: 0, clientX: 8 });
+    sendPagePointer(view, PAGE_PRESS, pointer(8, 0));
     expect(spell.suggest).not.toHaveBeenCalled();
 
-    fire("mousedown", { button: 2, clientX: 8 });
+    sendPagePointer(view, PAGE_PRESS, pointer(8));
     expect(spell.suggest).toHaveBeenCalledWith("wrng");
 
-    fire("mousedown", { button: 2, clientX: -1 });
+    sendPagePointer(view, PAGE_PRESS, pointer(-1));
     prefetch(view.state, 3);
     expect(spell.suggest).toHaveBeenCalledTimes(1);
   });
@@ -283,9 +295,7 @@ describe("plugin.contextMenu", () => {
 
   it("falls back to the top left corner without coordinates", async () => {
     await setup();
-    vi.mocked(view.coordsAtPos).mockImplementation(() => {
-      throw new Error("not rendered");
-    });
+    vi.mocked(caretBox).mockReturnValue(null);
 
     openContextMenu(view, 3, { keyboard: true });
 

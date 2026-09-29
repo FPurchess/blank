@@ -12,6 +12,7 @@ import {
   keymap,
   languagePicker,
   openLink,
+  pageSync,
   pageView,
   properties,
   spellcheck,
@@ -38,6 +39,8 @@ export const bootEditor = async () => {
       // the pickers and autocorrect see Enter and Tab before the table keys
       // and the keymap do; prosemirror-tables asks for tableEditing last
       plugins: [
+        // lays out first, so the other plugins' views measure the new layout
+        pageSync(),
         history(),
         languagePicker(),
         tablePickerKeys(),

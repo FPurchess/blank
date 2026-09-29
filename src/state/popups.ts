@@ -65,12 +65,15 @@ export type Span = [from: number, to: number];
 
 export interface TableHandlesState {
   // the box of the rows of the table under the mouse (without its caption),
-  // in viewport coordinates, and the part of it in view sideways, since a
-  // wide table scrolls
+  // in viewport coordinates, and the part of it in view sideways
   box: { left: number; top: number; right: number; bottom: number };
   visible: { left: number; right: number };
-  // where each row and column starts, and where the last one ends
+  // where each row and column starts, and where the last one ends. A table
+  // on several pages shows the rows of the page under the mouse: `rows` are
+  // those, from row `firstRow` of its `rowCount` rows on.
   rows: number[];
+  firstRow: number;
+  rowCount: number;
   columns: number[];
   // the header rows and header column, which rows and columns don't move
   // into and nothing is inserted before

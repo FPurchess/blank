@@ -52,6 +52,19 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * the boxes of the blocks from `from` to `to`, one per page: page, x,
+     * y, width and height each
+     * @param {number} from
+     * @param {number} to
+     * @returns {Float32Array}
+     */
+    boxes(from, to) {
+        const ret = wasm.layoutengine_boxes(this.__wbg_ptr, from, to);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * page, x, y and height of the caret at a position, or nothing
      * @param {number} pos
      * @param {boolean} after
@@ -207,6 +220,19 @@ export class LayoutEngine {
     stats() {
         const ret = wasm.layoutengine_stats(this.__wbg_ptr);
         var v1 = getArrayI32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * the table at `pos` as laid out: the number of columns' edges, the
+     * edges, then page, row, y, height and repeat (0 or 1) for each row
+     * placed on a page; nothing for no table
+     * @param {number} pos
+     * @returns {Float32Array}
+     */
+    tableGrid(pos) {
+        const ret = wasm.layoutengine_tableGrid(this.__wbg_ptr, pos);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v1;
     }

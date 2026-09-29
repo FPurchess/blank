@@ -46,9 +46,20 @@ const editorText = () =>
 const frames = () => $$("#page-view .page-frame");
 
 // a click `dx`, `dy` pixels into the first shown frame of a page
+// scrolls the view so that the top of a page's frame is near the top
+const showPage = (page: number) =>
+  browser.execute((page: number) => {
+    const view = document.getElementById("page-view")!;
+    const frame = view.querySelector<HTMLElement>(
+      `.page-frame[data-page="${page}"]`,
+    );
+    if (frame) view.scrollTop = frame.offsetTop - 80;
+  }, page);
+
 const clickOnPage = async (page: number, dx: number, dy: number) => {
   const frame = await $(`#page-view .page-frame[data-page="${page}"]`);
   await frame.waitForExist();
+  await showPage(page);
   const location = await frame.getLocation();
   await browser
     .action("pointer")
@@ -154,6 +165,74 @@ describe("page view", () => {
       document.querySelector(".page-end")!.scrollIntoView({ block: "center" }),
     );
     await browser.saveScreenshot(path.join(SHOTS, "engine-page-end.png"));
+  });
+
+  it("moves a view's height with Page Down and back with Page Up", async () => {
+    await clickOnPage(1, 44, 58);
+    const scroller = () =>
+      browser.execute(() => document.getElementById("page-view")!.scrollTop);
+    const top = await scroller();
+    await browser.keys(Key.PageDown);
+    await browser.keys(Key.PageDown);
+    await expect(scroller()).resolves.toBeGreaterThan(top + 400);
+    await browser.keys(Key.PageUp);
+    await browser.keys(Key.PageUp);
+    await expect(scroller()).resolves.toBeLessThan(top + 50);
+  });
+
+  it("opens the context menu where the pages are right clicked", async () => {
+    await showPage(1);
+    const frame = await $('#page-view .page-frame[data-page="1"]');
+    const location = await frame.getLocation();
+    await browser
+      .action("pointer")
+      .move({
+        x: Math.round(location.x + 60),
+        y: Math.round(location.y + 58),
+        origin: "viewport",
+      })
+      .down({ button: 2 })
+      .up({ button: 2 })
+      .perform();
+    const menu = $("#context-menu");
+    await expect(menu).toBeExisting();
+    const box = await menu.getLocation();
+    expect(Math.abs(box.x - (location.x + 60))).toBeLessThan(40);
+    await browser.keys(Key.Escape);
+    await expect(menu).not.toBeExisting();
+  });
+
+  it("places the table toolbar on the painted table", async () => {
+    const file = path.join(dir, "table.md");
+    fs.writeFileSync(
+      file,
+      [
+        "Some text above the table.",
+        "",
+        "| Name | Value |",
+        "| --- | --- |",
+        "| one | 1 |",
+        "| two | 2 |",
+        "",
+        "Text below.",
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    // into the table's second row
+    await clickOnPage(1, 60, 58);
+    await browser.keys(Key.ArrowDown);
+    await browser.keys(Key.ArrowDown);
+    const toolbar = $("#table-toolbar");
+    await expect(toolbar).toBeDisplayed();
+    const frame = await $('#page-view .page-frame[data-page="1"]');
+    const page = await frame.getLocation();
+    const bar = await toolbar.getLocation();
+    const size = await toolbar.getSize();
+    // above the table, whose top is a line or two below the page's top
+    expect(bar.y + size.height).toBeGreaterThan(page.y);
+    expect(bar.y + size.height).toBeLessThan(page.y + 80);
+    await browser.saveScreenshot(path.join(SHOTS, "engine-table.png"));
   });
 
   // two chapters of four paragraphs fill about a page

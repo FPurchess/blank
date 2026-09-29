@@ -2,7 +2,7 @@
 import { computed } from "vue";
 
 import { pageCaret, pageSelection } from "../state";
-import { type FrameLayout, onDesk } from "./pageViewModel";
+import { type FrameLayout, onDesk } from "../engine/frames";
 
 // The caret and the selection over the painted pages. Apart from the pages,
 // so a moving caret renders only this.

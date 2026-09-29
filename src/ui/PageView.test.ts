@@ -3,7 +3,17 @@ import { nextTick } from "vue";
 
 import { setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
-import { pageCaret, pageLayoutState, pageView, pageSelection } from "../state";
+import {
+  contextMenu,
+  pageCaret,
+  pageLayoutState,
+  pageView,
+  pageSelection,
+} from "../state";
+import { EditorView } from "prosemirror-view";
+
+import { createEditorHandle } from "../editor/handle";
+import { contextMenuPlugin } from "../editor/plugins/contextMenu";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
@@ -110,6 +120,34 @@ describe("page view", () => {
       }),
     );
     expect(handle.view.state.selection.empty).toBe(false);
+  });
+
+  it("opens the context menu on a right click, where it hits", async () => {
+    const engine = layOut();
+    const editor = new EditorView(document.createElement("div"), {
+      state: createState(node, { cursor: 3, plugins: [contextMenuPlugin()] }),
+    });
+    dispose = bootApp(createEditorHandle(editor).handle);
+    await nextTick();
+    const frame = frames()[0];
+    const top = parseFloat(frame.style.top);
+    const left = parseFloat(frame.style.left);
+    const caret = engine.caret(20)!;
+    const scale = parseFloat(frame.style.width) / (595.28 - 2 * 70.87 + 48);
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      clientX: left + (caret.x - 70.87 + 24) * scale,
+      clientY: top + (caret.y - 70.87 + caret.height / 2) * scale,
+    });
+    view().dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(contextMenu.value?.anchor.left).toBe(event.clientX);
+    // the caret went where the click was
+    expect(Math.abs(editor.state.selection.head - 20)).toBeLessThan(2);
+    contextMenu.value = null;
+    editor.destroy();
   });
 
   it("shows the page of the caret in the bottom bar", async () => {

@@ -82,6 +82,9 @@ pub struct Laid {
     pub texts: Vec<TextBox>,
     /// the list marker, drawn with the first unit
     pub marker: Option<TextBox>,
+    /// for a table: where each column starts and where the last one ends,
+    /// in the item's coordinates
+    pub columns: Vec<f32>,
 }
 
 impl Laid {
@@ -172,6 +175,7 @@ impl Laid {
             }],
             texts: vec![],
             marker: None,
+            columns: vec![],
         }
     }
 
@@ -214,6 +218,7 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         units,
         texts: vec![boxed],
         marker: None,
+        columns: vec![],
     }
 }
 
@@ -329,9 +334,14 @@ fn table_units(
         });
         top += height;
     }
+    let mut edges = vec![indent];
+    for share in &shares {
+        edges.push(edges[edges.len() - 1] + share * width);
+    }
     Laid {
         units,
         texts,
         marker: None,
+        columns: edges,
     }
 }

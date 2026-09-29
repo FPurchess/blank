@@ -12,7 +12,9 @@ export const pageSelect =
   (state, dispatch) => {
     const selection = selectionAt(state, hit, anchor);
     if (selection.eq(state.selection)) return true;
-    dispatch?.(state.tr.setSelection(selection).setMeta(pageViewKey, POINTER));
+    dispatch?.(
+      state.tr.setSelection(selection).setMeta(pageViewKey, { by: POINTER }),
+    );
     return true;
   };
 

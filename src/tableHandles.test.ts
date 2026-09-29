@@ -16,6 +16,8 @@ const fake = (change: Partial<TableHandlesState> = {}): TableHandlesState => ({
   box: { left: 100, top: 100, right: 400, bottom: 220 },
   visible: { left: 100, right: 400 },
   rows: [100, 140, 180, 220],
+  firstRow: 0,
+  rowCount: 3,
   columns: [100, 200, 300, 400],
   headerRows: 1,
   headerColumn: false,
@@ -110,6 +112,32 @@ describe("sizeAt", () => {
 
   it("shrinks down to the smallest size the table allows", () => {
     expect(sizeAt(fake(), -300, -200)).toEqual({ cols: 2, rows: 2 });
+  });
+});
+
+describe("a table on several pages", () => {
+  // rows 2 and 3 of 5, on the page under the mouse
+  const piece = () =>
+    fake({
+      box: { left: 100, top: 100, right: 400, bottom: 180 },
+      rows: [100, 140, 180],
+      firstRow: 2,
+      rowCount: 5,
+    });
+
+  it("counts the rows shown from the first of them", () => {
+    expect(hoverAt(piece(), { x: 250, y: 150 })).toMatchObject({
+      row: 3,
+      column: 1,
+    });
+    expect(hoverAt(piece(), { x: 102, y: 141 }).insertRow).toBe(3);
+    // the line above the first row shown inserts before it
+    expect(hoverAt(piece(), { x: 102, y: 101 }).insertRow).toBe(2);
+  });
+
+  it("moves and grows by the rows of the whole table", () => {
+    expect(sizeAt(piece(), 0, 0)).toEqual({ cols: 3, rows: 4 });
+    expect(dropAt(piece().rows, [0, 1], 178, 0)).toBe(2);
   });
 });
 

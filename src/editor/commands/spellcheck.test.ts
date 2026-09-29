@@ -12,8 +12,11 @@ import {
   spellcheckStatus,
 } from "../../state";
 import type { Spellchecker } from "../../spellcheck/types";
+import { caretBox } from "../../engine/geometry";
 import { keymap } from "../plugins/keymap";
 import { spellcheck as spellcheckPlugin } from "../plugins/spellcheck";
+
+vi.mock("../../engine/geometry", () => ({ caretBox: vi.fn() }));
 
 const checker: Spellchecker = {
   tag: "en",
@@ -37,7 +40,7 @@ const setup = async (text = "wrng this tset") => {
       plugins: [spellcheckPlugin(), plugin],
     }),
   });
-  vi.spyOn(view, "coordsAtPos").mockReturnValue({
+  vi.mocked(caretBox).mockReturnValue({
     left: 1,
     right: 1,
     top: 2,

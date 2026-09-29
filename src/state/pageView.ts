@@ -56,6 +56,23 @@ export const pagePosition = computed(() => {
   return { page: head + 1, pages: layout.pages };
 });
 
-// asks the page view to bring the selection's head into view, e.g. after a
-// key moved it; a new object each time
-export const pageScrollRequest = shallowRef<PageRect | null>(null);
+// asks the page view to bring a spot into view, e.g. the selection's head
+// after a key moved it; with `at`, to show it that many pixels below the top
+// of the view, e.g. for Page Down. A new object each time.
+export type PageScrollRequest = PageRect & { at?: number };
+export const pageScrollRequest = shallowRef<PageScrollRequest | null>(null);
+
+// where the page view shows the pages: its box in the window and how far it
+// is scrolled, written by src/ui/PageView.vue whenever it scrolls or
+// resizes, and null while it isn't shown. The geometry (src/engine/
+// geometry.ts) measures with it, and plugins watch it to place what they
+// show again.
+export interface PageViewport {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  scrollTop: number;
+}
+
+export const pageViewport = shallowRef<PageViewport | null>(null);

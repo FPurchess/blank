@@ -4,7 +4,7 @@ export { contextMenuPlugin as contextMenu } from "./contextMenu";
 export { keymap } from "./keymap";
 export { languagePicker } from "./languagePicker";
 export { default as openLink } from "./openLink";
-export { pageView } from "./pageView";
+export { pageSync, pageView } from "./pageView";
 export { spellcheck } from "./spellcheck";
 export { default as properties } from "./properties";
 export {

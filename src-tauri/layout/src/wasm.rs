@@ -228,6 +228,38 @@ impl LayoutEngine {
             .collect()
     }
 
+    /// the boxes of the blocks from `from` to `to`, one per page: page, x,
+    /// y, width and height each
+    pub fn boxes(&self, from: u32, to: u32) -> Vec<f32> {
+        self.engine
+            .boxes(from, to)
+            .into_iter()
+            .flat_map(|(page, x, y, w, h)| [page as f32, x, y, w, h])
+            .collect()
+    }
+
+    /// the table at `pos` as laid out: the number of columns' edges, the
+    /// edges, then page, row, y, height and repeat (0 or 1) for each row
+    /// placed on a page; nothing for no table
+    #[wasm_bindgen(js_name = tableGrid)]
+    pub fn table_grid(&self, pos: u32) -> Vec<f32> {
+        let Some(grid) = self.engine.table_grid(pos) else {
+            return vec![];
+        };
+        let mut out = vec![grid.columns.len() as f32];
+        out.extend(&grid.columns);
+        for row in grid.rows {
+            out.extend([
+                row.page as f32,
+                row.row as f32,
+                row.y,
+                row.height,
+                if row.repeat { 1.0 } else { 0.0 },
+            ]);
+        }
+        out
+    }
+
     /// how much the last change laid out: items, the page it paginated
     /// from, and the page it settled at (-1 for none)
     pub fn stats(&self) -> Vec<i32> {

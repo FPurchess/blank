@@ -79,25 +79,49 @@ const nearestLine = (
  * hoverAt returns which handles the mouse at `point` shows for `table`
  */
 export const hoverAt = (table: TableHandlesState, point: Point): Hover => {
-  const { box, visible, rows, columns, headerRows, headerColumn } = table;
+  const { box, visible, rows, columns, headerRows, headerColumn, firstRow } =
+    table;
   const x = Math.min(Math.max(point.x, visible.left), visible.right - 1);
   const y = Math.min(Math.max(point.y, box.top), box.bottom - 1);
   // nothing goes before the header row or header column
-  const insertRow =
+  const line =
     Math.abs(point.x - visible.left) <= EDGE_NEAR
-      ? nearestLine(rows, point.y, INSERT_NEAR, headerRows > 0 ? 1 : 0)
+      ? nearestLine(
+          rows,
+          point.y,
+          INSERT_NEAR,
+          headerRows > 0 ? Math.max(0, 1 - firstRow) : 0,
+        )
       : null;
+  const insertRow = line === null ? null : line + firstRow;
   const insertColumn =
     Math.abs(point.y - box.top) <= EDGE_NEAR
       ? nearestLine(columns, point.x, INSERT_NEAR, headerColumn ? 1 : 0)
       : null;
+  const row = indexAt(rows, y);
   return {
-    row: indexAt(rows, y),
+    row: row === null ? null : row + firstRow,
     column: indexAt(columns, x),
     insertRow,
     insertColumn: insertRow === null ? insertColumn : null,
   };
 };
+
+/**
+ * lastPiece returns whether the rows shown are the table's last ones, where
+ * its bottom edge is
+ */
+const lastPiece = (table: TableHandlesState) =>
+  table.firstRow + table.rows.length - 1 >= table.rowCount;
+
+/**
+ * lineOf returns where the line before row `index` of the table is, within
+ * the rows shown
+ */
+const lineOf = (table: TableHandlesState, index: number) =>
+  table.rows[
+    Math.min(Math.max(index - table.firstRow, 0), table.rows.length - 1)
+  ];
 
 /**
  * dropAt returns the line of `lines` where rows or columns dragged from
@@ -182,7 +206,7 @@ export const sizeAt = (table: TableHandlesState, dx: number, dy: number) => ({
   ),
   rows: Math.max(
     table.smallest.rows,
-    countAt(table.rows, dy, growStep(table.rows, false)),
+    table.firstRow + countAt(table.rows, dy, growStep(table.rows, false)),
   ),
 });
 
@@ -258,12 +282,19 @@ export const outcomeOf = (drag: Drag, table: TableHandlesState): Outcome => {
   const dy = drag.at.y - drag.start.y;
   if (drag.kind === "move") {
     const rows = drag.axis === "rows";
-    const line = dropAt(
-      rows ? table.rows : table.columns,
-      drag.span,
-      rows ? drag.at.y : drag.at.x,
-      firstMovable(table, drag.axis),
-    );
+    const lines = rows ? table.rows : table.columns;
+    // the rows shown start at firstRow
+    const offset = rows ? table.firstRow : 0;
+    const local = (index: number) =>
+      Math.min(Math.max(index - offset, 0), lines.length - 1);
+    const line =
+      offset +
+      dropAt(
+        lines,
+        [local(drag.span[0]), local(drag.span[1])],
+        rows ? drag.at.y : drag.at.x,
+        Math.max(0, firstMovable(table, drag.axis) - offset),
+      );
     return { kind: "move", line, by: movedBy(drag.span, line) };
   }
   if (drag.kind === "resize") {
@@ -327,7 +358,8 @@ export const bootTableHandles = () =>
       const [from, to] = table.selected[axis];
       const [acrossFrom, acrossTo] =
         table.selected[axis === "rows" ? "columns" : "rows"];
-      const across = (axis === "rows" ? table.columns : table.rows).length - 1;
+      const across =
+        axis === "rows" ? table.columns.length - 1 : table.rowCount;
       const whole = acrossFrom === 0 && acrossTo === across;
       return whole && index >= from && index < to ? [from, to] : null;
     };
@@ -342,7 +374,7 @@ export const bootTableHandles = () =>
     const render = () => {
       root.hidden = !table;
       if (!table) return;
-      const { box, visible, rows, columns } = table;
+      const { box, visible, columns } = table;
       const height = box.bottom - box.top;
       const across = visible.right - visible.left;
 
@@ -357,9 +389,12 @@ export const bootTableHandles = () =>
           ? null
           : {
               left: visible.left - 6,
-              top: rows[row] + 6,
+              top: lineOf(table, row) + 6,
               width: 12,
-              height: Math.max(rows[row + 1] - rows[row] - 12, 8),
+              height: Math.max(
+                lineOf(table, row + 1) - lineOf(table, row) - 12,
+                8,
+              ),
             },
       );
       rowGrip.classList.toggle(
@@ -387,7 +422,8 @@ export const bootTableHandles = () =>
       );
 
       // the "+" and the line where it inserts
-      const y = hover.insertRow === null ? null : rows[hover.insertRow];
+      const y =
+        hover.insertRow === null ? null : lineOf(table, hover.insertRow);
       const x =
         hover.insertColumn === null ? null : columns[hover.insertColumn];
       const columnShown = x !== null && x >= visible.left && x <= visible.right;
@@ -430,8 +466,10 @@ export const bootTableHandles = () =>
         );
       });
 
-      // the edges, which add and drop columns and rows
+      // the edges, which add and drop columns and rows; the bottom one on
+      // the page the table ends on
       const rightShown = !drag && box.right <= visible.right + 1;
+      const bottomShown = !drag && lastPiece(table);
       place(
         right,
         rightShown
@@ -440,7 +478,7 @@ export const bootTableHandles = () =>
       );
       place(
         bottom,
-        drag
+        !bottomShown
           ? null
           : {
               left: visible.left,
@@ -451,7 +489,7 @@ export const bootTableHandles = () =>
       );
       place(
         corner,
-        rightShown
+        rightShown && bottomShown
           ? { left: box.right - 5, top: box.bottom - 5, width: 12, height: 12 }
           : null,
       );
@@ -466,21 +504,21 @@ export const bootTableHandles = () =>
       const height = box.bottom - box.top;
       const outcome = outcomeOf(current, now);
       if (outcome.kind === "move" && current.kind === "move") {
-        const lines = current.axis === "rows" ? rows : columns;
+        const lines = columns;
         const [from, to] = current.span;
         if (current.axis === "rows") {
           const across = visible.right - visible.left;
           place(guide, {
             left: visible.left,
-            top: lines[outcome.line] - 2,
+            top: lineOf(now, outcome.line) - 2,
             width: across,
             height: 4,
           });
           place(dragged, {
             left: visible.left,
-            top: lines[from],
+            top: lineOf(now, from),
             width: across,
-            height: lines[to] - lines[from],
+            height: lineOf(now, to) - lineOf(now, from),
           });
         } else {
           const left = Math.max(lines[from], visible.left);
@@ -508,7 +546,8 @@ export const bootTableHandles = () =>
         const width =
           extent(columns, outcome.cols, growStep(columns, true)) - box.left;
         const tall =
-          extent(rows, outcome.rows, growStep(rows, false)) - box.top;
+          extent(rows, outcome.rows - now.firstRow, growStep(rows, false)) -
+          box.top;
         place(ghost, { left: box.left, top: box.top, width, height: tall });
         size.textContent = `${outcome.cols} × ${outcome.rows}`;
       }
@@ -535,7 +574,7 @@ export const bootTableHandles = () =>
       } else if (outcome.kind === "edge") {
         const changed =
           outcome.cols !== now.columns.length - 1 ||
-          outcome.rows !== now.rows.length - 1;
+          outcome.rows !== now.rowCount;
         if (changed) now.resize(outcome.cols, outcome.rows);
       }
     };

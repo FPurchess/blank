@@ -1,8 +1,7 @@
 import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
+import { EditorView } from "prosemirror-view";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { setPageEngine } from "../../engine/engine";
 import { schema } from "../../markdown";
 import {
   pageCaret,
@@ -11,45 +10,37 @@ import {
   pageSelection,
 } from "../../state";
 import { doc, keyEvent, p } from "../../test/editor";
-import { testEngine } from "../../test/engine";
+import { hidePages, showPages } from "../../test/engine";
+import { caretBox } from "../../engine/geometry";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
-import { pageView, pageViewKey, selectionAt } from "./pageView";
+import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
 
-// a view that runs the plugin's view like EditorView does
+// an editor with the page view's plugins, on the pages the app shows
 const mount = (node = doc(p(LONG), p(LONG))) => {
-  const plugin = pageView();
-  let state = EditorState.create({ schema, doc: node, plugins: [plugin] });
+  let state = EditorState.create({
+    schema,
+    doc: node,
+    plugins: [pageSync(), pageView()],
+  });
   state = state.apply(
     state.tr.setSelection(TextSelection.create(state.doc, 5)),
   );
-  const view = {
-    state,
-    dispatch(tr: import("prosemirror-state").Transaction) {
-      const previous = view.state;
-      view.state = view.state.apply(tr);
-      pluginView.update?.(view as unknown as EditorView, previous);
-    },
-  };
-  const pluginView = plugin.spec.view!(view as unknown as EditorView);
+  const view = new EditorView(document.createElement("div"), { state });
   const press = (combo: string) =>
-    plugin.props.handleKeyDown!.call(
-      plugin,
-      view as unknown as EditorView,
-      keyEvent(combo),
-    );
-  return { view, plugin, pluginView, press };
+    view.someProp("handleKeyDown", (f) => f(view, keyEvent(combo))) ?? false;
+  return { view, press, pluginView: { destroy: () => view.destroy() } };
 };
 
 describe("pageView plugin", () => {
   let destroy = () => {};
 
-  beforeEach(() => setPageEngine(testEngine()));
+  beforeEach(() => showPages());
   afterEach(() => {
     destroy();
-    setPageEngine(null);
+    hidePages();
     pageScrollRequest.value = null;
   });
 
@@ -106,6 +97,29 @@ describe("pageView plugin", () => {
     expect(end).toBeLessThan(LONG.length);
     mounted.press("Home");
     expect(mounted.view.state.selection.head).toBe(1);
+  });
+
+  it("moves a view's height with Page Up and Down, keeping its place", () => {
+    const mounted = mount(doc(...Array.from({ length: 30 }, () => p(LONG))));
+    destroy = () => mounted.pluginView.destroy?.();
+    const start = caretBox(5)!;
+    expect(mounted.press("PageDown")).toBe(true);
+    const head = mounted.view.state.selection.head;
+    const moved = caretBox(head)!;
+    // most of the 600 px view further down, in the same column
+    expect(moved.top - start.top).toBeGreaterThan(400);
+    expect(moved.top - start.top).toBeLessThan(600);
+    expect(Math.abs(moved.left - start.left)).toBeLessThan(10);
+    // the view scrolls as far, so the caret stays where it was in it
+    expect(pageScrollRequest.value?.at).toBeCloseTo(start.top, 0);
+    mounted.press("PageUp");
+    expect(mounted.view.state.selection.head).toBe(5);
+    // up from the top goes to the start
+    mounted.press("PageUp");
+    expect(mounted.view.state.selection.head).toBe(0 + 1);
+    // with Shift, it selects
+    mounted.press("Shift-PageDown");
+    expect(mounted.view.state.selection.empty).toBe(false);
   });
 
   it("selects what the pointer hits, without scrolling", () => {

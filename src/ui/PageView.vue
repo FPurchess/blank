@@ -10,6 +10,12 @@ import {
 } from "vue";
 
 import { alignHiddenEditor } from "../editor/hidden";
+import {
+  PAGE_MENU,
+  PAGE_PRESS,
+  type PagePointer,
+  sendPagePointer,
+} from "../editor/pagePointer";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import { listenOnWindow } from "../scope";
@@ -18,11 +24,13 @@ import {
   pageLayoutState,
   pageScrollRequest,
   pageView,
+  pageViewport,
 } from "../state";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
-import { drag, press } from "./pagePointer";
-import { frameLayout, onDesk, scrollFor, visibleFrames } from "./pageViewModel";
+import { drag, edgeStep, press, targetAt } from "./pagePointer";
+import { frameLayout, onDesk, visibleFrames } from "../engine/frames";
+import { scrollFor } from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -35,12 +43,22 @@ const width = shallowRef(800);
 const scrollTop = shallowRef(0);
 const viewHeight = shallowRef(600);
 
+// publishes where the pages are shown, for the geometry and what places
+// itself at the text
 const measure = () => {
   const element = scroller.value;
   if (!element) return;
   width.value = element.clientWidth || window.innerWidth;
   viewHeight.value = element.clientHeight || window.innerHeight;
   scrollTop.value = element.scrollTop;
+  const box = element.getBoundingClientRect();
+  pageViewport.value = {
+    left: box.left,
+    top: box.top,
+    width: width.value,
+    height: viewHeight.value,
+    scrollTop: scrollTop.value,
+  };
 };
 
 const layout = computed(() =>
@@ -65,6 +83,7 @@ const frames = computed(() => {
 });
 
 onMounted(measure);
+onUnmounted(() => (pageViewport.value = null));
 listenOnWindow("resize", measure);
 
 // the view keeps its place on the page when it switches or resizes
@@ -79,12 +98,15 @@ const scrollToCaret = (center = false) => {
   if (!element || !layout.value || !request) return;
   const rect = onDesk(layout.value, { ...request, width: 0 });
   if (!rect) return;
+  const at = pageScrollRequest.value?.at;
   const target = center
     ? Math.max(0, rect.top - element.clientHeight / 2)
-    : scrollFor(rect, element.scrollTop, element.clientHeight);
-  if (target !== null) {
+    : at !== undefined
+      ? Math.max(0, rect.top - at)
+      : scrollFor(rect, element.scrollTop, element.clientHeight);
+  if (target !== null && target !== element.scrollTop) {
     element.scrollTop = target;
-    scrollTop.value = element.scrollTop;
+    measure();
   }
 };
 
@@ -124,36 +146,101 @@ const onScroll = () => {
   alignSoon();
 };
 
-const deskPoint = (event: MouseEvent) => {
+const deskPoint = (x: number, y: number) => {
   const element = scroller.value!;
   const box = element.getBoundingClientRect();
+  return { x: x - box.left, y: y - box.top + element.scrollTop };
+};
+
+// what the pointer targets, for the editor's plugins
+const pointerAt = (event: MouseEvent): PagePointer => {
+  const target = pageEngine &&
+    layout.value && {
+      engine: pageEngine,
+      editor,
+      layout: layout.value,
+    };
+  const { x, y } = deskPoint(event.clientX, event.clientY);
   return {
-    x: event.clientX - box.left,
-    y: event.clientY - box.top + element.scrollTop,
+    ...(target ? targetAt(target, x, y) : { pos: null, link: null }),
+    x: event.clientX,
+    y: event.clientY,
+    button: event.button,
+    shiftKey: event.shiftKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    altKey: event.altKey,
   };
 };
 
 let anchor: number | null = null;
+// the last point of a drag, in the window, for scrolling at the edges
+let dragAt: { x: number; y: number } | null = null;
+let edgeScroll: number | undefined;
 
 const onMouseDown = (event: MouseEvent) => {
-  if (event.button !== 0 || !pageEngine || !layout.value) return;
+  if (!pageEngine || !layout.value) return;
   // the hidden editor keeps the focus
   event.preventDefault();
-  const { x, y } = deskPoint(event);
+  // the editor's plugins see the press first, e.g. to close a picker
+  if (sendPagePointer(editor.view, PAGE_PRESS, pointerAt(event))) return;
+  if (event.button !== 0) return;
+  const { x, y } = deskPoint(event.clientX, event.clientY);
   anchor = press({ engine: pageEngine, editor, layout: layout.value }, x, y, {
     count: Math.min(event.detail || 1, 3),
     shift: event.shiftKey,
   });
+  dragAt = { x: event.clientX, y: event.clientY };
+};
+
+const onContextMenu = (event: MouseEvent) => {
+  // Shift keeps the webview's menu, e.g. for system services
+  if (event.shiftKey) return;
+  event.preventDefault();
+  sendPagePointer(editor.view, PAGE_MENU, pointerAt(event));
+};
+
+const dragTo = (x: number, y: number) => {
+  if (anchor === null || !pageEngine || !layout.value) return;
+  const point = deskPoint(x, y);
+  drag(
+    { engine: pageEngine, editor, layout: layout.value },
+    anchor,
+    point.x,
+    point.y,
+  );
+};
+
+// while a drag is beyond the top or bottom edge, the view scrolls, the
+// faster the farther
+const scrollAtEdges = () => {
+  edgeScroll = undefined;
+  const element = scroller.value;
+  if (anchor === null || !dragAt || !element) return;
+  const box = element.getBoundingClientRect();
+  const step = edgeStep(dragAt.y, box.top, box.bottom);
+  if (step === 0) return;
+  element.scrollTop += step;
+  measure();
+  dragTo(dragAt.x, dragAt.y);
+  edgeScroll = requestAnimationFrame(scrollAtEdges);
 };
 
 listenOnWindow("mousemove", (event) => {
-  if (anchor === null || !(event.buttons & 1) || !pageEngine || !layout.value)
-    return;
-  const { x, y } = deskPoint(event);
-  drag({ engine: pageEngine, editor, layout: layout.value }, anchor, x, y);
+  if (anchor === null || !(event.buttons & 1)) return;
+  dragAt = { x: event.clientX, y: event.clientY };
+  dragTo(event.clientX, event.clientY);
+  if (edgeScroll === undefined)
+    edgeScroll = requestAnimationFrame(scrollAtEdges);
 });
 listenOnWindow("mouseup", () => {
   anchor = null;
+  dragAt = null;
+  if (edgeScroll !== undefined) cancelAnimationFrame(edgeScroll);
+  edgeScroll = undefined;
+});
+onUnmounted(() => {
+  if (edgeScroll !== undefined) cancelAnimationFrame(edgeScroll);
 });
 </script>
 
@@ -164,6 +251,7 @@ listenOnWindow("mouseup", () => {
     :class="pageView"
     @scroll="onScroll"
     @mousedown="onMouseDown"
+    @contextmenu="onContextMenu"
   >
     <div
       v-if="layout"

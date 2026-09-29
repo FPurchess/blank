@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { caretBox } from "../../../engine/geometry";
 import { tablePicker } from "../../../state";
 import {
   createState,
@@ -15,12 +16,17 @@ import { createTable } from "./insert";
 import { tableTools, toolsKey } from "../../plugins/tables/tools";
 import { tableKey } from "./tableKey";
 
+vi.mock("../../../engine/geometry", () => ({ caretBox: vi.fn() }));
+
 const setup = (node = doc(p()), cursor = 1) => {
   const view = createTestView(createState(node, { cursor }));
-  Object.assign(view, {
-    coordsAtPos: () => ({ left: 10, right: 10, top: 20, bottom: 40 }),
-    focus: vi.fn(),
+  vi.mocked(caretBox).mockReturnValue({
+    left: 10,
+    right: 10,
+    top: 20,
+    bottom: 40,
   });
+  Object.assign(view, { focus: vi.fn() });
   return view;
 };
 

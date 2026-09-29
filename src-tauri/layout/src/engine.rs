@@ -103,6 +103,25 @@ pub struct Word {
     start: u32,
 }
 
+/// a row of a table placed on a page
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GridRow {
+    pub page: usize,
+    pub row: usize,
+    pub y: f32,
+    pub height: f32,
+    /// a header row repeated on a page the table continues on
+    pub repeat: bool,
+}
+
+/// a table as laid out, see Engine::table_grid
+#[derive(Clone, Debug, PartialEq)]
+pub struct TableGrid {
+    /// where each column starts on the page, and where the last one ends
+    pub columns: Vec<f32>,
+    pub rows: Vec<GridRow>,
+}
+
 /// how a position is shown: as a caret in text, or as a whole node
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Hit {
@@ -654,6 +673,101 @@ impl Engine {
             }
         }
         rects
+    }
+
+    /// the box of a fragment on its page: x, y, width and height
+    fn frag_box(&self, frag_index: usize) -> (f32, f32, f32, f32) {
+        let frag = self.frags[frag_index];
+        let item = &self.items[frag.item];
+        let laid = &self.laid[frag.item];
+        let unit = &laid.units[frag.unit];
+        let left = self.settings.margins.left;
+        // an image is as wide as it is shown
+        if let Some(crate::items::Deco::Image { x, w, .. }) = unit
+            .decos
+            .iter()
+            .find(|deco| matches!(deco, crate::items::Deco::Image { .. }))
+        {
+            return (left + x, frag.y, *w, unit.height);
+        }
+        (
+            left + item.indent,
+            frag.y,
+            self.settings.content_width() - item.indent,
+            unit.height,
+        )
+    }
+
+    /// the boxes of the blocks from `from` to `to`, one per page they are
+    /// on: page, x, y, width and height. A block is in the range when all
+    /// of it is, as the items of a node are within the node.
+    pub fn boxes(&self, from: u32, to: u32) -> Vec<(usize, f32, f32, f32, f32)> {
+        let mut boxes: Vec<(usize, f32, f32, f32, f32)> = vec![];
+        let start = self.items.partition_point(|item| item.from() < from);
+        for item in start..self.items.len() {
+            if self.items[item].from() > to {
+                break;
+            }
+            if self.items[item].to() > to {
+                continue;
+            }
+            let Some(first) = self.first_frag.get(item).copied() else {
+                continue;
+            };
+            if first == usize::MAX {
+                continue;
+            }
+            for index in first..self.frags.len() {
+                let frag = self.frags[index];
+                if frag.item != item {
+                    if frag.repeat {
+                        continue;
+                    }
+                    break;
+                }
+                let page = self.page_of_frag(index);
+                let (x, y, w, h) = self.frag_box(index);
+                match boxes.last_mut() {
+                    Some(last) if last.0 == page => {
+                        let right = (last.1 + last.3).max(x + w);
+                        let bottom = (last.2 + last.4).max(y + h);
+                        last.1 = last.1.min(x);
+                        last.2 = last.2.min(y);
+                        last.3 = right - last.1;
+                        last.4 = bottom - last.2;
+                    }
+                    _ => boxes.push((page, x, y, w, h)),
+                }
+            }
+        }
+        boxes
+    }
+
+    /// how the table at `pos` is laid out: where its columns are, on the
+    /// page, and each row placed on a page (repeated header rows too)
+    pub fn table_grid(&self, pos: u32) -> Option<TableGrid> {
+        let item = self
+            .items
+            .iter()
+            .position(|item| matches!(item.content, Content::Table { .. }) && item.from() == pos)?;
+        let laid = &self.laid[item];
+        let left = self.settings.margins.left;
+        let columns = laid.columns.iter().map(|x| left + x).collect();
+        let mut rows = vec![];
+        for (index, frag) in self.frags.iter().enumerate() {
+            if frag.item != item {
+                continue;
+            }
+            let unit = &laid.units[frag.unit];
+            rows.push(GridRow {
+                page: self.page_of_frag(index),
+                row: frag.unit,
+                y: frag.y,
+                height: unit.height,
+                repeat: frag.repeat,
+            });
+        }
+        Some(TableGrid { columns, rows })
     }
 
     /// the lines of the document as laid out: page, x and baseline of the
@@ -1417,5 +1531,39 @@ mod tests {
         let (page, x, y, h) = engine.caret(10 + 2, false).unwrap();
         assert_eq!(page, 0);
         assert_eq!(engine.hit(page, x + 0.1, y + h / 2.0), Some(Hit::Text(12)));
+        // the grid: two columns across the text, every row placed, the
+        // header row again on the second page
+        let grid = engine.table_grid(0).unwrap();
+        assert_eq!(grid.columns.len(), 3);
+        let left = engine.settings.margins.left;
+        assert!((grid.columns[0] - left).abs() < 0.01);
+        assert!((grid.columns[2] - left - engine.settings.content_width()).abs() < 0.01);
+        assert_eq!(grid.rows.iter().filter(|row| !row.repeat).count(), 81);
+        let repeated = grid.rows.iter().find(|row| row.repeat).unwrap();
+        assert_eq!((repeated.page, repeated.row), (1, 0));
+        assert!(engine.table_grid(5).is_none());
+        // the table's box on each page
+        let boxes = engine.boxes(0, 2000);
+        assert_eq!(boxes.len(), engine.pages.len());
+        assert!((boxes[0].2 - engine.settings.content_top()).abs() < 0.01);
+    }
+
+    #[test]
+    fn boxes_blocks_by_page() {
+        let items = document(&["one", "two", LONG]);
+        let engine = engine(items.clone());
+        // the second paragraph: its node is from 5 to 10
+        let boxes = engine.boxes(5, 10);
+        assert_eq!(boxes.len(), 1);
+        let (page, x, y, w, h) = boxes[0];
+        assert_eq!(page, 0);
+        assert!((x - engine.settings.margins.left).abs() < 0.01);
+        assert!((w - engine.settings.content_width()).abs() < 0.01);
+        assert!(y > engine.settings.content_top() && h > 10.0);
+        // all three are one box on the page
+        let all = engine.boxes(0, items[2].to() + 1);
+        assert_eq!(all.len(), 1);
+        assert!(all[0].4 > h * 3.0);
+        assert!(engine.boxes(100_000, 100_010).is_empty());
     }
 }

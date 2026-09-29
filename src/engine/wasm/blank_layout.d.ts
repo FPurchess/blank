@@ -15,6 +15,11 @@ export class LayoutEngine {
      */
     bottoms(): Float32Array;
     /**
+     * the boxes of the blocks from `from` to `to`, one per page: page, x,
+     * y, width and height each
+     */
+    boxes(from: number, to: number): Float32Array;
+    /**
      * page, x, y and height of the caret at a position, or nothing
      */
     caret(pos: number, after: boolean): Float32Array;
@@ -55,6 +60,12 @@ export class LayoutEngine {
      * from, and the page it settled at (-1 for none)
      */
     stats(): Int32Array;
+    /**
+     * the table at `pos` as laid out: the number of columns' edges, the
+     * edges, then page, row, y, height and repeat (0 or 1) for each row
+     * placed on a page; nothing for no table
+     */
+    tableGrid(pos: number): Float32Array;
     unitsPerEm(font: number): number;
     update(start: number, _delete: number, json: string, shift: number): void;
     /**
@@ -77,6 +88,7 @@ export interface InitOutput {
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly layoutengine_bands: (a: number, b: number) => [number, number];
     readonly layoutengine_bottoms: (a: number) => [number, number];
+    readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_clearImages: (a: number) => void;
     readonly layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
@@ -90,6 +102,7 @@ export interface InitOutput {
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_stats: (a: number) => [number, number];
+    readonly layoutengine_tableGrid: (a: number, b: number) => [number, number];
     readonly layoutengine_unitsPerEm: (a: number, b: number) => number;
     readonly layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
     readonly layoutengine_versions: (a: number) => [number, number];

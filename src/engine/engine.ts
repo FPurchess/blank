@@ -21,6 +21,43 @@ export interface Hit {
 const toHit = (values: Float64Array): Hit | null =>
   values.length === 2 ? { node: values[0] === 1, pos: values[1] } : null;
 
+// a box on a page, in points from its top left corner
+export interface PageBox {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// a table as laid out: where each column starts on the page and where the
+// last ends, and each row placed on a page
+export interface EngineTableGrid {
+  columns: number[];
+  rows: {
+    page: number;
+    row: number;
+    y: number;
+    height: number;
+    // a header row repeated on a page the table continues on
+    repeat: boolean;
+  }[];
+}
+
+const rectsOf = (values: Float32Array): PageBox[] => {
+  const rects: PageBox[] = [];
+  for (let index = 0; index + 4 < values.length; index += 5) {
+    rects.push({
+      page: values[index],
+      x: values[index + 1],
+      y: values[index + 2],
+      width: values[index + 3],
+      height: values[index + 4],
+    });
+  }
+  return rects;
+};
+
 // what a page shows, as the engine writes it (see wasm.rs `page`)
 export interface PageDisplay {
   // rectangles: x, y, width, height, role
@@ -167,18 +204,37 @@ export class PageEngine {
   }
 
   selection(from: number, to: number) {
-    const values = this.raw.selection(from, to);
-    const rects = [];
-    for (let index = 0; index + 4 < values.length; index += 5) {
-      rects.push({
+    return rectsOf(this.raw.selection(from, to));
+  }
+
+  /**
+   * boxes returns the boxes of the blocks from `from` to `to`, one for each
+   * page they are on, in points
+   */
+  boxes(from: number, to: number): PageBox[] {
+    return rectsOf(this.raw.boxes(from, to));
+  }
+
+  /**
+   * tableGrid returns where the columns of the table at `pos` are, and each
+   * of its rows placed on a page, in points, or null for no table there
+   */
+  tableGrid(pos: number): EngineTableGrid | null {
+    const values = this.raw.tableGrid(pos);
+    if (values.length === 0) return null;
+    const count = values[0];
+    const columns = Array.from(values.subarray(1, 1 + count));
+    const rows: EngineTableGrid["rows"] = [];
+    for (let index = 1 + count; index + 4 < values.length; index += 5) {
+      rows.push({
         page: values[index],
-        x: values[index + 1],
+        row: values[index + 1],
         y: values[index + 2],
-        width: values[index + 3],
-        height: values[index + 4],
+        height: values[index + 3],
+        repeat: values[index + 4] === 1,
       });
     }
-    return rects;
+    return { columns, rows };
   }
 
   hit(page: number, x: number, y: number) {

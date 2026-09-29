@@ -1,7 +1,8 @@
 import type { EditorHandle } from "../editor/handle";
 import { pageSelect, pageSelectRange } from "../editor/commands/pageSelect";
 import type { PageEngine } from "../engine/engine";
-import { type FrameLayout, pointOnPage } from "./pageViewModel";
+import { type FrameLayout, pointOnPage } from "../engine/frames";
+import { pageLayoutState } from "../state";
 
 // What the pointer does on the painted pages: a click places the caret, a
 // double click selects a word, a triple click a line, Shift extends the
@@ -65,4 +66,47 @@ export const drag = (
     editor.run(pageSelect({ node: false, pos: hit.pos }, anchor), {
       focus: false,
     });
+};
+
+/**
+ * targetAt returns what a point of the desk hits: the position, and the
+ * link under it
+ */
+export const targetAt = (
+  { engine, layout }: Omit<PointerTarget, "editor">,
+  x: number,
+  y: number,
+) => {
+  const point = pointOnPage(layout, x, y);
+  if (!point) return { pos: null, link: null };
+  const hit = engine.hit(point.page, point.x, point.y);
+  const version = pageLayoutState.value?.versions[point.page] ?? 0;
+  const link = engine
+    .display(point.page, version)
+    .l.find(
+      ([, lx, ly, w, h]) =>
+        point.x >= lx &&
+        point.x <= lx + w &&
+        point.y >= ly &&
+        point.y <= ly + h,
+    );
+  return { pos: hit?.pos ?? null, link: link?.[0] ?? null };
+};
+
+// how near the top and bottom edges of the view a drag scrolls, and how
+// fast at most, in px per frame
+const EDGE = 24;
+const MAX_STEP = 40;
+
+/**
+ * edgeStep returns how far a drag at `y` scrolls the view from `top` to
+ * `bottom` in a frame: up near or above the top, down near or below the
+ * bottom, the farther the faster
+ */
+export const edgeStep = (y: number, top: number, bottom: number) => {
+  if (y < top + EDGE)
+    return -Math.min(MAX_STEP, Math.ceil((top + EDGE - y) / 2));
+  if (y > bottom - EDGE)
+    return Math.min(MAX_STEP, Math.ceil((y - bottom + EDGE) / 2));
+  return 0;
 };
