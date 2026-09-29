@@ -132,13 +132,30 @@ step.
   - E2E helpers for the pages: `clickText`, `textBox`, `editorText` and
     `focusEditor` (`e2e/helpers.ts`), on `window.blankGeometry.find`.
 
+- 6. **PDF parity, and pdfmake removed:**
+  - The engine's PDF has what pdfmake's had: images loaded like before
+    (`prepareImages`, web images through `@tauri-apps/plugin-http`) with the
+    warning for those that couldn't be, and their alt text in their place;
+    the table colours of `TABLE_COLORS` and the lines of `TABLE_LINES`;
+    captions, quote bars, rules, code blocks, line breaks, ordered lists
+    from any number; the DejaVu fallback per glyph (Parley's font stack);
+    the "Exported N pages" notification and the layout warnings
+    (`exportAs.ts`, unchanged); clickable links; title, author and creator.
+    Beyond pdfmake: code in Plex Mono with its tint, emoji and other scripts,
+    merged cells, rows taller than a page.
+  - pdfmake, `@types/pdfmake`, `src/exporters/pdf/` with its generated font
+    VFS, and `scripts/build-pdf-vfs.ts` (`fonts:vfs`) are gone. The Word
+    export loads Plex Sans from `fonts/` (`src/exporters/docx/font.ts`).
+  - Verified: `src/engine/pdf.test.ts` (warnings, pages, and with poppler:
+    the text, the list numbers, the alt text, the image, the link, the
+    metadata), `exact.test.ts`, the Rust tests.
+
 ### In progress
 
-- 6. PDF parity with pdfmake.
+- 7. IME and accessibility.
 
 ### Open
 
-- 6. PDF parity with pdfmake, then remove pdfmake.
 - 7. IME and accessibility.
 - 8. Performance: start-up, work per key on 100 pages.
 - 9. E2E, docs shots, CI, coverage, user docs.
@@ -374,9 +391,9 @@ as mean / p95, and `performance.now()` there is only accurate to about 1 ms.
    (line height, spacing, lists, tables, images, justification, hyphenation,
    widows) has to be built in the engine. The Word export still follows its own
    rules, so Word and the PDF can differ.
-5. **Size and start-up:** about 3 MB of wasm plus 4 MB of TTFs are bundled
-   (the pdfmake VFS stays for the Word export's embedded font). Loading them
-   adds to start-up.
+5. **Size and start-up:** about 3 MB of wasm plus 4.7 MB of TTFs are
+   bundled (and 2 MB of Noto Emoji, loaded only when needed). The pdfmake
+   VFS is gone. Loading them adds to start-up.
 6. **Tests:** E2E has to move to the page view, and the unit tests need the
    wasm (committed) plus pdftotext for the exactness check.
 

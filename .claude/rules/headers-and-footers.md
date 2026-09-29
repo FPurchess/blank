@@ -7,7 +7,7 @@ paths:
   - "src/state/page.ts"
   - "src/state/dialogs.ts"
   - "src/ui.ts"
-  - "src/exporters/pdf/**"
+  - "src-tauri/layout/src/bands.rs"
   - "src/exporters/docx/**"
   - "src/importers/docx/**"
   - "src/editor/index.ts"
@@ -32,9 +32,7 @@ paths:
   - the band's size and distance from the edge (`BAND`, `BAND_ROOM`)
   - `bandsOn`: the bands of a page. The first page's own or none; even pages by the number they show, as in Word.
   - `variantsOf`, `formatNumber` (roman numerals), `documentFields`, `chapterOn`, `fieldValues`
-- PDF (`src/exporters/pdf/bands.ts`, `index.ts`): pdfmake's `header`/`footer` functions draw the bands.
-  - `{chapter}` comes from the `positions` pdfmake leaves on the top-level heading 1 blocks (`chapterPages`). pdfmake lays out the text before it draws the headers and doesn't copy the document definition, so one pass is enough.
-  - A test against the real pdfmake guards this (`index.test.ts`).
+- The pages and the PDF: the layout engine lays out the bands of each page (`src-tauri/layout/src/bands.rs`, a port of `bands.ts` and `tokens.ts`) after it paginated, so `{chapter}` and `{pages}` are known; the screen paints them on the sheets and the PDF holds them.
 - Word (`src/exporters/docx/bands.ts`):
   - One paragraph per band in Word's `Header`/`Footer` style, with center and right tab stops.
   - Word's own fields: `PAGE`, `NUMPAGES`, `TITLE`, `AUTHOR`, `STYLEREF "Heading 1"`, `DATE \@ "<picture>"` (`datePicture`) and `FILENAME`. Their names and the page number formats are in `fields.ts`, which the Word import reads them back by.

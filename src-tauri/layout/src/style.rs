@@ -1,5 +1,5 @@
 //! The text styles: 11 pt body and headings on a major third scale, as
-//! src/exporters/pdf/template.ts had them for pdfmake, whose line height is
+//! the PDF had them since pdfmake wrote it, whose line height was
 //! a factor of IBM Plex Sans' natural 1.3 em.
 
 /// IBM Plex Sans' ascender plus descender, in em

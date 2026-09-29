@@ -6,8 +6,8 @@ import type { Content, EngineItem, EngineSpan, EngineText } from "./types";
 // Flattens a ProseMirror document into the items the layout engine lays out
 // one after the other: every textblock, rule, page break, image and table,
 // with where it stands (indent, list marker, quote bars) and the space
-// around it. The space is what pdfmake gave the blocks, see
-// src/exporters/pdf/template.ts: margins that add up instead of collapsing.
+// around it: margins that add up instead of collapsing, as the PDF had them
+// since pdfmake wrote it.
 
 // space below a paragraph, above and below a heading
 const BLOCK_AFTER = 8;

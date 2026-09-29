@@ -28,8 +28,9 @@ $font-weight-regular: 400;
 $font-weight-medium: 500;
 $font-weight-bold: 700;
 
-// Headings step up on a major third. The PDF export mirrors these values in
-// src/exporters/pdf/template.ts.
+// Headings step up on a major third. The layout engine, which paints the
+// pages and writes the PDF, mirrors these values in
+// src-tauri/layout/src/style.rs.
 $scale-ratio: 1.25;
 
 // Margins are given relative to the body size, so they stay the same whatever

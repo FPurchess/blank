@@ -1,5 +1,5 @@
 // Lengths as people write them, "2.5cm" or "1 in", in points: the unit of
-// pdfmake and, times 20, of Word.
+// the PDF and, times 20, of Word.
 
 export type Unit = "mm" | "cm" | "in" | "pt";
 

@@ -47,6 +47,7 @@ import {
   stylesFor,
   twips,
 } from "./template";
+import { loadFont } from "./font";
 
 type Docx = typeof import("docx");
 
@@ -483,17 +484,6 @@ const spaceTopLevel = (blocks: Block[], serializer: Serializer) =>
       ? block
       : { ...block, spacing: { ...block.spacing, before } };
   });
-
-let font: Promise<Uint8Array> | undefined;
-
-// the regular face of IBM Plex Sans, shared with the PDF export, whose font
-// files are several megabytes and only loaded on the first export
-const loadFont = () =>
-  (font ??= import("../pdf/pdfmake-vfs").then(({ default: vfs }) =>
-    Uint8Array.from(atob(vfs["IBMPlexSans-Regular.ttf"]), (char) =>
-      char.charCodeAt(0),
-    ),
-  ));
 
 const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const docx = await import("docx");

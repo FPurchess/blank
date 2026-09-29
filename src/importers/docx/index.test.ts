@@ -24,8 +24,8 @@ vi.mock("../../images/codec", () => ({
   decodeSize: vi.fn(),
   rasterize: vi.fn(),
 }));
-vi.mock("../../exporters/pdf/pdfmake-vfs", () => ({
-  default: { "IBMPlexSans-Regular.ttf": btoa("font") },
+vi.mock("../../exporters/docx/font", () => ({
+  loadFont: async () => new TextEncoder().encode("font"),
 }));
 
 // made by scripts/build-docx-fixtures.sh; tests run from the project root

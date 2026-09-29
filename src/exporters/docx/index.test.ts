@@ -11,8 +11,8 @@ import { testLayout } from "../../test/layout";
 import { NO_SLOTS } from "../../layout/settings";
 import { datePicture } from "./bands";
 
-vi.mock("../pdf/pdfmake-vfs", () => ({
-  default: { "IBMPlexSans-Regular.ttf": btoa("not really a font") },
+vi.mock("./font", () => ({
+  loadFont: async () => new TextEncoder().encode("not really a font"),
 }));
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";

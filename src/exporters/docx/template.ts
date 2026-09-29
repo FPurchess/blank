@@ -5,7 +5,8 @@ import { BAND } from "../../layout/bands";
 import { WORD_NUMBER_FORMATS } from "./fields";
 import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
-// Mirrors the PDF styles in ../pdf/template.ts (and so the editor typography
+// Mirrors the PDF styles of the layout engine in
+// src-tauri/layout/src/style.rs (and so the editor typography
 // in src/scss/_typography.scss): 11pt body, headings on a major third scale.
 // Change them together. Word measures font sizes in half points, spacing in
 // twentieths of a point (twips) and line heights in 240ths of a line.
@@ -19,7 +20,8 @@ export const twips = (points: number) => Math.round(points * 20);
 const eighths = (points: number) => Math.round(points * 8);
 const BODY_SIZE = 11;
 const halfPoints = (points: number) => Math.round(points * 2);
-// pdfmake multiplies lineHeight with the natural line height of IBM Plex Sans
+// the PDF's line heights are a factor of IBM Plex Sans' natural 1.3 em (see
+// src-tauri/layout/src/style.rs)
 const line = (pdfLineHeight: number) => Math.round(pdfLineHeight * 1.3 * 240);
 
 // the space between blocks, like BLOCK_MARGIN in the PDF
@@ -44,7 +46,7 @@ export const QUOTE_BORDER = {
   space: 12,
 } as const;
 
-// tables mirror the PDF (../pdf/template.ts): thin lines between rows and
+// tables mirror the PDF (the engine's table_units): thin lines between rows and
 // columns, a stronger one under the header rows, none around the table's
 // sides and top
 export const TABLE_CELL_MARGINS = {
