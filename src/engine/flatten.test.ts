@@ -131,6 +131,41 @@ describe("flatten", () => {
     expect(item.end).toBe(node.child(0).nodeSize);
   });
 
+  it("places merged cells in their columns, with the caption", () => {
+    const node = doc(
+      schema.node("table", { caption: "Totals" }, [
+        tr(th("a", { colspan: 2 })),
+        tr(td("b", { rowspan: 2 }), td("c")),
+        tr(td("d")),
+      ]),
+    );
+    const [item] = items(node);
+    if (item.kind !== "table") throw new Error("no table");
+    expect(item.caption).toBe("Totals");
+    expect(item.rows[0].cells[0]).toMatchObject({ col: 0, colspan: 2 });
+    expect(item.rows[1].cells[0]).toMatchObject({ col: 0, rowspan: 2 });
+    // the last row's only cell starts in the second column
+    expect(item.rows[2].cells).toHaveLength(1);
+    expect(item.rows[2].cells[0]).toMatchObject({ col: 1, colspan: 1 });
+  });
+
+  it("keeps the widths of a frozen table", () => {
+    const node = doc(p("x"), table(tr(td("a"), td("a much longer cell"))));
+    const [, free] = items(node);
+    if (free.kind !== "table") throw new Error("no table");
+    expect(free.widths[1]).toBeGreaterThan(free.widths[0]);
+    const records = flatten(node, noSizes, { pos: 3, widths: [0.5, 0.5] });
+    const frozen = records[1].build();
+    if (frozen.kind !== "table") throw new Error("no table");
+    expect(frozen.widths).toEqual([0.5, 0.5]);
+    // a new key, so the engine lays it out again once it relaxes
+    expect(records[1].key).not.toBe(flatten(node, noSizes)[1].key);
+    // widths for another number of columns don't fit
+    const other = flatten(node, noSizes, { pos: 3, widths: [1] })[1].build();
+    if (other.kind !== "table") throw new Error("no table");
+    expect(other.widths).toEqual(free.widths);
+  });
+
   it("keys records by what they look like", () => {
     const [plain] = flatten(doc(p("a")), noSizes);
     const [listed] = flatten(doc(ul(li(p("a")))), noSizes);

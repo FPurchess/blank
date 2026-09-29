@@ -26,6 +26,26 @@ const waitForSaved = async (filePath: string, text: string) => {
   return fs.readFileSync(filePath, "utf8");
 };
 
+/**
+ * tableLayout returns where the rows and columns of the first table start,
+ * and where the last ones end, in viewport px, on the first page it is on
+ */
+const tableLayout = () =>
+  browser.execute(() => {
+    type Piece = {
+      box: { left: number; top: number; right: number; bottom: number };
+      rows: number[];
+      columns: number[];
+    };
+    const geometry = (
+      window as unknown as {
+        blankGeometry: { tables: () => { pieces: Piece[] }[] };
+      }
+    ).blankGeometry;
+    const { box, rows, columns } = geometry.tables()[0].pieces[0];
+    return { box, rows, columns };
+  });
+
 describe("tables", () => {
   let dir: string;
   let file: string;
@@ -33,6 +53,7 @@ describe("tables", () => {
   const open = async (content: string) => {
     fs.writeFileSync(file, content);
     await restartApp([file]);
+    await $("#page-view .page-canvas").waitForExist();
   };
 
   before(() => {
@@ -263,29 +284,9 @@ describe("tables", () => {
   describe("with the mouse", () => {
     /**
      * where the first table's rows and columns start, and where the last
-     * one ends, in viewport px
+     * one ends, in viewport px, as the page view shows it
      */
-    const layout = () =>
-      browser.execute(() => {
-        const table = document.querySelector("#editor table")!;
-        const box = table.getBoundingClientRect();
-        const rows = [...table.querySelectorAll("tr")].map(
-          (row) => row.getBoundingClientRect().top,
-        );
-        const columns = [...table.querySelectorAll("tr:first-child > *")].map(
-          (cell) => cell.getBoundingClientRect().left,
-        );
-        return {
-          rows: [...rows, box.bottom],
-          columns: [...columns, box.right],
-          box: {
-            left: box.left,
-            top: box.top,
-            right: box.right,
-            bottom: box.bottom,
-          },
-        };
-      });
+    const layout = () => tableLayout();
     const at = (x: number, y: number) => ({
       x: Math.round(x),
       y: Math.round(y),
@@ -395,7 +396,17 @@ describe("tables", () => {
 
   it("deletes a row from the table menu", async () => {
     await open("| a |\n| - |\n| b |\n| c |\n");
-    await $$("#editor td")[0].click({ button: "right" });
+    const { box, rows } = await tableLayout();
+    await browser
+      .action("pointer")
+      .move({
+        x: Math.round(box.left + 20),
+        y: Math.round((rows[1] + rows[2]) / 2),
+        origin: "viewport",
+      })
+      .down({ button: 2 })
+      .up({ button: 2 })
+      .perform();
     await $('[data-id="table"]').click();
     await $('[data-id="table-row-delete"]').click();
 

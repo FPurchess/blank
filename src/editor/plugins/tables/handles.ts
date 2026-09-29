@@ -7,7 +7,11 @@ import { columnPercents, roundPercent } from "../../../markdown/tables";
 import { headerRowCount } from "../../../markdown";
 import { watch } from "vue";
 
-import { tableGeometry, type TablePiece } from "../../../engine/geometry";
+import {
+  tableGeometry,
+  tablePositions,
+  type TablePiece,
+} from "../../../engine/geometry";
 import {
   pageViewport,
   type Point,
@@ -47,24 +51,11 @@ interface Under {
 }
 
 /**
- * tablesOf returns where the tables of a document are
- */
-const tablesOf = (doc: Node) => {
-  const found: { node: Node; pos: number }[] = [];
-  doc.descendants((node, pos) => {
-    if (node.type.name !== "table") return true;
-    found.push({ node, pos });
-    return false;
-  });
-  return found;
-};
-
-/**
  * tableUnder returns the piece of a table at `point` or just around it, as
  * the page view shows it
  */
 const tableUnder = (view: EditorView, point: Point): Under | undefined => {
-  for (const { node, pos } of tablesOf(view.state.doc)) {
+  for (const { node, pos } of tablePositions(view.state.doc)) {
     const geometry = tableGeometry(pos);
     for (const piece of geometry?.pieces ?? []) {
       const { box } = piece;

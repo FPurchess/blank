@@ -16,6 +16,11 @@ import { imageSizes, imagesLoaded } from "../../engine/images";
 import { timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { summarize } from "./properties";
+import { tableAround } from "./tables/util";
+import { columnPercents } from "../../markdown/tables";
+import { tableGrid } from "../../exporters/table";
+import type { FrozenWidths } from "../../engine/flatten";
+import { TableMap } from "prosemirror-tables";
 import { pageGeometry } from "../../layout/resolve";
 import {
   frontmatter,
@@ -125,10 +130,32 @@ const publishComposition = (
 };
 
 /**
+ * frozenWidths keeps the column widths of the table the cursor is in as they
+ * were when it went in, so the columns don't move while typing; they follow
+ * the text again once it leaves. Widths set on the table stay as they are.
+ */
+export const frozenWidths = (
+  state: EditorState,
+  frozen: FrozenWidths | null,
+): FrozenWidths | null => {
+  const table = tableAround(state.selection.$head);
+  if (!table || columnPercents(table.node)) return null;
+  const { width } = TableMap.get(table.node);
+  if (frozen?.pos === table.pos && frozen.widths.length === width)
+    return frozen;
+  return { pos: table.pos, widths: tableGrid(table.node).widths };
+};
+
+/**
  * sync hands the engine the document and the page
  * @param force flattens the document again, e.g. once an image is loaded
  */
-const sync = (engine: PageEngine, state: EditorState, force = false) => {
+const sync = (
+  engine: PageEngine,
+  state: EditorState,
+  frozen: FrozenWidths | null,
+  force = false,
+) => {
   const { layout } = pageLayout.value;
   const changed = engine.setSettings(layout, pageFields.value);
   const { contentWidth, contentHeight } = pageGeometry(layout);
@@ -136,8 +163,8 @@ const sync = (engine: PageEngine, state: EditorState, force = false) => {
     width: contentWidth,
     height: contentHeight,
   });
-  engine.sync(state.doc, sizes, force || changed);
-  publishLayout(engine);
+  const laidOut = engine.sync(state.doc, sizes, force || changed, frozen);
+  if (laidOut || changed || !pageLayoutState.value) publishLayout(engine);
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
@@ -152,6 +179,8 @@ const PAGE_STEP = 0.85;
 export const pageSync = () => {
   // where the text being composed starts, while an input method composes
   let composing: number | null = null;
+  // the widths kept of the table the cursor is in
+  let frozen: FrozenWidths | null = null;
   return new Plugin({
     props: {
       handleDOMEvents: {
@@ -169,13 +198,13 @@ export const pageSync = () => {
     view(view) {
       const engine = pageEngine;
       if (!engine) return {};
-      sync(engine, view.state);
+      sync(engine, view.state, frozen);
       publishSelection(engine, view.state, false);
       // the page setup, the fields of headers and footers, loaded images
       const stop = watch(
         [pageLayout, pageFields, imagesLoaded],
         () => {
-          timed("layout", () => sync(engine, view.state, true));
+          timed("layout", () => sync(engine, view.state, frozen, true));
           publishSelection(engine, view.state, false);
         },
         { flush: "sync" },
@@ -183,7 +212,13 @@ export const pageSync = () => {
       return {
         update(view, previous) {
           const docChanged = view.state.doc !== previous.doc;
-          if (docChanged) timed("layout", () => sync(engine, view.state));
+          // a move into or out of a table freezes or relaxes its columns
+          const moved = !view.state.selection.eq(previous.selection);
+          if (docChanged || moved)
+            timed("layout", () => {
+              frozen = frozenWidths(view.state, frozen);
+              sync(engine, view.state, frozen);
+            });
           if (docChanged || !view.state.selection.eq(previous.selection)) {
             const moved = pageViewKey.getState(view.state);
             timed("caret", () =>

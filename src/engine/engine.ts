@@ -2,7 +2,13 @@ import type { Node } from "prosemirror-model";
 
 import type { DocumentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
-import { diff, flatten, type FlatRecord, type ImageSizes } from "./flatten";
+import {
+  diff,
+  flatten,
+  type FlatRecord,
+  type FrozenWidths,
+  type ImageSizes,
+} from "./flatten";
 import { FONT_URLS } from "./fonts";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
@@ -99,6 +105,7 @@ export class PageEngine {
   private records: FlatRecord[] = [];
   private doc: Node | null = null;
   private settings = "";
+  private frozen = "";
   private displays = new Map<
     number,
     { version: number; display: PageDisplay }
@@ -127,9 +134,16 @@ export class PageEngine {
    *   image's size is known
    * @returns whether anything changed
    */
-  sync(doc: Node, sizes: ImageSizes, force = false) {
-    if (doc === this.doc && !force) return false;
-    const records = flatten(doc, sizes);
+  sync(
+    doc: Node,
+    sizes: ImageSizes,
+    force = false,
+    frozen: FrozenWidths | null = null,
+  ) {
+    const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
+    if (doc === this.doc && !force && frozenKey === this.frozen) return false;
+    this.frozen = frozenKey;
+    const records = flatten(doc, sizes, frozen);
     if (this.doc === null) {
       this.raw.setItems(
         JSON.stringify(records.map((record) => record.build())),

@@ -58,4 +58,7 @@ pub const RULE: f32 = 0.75;
 /// the padding of table cells, 0.4 and 0.7 em as in the editor
 pub const CELL_PADDING_Y: f32 = 0.4 * BODY;
 pub const CELL_PADDING_X: f32 = 0.7 * BODY;
-pub const CELL_LINE: f32 = 0.75;
+/// the lines of a table and the one under its header rows, as
+/// TABLE_LINES in src/exporters/table.ts
+pub const TABLE_LINE: f32 = 0.6;
+pub const HEADER_LINE: f32 = 1.2;

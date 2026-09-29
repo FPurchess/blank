@@ -1,3 +1,5 @@
+import type { Node } from "prosemirror-model";
+
 import {
   type PageLayoutState,
   pageLayoutState,
@@ -209,6 +211,36 @@ export const hitAt = (x: number, y: number): Hit | null => {
     y - viewport.top + viewport.scrollTop,
   );
   return point ? shown.engine.hit(point.page, point.x, point.y) : null;
+};
+
+/**
+ * tablePositions returns where the tables of a document are, in order
+ */
+export const tablePositions = (doc: Node) => {
+  const found: { node: Node; pos: number }[] = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name !== "table") return true;
+    found.push({ node, pos });
+    return false;
+  });
+  return found;
+};
+
+/**
+ * exposeGeometry lets E2E tests measure the pages as the page view shows
+ * them, through `window.blankGeometry`, since what is painted has no DOM
+ * @param doc the editor's document now
+ */
+export const exposeGeometry = (doc: () => Node) => {
+  Object.assign(window, {
+    blankGeometry: {
+      caretBox,
+      rangeRects,
+      blockBoxes,
+      hitAt,
+      tables: () => tablePositions(doc()).map(({ pos }) => tableGeometry(pos)),
+    },
+  });
 };
 
 /**

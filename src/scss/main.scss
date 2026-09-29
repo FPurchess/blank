@@ -1438,9 +1438,3 @@ body.editing-footer #editor {
     opacity: 0;
   }
 }
-
-// the table's mouse handles measure the editor's own DOM, which the page
-// view hides, so they would stand beside the painted table
-.table-handles {
-  display: none;
-}

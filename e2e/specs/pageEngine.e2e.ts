@@ -309,6 +309,55 @@ describe("page view", () => {
     await expect($("#page-setup")).not.toBeExisting();
   });
 
+  it("lays out captions, merged cells and rows taller than a page", async () => {
+    const file = path.join(dir, "merged.md");
+    const long = `${paragraph} `.repeat(30);
+    fs.writeFileSync(
+      file,
+      [
+        "<table>",
+        "<caption>Fruit and more</caption>",
+        "<tr><th>Fruit</th><th>Qty</th><th>Note</th></tr>",
+        '<tr><th rowspan="2">kiwi</th><td>10</td><td>green</td></tr>',
+        '<tr><td colspan="2">two columns merged</td></tr>',
+        "</table>",
+        "",
+        "| Head |",
+        "| --- |",
+        `| ${long} |`,
+        "",
+        "After the tables.",
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    const tables = () =>
+      browser.execute(() =>
+        (
+          window as unknown as {
+            blankGeometry: {
+              tables: () => {
+                rowCount: number;
+                pieces: { page: number; firstRow: number }[];
+              }[];
+            };
+          }
+        ).blankGeometry.tables(),
+      );
+    const [merged, tall] = await tables();
+    expect(merged.rowCount).toBe(3);
+    expect(merged.pieces).toHaveLength(1);
+    // the tall row goes on over the pages
+    expect(tall.rowCount).toBe(2);
+    expect(tall.pieces.length).toBeGreaterThan(1);
+    await browser.saveScreenshot(path.join(SHOTS, "engine-merged.png"));
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    await showPage(2);
+    await browser.saveScreenshot(path.join(SHOTS, "engine-tall-row.png"));
+    await pressMod(Key.Alt, "v");
+  });
+
   // two chapters of four paragraphs fill about a page
   for (const [name, chapters] of [
     ["1", 1],

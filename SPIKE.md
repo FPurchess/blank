@@ -76,15 +76,35 @@ step.
     screenshots). Not verified in E2E: the hand over links, the composition
     underline (WebDriver can't compose).
 
+- 3. **Tables at today's level:**
+  - The mouse handles work on the painted table: select rows and columns
+    (with the table menu), the "+" to insert, drag to move rows and
+    columns, resize columns (double click resets), drag the edges. A table
+    on several pages has handles on its piece under the mouse.
+  - The engine lays out captions above the table (kept with it), merged
+    cells across columns and rows (the rows they join stay together), header
+    cells in any row or column (bold and tinted), and slices a row taller
+    than a page between its lines, so it starts where it comes and goes on
+    over the pages, with the header rows repeated. The lines are
+    `TABLE_LINES` (0.6 pt, 1.2 pt under the header rows).
+  - Column widths are `tableGrid`'s, and stay as they were while the cursor
+    is in the table (`frozenWidths`), relaxing once it leaves.
+  - `window.blankGeometry` lets E2E measure what is painted.
+  - Verified: Rust tests (merged cells, caption kept with the table, sliced
+    rows, the grid of a sliced row), `flatten.test.ts`, `pageView.test.ts`
+    (frozen columns), and E2E: the five mouse tests of `tables.e2e.ts`
+    ported to the painted table (insert, move, resize and reset, edges,
+    table menu), and "lays out captions, merged cells and rows taller than a
+    page" in `pageEngine.e2e.ts` (looked at in the screenshots).
+  - Not yet: images, lists and quotes inside cells are laid out as plain
+    paragraphs (an image shows as a placeholder character).
+
 ### In progress
 
-- 3. Tables.
+- 4. Text coverage.
 
 ### Open
 
-- 3. Tables: mouse handles (now placed through the engine; E2E open),
-  captions, rowspan/colspan, header column, rows split across pages, column
-  widths as `tableGrid` and frozen while editing.
 - 4. Text coverage: code in IBM Plex Mono, emoji and CJK.
 - 5. Header and footer strips: none where "pages" shows the bands, a click
   on a band or page-end mark opens its strip.

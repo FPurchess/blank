@@ -23,6 +23,10 @@ export interface EngineCell {
   paragraphs: EngineText[];
   header: boolean;
   align?: string;
+  // the first column it covers, and how many columns and rows
+  col: number;
+  colspan: number;
+  rowspan: number;
 }
 
 export type Content =
@@ -43,6 +47,7 @@ export type Content =
       end: number;
       rows: { header: boolean; cells: EngineCell[] }[];
       widths: number[];
+      caption?: string;
     };
 
 export type EngineItem = Content & {

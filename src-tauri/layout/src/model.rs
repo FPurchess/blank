@@ -54,6 +54,19 @@ pub struct Cell {
     /// left, center or right
     #[serde(default)]
     pub align: Option<String>,
+    /// the first column it covers, by default the one after the cell
+    /// before it
+    #[serde(default)]
+    pub col: Option<u32>,
+    /// how many columns and rows it covers, 1 by default
+    #[serde(default = "one_u32")]
+    pub colspan: u32,
+    #[serde(default = "one_u32")]
+    pub rowspan: u32,
+}
+
+fn one_u32() -> u32 {
+    1
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
@@ -94,6 +107,9 @@ pub enum Content {
         /// relative widths of the columns
         #[serde(default)]
         widths: Vec<f32>,
+        /// the caption above it
+        #[serde(default)]
+        caption: Option<String>,
     },
 }
 

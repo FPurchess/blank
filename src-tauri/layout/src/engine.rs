@@ -149,16 +149,10 @@ impl Engine {
 
     fn lay_out(&mut self, item: &Item) -> Laid {
         let width = self.settings.content_width();
-        let mut laid = Laid::new(&mut self.fonts, item, width);
+        let room = self.settings.content_bottom() - self.settings.content_top();
+        let mut laid = Laid::new(&mut self.fonts, item, width, room);
         if laid.units.is_empty() {
-            laid.units.push(crate::items::Unit {
-                top: 0.0,
-                height: 0.0,
-                header: false,
-                texts: 0..0,
-                line: None,
-                decos: vec![],
-            });
+            laid.units.push(crate::items::Unit::default());
         }
         laid
     }
@@ -168,9 +162,11 @@ impl Engine {
         if settings == self.settings {
             return;
         }
+        // the width of the text, and its height, which tall table rows are
+        // sliced to
         let relayout = settings.width != self.settings.width
-            || settings.margins.left != self.settings.margins.left
-            || settings.margins.right != self.settings.margins.right;
+            || settings.height != self.settings.height
+            || settings.margins != self.settings.margins;
         self.settings = settings;
         if relayout {
             let items = std::mem::take(&mut self.items);
@@ -387,11 +383,17 @@ impl Engine {
 
     fn unit_of_text(&self, item: usize, text: usize, line: usize) -> usize {
         let laid = &self.laid[item];
+        let boxed = &laid.texts[text];
+        let lines = boxed.lines();
+        let (top, bottom) = lines
+            .get(line)
+            .map(|info| (boxed.y + info.top, boxed.y + info.bottom))
+            .unwrap_or((boxed.y, boxed.y));
         laid.units
             .iter()
             .position(|unit| match unit.line {
                 Some(unit_line) => unit.texts.contains(&text) && unit_line == line,
-                None => unit.texts.contains(&text),
+                None => unit.texts.contains(&text) && unit.shows(top, bottom),
             })
             .unwrap_or(0)
     }
@@ -495,7 +497,11 @@ impl Engine {
         let unit = &self.laid[frag.item].units[frag.unit];
         let texts = &self.laid[frag.item].texts;
         let item_x = x - self.settings.margins.left;
-        let item_y = y - frag.y + unit.top;
+        let mut item_y = y - frag.y + unit.top;
+        // a slice of rows only has the lines within it
+        if let Some((from, to)) = unit.clip {
+            item_y = item_y.clamp(from, to - 0.01);
+        }
         let mut best: Option<(usize, f32)> = None;
         for index in unit.texts.clone() {
             let boxed = &texts[index];
@@ -775,13 +781,24 @@ impl Engine {
                 continue;
             }
             let unit = &laid.units[frag.unit];
-            rows.push(GridRow {
-                page: self.page_of_frag(index),
-                row: frag.unit,
-                y: frag.y,
-                height: unit.height,
-                repeat: frag.repeat,
-            });
+            let page = self.page_of_frag(index);
+            for (row, top, bottom) in &unit.rows {
+                let y = frag.y - unit.top + top;
+                // the slices of a row on one page are one row
+                if let Some(last) = rows.last_mut().filter(|last: &&mut GridRow| {
+                    last.page == page && last.row == *row && last.repeat == frag.repeat
+                }) {
+                    last.height = y + bottom - top - last.y;
+                    continue;
+                }
+                rows.push(GridRow {
+                    page,
+                    row: *row,
+                    y,
+                    height: bottom - top,
+                    repeat: frag.repeat,
+                });
+            }
         }
         Some(TableGrid { columns, rows })
     }
@@ -907,8 +924,14 @@ impl Engine {
                     push_text_ops(&mut ops, &self.fonts, marker, 0, dx, dy, Role::Text);
                 }
                 if let Some(label) = &laid.label {
+                    // a table's caption is text; an image's alt text a hint
+                    let role = if matches!(item.content, Content::Table { .. }) {
+                        Role::Text
+                    } else {
+                        Role::Hint
+                    };
                     for line in 0..label.line_count() {
-                        push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, Role::Hint);
+                        push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, role);
                     }
                 }
             }
@@ -918,8 +941,12 @@ impl Engine {
                     Some(line) => line..line + 1,
                     None => 0..boxed.line_count(),
                 };
+                let infos = boxed.lines();
                 for line in lines {
-                    push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, Role::Text);
+                    let info = &infos[line];
+                    if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
+                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, Role::Text);
+                    }
                 }
             }
         }
@@ -1159,7 +1186,10 @@ impl Paginator<'_> {
                     }
                 }
             }
-            let headers = laid.units.iter().take_while(|unit| unit.header).count();
+            // the header rows of a table, repeated on each page it goes on
+            let headers: Vec<usize> = (0..laid.units.len())
+                .filter(|&unit| laid.units[unit].header)
+                .collect();
             for unit_index in first_unit..laid.units.len() {
                 let unit = &laid.units[unit_index];
                 let mut y = if unit_index == first_unit {
@@ -1174,13 +1204,25 @@ impl Paginator<'_> {
                     self.y + unit.top - (previous.top + previous.height)
                 };
                 let fresh = self.empty;
-                if !fresh && y + unit.height > bottom + EPSILON {
+                // a unit that stays with the next, e.g. a caption with the
+                // header rows and the first row, goes on with them
+                let mut needed = unit.height;
+                let mut next = unit_index;
+                while laid.units[next].keep_next && next + 1 < laid.units.len() {
+                    next += 1;
+                    needed = laid.units[next].top + laid.units[next].height - unit.top;
+                }
+                if !fresh && y + needed > bottom + EPSILON {
                     self.open_page();
                     y = self.y;
                 }
-                if self.empty && unit_index >= headers && unit_index > 0 && headers > 0 {
+                let last_header = headers.last().copied();
+                if self.empty
+                    && unit_index > 0
+                    && last_header.is_some_and(|last| unit_index > last)
+                {
                     // the table goes on: its header rows first
-                    for header in 0..headers {
+                    for &header in &headers {
                         let at = self.y;
                         self.place(index, header, at, true);
                     }
@@ -1525,7 +1567,7 @@ mod tests {
                 ..Default::default()
             }],
             header,
-            align: None,
+            ..Default::default()
         };
         let mut rows = vec![Row {
             cells: vec![cell(3, "Name", true), cell(10, "Value", true)],
@@ -1544,6 +1586,7 @@ mod tests {
                 end: 2000,
                 rows,
                 widths: vec![],
+                caption: None,
             },
             ..paragraph(0, "")
         };
@@ -1607,6 +1650,180 @@ mod tests {
             .page_ops(0, false)
             .iter()
             .all(|op| !matches!(op, Op::Glyphs { .. })));
+    }
+
+    fn table_item(rows: Vec<crate::model::Row>, caption: Option<&str>) -> Item {
+        Item {
+            content: Content::Table {
+                pos: 0,
+                end: 100_000,
+                rows,
+                widths: vec![],
+                caption: caption.map(String::from),
+            },
+            ..paragraph(0, "")
+        }
+    }
+
+    fn cell(pos: u32, text: &str) -> crate::model::Cell {
+        crate::model::Cell {
+            paragraphs: vec![Text {
+                pos,
+                text: text.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn merges_cells_across_columns_and_rows() {
+        use crate::model::{Cell, Row};
+        // | a (2 rows) | b | c |
+        // |            | d e (2 columns) |
+        let rows = vec![
+            Row {
+                cells: vec![
+                    Cell {
+                        rowspan: 2,
+                        ..cell(3, "a")
+                    },
+                    cell(8, "b"),
+                    cell(13, "c"),
+                ],
+                header: false,
+            },
+            Row {
+                cells: vec![Cell {
+                    col: Some(1),
+                    colspan: 2,
+                    ..cell(20, "d e")
+                }],
+                header: false,
+            },
+        ];
+        let engine = engine(vec![table_item(rows, None)]);
+        let grid = engine.table_grid(0).unwrap();
+        assert_eq!(grid.columns.len(), 4);
+        // the rows the merged cell joins are one unit, both rows in the grid
+        assert_eq!(engine.laid[0].units.len(), 1);
+        assert_eq!(grid.rows.len(), 2);
+        assert!((grid.rows[1].y - grid.rows[0].y - grid.rows[0].height).abs() < 0.01);
+        // "d e" spans the second and third column
+        let (_, x, ..) = engine.caret(20, false).unwrap();
+        assert!(x > grid.columns[1] && x < grid.columns[2], "{x}");
+        let texts = &engine.laid[0].texts;
+        assert!(texts[3].width > texts[1].width * 1.5);
+    }
+
+    #[test]
+    fn puts_the_caption_above_and_keeps_it_with_the_table() {
+        use crate::model::Row;
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(10 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut engine = engine(vec![table_item(rows, Some("The caption"))]);
+        let ops = engine.page_ops(0, false);
+        let caption = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs { run, text, .. } if text.starts_with("The caption") => Some(run.baseline),
+                _ => None,
+            })
+            .unwrap();
+        let grid = engine.table_grid(0).unwrap();
+        assert!(caption < grid.rows[0].y);
+        // the caption is not a row
+        assert_eq!(grid.rows.len(), 3);
+        // at the bottom of a page, the caption moves on with the table
+        let settings = engine.settings.clone();
+        let line = crate::style::text_style("p").line;
+        let fill = ((settings.content_bottom() - settings.content_top()) / line) as usize - 3;
+        let mut items: Vec<Item> = (0..fill).map(|index| paragraph(index as u32 * 3 + 1, "x")).collect();
+        for item in &mut items {
+            item.after = 0.0;
+        }
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(90_000 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut table = table_item(rows, Some("The caption"));
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 80_000;
+        }
+        items.push(table);
+        let moved = super::tests::engine(items);
+        let grid = moved.table_grid(80_000).unwrap();
+        assert!(grid.rows.iter().all(|row| row.page == 1));
+        assert_eq!(moved.pages[1].first.unwrap().1, 0);
+    }
+
+    #[test]
+    fn slices_rows_taller_than_a_page() {
+        use crate::model::Row;
+        let long = LONG.repeat(40);
+        let rows = vec![
+            Row {
+                cells: vec![cell(3, "Head")],
+                header: true,
+            },
+            Row {
+                cells: vec![cell(12, &long)],
+                header: false,
+            },
+        ];
+        let mut engine = engine(vec![table_item(rows, None)]);
+        assert!(engine.pages.len() >= 2, "{}", engine.pages.len());
+        let bottom = engine.settings.content_bottom();
+        for page in &engine.pages {
+            assert!(page.bottom <= bottom + 0.1, "{} > {bottom}", page.bottom);
+        }
+        // every line of the cell is shown once, on some page
+        let lines = engine.laid[0].texts[1].line_count();
+        let shown: usize = (0..engine.pages.len())
+            .map(|page| {
+                engine
+                    .page_ops(page, false)
+                    .iter()
+                    .filter(|op| matches!(op, Op::Glyphs { text, .. } if text.len() > 1000))
+                    .count()
+            })
+            .sum();
+        assert_eq!(shown, lines);
+        // the header row again at the top of the second page
+        let second = engine.pages[1].start;
+        assert!(engine.frags[second].repeat);
+        // the caret at the end of the cell is on the last page
+        let end = 12 + long.len() as u32;
+        let (page, ..) = engine.caret(end, false).unwrap();
+        assert_eq!(page, engine.pages.len() - 1);
+        // after a paragraph, the row starts on the same page
+        let rows = vec![
+            Row {
+                cells: vec![cell(13, "Head")],
+                header: true,
+            },
+            Row {
+                cells: vec![cell(22, &long)],
+                header: false,
+            },
+        ];
+        let mut table = table_item(rows, None);
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 10;
+        }
+        let after = super::tests::engine(vec![paragraph(1, "before"), table]);
+        let grid = after.table_grid(10).unwrap();
+        assert_eq!(grid.rows[0].page, 0);
+        assert_eq!(grid.rows.iter().find(|row| row.row == 1).unwrap().page, 0);
+        // one row on each page it is on, besides the header rows
+        let body: Vec<_> = grid.rows.iter().filter(|row| row.row == 1).collect();
+        assert_eq!(body.len(), after.pages.len());
     }
 
     #[test]

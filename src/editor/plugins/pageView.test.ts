@@ -11,7 +11,8 @@ import {
   pageScrollRequest,
   pageSelection,
 } from "../../state";
-import { doc, keyEvent, p } from "../../test/editor";
+import { doc, keyEvent, p, table, td, tr } from "../../test/editor";
+import { pageEngine } from "../../engine/engine";
 import { hidePages, showPages } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
@@ -148,6 +149,25 @@ describe("pageView plugin", () => {
     expect(pageNodeSelection.value).toHaveLength(1);
     expect(pageSelection.value).toEqual([]);
     expect(pageCaret.value).toBeNull();
+  });
+
+  it("keeps the columns of the table the cursor is in while typing", () => {
+    const mounted = mount(doc(p("x"), table(tr(td("a"), td("b"))), p("after")));
+    destroy = () => mounted.pluginView.destroy?.();
+    const { view } = mounted;
+    const columns = () => pageEngine!.tableGrid(3)!.columns;
+    const before = columns();
+    // into the first cell, and type a lot there
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 7)),
+    );
+    view.dispatch(view.state.tr.insertText(" and a much longer text"));
+    expect(columns()).toEqual(before);
+    // out of the table: the columns follow the text again
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)),
+    );
+    expect(columns()[1]).toBeGreaterThan(before[1]);
   });
 
   it("selects what the pointer hits, without scrolling", () => {

@@ -30,6 +30,14 @@ export type ImageSizes = (
   src: string,
 ) => { width: number; height: number } | undefined;
 
+// the column widths of the table the cursor is in, kept while it's there so
+// the columns don't move while typing (see frozenWidths)
+export interface FrozenWidths {
+  // where the table is
+  pos: number;
+  widths: number[];
+}
+
 // where a block stands, which the item gets
 interface Context {
   indent: number;
@@ -126,8 +134,13 @@ const textOf = (
  * tableOf builds a table: its rows, header rows, cells and column widths
  * @param pos the position of the table
  */
-const tableOf = (node: Node, pos: number): Content => {
+const tableOf = (
+  node: Node,
+  pos: number,
+  widths: number[] | undefined,
+): Content => {
   const grid = tableGrid(node);
+  const caption = node.attrs.caption as string | null;
   const rows = grid.rows.map((row, index) => ({
     header: index < grid.headerRows,
     cells: row.flatMap((cell) => {
@@ -147,6 +160,9 @@ const tableOf = (node: Node, pos: number): Content => {
           paragraphs,
           header: cell.header,
           align: (cell.node.attrs.align as string | null) ?? undefined,
+          col: cell.col,
+          colspan: cell.colspan,
+          rowspan: cell.rowspan,
         },
       ];
     }),
@@ -156,7 +172,8 @@ const tableOf = (node: Node, pos: number): Content => {
     pos,
     end: pos + node.nodeSize,
     rows,
-    widths: grid.widths,
+    widths: widths?.length === grid.widths.length ? widths : grid.widths,
+    ...(caption ? { caption } : {}),
   };
 };
 
@@ -180,7 +197,11 @@ interface Space {
  * flatten returns the records of a document's items in order
  * @param sizes the sizes of the images that are loaded
  */
-export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
+export const flatten = (
+  doc: Node,
+  sizes: ImageSizes,
+  frozen: FrozenWidths | null = null,
+): FlatRecord[] => {
   const records: FlatRecord[] = [];
   const quoteOf: number[][] = [];
 
@@ -254,7 +275,10 @@ export const flatten = (doc: Node, sizes: ImageSizes): FlatRecord[] => {
       return;
     }
     if (name === "table") {
-      push(node, pos, context, space, () => tableOf(node, pos));
+      const widths = frozen?.pos === pos ? frozen.widths : undefined;
+      push(node, pos, context, space, () => tableOf(node, pos, widths), {
+        key: widths ? widths.join(" ") : "",
+      });
       return;
     }
     if (node.isTextblock) {

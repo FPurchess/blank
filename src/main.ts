@@ -5,6 +5,7 @@ import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootEngine } from "./engine/engine";
+import { exposeGeometry } from "./engine/geometry";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
@@ -39,6 +40,7 @@ const showBootError = (error: unknown) => {
     await bootEngine();
     const editor = await bootEditor();
     editorReady = true;
+    exposeGeometry(() => editor.view.state.doc);
     bootUI(editor);
     // doesn't wait for the dictionary, which may need a download
     bootSpellcheck();
