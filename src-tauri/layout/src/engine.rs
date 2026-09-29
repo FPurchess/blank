@@ -675,6 +675,22 @@ impl Engine {
         rects
     }
 
+    /// the positions the blocks on a page start and end at, e.g. to find
+    /// what else is to paint on it
+    pub fn page_span(&self, page: usize) -> Option<(u32, u32)> {
+        let range = self.frags_on(page);
+        let mut span: Option<(u32, u32)> = None;
+        for index in range {
+            let item = &self.items[self.frags[index].item];
+            let (from, to) = (item.from(), item.to());
+            span = Some(match span {
+                Some((a, b)) => (a.min(from), b.max(to)),
+                None => (from, to),
+            });
+        }
+        span
+    }
+
     /// the box of a fragment on its page: x, y, width and height
     fn frag_box(&self, frag_index: usize) -> (f32, f32, f32, f32) {
         let frag = self.frags[frag_index];
@@ -890,6 +906,11 @@ impl Engine {
                 if let Some(marker) = &laid.marker {
                     push_text_ops(&mut ops, &self.fonts, marker, 0, dx, dy, Role::Text);
                 }
+                if let Some(label) = &laid.label {
+                    for line in 0..label.line_count() {
+                        push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, Role::Hint);
+                    }
+                }
             }
             for text in unit.texts.clone() {
                 let boxed = &laid.texts[text];
@@ -989,7 +1010,11 @@ fn push_text_ops(
                 y: run.baseline + offset,
                 w: run.width,
                 h: thickness,
-                role,
+                role: if role == Role::Text {
+                    Role::LinkLine
+                } else {
+                    role
+                },
             });
         }
         if let Some(href) = boxed.link_of(run.ink) {
@@ -1549,6 +1574,42 @@ mod tests {
     }
 
     #[test]
+    fn shows_the_alt_text_of_an_image_not_loaded() {
+        let image = |width: f32| Item {
+            content: Content::Image {
+                pos: 0,
+                src: "a.png".into(),
+                width,
+                height: width,
+                alt: "a cat".into(),
+            },
+            ..paragraph(0, "")
+        };
+        let mut waiting = engine(vec![image(0.0)]);
+        let ops = waiting.page_ops(0, false);
+        let hint = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs {
+                    role: Role::Hint,
+                    run,
+                    text,
+                } => Some(text[run.glyphs[0].start as usize..].to_string()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(hint, "a cat");
+        // the alt text isn't text of the document: the caret is before or
+        // after the image
+        assert!(waiting.laid[0].texts.is_empty());
+        let mut loaded = engine(vec![image(50.0)]);
+        assert!(loaded
+            .page_ops(0, false)
+            .iter()
+            .all(|op| !matches!(op, Op::Glyphs { .. })));
+    }
+
+    #[test]
     fn boxes_blocks_by_page() {
         let items = document(&["one", "two", LONG]);
         let engine = engine(items.clone());
@@ -1565,5 +1626,7 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert!(all[0].4 > h * 3.0);
         assert!(engine.boxes(100_000, 100_010).is_empty());
+        assert_eq!(engine.page_span(0), Some((1, items[2].to())));
+        assert_eq!(engine.page_span(9), None);
     }
 }

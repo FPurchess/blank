@@ -24,6 +24,9 @@ export interface PageLayoutState {
   versions: Uint32Array;
   // where the text of each page ends, from its top edge
   bottoms: Float32Array;
+  // whether the line with the document's properties shows above the first
+  // page (see src/ui/PageProperties.vue), which takes room there
+  properties?: boolean;
 }
 
 // null until the engine laid out the document
@@ -41,8 +44,17 @@ export interface PageRect {
 // the caret, null while the selection isn't empty or a node is selected
 export const pageCaret = shallowRef<PageRect | null>(null);
 
-// the selection's rectangles, empty while it is a caret
+// the selection's rectangles, empty while it is a caret: the text of a
+// range, or the selected cells
 export const pageSelection = shallowRef<PageRect[]>([]);
+
+// the boxes of the selected node, e.g. an image, a rule or a page break,
+// which the page view outlines; empty for any other selection
+export const pageNodeSelection = shallowRef<PageRect[]>([]);
+
+// the text being composed with an input method, which the page view
+// underlines; empty while nothing is composed
+export const pageComposition = shallowRef<PageRect[]>([]);
 
 // the page the selection's head is on, counted from 1, and how many there
 // are, for "Page N of M"
@@ -52,6 +64,7 @@ export const pagePosition = computed(() => {
   const head =
     pageCaret.value?.page ??
     pageSelection.value[pageSelection.value.length - 1]?.page ??
+    pageNodeSelection.value[0]?.page ??
     0;
   return { page: head + 1, pages: layout.pages };
 });

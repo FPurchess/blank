@@ -235,6 +235,80 @@ describe("page view", () => {
     await browser.saveScreenshot(path.join(SHOTS, "engine-table.png"));
   });
 
+  it("paints what the editor shows around the text", async () => {
+    const file = path.join(dir, "marks.md");
+    fs.writeFileSync(
+      file,
+      [
+        "---",
+        "title: Marks",
+        "author: Ada",
+        "---",
+        "",
+        "A wrng word and [a link](https://example.com) in the text.",
+        "",
+        "![a cat](missing.png)",
+        "",
+        "<!-- pagebreak -->",
+        "",
+        "The second page.",
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    await expect(
+      browser.execute(
+        () => document.querySelector("#page-view .doc-properties")?.textContent,
+      ),
+    ).resolves.toMatch(/^\s*Marks · by Ada\s*$/);
+    await expect($("#page-view .page-break-mark")).toBeExisting();
+    // spell check in English, off by default
+    await pressMod(Key.Alt, "l");
+    await type("en");
+    await type(Key.Enter);
+    await pressMod(Key.Alt, "s");
+    await expect($("#page-view .page-misspelling")).toBeExisting();
+    // a right click on it offers the suggestions
+    const mark = await browser.execute(() => {
+      const box = document
+        .querySelector("#page-view .page-misspelling")!
+        .getBoundingClientRect();
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    });
+    await browser
+      .action("pointer")
+      .move({
+        x: Math.round(mark.x),
+        y: Math.round(mark.y),
+        origin: "viewport",
+      })
+      .down({ button: 2 })
+      .up({ button: 2 })
+      .perform();
+    await expect($("#context-menu")).toBeDisplayed();
+    await $(`[data-id="loading"]`).waitForExist({ reverse: true });
+    await expect($('#context-menu [data-id^="suggestion:"]')).toBeExisting();
+    await browser.saveScreenshot(path.join(SHOTS, "engine-suggestions.png"));
+    await browser.keys(Key.Escape);
+    await browser.saveScreenshot(path.join(SHOTS, "engine-marks.png"));
+    // every other theme, and back to the first
+    for (let index = 0; index < 6; index++) {
+      await pressMod(Key.Alt, "t");
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      const theme = await browser.execute(() => document.body.dataset.theme);
+      await browser.saveScreenshot(
+        path.join(SHOTS, `engine-theme-${theme}.png`),
+      );
+    }
+    // the summary opens the page setup
+    await $("#page-view .doc-properties").click();
+    await expect($("#page-setup")).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    await expect($("#page-setup")).not.toBeExisting();
+  });
+
   // two chapters of four paragraphs fill about a page
   for (const [name, chapters] of [
     ["1", 1],

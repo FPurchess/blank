@@ -44,16 +44,44 @@ step.
     click, the toolbar on the painted table). Drag scrolling is unit tested
     for its speed only, not in E2E.
 
+- 2. **Paint what the editor shows:**
+  - Spell check: the misspelled words of the spell check's decorations get a
+    wavy line in the theme's `--spelling-color` (`PageMarks.vue`,
+    `pageMarks.ts`, only on the pages in view; `pageSpan` in the engine). A
+    right click on a painted word opens the menu with its suggestions.
+  - Links: the underline is its own role, half as strong as the text as in
+    the editor (black in the PDF, as pdfmake). Ctrl (Cmd) + click opens a
+    link (`openLink.ts` on `PAGE_PRESS`, the link found in the page's
+    display list), the pointer is a hand while the key is held over a link,
+    and the tooltip shows its url and the hint.
+  - An image that isn't loaded, or can't be, shows its alt text (or its src)
+    in italics, dimmed on screen, as the PDF does (a `label` of the item,
+    not text of the document).
+  - The frontmatter summary shows above the first page, with room made for
+    it (`PageProperties.vue`, `properties` in `PageLayoutState`); a click
+    opens the page setup.
+  - The "Page break" label at every page break (not in the PDF).
+  - A selected node (image, rule, page break) is outlined, selected cells
+    are one rectangle per page (`src/engine/selection.ts`), the text being
+    composed with an input method is underlined.
+  - The caret shows while the editor has the focus, and the selection dims
+    without it. The main editor never had a focus ring (`outline: none`).
+  - All six themes, from their variables (screenshots
+    `engine-theme-*.png` from `pageEngine.e2e.ts`).
+  - Verified: unit tests (`pageMarks.test.ts`, `selection.test.ts`,
+    `pageView.test.ts` for the composition and node outline, `openLink.test.ts`
+    for Ctrl + click), and `pageEngine.e2e.ts` ("paints what the editor
+    shows around the text": the summary and its click, the page break label,
+    the spelling line and its suggestions, the six themes, looked at in the
+    screenshots). Not verified in E2E: the hand over links, the composition
+    underline (WebDriver can't compose).
+
 ### In progress
 
-- 2. Paint what the editor shows.
+- 3. Tables.
 
 ### Open
 
-- 2. Paint what the editor shows: spell check underlines and right-click
-  menu, links (colour, Mod+click, pointer), image placeholder and alt text,
-  the frontmatter summary, the page break label, node selection outline,
-  `CellSelection`, IME underline, focus ring, all six themes.
 - 3. Tables: mouse handles (now placed through the engine; E2E open),
   captions, rowspan/colspan, header column, rows split across pages, column
   widths as `tableGrid` and frozen while editing.

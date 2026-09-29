@@ -12,6 +12,9 @@ import type {
 
 // room above the first and below the last page, for the bars
 export const VIEW_TOP = 56;
+// more room above the first page for the line with the document's
+// properties
+export const PROPERTIES_ROOM = 28;
 export const VIEW_BOTTOM = 72;
 // between the sheets, and around them
 export const SHEET_GAP = 24;
@@ -60,6 +63,7 @@ export const frameLayout = (
   width: number,
 ): FrameLayout => {
   const frames: Frame[] = [];
+  const viewTop = VIEW_TOP + (layout.properties ? PROPERTIES_ROOM : 0);
   if (mode === "pages") {
     const scale = Math.max(
       0.2,
@@ -71,7 +75,7 @@ export const frameLayout = (
     for (let page = 0; page < layout.pages; page++) {
       frames.push({
         page,
-        top: VIEW_TOP + page * (sheetHeight + SHEET_GAP),
+        top: viewTop + page * (sheetHeight + SHEET_GAP),
         left,
         width: sheetWidth,
         height: sheetHeight,
@@ -82,7 +86,7 @@ export const frameLayout = (
       });
     }
     const height =
-      VIEW_TOP +
+      viewTop +
       layout.pages * (sheetHeight + SHEET_GAP) -
       SHEET_GAP +
       VIEW_BOTTOM;
@@ -95,7 +99,7 @@ export const frameLayout = (
     Math.min(TEXT_SCALE, (width - 2 * DESK_SIDE) / shown),
   );
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
-  let top = VIEW_TOP;
+  let top = viewTop;
   for (let page = 0; page < layout.pages; page++) {
     const bottom = Math.max(layout.bottoms[page] ?? 0, margins.top + MIN_TEXT);
     const h = bottom - margins.top;

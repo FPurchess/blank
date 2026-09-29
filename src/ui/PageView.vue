@@ -10,6 +10,7 @@ import {
 } from "vue";
 
 import { alignHiddenEditor } from "../editor/hidden";
+import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
 import {
   PAGE_MENU,
   PAGE_PRESS,
@@ -27,7 +28,9 @@ import {
   pageViewport,
 } from "../state";
 import PageFrame from "./PageFrame.vue";
+import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
+import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
 import { frameLayout, onDesk, visibleFrames } from "../engine/frames";
 import { scrollFor } from "./pageViewModel";
@@ -81,6 +84,9 @@ const frames = computed(() => {
     }),
   );
 });
+
+// the pages in view, whose marks show
+const shownPages = computed(() => frames.value.map((frame) => frame.page));
 
 onMounted(measure);
 onUnmounted(() => (pageViewport.value = null));
@@ -193,6 +199,21 @@ const onMouseDown = (event: MouseEvent) => {
   dragAt = { x: event.clientX, y: event.clientY };
 };
 
+// the link under the pointer, and whether the key that opens links is held:
+// the pointer shows a hand then, and the link's url and hint as a tooltip
+const hoverLink = shallowRef<string | null>(null);
+const opening = shallowRef(false);
+const onHover = (event: MouseEvent) => {
+  opening.value = hasOpenModifier(event);
+  if (anchor !== null) return;
+  hoverLink.value = pointerAt(event).link;
+};
+const onModifier = (event: KeyboardEvent) => {
+  opening.value = hasOpenModifier(event);
+};
+listenOnWindow("keydown", onModifier);
+listenOnWindow("keyup", onModifier);
+
 const onContextMenu = (event: MouseEvent) => {
   // Shift keeps the webview's menu, e.g. for system services
   if (event.shiftKey) return;
@@ -248,9 +269,12 @@ onUnmounted(() => {
   <div
     id="page-view"
     ref="scroller"
-    :class="pageView"
+    :class="[pageView, { 'follow-links': hoverLink && opening }]"
+    :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
+    @mousemove="onHover"
+    @mouseleave="hoverLink = null"
     @contextmenu="onContextMenu"
   >
     <div
@@ -273,7 +297,9 @@ onUnmounted(() => {
         :scale="layout.scale"
         :sheet="layout.mode === 'pages'"
       />
+      <PageMarks :layout="layout" :pages="shownPages" />
       <PageOverlay :layout="layout" />
+      <PageProperties :layout="layout" />
     </div>
   </div>
 </template>

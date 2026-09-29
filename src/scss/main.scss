@@ -1264,7 +1264,11 @@ body.editing-footer #editor {
 
   &.pages {
     // a calm desk, a shade off the paper
-    background-color: color-mix(in srgb, var(--color) 7%, var(--background-color));
+    background-color: color-mix(
+      in srgb,
+      var(--color) 7%,
+      var(--background-color)
+    );
   }
 }
 
@@ -1338,6 +1342,86 @@ body.editing-footer #editor {
   background-color: var(--color);
   opacity: 0.16;
   pointer-events: none;
+}
+
+// the selection dims while the editor hasn't the focus, e.g. behind a dialog
+.page-selection.inactive {
+  opacity: 0.08;
+}
+
+// a selected image, rule or page break, as the editor outlined it
+.page-node-selection {
+  position: absolute;
+  min-height: 2px;
+  outline: 2px solid var(--color);
+  outline-offset: 4px;
+  pointer-events: none;
+}
+
+// the text an input method is composing
+.page-composition {
+  position: absolute;
+  border-bottom: 1.5px solid var(--color);
+  pointer-events: none;
+}
+
+// a misspelled word: a wavy line in the theme's spelling colour along the
+// bottom of its text
+.page-misspelling {
+  position: absolute;
+  pointer-events: none;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background-color: var(--spelling-color);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 3 L1.5 1 L3 3 L4.5 1 L6 3' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E")
+      repeat-x left bottom / 6px 4px;
+  }
+}
+
+// a page break: a dashed line with its name, as in the editor; it isn't
+// printed
+.page-break-mark {
+  position: absolute;
+  pointer-events: none;
+  border-top: 1px dashed var(--color);
+  opacity: 0.45;
+
+  &::after {
+    content: "Page break";
+    position: absolute;
+    top: -0.65em;
+    left: 50%;
+    padding: 0 0.6em;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color);
+    background-color: var(--background-color);
+    transform: translateX(-50%);
+  }
+}
+
+// Ctrl (Cmd) + click opens the link under the pointer
+#page-view.follow-links {
+  cursor: pointer;
+}
+
+// the line with the document's properties above the first page
+#page-view .doc-properties {
+  position: absolute;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.55;
+  cursor: pointer;
 }
 
 .page-caret {

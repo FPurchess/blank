@@ -238,6 +238,15 @@ impl LayoutEngine {
             .collect()
     }
 
+    /// the positions the blocks on a page start and end at, or nothing
+    #[wasm_bindgen(js_name = pageSpan)]
+    pub fn page_span(&self, page: u32) -> Vec<u32> {
+        match self.engine.page_span(page as usize) {
+            Some((from, to)) => vec![from, to],
+            None => vec![],
+        }
+    }
+
     /// the table at `pos` as laid out: the number of columns' edges, the
     /// edges, then page, row, y, height and repeat (0 or 1) for each row
     /// placed on a page; nothing for no table

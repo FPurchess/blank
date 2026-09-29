@@ -7,7 +7,7 @@ use parley::Alignment;
 
 use crate::fonts::Fonts;
 use crate::model::{Content, Item, Text};
-use crate::style::{text_style, CELL_LINE, CELL_PADDING_X, CELL_PADDING_Y, MARKER_GAP, RULE};
+use crate::style::{CELL_LINE, CELL_PADDING_X, CELL_PADDING_Y, MARKER_GAP, RULE};
 use crate::text::TextBox;
 
 /// what the colours of the screen and the PDF stand for
@@ -20,6 +20,10 @@ pub enum Role {
     HeaderLine = 4,
     HeaderFill = 5,
     Placeholder = 6,
+    /// the underline of a link
+    LinkLine = 7,
+    /// what stands for an image that isn't loaded: its alt text
+    Hint = 8,
 }
 
 /// something drawn in an item besides its text
@@ -82,6 +86,9 @@ pub struct Laid {
     pub texts: Vec<TextBox>,
     /// the list marker, drawn with the first unit
     pub marker: Option<TextBox>,
+    /// what stands in for an image that isn't loaded, drawn with the first
+    /// unit; it isn't text of the document
+    pub label: Option<TextBox>,
     /// for a table: where each column starts and where the last one ends,
     /// in the item's coordinates
     pub columns: Vec<f32>,
@@ -108,6 +115,7 @@ impl Laid {
                 src,
                 width: image_width,
                 height,
+                alt,
                 ..
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
@@ -125,18 +133,19 @@ impl Laid {
                         }],
                     )
                 } else {
-                    // until it is loaded
-                    let h = text_style("p").line;
-                    Laid::single(
-                        h,
-                        vec![Deco::Rect {
-                            x: item.indent,
-                            y: 0.0,
-                            w: h * 1.5,
-                            h,
-                            role: Role::Placeholder,
-                        }],
-                    )
+                    // until it is loaded, or if it can't be: its alt text,
+                    // or else its src, in italics
+                    let text = Text {
+                        pos: 0,
+                        text: if alt.is_empty() { src.clone() } else { alt.clone() },
+                        style: "alt".into(),
+                        ..Default::default()
+                    };
+                    let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
+                    label.x = item.indent;
+                    let mut laid = Laid::single(label.height(), vec![]);
+                    laid.label = Some(label);
+                    laid
                 }
             }
             Content::Table { rows, widths, .. } => {
@@ -175,6 +184,7 @@ impl Laid {
             }],
             texts: vec![],
             marker: None,
+            label: None,
             columns: vec![],
         }
     }
@@ -218,6 +228,7 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         units,
         texts: vec![boxed],
         marker: None,
+        label: None,
         columns: vec![],
     }
 }
@@ -342,6 +353,7 @@ fn table_units(
         units,
         texts,
         marker: None,
+        label: None,
         columns: edges,
     }
 }

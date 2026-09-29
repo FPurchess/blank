@@ -39,6 +39,7 @@ pub fn text_style(name: &str) -> TextStyle {
         "h4" => style(BODY, 1.12, BOLD, false, 0.0),
         "h5" => style(BODY, 1.12, BOLD, true, 0.0),
         "h6" => style(BODY, 1.12, REGULAR, true, 0.0),
+        "alt" => style(BODY, 1.12, REGULAR, true, 0.0),
         "caption" => style(BODY / 1.25, 1.12, REGULAR, true, 0.0),
         "th" => style(BODY, 1.12, BOLD, false, 0.0),
         "band" => style(crate::bands::BAND_SIZE, 1.0, REGULAR, false, 0.0),

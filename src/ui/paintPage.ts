@@ -14,6 +14,8 @@ export const ROLE_OPACITY = [
   0.55, // the line under the header rows
   0.05, // header cells
   0.15, // an image that isn't loaded yet
+  0.5, // the underline of a link, softer than the text as in the editor
+  0.6, // the alt text of an image that isn't loaded
 ];
 
 export interface PaintOptions {

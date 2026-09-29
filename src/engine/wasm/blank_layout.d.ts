@@ -42,6 +42,10 @@ export class LayoutEngine {
     constructor(bytes: Uint8Array, lengths: Uint32Array);
     pageCount(): number;
     /**
+     * the positions the blocks on a page start and end at, or nothing
+     */
+    pageSpan(page: number): Uint32Array;
+    /**
      * what a page shows: rectangles, images, links and glyph runs
      */
     page(page: number): string;
@@ -97,6 +101,7 @@ export interface InitOutput {
     readonly layoutengine_new: (a: number, b: number, c: number, d: number) => number;
     readonly layoutengine_page: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
+    readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
     readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number];

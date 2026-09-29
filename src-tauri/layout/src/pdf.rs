@@ -32,7 +32,9 @@ pub struct Info {
 /// the colour of each role on paper
 fn color(role: Role) -> rgb::Color {
     match role {
-        Role::Text => rgb::Color::new(0, 0, 0),
+        // the PDF shows links and alt text in the text's colour, as pdfmake
+        // did
+        Role::Text | Role::LinkLine | Role::Hint => rgb::Color::new(0, 0, 0),
         Role::Band => rgb::Color::new(0x66, 0x66, 0x66),
         Role::CodeFill => rgb::Color::new(0xf1, 0xf2, 0xf3),
         Role::TableLine | Role::Placeholder => rgb::Color::new(0xd1, 0xd4, 0xd6),

@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { schema } from "../../markdown";
 import {
   pageCaret,
+  pageComposition,
   pageLayoutState,
+  pageNodeSelection,
   pageScrollRequest,
   pageSelection,
 } from "../../state";
@@ -120,6 +122,32 @@ describe("pageView plugin", () => {
     // with Shift, it selects
     mounted.press("Shift-PageDown");
     expect(mounted.view.state.selection.empty).toBe(false);
+  });
+
+  it("underlines the text being composed", () => {
+    const mounted = mount();
+    destroy = () => mounted.pluginView.destroy?.();
+    const { view } = mounted;
+    view.dom.dispatchEvent(new CompositionEvent("compositionstart"));
+    view.dispatch(view.state.tr.insertText("にほん"));
+    expect(pageComposition.value).toHaveLength(1);
+    expect(pageComposition.value[0].width).toBeGreaterThan(0);
+    view.dom.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(pageComposition.value).toEqual([]);
+  });
+
+  it("outlines a selected node instead of selecting text", () => {
+    const mounted = mount(
+      doc(p("a"), schema.nodes.horizontal_rule.create(), p("b")),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    const { view } = mounted;
+    view.dispatch(
+      view.state.tr.setSelection(NodeSelection.create(view.state.doc, 3)),
+    );
+    expect(pageNodeSelection.value).toHaveLength(1);
+    expect(pageSelection.value).toEqual([]);
+    expect(pageCaret.value).toBeNull();
   });
 
   it("selects what the pointer hits, without scrolling", () => {

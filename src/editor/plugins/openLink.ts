@@ -6,6 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { errorMessage } from "../../errors";
+import { PAGE_PRESS, type PagePointerEvent } from "../pagePointer";
 
 // set on the editor while the modifier to open links is held
 const FOLLOW_CLASS = "follow-links";
@@ -16,8 +17,21 @@ const OPENABLE_URL = /^(https?|mailto|tel):/i;
 // macOS uses Cmd+Click, since Ctrl+Click is the secondary (right) click there
 export const isMac = () => /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 
-const hasOpenModifier = (event: MouseEvent | KeyboardEvent) =>
-  isMac() ? event.metaKey : event.ctrlKey;
+export const hasOpenModifier = (event: {
+  metaKey: boolean;
+  ctrlKey: boolean;
+}) => (isMac() ? event.metaKey : event.ctrlKey);
+
+/**
+ * linkHint returns the tooltip of a link: its title, its url, and how to
+ * open it
+ */
+export const linkHint = (href: string, title?: string | null) => {
+  const hint = OPENABLE_URL.test(href)
+    ? `${isMac() ? "Cmd" : "Ctrl"}+Click to open`
+    : null;
+  return [title, href, hint].filter(Boolean).join("\n");
+};
 
 /**
  * _openLink opens href with the default application, e.g. the browser
@@ -40,14 +54,9 @@ export const _openLink = async (href: string) => {
  */
 const linkView = (mark: Mark) => {
   const href = mark.attrs.href as string;
-  const title = mark.attrs.title as string | null;
-  const hint = OPENABLE_URL.test(href)
-    ? `${isMac() ? "Cmd" : "Ctrl"}+Click to open`
-    : null;
-
   const dom = document.createElement("a");
   dom.setAttribute("href", href);
-  dom.title = [title, href, hint].filter(Boolean).join("\n");
+  dom.title = linkHint(href, mark.attrs.title as string | null);
   return { dom };
 };
 
@@ -85,6 +94,15 @@ export default () =>
         return true;
       },
       handleDOMEvents: {
+        // a press on a link on the pages, see src/editor/pagePointer.ts
+        [PAGE_PRESS]: (_view, event: PagePointerEvent) => {
+          const { button, link } = event.detail;
+          if (button !== 0 || !link || !hasOpenModifier(event.detail))
+            return false;
+          event.preventDefault();
+          _openLink(link);
+          return true;
+        },
         // handleClick runs on mouseup, so also cancel what the webview itself
         // might do on the following click, e.g. open the link in a new window
         click: (view, event) => {

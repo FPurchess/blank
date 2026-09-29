@@ -8,18 +8,23 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
-import { watch } from "vue";
+import { computed, watch } from "vue";
 
 import { pageEngine, type Hit, type PageEngine } from "../../engine/engine";
 import { caretBox, hitAt, viewBox } from "../../engine/geometry";
 import { imageSizes, imagesLoaded } from "../../engine/images";
 import { timed } from "../../engine/perf";
+import { shownSelection } from "../../engine/selection";
+import { summarize } from "./properties";
 import { pageGeometry } from "../../layout/resolve";
 import {
+  frontmatter,
   pageCaret,
+  pageComposition,
   pageFields,
   pageLayout,
   pageLayoutState,
+  pageNodeSelection,
   pageScrollRequest,
   pageSelection,
   path,
@@ -64,6 +69,10 @@ export const selectionAt = (
   return TextSelection.between(doc.resolve(pos), doc.resolve(pos));
 };
 
+// whether the document's properties show above the first page, read again
+// only when the frontmatter changes
+const hasProperties = computed(() => summarize(frontmatter.value) !== null);
+
 /**
  * publishLayout publishes the pages as the engine laid them out
  */
@@ -77,6 +86,7 @@ const publishLayout = (engine: PageEngine) => {
     pages: engine.pages(),
     versions: engine.raw.versions(),
     bottoms: engine.raw.bottoms(),
+    properties: hasProperties.value,
   };
 };
 
@@ -91,16 +101,27 @@ const publishSelection = (
   at?: number,
 ) => {
   const { selection } = state;
-  const head = engine.caret(selection.head);
-  if (selection.empty) {
-    pageCaret.value = head;
-    pageSelection.value = [];
-  } else {
-    pageCaret.value = null;
-    pageSelection.value = engine.selection(selection.from, selection.to);
-  }
+  const shown = shownSelection(engine, selection);
+  pageCaret.value = shown.caret;
+  pageSelection.value = shown.rects;
+  pageNodeSelection.value = shown.nodes;
+  const head = shown.caret ?? engine.caret(selection.head);
   if (scroll && head)
     pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
+};
+
+/**
+ * publishComposition underlines the text being composed, from where the
+ * composition started to the head
+ */
+const publishComposition = (
+  engine: PageEngine,
+  state: EditorState,
+  from: number | null,
+) => {
+  const to = state.selection.head;
+  pageComposition.value =
+    from === null || to <= from ? [] : engine.selection(from, to);
 };
 
 /**
@@ -128,8 +149,23 @@ const PAGE_STEP = 0.85;
  * the pages, the caret and the selection. It comes first of the plugins, so
  * the views of the others measure the new layout when they update.
  */
-export const pageSync = () =>
-  new Plugin({
+export const pageSync = () => {
+  // where the text being composed starts, while an input method composes
+  let composing: number | null = null;
+  return new Plugin({
+    props: {
+      handleDOMEvents: {
+        compositionstart: (view) => {
+          composing = view.state.selection.from;
+          return false;
+        },
+        compositionend: (view) => {
+          composing = null;
+          if (pageEngine) publishComposition(pageEngine, view.state, null);
+          return false;
+        },
+      },
+    },
     view(view) {
       const engine = pageEngine;
       if (!engine) return {};
@@ -159,16 +195,22 @@ export const pageSync = () =>
               ),
             );
           }
+          if (composing !== null) {
+            publishComposition(engine, view.state, composing);
+          }
         },
         destroy() {
           stop();
           pageLayoutState.value = null;
           pageCaret.value = null;
           pageSelection.value = [];
+          pageNodeSelection.value = [];
+          pageComposition.value = [];
         },
       };
     },
   });
+};
 
 export const pageView = () => {
   // the x the caret keeps while it moves up and down, in points

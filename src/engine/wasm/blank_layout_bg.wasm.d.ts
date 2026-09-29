@@ -14,6 +14,7 @@ export const layoutengine_lineEdge: (a: number, b: number, c: number) => number;
 export const layoutengine_new: (a: number, b: number, c: number, d: number) => number;
 export const layoutengine_page: (a: number, b: number) => [number, number];
 export const layoutengine_pageCount: (a: number) => number;
+export const layoutengine_pageSpan: (a: number, b: number) => [number, number];
 export const layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const layoutengine_selection: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_setItems: (a: number, b: number, c: number) => [number, number];

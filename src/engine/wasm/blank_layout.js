@@ -143,6 +143,17 @@ export class LayoutEngine {
         return ret >>> 0;
     }
     /**
+     * the positions the blocks on a page start and end at, or nothing
+     * @param {number} page
+     * @returns {Uint32Array}
+     */
+    pageSpan(page) {
+        const ret = wasm.layoutengine_pageSpan(this.__wbg_ptr, page);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * what a page shows: rectangles, images, links and glyph runs
      * @param {number} page
      * @returns {string}

@@ -237,6 +237,14 @@ export class PageEngine {
     return { columns, rows };
   }
 
+  /**
+   * pageSpan returns the positions the blocks on a page start and end at
+   */
+  pageSpan(page: number) {
+    const values = this.raw.pageSpan(page);
+    return values.length === 2 ? { from: values[0], to: values[1] } : null;
+  }
+
   hit(page: number, x: number, y: number) {
     return toHit(this.raw.hit(page, x, y));
   }

@@ -1,3 +1,5 @@
+import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
+
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
 
@@ -37,5 +39,21 @@ export const endMark = (
     footer,
     number: hasNumber ? "" : `${page + 1}`,
     header: next ? next.slice(0, 3) : ["", "", ""],
+  };
+};
+
+/**
+ * propertiesPlace returns where the line with the document's properties
+ * goes: right above the first page's text, as wide as it
+ */
+export const propertiesPlace = (layout: FrameLayout) => {
+  const first = layout.frames[0];
+  if (!first) return null;
+  // in "page ends" the frame shows some room beside the text
+  const inset = layout.mode === "pages" ? 0 : BLEED * layout.scale;
+  return {
+    left: first.left + inset,
+    top: first.top - PROPERTIES_ROOM - 4,
+    width: first.width - 2 * inset,
   };
 };
