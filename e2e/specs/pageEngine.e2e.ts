@@ -149,6 +149,11 @@ describe("page view", () => {
     await type("q");
     expect((await editorText()).length).toBe(before.length + 1);
     await browser.saveScreenshot(path.join(SHOTS, "engine-moved.png"));
+    // the mark where the first page ends
+    await browser.execute(() =>
+      document.querySelector(".page-end")!.scrollIntoView({ block: "center" }),
+    );
+    await browser.saveScreenshot(path.join(SHOTS, "engine-page-end.png"));
   });
 
   // two chapters of four paragraphs fill about a page
