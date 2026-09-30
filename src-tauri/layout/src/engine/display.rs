@@ -47,8 +47,16 @@ impl Engine {
     /// what a page shows: its text, decorations, images, links and, with
     /// `bands`, its header and footer
     pub fn page_ops(&mut self, page: usize, bands: bool) -> Vec<Op> {
+        let mut ops = self.body_ops(page);
+        if bands {
+            ops.extend(self.band_ops(page));
+        }
+        ops
+    }
+
+    /// what a page shows besides its header and footer
+    pub fn body_ops(&self, page: usize) -> Vec<Op> {
         let mut ops = vec![];
-        let band_boxes = if bands { self.band_boxes(page) } else { vec![] };
         let left = self.settings.margins.left;
         let range = self.frags_on(page);
         for index in range.clone() {
@@ -112,7 +120,13 @@ impl Engine {
                 }
             }
         }
-        for (boxed, dx, dy) in &band_boxes {
+        ops
+    }
+
+    /// a page's header and footer
+    pub fn band_ops(&mut self, page: usize) -> Vec<Op> {
+        let mut ops = vec![];
+        for (boxed, dx, dy) in &self.band_boxes(page) {
             for line in 0..boxed.line_count() {
                 push_text_ops(&mut ops, &self.fonts, boxed, line, *dx, *dy, Role::Band);
             }

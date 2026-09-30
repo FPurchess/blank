@@ -361,6 +361,33 @@ fn settings_for(run: u64) -> Settings {
     settings
 }
 
+/// one random edit of the blocks
+fn edit(random: &mut Random, specs: &mut Vec<Spec>, room: f32) {
+    match random.below(10) {
+        0..=2 => {
+            let at = random.below(specs.len() + 1);
+            specs.insert(at, random_spec(random, room));
+        }
+        3 | 4 if specs.len() > 2 => {
+            let at = random.below(specs.len());
+            specs.remove(at);
+        }
+        _ if !specs.is_empty() => {
+            let at = random.below(specs.len());
+            restyle(random, &mut specs[at], room);
+        }
+        _ => specs.push(random_spec(random, room)),
+    }
+}
+
+fn first_to_last(indices: impl Iterator<Item = usize>) -> std::ops::Range<usize> {
+    let indices: Vec<usize> = indices.collect();
+    match (indices.first(), indices.last()) {
+        (Some(&first), Some(&last)) => first..last + 1,
+        _ => 0..0,
+    }
+}
+
 #[test]
 fn incremental_equals_full() {
     const RUNS: u64 = 4;
@@ -383,28 +410,40 @@ fn incremental_equals_full() {
         for step in 0..steps {
             let before_pages = engine.pages.clone();
             let before_frags = engine.frags.clone();
-            let old_items = to_items(&specs);
-            match random.below(10) {
-                0..=2 => {
-                    let at = random.below(specs.len() + 1);
-                    specs.insert(at, random_spec(&mut random, room));
-                }
-                3 | 4 if specs.len() > 2 => {
-                    let at = random.below(specs.len());
-                    specs.remove(at);
-                }
-                _ if !specs.is_empty() => {
-                    let at = random.below(specs.len());
-                    restyle(&mut random, &mut specs[at], room);
-                }
-                _ => specs.push(random_spec(&mut random, room)),
+            // one edit through update, or a few at once through update_many:
+            // in document order mostly, and sometimes not
+            let edits = if random.chance(25) {
+                2 + random.below(2)
+            } else {
+                1
+            };
+            let mut entries = vec![];
+            let mut current = to_items(&specs);
+            // the index each item had before the step, None for new ones
+            let mut old_index: Vec<Option<usize>> = (0..current.len()).map(Some).collect();
+            for _ in 0..edits {
+                edit(&mut random, &mut specs, room);
+                let items = to_items(&specs);
+                let entry = change(&current, &items);
+                old_index.splice(entry.0..entry.0 + entry.1, vec![None; entry.2.len()]);
+                entries.push(entry);
+                current = items;
             }
-            let items = to_items(&specs);
-            let (start, delete, inserted, shift) = change(&old_items, &items);
-            let count = inserted.len();
-            engine.update(start, delete, inserted, shift);
-            let context =
-                format!("run {run} step {step}: update({start}, {delete}, {count}, {shift})");
+            let items = current;
+            let described: Vec<String> = entries
+                .iter()
+                .map(|(start, delete, inserted, shift)| {
+                    format!("({start}, {delete}, {}, {shift})", inserted.len())
+                })
+                .collect();
+            let count: usize = entries.iter().map(|entry| entry.2.len()).sum();
+            let context = format!("run {run} step {step}: update {}", described.join(" "));
+            let changes = if entries.len() == 1 {
+                let (start, delete, inserted, shift) = entries.pop().unwrap();
+                engine.update(start, delete, inserted, shift)
+            } else {
+                engine.update_many(entries)
+            };
 
             // the shift moved every position the engine keeps
             assert_eq!(engine.items, items, "{context}");
@@ -439,7 +478,23 @@ fn incremental_equals_full() {
             );
 
             // a version stands for what a page shows: one that was there
-            // before shows what it showed then
+            // before shows what it showed then. The body version for the
+            // page without its bands, the band version for the bands.
+            let body = |page: &Page, ops: &[Op]| {
+                let _ = page;
+                ops.iter()
+                    .filter(|op| {
+                        !matches!(
+                            op,
+                            Op::Glyphs {
+                                role: crate::items::Role::Band,
+                                ..
+                            }
+                        )
+                    })
+                    .cloned()
+                    .collect::<Vec<Op>>()
+            };
             for (index, page) in engine.pages.iter().enumerate() {
                 if let Some(old) = before_pages
                     .iter()
@@ -450,46 +505,182 @@ fn incremental_equals_full() {
                         "{context}: page {index} kept the version of page {old}, which showed something else"
                     );
                 }
+                if let Some(old) = before_pages
+                    .iter()
+                    .position(|old| old.body_version == page.body_version)
+                {
+                    assert!(
+                        body(page, &ops[index]) == body(&before_pages[old], &before_ops[old]),
+                        "{context}: page {index} kept the body version of page {old}, whose body was another"
+                    );
+                }
+                if let Some(old) = before_pages
+                    .iter()
+                    .position(|old| old.band_version == page.band_version)
+                {
+                    assert_eq!(
+                        page.bands, before_pages[old].bands,
+                        "{context}: page {index} kept the band version of page {old}"
+                    );
+                }
             }
-            // and a page that shows what it showed keeps its version, so it
+            // and a page that shows what it showed keeps its versions, so it
             // isn't painted again: one whose fragments are the old page's,
-            // of items that weren't laid out again, with the same bands
-            let moved = |frag: &super::Frag| -> Option<super::Frag> {
-                let item = if frag.item < start {
-                    frag.item
-                } else if frag.item >= start + delete {
-                    frag.item + count - delete
-                } else {
-                    return None;
-                };
-                Some(super::Frag { item, ..*frag })
+            // of items that weren't laid out again, keeps its body, and with
+            // the same bands its version too
+            let moved = |frag: &super::Frag| -> Option<usize> {
+                old_index.get(frag.item).copied().flatten()
             };
             for (index, page) in engine.pages.iter().enumerate() {
                 let Some(old) = before_pages.get(index) else {
                     continue;
                 };
                 let new_frags = &engine.frags[page.start..page.end];
-                let old_frags: Vec<Option<super::Frag>> =
-                    before_frags[old.start..old.end].iter().map(moved).collect();
+                let old_frags = &before_frags[old.start..old.end];
                 let same = new_frags.len() == old_frags.len()
-                    && new_frags
-                        .iter()
-                        .zip(&old_frags)
-                        .all(|(a, b)| Some(*a) == *b);
-                if same && page.bands == old.bands {
+                    && new_frags.iter().zip(old_frags).all(|(a, b)| {
+                        moved(a) == Some(b.item)
+                            && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
+                    });
+                if same {
                     assert_eq!(
-                        page.version, old.version,
-                        "{context}: page {index} was painted again"
+                        page.body_version, old.body_version,
+                        "{context}: page {index}'s body was painted again"
                     );
+                    if page.bands == old.bands {
+                        assert_eq!(
+                            page.version, old.version,
+                            "{context}: page {index} was painted again"
+                        );
+                    }
                 }
             }
+            // the ranges it reports are the pages whose versions changed
+            let differ = |version: fn(&Page) -> u32| {
+                first_to_last((0..engine.pages.len()).filter(|&index| {
+                    before_pages.get(index).map(version) != Some(version(&engine.pages[index]))
+                }))
+            };
+            assert_eq!(
+                changes.body,
+                differ(|page| page.body_version),
+                "{context}: body"
+            );
+            assert_eq!(
+                changes.bands,
+                differ(|page| page.band_version),
+                "{context}: bands"
+            );
             before_ops = ops;
         }
     }
 }
 
+/// a document that fills its pages, with `{page} of {pages}` in the footer
+fn numbered(paragraphs: usize) -> (Engine, Vec<Item>) {
+    use super::test_support::document;
+    let mut settings = Settings::default();
+    settings.footer.center = "{page} of {pages}".into();
+    let items = document(&vec![LONG; paragraphs]);
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings);
+    engine.set_items(items.clone());
+    (engine, items)
+}
+
+#[test]
+fn a_new_page_changes_only_the_bands_of_the_others() {
+    let (mut engine, items) = numbered(40);
+    let before = engine.pages.clone();
+    // paragraphs at the end until there is a page more
+    let mut added = 0;
+    let mut pos = items.last().unwrap().to() + 1;
+    let mut changes = Default::default();
+    while engine.pages.len() == before.len() {
+        changes = engine.update(
+            items.len() + added,
+            0,
+            vec![super::test_support::paragraph(pos + 1, LONG)],
+            0,
+        );
+        pos += LONG.len() as u32 + 2;
+        added += 1;
+    }
+    let pages = engine.pages.len();
+    assert_eq!(pages, before.len() + 1);
+    let last = before.len() - 1;
+    for (index, (page, old)) in engine.pages.iter().zip(&before[..last]).enumerate() {
+        assert_eq!(page.body_version, old.body_version);
+        assert_ne!(page.band_version, old.band_version);
+        assert_ne!(page.version, old.version);
+        assert_eq!(page.bands[4], format!("{} of {pages}", index + 1));
+    }
+    // every band changed, and the bodies from the page the paragraphs went on
+    assert_eq!(changes.bands, 0..pages);
+    assert!(
+        changes.body.start >= last && changes.body.end == pages,
+        "{changes:?}"
+    );
+}
+
+#[test]
+fn new_bands_keep_the_bodies() {
+    let (mut engine, _) = numbered(30);
+    let before = engine.pages.clone();
+    let mut settings = engine.settings.clone();
+    settings.header.left = "Draft".into();
+    let changes = engine.set_settings(settings);
+    for (page, old) in engine.pages.iter().zip(&before) {
+        assert_eq!(page.body_version, old.body_version);
+        assert_ne!(page.band_version, old.band_version);
+    }
+    assert_eq!(changes.body, 0..0);
+    assert_eq!(changes.bands, 0..before.len());
+}
+
+#[test]
+fn a_new_font_changes_every_body() {
+    // the screen caches a page's body by its version, so every page whose
+    // glyphs could change with a font must get a new one
+    let (mut engine, _) = numbered(30);
+    let before = engine.pages.clone();
+    let dejavu = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fonts/dejavu-sans.ttf"
+    ))
+    .unwrap();
+    let changes = engine.add_font(dejavu, "DejaVu Sans");
+    for (page, old) in engine.pages.iter().zip(&before) {
+        assert_ne!(page.body_version, old.body_version);
+        assert_ne!(page.version, old.version);
+    }
+    assert_eq!(changes.body, 0..engine.pages.len());
+}
+
+#[test]
+fn splices_runs_of_items() {
+    let mut runs = vec![(10, Some(0))];
+    super::splice_runs(&mut runs, 3, 2, 1);
+    assert_eq!(runs, [(3, Some(0)), (1, None), (5, Some(5))]);
+    // an update after it counts the items as the first left them
+    super::splice_runs(&mut runs, 6, 0, 2);
+    assert_eq!(
+        runs,
+        [
+            (3, Some(0)),
+            (1, None),
+            (2, Some(5)),
+            (2, None),
+            (3, Some(7))
+        ]
+    );
+    super::splice_runs(&mut runs, 0, 11, 0);
+    assert_eq!(runs, []);
+}
+
 /// how long an update takes at the end of a long document: one character
-/// typed into a paragraph in its middle, 200 times. Run it in release:
+/// typed into a paragraph in its middle, the best of 5 runs of 40, as the
+/// machine may be busy. Run it in release:
 /// cargo test --release -p blank-layout --lib update_timing -- --ignored --nocapture
 #[test]
 #[ignore]
@@ -500,20 +691,23 @@ fn update_timing() {
         let mut engine = engine(items.clone());
         let pages = engine.pages.len();
         let middle = paragraphs / 2;
-        let started = std::time::Instant::now();
-        const TIMES: usize = 200;
-        for _ in 0..TIMES {
-            let mut changed = items[middle].clone();
-            if let Content::Text(text) = &mut changed.content {
-                text.text.insert(0, 'x');
+        let mut best = f64::MAX;
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            const TIMES: usize = 40;
+            for _ in 0..TIMES {
+                let mut changed = items[middle].clone();
+                if let Content::Text(text) = &mut changed.content {
+                    text.text.insert(0, 'x');
+                }
+                items[middle] = changed.clone();
+                for item in &mut items[middle + 1..] {
+                    item.shift(1);
+                }
+                engine.update(middle, 1, vec![changed], 1);
             }
-            items[middle] = changed.clone();
-            for item in &mut items[middle + 1..] {
-                item.shift(1);
-            }
-            engine.update(middle, 1, vec![changed], 1);
+            best = best.min(started.elapsed().as_secs_f64() * 1000.0 / TIMES as f64);
         }
-        let each = started.elapsed().as_secs_f64() * 1000.0 / TIMES as f64;
-        println!("{pages} pages: {each:.3} ms per update");
+        println!("{pages} pages: {best:.3} ms per update");
     }
 }

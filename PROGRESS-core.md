@@ -4,7 +4,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 
 - [x] 0. Split `engine.rs` into `engine/` and `items.rs` into `items/`, as a pure move
 - [x] 1. B1: incremental re-layout equals a full layout
-- [ ] 2. S6: changed page ranges, body and band versions, `updateMany`
+- [x] 2. S6: changed page ranges, body and band versions, `updateMany`
 - [ ] 3. B2 / S5: no panic from JS input
 - [ ] 4. B4 / S1: line affinity for ↑/↓ and End
 - [ ] 5. Up/Down through the paragraphs of a cell, and past a table's caption
@@ -63,11 +63,34 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `BLANK_PROPERTY_STEPS=2000 cargo test --release` (8000 edits) passed in 18 min.
   - Mutation checks: never keeping a repaginated page's version, and keeping it unconditionally, each fail the version assertions.
 
+### Task 2: S6
+
+- Pages have three versions:
+  - `version`: the body or the bands changed, as before
+  - `body_version`
+  - `band_version`
+- `update`, `update_many`, `set_items`, `set_settings` and `add_font` return `Changes`, the ranges of pages whose body and bands changed. See `SEAM.md`.
+- A `set_settings` that doesn't lay out again (new bands, say) keeps the body versions of pages with the same fragments.
+- `update_many` applies several changes and paginates once. `ItemMap` keeps track of which items are the old ones, and the tail after the last change still settles.
+- The `shift` covers every position the engine keeps. Checked by the property test, which compares the items and the text boxes' positions after every edit.
+- The `Laid` cache is reused: the property test checks that only the inserted items are laid out (`stats.laid_out`).
+- Tests:
+  - The property test now also sends a quarter of its steps as 2–3 edits through `update_many` (sometimes out of order).
+  - It checks body and band versions both ways, and that the reported ranges are exactly the pages whose versions changed.
+  - New tests:
+    - `a_new_page_changes_only_the_bands_of_the_others` (`{pages}` in the footer)
+    - `new_bands_keep_the_bodies`
+    - `a_new_font_changes_every_body`
+    - `splices_runs_of_items`
+  - Mutation checks: ignoring out-of-order entries, and keeping band versions whose texts changed, each fail it.
+
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
+
+`update_timing` (`--ignored`), the best of 5 runs of 40 updates, and here the best of 3 such runs. The machine was shared with other builds (load average about 35), so differences below about 30% are noise. Task 1's code and task 2's code were run alternately.
 
 | pages | after task 1 | after task 2 | after task 16 |
 |---|---|---|---|
-| 1 | 0.210 | | |
-| 39 | 0.287 | | |
-| 200 | 0.453 | | |
-| 823 | 1.766 | | |
+| 1 | 0.147 | 0.139 | |
+| 39 | 0.165 | 0.166 | |
+| 200 | 0.311 | 0.286 | |
+| 823 | 1.019 | 1.267 | |

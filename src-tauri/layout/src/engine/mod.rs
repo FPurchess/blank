@@ -41,11 +41,26 @@ pub struct Page {
     pub first: Option<(usize, usize)>,
     /// where its text ends, from the page's top edge
     pub bottom: f32,
-    /// changes whenever what the page shows changes, so the screen paints
-    /// only those pages again
+    /// changes whenever what the page shows changes, its body or its
+    /// bands, so the screen paints only those pages again
     pub version: u32,
+    /// changes whenever its body changes: the text and everything drawn
+    /// with it, but not the header and footer
+    pub body_version: u32,
+    /// changes whenever the text of its header or footer changes
+    pub band_version: u32,
     /// the text of its header and footer slots
     pub bands: [String; 6],
+}
+
+/// the pages whose body and whose bands show something else than the page
+/// at the same index did before a change, as ranges of page indices; empty
+/// when none did. Pages the change dropped aren't in them: they are no
+/// longer there.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Changes {
+    pub body: std::ops::Range<usize>,
+    pub bands: std::ops::Range<usize>,
 }
 
 /// what changed with an update, for the measurements
@@ -99,9 +114,9 @@ impl Engine {
     }
 
     /// sets the page and lays out everything again, if it changed
-    pub fn set_settings(&mut self, settings: Settings) {
+    pub fn set_settings(&mut self, settings: Settings) -> Changes {
         if settings == self.settings {
-            return;
+            return Changes::default();
         }
         // the width of the text, and its height, which tall table rows are
         // sliced to
@@ -113,18 +128,25 @@ impl Engine {
             let items = std::mem::take(&mut self.items);
             self.laid = items.iter().map(|item| self.lay_out(item)).collect();
             self.items = items;
+            return self.paginate_from(0, None);
         }
-        self.paginate_from(0, None);
+        // the same items, only paginated again, e.g. for new bands: pages
+        // that keep their fragments keep their bodies
+        let change = Change {
+            tail: None,
+            map: ItemMap(vec![(0, self.items.len(), 0)]),
+        };
+        self.paginate_from(0, Some(change))
     }
 
     /// adds a font for what the others lack, see Fonts::add, and lays out
     /// everything again with it
-    pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) {
+    pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) -> Changes {
         self.fonts.add(bytes, family);
         let items = std::mem::take(&mut self.items);
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
-        self.paginate_from(0, None);
+        self.paginate_from(0, None)
     }
 
     /// the characters of the document no font has a glyph for
@@ -143,65 +165,115 @@ impl Engine {
     }
 
     /// replaces all items
-    pub fn set_items(&mut self, items: Vec<Item>) {
+    pub fn set_items(&mut self, items: Vec<Item>) -> Changes {
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
         self.stats = Stats {
             laid_out: self.items.len(),
             ..Default::default()
         };
-        self.paginate_from(0, None);
+        self.paginate_from(0, None)
     }
 
     /// replaces `delete` items from `start` with `inserted`, and moves the
     /// items after them by `shift` positions. Only the new items are laid
-    /// out, and the pages are paginated again from the page of the first
+    /// out, and the pages are paginated again from the page before the
     /// change until they start as before.
-    pub fn update(&mut self, start: usize, delete: usize, inserted: Vec<Item>, shift: i64) {
-        let start = start.min(self.items.len());
-        let delete = delete.min(self.items.len() - start);
-        // a heading before the change is kept with what follows it, so the
-        // pagination starts at the run of headings before it
+    pub fn update(
+        &mut self,
+        start: usize,
+        delete: usize,
+        inserted: Vec<Item>,
+        shift: i64,
+    ) -> Changes {
+        self.update_many(vec![(start, delete, inserted, shift)])
+    }
+
+    /// several updates at once, each as `update` takes it and in document
+    /// order: each one's `start` counts the items as the ones before it
+    /// left them, and its `shift` moves the items after it. The pages are
+    /// paginated again once, from the page before the first change. Out of
+    /// order, they still apply, but paginate from the first page.
+    pub fn update_many(&mut self, changes: Vec<(usize, usize, Vec<Item>, i64)>) -> Changes {
+        if changes.is_empty() {
+            return Changes::default();
+        }
+        // the items as runs of (length, index before the updates), with
+        // None for new ones
+        let mut runs: Vec<(usize, Option<usize>)> = vec![(self.items.len(), Some(0))];
+        let mut restart_page = None;
+        let mut previous_end = 0;
+        let mut laid_out = 0;
+        for (start, delete, inserted, shift) in changes {
+            let start = start.min(self.items.len());
+            let delete = delete.min(self.items.len() - start);
+            let count = inserted.len();
+            if restart_page.is_none() {
+                restart_page = Some(self.restart_page(start));
+            } else if start < previous_end {
+                restart_page = Some(0);
+            }
+            previous_end = start + count;
+            let laid: Vec<Laid> = inserted.iter().map(|item| self.lay_out(item)).collect();
+            self.items.splice(start..start + delete, inserted);
+            self.laid.splice(start..start + delete, laid);
+            if shift != 0 {
+                for item in &mut self.items[start + count..] {
+                    item.shift(shift);
+                }
+                for laid in &mut self.laid[start + count..] {
+                    for text in &mut laid.texts {
+                        text.pos = (text.pos as i64 + shift).max(0) as u32;
+                    }
+                }
+            }
+            splice_runs(&mut runs, start, delete, count);
+            laid_out += count;
+        }
+        self.stats = Stats {
+            laid_out,
+            ..Default::default()
+        };
+        let mut map = vec![];
+        let mut at = 0;
+        for &(length, old) in &runs {
+            if let Some(old) = old {
+                map.push((at, at + length, old));
+            }
+            at += length;
+        }
+        // the items after the last change are the old ones, moved: once a
+        // page starts with one of them as an old page did, the rest is as
+        // before
+        let tail = match runs.last() {
+            Some(&(length, Some(old))) if length > 0 => Some(Tail {
+                start: at - length,
+                delta: (at - length) as i64 - old as i64,
+            }),
+            _ => None,
+        };
+        let change = Change {
+            tail,
+            map: ItemMap(map),
+        };
+        self.paginate_from(restart_page.unwrap_or(0), Some(change))
+    }
+
+    /// the page to paginate again from for a change at item `start`: a
+    /// heading before the change is kept with what follows it, so the run
+    /// of headings before it, and the page before that, where what follows
+    /// may flow back to
+    fn restart_page(&self, start: usize) -> usize {
         let mut earliest = start;
         while earliest > 0 && self.items[earliest - 1].heading_level() > 0 {
             earliest -= 1;
         }
-        // and at the page before it, where what follows may flow back to
-        let restart_page = if earliest < self.first_frag.len() {
+        if earliest < self.first_frag.len() {
             self.page_of_frag(self.first_frag[earliest])
         } else {
             self.pages.len().saturating_sub(1)
         }
-        .saturating_sub(1);
-        let laid: Vec<Laid> = inserted.iter().map(|item| self.lay_out(item)).collect();
-        let count = inserted.len();
-        self.items.splice(start..start + delete, inserted);
-        self.laid.splice(start..start + delete, laid);
-        if shift != 0 {
-            for item in &mut self.items[start + count..] {
-                item.shift(shift);
-            }
-            for laid in &mut self.laid[start + count..] {
-                for text in &mut laid.texts {
-                    text.pos = (text.pos as i64 + shift).max(0) as u32;
-                }
-            }
-        }
-        self.stats = Stats {
-            laid_out: count,
-            ..Default::default()
-        };
-        let change = Change {
-            tail: Tail {
-                start: start + count,
-                delta: count as i64 - delete as i64,
-            },
-            map: ItemMap(vec![
-                (0, start, 0),
-                (start + count, self.items.len(), start + delete),
-            ]),
-        };
-        self.paginate_from(restart_page, Some(change));
+        .saturating_sub(1)
     }
 
     fn band_texts(&self, page: usize) -> [String; 6] {
@@ -216,6 +288,41 @@ impl Engine {
         let [d, e, f] = expand_slots(&bands.footer, &values);
         [a, b, c, d, e, f]
     }
+}
+
+/// replaces `delete` items from `start` in the runs of items with `count`
+/// new ones
+fn splice_runs(runs: &mut Vec<(usize, Option<usize>)>, start: usize, delete: usize, count: usize) {
+    let split = |at: usize, runs: &mut Vec<(usize, Option<usize>)>| {
+        let mut position = 0;
+        for index in 0..runs.len() {
+            let (length, old) = runs[index];
+            if at > position && at < position + length {
+                let first = at - position;
+                runs[index] = (first, old);
+                runs.insert(index + 1, (length - first, old.map(|old| old + first)));
+                return;
+            }
+            position += length;
+        }
+    };
+    split(start, runs);
+    split(start + delete, runs);
+    let mut position = 0;
+    let mut index = 0;
+    while index < runs.len() && position < start {
+        position += runs[index].0;
+        index += 1;
+    }
+    let mut removed = 0;
+    while index < runs.len() && removed < delete {
+        removed += runs[index].0;
+        runs.remove(index);
+    }
+    if count > 0 {
+        runs.insert(index, (count, None));
+    }
+    runs.retain(|(length, _)| *length > 0);
 }
 
 #[cfg(test)]

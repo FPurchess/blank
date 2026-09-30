@@ -1,7 +1,7 @@
 //! Pagination: places the units of the items on pages, and starts again
 //! from a change until the pages settle.
 
-use super::{Engine, Frag, Page};
+use super::{Changes, Engine, Frag, Page};
 use crate::bands::Chapter;
 use crate::items::Laid;
 use crate::model::{Content, Item, Settings};
@@ -14,16 +14,17 @@ impl Engine {
     }
 
     /// paginates from the start of page `from`. With a `change`, the items
-    /// from `change.tail.start` on are the ones that were there before,
-    /// moved by `change.tail.delta`: once a page starts with one of them
-    /// where an old page did, the rest is as before. Without one, every item
-    /// was laid out again, and every page gets a new version.
-    pub(super) fn paginate_from(&mut self, from: usize, change: Option<Change>) {
-        let tail = change.as_ref().map(|change| change.tail);
+    /// it maps are the ones that were there before, and those from
+    /// `change.tail.start` on are moved by `change.tail.delta`: once a page
+    /// starts with one of them where an old page did, the rest is as
+    /// before. Without one, every item was laid out again, and every page
+    /// gets new versions.
+    pub(super) fn paginate_from(&mut self, from: usize, change: Option<Change>) -> Changes {
+        let tail = change.as_ref().and_then(|change| change.tail);
         let from = from.min(self.pages.len());
         let old_pages = std::mem::take(&mut self.pages);
         let old_frags = std::mem::take(&mut self.frags);
-        let mut from = if tail.is_none() { 0 } else { from };
+        let mut from = if change.is_none() { 0 } else { from };
         while from > 0 && old_pages.get(from).is_none_or(|page| page.first.is_none()) {
             from -= 1;
         }
@@ -98,50 +99,86 @@ impl Engine {
                 _ => None,
             })
             .collect();
-        // new versions for the pages whose fragments changed, and for the
-        // pages whose headers or footers changed
+        // new versions for what changed on each page: its body when its
+        // fragments did, or their items were laid out again; its bands when
+        // their texts did
+        let mut changes = Changes::default();
+        let mut body_changed: Vec<usize> = vec![];
+        let mut bands_changed: Vec<usize> = vec![];
         let count = self.pages.len();
         for index in 0..count {
             let bands = self.band_texts(index);
-            let source = if change.is_none() {
-                None
+            // the old page each part is the same as, if any
+            let (body_source, band_source) = if change.is_none() {
+                (None, None)
             } else if index < from {
-                Some(index)
+                (Some(index), Some(index))
             } else if index >= copied_from {
-                settled.map(|old_index| old_index + index - copied_from)
+                let source = settled.map(|old_index| old_index + index - copied_from);
+                (source, source)
             } else {
-                // paginated again: the same as the old page if it has the
-                // same fragments, of items that weren't laid out again
-                change.as_ref().and_then(|change| {
-                    let old = old_pages.get(index)?;
+                // paginated again: the same body as the old page if it has
+                // the same fragments, of items that weren't laid out again
+                let same = change.as_ref().is_some_and(|change| {
+                    let Some(old) = old_pages.get(index) else {
+                        return false;
+                    };
                     let page = &self.pages[index];
                     let new = &self.frags[page.start..page.end];
                     let before = &old_frags[old.start..old.end];
-                    let same = new.len() == before.len()
+                    new.len() == before.len()
                         && new.iter().zip(before).all(|(a, b)| {
                             change.map.old_of(a.item) == Some(b.item)
                                 && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
-                        });
-                    same.then_some(index)
-                })
+                        })
+                });
+                (same.then_some(index), Some(index))
             };
-            let kept = source
+            let body = body_source.and_then(|source| old_pages.get(source));
+            let band = band_source
                 .and_then(|source| old_pages.get(source))
-                .filter(|old| old.bands == bands)
-                .map(|old| old.version);
-            self.pages[index].version = kept.unwrap_or_else(|| {
+                .filter(|old| old.bands == bands);
+            let mut new_version = || {
                 self.next_version += 1;
                 self.next_version
-            });
-            self.pages[index].bands = bands;
+            };
+            let body_version = body
+                .map(|old| old.body_version)
+                .unwrap_or_else(&mut new_version);
+            let band_version = band
+                .map(|old| old.band_version)
+                .unwrap_or_else(&mut new_version);
+            let version = match (body, band) {
+                (Some(old), Some(_)) if body_source == band_source => old.version,
+                _ => new_version(),
+            };
+            let before = old_pages.get(index);
+            if before.map(|old| old.body_version) != Some(body_version) {
+                body_changed.push(index);
+            }
+            if before.map(|old| old.band_version) != Some(band_version) {
+                bands_changed.push(index);
+            }
+            let page = &mut self.pages[index];
+            page.version = version;
+            page.body_version = body_version;
+            page.band_version = band_version;
+            page.bands = bands;
         }
+        let range = |indices: &[usize]| match (indices.first(), indices.last()) {
+            (Some(&first), Some(&last)) => first..last + 1,
+            _ => 0..0,
+        };
+        changes.body = range(&body_changed);
+        changes.bands = range(&bands_changed);
+        changes
     }
 }
 
 /// what an update changed: which items are the ones before it, where the
 /// unchanged tail starts
 pub(super) struct Change {
-    pub(super) tail: Tail,
+    pub(super) tail: Option<Tail>,
     pub(super) map: ItemMap,
 }
 
@@ -192,6 +229,8 @@ impl Paginator<'_> {
             first: None,
             bottom: self.settings.content_top(),
             version: 0,
+            body_version: 0,
+            band_version: 0,
             bands: Default::default(),
         });
         self.y = self.settings.content_top();
