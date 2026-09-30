@@ -21,7 +21,7 @@ deletes this file on merge.
 - [x] 12. The hidden `TableView` no longer freezes columns
 - [x] 13. Page setup and field watchers lay out on the new state
 - [x] 14. `frozen` is reset with the plugin view
-- [ ] 15. Share the fonts between engines — waiting for S3
+- [x] 15. Share the fonts between engines (S3)
 - [x] 16. Test hooks only in dev and E2E builds
 - [x] 17. Dead code, and a parity test of the bands
 - [x] 18. Table handles measure only the tables under the pointer
@@ -103,6 +103,15 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   itself). `src/layout/bands.parity.test.ts` checks that the engine's bands
   are `bandsOn` + `fieldValues` + `expand` for numbering styles, start
   numbers, first and even pages.
+
+- engine-core, integrator (S3): the PDF export's engine is
+  `LayoutEngine.withFontsOf(pageEngine.raw)` (`PageEngine.sharing`), which
+  also knows the fallbacks already added, so no font bytes go into the wasm
+  again per export. The trap worker rebuilds from Blank's font files plus
+  `fallbackFonts`, which is the store's order (`fontFileFamily` "" first,
+  then the fallbacks as added; a test pins it). Their bytes stay in JS once,
+  as they were: reading them back out of the store while healthy would make
+  that same one JS copy, and after a trap it can't be read.
 
 ## Verification
 

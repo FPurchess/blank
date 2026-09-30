@@ -34,6 +34,8 @@ import { readFileSync } from "node:fs";
 import { handleJob, type PdfReply } from "./pdfWorker";
 import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
+import * as pdfJob from "./pdfJob";
+import { baseFonts, setPageEngine } from "./engine";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -351,5 +353,63 @@ describe("the PDF's tables", () => {
       encoding: "utf8",
     });
     expect(images).toMatch(/^\s*1\s+0\s+image\s+3\s+2\s/m);
+  });
+});
+
+describe("the PDF's fonts, shared with the page view", () => {
+  const emoji = () =>
+    readFileSync(
+      join(import.meta.dirname, "../../fonts/NotoEmoji-VariableFont_wght.ttf"),
+    );
+
+  afterEach(() => {
+    setPageEngine(null);
+    forgetFallbacks();
+  });
+
+  it("aren't copied into the engine again for an export", async () => {
+    const page = testEngine();
+    const font = { family: "Noto Emoji", bytes: new Uint8Array(emoji()) };
+    fallbackFonts.value = [font];
+    page.addFonts([font]);
+    setPageEngine(page);
+    const packed = vi.spyOn(pdfJob, "packFonts");
+    const added = vi.spyOn(LayoutEngine.prototype, "addFont");
+    const shared = vi.spyOn(LayoutEngine, "withFontsOf");
+
+    const doc = parseMarkdown("Crab 🦀\n");
+    await toPDF(EditorState.create({ schema, doc }), {
+      docPath: null,
+      layout: testLayout(),
+    });
+
+    expect(shared).toHaveBeenCalledWith(page.raw);
+    expect(packed).not.toHaveBeenCalled();
+    expect(added).not.toHaveBeenCalled();
+  });
+
+  it("are what the worker rebuilds its engine from, in the same order", async () => {
+    const page = testEngine();
+    const font = { family: "Noto Emoji", bytes: new Uint8Array(emoji()) };
+    fallbackFonts.value = [font];
+    page.addFonts([font]);
+    const raw = page.raw;
+    const store = Array.from({ length: raw.fontFileCount() }, (_, index) => ({
+      family: raw.fontFileFamily(index),
+      bytes: raw.fontFile(index),
+    }));
+
+    // the files of the worker's job: Blank's own, then the fallbacks
+    const files = await baseFonts();
+    const job = [
+      ...files.map((bytes) => ({ family: "", bytes })),
+      ...fallbackFonts.value,
+    ];
+    expect(store.map((file) => file.family)).toEqual(
+      job.map((file) => file.family),
+    );
+    store.forEach((file, index) =>
+      expect(file.bytes.length).toBe(job[index].bytes.length),
+    );
   });
 });

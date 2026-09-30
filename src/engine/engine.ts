@@ -378,6 +378,19 @@ export class PageEngine {
   }
 
   /**
+   * sharing makes another engine with this one's fonts, which the wasm
+   * shares instead of copying them: its files and the fallbacks added
+   * @param strict see the constructor
+   */
+  sharing(strict = false) {
+    const raw = this.call(null, () => LayoutEngine.withFontsOf(this.raw));
+    if (!raw) throw new Error("the page layout failed");
+    const engine = new PageEngine(raw, strict);
+    for (const font of this.added) engine.added.add(font);
+    return engine;
+  }
+
+  /**
    * breakForTest makes the next call fail, as if the wasm trapped
    */
   breakForTest() {
@@ -929,11 +942,17 @@ const loadFiles = () =>
   })());
 
 /**
- * newEngine makes another engine with the fonts already loaded, or loads them
+ * newEngine makes another engine, e.g. the PDF export's: one sharing the
+ * page view's fonts (its files and every fallback added to it), or else
+ * with the fonts already loaded, or loads them
  * @param strict throws when a call fails, see PageEngine
  */
-export const newEngine = async (strict = false) =>
-  createEngine(fontFiles ?? (await loadFiles()), strict);
+export const newEngine = async (strict = false) => {
+  // the page view's fonts, shared in the wasm, not copied into it again
+  const shared = pageEngine && !pageEngine.broken ? pageEngine : null;
+  if (shared) return shared.sharing(strict);
+  return createEngine(fontFiles ?? (await loadFiles()), strict);
+};
 
 /**
  * baseFonts returns Blank's own font files, as the engines got them
