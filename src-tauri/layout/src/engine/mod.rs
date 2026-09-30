@@ -344,7 +344,7 @@ fn splice_runs(runs: &mut Vec<(usize, Option<usize>)>, start: usize, delete: usi
 #[cfg(test)]
 mod tests {
     use super::test_support::*;
-    use super::Op;
+    use super::{Engine, Op};
 
     #[test]
     fn tells_what_no_font_has_and_takes_fonts_for_it() {
@@ -385,5 +385,52 @@ mod tests {
         )
         .unwrap();
         assert!(pdf.len() > 1000);
+    }
+
+    #[test]
+    fn engines_share_their_fonts() {
+        let mut page = engine(document(&[LONG; 12]));
+        let dejavu = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/dejavu-sans-bold.ttf"
+        ))
+        .unwrap();
+        page.add_font(dejavu, "Fallback");
+        let mut export = Engine::new(page.fonts.share());
+        // the same files, not copies of them
+        assert_eq!(export.fonts.files.len(), page.fonts.files.len());
+        for (a, b) in export.fonts.files.iter().zip(&page.fonts.files) {
+            assert!(std::sync::Arc::ptr_eq(&a.data, &b.data));
+            assert_eq!(a.blob.id(), b.blob.id());
+        }
+        assert_eq!(export.fonts.stack, page.fonts.stack);
+        // what makes the same fonts elsewhere: each file once, with the
+        // family of the fallback
+        let sources = page.fonts.sources();
+        assert_eq!(sources.len(), crate::fonts::FONT_FILES.len() + 1);
+        assert!(sources[..crate::fonts::FONT_FILES.len()]
+            .iter()
+            .all(|(_, family)| family.is_empty()));
+        assert_eq!(sources.last().unwrap().1, "Fallback");
+        // and the PDF of an engine that shares the fonts is the PDF of one
+        // with its own
+        let mut fresh = Engine::new(crate::fonts::repository_fonts());
+        let dejavu = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/dejavu-sans-bold.ttf"
+        ))
+        .unwrap();
+        fresh.add_font(dejavu, "Fallback");
+        let items = page.items.clone();
+        export.set_items(items.clone());
+        fresh.set_items(items);
+        let info = crate::pdf::Info {
+            title: "Shared".into(),
+            author: String::new(),
+        };
+        let shared = crate::pdf::write(&mut export, &Default::default(), &info).unwrap();
+        let own = crate::pdf::write(&mut fresh, &Default::default(), &info).unwrap();
+        assert!(shared == own, "the PDFs differ");
+        assert_eq!(export.frags, page.frags);
     }
 }

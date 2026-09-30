@@ -325,3 +325,121 @@ fn the_pdf_holds_tables_with_lists_and_quotes() {
         assert!(count >= 20, "{count} words");
     }
 }
+
+/// the plain text pdftotext reads from a PDF, or nothing without pdftotext
+fn read_text(pdf: &[u8], name: &str) -> Option<String> {
+    let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
+    std::fs::write(&path, pdf).unwrap();
+    let out = path.with_extension("txt");
+    let status = Command::new("pdftotext")
+        .arg("-enc")
+        .arg("UTF-8")
+        .arg(&path)
+        .arg(&out)
+        .status()
+        .ok()?;
+    assert!(status.success());
+    Some(std::fs::read_to_string(&out).unwrap())
+}
+
+fn pdf_of(engine: &mut Engine) -> Vec<u8> {
+    write(
+        engine,
+        &Default::default(),
+        &Info {
+            title: String::new(),
+            author: String::new(),
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn pdf_text_keeps_marks_and_ligatures() {
+    // NFD marks, Arabic with lam-alef and a mark, and Hebrew points, all
+    // in DejaVu Sans; and a Devanagari conjunct in Noto Sans Devanagari if
+    // this system has it
+    let devanagari = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf";
+    let mut lines = vec![
+        "cafe\u{301} and e\u{301}x",
+        "\u{627}\u{644}\u{633}\u{644}\u{627}\u{645} \u{628}\u{64e}\u{628}",
+        "\u{5e9}\u{5b8}\u{5c1}\u{5dc}\u{5d5}\u{5b9}\u{5dd}",
+    ];
+    let mut engine = Engine::new(repository_fonts());
+    match std::fs::read(devanagari) {
+        Ok(bytes) => {
+            engine.fonts.add(bytes, "Noto Sans Devanagari");
+            lines.push("\u{915}\u{94d}\u{937}\u{92e}\u{93e}");
+        }
+        Err(_) => eprintln!("no Noto Sans Devanagari, skipping the conjunct"),
+    }
+    let mut pos = 0;
+    let items: Vec<Item> = lines
+        .iter()
+        .map(|line| {
+            let item = text_item(pos + 1, line, "p", 0, vec![]);
+            pos += line.encode_utf16().count() as u32 + 2;
+            item
+        })
+        .collect();
+    engine.set_items(items);
+    let Some(text) = read_text(&pdf_of(&mut engine), "marks") else {
+        eprintln!("pdftotext is missing, skipping the check");
+        return;
+    };
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !('\u{202a}'..='\u{202e}').contains(c))
+        .collect();
+    for line in lines {
+        for word in line.split(' ') {
+            let rtl = word.chars().any(|c| ('\u{590}'..='\u{6ff}').contains(&c));
+            if rtl {
+                // every letter and mark is there. pdftotext turns the
+                // letters of one glyph around right to left (lam-alef, a
+                // letter with its marks), while the PDF has them as they are
+                // written, as its ToUnicode mapping must
+                let mut expected: Vec<char> = word.chars().collect();
+                expected.sort();
+                let found = text.chars().collect::<Vec<_>>();
+                let found = found.windows(expected.len()).any(|window| {
+                    let mut window = window.to_vec();
+                    window.sort();
+                    window == expected
+                });
+                assert!(found, "{word:?} is not in {text:?}");
+            } else {
+                // left to right exactly, the marks composed or not
+                assert!(
+                    text.contains(word) || text.contains(&compose(word)),
+                    "{word:?} is not in {text:?}"
+                );
+            }
+        }
+    }
+}
+
+/// é from e and a combining acute, the only composition the checks need
+fn compose(word: &str) -> String {
+    word.replace("e\u{301}", "\u{e9}")
+}
+
+#[test]
+fn pdf_text_keeps_what_no_font_has() {
+    // Chinese, which no font of the repository has: laid out with the
+    // missing glyph, and still in the PDF's text where it was laid out
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_items(vec![text_item(
+        1,
+        "plain \u{4e2d}\u{6587}\u{5b57} text \u{4e2d}",
+        "p",
+        0,
+        vec![],
+    )]);
+    assert!(!engine.missing().is_empty());
+    let pdf = pdf_of(&mut engine);
+    if let Some(text) = read_text(&pdf, "notdef") {
+        assert!(text.contains("\u{4e2d}\u{6587}\u{5b57}"), "{text:?}");
+    }
+    compare(&mut engine, "notdef");
+}

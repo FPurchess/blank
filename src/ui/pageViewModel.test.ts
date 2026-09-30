@@ -21,6 +21,7 @@ const pageEnds: FrameLayout = {
   scale: 1.5,
   frames: [{ ...frame, ...place }],
   height: 1200,
+  headerRoom: 0,
 };
 const pages: FrameLayout = { ...pageEnds, mode: "pages" };
 
@@ -88,32 +89,33 @@ describe("endMark", () => {
 });
 
 describe("firstHeaderPlace", () => {
-  it("puts the first page's header right above its text in page ends", () => {
+  it("puts the first page's header in the room above its text in page ends", () => {
     // the frame shows 24 pt beside the text
-    expect(firstHeaderPlace(pageEnds)).toEqual({
+    expect(firstHeaderPlace({ ...pageEnds, headerRoom: 20 })).toEqual({
       left: 76,
       top: 80,
       width: 528,
       height: 20,
     });
-    // in the room the layout keeps for it
-    expect(
-      firstHeaderPlace({ ...pageEnds, headerRoom: 22 } as FrameLayout),
-    ).toMatchObject({ top: 78, height: 22 });
   });
 
-  it("leaves the header to the sheets in pages", () => {
-    expect(firstHeaderPlace(pages)).toBeNull();
-    expect(firstHeaderPlace({ ...pageEnds, frames: [] })).toBeNull();
+  it("shows none without room for it, or on the sheets of pages", () => {
+    expect(firstHeaderPlace(pageEnds)).toBeNull();
+    expect(firstHeaderPlace({ ...pages, headerRoom: 20 })).toBeNull();
+    expect(
+      firstHeaderPlace({ ...pageEnds, headerRoom: 20, frames: [] }),
+    ).toBeNull();
   });
 });
 
 describe("propertiesPlace", () => {
   it("puts the properties above the first page and its header", () => {
     expect(propertiesPlace(pages)).toEqual({ left: 40, top: 68, width: 600 });
-    expect(
-      propertiesPlace({ ...pageEnds, headerRoom: 20 } as FrameLayout),
-    ).toEqual({ left: 76, top: 48, width: 528 });
+    expect(propertiesPlace({ ...pageEnds, headerRoom: 20 })).toEqual({
+      left: 76,
+      top: 48,
+      width: 528,
+    });
   });
 });
 
@@ -148,6 +150,7 @@ describe("viewAnchor and anchorTop", () => {
       },
     ],
     height: 1200,
+    headerRoom: 0,
   };
   const sheets: FrameLayout = {
     mode: "pages",
@@ -177,6 +180,7 @@ describe("viewAnchor and anchorTop", () => {
       },
     ],
     height: 1800,
+    headerRoom: 0,
   };
 
   it("finds the spot at the top of the view, and scrolls back to it", () => {

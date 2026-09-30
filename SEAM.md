@@ -129,3 +129,26 @@ A cell gets `blocks`, used instead of `paragraphs` when it isn't empty. `paragra
 - Markers and alt texts are painted but aren't text of the document: the caret and hits only land in the text blocks.
 - Every position in `blocks` moves with `update`'s `shift`, like the rest.
 - TS side (engine-editor): have `flatten.ts` send `blocks` for cells with lists, quotes or images, instead of "￼" and flattened paragraphs. Cells of plain paragraphs may keep `paragraphs`.
+
+## S3: one shared font store (task 11)
+
+Commit: `feat: let engines share one store of fonts` (its hash is in the handoff message and the next section).
+
+The font files live once in the wasm instance, shared by reference (`Arc`) between the engines made from one another. wasm memory never shrinks, so every copy of a 20 MB CJK font used to stay for good.
+
+| | old | new |
+|---|---|---|
+| `new LayoutEngine(bytes, lengths)` | copies the files | unchanged: the first engine still gets its files this way |
+| `LayoutEngine.withFontsOf(other)` | — | static: a new engine with `other`'s fonts at that moment (the ones it was made with and every `addFont` fallback), sharing their files. Its page, items and images are its own. Fonts added to either engine later stay its own |
+| `fontFileCount()` | — | the number of font files, each once (a `.ttc` is one file), in the order they came: the constructor's, then `addFont`'s |
+| `fontFile(i)` | — | `Uint8Array`, a copy of file `i`'s bytes (empty for none) |
+| `fontFileFamily(i)` | — | the family file `i` was added for with `addFont`, `""` for the constructor's files and for none |
+
+- TS side (engine-editor):
+  - `src/engine/pdf.ts` makes the export engine with `LayoutEngine.withFontsOf(pageEngine.raw)` instead of `newEngine()`, so it doesn't copy the 14 base fonts and every fallback again, and frees it with `free()` as now.
+  - Don't keep the font bytes in JS for it.
+- For a PDF worker with a fresh wasm instance (after a trap):
+  - Read `fontFileCount()`, `fontFile(i)` and `fontFileFamily(i)` from the page engine *before* it traps, or from where the files came from.
+  - Pass the files with family `""` to `new LayoutEngine(bytes, lengths)` in their order, then `addFont(fontFile(i), fontFileFamily(i))` for the others, in their order.
+  - This gives the same font indices and the same layout. `addFont` lays out again, which is cheap before `setItems`.
+- A PDF from an engine that shares the fonts is byte for byte the PDF of an engine with its own copies (cargo test `engines_share_their_fonts`).

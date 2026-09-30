@@ -14,10 +14,15 @@ import {
 import { alignHiddenEditor } from "../editor/hidden";
 import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
 import {
+  dragCopies,
+  dropExternal,
+  dropMoved,
+  moveCandidate,
   PAGE_MENU,
   PAGE_PRESS,
   type PagePointer,
   sendPagePointer,
+  showDropAt,
 } from "../editor/pagePointer";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
@@ -152,7 +157,7 @@ const frames = computed(() => {
   const [shownFirst, shownLast] = inView.value
     ? inView.value.split("-").map(Number)
     : [Infinity, -Infinity];
-  const versions = layerVersions(state, pageEngine);
+  const versions = layerVersions(state);
   const next = new Map<number, ShownFrame>();
   const list = layout.value.frames.slice(first, last + 1).map((frame) => {
     const made: ShownFrame = {
@@ -355,12 +360,75 @@ const onMouseDown = (event: MouseEvent) => {
   // a header or footer opens on a double click, and a press on it leaves
   // the selection where it is
   if ((event.target as Element).closest?.(BANDS)) return;
+  // a press in the selected text may drag it, see onPointerDown
+  if (moving) return;
   const { x, y } = deskPoint(event.clientX, event.clientY);
   anchor = press({ engine: pageEngine, editor, layout: layout.value }, x, y, {
     count: Math.min(event.detail || 1, 3),
     shift: event.shiftKey,
   });
   dragAt = { x: event.clientX, y: event.clientY };
+};
+
+// dragging the selected text to another place: a press in it and a move of
+// a few pixels, then where the pointer is let go; a press in it without a
+// move places the caret there
+let moving: { x: number; y: number; dragging: boolean } | null = null;
+const DRAG_START = 4;
+const onPointerDown = (event: PointerEvent) => {
+  moving = null;
+  if (!pageEngine || !layout.value || event.button !== 0 || event.shiftKey)
+    return;
+  if (!moveCandidate(editor.view.state, pointerAt(event).pos)) return;
+  moving = { x: event.clientX, y: event.clientY, dragging: false };
+  scroller.value?.setPointerCapture?.(event.pointerId);
+};
+const onPointerMove = (event: PointerEvent) => {
+  if (!moving) return;
+  const far = Math.hypot(event.clientX - moving.x, event.clientY - moving.y);
+  if (!moving.dragging && far < DRAG_START) return;
+  moving.dragging = true;
+  showDropAt(editor.view, pointerAt(event).pos);
+};
+const onPointerUp = (event: PointerEvent) => {
+  const was = moving;
+  moving = null;
+  if (!was || !pageEngine || !layout.value) return;
+  if (was.dragging) {
+    const { pos } = pointerAt(event);
+    showDropAt(editor.view, null);
+    if (pos !== null) dropMoved(editor.view, pos, dragCopies(event));
+    return;
+  }
+  const { x, y } = deskPoint(was.x, was.y);
+  press({ engine: pageEngine, editor, layout: layout.value }, x, y, {
+    count: 1,
+    shift: false,
+  });
+};
+const cancelMove = () => {
+  moving = null;
+  showDropAt(editor.view, null);
+};
+listenOnWindow("keydown", (event) => {
+  if (event.key === "Escape" && moving) cancelMove();
+});
+// text dropped from another app
+const dropsText = (event: DragEvent) =>
+  ["text/plain", "text/html"].some((type) =>
+    event.dataTransfer?.types.includes(type),
+  );
+const onDragOver = (event: DragEvent) => {
+  if (!dropsText(event)) return;
+  event.preventDefault();
+  showDropAt(editor.view, pointerAt(event).pos);
+};
+const onDrop = (event: DragEvent) => {
+  showDropAt(editor.view, null);
+  const { pos } = pointerAt(event);
+  if (!event.dataTransfer || pos === null) return;
+  if (dropExternal(editor.view, pos, event.dataTransfer))
+    event.preventDefault();
 };
 
 // the link under the pointer, and whether the key that opens links is held:
@@ -440,6 +508,13 @@ onUnmounted(() => {
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="cancelMove"
+    @dragover="onDragOver"
+    @dragleave="showDropAt(editor.view, null)"
+    @drop="onDrop"
     @mousemove="onHover"
     @mouseleave="hoverLink = null"
     @contextmenu="onContextMenu"

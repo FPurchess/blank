@@ -17,6 +17,11 @@ export interface GridCell {
   rowspan: number;
   colspan: number;
   header: boolean;
+  // where the cell starts, counted from the start of the table's content
+  // (TableMap's offset). The same node may stand in several cells, e.g.
+  // after pasting one cell into a larger selection, so only this tells them
+  // apart.
+  offset: number;
 }
 
 export interface TableGrid {
@@ -85,7 +90,7 @@ export const tableGrid = (table: Node): TableGrid => {
       rowspan: number;
     };
     const header = isHeaderCell(node);
-    rows[row][col] = { node, row, col, rowspan, colspan, header };
+    rows[row][col] = { node, row, col, rowspan, colspan, header, offset };
     if (colspan === 1) {
       chars[col] = Math.max(chars[col], Math.min(textLength(node), MAX_CHARS));
     }

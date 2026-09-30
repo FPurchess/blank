@@ -459,7 +459,7 @@ describe("tables", () => {
     await $('[data-id="table-row-delete"]').click();
 
     await pressMod("s");
-    const saved = await waitForSaved(file, "| c");
+    const saved = await waitForSaved(file, "| --- |");
     expect(saved).toBe("| a   |\n| --- |\n| c   |");
   });
 });
