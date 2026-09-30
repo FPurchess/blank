@@ -372,9 +372,9 @@ const onModifier = (event: KeyboardEvent) => {
 listenOnWindow("keydown", onModifier);
 listenOnWindow("keyup", onModifier);
 
+// Blank's menu, with Shift too: the webview's own has Back and Reload on the
+// pages, which src/nativeMenu.ts keeps away
 const onContextMenu = (event: MouseEvent) => {
-  // Shift keeps the webview's menu, e.g. for system services
-  if (event.shiftKey) return;
   event.preventDefault();
   sendPagePointer(editor.view, PAGE_MENU, pointerAt(event));
 };

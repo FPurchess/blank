@@ -158,6 +158,19 @@ describe("page view", () => {
     // the caret went where the click was
     expect(Math.abs(editor.state.selection.head - 20)).toBeLessThan(2);
     contextMenu.value = null;
+    // with Shift too, never the webview's menu with Back and Reload
+    const shifted = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      shiftKey: true,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    view().dispatchEvent(shifted);
+    expect(shifted.defaultPrevented).toBe(true);
+    expect(contextMenu.value).not.toBeNull();
+    contextMenu.value = null;
     editor.destroy();
   });
 

@@ -16,7 +16,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 9. Reduced motion: the caret keeps still and the strips, hints and faded pages change at once under `prefers-reduced-motion: reduce` (`src/scss/motion.test.ts`)
 - [x] 10. Shadows and the desk in dark themes: `--desk-color`, `--sheet-edge`, `--sheet-shadow` per theme, a darker desk and black shadows without blur (unit test, and a pixel check of the desk against the sheet in every theme in `pageEngine.e2e.ts`)
 - [x] 11. The page number where a page ends: the page's number as the pages are numbered (style, start number), shown unless its footer's settings hold `{page}`
-- [ ] 12. Shift + right click
+- [x] 12. Shift + right click opens Blank's menu too
 - [ ] 13. Bands open on a double click
 - [ ] 14. Small UI details
 - [ ] 15. Unit test gaps
