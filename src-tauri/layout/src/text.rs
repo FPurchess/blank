@@ -3,7 +3,7 @@
 
 use parley::{
     Affinity, Alignment, AlignmentOptions, Cursor, FontFamily, FontStyle, FontWeight, Layout,
-    LineHeight, PositionedLayoutItem, Selection, StyleProperty,
+    LineHeight, OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
 };
 
 use crate::fonts::{ink_link, Fonts, Ink, INK_CODE};
@@ -111,6 +111,10 @@ impl TextBox {
             // no ligatures, like the editor, so every character is a cluster
             // of its own for the cursor
             builder.push_default(StyleProperty::FontFeatures("\"liga\" 0, \"clig\" 0".into()));
+            // a word wider than the line, e.g. a long URL, breaks where it
+            // must instead of running off the page, as the editor's CSS
+            // (overflow-wrap) did
+            builder.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
             if !text.text.is_empty() {
                 for span in &text.spans {
                     let range =
@@ -467,6 +471,44 @@ mod tests {
                     let text = &narrow.text[glyph.start as usize..glyph.end as usize];
                     assert!(text == " " || glyph.x + glyph.advance <= 200.5);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn breaks_words_wider_than_the_line() {
+        let mut fonts = repository_fonts();
+        let long_word = "a".repeat(300);
+        let url = format!("see https://example.com/{} here", "path/".repeat(60));
+        for value in [long_word.as_str(), url.as_str()] {
+            let boxed = TextBox::new(&mut fonts, &text(value), 200.0, Alignment::Start);
+            assert!(boxed.line_count() > 3, "{}", boxed.line_count());
+            for index in 0..boxed.line_count() {
+                for run in boxed.glyph_runs(&fonts, index) {
+                    for glyph in run.glyphs {
+                        assert!(
+                            glyph.x + glyph.advance <= 200.5,
+                            "{} > 200",
+                            glyph.x + glyph.advance
+                        );
+                    }
+                }
+            }
+            // every position has one place, and the caret moves along the
+            // forced breaks: each position's caret is after the one before
+            let mut last = (0usize, -1.0f32);
+            for pos in 1..=boxed.len {
+                let (line, x, ..) = boxed.caret(1 + pos, false);
+                assert!(line > last.0 || (line == last.0 && x >= last.1), "{pos}");
+                assert_eq!(
+                    boxed.hit(
+                        x + 0.01,
+                        (boxed.lines()[line].top + boxed.lines()[line].bottom) / 2.0
+                    ),
+                    1 + pos,
+                    "{pos}"
+                );
+                last = (line, x);
             }
         }
     }

@@ -206,6 +206,43 @@ describe.runIf(hasPdftotext)("the PDF holds the layout", () => {
     expect(words).toBeGreaterThan(20);
   });
 
+  it("with words longer than the line, broken where they must", () => {
+    const url = `https://example.com/${"a-long-path/".repeat(12)}end`;
+    const word = "Donaudampfschifffahrtsgesellschaft".repeat(4);
+    const markdown = [
+      "---",
+      `page:`,
+      `  header: { left: '${word}' }`,
+      "---",
+      "",
+      `# ${word}`,
+      "",
+      `See ${url} and [${url}](${url}) and ${word} here.`,
+      "",
+      `- ${word}`,
+      "",
+      "| Name | Value |",
+      "| --- | --- |",
+      `| ${word} | ${url} |`,
+    ].join("\n");
+    const engine = testEngine();
+    const doc = parseMarkdown(markdown);
+    const { layout } = resolveLayout(
+      doc.attrs.frontmatter as string | null,
+      DEFAULT_PAGE,
+      "de-DE",
+    );
+    engine.setSettings(layout, documentFields(doc));
+    engine.sync(doc, () => undefined);
+    const laid = JSON.parse(engine.raw.words()) as LaidWord[];
+    // nothing runs past the right margin
+    const right = 595.28 - 70.87;
+    for (const laidWord of laid)
+      expect(laidWord.right).toBeLessThan(right + 0.5);
+    const { words } = compare(markdown, "long-words");
+    expect(words).toBeGreaterThan(20);
+  });
+
   it("with headers, footers, chapters on new pages and another paper", () => {
     const markdown = [
       "---",

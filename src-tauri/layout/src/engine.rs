@@ -1934,6 +1934,46 @@ mod tests {
     }
 
     #[test]
+    fn keeps_long_words_on_the_page_everywhere() {
+        use crate::model::{Row, Slots};
+        let long = "x".repeat(400);
+        let mut heading = heading(1, 1, &long);
+        heading.before = 0.0;
+        let mut item = paragraph(420, &long);
+        item.indent = 18.0;
+        item.marker = Some("•".into());
+        let rows = vec![Row {
+            cells: vec![cell(900, &long), cell(1400, "b")],
+            header: false,
+        }];
+        let mut table = table_item(rows, None);
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 850;
+        }
+        let mut engine = engine(vec![heading, item, table]);
+        let mut settings = engine.settings.clone();
+        settings.header = Slots {
+            left: long.clone(),
+            ..Default::default()
+        };
+        engine.set_settings(settings);
+        let right = engine.settings.width - engine.settings.margins.right;
+        for page in 0..engine.pages.len() {
+            for op in engine.page_ops(page, true) {
+                if let Op::Glyphs { run, .. } = op {
+                    for glyph in run.glyphs {
+                        assert!(
+                            glyph.x + glyph.advance <= right + 0.5,
+                            "{} > {right}",
+                            glyph.x
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn boxes_blocks_by_page() {
         let items = document(&["one", "two", LONG]);
         let engine = engine(items.clone());

@@ -185,6 +185,17 @@ step.
   - Start-up steps are marked (`bootMark`, `window.blankBootTimes`).
   - Measured, see "Measurements" below.
 
+- **Fix (found in Option B, checked here): words wider than the line.** A
+  long URL or `aaaa…` ran past the right margin, on the pages and in the
+  PDF alike: Parley's default `OverflowWrap::Normal` only breaks at break
+  opportunities. `TextBox::new` now sets `OverflowWrap::Anywhere`, so such a
+  word breaks where it must (as the editor's CSS did), everywhere text is
+  laid out: body text, headings, list items, table cells, headers and
+  footers. Verified: Rust tests (every glyph within the line, the caret and
+  hits along the forced breaks, every kind of block and the header on the
+  page), and `exact.test.ts` with a long URL and a long word in a heading, a
+  paragraph, a link, a list item, a table cell and the header (0.05 pt).
+
 ### In progress
 
 - 9. Tests, CI and docs.
