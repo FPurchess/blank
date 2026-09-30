@@ -62,7 +62,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
     },
     "linux": {
       "deb": {

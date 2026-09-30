@@ -4,6 +4,8 @@
 
 ## macOS
 
+Blank needs macOS 11 (Big Sur) or newer.
+
 Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
 
 - **macOS 15 (Sequoia) or newer:** try to open Blank once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
