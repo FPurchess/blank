@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use wasm_bindgen::prelude::*;
 
-use crate::engine::{Engine, Hit, Op};
+use crate::engine::{Changes, Engine, Hit, Op};
 use crate::fonts::Fonts;
 use crate::model::{Item, Settings};
 use crate::pdf::{self, ImageData, Info};
@@ -27,6 +27,79 @@ fn hit(hit: Option<Hit>) -> Vec<f64> {
         Some(Hit::Node(pos)) => vec![1.0, pos as f64],
         None => vec![],
     }
+}
+
+/// the pages a change touched: the body's from and to, then the bands'
+fn changes(changes: Changes) -> Vec<u32> {
+    [
+        changes.body.start,
+        changes.body.end,
+        changes.bands.start,
+        changes.bands.end,
+    ]
+    .into_iter()
+    .map(|index| index as u32)
+    .collect()
+}
+
+/// a page's display list as JSON: rectangles, images, links and glyph runs
+fn display(ops: Vec<Op>) -> String {
+    let mut rects = String::new();
+    let mut images = String::new();
+    let mut links = String::new();
+    let mut glyphs = String::new();
+    let separate = |out: &mut String| {
+        if !out.is_empty() {
+            out.push(',');
+        }
+    };
+    for op in ops {
+        match op {
+            Op::Rect { x, y, w, h, role } => {
+                separate(&mut rects);
+                rects.push('[');
+                for value in [x, y, w, h] {
+                    number(&mut rects, value);
+                    rects.push(',');
+                }
+                let _ = write!(rects, "{}]", role as u8);
+            }
+            Op::Image { src, x, y, w, h } => {
+                separate(&mut images);
+                images.push('[');
+                string(&mut images, &src);
+                for value in [x, y, w, h] {
+                    images.push(',');
+                    number(&mut images, value);
+                }
+                images.push(']');
+            }
+            Op::Link { href, x, y, w, h } => {
+                separate(&mut links);
+                links.push('[');
+                string(&mut links, &href);
+                for value in [x, y, w, h] {
+                    links.push(',');
+                    number(&mut links, value);
+                }
+                links.push(']');
+            }
+            Op::Glyphs { run, role, .. } => {
+                separate(&mut glyphs);
+                let _ = write!(glyphs, "[{},", run.font);
+                number(&mut glyphs, run.size);
+                let _ = write!(glyphs, ",{}", role as u8);
+                for glyph in &run.glyphs {
+                    let _ = write!(glyphs, ",{},", glyph.id);
+                    number(&mut glyphs, glyph.x);
+                    glyphs.push(',');
+                    number(&mut glyphs, glyph.y);
+                }
+                glyphs.push(']');
+            }
+        }
+    }
+    format!("{{\"r\":[{rects}],\"i\":[{images}],\"l\":[{links}],\"g\":[{glyphs}]}}")
 }
 
 /// a number with at most three decimals, which is finer than any screen
@@ -57,31 +130,47 @@ impl LayoutEngine {
         }
     }
 
+    /// sets the page; the pages that changed, as `update` gives them
     #[wasm_bindgen(js_name = setSettings)]
-    pub fn set_settings(&mut self, json: &str) -> Result<(), JsError> {
+    pub fn set_settings(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
         let settings: Settings = serde_json::from_str(json).map_err(error)?;
-        self.engine.set_settings(settings);
-        Ok(())
+        Ok(changes(self.engine.set_settings(settings)))
     }
 
+    /// replaces all items; the pages that changed, as `update` gives them
     #[wasm_bindgen(js_name = setItems)]
-    pub fn set_items(&mut self, json: &str) -> Result<(), JsError> {
+    pub fn set_items(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
         let items: Vec<Item> = serde_json::from_str(json).map_err(error)?;
-        self.engine.set_items(items);
-        Ok(())
+        Ok(changes(self.engine.set_items(items)))
     }
 
+    /// replaces `delete` items from `start` with the items in `json`, and
+    /// moves the ones after them by `shift`; the pages that changed: the
+    /// body's from and to (exclusive), then the bands', from == to for none
     pub fn update(
         &mut self,
         start: u32,
         delete: u32,
         json: &str,
         shift: i32,
-    ) -> Result<(), JsError> {
+    ) -> Result<Vec<u32>, JsError> {
         let items: Vec<Item> = serde_json::from_str(json).map_err(error)?;
-        self.engine
-            .update(start as usize, delete as usize, items, shift as i64);
-        Ok(())
+        Ok(changes(self.engine.update(
+            start as usize,
+            delete as usize,
+            items,
+            shift as i64,
+        )))
+    }
+
+    /// several updates at once, `[[start, delete, items, shift], …]` in
+    /// document order, each counting the items as the ones before it left
+    /// them; the pages that changed, as `update` gives them
+    #[wasm_bindgen(js_name = updateMany)]
+    pub fn update_many(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
+        let entries: Vec<(usize, usize, Vec<Item>, i64)> =
+            serde_json::from_str(json).map_err(error)?;
+        Ok(changes(self.engine.update_many(entries)))
     }
 
     #[wasm_bindgen(js_name = pageCount)]
@@ -92,6 +181,27 @@ impl LayoutEngine {
     /// what each page shows changes with its version
     pub fn versions(&self) -> Vec<u32> {
         self.engine.pages.iter().map(|page| page.version).collect()
+    }
+
+    /// each page's body, without its header and footer, changes with its
+    /// body version
+    #[wasm_bindgen(js_name = bodyVersions)]
+    pub fn body_versions(&self) -> Vec<u32> {
+        self.engine
+            .pages
+            .iter()
+            .map(|page| page.body_version)
+            .collect()
+    }
+
+    /// each page's header and footer change with its band version
+    #[wasm_bindgen(js_name = bandVersions)]
+    pub fn band_versions(&self) -> Vec<u32> {
+        self.engine
+            .pages
+            .iter()
+            .map(|page| page.band_version)
+            .collect()
     }
 
     /// where the text of each page ends, from its top edge
@@ -109,65 +219,22 @@ impl LayoutEngine {
             .unwrap_or_else(|| "[]".into())
     }
 
-    /// what a page shows: rectangles, images, links and glyph runs
+    /// what a page shows: rectangles, images, links and glyph runs, of its
+    /// body and its header and footer
     pub fn page(&mut self, page: u32) -> String {
-        let ops = self.engine.page_ops(page as usize, true);
-        let mut rects = String::new();
-        let mut images = String::new();
-        let mut links = String::new();
-        let mut glyphs = String::new();
-        let separate = |out: &mut String| {
-            if !out.is_empty() {
-                out.push(',');
-            }
-        };
-        for op in ops {
-            match op {
-                Op::Rect { x, y, w, h, role } => {
-                    separate(&mut rects);
-                    rects.push('[');
-                    for value in [x, y, w, h] {
-                        number(&mut rects, value);
-                        rects.push(',');
-                    }
-                    let _ = write!(rects, "{}]", role as u8);
-                }
-                Op::Image { src, x, y, w, h } => {
-                    separate(&mut images);
-                    images.push('[');
-                    string(&mut images, &src);
-                    for value in [x, y, w, h] {
-                        images.push(',');
-                        number(&mut images, value);
-                    }
-                    images.push(']');
-                }
-                Op::Link { href, x, y, w, h } => {
-                    separate(&mut links);
-                    links.push('[');
-                    string(&mut links, &href);
-                    for value in [x, y, w, h] {
-                        links.push(',');
-                        number(&mut links, value);
-                    }
-                    links.push(']');
-                }
-                Op::Glyphs { run, role, .. } => {
-                    separate(&mut glyphs);
-                    let _ = write!(glyphs, "[{},", run.font);
-                    number(&mut glyphs, run.size);
-                    let _ = write!(glyphs, ",{}", role as u8);
-                    for glyph in &run.glyphs {
-                        let _ = write!(glyphs, ",{},", glyph.id);
-                        number(&mut glyphs, glyph.x);
-                        glyphs.push(',');
-                        number(&mut glyphs, glyph.y);
-                    }
-                    glyphs.push(']');
-                }
-            }
-        }
-        format!("{{\"r\":[{rects}],\"i\":[{images}],\"l\":[{links}],\"g\":[{glyphs}]}}")
+        display(self.engine.page_ops(page as usize, true))
+    }
+
+    /// what a page shows besides its header and footer, as `page` gives it
+    #[wasm_bindgen(js_name = pageBody)]
+    pub fn page_body(&self, page: u32) -> String {
+        display(self.engine.body_ops(page as usize))
+    }
+
+    /// only a page's header and footer, as `page` gives them
+    #[wasm_bindgen(js_name = pageBands)]
+    pub fn page_bands(&mut self, page: u32) -> String {
+        display(self.engine.band_ops(page as usize))
     }
 
     /// a glyph's outline as an SVG path, in font units with y up
