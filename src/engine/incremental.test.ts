@@ -318,6 +318,70 @@ describe("incremental layout", () => {
     );
   });
 
+  describe("the pages the first edits change", () => {
+    const LONG =
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    // the pages whose body versions differ
+    const changed = (before: Uint32Array, after: Uint32Array) =>
+      [...after].flatMap((version, page) =>
+        version === before[page] ? [] : [page],
+      );
+
+    // a heading and 300 paragraphs, laid out as the page view does
+    const opened = (progressive: boolean) => {
+      const node = doc(
+        h(1, "Title"),
+        ...Array.from({ length: 300 }, () => p(LONG)),
+      );
+      const engine = testEngine();
+      engine.setSettings(testLayout(), documentFields(node));
+      engine.sync(node, noSizes, { progressive });
+      let state = EditorState.create({ schema, doc: node });
+      // types in the first paragraph, whose text starts at 8
+      const type = (text: string) => {
+        const tr = state.tr.insertText(text, 12);
+        const tracked = trackChanges(
+          tr,
+          { from: null, ranges: [] },
+          state,
+          engine.syncedDoc,
+        );
+        state = state.apply(tr);
+        const before = engine.bodyVersions();
+        engine.sync(state.doc, noSizes, {
+          changes: { from: tracked.from!, ranges: tracked.ranges },
+        });
+        return changed(before, engine.bodyVersions());
+      };
+      return { engine, type };
+    };
+
+    it("are only the page typed on, from the first edit on", () => {
+      const { type } = opened(false);
+      expect(type("x")).toEqual([0]);
+      expect(type("y")).toEqual([0]);
+    });
+
+    it("are also the pages laid out for the first time, while the rest of a long document is still to lay out", () => {
+      vi.useFakeTimers();
+      const { engine, type } = opened(true);
+      const first = engine.pages();
+      // the edit lays out the rest first: the last page laid out goes on,
+      // and the pages after it are new; those before it stay as they were
+      const pages = type("x");
+      expect(pages[0]).toBe(0);
+      expect(pages).not.toContain(1);
+      expect(pages.slice(1)).toEqual(
+        Array.from(
+          { length: engine.pages() - first + 1 },
+          (_, index) => first - 1 + index,
+        ),
+      );
+      expect(type("y")).toEqual([0]);
+      vi.useRealTimers();
+    });
+  });
+
   it("flattens it all when the changes count from another document", () => {
     const node = doc(p("one"), p("two"));
     const engine = testEngine();
