@@ -252,10 +252,13 @@ watch(layout, (next, previous) => {
   if (!element || !next || !previous) return;
   if (!movesPages(next, previous)) return;
   const anchor = viewAnchor(previous, element.scrollTop);
-  if (!anchor) return;
+  const top = anchor && anchorTop(next, anchor);
+  if (top === null) return;
+  // the render that follows already shows the pages there, rather than
+  // those at the old scroll in the new layout
+  scrollTop.value = top;
   void nextTick(() => {
-    const top = anchorTop(next, anchor);
-    if (top === null || !scroller.value) return;
+    if (!scroller.value) return;
     scroller.value.scrollTop = top;
     measure(false);
   });

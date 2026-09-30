@@ -317,6 +317,8 @@ describe("page view", () => {
     expect(before.page).toBe(2);
     pageView.value = "pages";
     await nextTick();
+    // the first render after the switch already shows the third page
+    expect(frames().map((frame) => frame.dataset.page)).toContain("3");
     await nextTick();
     const after = viewAnchor(shown("pages"), view().scrollTop)!;
     expect(after.page).toBe(2);

@@ -45,7 +45,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
   | blue | `#7c9bcc` | `#25324c` | 4.52 | 4.52 | 2.0 | 4.1 |
 - [x] 1. The edge line follows `engineMissing` at runtime (engine-editor sets it in `useFallbackEditor`; until then the class at boot still works)
 - [x] 3. The view keeps its place when the header or properties room changes (`movesPages`)
-- [ ] 4. A switch renders the target range right away
+- [x] 4. A switch renders the target range right away (the watcher sets `scrollTop` before the render; no test can tell it apart in jsdom's small documents, the switch test still covers the result)
 - [ ] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
 - [ ] 7. The bitmap cache is cleared on an engine change and drops a page's superseded key
 - [ ] 8. Less work per key in the first header and the overlay's under layer
