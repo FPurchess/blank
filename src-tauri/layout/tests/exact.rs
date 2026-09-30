@@ -114,12 +114,18 @@ fn settings() -> Settings {
 /// the words pdftotext finds in a PDF: page, xMin, yMin, xMax, yMax, text
 fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, String)>> {
     let out = pdf.with_extension("html");
-    let status = Command::new("pdftotext")
+    let status = match Command::new("pdftotext")
         .arg("-bbox")
         .arg(pdf)
         .arg(&out)
         .status()
-        .ok()?;
+    {
+        Ok(status) => status,
+        Err(_) if std::env::var_os("CI").is_some() => {
+            panic!("pdftotext is missing: install poppler-utils, CI doesn't skip the comparison")
+        }
+        Err(_) => return None,
+    };
     assert!(status.success());
     let html = std::fs::read_to_string(&out).unwrap();
     let mut words = vec![];
