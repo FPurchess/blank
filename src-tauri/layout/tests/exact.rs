@@ -416,18 +416,39 @@ fn the_pdf_holds_tables_with_lists_and_quotes() {
     }
 }
 
+/// what a missing tool means: on CI a failure, as there the checks must
+/// run, and else a skip
+fn missing_tool<T>(tool: &str, package: &str) -> Option<T> {
+    if std::env::var_os("CI").is_some() {
+        panic!("{tool} is missing: install {package}, CI doesn't skip the check");
+    }
+    None
+}
+
+/// the package a tool comes with
+fn package_of(tool: &str) -> &'static str {
+    match tool {
+        "qpdf" => "qpdf",
+        _ => "poppler-utils",
+    }
+}
+
 /// the plain text pdftotext reads from a PDF, or nothing without pdftotext
+/// (only off CI)
 fn read_text(pdf: &[u8], name: &str) -> Option<String> {
     let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
     std::fs::write(&path, pdf).unwrap();
     let out = path.with_extension("txt");
-    let status = Command::new("pdftotext")
+    let status = match Command::new("pdftotext")
         .arg("-enc")
         .arg("UTF-8")
         .arg(&path)
         .arg(&out)
         .status()
-        .ok()?;
+    {
+        Ok(status) => status,
+        Err(_) => return missing_tool("pdftotext", "poppler-utils"),
+    };
     assert!(status.success());
     Some(std::fs::read_to_string(&out).unwrap())
 }
@@ -534,9 +555,12 @@ fn pdf_text_keeps_what_no_font_has() {
     compare(&mut engine, "notdef");
 }
 
-/// what a command prints, or nothing without it
+/// what a command prints, or nothing without it (only off CI)
 fn run(program: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(program).args(args).output().ok()?;
+    let out = match Command::new(program).args(args).output() {
+        Ok(out) => out,
+        Err(_) => return missing_tool(program, package_of(program)),
+    };
     Some(String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
 }
 

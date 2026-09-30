@@ -501,7 +501,7 @@ mod tests {
         }
     }
 
-    /// the plain text of a PDF, if pdftotext is there
+    /// the plain text of a PDF, if pdftotext is there; on CI it must be
     fn text_of(pdf: &[u8], name: &str) -> Option<String> {
         let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
         std::fs::write(&path, pdf).unwrap();
@@ -509,8 +509,14 @@ mod tests {
             .args(["-enc", "UTF-8"])
             .arg(&path)
             .arg("-")
-            .output()
-            .ok()?;
+            .output();
+        let out = match out {
+            Ok(out) => out,
+            Err(_) if std::env::var_os("CI").is_some() => {
+                panic!("pdftotext is missing: install poppler-utils, CI doesn't skip the check")
+            }
+            Err(_) => return None,
+        };
         Some(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 

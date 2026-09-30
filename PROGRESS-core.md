@@ -286,6 +286,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - Quotes (`"` and `'`) in the text: pdftotext writes them as entities, which `read_words` doesn't read back. I left `read_words` alone, since engine-release changes it.
 - `read_words` and the skip guard are untouched.
 - `exact.rs` has 6 tests: the sample on two papers, cell blocks, marks and ligatures, what no font has, and the tagged PDF.
+- On CI, a missing pdftotext, pdfinfo or qpdf fails the checks that need it, with the package to install. Locally they skip, as engine-release gated `read_words`: `missing_tool` in `exact.rs`, and `text_of` in the PDF's unit tests. Checked by running both ways with the tools off `PATH`.
 
 ### Known quirks (of other tools, not of the PDF)
 
