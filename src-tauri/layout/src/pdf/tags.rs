@@ -14,7 +14,9 @@ use krilla::tagging::{
 };
 
 use crate::engine::{Engine, Part};
+use crate::items::{Laid, Role, TableCell};
 use crate::model::Content;
+use crate::text::TextBox;
 
 /// the marked content drawn for each part of the document, in the order it
 /// was drawn
@@ -209,18 +211,7 @@ fn table_node(engine: &Engine, index: usize, ids: &mut Ids, link: Option<Node>) 
     for row in 0..rows {
         let mut cells = vec![];
         for cell in laid.cells.iter().filter(|cell| cell.row == row) {
-            let mut content = vec![];
-            for extra in cell.extras.clone() {
-                content.extend(leaves(ids, Part::Extra { item: index, extra }));
-            }
-            for text in cell.texts.clone() {
-                content.push(group(Tag::P, leaves(ids, Part::Text { item: index, text })));
-            }
-            for &image in &cell.images {
-                let alt = laid.cell_images[image].alt.clone();
-                let figure = leaves(ids, Part::CellImage { item: index, image });
-                content.push(group(Tag::Figure(Some(alt)), figure));
-            }
+            let content = cell_content(laid, index, cell, ids);
             cells.push(if cell.header {
                 group(Tag::TH(TableHeaderScope::Column), content)
             } else {
@@ -235,6 +226,75 @@ fn table_node(engine: &Engine, index: usize, ids: &mut Ids, link: Option<Node>) 
         Some(link) => group(Tag::Div, vec![table, link]),
         None => table,
     }
+}
+
+/// what a cell holds, in the order it shows it: its paragraphs, with the
+/// list markers on their baselines as the labels of list items, its images
+/// and its alt texts, from the top down
+fn cell_content(laid: &Laid, index: usize, cell: &TableCell, ids: &mut Ids) -> Vec<Node> {
+    let baseline =
+        |boxed: &TextBox| boxed.y + boxed.lines().first().map_or(0.0, |line| line.baseline);
+    let left = cell
+        .texts
+        .clone()
+        .map(|text| laid.texts[text].x)
+        .fold(f32::INFINITY, f32::min);
+    // the markers, by the text box on their baseline
+    let mut markers: Vec<(usize, usize)> = vec![];
+    let mut blocks: Vec<(f32, Node)> = vec![];
+    for extra in cell.extras.clone() {
+        let (boxed, role) = &laid.extras[extra];
+        let owner = cell
+            .texts
+            .clone()
+            .find(|&text| (baseline(&laid.texts[text]) - baseline(boxed)).abs() < 0.5);
+        match (role, owner) {
+            (Role::Text, Some(text)) => markers.push((text, extra)),
+            // an alt text stands for an image that isn't loaded
+            _ => {
+                let content = leaves(ids, Part::Extra { item: index, extra });
+                blocks.push((
+                    boxed.y,
+                    group(Tag::Figure(Some(boxed.text.to_string())), content),
+                ));
+            }
+        }
+    }
+    for &image in &cell.images {
+        let placed = &laid.cell_images[image];
+        let alt = (!placed.alt.is_empty()).then(|| placed.alt.clone());
+        let figure = leaves(ids, Part::CellImage { item: index, image });
+        blocks.push((placed.y, group(Tag::Figure(alt), figure)));
+    }
+    let mut builder = Builder::default();
+    let mut texts: Vec<(f32, usize)> = cell
+        .texts
+        .clone()
+        .map(|text| (laid.texts[text].y, text))
+        .collect();
+    texts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    blocks.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut blocks = blocks.into_iter().peekable();
+    for (y, text) in texts {
+        while let Some((_, node)) = blocks.next_if(|(block_y, _)| *block_y < y) {
+            builder.place(0, 0.0, None, node);
+        }
+        let paragraph = group(Tag::P, leaves(ids, Part::Text { item: index, text }));
+        let boxed = &laid.texts[text];
+        let marker = markers
+            .iter()
+            .find(|(owner, _)| *owner == text)
+            .map(|&(_, extra)| {
+                let numbered = laid.extras[extra].0.text.trim_end().ends_with('.');
+                (leaves(ids, Part::Extra { item: index, extra }), numbered)
+            });
+        builder.place(0, boxed.x - left, marker, paragraph);
+    }
+    for (_, node) in blocks {
+        builder.place(0, 0.0, None, node);
+    }
+    builder.close_all();
+    builder.root
 }
 
 /// the structure of the document, holding everything drawn for it
