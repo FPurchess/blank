@@ -11,10 +11,19 @@ export class LayoutEngine {
     addFont(bytes: Uint8Array, family: string): void;
     addImage(src: string, bytes: Uint8Array, jpeg: boolean): void;
     /**
+     * each page's header and footer change with its band version
+     */
+    bandVersions(): Uint32Array;
+    /**
      * the text of a page's header and footer slots: left, center and right
      * of the header, then of the footer
      */
     bands(page: number): string;
+    /**
+     * each page's body, without its header and footer, changes with its
+     * body version
+     */
+    bodyVersions(): Uint32Array;
     /**
      * where the text of each page ends, from its top edge
      */
@@ -49,13 +58,22 @@ export class LayoutEngine {
      * the fonts' files one after the other, with their lengths
      */
     constructor(bytes: Uint8Array, lengths: Uint32Array);
+    /**
+     * only a page's header and footer, as `page` gives them
+     */
+    pageBands(page: number): string;
+    /**
+     * what a page shows besides its header and footer, as `page` gives it
+     */
+    pageBody(page: number): string;
     pageCount(): number;
     /**
      * the positions the blocks on a page start and end at, or nothing
      */
     pageSpan(page: number): Uint32Array;
     /**
-     * what a page shows: rectangles, images, links and glyph runs
+     * what a page shows: rectangles, images, links and glyph runs, of its
+     * body and its header and footer
      */
     page(page: number): string;
     /**
@@ -66,8 +84,14 @@ export class LayoutEngine {
      * the selection's rectangles: page, x, y, width and height each
      */
     selection(from: number, to: number): Float32Array;
-    setItems(json: string): void;
-    setSettings(json: string): void;
+    /**
+     * replaces all items; the pages that changed, as `update` gives them
+     */
+    setItems(json: string): Uint32Array;
+    /**
+     * sets the page; the pages that changed, as `update` gives them
+     */
+    setSettings(json: string): Uint32Array;
     /**
      * how much the last change laid out: items, the page it paginated
      * from, and the page it settled at (-1 for none)
@@ -80,7 +104,18 @@ export class LayoutEngine {
      */
     tableGrid(pos: number): Float32Array;
     unitsPerEm(font: number): number;
-    update(start: number, _delete: number, json: string, shift: number): void;
+    /**
+     * several updates at once, `[[start, delete, items, shift], …]` in
+     * document order, each counting the items as the ones before it left
+     * them; the pages that changed, as `update` gives them
+     */
+    updateMany(json: string): Uint32Array;
+    /**
+     * replaces `delete` items from `start` with the items in `json`, and
+     * moves the ones after them by `shift`; the pages that changed: the
+     * body's from and to (exclusive), then the bands', from == to for none
+     */
+    update(start: number, _delete: number, json: string, shift: number): Uint32Array;
     /**
      * what each page shows changes with its version
      */
@@ -100,7 +135,9 @@ export interface InitOutput {
     readonly __wbg_layoutengine_free: (a: number, b: number) => void;
     readonly layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly layoutengine_bandVersions: (a: number) => [number, number];
     readonly layoutengine_bands: (a: number, b: number) => [number, number];
+    readonly layoutengine_bodyVersions: (a: number) => [number, number];
     readonly layoutengine_bottoms: (a: number) => [number, number];
     readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
@@ -111,16 +148,19 @@ export interface InitOutput {
     readonly layoutengine_missing: (a: number) => [number, number];
     readonly layoutengine_new: (a: number, b: number, c: number, d: number) => number;
     readonly layoutengine_page: (a: number, b: number) => [number, number];
+    readonly layoutengine_pageBands: (a: number, b: number) => [number, number];
+    readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
     readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
-    readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number];
-    readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number];
+    readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_stats: (a: number) => [number, number];
     readonly layoutengine_tableGrid: (a: number, b: number) => [number, number];
     readonly layoutengine_unitsPerEm: (a: number, b: number) => number;
-    readonly layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
+    readonly layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_versions: (a: number) => [number, number];
     readonly layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];

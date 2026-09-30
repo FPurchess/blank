@@ -603,3 +603,16 @@ as mean / p95, and `performance.now()` there is only accurate to about 1 ms.
 - `bun run test:rust` now runs the whole workspace.
 - `cd e2e && E2E_PORT=4482 xvfb-run -a bunx wdio run ./wdio.conf.ts --spec specs/pageEngine.e2e.ts`
   runs the page view E2E and prints the measurements.
+
+## Parallel sessions
+
+From 8efdc17 the review findings are worked on in four worktrees, each with its brief in `TASK.md` (not committed) and its progress in `PROGRESS-<name>.md`:
+
+| Session | Worktree | Branch | Owns | E2E port |
+|---|---|---|---|---|
+| engine-core | `.claude/worktrees/engine-core` | `engine/core` | `src-tauri/layout/**`, the seam (`SEAM.md`) | 4501 |
+| engine-editor | `.claude/worktrees/engine-editor` | `engine/editor` | `src/engine/*.ts`, `src/editor/**` | 4511 |
+| engine-ui | `.claude/worktrees/engine-ui` | `engine/ui` | `src/ui/Page*`, the painter, SCSS, `e2e/**`, `docs/guide/**` | 4521 |
+| engine-release | `.claude/worktrees/engine-release` | `engine/release` | `.github/**`, build scripts, `src-tauri/src`, notices, `CLAUDE.md`, rules | 4531 |
+
+No branch commits `src/engine/wasm/`: the integrator rebuilds it once per merge. Merge order: core → editor → ui → release, with core's seam commits merged into editor and ui early.

@@ -1,278 +1,15 @@
-//! Laying out one item of the flow: its textblocks, and the units the
-//! pagination places, which are lines for text and rows for tables.
+//! Laying out a table: its caption, then its rows with the cells in the
+//! grid of their columns.
 
 use std::ops::Range;
 
 use parley::Alignment;
 
+use super::{Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
-use crate::model::{Content, Item, Text};
-use crate::style::{CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, RULE, TABLE_LINE};
+use crate::model::Text;
+use crate::style::{CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, TABLE_LINE};
 use crate::text::TextBox;
-
-/// what the colours of the screen and the PDF stand for
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Role {
-    Text = 0,
-    Band = 1,
-    CodeFill = 2,
-    TableLine = 3,
-    HeaderLine = 4,
-    HeaderFill = 5,
-    Placeholder = 6,
-    /// the underline of a link
-    LinkLine = 7,
-    /// what stands for an image that isn't loaded: its alt text
-    Hint = 8,
-}
-
-/// something drawn in an item besides its text
-#[derive(Clone, Debug, PartialEq)]
-pub enum Deco {
-    Rect {
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        role: Role,
-    },
-    Image {
-        src: String,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-    },
-}
-
-impl Deco {
-    pub fn moved(&self, dx: f32, dy: f32) -> Deco {
-        match self {
-            Deco::Rect { x, y, w, h, role } => Deco::Rect {
-                x: x + dx,
-                y: y + dy,
-                w: *w,
-                h: *h,
-                role: *role,
-            },
-            Deco::Image { src, x, y, w, h } => Deco::Image {
-                src: src.clone(),
-                x: x + dx,
-                y: y + dy,
-                w: *w,
-                h: *h,
-            },
-        }
-    }
-}
-
-/// a piece of an item that stays on one page: a line of text, the rows of a
-/// table that merged cells join, a slice of rows taller than a page, an image
-#[derive(Default)]
-pub struct Unit {
-    pub top: f32,
-    pub height: f32,
-    /// a header row of a table, repeated on the pages it continues on
-    pub header: bool,
-    /// the text boxes in it
-    pub texts: Range<usize>,
-    /// for a line of text: which line of its box
-    pub line: Option<usize>,
-    /// for a slice of rows: the part of the item it shows, from and to, in
-    /// the item's coordinates; the lines of its texts outside are the other
-    /// slices'
-    pub clip: Option<(f32, f32)>,
-    /// for a table: the rows in it, with where each starts and ends in the
-    /// item's coordinates
-    pub rows: Vec<(usize, f32, f32)>,
-    /// stays on the page of the unit after it, e.g. a caption or the header
-    /// rows with the first row
-    pub keep_next: bool,
-    /// drawn with the unit, in the item's coordinates
-    pub decos: Vec<Deco>,
-}
-
-impl Unit {
-    /// whether a line of a text box, at `top` to `bottom` in the item's
-    /// coordinates, is shown with this unit
-    pub fn shows(&self, top: f32, bottom: f32) -> bool {
-        match self.clip {
-            Some((from, to)) => {
-                let middle = (top + bottom) / 2.0;
-                middle >= from && middle < to
-            }
-            None => true,
-        }
-    }
-}
-
-pub struct Laid {
-    pub units: Vec<Unit>,
-    pub texts: Vec<TextBox>,
-    /// the list marker, drawn with the first unit
-    pub marker: Option<TextBox>,
-    /// what stands in for an image that isn't loaded, drawn with the first
-    /// unit; it isn't text of the document
-    pub label: Option<TextBox>,
-    /// for a table: where each column starts and where the last one ends,
-    /// in the item's coordinates
-    pub columns: Vec<f32>,
-}
-
-impl Laid {
-    /// lays out an item in `width`, the width of the text on the page;
-    /// `room` is the height of the text on a page, which rows of a table
-    /// taller than it are sliced to
-    pub fn new(fonts: &mut Fonts, item: &Item, width: f32, room: f32) -> Laid {
-        let inner = (width - item.indent).max(20.0);
-        let mut laid = match &item.content {
-            Content::Text(text) => text_units(fonts, text, item.indent, inner),
-            Content::Break { .. } => Laid::single(0.0, vec![]),
-            Content::Rule { .. } => Laid::single(
-                RULE,
-                vec![Deco::Rect {
-                    x: item.indent,
-                    y: 0.0,
-                    w: inner,
-                    h: RULE,
-                    role: Role::Text,
-                }],
-            ),
-            Content::Image {
-                src,
-                width: image_width,
-                height,
-                alt,
-                ..
-            } => {
-                if *image_width > 0.0 && *height > 0.0 {
-                    // an image never is wider than the room it has
-                    let scale = (inner / image_width).min(1.0);
-                    let (w, h) = (image_width * scale, height * scale);
-                    Laid::single(
-                        h,
-                        vec![Deco::Image {
-                            src: src.clone(),
-                            x: item.indent,
-                            y: 0.0,
-                            w,
-                            h,
-                        }],
-                    )
-                } else {
-                    // until it is loaded, or if it can't be: its alt text,
-                    // or else its src, in italics
-                    let text = Text {
-                        pos: 0,
-                        text: if alt.is_empty() {
-                            src.clone()
-                        } else {
-                            alt.clone()
-                        },
-                        style: "alt".into(),
-                        ..Default::default()
-                    };
-                    let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
-                    label.x = item.indent;
-                    let mut laid = Laid::single(label.height(), vec![]);
-                    laid.label = Some(label);
-                    laid
-                }
-            }
-            Content::Table {
-                rows,
-                widths,
-                caption,
-                ..
-            } => table_units(
-                fonts,
-                TableSpec {
-                    rows,
-                    widths,
-                    caption: caption.as_deref(),
-                },
-                item.indent,
-                inner,
-                room,
-            ),
-        };
-        if let (Some(marker), Some(first)) = (&item.marker, laid.units.first()) {
-            let text = Text {
-                pos: 0,
-                text: marker.clone(),
-                ..Default::default()
-            };
-            let mut boxed = TextBox::new(fonts, &text, 100.0, Alignment::Start);
-            let marker_width = boxed.layout.width();
-            boxed.x = item.indent - MARKER_GAP - marker_width;
-            // on the baseline of the first line
-            let baseline = match (&item.content, first.line) {
-                (Content::Text(_), Some(_)) => laid.texts[0].lines()[0].baseline,
-                _ => boxed.lines()[0].baseline,
-            };
-            boxed.y = baseline - boxed.lines()[0].baseline;
-            laid.marker = Some(boxed);
-        }
-        laid
-    }
-
-    fn single(height: f32, decos: Vec<Deco>) -> Laid {
-        Laid {
-            units: vec![Unit {
-                height,
-                decos,
-                ..Default::default()
-            }],
-            texts: vec![],
-            marker: None,
-            label: None,
-            columns: vec![],
-        }
-    }
-
-    pub fn height(&self) -> f32 {
-        self.units
-            .last()
-            .map(|unit| unit.top + unit.height)
-            .unwrap_or(0.0)
-    }
-}
-
-fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
-    let mut boxed = TextBox::new(fonts, text, width, Alignment::Start);
-    boxed.x = indent;
-    let code = text.style == "code";
-    let units = boxed
-        .lines()
-        .iter()
-        .enumerate()
-        .map(|(index, line)| Unit {
-            top: line.top,
-            height: line.bottom - line.top,
-            texts: 0..1,
-            line: Some(index),
-            decos: if code {
-                vec![Deco::Rect {
-                    x: indent - 4.0,
-                    y: line.top,
-                    w: width + 8.0,
-                    h: line.bottom - line.top,
-                    role: Role::CodeFill,
-                }]
-            } else {
-                vec![]
-            },
-            ..Default::default()
-        })
-        .collect();
-    Laid {
-        units,
-        texts: vec![boxed],
-        marker: None,
-        label: None,
-        columns: vec![],
-    }
-}
 
 /// the space between the paragraphs of a cell
 const CELL_PARAGRAPH_GAP: f32 = 8.0;
@@ -301,7 +38,13 @@ struct PlacedCell {
 /// of their columns, merged cells spanning columns and rows. Rows that
 /// merged cells join stay together, and rows taller than `room` are sliced
 /// between lines.
-fn table_units(fonts: &mut Fonts, table: TableSpec, indent: f32, width: f32, room: f32) -> Laid {
+pub(super) fn table_units(
+    fonts: &mut Fonts,
+    table: TableSpec,
+    indent: f32,
+    width: f32,
+    room: f32,
+) -> Laid {
     let rows = table.rows;
     let columns = rows
         .iter()
@@ -583,4 +326,224 @@ fn clipped(deco: &Deco, from: f32, to: f32) -> Option<Deco> {
         h: bottom - top,
         role: *role,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::engine::test_support::{self, *};
+    use crate::engine::{Hit, Op};
+    use crate::model::{Content, Item, Text};
+
+    #[test]
+    fn repeats_table_headers() {
+        use crate::model::{Cell, Row};
+        let cell = |pos: u32, text: &str, header: bool| Cell {
+            paragraphs: vec![Text {
+                pos,
+                text: text.into(),
+                ..Default::default()
+            }],
+            header,
+            ..Default::default()
+        };
+        let mut rows = vec![Row {
+            cells: vec![cell(3, "Name", true), cell(10, "Value", true)],
+            header: true,
+        }];
+        for index in 0..80u32 {
+            let pos = 20 + index * 20;
+            rows.push(Row {
+                cells: vec![cell(pos, "row", false), cell(pos + 8, "value", false)],
+                header: false,
+            });
+        }
+        let table = Item {
+            content: Content::Table {
+                pos: 0,
+                end: 2000,
+                rows,
+                widths: vec![],
+                caption: None,
+            },
+            ..paragraph(0, "")
+        };
+        let engine = engine(vec![table]);
+        assert!(engine.pages.len() >= 2);
+        let second = engine.pages[1].start;
+        assert!(engine.frags[second].repeat);
+        assert_eq!(engine.frags[second].unit, 0);
+        // a click into a cell lands in its text
+        let (page, x, y, h) = engine.caret(10 + 2, false).unwrap();
+        assert_eq!(page, 0);
+        assert_eq!(engine.hit(page, x + 0.1, y + h / 2.0), Some(Hit::Text(12)));
+        // the grid: two columns across the text, every row placed, the
+        // header row again on the second page
+        let grid = engine.table_grid(0).unwrap();
+        assert_eq!(grid.columns.len(), 3);
+        let left = engine.settings.margins.left;
+        assert!((grid.columns[0] - left).abs() < 0.01);
+        assert!((grid.columns[2] - left - engine.settings.content_width()).abs() < 0.01);
+        assert_eq!(grid.rows.iter().filter(|row| !row.repeat).count(), 81);
+        let repeated = grid.rows.iter().find(|row| row.repeat).unwrap();
+        assert_eq!((repeated.page, repeated.row), (1, 0));
+        assert!(engine.table_grid(5).is_none());
+        // the table's box on each page
+        let boxes = engine.boxes(0, 2000);
+        assert_eq!(boxes.len(), engine.pages.len());
+        assert!((boxes[0].2 - engine.settings.content_top()).abs() < 0.01);
+    }
+
+    #[test]
+    fn merges_cells_across_columns_and_rows() {
+        use crate::model::{Cell, Row};
+        // | a (2 rows) | b | c |
+        // |            | d e (2 columns) |
+        let rows = vec![
+            Row {
+                cells: vec![
+                    Cell {
+                        rowspan: 2,
+                        ..cell(3, "a")
+                    },
+                    cell(8, "b"),
+                    cell(13, "c"),
+                ],
+                header: false,
+            },
+            Row {
+                cells: vec![Cell {
+                    col: Some(1),
+                    colspan: 2,
+                    ..cell(20, "d e")
+                }],
+                header: false,
+            },
+        ];
+        let engine = engine(vec![table_item(rows, None)]);
+        let grid = engine.table_grid(0).unwrap();
+        assert_eq!(grid.columns.len(), 4);
+        // the rows the merged cell joins are one unit, both rows in the grid
+        assert_eq!(engine.laid[0].units.len(), 1);
+        assert_eq!(grid.rows.len(), 2);
+        assert!((grid.rows[1].y - grid.rows[0].y - grid.rows[0].height).abs() < 0.01);
+        // "d e" spans the second and third column
+        let (_, x, ..) = engine.caret(20, false).unwrap();
+        assert!(x > grid.columns[1] && x < grid.columns[2], "{x}");
+        let texts = &engine.laid[0].texts;
+        assert!(texts[3].width > texts[1].width * 1.5);
+    }
+
+    #[test]
+    fn puts_the_caption_above_and_keeps_it_with_the_table() {
+        use crate::model::Row;
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(10 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut engine = engine(vec![table_item(rows, Some("The caption"))]);
+        let ops = engine.page_ops(0, false);
+        let caption = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs { run, text, .. } if text.starts_with("The caption") => {
+                    Some(run.baseline)
+                }
+                _ => None,
+            })
+            .unwrap();
+        let grid = engine.table_grid(0).unwrap();
+        assert!(caption < grid.rows[0].y);
+        // the caption is not a row
+        assert_eq!(grid.rows.len(), 3);
+        // at the bottom of a page, the caption moves on with the table
+        let settings = engine.settings.clone();
+        let line = crate::style::text_style("p").line;
+        let fill = ((settings.content_bottom() - settings.content_top()) / line) as usize - 3;
+        let mut items: Vec<Item> = (0..fill)
+            .map(|index| paragraph(index as u32 * 3 + 1, "x"))
+            .collect();
+        for item in &mut items {
+            item.after = 0.0;
+        }
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(90_000 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut table = table_item(rows, Some("The caption"));
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 80_000;
+        }
+        items.push(table);
+        let moved = test_support::engine(items);
+        let grid = moved.table_grid(80_000).unwrap();
+        assert!(grid.rows.iter().all(|row| row.page == 1));
+        assert_eq!(moved.pages[1].first.unwrap().1, 0);
+    }
+
+    #[test]
+    fn slices_rows_taller_than_a_page() {
+        use crate::model::Row;
+        let long = LONG.repeat(40);
+        let rows = vec![
+            Row {
+                cells: vec![cell(3, "Head")],
+                header: true,
+            },
+            Row {
+                cells: vec![cell(12, &long)],
+                header: false,
+            },
+        ];
+        let mut engine = engine(vec![table_item(rows, None)]);
+        assert!(engine.pages.len() >= 2, "{}", engine.pages.len());
+        let bottom = engine.settings.content_bottom();
+        for page in &engine.pages {
+            assert!(page.bottom <= bottom + 0.1, "{} > {bottom}", page.bottom);
+        }
+        // every line of the cell is shown once, on some page
+        let lines = engine.laid[0].texts[1].line_count();
+        let shown: usize = (0..engine.pages.len())
+            .map(|page| {
+                engine
+                    .page_ops(page, false)
+                    .iter()
+                    .filter(|op| matches!(op, Op::Glyphs { text, .. } if text.len() > 1000))
+                    .count()
+            })
+            .sum();
+        assert_eq!(shown, lines);
+        // the header row again at the top of the second page
+        let second = engine.pages[1].start;
+        assert!(engine.frags[second].repeat);
+        // the caret at the end of the cell is on the last page
+        let end = 12 + long.len() as u32;
+        let (page, ..) = engine.caret(end, false).unwrap();
+        assert_eq!(page, engine.pages.len() - 1);
+        // after a paragraph, the row starts on the same page
+        let rows = vec![
+            Row {
+                cells: vec![cell(13, "Head")],
+                header: true,
+            },
+            Row {
+                cells: vec![cell(22, &long)],
+                header: false,
+            },
+        ];
+        let mut table = table_item(rows, None);
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 10;
+        }
+        let after = test_support::engine(vec![paragraph(1, "before"), table]);
+        let grid = after.table_grid(10).unwrap();
+        assert_eq!(grid.rows[0].page, 0);
+        assert_eq!(grid.rows.iter().find(|row| row.row == 1).unwrap().page, 0);
+        // one row on each page it is on, besides the header rows
+        let body: Vec<_> = grid.rows.iter().filter(|row| row.row == 1).collect();
+        assert_eq!(body.len(), after.pages.len());
+    }
 }
