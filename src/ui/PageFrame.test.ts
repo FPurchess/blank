@@ -157,19 +157,12 @@ describe("the pages and the painter", () => {
     );
     expect(engine.pages()).toBeGreaterThan(10);
     dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
-    // "Title" becomes "Titles", then "Titless"; the first edit after the
-    // first layout still gives every page a new version (reported to the
-    // engine), the second is what typing does
-    let typed = createState(node, { cursor: 7 });
-    for (const step of [0, 1]) {
-      if (step === 1) {
-        await paintQueued();
-        layers.length = 0;
-      }
-      typed = typed.apply(typed.tr.insertText("s", 7 + step));
-      engine.sync(typed.doc, () => undefined);
-      publish(engine);
-    }
+    await paintQueued();
+    layers.length = 0;
+    // "Title" becomes "Tiqtle", within the heading on the first page
+    const typed = createState(node, { cursor: 3 });
+    engine.sync(typed.apply(typed.tr.insertText("q", 3)).doc, () => undefined);
+    publish(engine);
     const renders = frameRenders.count;
     await paintQueued();
     expect(layers).toEqual(["1:body"]);

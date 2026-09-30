@@ -8,7 +8,6 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 3. Restore the weakened E2E checks (real clicks in `focusEditor`, painted grid lines, underlines and header)
 - [x] 4. The view keeps its place when it switches or resizes (`viewAnchor`/`anchorTop`; requests are cleared once served)
 - [x] 5. Repaint only the pages that changed, with the bands as their own layer (after S6): body and band canvases with their own versions, jobs and bitmaps (`src/ui/pageLayers.ts`, which reads `pageBody`/`pageBands` from `raw` until engine-editor's `bodyDisplay`/`bandDisplay` land; drop that part then), images repaint only the pages showing them, and the frames' props and margins stay the same objects and numbers while unchanged.
-  - For engine-core: the first edit after the first layout gives every page a new body version; later edits change only the page edited (see the note in `PageFrame.test.ts`).
 - [x] 6. A swappable painter (`src/ui/painter/`; jsdom canvases record paints, `src/test/canvas.ts`)
 - [x] 7. A visible selection in every theme: `--selection-color` at ≥ 3:1 per theme (`src/scss/themes.test.ts`), painted under the text: sheets, selection, the transparent canvases, caret, in DOM order.
   - WebKitGTK doesn't apply `mix-blend-mode` over the pages, and a z-index on the canvases made WebKit composite them and crash in Skia's GPU shaders under xvfb, so neither is used.
