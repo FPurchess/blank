@@ -40,6 +40,9 @@ dictionaries: ## Update the spell check dictionaries and their catalog
 engine: ## Build the layout engine for the webview into src/engine/wasm
 	bun run engine:build
 
+notices: ## Regenerate public/THIRD-PARTY-NOTICES.txt after changing dependencies (needs cargo-about)
+	bun run notices
+
 clean: ## Remove build output and coverage, incl. the Rust target dir (full rebuild)
 	rm -rf dist coverage e2e/screenshots
 	cargo clean --manifest-path src-tauri/Cargo.toml
