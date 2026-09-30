@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import localforage from "localforage";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { bootConfig } from "./config";
@@ -7,13 +11,17 @@ import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
 import { bootEngine } from "./engine/engine";
 import { deferred, flushPromises } from "./test/async";
-import { createTestHandle } from "./test/editor";
+import { createTestHandle, doc, p } from "./test/editor";
+import { mockCliArgs } from "./test/tauri";
 
 vi.mock("./config", () => ({ bootConfig: vi.fn() }));
 vi.mock("./storage", () => ({ bootStorage: vi.fn() }));
 vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
-vi.mock("./engine/engine", () => ({ bootEngine: vi.fn() }));
+vi.mock("./engine/engine", () => ({
+  bootEngine: vi.fn(),
+  useFallbackEditor: () => document.body.classList.add("without-engine"),
+}));
 vi.mock("./engine/geometry", () => ({ exposeGeometry: vi.fn() }));
 
 // the handle the mocked bootEditor returns
@@ -142,4 +150,83 @@ describe("main", () => {
       notifyError,
     );
   });
+});
+
+describe("main with the real editor and engine", () => {
+  const root = resolve(import.meta.dirname, "..");
+
+  beforeEach(async () => {
+    vi.doUnmock("./editor");
+    vi.doUnmock("./engine/engine");
+    vi.doUnmock("./engine/geometry");
+    // the document of the last session, restored from storage
+    vi.doMock("./storage", async (actual) => ({
+      ...(await actual<typeof import("./storage")>()),
+      bootStorage: vi.fn(),
+    }));
+    vi.doMock("./config", async (actual) => ({
+      ...(await actual<typeof import("./config")>()),
+      bootConfig: vi.fn(async () => {}),
+    }));
+    vi.mocked(bootUI).mockImplementation(() => () => {});
+    mockCliArgs();
+    await localforage.clear();
+    await localforage.setItem(
+      "doc",
+      doc(p("The text of the last session")).toJSON(),
+    );
+    document.body.replaceChildren();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // the wasm and the fonts, served from the repository
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        const file = resolve(root, String(url).replace(/^\//, ""));
+        return new Response(readFileSync(file), {
+          headers: file.endsWith(".wasm")
+            ? { "Content-Type": "application/wasm" }
+            : {},
+        });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.doUnmock("./storage");
+    vi.doUnmock("./config");
+    document.body.classList.remove("without-engine");
+  });
+
+  it(
+    "starts with the stored document when its first layout fails",
+    { timeout: 20_000 },
+    async () => {
+      vi.resetModules();
+      // the wasm the app loads, whose first layout traps
+      const { LayoutEngine } = await import("./engine/wasm/blank_layout.js");
+      vi.spyOn(LayoutEngine.prototype, "setItems").mockImplementation(() => {
+        throw new WebAssembly.RuntimeError("unreachable");
+      });
+
+      await import("./main");
+      await vi.waitFor(() => expect(bootUI).toHaveBeenCalled(), {
+        timeout: 10_000,
+      });
+
+      expect(document.querySelector(".boot-error")).toBeNull();
+      expect(document.querySelector("#editor")?.textContent).toContain(
+        "The text of the last session",
+      );
+      expect(document.body.classList).toContain("without-engine");
+      // the engine loaded, and gave up on the document, which it failed on
+      expect(console.error).not.toHaveBeenCalledWith(
+        "failed to load the layout engine",
+        expect.anything(),
+      );
+      expect(console.error).toHaveBeenCalledWith(
+        "the layout engine failed",
+        expect.any(WebAssembly.RuntimeError),
+      );
+    },
+  );
 });

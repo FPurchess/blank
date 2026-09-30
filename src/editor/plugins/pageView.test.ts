@@ -1,6 +1,7 @@
 import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { sendNotification } from "@tauri-apps/plugin-notification";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
@@ -12,7 +13,11 @@ import {
   pageSelection,
 } from "../../state";
 import { doc, keyEvent, p, table, td, tr } from "../../test/editor";
-import { pageEngine } from "../../engine/engine";
+import {
+  ENGINE_FAILED,
+  forgetEngineFailure,
+  pageEngine,
+} from "../../engine/engine";
 import { hidePages, showPages } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
@@ -197,5 +202,55 @@ describe("selectionAt", () => {
     expect(selectionAt(state, { node: false, pos: 99 }).head).toBe(
       node.content.size - 1,
     );
+  });
+});
+
+describe("an engine that fails", () => {
+  const trap = () => {
+    throw new WebAssembly.RuntimeError("unreachable");
+  };
+  let destroy = () => {};
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    destroy();
+    destroy = () => {};
+    hidePages();
+    forgetEngineFailure();
+  });
+
+  it("lets editing go on without the pages, and tells the user once", () => {
+    const engine = showPages();
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+    vi.spyOn(engine.raw, "update").mockImplementation(trap);
+
+    mounted.view.dispatch(mounted.view.state.tr.insertText("a", 1));
+    mounted.view.dispatch(mounted.view.state.tr.insertText("b", 1));
+
+    expect(mounted.view.state.doc.firstChild!.textContent).toMatch(/^baLorem/);
+    expect(document.body.classList).toContain("without-engine");
+    expect(pageEngine).toBeNull();
+    expect(pageLayoutState.value).toBeNull();
+    expect(pageCaret.value).toBeNull();
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(ENGINE_FAILED);
+    // the keys the page view moved by are the editor's own again
+    expect(mounted.press("ArrowDown")).toBe(false);
+  });
+
+  it("mounts the editor when the first layout fails", () => {
+    const engine = showPages();
+    vi.spyOn(engine.raw, "setItems").mockImplementation(trap);
+
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+
+    expect(pageLayoutState.value).toBeNull();
+    expect(document.body.classList).toContain("without-engine");
+    mounted.view.dispatch(mounted.view.state.tr.insertText("typed ", 1));
+    expect(mounted.view.state.doc.textContent).toMatch(/^typed /);
   });
 });

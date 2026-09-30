@@ -3,15 +3,31 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { save } from "@tauri-apps/plugin-dialog";
 import { fetch } from "@tauri-apps/plugin-http";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import { EditorState } from "prosemirror-state";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { parseMarkdown, schema } from "../markdown";
 import { IMAGES } from "../test/images";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
+import exportAs from "../editor/commands/exportAs";
+import { flushPromises } from "../test/async";
+import { engineInstanceBroken, forgetEngineFailure } from "./engine";
 import toPDF from "./pdf";
+import { handleJob, type PdfReply } from "./pdfWorker";
+import type { PdfJob } from "./pdfJob";
+import { LayoutEngine } from "./wasm/blank_layout.js";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -140,4 +156,85 @@ describe("the PDF export", () => {
       expect(links).toContain("https://example.com");
     },
   );
+});
+
+describe("the PDF export after the engine trapped", () => {
+  const trap = () => {
+    throw new WebAssembly.RuntimeError("unreachable");
+  };
+  // what the worker got, run in this process, since jsdom has no workers
+  let jobs: PdfJob[] = [];
+  let workerFails = false;
+
+  class InProcessWorker {
+    onmessage: ((event: { data: PdfReply }) => void) | null = null;
+    onerror: ((event: { message: string }) => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    terminate = vi.fn();
+    postMessage(job: PdfJob) {
+      jobs.push(job);
+      if (workerFails) {
+        queueMicrotask(() => this.onerror?.({ message: "no worker" }));
+        return;
+      }
+      void handleJob(job, (reply) => this.onmessage?.({ data: reply }));
+    }
+  }
+
+  beforeEach(() => {
+    testEngine();
+    jobs = [];
+    workerFails = false;
+    vi.mocked(fetch).mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("Worker", InProcessWorker);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => forgetEngineFailure());
+
+  it.runIf(has("pdftotext"))(
+    "writes it in a worker with a wasm instance of its own",
+    async () => {
+      vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+
+      const { contents, pages } = await exportIt();
+
+      expect(engineInstanceBroken()).toBe(true);
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].title).toBe("The Report");
+      expect(pages).toBe(1);
+      const file = join(dir, "worker.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], {
+        encoding: "utf8",
+      });
+      expect(text).toContain("Findings");
+    },
+  );
+
+  it("goes straight to the worker once the instance is broken", async () => {
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    await exportIt();
+    await exportIt();
+    expect(jobs).toHaveLength(2);
+  });
+
+  it("tells the user when the worker fails too", async () => {
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementation(trap);
+    workerFails = true;
+    vi.mocked(save).mockResolvedValue("/out.pdf");
+    const doc = parseMarkdown("Some text");
+    const state = EditorState.create({ schema, doc });
+
+    exportAs("PDF-Export", toPDF, [{ name: "PDF", extensions: ["pdf"] }])(
+      state,
+    );
+    await vi.waitFor(() => expect(sendNotification).toHaveBeenCalled());
+    await flushPromises();
+
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "PDF-Export",
+      body: "Failed to export file: the page layout failed while writing the PDF: no worker",
+    });
+  });
 });

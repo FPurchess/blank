@@ -1,3 +1,4 @@
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import type { Node } from "prosemirror-model";
 import { shallowRef } from "vue";
 
@@ -15,6 +16,7 @@ import { FONT_URLS } from "./fonts";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
+import { packFonts } from "./pdfJob";
 
 // The layout engine (src-tauri/layout, built for the webview by
 // scripts/build-engine.sh) and what it needs: its fonts, the document as
@@ -100,6 +102,51 @@ export const settingsOf = (layout: Layout, fields: DocumentFields) => {
   };
 };
 
+// Whether the engine runs: "off" when the user switched it off (see
+// bootEngine), "unavailable" when it couldn't load, and "failed" when it
+// stopped working while Blank ran. Without it, the editor shows the text
+// itself (body.without-engine), as before the page view.
+export type EngineStatus = "ready" | "off" | "unavailable" | "failed";
+let status: EngineStatus = "ready";
+
+export const engineStatus = () => status;
+
+/**
+ * engineless tells whether Blank runs without the engine, as a plain editor
+ */
+export const engineless = () => status !== "ready";
+
+/**
+ * useFallbackEditor lets the editor show the text itself, without the engine
+ */
+export const useFallbackEditor = (reason: Exclude<EngineStatus, "ready">) => {
+  status = reason;
+  document.body.classList.add("without-engine");
+};
+
+// what the user reads once the engine stopped working
+export const ENGINE_FAILED =
+  "The page layout stopped working. Your text is safe: Blank shows it without pages until you restart it.";
+
+// whether the wasm instance trapped, after which the PDF export uses one of
+// its own (see pdf.ts)
+let instanceBroken = false;
+export const engineInstanceBroken = () => instanceBroken;
+
+let notified = false;
+
+/**
+ * forgetEngineFailure forgets that the engine failed, e.g. between tests
+ */
+export const forgetEngineFailure = () => {
+  status = "ready";
+  instanceBroken = false;
+  notified = false;
+  document.body.classList.remove("without-engine");
+};
+
+const EMPTY_DISPLAY: PageDisplay = { r: [], i: [], l: [], g: [] };
+
 // how many items the first layout of a long document lays out before the
 // pages show, a few pages' worth, and then at a time
 const FIRST_ITEMS = 60;
@@ -107,7 +154,9 @@ const CHUNK_ITEMS = 80;
 
 /**
  * PageEngine keeps the engine in step with a document: only what changed
- * is handed to it
+ * is handed to it. Every call into the engine goes through `call`, so an
+ * error in it (a trap of the wasm, say) never reaches the editor or the
+ * painters: the engine is given up, and the editor shows the text itself.
  */
 export class PageEngine {
   private records: FlatRecord[] = [];
@@ -124,7 +173,69 @@ export class PageEngine {
   // the fallback fonts added, see fallback.ts
   private added = new Set<FallbackFont>();
 
-  constructor(readonly raw: LayoutEngine) {}
+  // set once a call failed, after which each call returns its fallback
+  broken = false;
+  // for a test: the next call fails, as if the wasm trapped
+  private breakNext = false;
+
+  /**
+   * @param strict throws the error of a failed call instead of returning
+   *   the fallback, e.g. for the PDF export, which must not write an empty
+   *   document
+   */
+  constructor(
+    readonly raw: LayoutEngine,
+    private readonly strict = false,
+  ) {}
+
+  /**
+   * call runs `run`, which calls the engine, and returns `fallback` if it
+   * fails or the engine failed before
+   */
+  private call<T>(fallback: T, run: () => T): T {
+    if (this.broken) {
+      if (this.strict) throw new Error("the page layout failed before");
+      return fallback;
+    }
+    try {
+      if (this.breakNext) {
+        this.breakNext = false;
+        throw new WebAssembly.RuntimeError("unreachable (blankBreakEngine)");
+      }
+      return run();
+    } catch (error) {
+      this.fail(error);
+      if (this.strict) throw error;
+      return fallback;
+    }
+  }
+
+  // gives the engine up after its first error
+  private fail(error: unknown) {
+    this.broken = true;
+    instanceBroken = true;
+    clearTimeout(this.timer);
+    this.pending = null;
+    this.onProgress = null;
+    console.error("the layout engine failed", error);
+    if (this !== pageEngine) return;
+    useFallbackEditor("failed");
+    setPageEngine(null);
+    if (notified) return;
+    notified = true;
+    try {
+      sendNotification(ENGINE_FAILED);
+    } catch (notifyError) {
+      console.error("failed to send notification", notifyError);
+    }
+  }
+
+  /**
+   * breakForTest makes the next call fail, as if the wasm trapped
+   */
+  breakForTest() {
+    this.breakNext = true;
+  }
 
   /**
    * addFonts adds the fallback fonts it hasn't got yet, and lays out again
@@ -132,6 +243,10 @@ export class PageEngine {
    * @returns whether it added any
    */
   addFonts(fonts: readonly FallbackFont[]) {
+    return this.call(false, () => this.addNewFonts(fonts));
+  }
+
+  private addNewFonts(fonts: readonly FallbackFont[]) {
     let added = false;
     for (const font of fonts) {
       if (this.added.has(font)) continue;
@@ -147,7 +262,7 @@ export class PageEngine {
    * missing returns the characters of the document no font has
    */
   missing() {
-    return this.raw.missing();
+    return this.call("", () => this.raw.missing());
   }
 
   /**
@@ -155,11 +270,13 @@ export class PageEngine {
    * @returns whether it changed
    */
   setSettings(layout: Layout, fields: DocumentFields) {
-    const json = JSON.stringify(settingsOf(layout, fields));
-    if (json === this.settings) return false;
-    this.settings = json;
-    this.raw.setSettings(json);
-    return true;
+    return this.call(false, () => {
+      const json = JSON.stringify(settingsOf(layout, fields));
+      if (json === this.settings) return false;
+      this.settings = json;
+      this.raw.setSettings(json);
+      return true;
+    });
   }
 
   /**
@@ -175,6 +292,18 @@ export class PageEngine {
     force = false,
     frozen: FrozenWidths | null = null,
     progressive = false,
+  ) {
+    return this.call(false, () =>
+      this.syncNow(doc, sizes, force, frozen, progressive),
+    );
+  }
+
+  private syncNow(
+    doc: Node,
+    sizes: ImageSizes,
+    force: boolean,
+    frozen: FrozenWidths | null,
+    progressive: boolean,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
     if (doc === this.doc && !force && frozenKey === this.frozen) return false;
@@ -242,7 +371,8 @@ export class PageEngine {
   // lays out the rest a chunk at a time, between the webview's other work
   private later() {
     this.timer = setTimeout(() => {
-      this.append(CHUNK_ITEMS);
+      this.call(undefined, () => this.append(CHUNK_ITEMS));
+      if (this.broken) return;
       this.onProgress?.();
       if (this.pending) this.later();
     });
@@ -253,11 +383,41 @@ export class PageEngine {
    */
   finish() {
     clearTimeout(this.timer);
-    if (this.pending) this.append(Infinity);
+    if (this.pending) this.call(undefined, () => this.append(Infinity));
   }
 
   pages() {
-    return this.raw.pageCount();
+    return this.call(0, () => this.raw.pageCount());
+  }
+
+  // changes when what a page shows changes
+  versions() {
+    return this.call(new Uint32Array(), () => this.raw.versions());
+  }
+
+  // where the text of each page ends
+  bottoms() {
+    return this.call(new Float32Array(), () => this.raw.bottoms());
+  }
+
+  addImage(src: string, bytes: Uint8Array, jpeg: boolean) {
+    this.call(undefined, () => this.raw.addImage(src, bytes, jpeg));
+  }
+
+  pdf(title: string, author: string) {
+    return this.call(new Uint8Array(), () => this.raw.pdf(title, author));
+  }
+
+  /**
+   * free gives the engine's memory back; it can't be used after
+   */
+  free() {
+    try {
+      this.raw.free();
+    } catch (error) {
+      // a trapped engine may not free, which leaves its memory to the wasm
+      console.error("failed to free the layout engine", error);
+    }
   }
 
   /**
@@ -266,9 +426,11 @@ export class PageEngine {
   display(page: number, version: number): PageDisplay {
     const cached = this.displays.get(page);
     if (cached?.version === version) return cached.display;
-    const display = JSON.parse(this.raw.page(page)) as PageDisplay;
-    this.displays.set(page, { version, display });
-    return display;
+    return this.call(EMPTY_DISPLAY, () => {
+      const display = JSON.parse(this.raw.page(page)) as PageDisplay;
+      this.displays.set(page, { version, display });
+      return display;
+    });
   }
 
   /**
@@ -276,36 +438,43 @@ export class PageEngine {
    */
   glyph(font: number, id: number): Path2D {
     const key = font * 0x10000 + id;
-    let path = this.paths.get(key);
-    if (!path) {
-      path = new Path2D(this.raw.glyphPath(font, id));
+    const cached = this.paths.get(key);
+    if (cached) return cached;
+    return this.call(new Path2D(), () => {
+      const path = new Path2D(this.raw.glyphPath(font, id));
       this.paths.set(key, path);
-    }
-    return path;
+      return path;
+    });
   }
 
   unitsPerEm(font: number) {
-    let upem = this.upems.get(font);
-    if (upem === undefined) {
-      upem = this.raw.unitsPerEm(font);
+    const cached = this.upems.get(font);
+    if (cached !== undefined) return cached;
+    return this.call(1000, () => {
+      const upem = this.raw.unitsPerEm(font);
       this.upems.set(font, upem);
-    }
-    return upem;
+      return upem;
+    });
   }
 
   bands(page: number): string[] {
-    return JSON.parse(this.raw.bands(page)) as string[];
+    return this.call<string[]>(
+      [],
+      () => JSON.parse(this.raw.bands(page)) as string[],
+    );
   }
 
   caret(pos: number, after = false) {
-    const values = this.raw.caret(pos, after);
-    if (values.length !== 4) return null;
-    const [page, x, y, height] = values;
-    return { page, x, y, width: 0, height };
+    return this.call(null, () => {
+      const values = this.raw.caret(pos, after);
+      if (values.length !== 4) return null;
+      const [page, x, y, height] = values;
+      return { page, x, y, width: 0, height };
+    });
   }
 
   selection(from: number, to: number) {
-    return rectsOf(this.raw.selection(from, to));
+    return this.call([], () => rectsOf(this.raw.selection(from, to)));
   }
 
   /**
@@ -313,7 +482,7 @@ export class PageEngine {
    * page they are on, in points
    */
   boxes(from: number, to: number): PageBox[] {
-    return rectsOf(this.raw.boxes(from, to));
+    return this.call([], () => rectsOf(this.raw.boxes(from, to)));
   }
 
   /**
@@ -321,6 +490,10 @@ export class PageEngine {
    * of its rows placed on a page, in points, or null for no table there
    */
   tableGrid(pos: number): EngineTableGrid | null {
+    return this.call(null, () => this.readTableGrid(pos));
+  }
+
+  private readTableGrid(pos: number): EngineTableGrid | null {
     const values = this.raw.tableGrid(pos);
     if (values.length === 0) return null;
     const count = values[0];
@@ -342,26 +515,32 @@ export class PageEngine {
    * pageSpan returns the positions the blocks on a page start and end at
    */
   pageSpan(page: number) {
-    const values = this.raw.pageSpan(page);
-    return values.length === 2 ? { from: values[0], to: values[1] } : null;
+    return this.call(null, () => {
+      const values = this.raw.pageSpan(page);
+      return values.length === 2 ? { from: values[0], to: values[1] } : null;
+    });
   }
 
   hit(page: number, x: number, y: number) {
-    return toHit(this.raw.hit(page, x, y));
+    return this.call(null, () => toHit(this.raw.hit(page, x, y)));
   }
 
   word(page: number, x: number, y: number) {
-    const values = this.raw.word(page, x, y);
-    return values.length === 2 ? { from: values[0], to: values[1] } : null;
+    return this.call(null, () => {
+      const values = this.raw.word(page, x, y);
+      return values.length === 2 ? { from: values[0], to: values[1] } : null;
+    });
   }
 
   vertical(pos: number, down: boolean, goal: number) {
-    return toHit(this.raw.vertical(pos, down, goal));
+    return this.call(null, () => toHit(this.raw.vertical(pos, down, goal)));
   }
 
   lineEdge(pos: number, end: boolean) {
-    const edge = this.raw.lineEdge(pos, end);
-    return edge < 0 ? null : edge;
+    return this.call(null, () => {
+      const edge = this.raw.lineEdge(pos, end);
+      return edge < 0 ? null : edge;
+    });
   }
 }
 
@@ -370,18 +549,11 @@ let fontFiles: Uint8Array[] | null = null;
 
 /**
  * createEngine makes an engine with fonts, once the wasm is loaded
+ * @param strict throws when a call fails, see PageEngine
  */
-export const createEngine = (fonts: Uint8Array[]) => {
-  const lengths = new Uint32Array(fonts.map((font) => font.length));
-  const bytes = new Uint8Array(
-    lengths.reduce((sum, length) => sum + length, 0),
-  );
-  let offset = 0;
-  for (const font of fonts) {
-    bytes.set(font, offset);
-    offset += font.length;
-  }
-  const engine = new PageEngine(new LayoutEngine(bytes, lengths));
+export const createEngine = (fonts: Uint8Array[], strict = false) => {
+  const { bytes, lengths } = packFonts(fonts);
+  const engine = new PageEngine(new LayoutEngine(bytes, lengths), strict);
   engine.addFonts(fallbackFonts.value);
   return engine;
 };
@@ -400,8 +572,11 @@ let loading: Promise<Uint8Array[]> | null = null;
 /**
  * loadEngine loads the wasm and the fonts, once, and makes an engine
  */
-export const loadEngine = async () => {
-  loading ??= (async () => {
+export const loadEngine = async () => createEngine(await loadFiles());
+
+// loads the wasm and the fonts, once
+const loadFiles = () =>
+  (loading ??= (async () => {
     const [, ...fonts] = await Promise.all([
       init({ module_or_path: wasmUrl }).then(() => bootMark("wasm")),
       ...FONT_URLS.map(
@@ -411,15 +586,25 @@ export const loadEngine = async () => {
     bootMark("fonts");
     fontFiles = fonts as Uint8Array[];
     return fontFiles;
-  })();
-  return createEngine(await loading);
-};
+  })());
 
 /**
  * newEngine makes another engine with the fonts already loaded, or loads them
+ * @param strict throws when a call fails, see PageEngine
  */
-export const newEngine = async () =>
-  fontFiles ? createEngine(fontFiles) : loadEngine();
+export const newEngine = async (strict = false) =>
+  createEngine(fontFiles ?? (await loadFiles()), strict);
+
+/**
+ * baseFonts returns Blank's own font files, as the engines got them
+ */
+export const baseFonts = async () =>
+  fontFiles ??
+  Promise.all(
+    FONT_URLS.map(
+      async (url) => new Uint8Array(await (await fetch(url)).arrayBuffer()),
+    ),
+  );
 
 // the engine of the page view, see bootEngine
 export let pageEngine: PageEngine | null = null;

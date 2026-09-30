@@ -4,7 +4,7 @@ import { bootConfig } from "./config";
 import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
-import { bootEngine } from "./engine/engine";
+import { bootEngine, useFallbackEditor } from "./engine/engine";
 import { exposeGeometry } from "./engine/geometry";
 import { bootMark } from "./engine/perf";
 import { bootUI } from "./ui";
@@ -42,7 +42,7 @@ const showBootError = (error: unknown) => {
       () => bootMark("engine"),
       (error: unknown) => {
         console.error("failed to load the layout engine", error);
-        document.body.classList.add("without-engine");
+        useFallbackEditor("unavailable");
       },
     );
     bootState();

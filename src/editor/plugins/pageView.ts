@@ -96,8 +96,8 @@ const publishLayout = (engine: PageEngine) => {
     height,
     margins,
     pages: engine.pages(),
-    versions: engine.raw.versions(),
-    bottoms: engine.raw.bottoms(),
+    versions: engine.versions(),
+    bottoms: engine.bottoms(),
     properties: hasProperties.value,
   };
 };
@@ -178,6 +178,8 @@ const sync = (
     frozen,
     progressive,
   );
+  // an engine that failed has given up, and shows nothing
+  if (engine.broken) return;
   if (laidOut || changed || !pageLayoutState.value) {
     publishLayout(engine);
     // fonts for what Blank's fonts lack, which lay out again once found
@@ -216,7 +218,22 @@ export const pageSync = () => {
     },
     view(view) {
       let engine: PageEngine | null = null;
-      const stops: (() => void)[] = [];
+      let stops: (() => void)[] = [];
+      // the engine gave up (see PageEngine.call): the editor shows the text
+      const teardown = () => {
+        stops.forEach((stop) => stop());
+        stops = [];
+        if (engine) {
+          engine.onProgress = null;
+          engine.finish();
+        }
+        engine = null;
+        pageLayoutState.value = null;
+        pageCaret.value = null;
+        pageSelection.value = [];
+        pageNodeSelection.value = [];
+        pageComposition.value = [];
+      };
       const start = (ready: PageEngine) => {
         engine = ready;
         // a long document lays out its first pages first, and the rest a
@@ -226,6 +243,8 @@ export const pageSync = () => {
           publishSelection(ready, view.state, false);
         };
         sync(ready, view.state, frozen, false, true);
+        // an engine that fails on the document gives up before it watches
+        if (engine !== ready) return;
         bootMark("layout");
         publishSelection(ready, view.state, false);
         stops.push(
@@ -235,7 +254,7 @@ export const pageSync = () => {
             (fonts) => {
               if (!ready.addFonts(fonts)) return;
               timed("layout", () => sync(ready, view.state, frozen, true));
-              publishSelection(ready, view.state, false);
+              if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           ),
@@ -244,42 +263,40 @@ export const pageSync = () => {
             [pageLayout, pageFields, imagesLoaded],
             () => {
               timed("layout", () => sync(ready, view.state, frozen, true));
-              publishSelection(ready, view.state, false);
+              if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           ),
         );
       };
-      // the engine loads while the editor boots
+      // the engine loads while the editor boots, and is gone once it failed
+      const watching = watch(
+        pageEngineReady,
+        (ready) => {
+          if (!ready) teardown();
+          else if (!engine) start(ready);
+        },
+        { flush: "sync" },
+      );
       if (pageEngine) start(pageEngine);
-      else {
-        const waiting = watch(
-          pageEngineReady,
-          (ready) => {
-            if (!ready || engine) return;
-            waiting();
-            start(ready);
-          },
-          { flush: "sync" },
-        );
-        stops.push(waiting);
-      }
       return {
         update(view, previous) {
-          if (!engine) return;
+          const current = engine;
+          if (!current) return;
           const docChanged = view.state.doc !== previous.doc;
           // a move into or out of a table freezes or relaxes its columns
           const moved = !view.state.selection.eq(previous.selection);
-          if (docChanged || moved)
+          if (docChanged || moved) {
             timed("layout", () => {
               frozen = frozenWidths(view.state, frozen);
-              sync(engine!, view.state, frozen);
+              sync(current, view.state, frozen);
             });
-          if (docChanged || moved) {
+            // the engine may have failed on the change and given up
+            if (engine !== current) return;
             const by = pageViewKey.getState(view.state);
             timed("caret", () =>
               publishSelection(
-                engine!,
+                current,
                 view.state,
                 by?.by !== "pointer",
                 by?.at,
@@ -287,20 +304,12 @@ export const pageSync = () => {
             );
           }
           if (composing !== null) {
-            publishComposition(engine, view.state, composing);
+            publishComposition(current, view.state, composing);
           }
         },
         destroy() {
-          stops.forEach((stop) => stop());
-          if (engine) {
-            engine.onProgress = null;
-            engine.finish();
-          }
-          pageLayoutState.value = null;
-          pageCaret.value = null;
-          pageSelection.value = [];
-          pageNodeSelection.value = [];
-          pageComposition.value = [];
+          watching();
+          teardown();
         },
       };
     },
