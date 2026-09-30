@@ -25,7 +25,7 @@ deletes this file on merge.
 - [x] 16. Test hooks only in dev and E2E builds
 - [x] 17. Dead code, and a parity test of the bands
 - [x] 18. Table handles measure only the tables under the pointer
-- [ ] 19. The Word export's font loader recovers from a failed fetch
+- [x] 19. The Word export's font loader recovers from a failed fetch
 - [ ] 20. Incremental layout equals a fresh one on real transactions
 
 ## Notes for the other streams
