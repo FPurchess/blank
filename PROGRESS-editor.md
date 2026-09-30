@@ -98,6 +98,28 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   engine's next call fail as if the wasm trapped. `blank.engine=off` is not
   gated.
 
+- engine-release (`headers-and-footers.md`): `chapterOn` is gone from
+  `src/layout/bands.ts` (nothing used it; the engine finds `{chapter}`
+  itself). `src/layout/bands.parity.test.ts` checks that the engine's bands
+  are `bandsOn` + `fieldValues` + `expand` for numbering styles, start
+  numbers, first and even pages.
+
+## Verification
+
+At `51f76b9`:
+- `bun run lint`, `bun run format:check`, `bun run test` (150 files, 2328
+  tests) and `bun run test:coverage` (95.7 % statements, 90.7 % branches).
+- `cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout`: 61 + 3
+  passed.
+- E2E (`E2E_PORT=4511 xvfb-run -a`), the nine specs of TASK.md: editing,
+  tables, images, pageEngine, file, launch, persistence, spellcheck, import:
+  9 of 9 spec files, 70 tests, passed.
+- The PDF worker in the debug app: Vite bundles it as
+  `assets/pdfWorker-*.js`; a local probe (not committed) created it with
+  `new Worker(…, { type: "module" })` in the webview, and it loaded its own
+  wasm and answered (with the engine's own error for the empty job it was
+  sent).
+
 ## Measurements
 
 Task 4, stage 1: ms per keystroke, from `pageEngine.e2e.ts`' "measures
