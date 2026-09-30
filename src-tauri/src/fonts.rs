@@ -35,8 +35,9 @@ pub struct FontState {
 /// the most of the text looked up at once, in bytes, and of a language tag
 const MAX_TEXT: usize = 64 * 1024;
 const MAX_LANGUAGE: usize = 35;
-/// the most characters of no script in particular looked up at once
-const MAX_COMMON: usize = 256;
+/// the most characters of one script, or of none in particular, looked up
+/// at once
+const MAX_CHARS: usize = 256;
 
 /// the scripts no font family is chosen for: common to all (punctuation,
 /// symbols), inherited (combining marks) and unknown
@@ -84,16 +85,22 @@ fn language_tag(language: &str) -> &str {
     }
 }
 
-/// the scripts of `text` that aren't common to all, like punctuation
-fn scripts(text: &str) -> Vec<String> {
-    let mut found: Vec<String> = vec![];
+/// the scripts of `text` that aren't common to all, like punctuation, each
+/// with its characters
+fn scripts(text: &str) -> Vec<(String, Vec<char>)> {
+    let mut found: Vec<(String, Vec<char>)> = vec![];
     for char in text.chars() {
         if is_common(char) {
             continue;
         }
         let name = char.script().short_name();
-        if !found.iter().any(|known| known == name) {
-            found.push(name.to_string());
+        match found.iter_mut().find(|(known, _)| known == name) {
+            Some((_, chars)) => {
+                if chars.len() < MAX_CHARS && !chars.contains(&char) {
+                    chars.push(char);
+                }
+            }
+            None => found.push((name.to_string(), vec![char])),
         }
     }
     found
@@ -112,7 +119,7 @@ fn common(text: &str) -> Vec<char> {
             && !found.contains(&char)
         {
             found.push(char);
-            if found.len() == MAX_COMMON {
+            if found.len() == MAX_CHARS {
                 break;
             }
         }
@@ -126,11 +133,45 @@ fn is_private_use(char: char) -> bool {
     matches!(char, '\u{E000}'..='\u{F8FF}' | '\u{F0000}'..)
 }
 
-/// the regular and bold fonts of the families that have `chars`, the ones
-/// for maths and sans-serif text first, then the others by name
-fn fonts_covering(collection: &mut Collection, chars: &[char]) -> Vec<FallbackFont> {
-    let mut ids: Vec<FamilyId> = collection.generic_families(GenericFamily::Math).collect();
-    ids.extend(collection.generic_families(GenericFamily::SansSerif));
+/// the characters of `chars` the regular font of a family has
+fn covered(family: &FamilyInfo, chars: &[char]) -> Vec<char> {
+    let Some(regular) = family.match_font(
+        Default::default(),
+        FontStyle::Normal,
+        FontWeight::NORMAL,
+        true,
+    ) else {
+        return vec![];
+    };
+    let Some(blob) = regular.load(None) else {
+        return vec![];
+    };
+    let Some(charmap) = regular.charmap_index().charmap(blob.data()) else {
+        return vec![];
+    };
+    chars
+        .iter()
+        .copied()
+        .filter(|char| charmap.map(*char).is_some_and(|glyph| glyph != 0))
+        .collect()
+}
+
+/// the regular and bold fonts of the families that have `chars`: the ones
+/// in `first` (those found for the text's scripts), then the ones for maths
+/// and sans-serif text, then the others by name
+fn fonts_covering(
+    collection: &mut Collection,
+    chars: &[char],
+    first: &[FamilyId],
+) -> Vec<FallbackFont> {
+    let mut ids: Vec<FamilyId> = first.to_vec();
+    let mut generic: Vec<FamilyId> = collection.generic_families(GenericFamily::Math).collect();
+    generic.extend(collection.generic_families(GenericFamily::SansSerif));
+    for id in generic {
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
     let mut names: Vec<String> = collection.family_names().map(str::to_string).collect();
     names.sort();
     for name in names {
@@ -149,29 +190,15 @@ fn fonts_covering(collection: &mut Collection, chars: &[char]) -> Vec<FallbackFo
         let Some(family) = collection.family(id) else {
             continue;
         };
-        let Some(regular) = family.match_font(
-            Default::default(),
-            FontStyle::Normal,
-            FontWeight::NORMAL,
-            true,
-        ) else {
-            continue;
-        };
-        let Some(blob) = regular.load(None) else {
-            continue;
-        };
-        let Some(charmap) = regular.charmap_index().charmap(blob.data()) else {
-            continue;
-        };
-        let has = |char: &char| charmap.map(*char).is_some_and(|glyph| glyph != 0);
-        if !left.iter().any(has) {
+        let has = covered(&family, &left);
+        if has.is_empty() {
             continue;
         }
         let fonts = faces_of(&family);
         if fonts.is_empty() {
             continue;
         }
-        left.retain(|char| !has(char));
+        left.retain(|char| !has.contains(char));
         for font in fonts {
             if !found.contains(&font) {
                 found.push(font);
@@ -180,9 +207,6 @@ fn fonts_covering(collection: &mut Collection, chars: &[char]) -> Vec<FallbackFo
     }
     found
 }
-
-/// the fallback families fontique tries for a script, at most this many
-const MAX_FAMILIES: usize = 16;
 
 // OS/2 fsType: the licence's embedding permissions
 const USAGE_PERMISSIONS: u16 = 0x000F;
@@ -246,10 +270,25 @@ fn faces_of(family: &FamilyInfo) -> Vec<FallbackFont> {
         .collect()
 }
 
-/// the regular and bold fonts of the first family the system falls back to
-/// for a script that may be embedded, in `language`, e.g. "zh", which picks
-/// the Chinese forms of Han characters rather than the Japanese ones
-fn fonts_for(collection: &mut Collection, script: &str, language: &str) -> Vec<FallbackFont> {
+/// a family the system falls back to for a script, and its fonts
+struct ScriptFonts {
+    family: FamilyId,
+    fonts: Vec<FallbackFont>,
+    /// the characters of the script it doesn't have
+    left: Vec<char>,
+}
+
+/// the regular and bold fonts of the family the system falls back to for a
+/// script, in `language`, e.g. "zh", which picks the Chinese forms of Han
+/// characters rather than the Japanese ones; or without the language. Only
+/// a family that has some of `chars` and may be embedded counts: the system
+/// gives one family for each, its best match, even one without the script.
+fn fonts_for(
+    collection: &mut Collection,
+    script: &str,
+    chars: &[char],
+    language: &str,
+) -> Option<ScriptFonts> {
     let script = Script::from_str_unchecked(script);
     let mut ids: Vec<FamilyId> = vec![];
     if !language.is_empty() {
@@ -260,16 +299,60 @@ fn fonts_for(collection: &mut Collection, script: &str, language: &str) -> Vec<F
             ids.push(id);
         }
     }
-    for id in ids.into_iter().take(MAX_FAMILIES) {
+    for id in ids {
         let Some(family) = collection.family(id) else {
             continue;
         };
+        let has = covered(&family, chars);
+        if has.is_empty() {
+            continue;
+        }
         let fonts = faces_of(&family);
-        if !fonts.is_empty() {
-            return fonts;
+        if fonts.is_empty() {
+            continue;
+        }
+        let left = chars
+            .iter()
+            .copied()
+            .filter(|char| !has.contains(char))
+            .collect();
+        return Some(ScriptFonts {
+            family: id,
+            fonts,
+            left,
+        });
+    }
+    None
+}
+
+/// the fonts of `collection` for `text`: the families the system falls back
+/// to for its scripts, then, for what they lack and for the characters of no
+/// script, the families that have them
+fn lookup_in(collection: &mut Collection, text: &str, language: &str) -> Vec<FallbackFont> {
+    let mut fonts = vec![];
+    let mut families = vec![];
+    let mut left = vec![];
+    for (script, chars) in scripts(text) {
+        match fonts_for(collection, &script, &chars, language) {
+            Some(found) => {
+                families.push(found.family);
+                fonts.extend(found.fonts);
+                left.extend(found.left);
+            }
+            None => left.extend(chars),
         }
     }
-    vec![]
+    left.extend(common(text));
+    if !left.is_empty() {
+        fonts.extend(fonts_covering(collection, &left, &families));
+    }
+    let mut found: Vec<FallbackFont> = vec![];
+    for font in fonts {
+        if !found.contains(&font) {
+            found.push(font);
+        }
+    }
+    found
 }
 
 /// the system's fonts for the scripts of `text`, in the document's
@@ -277,24 +360,10 @@ fn fonts_for(collection: &mut Collection, script: &str, language: &str) -> Vec<F
 pub fn lookup(fonts: &Mutex<Option<Collection>>, text: &str, language: &str) -> Vec<FallbackFont> {
     let (text, language) = (capped(text), language_tag(language));
     let mut collection = collection_of(fonts);
-    let Some(collection) = collection.as_mut() else {
-        return vec![];
-    };
-    let mut found: Vec<FallbackFont> = vec![];
-    let mut fonts = vec![];
-    for script in scripts(text) {
-        fonts.extend(fonts_for(collection, &script, language));
+    match collection.as_mut() {
+        Some(collection) => lookup_in(collection, text, language),
+        None => vec![],
     }
-    let common = common(text);
-    if !common.is_empty() {
-        fonts.extend(fonts_covering(collection, &common));
-    }
-    for font in fonts {
-        if !found.contains(&font) {
-            found.push(font);
-        }
-    }
-    found
 }
 
 /// the system's fonts for the scripts of `text`, looked up on a thread of
@@ -400,10 +469,17 @@ mod tests {
 
     #[test]
     fn finds_the_scripts_of_a_text() {
+        let names = |text| {
+            scripts(text)
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>()
+        };
         assert_eq!(
-            scripts("abc, 中文 かな 한글!"),
+            names("abc, 中文 かな 한글!"),
             ["Latn", "Hani", "Hira", "Hang"]
         );
+        assert_eq!(scripts("中文中"), [("Hani".to_string(), vec!['中', '文'])]);
         assert!(scripts("1, 2; 3.").is_empty());
     }
 
@@ -429,7 +505,7 @@ mod tests {
     fn finds_fonts_by_the_characters_they_have() {
         let mut collection = repository_fonts();
         // Plex lacks the arrow, DejaVu Sans has it
-        let fonts = fonts_covering(&mut collection, &['⇒']);
+        let fonts = fonts_covering(&mut collection, &['⇒'], &[]);
         assert!(!fonts.is_empty());
         for font in &fonts {
             assert_eq!(font.family, "DejaVu Sans", "{font:?}");
@@ -438,7 +514,62 @@ mod tests {
             .iter()
             .any(|font| font.path.ends_with("dejavu-sans.ttf")));
         // an unassigned character none of them has
-        assert!(fonts_covering(&mut collection, &['\u{0378}']).is_empty());
+        assert!(fonts_covering(&mut collection, &['\u{0378}'], &[]).is_empty());
+    }
+
+    /// Blank's own fonts, with `family` as the one the system falls back to
+    /// for `script`
+    fn falling_back_to(script: &str, family: &str) -> Collection {
+        let mut collection = repository_fonts();
+        let id = collection.family_id(family).unwrap();
+        collection.set_fallbacks(Script::from_str_unchecked(script), [id].into_iter());
+        collection
+    }
+
+    #[test]
+    fn skips_a_fallback_family_without_the_script() {
+        // fontconfig's best match for Chinese can be a font without it
+        let mut collection = falling_back_to("Hani", "IBM Plex Sans");
+        assert!(fonts_for(&mut collection, "Hani", &['中'], "").is_none());
+        assert!(lookup_in(&mut collection, "中", "").is_empty());
+    }
+
+    #[test]
+    fn finds_what_the_fallback_family_lacks_by_the_characters() {
+        // Plex has no Arabic, DejaVu Sans has
+        let mut collection = falling_back_to("Arab", "IBM Plex Sans");
+        let fonts = lookup_in(&mut collection, "سلام", "");
+        assert!(!fonts.is_empty());
+        assert!(
+            fonts.iter().all(|font| font.family == "DejaVu Sans"),
+            "{fonts:?}"
+        );
+    }
+
+    #[test]
+    fn keeps_a_fallback_family_that_has_the_script() {
+        let mut collection = falling_back_to("Arab", "DejaVu Sans");
+        let found = fonts_for(&mut collection, "Arab", &['س', 'ل'], "").unwrap();
+        assert!(found.left.is_empty());
+        assert!(found.fonts.iter().all(|font| font.family == "DejaVu Sans"));
+    }
+
+    #[test]
+    fn tries_the_families_found_for_the_scripts_first() {
+        // both have Ω; by name DejaVu Sans comes first
+        let mut collection = repository_fonts();
+        let fonts = fonts_covering(&mut collection, &['Ω'], &[]);
+        assert!(
+            fonts.iter().all(|font| font.family == "DejaVu Sans"),
+            "{fonts:?}"
+        );
+        let plex = collection.family_id("IBM Plex Sans").unwrap();
+        let fonts = fonts_covering(&mut collection, &['Ω'], &[plex]);
+        assert!(!fonts.is_empty());
+        assert!(
+            fonts.iter().all(|font| font.family == "IBM Plex Sans"),
+            "{fonts:?}"
+        );
     }
 
     #[test]
@@ -517,7 +648,9 @@ mod tests {
             system_fonts: true,
         });
         // whatever the system has for Chinese, if anything
-        let fonts = fonts_for(&mut collection, "Hani", "zh");
+        let fonts = fonts_for(&mut collection, "Hani", &['中'], "zh")
+            .map(|found| found.fonts)
+            .unwrap_or_default();
         for font in &fonts {
             assert!(std::path::Path::new(&font.path).exists(), "{font:?}");
             assert!(!font.family.is_empty());
