@@ -14,15 +14,20 @@ use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::Fill;
 use krilla::surface::Surface;
+use krilla::tagging::{Artifact, ArtifactType, ContentTag, SpanTag};
 use krilla::text::{Font, GlyphId, KrillaGlyph};
 use krilla::Document;
 use parley::Alignment;
 
-use crate::engine::{Engine, Op};
+use crate::engine::{Engine, Op, Part};
 use crate::fonts::Fonts;
 use crate::items::Role;
 use crate::model::Text;
 use crate::text::{Glyph, TextBox};
+
+mod tags;
+
+pub use tags::outline_entries;
 
 /// an image's file, by its src
 pub struct ImageData {
@@ -65,6 +70,10 @@ fn fill(role: Role) -> Fill {
 /// empty text first, with an invisible one: every character shown with it
 /// then gets its own span.
 fn unmap_missing_glyph(surface: &mut Surface, font: Font) {
+    surface.start_tagged(ContentTag::Artifact(Artifact::new(
+        ArtifactType::Other,
+        None,
+    )));
     surface.set_fill(Some(Fill {
         paint: rgb::Color::new(0, 0, 0).into(),
         opacity: NormalizedF32::ZERO,
@@ -72,6 +81,7 @@ fn unmap_missing_glyph(surface: &mut Surface, font: Font) {
     }));
     let glyph = KrillaGlyph::new(GlyphId::new(0), 0.0, 0.0, 0.0, 0.0, 0..0, None);
     surface.draw_glyphs(Point::from_xy(0.0, 0.0), &[glyph], font, "", 1.0, false);
+    surface.end_tagged();
 }
 
 /// what went wrong in a PDF that was still written
@@ -241,6 +251,7 @@ fn attempt(
         .collect();
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let mut undecoded: Vec<String> = vec![];
+    let mut ids = tags::Ids::new();
     let (width, height) = (engine.settings.width, engine.settings.height);
     // the fonts whose missing glyph the document shows, for what no font has
     let mut missing: Vec<usize> = vec![];
@@ -254,7 +265,8 @@ fn attempt(
         }
     }
     for page_index in 0..engine.pages.len() {
-        let ops = engine.page_ops(page_index, true);
+        let mut ops = engine.body_parts(page_index);
+        ops.extend(engine.band_parts(page_index));
         let settings = PageSettings::from_wh(width, height)
             .ok_or_else(|| Failed::Other("the page has no size".into()))?;
         let mut page = document.start_page_with(settings);
@@ -266,7 +278,29 @@ fn attempt(
                     unmap_missing_glyph(&mut surface, font);
                 }
             }
-            for op in ops {
+            for (op, part) in ops {
+                if let Op::Link { href, x, y, w, h } = op {
+                    links.push((href, x, y, w, h, part));
+                    continue;
+                }
+                // what isn't content of the document is an artifact, and the
+                // rest is tagged, for the structure to hold it
+                let tag = match part {
+                    Part::Decoration => {
+                        ContentTag::Artifact(Artifact::new(ArtifactType::Other, None))
+                    }
+                    Part::Band { footer: false } => {
+                        ContentTag::Artifact(Artifact::new(ArtifactType::Header, None))
+                    }
+                    Part::Band { footer: true } => {
+                        ContentTag::Artifact(Artifact::new(ArtifactType::Footer, None))
+                    }
+                    _ => ContentTag::Span(SpanTag::empty()),
+                };
+                let id = surface.start_tagged(tag);
+                if !matches!(part, Part::Decoration | Part::Band { .. }) {
+                    ids.entry(part).or_default().push(id);
+                }
                 match op {
                     Op::Rect { x, y, w, h, role } => {
                         let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) else {
@@ -323,22 +357,25 @@ fn attempt(
                             }
                         }
                     }
-                    Op::Link { href, x, y, w, h } => links.push((href, x, y, w, h)),
+                    Op::Link { .. } => {}
                 }
+                surface.end_tagged();
             }
             surface.finish();
         }
-        for (href, x, y, w, h) in links {
+        for (href, x, y, w, h, part) in links {
             if let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) {
-                let target = Target::Action(Action::Link(LinkAction::new(href)));
-                page.add_annotation(Annotation::new_link(
-                    LinkAnnotation::new(rect, target),
-                    None,
-                ));
+                let target = Target::Action(Action::Link(LinkAction::new(href.clone())));
+                let annotation =
+                    Annotation::new_link(LinkAnnotation::new(rect, target), Some(href));
+                let id = page.add_tagged_annotation(annotation);
+                ids.entry(part).or_default().push(id);
             }
         }
         page.finish();
     }
+    document.set_tag_tree(tags::tag_tree(engine, &mut ids, language));
+    document.set_outline(tags::outline(engine));
     let mut metadata = Metadata::new().creator("Blank".into());
     if !info.title.is_empty() {
         metadata = metadata.title(info.title.clone());

@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use parley::Alignment;
 
-use super::{CellImage, Deco, Laid, Role, Unit};
+use super::{CellImage, Deco, Laid, Role, TableCell, Unit};
 use crate::fonts::Fonts;
 use crate::model::{CellBlock, Text};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
@@ -38,8 +38,9 @@ struct PlacedCell {
     extras: Range<usize>,
     /// its quote bars and images, from the top of its row
     decos: Vec<Deco>,
-    /// its images: their positions and places, from the top of its row
-    images: Vec<(u32, f32, f32, f32, f32)>,
+    /// its images: their positions, alt texts and places, from the top of
+    /// its row
+    images: Vec<(u32, String, f32, f32, f32, f32)>,
     /// how high its content is, with the padding
     height: f32,
 }
@@ -209,7 +210,7 @@ pub(super) fn table_units(
                                 w,
                                 h,
                             });
-                            images.push((*pos, left, y, w, h));
+                            images.push((*pos, alt.clone(), left, y, w, h));
                             y += h;
                         } else {
                             // until it is loaded: its alt text, or its src
@@ -273,7 +274,7 @@ pub(super) fn table_units(
         }
         cell.decos = cell.decos.iter().map(|deco| deco.moved(0.0, top)).collect();
         for image in &mut cell.images {
-            image.2 += top;
+            image.3 += top;
         }
     }
     let mut cell_images = vec![];
@@ -362,9 +363,9 @@ pub(super) fn table_units(
             .unwrap_or(0..0);
         // the quote bars and images of the cells, over their fills and lines
         decos.extend(group.iter().flat_map(|cell| cell.decos.iter().cloned()));
-        let group_images: Vec<(u32, f32, f32, f32, f32)> = group
+        let group_images: Vec<(u32, String, f32, f32, f32, f32)> = group
             .iter()
-            .flat_map(|cell| cell.images.iter().copied())
+            .flat_map(|cell| cell.images.iter().cloned())
             .collect();
         let header = end <= header_rows;
         let row_edges: Vec<(usize, f32, f32)> = (start..end)
@@ -379,9 +380,10 @@ pub(super) fn table_units(
             room
         };
         if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
-            for &(pos, x, y, w, h) in &group_images {
+            for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
                 cell_images.push(CellImage {
                     pos,
+                    alt,
                     unit: units.len(),
                     x,
                     y,
@@ -421,7 +423,7 @@ pub(super) fn table_units(
                         .filter(|&index| extras[index].1 == Role::Hint)
                         .flat_map(|index| line_spans(&extras[index].0)),
                 )
-                .chain(group_images.iter().map(|&(_, _, y, _, h)| (y, y + h)))
+                .chain(group_images.iter().map(|&(_, _, _, y, _, h)| (y, y + h)))
                 .collect();
             let mut from = y0;
             while from < y1 - 0.01 {
@@ -441,10 +443,11 @@ pub(super) fn table_units(
                         .fold(f32::NAN, f32::min)
                 };
                 let to = if to.is_nan() { limit } else { to };
-                for &(pos, x, y, w, h) in &group_images {
+                for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
                     if y >= from - 0.01 && y < to - 0.01 {
                         cell_images.push(CellImage {
                             pos,
+                            alt,
                             unit: units.len(),
                             x,
                             y,
@@ -476,6 +479,22 @@ pub(super) fn table_units(
         }
         start = end;
     }
+    let cells = cells
+        .iter()
+        .map(|cell| TableCell {
+            row: cell.row,
+            col: cell.col,
+            // a cell of a header row is a header cell too
+            header: cell.header || rows[cell.row].header,
+            texts: cell.texts.clone(),
+            extras: cell.extras.clone(),
+            images: cell
+                .images
+                .iter()
+                .filter_map(|image| cell_images.iter().position(|known| known.pos == image.0))
+                .collect(),
+        })
+        .collect();
     Laid {
         units,
         texts,
@@ -484,6 +503,7 @@ pub(super) fn table_units(
         columns: edges,
         extras,
         cell_images,
+        cells,
     }
 }
 

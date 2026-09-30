@@ -141,6 +141,24 @@ pub struct Laid {
     pub extras: Vec<(TextBox, Role)>,
     /// for a table: the images in its cells
     pub cell_images: Vec<CellImage>,
+    /// for a table: its cells, in the order of its rows
+    pub cells: Vec<TableCell>,
+}
+
+/// a cell of a table as laid out: where it is in the grid, and what of the
+/// table's is in it
+#[derive(Clone, Debug, PartialEq)]
+pub struct TableCell {
+    pub row: usize,
+    pub col: usize,
+    /// a header cell, or a cell of a header row
+    pub header: bool,
+    /// its text boxes, in `Laid::texts`
+    pub texts: Range<usize>,
+    /// its list markers and alt texts, in `Laid::extras`
+    pub extras: Range<usize>,
+    /// its images, in `Laid::cell_images`
+    pub images: Vec<usize>,
 }
 
 /// an image in a table's cell: its position, the unit it is drawn with,
@@ -148,6 +166,7 @@ pub struct Laid {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CellImage {
     pub pos: u32,
+    pub alt: String,
     pub unit: usize,
     pub x: f32,
     pub y: f32,
@@ -268,6 +287,7 @@ impl Laid {
             columns: vec![],
             extras: vec![],
             cell_images: vec![],
+            cells: vec![],
         }
     }
 
@@ -314,5 +334,6 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         columns: vec![],
         extras: vec![],
         cell_images: vec![],
+        cells: vec![],
     }
 }

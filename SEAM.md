@@ -155,7 +155,7 @@ The font files live once in the wasm instance, shared by reference (`Arc`) betwe
 
 ## S4: `pdf()` takes the language and reports warnings (tasks 12 and 13)
 
-Commits: `fix: write the alt text of images the PDF can't decode, and warn about them` (task 12), and task 13's, which tags the PDF (see below).
+Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and warn about them` (task 12), and `feat: tag the PDF and give it a language and bookmarks` (task 13; its hash is in the handoff message).
 
 | | old | new |
 |---|---|---|
@@ -171,3 +171,18 @@ Commits: `fix: write the alt text of images the PDF can't decode, and warn about
   - `src/engine/pdf.ts` passes the document's language, the `language` setting, as the third argument.
   - Add `JSON.parse(raw.pdfWarnings())` to the export's `warnings`, e.g. "The image cat.png couldn't be put into the PDF", next to `failureWarning(failures)`.
   - Old callers of `pdf(title, author)` still work.
+
+### Task 13: what the language and the tags give
+
+- With `language`, the PDF's catalog has `/Lang`, and so does its structure's root. Screen readers read it in that language.
+- The PDF is tagged (`pdfinfo`: "Tagged: yes"):
+  - headings `H1`–`H6` (the heading text as their title)
+  - paragraphs `P`, code blocks `P` > `Code`
+  - lists `L` (numbered when the marker ends in "."), nested by indent, of `LI` > `Lbl` (the marker) + `LBody`
+  - quotes `BlockQuote`, nested by their bars
+  - tables `Table` > `Caption`, `TR` > `TH` (header cells and the cells of header rows) / `TD` > `P` and `Figure`
+  - images `Figure` with their alt text (or src)
+  - links `Link` with the link annotation
+  - Headers, footers, rules, fills and lines are artifacts.
+- The PDF has bookmarks: one per heading, nested by level, jumping to where it starts.
+- TS side: nothing beyond passing `language` (above). There is no PDF/A: that's the owner's decision.
