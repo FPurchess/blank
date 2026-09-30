@@ -420,7 +420,17 @@ describe("page view", () => {
     await nextTick();
     const status = document.getElementById("ui-page-number")!;
     expect(status.textContent!.trim()).toMatch(/^Page 2 of \d+$/);
-    // screen readers are told the page, as they read the text, not the pages
-    expect(status.getAttribute("role")).toBe("status");
+    // screen readers are told the page, as they read the text, not the
+    // pages, in a live region that stays, and not how many there are
+    const spoken = document.getElementById("ui-page-spoken")!;
+    expect(spoken.getAttribute("role")).toBe("status");
+    expect(spoken.textContent!.trim()).toBe("Page 2");
+    pageLayoutState.value = {
+      ...pageLayoutState.value!,
+      pages: pageLayoutState.value!.pages + 1,
+    };
+    await nextTick();
+    expect(document.getElementById("ui-page-spoken")).toBe(spoken);
+    expect(spoken.textContent!.trim()).toBe("Page 2");
   });
 });

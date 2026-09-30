@@ -162,15 +162,12 @@ export const caretLine = (left: number, ratio: number) => {
 };
 
 /**
- * pageLabel returns "Page N of M" as the bar shows it: the page with the
- * number it shows, e.g. "iv" or from the number the first page starts at,
- * and how many there are
+ * pageLabel returns "Page N of M" as the bar shows it: where the caret is
+ * among the pages, counted from 1, whatever number the pages show, for
+ * finding one's way in the document
  */
-export const pageLabel = (
-  position: { page: number; pages: number },
-  layout: Layout,
-) =>
-  `Page ${formatNumber(pageNumber(layout, position.page), layout.numberStyle)} of ${position.pages}`;
+export const pageLabel = (position: { page: number; pages: number }) =>
+  `Page ${position.page} of ${position.pages}`;
 
 // a rectangle on a page, in points
 export interface PageBox {

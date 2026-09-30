@@ -229,17 +229,8 @@ describe("caretLine", () => {
 });
 
 describe("pageLabel", () => {
-  it("numbers the page as the pages are numbered", () => {
-    expect(pageLabel({ page: 2, pages: 10 }, testLayout())).toBe(
-      "Page 2 of 10",
-    );
-    expect(
-      pageLabel({ page: 4, pages: 10 }, testLayout({ numberStyle: "i" })),
-    ).toBe("Page iv of 10");
-    // the first page counts from 5; "of" counts every page, as {pages} does
-    expect(
-      pageLabel({ page: 1, pages: 3 }, testLayout({ startNumber: 5 })),
-    ).toBe("Page 5 of 3");
+  it("counts the pages from 1, whatever number they show", () => {
+    expect(pageLabel({ page: 2, pages: 10 })).toBe("Page 2 of 10");
   });
 });
 

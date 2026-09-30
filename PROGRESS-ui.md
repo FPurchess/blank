@@ -49,7 +49,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
 - [x] 7. The bitmap cache is cleared once the engine is missing (`engineMissing`) and keeps one bitmap per page layer and scale, the newest
 - [x] 8. Less work per key: the first header reads the engine only when page 1's band version changes and only in "page ends", and the overlay reads its layer before the refs
-- [ ] 9. "Page N of M": a stable live region, announcing a change of page only
+- [x] 9. "Page N of M" shows the physical position (the owner's choice); a stable, visually hidden live region (`#ui-page-spoken`) says only "Page N" when the page changes (`StatusBars.test.ts` lists it in the bar)
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
 - [ ] 11. The test gaps
 - [ ] 2. Shift + right click: the docs and comments say what each path does
