@@ -5,6 +5,7 @@ import path from "node:path";
 import { browser, $, $$, expect } from "@wdio/globals";
 
 import {
+  boxOf,
   clickText,
   doubleClickAt,
   editorText,
@@ -96,9 +97,6 @@ describe("navigation", () => {
       async () => (await $$("#editor .selectedCell").length) >= 2,
       { timeoutMsg: "Shift+↓ made no cell selection" },
     );
-    expect(
-      await $$("#page-view .page-selection").length,
-    ).toBeGreaterThanOrEqual(2);
 
     // from the middle of one cell to another
     const { rows, columns } = await browser.execute(() => {
@@ -115,6 +113,19 @@ describe("navigation", () => {
       x: Math.round((columns[column] + columns[column + 1]) / 2),
       y: Math.round((rows[row] + rows[row + 1]) / 2),
     });
+    // the pages paint it over both rows of the column
+    const painted = await browser.execute(() => {
+      const rects = [
+        ...document.querySelectorAll("#page-view .page-selection"),
+      ].map((element) => element.getBoundingClientRect());
+      return {
+        top: Math.min(...rects.map((rect) => rect.top)),
+        bottom: Math.max(...rects.map((rect) => rect.bottom)),
+      };
+    });
+    expect(painted.top).toBeLessThanOrEqual(rows[1] + 2);
+    expect(painted.bottom).toBeGreaterThanOrEqual(rows[3] - 2);
+
     await clickText("a");
     await browser
       .action("pointer")
@@ -132,20 +143,23 @@ describe("navigation", () => {
 
   it("moves a selected word where it's dragged", async () => {
     await open("move me here, then to the end.\n");
-    const word = await textBox("me");
-    await doubleClickAt(word.left + 2, (word.top + word.bottom) / 2);
-    const end = await textBox("end.", 4);
+    // the word's box: pressed in its middle, inside the selection, not on
+    // its edge
+    const word = await boxOf("me");
     const middle = (word.top + word.bottom) / 2;
+    const inside = (word.left + word.right) / 2;
+    await doubleClickAt(inside, middle);
+    // longer than a double click, so the press isn't a third click
+    await browser.pause(800);
+    const end = await textBox("end.", 4);
     const steps = 6;
     let action = browser
       .action("pointer")
-      .move({ x: Math.round(word.left + 4), y: Math.round(middle) })
+      .move({ x: Math.round(inside), y: Math.round(middle) })
       .down();
     for (let step = 1; step <= steps; step++) {
       action = action.move({
-        x: Math.round(
-          word.left + 4 + ((end.left - word.left - 4) * step) / steps,
-        ),
+        x: Math.round(inside + ((end.left - inside) * step) / steps),
         y: Math.round(middle + ((end.top - word.top) * step) / steps),
       });
     }

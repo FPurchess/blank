@@ -1321,10 +1321,11 @@ $page-end-height: 64px;
   min-height: 1.3em;
   padding: 0 24px;
 
-  // a long one stays on its line, cut short
+  // a long one stays on its line, cut short; clip rather than hidden, whose
+  // text WebKitWebDriver reads as empty
   span {
     min-width: 0;
-    overflow: hidden;
+    overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;
   }

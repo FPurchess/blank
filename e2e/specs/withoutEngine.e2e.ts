@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import { clickAt, Key, pressMod, restartApp, type } from "../helpers.ts";
 
 // Without the layout engine, e.g. when its wasm can't start, the editor shows
 // the text itself and everything but the pages keeps working. The debug
@@ -14,6 +14,18 @@ import { Key, pressMod, restartApp, type } from "../helpers.ts";
 // what the PDF export says without the engine: the constant engine-editor
 // exports for it, copied, since the e2e package doesn't load the app's code
 const NO_PDF = "The PDF export needs the page layout, which couldn't start.";
+
+// the start of the last line, which typing keeps in view, clear of the
+// header and the bars at the edges
+const lastLine = () =>
+  browser.execute(() => {
+    const lines = document.querySelectorAll("#editor > p");
+    const rect = lines[lines.length - 1].getBoundingClientRect();
+    return {
+      x: Math.round(rect.left + 10),
+      y: Math.round(rect.top + rect.height / 2),
+    };
+  });
 
 describe("without the layout engine", () => {
   let dir: string;
@@ -58,22 +70,17 @@ describe("without the layout engine", () => {
   });
 
   it("opens the context menu where it's right clicked", async () => {
-    const heading = await $("#editor h1");
-    const { x, y } = await heading.getLocation();
-    await browser
-      .action("pointer")
-      .move({ x: Math.round(x + 10), y: Math.round(y + 8), origin: "viewport" })
-      .down({ button: 2 })
-      .up({ button: 2 })
-      .perform();
+    const { x, y } = await lastLine();
+    await clickAt(x, y, 2);
     const menu = $("#context-menu");
     await expect(menu).toBeDisplayed();
-    expect(Math.abs((await menu.getLocation("x")) - (x + 10))).toBeLessThan(40);
+    expect(Math.abs((await menu.getLocation("x")) - x)).toBeLessThan(40);
     await browser.keys(Key.Escape);
   });
 
   it("shows the table toolbar in a table", async () => {
-    await $("#editor h1").click();
+    const { x, y } = await lastLine();
+    await clickAt(x, y);
     await type(Key.End);
     await type(Key.Enter);
     await pressMod("t");
