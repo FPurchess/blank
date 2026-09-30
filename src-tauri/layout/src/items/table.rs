@@ -510,6 +510,7 @@ pub(super) fn table_units(
         extras,
         cell_images,
         cells,
+        missing: vec![],
     }
 }
 

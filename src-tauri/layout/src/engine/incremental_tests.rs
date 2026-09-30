@@ -494,6 +494,18 @@ fn incremental_equals_full() {
             }
             // only the new items were laid out
             assert_eq!(engine.stats.laid_out, count, "{context}");
+            // and what no font has is counted as they come and go (in the
+            // order the characters came, which after edits isn't the
+            // document's)
+            let sorted = |mut chars: Vec<char>| {
+                chars.sort();
+                chars
+            };
+            assert_eq!(
+                sorted(engine.missing()),
+                sorted(fresh.missing()),
+                "{context}"
+            );
 
             // the pages are what a fresh layout gives
             if let Some(at) = (0..engine.frags.len().max(fresh.frags.len()))
