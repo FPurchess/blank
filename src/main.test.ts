@@ -9,7 +9,8 @@ import { bootConfig } from "./config";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
-import { bootEngine } from "./engine/engine";
+import { bootEngine, exposeEngineHooks } from "./engine/engine";
+import { exposeGeometry } from "./engine/geometry";
 import { deferred, flushPromises } from "./test/async";
 import { createTestHandle, doc, p } from "./test/editor";
 import { mockCliArgs } from "./test/tauri";
@@ -20,6 +21,7 @@ vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
 vi.mock("./engine/engine", () => ({
   bootEngine: vi.fn(),
+  exposeEngineHooks: vi.fn(),
   useFallbackEditor: () => document.body.classList.add("without-engine"),
 }));
 vi.mock("./engine/geometry", () => ({ exposeGeometry: vi.fn() }));
@@ -106,6 +108,41 @@ describe("main", () => {
     expect(message?.querySelector("b")).toBeNull();
     expect(bootUI).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith("failed to start Blank", error);
+  });
+
+  it("publishes the test hooks in development", async () => {
+    await importMain();
+    await flushPromises();
+
+    expect(exposeGeometry).toHaveBeenCalledWith(editor.view);
+    expect(exposeEngineHooks).toHaveBeenCalled();
+    expect("blankPageViewPerf" in window).toBe(true);
+  });
+
+  it("publishes no test hooks in a release build", async () => {
+    vi.stubEnv("DEV", false);
+    vi.stubGlobal("__TEST_HOOKS__", false);
+    delete (window as { blankPageViewPerf?: unknown }).blankPageViewPerf;
+
+    await importMain();
+    await flushPromises();
+
+    expect(bootUI).toHaveBeenCalled();
+    expect(exposeGeometry).not.toHaveBeenCalled();
+    expect(exposeEngineHooks).not.toHaveBeenCalled();
+    expect("blankPageViewPerf" in window).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it("publishes them in the debug build the E2E tests run", async () => {
+    vi.stubEnv("DEV", false);
+    vi.stubGlobal("__TEST_HOOKS__", true);
+
+    await importMain();
+    await flushPromises();
+
+    expect(exposeGeometry).toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 
   it("shows a non-Error rejection as text", async () => {

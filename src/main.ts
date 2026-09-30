@@ -4,9 +4,13 @@ import { bootConfig } from "./config";
 import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
-import { bootEngine, useFallbackEditor } from "./engine/engine";
+import {
+  bootEngine,
+  exposeEngineHooks,
+  useFallbackEditor,
+} from "./engine/engine";
 import { exposeGeometry } from "./engine/geometry";
-import { bootMark } from "./engine/perf";
+import { bootMark, exposePerf } from "./engine/perf";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
@@ -31,10 +35,18 @@ const showBootError = (error: unknown) => {
   document.body.appendChild(message);
 };
 
+// the hooks E2E tests measure and break the page view with, in `bun run
+// dev` and the debug builds they run
+const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
+
 (async () => {
   let editorReady = false;
   try {
     bootMark("start");
+    if (testHooks) {
+      exposePerf();
+      exposeEngineHooks();
+    }
     // the page view's layout engine loads while the rest boots; the editor
     // lays out its document once it's there. Without it, the editor shows
     // the text itself.
@@ -56,7 +68,7 @@ const showBootError = (error: unknown) => {
     const editor = await bootEditor();
     bootMark("editor");
     editorReady = true;
-    exposeGeometry(editor.view);
+    if (testHooks) exposeGeometry(editor.view);
     bootUI(editor);
     bootMark("ui");
     // doesn't wait for the dictionary, which may need a download

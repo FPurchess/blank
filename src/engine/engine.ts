@@ -980,6 +980,16 @@ const switchedOff = () => {
 };
 
 /**
+ * exposeEngineHooks lets E2E tests break the page view's engine, through
+ * `window.blankBreakEngine()`: its next call fails, as if the wasm trapped
+ */
+export const exposeEngineHooks = () => {
+  Object.assign(window, {
+    blankBreakEngine: () => pageEngine?.breakForTest(),
+  });
+};
+
+/**
  * setPageEngine sets the page view's engine, e.g. in tests
  */
 export const setPageEngine = (engine: PageEngine | null) => {

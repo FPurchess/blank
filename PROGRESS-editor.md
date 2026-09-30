@@ -22,7 +22,7 @@ deletes this file on merge.
 - [x] 13. Page setup and field watchers lay out on the new state
 - [x] 14. `frozen` is reset with the plugin view
 - [ ] 15. Share the fonts between engines — waiting for S3
-- [ ] 16. Test hooks only in dev and E2E builds
+- [x] 16. Test hooks only in dev and E2E builds
 - [ ] 17. Dead code, and a parity test of the bands
 - [ ] 18. Table handles measure only the tables under the pointer
 - [ ] 19. The Word export's font loader recovers from a failed fetch
@@ -88,6 +88,15 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   word for word) holds where it would drop; please paint it. A drag moves
   the text, and copies it with Ctrl (Option on macOS), as ProseMirror does.
   The E2E for it is yours (task 16).
+
+- engine-release, engine-ui (test hooks): `window.blankGeometry`,
+  `blankPageViewPerf`, `blankBootTimes` and the new `blankBreakEngine()` are
+  published only in `bun run dev` and in debug builds:
+  `import.meta.env.DEV || __TEST_HOOKS__`, where `vite.config.ts` defines
+  `__TEST_HOOKS__` from `TAURI_ENV_DEBUG`, which the Tauri CLI sets for
+  `tauri build --debug` (the E2E build). `blankBreakEngine()` makes the page
+  engine's next call fail as if the wasm trapped. `blank.engine=off` is not
+  gated.
 
 ## Measurements
 
