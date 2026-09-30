@@ -24,7 +24,8 @@ import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
 import { flushPromises } from "../test/async";
 import { engineInstanceBroken, forgetEngineFailure } from "./engine";
-import toPDF, { sizesOf } from "./pdf";
+import toPDF, { describeWarnings, pdfLanguage, sizesOf } from "./pdf";
+import { language } from "../state";
 import { prepareImages } from "../images/prepare";
 import { documentFields } from "../layout/bands";
 import { pageGeometry } from "../layout/resolve";
@@ -222,9 +223,13 @@ describe("the PDF export after the engine trapped", () => {
 
   it("goes straight to the worker once the instance is broken", async () => {
     vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    language.value = "de-CH";
     await exportIt();
     await exportIt();
+    language.value = "en";
     expect(jobs).toHaveLength(2);
+    // with the document's language, as the page view's engine gets it
+    expect(jobs[1].language).toBe("de-CH");
   });
 
   it("tells the user when the worker fails too", async () => {
@@ -411,5 +416,83 @@ describe("the PDF's fonts, shared with the page view", () => {
     store.forEach((file, index) =>
       expect(file.bytes.length).toBe(job[index].bytes.length),
     );
+  });
+});
+
+describe("the PDF's language", () => {
+  afterEach(() => (language.value = "en"));
+
+  it("is the language setting, as a BCP 47 tag", () => {
+    language.value = "de-CH";
+    expect(pdfLanguage()).toBe("de-CH");
+    language.value = "fr";
+    expect(pdfLanguage()).toBe("fr");
+  });
+
+  it("is none for what isn't a language tag", () => {
+    for (const value of ["", "  ", "not a tag", "de_CH"]) {
+      language.value = value;
+      expect(pdfLanguage()).toBeUndefined();
+    }
+  });
+
+  it("is written into the PDF", async () => {
+    testEngine();
+    language.value = "de-CH";
+    const doc = parseMarkdown("Grüezi\n");
+    const { contents } = await toPDF(EditorState.create({ schema, doc }), {
+      docPath: null,
+      layout: testLayout(),
+    });
+    expect(new TextDecoder("latin1").decode(contents)).toMatch(
+      /\/Lang\s*\(de-CH\)/,
+    );
+  });
+});
+
+describe("the PDF's warnings", () => {
+  it("tell in plain words what the PDF left out", () => {
+    expect(describeWarnings([])).toEqual([]);
+    expect(describeWarnings([{ kind: "image", src: "cat.png" }])).toEqual([
+      "1 image couldn't be read and shows its alt text: cat.png",
+    ]);
+    expect(
+      describeWarnings([
+        { kind: "image", src: "cat.png" },
+        { kind: "image", src: "dog.png" },
+        { kind: "font", font: 20, family: "Noto Sans CJK SC" },
+      ]),
+    ).toEqual([
+      "2 images couldn't be read and show their alt text: cat.png, dog.png",
+      "1 font couldn't be embedded, so its text is left out: Noto Sans CJK SC",
+    ]);
+    expect(
+      describeWarnings([
+        { kind: "font", font: 1, family: "" },
+        { kind: "font", font: 20, family: "Noto Sans CJK SC" },
+      ]),
+    ).toEqual([
+      "2 fonts couldn't be embedded, so their text is left out: one of Blank's fonts, Noto Sans CJK SC",
+    ]);
+  });
+
+  it("come with the export of an image the engine can't decode", async () => {
+    testEngine();
+    // a PNG whose header is fine, but whose pixels are broken
+    const bytes = Uint8Array.from(atob(IMAGES.png), (c) => c.charCodeAt(0));
+    const idat = bytes.findIndex(
+      (_, index) =>
+        String.fromCharCode(...bytes.slice(index, index + 4)) === "IDAT",
+    );
+    for (let index = idat + 4; index < idat + 14; index++) bytes[index] ^= 0xff;
+    const src = `data:image/png;base64,${btoa(String.fromCharCode(...bytes))}`;
+    const doc = parseMarkdown(`![a broken dot](${src})\n`);
+    const { warnings } = await toPDF(EditorState.create({ schema, doc }), {
+      docPath: null,
+      layout: testLayout(),
+    });
+    expect(warnings).toEqual([
+      "1 image couldn't be read and shows its alt text: a broken dot",
+    ]);
   });
 });
