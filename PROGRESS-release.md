@@ -7,7 +7,7 @@
 - [x] 5. skip system fonts whose licence forbids embedding
 - [x] 3b. (from the integrator) the `test` job installs `fonts-noto-cjk`, and exact.test.ts fails on CI without it instead of laying the Chinese out without a font. e2e.yml doesn't need it: pageEngine.e2e.ts only takes a screenshot of the Chinese.
 - [x] 6. `fallback_fonts` off the main thread
-- [ ] 7. system fallback for Common-script characters
+- [x] 7. system fallback for Common-script characters
 - [ ] 8. third-party notices and all font licences ship
 - [ ] 9. CI time and caching
 - [ ] 10. CLAUDE.md and the rules
@@ -20,3 +20,4 @@
 - `make release` runs `scripts/check-engine-ci.sh` on origin/main. Tested: it fails on dfe99a8 ("hasn't run") and on 157bd00 ("ended with failure"). No commit has a passing `engine` run yet, so the pass path is untested against GitHub.
 - Why the `engine` check failed at 157bd00: with the `rust-src` component installed (as locally), rustc names std's files by their path in it, which the old script mapped to `/rust/lib/rustlib/src/rust/library/…`. On CI (minimal profile, no `rust-src`) they stay `/rustc/<commit>/library/…`, so the wasm grew by 83 bytes. `build-engine.sh` now maps the rust-src path to `/rustc/<commit>`. Checked: the default toolchain with rust-src, and a 1.98.1 toolchain without it plus an outside `CARGO_TARGET_DIR`, build byte-identical files, 3138904 bytes like CI's. The committed wasm (3138821 bytes) needs one rebuild at integration.
 - Task 3: the exact.rs guard is in `read_words` (approved), which covers both comparisons; `:253` dropped the `None` silently before.
+- Task 7: characters of no script (Zyyy, Zinh, Zzzz; not whitespace, control or private use) are looked up by the families whose regular font maps them: the math family first, then sans-serif, then all by name. On this machine 𝐀 finds DejaVu Math TeX Gyre. Worst case, a character no font has: about 1 s across 1812 families, on the blocking thread, once per character (fallback.ts never asks twice).
