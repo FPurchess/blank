@@ -6,7 +6,7 @@ deletes this file on merge.
 ## Tasks
 
 - [x] 1. An engine error never blocks boot or breaks editing (B2, JS side)
-- [ ] B. `blank.engine=off` starts Blank without the engine
+- [x] B. `blank.engine=off` starts Blank without the engine
 - [ ] 2. Without the engine, a fully usable plain editor (B3)
 - [ ] A. `HEADER_ROOM` above the first page's header in "page ends"
 - [ ] 3. ↑/↓ and End keep the line affinity — waiting for S1
@@ -42,3 +42,6 @@ deletes this file on merge.
   instance per module and `initSync` does nothing once it has one.
 - engine-core: the worker needs the font bytes (base files and fallbacks);
   S3 must keep them obtainable (`fontFile(i)`), see task 15.
+- engine-ui: `localStorage.setItem("blank.engine", "off")` before a start
+  (read in `bootEngine`, in a try/catch) starts Blank without loading the
+  wasm; `engineStatus()` is then "off", the same fallback as "unavailable".

@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
 import { doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
-import { settingsOf } from "./engine";
+import {
+  bootEngine,
+  engineless,
+  engineStatus,
+  forgetEngineFailure,
+  pageEngine,
+  settingsOf,
+} from "./engine";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
@@ -132,5 +139,41 @@ describe("PageEngine", () => {
       numberStyle: "1",
     });
     expect(settings.width).toBeCloseTo(595.28, 1);
+  });
+});
+
+describe("bootEngine", () => {
+  afterEach(() => {
+    localStorage.removeItem("blank.engine");
+    forgetEngineFailure();
+  });
+
+  it("starts Blank as a plain editor when the engine is switched off", async () => {
+    localStorage.setItem("blank.engine", "off");
+    const fetching = vi.fn();
+    vi.stubGlobal("fetch", fetching);
+
+    expect(await bootEngine()).toBeNull();
+
+    expect(fetching).not.toHaveBeenCalled();
+    expect(pageEngine).toBeNull();
+    expect(engineless()).toBe(true);
+    expect(engineStatus()).toBe("off");
+    expect(document.body.classList).toContain("without-engine");
+  });
+
+  it("loads the engine when the storage can't be read", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    const fetching = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    vi.stubGlobal("fetch", fetching);
+
+    await expect(bootEngine()).rejects.toThrow("offline");
+
+    expect(fetching).toHaveBeenCalled();
+    expect(engineStatus()).toBe("ready");
   });
 });

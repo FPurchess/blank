@@ -617,8 +617,26 @@ export const pageEngineReady = shallowRef<PageEngine | null>(null);
  * the rest boots; the editor lays out its document once it's there.
  */
 export const bootEngine = async () => {
+  if (switchedOff()) {
+    useFallbackEditor("off");
+    bootMark("engine off");
+    return null;
+  }
   setPageEngine(await loadEngine());
   return pageEngine;
+};
+
+/**
+ * switchedOff tells whether the user switched the engine off, with
+ * `localStorage.setItem("blank.engine", "off")` in the webview's console,
+ * e.g. to use Blank as a plain editor if the engine misbehaves
+ */
+const switchedOff = () => {
+  try {
+    return localStorage.getItem("blank.engine") === "off";
+  } catch {
+    return false;
+  }
 };
 
 /**
