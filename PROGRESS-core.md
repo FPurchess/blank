@@ -20,7 +20,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 15. Fallback families as a list, not CSS
 - [x] 16. Waste in `page_ops` and per keystroke
 - [x] 17. Dead and test-only code
-- [ ] 18. The exactness tests prove more
+- [x] 18. The exactness tests prove more
 
 ## Notes
 
@@ -272,6 +272,20 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - The only aligned pair is Parley 0.10.0 with krilla 0.8.2. It built with no code change and passed every cargo test, and the raw wasm shrank from 4.29 to 3.97 MB (−316 KB, about 7%).
   - Decision, with the coordinator: stay on Parley 0.11, since a current shaper (harfrust 0.12, fontique 0.11) is worth more in a major release. Align once krilla depends on skrifa 0.44 or newer. The comment next to the dependencies in `Cargo.toml` says so.
 - clippy on wasm32 is clean. `--all-targets` has only the `type_complexity` warning in `tests/exact.rs` `read_words`, which is engine-release's to change.
+
+### Task 18: the exactness sample
+
+- `sample()` has, after its chapters (`more_of_the_sample`):
+  - a table of three columns with two header rows, widths and a caption
+  - a code block
+  - a paragraph with NFD marks (`cafe\u{301}`, `cre\u{300}me bru\u{302}le\u{301}e`)
+  - an image, a red pixel handed over as `ImageData` (`sample_images`). `compare` writes the PDF with it: one line changed, from `Default::default()`.
+- `the_pdf_holds_the_layout` and `…_on_other_paper` check every word of that on the page, line and spot it was laid out. `pdfimages` lists the embedded pixel.
+- Not in the sample:
+  - Arabic: pdftotext turns the characters of one right-to-left glyph around (see "Known quirks"), so its words can't match word for word. `pdf_text_keeps_marks_and_ligatures` checks Arabic and Hebrew by their characters.
+  - Quotes (`"` and `'`) in the text: pdftotext writes them as entities, which `read_words` doesn't read back. I left `read_words` alone, since engine-release changes it.
+- `read_words` and the skip guard are untouched.
+- `exact.rs` has 6 tests: the sample on two papers, cell blocks, marks and ligatures, what no font has, and the tagged PDF.
 
 ### Known quirks (of other tools, not of the PDF)
 
