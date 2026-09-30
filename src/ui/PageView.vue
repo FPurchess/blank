@@ -355,7 +355,7 @@ const dropsText = (event: DragEvent) =>
 const onDragOver = (event: DragEvent) => {
   if (!dropsText(event)) return;
   event.preventDefault();
-  showDropAt(editor.view, pointerAt(event).pos);
+  showDropAt(editor.view, pointerAt(event).pos, false);
 };
 const onDrop = (event: DragEvent) => {
   showDropAt(editor.view, null);

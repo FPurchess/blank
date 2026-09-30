@@ -134,14 +134,21 @@ export const dragCopies = (event: { altKey: boolean; ctrlKey: boolean }) =>
 /**
  * showDropAt shows where the dragged selection would drop, or nothing for
  * null
+ * @param own false for text dragged from another app, which drops where it
+ *   is let go, as a paste there
  */
-export const showDropAt = (view: EditorView, pos: number | null) => {
+export const showDropAt = (
+  view: EditorView,
+  pos: number | null,
+  own = true,
+) => {
   if (pos === null) {
     pageDropCaret.value = null;
     return;
   }
-  const at =
-    dropPoint(view.state.doc, pos, view.state.selection.content()) ?? pos;
+  const at = own
+    ? (dropPoint(view.state.doc, pos, view.state.selection.content()) ?? pos)
+    : pos;
   pageDropCaret.value = pageEngine?.caret(at) ?? null;
 };
 
