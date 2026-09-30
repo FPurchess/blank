@@ -1,7 +1,12 @@
+import { joinBackward, lift, splitBlock, wrapIn } from "prosemirror-commands";
+import { history, redo, undo } from "prosemirror-history";
+import { sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
+  type Command,
   EditorState,
   NodeSelection,
   type Plugin,
+  Selection,
   TextSelection,
 } from "prosemirror-state";
 import { CellSelection, tableEditing, TableMap } from "prosemirror-tables";
@@ -11,6 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  pageFields,
+  pageLayout,
   path,
   transaction,
   pageCaret,
@@ -21,9 +28,12 @@ import {
   pageSelection,
 } from "../../state";
 import {
+  blockquote,
   doc,
   docWithFrontmatter,
   h,
+  li,
+  ul,
   keyEvent,
   p,
   table,
@@ -35,7 +45,7 @@ import {
   forgetEngineFailure,
   pageEngine,
 } from "../../engine/engine";
-import { hidePages, showPages } from "../../test/engine";
+import { hidePages, showPages, testEngine } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
 import { forgetImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
@@ -626,4 +636,107 @@ describe("the line a caret is on", () => {
     mounted.view.dispatch(mounted.view.state.tr.insertText("x"));
     expect(pageViewKey.getState(mounted.view.state)?.after).toBeFalsy();
   });
+});
+
+describe("the pages after many real edits", () => {
+  // a seeded random number generator (mulberry32), so a failure repeats
+  const random = (seed: number) => () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const start = () =>
+    doc(
+      h(1, "Title"),
+      p("First paragraph with some words in it"),
+      blockquote(p("quoted"), p("more quoted")),
+      ul(li(p("one")), li(p("two"))),
+      h(2, "Section"),
+      table(tr(td("a"), td("b")), tr(td("c"), td("d"))),
+      p("Last paragraph"),
+    );
+
+  afterEach(() => hidePages());
+
+  it(
+    "are what a fresh layout gives, with every caret",
+    { timeout: 180_000 },
+    () => {
+      const engine = showPages();
+      const view = new EditorView(document.createElement("div"), {
+        state: EditorState.create({
+          schema,
+          doc: start(),
+          plugins: [pageSync(), pageView(), history()],
+        }),
+      });
+      const next = random(930);
+      const run = (command: Command) => command(view.state, view.dispatch);
+      const select = () =>
+        view.dispatch(
+          view.state.tr.setSelection(
+            Selection.near(
+              view.state.doc.resolve(
+                Math.floor(next() * view.state.doc.content.size),
+              ),
+            ),
+          ),
+        );
+      const edits: (() => void)[] = [
+        () => (select(), view.dispatch(view.state.tr.insertText("typed "))),
+        () => (select(), run(splitBlock)),
+        () => {
+          select();
+          const { $head } = view.state.selection;
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.create(view.state.doc, $head.start()),
+            ),
+          );
+          run(joinBackward);
+        },
+        () => (select(), run(wrapIn(schema.nodes.blockquote))),
+        () => (select(), run(lift)),
+        () => (select(), run(wrapInList(schema.nodes.bullet_list))),
+        () => (select(), run(sinkListItem(schema.nodes.list_item))),
+        () => run(undo),
+        () => run(redo),
+      ];
+
+      // the same as a fresh engine lays out, with the caret at every place
+      const expectFresh = (step: number) => {
+        // out of a table, whose widths are kept while the cursor is in it
+        view.dispatch(
+          view.state.tr.setSelection(Selection.atStart(view.state.doc)),
+        );
+        const fresh = testEngine();
+        fresh.setSettings(pageLayout.value.layout, pageFields.value);
+        fresh.sync(view.state.doc, () => undefined);
+        expect(engine.pages(), `after ${step}`).toBe(fresh.pages());
+        const ours = engine.versions();
+        const theirs = fresh.versions();
+        for (let page = 0; page < fresh.pages(); page++)
+          expect(engine.display(page, ours[page]), `after ${step}`).toEqual(
+            fresh.display(page, theirs[page]),
+          );
+        for (let pos = 0; pos <= view.state.doc.content.size; pos++)
+          for (const after of [false, true])
+            expect(engine.caret(pos, after), `after ${step} at ${pos}`).toEqual(
+              fresh.caret(pos, after),
+            );
+        fresh.free();
+      };
+
+      for (let step = 1; step <= 300; step++) {
+        // another document now and then, as opening one does
+        if (step % 100 === 0)
+          view.updateState(applyDocument(view.state, start()));
+        else edits[Math.floor(next() * edits.length)]();
+        expectFresh(step);
+      }
+      view.destroy();
+    },
+  );
 });
