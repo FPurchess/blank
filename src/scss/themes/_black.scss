@@ -6,6 +6,11 @@
   // and dimmed while the editor hasn't the focus
   --selection-color: #4e607d;
   --selection-inactive-color: #384459;
+  // the desk the sheets of "pages" lie on, a shade darker the paper, and the
+  // sheets' edge and shadow, in black
+  --desk-color: #000000;
+  --sheet-edge: rgba(0, 0, 0, 0.45);
+  --sheet-shadow: rgba(0, 0, 0, 0.3);
   --color-inverted: #0a0a0f;
   --background-inverted: #f4f4f2;
   --font-family:

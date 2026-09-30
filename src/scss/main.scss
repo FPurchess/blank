@@ -1266,12 +1266,8 @@ body.without-engine {
   user-select: none;
 
   &.pages {
-    // a calm desk, a shade off the paper
-    background-color: color-mix(
-      in srgb,
-      var(--color) 7%,
-      var(--background-color)
-    );
+    // a calm desk, a shade off the paper, darker in dark themes
+    background-color: var(--desk-color);
   }
 }
 
@@ -1287,15 +1283,15 @@ body.without-engine {
 }
 
 // the paper of a sheet in "pages", under the selection and the text, which
-// its frame paints over it. An edge and a solid shadow without blur: a
-// blurred one made the compositor redraw it on every step of a scroll (see
-// SPIKE.md)
+// its frame paints over it. An edge and a solid shadow without blur, in
+// black, so dark themes don't glow: a blurred one made the compositor redraw
+// it on every step of a scroll (see .claude/rules/layout-engine.md)
 .page-sheet {
   position: absolute;
   background-color: var(--background-color);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color) 10%, transparent),
-    0 2px 0 1px color-mix(in srgb, var(--color) 6%, transparent);
+    0 0 0 1px var(--sheet-edge),
+    0 2px 0 1px var(--sheet-shadow);
 }
 
 .page-canvas {

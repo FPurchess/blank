@@ -4,7 +4,15 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type, waitForInk } from "../helpers.ts";
+import {
+  Key,
+  luminance,
+  pressMod,
+  restartApp,
+  screenStats,
+  type,
+  waitForInk,
+} from "../helpers.ts";
 
 // The page view the layout engine paints: typing and clicking on the
 // painted pages, both views, "Page N of M", and how long it all takes.
@@ -305,6 +313,49 @@ describe("page view", () => {
         path.join(SHOTS, `engine-theme-${theme}.png`),
       );
     }
+    // on the sheets, the desk is a shade darker than the paper in every
+    // theme, dark ones too
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    for (let index = 0; index < 6; index++) {
+      await pressMod(Key.Alt, "t");
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      const theme = await browser.execute(() => document.body.dataset.theme);
+      const sheet = await browser.execute(() =>
+        document
+          .querySelector("#page-view .page-sheet")!
+          .getBoundingClientRect()
+          .toJSON(),
+      );
+      // a spot of the sheet in the window, below its top margin's header
+      const middle = Math.round(
+        Math.min(Math.max(sheet.top + 120, 120), sheet.bottom - 80, 480),
+      );
+      const desk = await screenStats({
+        left: 2,
+        right: Math.max(4, sheet.left - 4),
+        top: middle,
+        bottom: middle + 40,
+      });
+      // the margin left of the text
+      const paper = await screenStats({
+        left: sheet.left + 8,
+        right: sheet.left + 40,
+        top: middle,
+        bottom: middle + 40,
+      });
+      if (!(luminance(desk.background) < luminance(paper.background)))
+        throw new Error(
+          `in ${theme} the desk ${desk.background} isn't darker than the paper ${paper.background}`,
+        );
+      await browser.saveScreenshot(
+        path.join(SHOTS, `engine-sheets-${theme}.png`),
+      );
+    }
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
     // the summary opens the page setup
     await $("#page-view .doc-properties").click();
     await expect($("#page-setup")).toBeDisplayed();

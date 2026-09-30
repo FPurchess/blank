@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { themes } from "../state/appearance";
 import {
   contrast,
+  luminance,
   mix,
   parseColor,
   scssNumber,
@@ -50,6 +51,21 @@ describe("the faint text beside the pages", () => {
     expect(
       contrast(mix(text, background, opacity), background),
     ).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("the desk and the sheets", () => {
+  it.each(themes)("shade the desk and cast black shadows in %s", (theme) => {
+    const { variables, background, color } = colorsOf(theme);
+    // a shade off the paper; in dark themes darker, not lighter
+    expect(luminance(color("desk-color"))).toBeLessThan(luminance(background));
+    for (const name of ["sheet-edge", "sheet-shadow"]) {
+      const [r, g, b] = /rgba\((\d+), (\d+), (\d+),/
+        .exec(variables[name])!
+        .slice(1)
+        .map(Number);
+      expect([r, g, b]).toEqual([0, 0, 0]);
+    }
   });
 });
 
