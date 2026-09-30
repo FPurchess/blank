@@ -307,7 +307,7 @@ impl TextBox {
         if self.empty() {
             return self.pos;
         }
-        self.pos + utf16_of_byte(&self.text, byte)
+        self.pos.saturating_add(utf16_of_byte(&self.text, byte))
     }
 
     /// where the cursor stands at a position: its line and rectangle in the

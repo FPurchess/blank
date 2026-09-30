@@ -5,7 +5,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 0. Split `engine.rs` into `engine/` and `items.rs` into `items/`, as a pure move
 - [x] 1. B1: incremental re-layout equals a full layout
 - [x] 2. S6: changed page ranges, body and band versions, `updateMany`
-- [ ] 3. B2 / S5: no panic from JS input
+- [x] 3. B2 / S5: no panic from JS input
 - [ ] 4. B4 / S1: line affinity for ↑/↓ and End
 - [ ] 5. Up/Down through the paragraphs of a cell, and past a table's caption
 - [ ] 6. A page break near the bottom makes no blank page
@@ -83,6 +83,19 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
     - `a_new_font_changes_every_body`
     - `splices_runs_of_items`
   - Mutation checks: ignoring out-of-order entries, and keeping band versions whose texts changed, each fail it.
+
+### Task 3: B2 / S5
+
+- Every check sits in native code so cargo can test it: `fonts::split_files`, `Settings::sanitize`, `Item::sanitize`, `read_start_number`, `items::table::place` (`MAX_COLUMNS`) and `bands::format_number` (`LARGEST_ROMAN`). `wasm.rs` only calls them. `wasm.rs` is wasm32-only, so its methods can't run under cargo test.
+- The engine sanitizes in `set_settings`, `set_items` and `update_many`, so every entry point is covered.
+- The unwraps and indexing that input could reach are gone: `Paginator::place`, `vertical`, `box_near` and the list marker's baseline.
+- What stays is indexing by construction:
+  - every `Laid` has at least one unit (`lay_out`)
+  - the table's `edges`/`tops` start with one entry
+  - a text box always has a line (an empty one lays out a space)
+  - `text_layer::lines` checks `first()` before `last()`
+- Positions near `u32::MAX` add with `saturating_add` (`Item::to`, `TextBox::pos_of`, `selection`).
+- `boundary_tests.rs`: start numbers, huge roman numbers, a page out of range, items with infinite numbers, merged cells at `u32::MAX`, and every query with out-of-range and non-finite arguments on an empty engine and one with a table. `fonts::tests` checks the font lengths, and `bands::tests` the roman limit.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 

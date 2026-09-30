@@ -16,7 +16,7 @@ Not a seam change: task 0 (`refactor: split the layout engine into modules by co
 
 ## S6: changed page ranges, body and band versions, `updateMany` (task 2)
 
-Commit: `feat: report which pages changed and version bodies and bands apart` (hash: see the handoff message and `git log --grep "version bodies and bands"`).
+Commit: e9f8ef2 `feat: report which pages changed and version bodies and bands apart`.
 
 Everything is additive, so the old TS code keeps working with the new wasm.
 
@@ -47,3 +47,27 @@ Everything is additive, so the old TS code keeps working with the new wasm.
   - Repaint a page's body layer when `bodyVersions()[i]` changes, and its band layer when `bandVersions()[i]` changes. Paint them from `pageBody`/`pageBands`.
   - Use the returned ranges instead of comparing all versions.
   - Batch several steps with `updateMany` if the step-map approach needs it.
+
+## S5: the engine validates and clamps what it's handed (task 3)
+
+Commit: `fix: validate what the webview hands the layout engine and never panic on it` (its hash is in the next section's commit, or `git log --grep "never panic on it"`).
+
+The shapes don't change. What changes is how odd values behave:
+
+| input | before | now |
+|---|---|---|
+| `new LayoutEngine(bytes, lengths)` with lengths past `bytes` | trap | throws an `Error` (the constructor returns a Result) |
+| `startNumber` | an `i32`: `3000000000` made `setSettings` throw | any JSON number: truncated and clamped to ±1 000 000 000 (`START_NUMBER_LIMIT`). Only a non-number still throws |
+| `numberStyle` other than `1`, `i`, `I` | roman | arabic (`1`) |
+| roman page numbers above 3999 | one "m" per thousand (seconds per page) | arabic |
+| `width`, `height` | as given | clamped to 36–14400 pt; not finite → A4's |
+| margins | as given | not finite → 0, clamped to ≥ 0; opposite margins shrink proportionally until 36 pt are left for the text |
+| item `indent`, `before`, `after`, `bars` | as given | not finite → 0, negative → 0 |
+| image `width`/`height` not finite or negative | laid out with them | the image counts as not loaded (its alt text shows) |
+| table `widths` | as given | not finite or negative → 0 |
+| cell `col`/`colspan` | `u32::MAX` overflowed or allocated the grid | the grid has at most 1000 columns (`MAX_COLUMNS`) |
+| `hit`, `word`, `vertical` with a non-finite x, y or goal | undefined | `[]` (nothing) |
+| any position or page out of range | mostly nothing, some panics | nothing (empty arrays, `-1` for `lineEdge`) |
+
+- A panic hook writes any panic that is left to `console.error` ("the layout engine panicked: …") before the instance traps, so a trap is never silent.
+- TS side: nothing is required. Code that catches `setSettings` errors for big start numbers can drop that. The frontmatter reader may keep its own checks: the engine clamps anyway.

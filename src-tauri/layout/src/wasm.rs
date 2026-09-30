@@ -7,7 +7,7 @@ use std::fmt::Write;
 use wasm_bindgen::prelude::*;
 
 use crate::engine::{Changes, Engine, Hit, Op};
-use crate::fonts::Fonts;
+use crate::fonts::{split_files, Fonts};
 use crate::model::{Item, Settings};
 use crate::pdf::{self, ImageData, Info};
 
@@ -15,6 +15,23 @@ use crate::pdf::{self, ImageData, Info};
 pub struct LayoutEngine {
     engine: Engine,
     images: HashMap<String, ImageData>,
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// writes a panic to the console before the instance traps: with `panic =
+/// "abort"` it would trap without a word, and every later call would throw
+fn report_panics() {
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            console_error(&format!("the layout engine panicked: {info}"));
+        }));
+    });
 }
 
 fn error(message: impl std::fmt::Display) -> JsError {
@@ -114,20 +131,16 @@ fn string(out: &mut String, value: &str) {
 
 #[wasm_bindgen]
 impl LayoutEngine {
-    /// the fonts' files one after the other, with their lengths
+    /// the fonts' files one after the other, with their lengths; throws if
+    /// the lengths reach past the bytes
     #[wasm_bindgen(constructor)]
-    pub fn new(bytes: &[u8], lengths: &[u32]) -> LayoutEngine {
-        let mut files = vec![];
-        let mut start = 0usize;
-        for length in lengths {
-            let end = start + *length as usize;
-            files.push(bytes[start..end].to_vec());
-            start = end;
-        }
-        LayoutEngine {
+    pub fn new(bytes: &[u8], lengths: &[u32]) -> Result<LayoutEngine, JsError> {
+        report_panics();
+        let files = split_files(bytes, lengths).map_err(error)?;
+        Ok(LayoutEngine {
             engine: Engine::new(Fonts::new(files)),
             images: HashMap::new(),
-        }
+        })
     }
 
     /// sets the page; the pages that changed, as `update` gives them

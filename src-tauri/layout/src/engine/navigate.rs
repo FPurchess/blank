@@ -181,8 +181,10 @@ impl Engine {
         let (index, _) = best?;
         let boxed = &texts[index];
         let mut local_y = item_y - boxed.y;
-        if let Some(line) = unit.line {
-            let info = &boxed.lines()[line];
+        if let Some(info) = unit
+            .line
+            .and_then(|line| boxed.lines().into_iter().nth(line))
+        {
             local_y = local_y.clamp(info.top + 0.5, info.bottom - 0.5);
         }
         Some((frag.item, index, item_x - boxed.x, local_y))
@@ -190,6 +192,9 @@ impl Engine {
 
     /// the position at a point of a page
     pub fn hit(&self, page: usize, x: f32, y: f32) -> Option<Hit> {
+        if !(x.is_finite() && y.is_finite()) {
+            return None;
+        }
         let frag_index = self.frag_near(page, y)?;
         let frag = self.frags[frag_index];
         match self.box_near(frag_index, x, y) {
@@ -200,6 +205,9 @@ impl Engine {
 
     /// the word at a point of a page
     pub fn word(&self, page: usize, x: f32, y: f32) -> Option<(u32, u32)> {
+        if !(x.is_finite() && y.is_finite()) {
+            return None;
+        }
         let frag_index = self.frag_near(page, y)?;
         let (item, text, x, y) = self.box_near(frag_index, x, y)?;
         Some(self.laid[item].texts[text].word(x, y))
@@ -208,6 +216,9 @@ impl Engine {
     /// the position a line up (`down` false) or down from `pos`, nearest
     /// to `goal`, the x the movement started at
     pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Option<Hit> {
+        if !goal.is_finite() {
+            return None;
+        }
         let item = self.item_at(pos)?;
         let frag_index = match self.text_at(item, pos) {
             Some(text) => {
@@ -216,8 +227,8 @@ impl Engine {
                 let unit = self.unit_of_text(item, text, line);
                 // a table cell has several lines in one unit
                 let target = if down { line + 1 } else { line.wrapping_sub(1) };
-                if self.laid[item].units[unit].line.is_none() && target < boxed.line_count() {
-                    let info = &boxed.lines()[target];
+                let lines = boxed.lines();
+                if let (None, Some(info)) = (self.laid[item].units[unit].line, lines.get(target)) {
                     let x = goal - self.settings.margins.left - boxed.x;
                     return Some(Hit::Text(boxed.hit(x, (info.top + info.bottom) / 2.0)));
                 }
@@ -239,28 +250,24 @@ impl Engine {
             // the first or last line of the text box under the goal
             let texts = &self.laid[frag.item].texts;
             let item_x = goal - self.settings.margins.left;
-            let index = unit
-                .texts
-                .clone()
-                .min_by(|&a, &b| {
-                    let distance = |boxed: &TextBox| {
-                        if item_x < boxed.x {
-                            boxed.x - item_x
-                        } else {
-                            (item_x - boxed.x - boxed.width).max(0.0)
-                        }
-                    };
-                    distance(&texts[a]).total_cmp(&distance(&texts[b]))
-                })
-                .unwrap();
+            let index = unit.texts.clone().min_by(|&a, &b| {
+                let distance = |boxed: &TextBox| {
+                    if item_x < boxed.x {
+                        boxed.x - item_x
+                    } else {
+                        (item_x - boxed.x - boxed.width).max(0.0)
+                    }
+                };
+                distance(&texts[a]).total_cmp(&distance(&texts[b]))
+            })?;
             let boxed = &texts[index];
             let lines = boxed.lines();
             let line = match unit.line {
                 Some(line) => line,
                 None if down => 0,
-                None => lines.len() - 1,
+                None => lines.len().saturating_sub(1),
             };
-            let info = &lines[line];
+            let info = lines.get(line)?;
             return Some(Hit::Text(
                 boxed.hit(item_x - boxed.x, (info.top + info.bottom) / 2.0),
             ));
