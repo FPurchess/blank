@@ -1276,12 +1276,17 @@ body.without-engine {
 
 .page-frame {
   position: absolute;
+  // a page lays out on its own, so one that comes into view or changes
+  // lays out none of the others
+  contain: layout style;
 
+  // an edge and a solid shadow without blur: a blurred one made the
+  // compositor redraw it on every step of a scroll (see SPIKE.md)
   &.sheet {
     background-color: var(--background-color);
     box-shadow:
-      0 1px 3px color-mix(in srgb, var(--color) 18%, transparent),
-      0 6px 18px color-mix(in srgb, var(--color) 8%, transparent);
+      0 0 0 1px color-mix(in srgb, var(--color) 10%, transparent),
+      0 2px 0 1px color-mix(in srgb, var(--color) 6%, transparent);
   }
 }
 

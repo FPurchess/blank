@@ -12,6 +12,8 @@ import {
   TEXT_SCALE,
   VIEW_TOP,
   visibleFrames,
+  visibleRange,
+  keptRange,
 } from "./frames";
 
 const margin = 72;
@@ -87,5 +89,37 @@ describe("frameLayout", () => {
     expect(
       visibleFrames(placed, 800, 600, 0).map((frame) => frame.page),
     ).toEqual([0, 1]);
+  });
+});
+
+describe("visibleRange", () => {
+  it("names the pages near the view, the same while they stay", () => {
+    const state = {
+      width: 600,
+      height: 800,
+      margins: { top: 72, right: 72, bottom: 72, left: 72 },
+      pages: 10,
+      versions: new Uint32Array(10),
+      bottoms: new Float32Array(10).fill(700),
+    };
+    const layout = frameLayout(state, "pages", 800);
+    const sheet = layout.frames[1].top - layout.frames[0].top;
+    expect(visibleRange(layout, 0, 600, 0)).toBe("0-0");
+    expect(visibleRange(layout, 10, 600, 0)).toBe("0-0");
+    expect(visibleRange(layout, sheet * 3, 600, 0)).toBe("2-3");
+    // with the room around the view
+    expect(visibleRange(layout, sheet * 3, 600)).toBe("2-4");
+    expect(visibleRange(layout, sheet * 100, 600, 0)).toBe("");
+  });
+});
+
+describe("keptRange", () => {
+  it("keeps the pages shown before while they are within reach", () => {
+    expect(keptRange("", "2-4", "1-5")).toBe("2-4");
+    // moving down by a page: page 2 stays, as it's still near enough
+    expect(keptRange("2-4", "3-5", "2-6")).toBe("2-5");
+    // far away: only what is near
+    expect(keptRange("2-5", "9-11", "8-12")).toBe("9-11");
+    expect(keptRange("2-5", "", "")).toBe("");
   });
 });

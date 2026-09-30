@@ -396,6 +396,90 @@ The first spike's list is resolved by the parity steps above; what is left:
 - The word count in the bottom bar comes from the editor as before; the
   pages don't count words themselves.
 
+## Scrolling
+
+The owner found scrolling laggy. `e2e/specs/scroll.e2e.ts` measures it: the
+time between frames while the view scrolls 40 px on every frame for 240
+frames ("byFrames"), while it scrolls 8000 px smoothly ("smooth", as a wheel
+with kinetic scrolling does), and the same without the sheets' shadows
+("noShadow"), on about 20 and 100 pages, in both views, at 1× and at 2×
+(`GDK_SCALE=2`). It also sums the page view's own work meanwhile (the
+scroll handler, its render, painting and aligning the hidden editor, see
+`perf.ts`). "Dropped" frames took over 25 ms, "long" ones over 50 ms.
+WebKitWebDriver turns only the first notch of a wheel action into a scroll,
+so the wheel runs measure little and aren't in the table.
+
+The machine was shared and busy, so the builds before (828841c) and after
+ran in turns, three times each, under the same load; the table shows the
+medians. The "before" build had no timers for its scroll handler, render and
+alignment, so its JS work counts painting only.
+
+| document | view | ratio | scroll | before: mean / p95 frame ms, dropped, long | after | JS work per run, before → after (ms) |
+|---|---|---|---|---|---|---|
+| 20 p | page-ends | 1× | byFrames | 16.7 / 18, 6, 0 | 16.6 / 18, 5, 0 | 64 → 117 |
+| 20 p | page-ends | 1× | smooth | 16.6 / 17, 3, 0 | 16.4 / 17, 1, 0 | 14 → 20 |
+| 20 p | pages | 1× | byFrames | 16.9 / 18, 6, 1 | 16.6 / 18, 5, 0 | 36 → 70 |
+| 20 p | pages | 1× | noShadow | 16.6 / 18, 4, 0 | 16.6 / 18, 0, 0 | 28 → 39 |
+| 20 p | pages | 1× | smooth | 16.5 / 17, 3, 0 | 16.3 / 17, 0, 0 | 19 → 26 |
+| 100 p | page-ends | 1× | byFrames | 16.7 / 18, 7, 0 | 16.7 / 18, 6, 0 | 71 → 124 |
+| 100 p | page-ends | 1× | smooth | 16.5 / 17, 2, 0 | 16.4 / 17, 2, 0 | 17 → 29 |
+| 100 p | pages | 1× | byFrames | 16.7 / 18, 5, 0 | 16.7 / 18, 5, 0 | 36 → 71 |
+| 100 p | pages | 1× | noShadow | 16.7 / 18, 6, 0 | 16.6 / 18, 0, 0 | 38 → 34 |
+| 100 p | pages | 1× | smooth | 16.8 / 17, 3, 1 | 16.4 / 17, 0, 0 | 21 → 25 |
+| 20 p | page-ends | 2× | byFrames | 16.8 / 21, 2, 0 | 17 / 20, 4, 0 | 36 → 88 |
+| 20 p | page-ends | 2× | smooth | 16.8 / 17, 4, 1 | 16.4 / 17, 0, 0 | 15 → 31 |
+| 20 p | pages | 2× | byFrames | 16.8 / 19, 3, 0 | 16.8 / 19, 3, 0 | 20 → 54 |
+| 20 p | pages | 2× | noShadow | 16.6 / 18, 1, 0 | 16.6 / 18, 0, 0 | 17 → 29 |
+| 20 p | pages | 2× | smooth | 16.8 / 17, 4, 1 | 16.2 / 17, 0, 0 | 21 → 30 |
+| 100 p | page-ends | 2× | byFrames | 16.7 / 19, 1, 0 | 16.7 / 19, 2, 0 | 36 → 73 |
+| 100 p | page-ends | 2× | smooth | 16.9 / 18, 4, 0 | 16.2 / 17, 2, 0 | 21 → 35 |
+| 100 p | pages | 2× | byFrames | 18 / 25, 11, 0 | 16.7 / 18, 1, 0 | 33 → 37 |
+| 100 p | pages | 2× | noShadow | 16.6 / 18, 1, 0 | 16.7 / 18, 1, 0 | 31 → 26 |
+| 100 p | pages | 2× | smooth | 17.1 / 17, 4, 2 | 16.3 / 17, 1, 0 | 26 → 44 |
+
+**What caused it:**
+1. **The hidden editor moved on every scroll pause.** `onScroll` called
+   `alignSoon()`, so 80 ms after each pause the hidden editor moved, and the
+   webview laid out all of it again. These were the long frames (50 to
+   133 ms) of every smooth scroll before; after, there are none.
+2. **Every scroll event wrote the viewport** (a forced layout with
+   `getBoundingClientRect` and a new `pageViewport`), and the page view
+   rendered again, with the marks, since its list of pages was a new array
+   on every change of `scrollTop`.
+3. **Pages painted synchronously while mounting, and again every time they
+   came back**, with `getComputedStyle` on every paint.
+4. **The sheets' blurred shadows** cost the compositor on every step in
+   "pages": without them, "pages" dropped no frames even before.
+
+**What changed:**
+- Scrolling doesn't align the hidden editor any more; the caret moving and
+  `compositionstart`/`compositionupdate` still do.
+- A scroll is measured once per frame (`requestAnimationFrame`), without
+  `getBoundingClientRect` (only a resize measures the view's box), and
+  `pageViewport` is written only when a value changed.
+- The pages near the view are a range string (`visibleRange`, a bisection),
+  so the list of frames, the marks and `shownPages` change only when other
+  pages come near. Pages mount within a view's height and stay until two
+  views away (`keptRange`), so moving back and forth over the edge doesn't
+  drop a canvas and paint it again.
+- Pages paint in the next frame through a queue (`pageBitmaps.ts`): the
+  pages in view first, whatever they take, the ones just outside after them
+  within an 8 ms budget per frame and in later tasks. A page that leaves the
+  view is kept as an ImageBitmap (LRU, 192 MB), keyed by page, version,
+  size, scale, pixel ratio, theme and loaded images, and drawn from it when
+  it comes back. The theme's colour is read once per theme.
+- The canvases repaint when the pixel ratio changes (a `matchMedia`
+  resolution listener).
+- `.page-frame` has `contain: layout style`, and the sheets an edge and a
+  solid shadow without blur.
+
+**Not done, and why:** a worker with OffscreenCanvas (available in the
+webview) and tiles at 2×: after these changes the frames in view paint in
+2 to 10 ms and the measurements show no long frames, so they weren't needed
+here. Under xvfb with software rendering the frame times were close to 60 fps
+before as well; the owner's lag was on real hardware, which this machine
+can't measure, so check it there.
+
 ## Decisions for the owner
 
 - **Colour emoji.** The pages and the PDF show emoji in the monochrome Noto

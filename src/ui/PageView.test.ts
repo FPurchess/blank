@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { nextTick } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick, watch } from "vue";
 
 import { setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
@@ -10,6 +10,7 @@ import {
   pageLayoutState,
   pageView,
   pageSelection,
+  pageViewport,
 } from "../state";
 import { EditorView } from "prosemirror-view";
 
@@ -19,6 +20,9 @@ import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import { bootApp } from "./mount";
+import { alignHiddenEditor } from "../editor/hidden";
+
+vi.mock("../editor/hidden", () => ({ alignHiddenEditor: vi.fn() }));
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
@@ -174,6 +178,37 @@ describe("page view", () => {
     expect(bandEditor.value).toMatchObject({ band: "header" });
     bandEditor.value = null;
     editor.destroy();
+  });
+
+  it("measures a scroll once a frame, and leaves the hidden editor alone", async () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "setTimeout"] });
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    vi.runAllTimers();
+    vi.mocked(alignHiddenEditor).mockClear();
+    const writes: unknown[] = [];
+    const stop = watch(pageViewport, (value) => writes.push(value), {
+      flush: "sync",
+    });
+    for (const top of [100, 200, 300]) {
+      view().scrollTop = top;
+      view().dispatchEvent(new Event("scroll"));
+    }
+    // nothing yet, then one write for the frame
+    expect(writes).toHaveLength(0);
+    vi.advanceTimersToNextFrame();
+    expect(writes).toHaveLength(1);
+    expect(pageViewport.value?.scrollTop).toBe(300);
+    // a frame without a scroll writes nothing
+    vi.advanceTimersToNextFrame();
+    expect(writes).toHaveLength(1);
+    // scrolling doesn't move the hidden editor, which makes the webview lay
+    // it out again
+    vi.advanceTimersByTime(1000);
+    expect(alignHiddenEditor).not.toHaveBeenCalled();
+    stop();
+    vi.useRealTimers();
   });
 
   it("shows the page of the caret in the bottom bar", async () => {

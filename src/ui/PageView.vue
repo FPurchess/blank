@@ -2,8 +2,10 @@
 import {
   computed,
   nextTick,
+  onBeforeUpdate,
   onMounted,
   onUnmounted,
+  onUpdated,
   shallowRef,
   useTemplateRef,
   watch,
@@ -19,6 +21,7 @@ import {
 } from "../editor/pagePointer";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
+import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
   pageCaret,
@@ -32,7 +35,7 @@ import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
-import { frameLayout, onDesk, visibleFrames } from "../engine/frames";
+import { frameLayout, keptRange, onDesk, visibleRange } from "../engine/frames";
 import { scrollFor } from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
@@ -46,22 +49,48 @@ const width = shallowRef(800);
 const scrollTop = shallowRef(0);
 const viewHeight = shallowRef(600);
 
+// the view's box in the window, which only a resize changes, so scrolling
+// doesn't measure it
+let box = { left: 0, top: 0 };
+
 // publishes where the pages are shown, for the geometry and what places
-// itself at the text
-const measure = () => {
+// itself at the text; only what changed, so nothing follows a scroll that
+// doesn't need to
+const measure = (resized = true) => {
   const element = scroller.value;
   if (!element) return;
-  width.value = element.clientWidth || window.innerWidth;
-  viewHeight.value = element.clientHeight || window.innerHeight;
+  if (resized) {
+    width.value = element.clientWidth || window.innerWidth;
+    viewHeight.value = element.clientHeight || window.innerHeight;
+    const rect = element.getBoundingClientRect();
+    box = { left: rect.left, top: rect.top };
+  }
   scrollTop.value = element.scrollTop;
-  const box = element.getBoundingClientRect();
-  pageViewport.value = {
-    left: box.left,
-    top: box.top,
+  const next = {
+    ...box,
     width: width.value,
     height: viewHeight.value,
     scrollTop: scrollTop.value,
   };
+  const now = pageViewport.value;
+  if (
+    !now ||
+    now.left !== next.left ||
+    now.top !== next.top ||
+    now.width !== next.width ||
+    now.height !== next.height ||
+    now.scrollTop !== next.scrollTop
+  )
+    pageViewport.value = next;
+};
+
+// a scroll is measured once per frame, before it's drawn
+let scrolled: number | undefined;
+const measureSoon = () => {
+  scrolled ??= requestAnimationFrame(() => {
+    scrolled = undefined;
+    timed("scroll", () => measure(false));
+  });
 };
 
 const layout = computed(() =>
@@ -70,25 +99,65 @@ const layout = computed(() =>
     : null,
 );
 
+// the pages near the view, which changes only when other pages come near,
+// not on every scroll
+// Pages mount within a view's height of it and stay until two views away.
+let kept = "";
+const range = computed(() => {
+  if (!layout.value) return (kept = "");
+  const near = visibleRange(layout.value, scrollTop.value, viewHeight.value);
+  const far = visibleRange(
+    layout.value,
+    scrollTop.value,
+    viewHeight.value,
+    2 * viewHeight.value,
+  );
+  return (kept = keptRange(kept, near, far));
+});
+
+// the pages in view, without the room around it, which paint first
+const inView = computed(() =>
+  layout.value
+    ? visibleRange(layout.value, scrollTop.value, viewHeight.value, 0)
+    : "",
+);
+
 const frames = computed(() => {
   const state = pageLayoutState.value;
-  if (!layout.value || !state) return [];
-  return visibleFrames(layout.value, scrollTop.value, viewHeight.value).map(
-    (frame) => ({
-      ...frame,
-      version: state.versions[frame.page] ?? 0,
-      nextVersion:
-        frame.page + 1 < state.pages
-          ? (state.versions[frame.page + 1] ?? 0)
-          : -1,
-    }),
-  );
+  if (!layout.value || !state || !range.value) return [];
+  const [first, last] = range.value.split("-").map(Number);
+  const [shownFirst, shownLast] = inView.value
+    ? inView.value.split("-").map(Number)
+    : [Infinity, -Infinity];
+  return layout.value.frames.slice(first, last + 1).map((frame) => ({
+    ...frame,
+    version: state.versions[frame.page] ?? 0,
+    near: frame.page < shownFirst || frame.page > shownLast,
+    nextVersion:
+      frame.page + 1 < state.pages ? (state.versions[frame.page + 1] ?? 0) : -1,
+  }));
 });
+
+// the device's pixels per CSS pixel, which the pages are painted at, e.g.
+// when the window moves to another screen
+const ratio = shallowRef(window.devicePixelRatio || 1);
+let resolution: MediaQueryList | undefined;
+const watchRatio = () => {
+  resolution?.removeEventListener("change", onRatio);
+  resolution = window.matchMedia?.(`(resolution: ${ratio.value}dppx)`);
+  resolution?.addEventListener("change", onRatio);
+};
+const onRatio = () => {
+  ratio.value = window.devicePixelRatio || 1;
+  watchRatio();
+};
+onMounted(watchRatio);
+onUnmounted(() => resolution?.removeEventListener("change", onRatio));
 
 // the pages in view, whose marks show
 const shownPages = computed(() => frames.value.map((frame) => frame.page));
 
-onMounted(measure);
+onMounted(() => measure());
 // e.g. when an open strip of a header or footer takes room of the window
 let resized: ResizeObserver | undefined;
 onMounted(() => {
@@ -98,9 +167,10 @@ onMounted(() => {
 });
 onUnmounted(() => {
   resized?.disconnect();
+  if (scrolled !== undefined) cancelAnimationFrame(scrolled);
   pageViewport.value = null;
 });
-listenOnWindow("resize", measure);
+listenOnWindow("resize", () => measure());
 
 // the view keeps its place on the page when it switches or resizes
 watch(pageView, async () => {
@@ -122,7 +192,7 @@ const scrollToCaret = (center = false) => {
       : scrollFor(rect, element.scrollTop, element.clientHeight);
   if (target !== null && target !== element.scrollTop) {
     element.scrollTop = target;
-    measure();
+    measure(false);
   }
 };
 
@@ -136,10 +206,12 @@ const align = () => {
   const rect = onDesk(layout.value, { ...caret, width: 0 });
   if (!rect) return;
   const box = element.getBoundingClientRect();
-  alignHiddenEditor(
-    editor.view,
-    box.left + rect.left,
-    box.top + rect.top - element.scrollTop,
+  timed("align", () =>
+    alignHiddenEditor(
+      editor.view,
+      box.left + rect.left,
+      box.top + rect.top - element.scrollTop,
+    ),
   );
 };
 // not on every key: moving it makes the webview lay out the hidden editor
@@ -164,10 +236,15 @@ onUnmounted(() => {
   );
 });
 
-const onScroll = () => {
-  measure();
-  alignSoon();
-};
+// scrolling moves nothing but the pages: the hidden editor follows the
+// caret when it moves or composing starts, not the scrolling, since moving
+// it makes the webview lay out all of it again
+const onScroll = () => measureSoon();
+
+// how long the view takes to render, for the measurements
+let renderStart = 0;
+onBeforeUpdate(() => (renderStart = performance.now()));
+onUpdated(() => record("render", performance.now() - renderStart));
 
 const deskPoint = (x: number, y: number) => {
   const element = scroller.value!;
@@ -259,7 +336,7 @@ const scrollAtEdges = () => {
   const step = edgeStep(dragAt.y, box.top, box.bottom);
   if (step === 0) return;
   element.scrollTop += step;
-  measure();
+  measure(false);
   dragTo(dragAt.x, dragAt.y);
   edgeScroll = requestAnimationFrame(scrollAtEdges);
 };
@@ -316,6 +393,8 @@ onUnmounted(() => {
         :y="frame.y"
         :scale="layout.scale"
         :sheet="layout.mode === 'pages'"
+        :near="frame.near"
+        :ratio="ratio"
       />
       <PageMarks :layout="layout" :pages="shownPages" />
       <PageOverlay :layout="layout" />

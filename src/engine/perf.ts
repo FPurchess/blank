@@ -3,7 +3,16 @@
 // hundred changes; the E2E measurement reads them from
 // `window.blankPageViewPerf`.
 
-export type PerfKind = "dispatch" | "layout" | "caret" | "paint";
+export type PerfKind =
+  | "dispatch"
+  | "layout"
+  | "caret"
+  | "paint"
+  // the page view's scroll handler, its render, and moving the hidden
+  // editor under the caret
+  | "scroll"
+  | "render"
+  | "align";
 
 const LIMIT = 500;
 const samples: Record<PerfKind, number[]> = {
@@ -11,6 +20,9 @@ const samples: Record<PerfKind, number[]> = {
   layout: [],
   caret: [],
   paint: [],
+  scroll: [],
+  render: [],
+  align: [],
 };
 
 /**
@@ -43,6 +55,9 @@ export const perfSamples = (clear = false) => {
     layout: [...samples.layout],
     caret: [...samples.caret],
     paint: [...samples.paint],
+    scroll: [...samples.scroll],
+    render: [...samples.render],
+    align: [...samples.align],
   };
   if (clear) for (const list of Object.values(samples)) list.length = 0;
   return copy;

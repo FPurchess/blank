@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, useTemplateRef, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  useTemplateRef,
+  watch,
+} from "vue";
 
 import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
@@ -8,12 +15,15 @@ import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { bootMark, record } from "../engine/perf";
 import { pageLayoutState, path, theme } from "../state";
+import { bitmapKey, pageBitmaps, paintQueue } from "./pageBitmaps";
 import { paintPage } from "./paintPage";
 import { bandTitle, endMark } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends. Its props
-// are plain values, so it paints again only when one of them changes.
+// are plain values, so it paints again only when one of them changes, and
+// then from the bitmap it was painted into before, if there is one (see
+// pageBitmaps.ts).
 const props = defineProps<{
   page: number;
   version: number;
@@ -27,6 +37,10 @@ const props = defineProps<{
   y: number;
   scale: number;
   sheet: boolean;
+  // just outside the view, which paints after the pages in view
+  near: boolean;
+  // device pixels per CSS pixel
+  ratio: number;
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
@@ -45,40 +59,143 @@ const margins = computed(() => {
   };
 });
 
-const paint = () => {
-  const element = canvas.value;
+// the theme's text colour, read once for each theme
+const colors = new Map<string, string>();
+const colorOf = (element: HTMLElement) => {
+  let color = colors.get(theme.value);
+  if (!color) {
+    color = getComputedStyle(element).color;
+    colors.set(theme.value, color);
+  }
+  return color;
+};
+
+// what the canvas shows now, so the same isn't drawn twice
+let shown = "";
+
+/**
+ * paintInto paints the page into a context of `width` × `height` device
+ * pixels
+ */
+const paintInto = (
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  color: string,
+  ratio: number,
+) => {
   const engine = pageEngine;
-  if (!element || !engine) return;
+  if (!engine) return;
   const start = performance.now();
-  const ratio = window.devicePixelRatio || 1;
-  // a device pixel for each pixel of the canvas, which is shown at exactly
-  // its size, so nothing scales it and blurs the text
-  const width = Math.round(props.width * ratio);
-  const height = Math.round(props.height * ratio);
-  if (element.width !== width) element.width = width;
-  if (element.height !== height) element.height = height;
-  element.style.width = `${width / ratio}px`;
-  element.style.height = `${height / ratio}px`;
-  const context = element.getContext("2d");
-  if (!context) return;
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
-  const color = getComputedStyle(element).color;
-  paintPage(context, engine.display(props.page, props.version), {
-    scale: props.scale,
-    ratio,
-    x: props.x,
-    y: props.y,
-    color,
-    glyph: (font, id) => engine.glyph(font, id),
-    unitsPerEm: (font) => engine.unitsPerEm(font),
-    image: (src) => loadedImage(src, path.value)?.image ?? null,
-  });
+  paintPage(
+    context as CanvasRenderingContext2D,
+    engine.display(props.page, props.version),
+    {
+      scale: props.scale,
+      ratio,
+      x: props.x,
+      y: props.y,
+      color,
+      glyph: (font, id) => engine.glyph(font, id),
+      unitsPerEm: (font) => engine.unitsPerEm(font),
+      image: (src) => loadedImage(src, path.value)?.image ?? null,
+    },
+  );
   record("paint", performance.now() - start);
   bootMark("pages");
 };
 
+// a page has its own place in the queue, so a newer request replaces one
+// that hasn't run yet
+const job = computed(() => `page:${props.page}`);
+
+/**
+ * paint shows the page: drawn from its bitmap if it was painted before, or
+ * else painted in the next frame, the pages in view first
+ */
+const paint = () => {
+  const element = canvas.value;
+  if (!element || !pageEngine) return;
+  const { ratio } = props;
+  // a device pixel for each pixel of the canvas, which is shown at exactly
+  // its size, so nothing scales it and blurs the text
+  const width = Math.round(props.width * ratio);
+  const height = Math.round(props.height * ratio);
+  if (element.width !== width || element.height !== height) {
+    element.width = width;
+    element.height = height;
+    element.style.width = `${width / ratio}px`;
+    element.style.height = `${height / ratio}px`;
+    shown = "";
+  }
+  const key = bitmapKey({
+    page: props.page,
+    version: props.version,
+    width,
+    height,
+    scale: props.scale,
+    ratio,
+    x: props.x,
+    y: props.y,
+    theme: theme.value,
+    images: imagesLoaded.value,
+  });
+  if (key === shown) return;
+  const context = element.getContext("2d");
+  if (!context) return;
+  const cached = pageBitmaps.get(key);
+  if (cached) {
+    context.clearRect(0, 0, width, height);
+    context.drawImage(cached.image, 0, 0);
+    shown = key;
+    return;
+  }
+  // without bitmaps, e.g. in tests: right away
+  if (typeof createImageBitmap === "undefined") {
+    paintInto(context, colorOf(element), ratio);
+    shown = key;
+    return;
+  }
+  // until then the canvas shows what it showed, or the empty sheet
+  paintQueue.request({
+    key: job.value,
+    priority: props.near ? 1 : 0,
+    run: () => {
+      // unless the page changed meanwhile, which asks again
+      if (!canvas.value || element.width !== width || element.height !== height)
+        return;
+      context.clearRect(0, 0, width, height);
+      paintInto(context, colorOf(element), ratio);
+      shown = key;
+    },
+  });
+};
+
+/**
+ * keep keeps what the canvas shows for when the page comes into view again,
+ * as it leaves: a copy only of the pages that go, not of every paint
+ */
+const keep = () => {
+  const element = canvas.value;
+  if (!element || !shown || typeof createImageBitmap === "undefined") return;
+  if (pageBitmaps.get(shown)) return;
+  const key = shown;
+  const { width, height } = element;
+  createImageBitmap(element).then(
+    (bitmap) =>
+      pageBitmaps.set(key, {
+        image: bitmap,
+        width,
+        height,
+        close: () => bitmap.close(),
+      }),
+    () => {},
+  );
+};
+
 onMounted(paint);
+onBeforeUnmount(keep);
+onUnmounted(() => paintQueue.cancel(job.value));
 watch(
   () => [
     props.version,
@@ -87,6 +204,8 @@ watch(
     props.scale,
     props.x,
     props.y,
+    props.near,
+    props.ratio,
     theme.value,
     imagesLoaded.value,
   ],

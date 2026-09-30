@@ -65,8 +65,8 @@ export const clickInto = async (
   index = 0,
   button: 0 | 1 | 2 = 0,
 ) => {
-  const box = await browser.execute(
-    (selector: string, index: number) => {
+  const box = await browser.executeAsync(
+    (selector: string, index: number, done: (box: Box | null) => void) => {
       const geometry = (
         window as unknown as {
           blankGeometry: {
@@ -76,16 +76,18 @@ export const clickInto = async (
         }
       ).blankGeometry;
       const element = document.querySelectorAll(selector)[index];
-      if (!element) return null;
+      if (!element) return done(null);
       const pos = geometry.endOf(element);
       const view = document.getElementById("page-view")!;
-      let caret = geometry.caretBox(pos);
+      const caret = geometry.caretBox(pos);
       if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
         view.scrollTop += caret.top - view.clientHeight / 2;
-        view.dispatchEvent(new Event("scroll"));
-        caret = geometry.caretBox(pos);
+        // the view measures a scroll once a frame
+        return requestAnimationFrame(() =>
+          requestAnimationFrame(() => done(geometry.caretBox(pos))),
+        );
       }
-      return caret;
+      done(caret);
     },
     selector,
     index,
@@ -155,8 +157,13 @@ export const focusEditor = async () => {
  * into view first
  */
 export const textBox = async (text: string, offset = 0, index = 0) => {
-  const box = await browser.execute(
-    (text: string, offset: number, index: number) => {
+  const box = await browser.executeAsync(
+    (
+      text: string,
+      offset: number,
+      index: number,
+      done: (box: Box | null) => void,
+    ) => {
       const geometry = (
         window as unknown as {
           blankGeometry: {
@@ -166,15 +173,17 @@ export const textBox = async (text: string, offset = 0, index = 0) => {
         }
       ).blankGeometry;
       const pos = geometry.find(text, index);
-      if (pos < 0) return null;
+      if (pos < 0) return done(null);
       const view = document.getElementById("page-view")!;
-      let caret = geometry.caretBox(pos + offset);
+      const caret = geometry.caretBox(pos + offset);
       if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
         view.scrollTop += caret.top - view.clientHeight / 2;
-        view.dispatchEvent(new Event("scroll"));
-        caret = geometry.caretBox(pos + offset);
+        // the view measures a scroll once a frame
+        return requestAnimationFrame(() =>
+          requestAnimationFrame(() => done(geometry.caretBox(pos + offset))),
+        );
       }
-      return caret;
+      done(caret);
     },
     text,
     offset,

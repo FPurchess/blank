@@ -157,6 +157,53 @@ export const visibleFrames = (
   );
 
 /**
+ * visibleRange returns the first and last page whose frames are within
+ * `overscan` pixels of the part of the desk from `top` that is `height`
+ * pixels high, as a string, e.g. "3-5", so what depends on it changes only
+ * when the pages change; "" for none
+ */
+export const visibleRange = (
+  layout: FrameLayout,
+  top: number,
+  height: number,
+  overscan = height,
+) => {
+  const { frames } = layout;
+  const from = top - overscan;
+  const to = top + height + overscan;
+  // the first frame that ends below `from`, by bisection: the frames are in
+  // order down the desk
+  let low = 0;
+  let high = frames.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (frames[middle].top + frames[middle].height < from) low = middle + 1;
+    else high = middle;
+  }
+  let last = low - 1;
+  while (last + 1 < frames.length && frames[last + 1].top <= to) last++;
+  return last < low ? "" : `${low}-${last}`;
+};
+
+/**
+ * keptRange returns the pages to keep shown: those `near` the view, and
+ * those shown before that are still within `far`, so a page isn't dropped
+ * and shown again while the view moves back and forth over its edge
+ * @param shown the pages shown before, near and far as from visibleRange
+ */
+export const keptRange = (shown: string, near: string, far: string) => {
+  if (!near || !shown || !far) return near;
+  const [nearFirst, nearLast] = near.split("-").map(Number);
+  const [shownFirst, shownLast] = shown.split("-").map(Number);
+  const [farFirst, farLast] = far.split("-").map(Number);
+  // what was shown and is still within reach
+  const keptFirst = Math.max(shownFirst, farFirst);
+  const keptLast = Math.min(shownLast, farLast);
+  if (keptFirst > keptLast) return near;
+  return `${Math.min(nearFirst, keptFirst)}-${Math.max(nearLast, keptLast)}`;
+};
+
+/**
  * frameNear returns the frame at a height of the desk, or the nearest one
  */
 export const frameNear = (layout: FrameLayout, y: number): Frame | null => {
