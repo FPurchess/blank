@@ -11,6 +11,7 @@ import {
   type Command,
   EditorState,
   NodeSelection,
+  Plugin as PluginClass,
   type Plugin,
   Selection,
   TextSelection,
@@ -491,6 +492,40 @@ describe("images on the pages", () => {
     expect(shown[3]).toBeCloseTo(225);
     expect(shown[4]).toBeCloseTo(112.5);
     mounted.view.destroy();
+  });
+
+  it("follows a Save As after a transaction another plugin added to", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    // adds a paragraph after each change, as the table guard may
+    const appending = new PluginClass({
+      appendTransaction: (trs, _old, state) =>
+        trs.some((tr) => tr.docChanged && !tr.getMeta("appended"))
+          ? state.tr
+              .insert(state.doc.content.size, p("kept"))
+              .setMeta("appended", true)
+          : null,
+    });
+    const state = EditorState.create({
+      schema,
+      doc: doc(p("text"), schema.node("paragraph", null, image)),
+      plugins: [pageSync(), pageView(), appending],
+    });
+    // as bootEditor dispatches: the transaction is published first
+    const view: EditorView = new EditorView(document.createElement("div"), {
+      state,
+      dispatchTransaction(tr) {
+        transaction.value = tr;
+        view.updateState(view.state.apply(tr));
+      },
+    });
+    view.dispatch(view.state.tr.insertText("typed ", 1));
+    expect(view.state.doc.lastChild!.textContent).toBe("kept");
+
+    path.value = "/docs/report.md";
+
+    expect(loads).toHaveLength(1);
+    view.destroy();
+    transaction.value = null;
   });
 });
 

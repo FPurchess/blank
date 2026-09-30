@@ -428,9 +428,14 @@ export const pageSync = () => {
               );
               // the page setup and the fields follow the transaction being
               // dispatched, which the view doesn't have yet: its update lays
-              // out once, with them
+              // out once, with them. Once the view has it, and the
+              // transactions appended to it, a change is laid out here.
               const pending = transaction.value;
-              if (!fresh.size && pending && pending.doc !== view.state.doc)
+              if (
+                !fresh.size &&
+                pending?.docChanged &&
+                pending.before === view.state.doc
+              )
                 return;
               const blocks = fresh.size
                 ? imageBlocks(view.state.doc, fresh)
