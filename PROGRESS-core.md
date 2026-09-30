@@ -12,8 +12,8 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 7. A row nearly a page tall under repeated header rows
 - [x] 8. A heading stays with a captioned table
 - [x] 9. S2: lists, quotes and images in table cells
-- [ ] 10. The PDF text layer keeps combining marks and ligature parts
-- [ ] 11. S3: one shared font store
+- [x] 10. The PDF text layer keeps combining marks and ligature parts
+- [x] 11. S3: one shared font store
 - [ ] 12. S4: failed image decodes and broken fonts in the PDF
 - [ ] 13. Tags, `/Lang` and bookmarks in the PDF
 - [ ] 14. Variable-font coordinates
@@ -159,6 +159,39 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `exact.rs`: `the_pdf_holds_tables_with_lists_and_quotes`
   - The property test's tables now use blocks 30% of the time. It compares `cell_images` with a fresh layout.
 - Found on the way, with the new random sequence: `update_many` whose last entry deleted the last items could settle on a tail that didn't reach the old end, and panic. Fixed in its own commit (e2ac963), with the regression test `update_many_ending_in_a_deletion_at_the_end`.
+
+### Task 10: the PDF text layer
+
+- What the probe found (Parley 0.11.1, DejaVu Sans and Plex):
+  - A combining mark, the other letters of a ligature (lam-alef) and the rest of a conjunct are clusters without glyphs, marked as ligature continuations.
+  - Left to right they follow the cluster that carries the glyph. Right to left they come before it, in the order of the text: beh + fatha, shin + points, lam-alef in the middle of a word.
+- `text::cluster_ranges`: each glyph-bearing cluster's text grows by the continuation clusters that belong to it. Other clusters without glyphs (line breaks) stay without text.
+- Characters no font has (the coordinator's CI finding, `src/engine/exact.test.ts:175`):
+  - They are shown as glyph 0, and readers take no text from glyph 0's ToUnicode mapping.
+  - krilla writes an ActualText span for a glyph whose text differs from the one it mapped before. So `pdf::unmap_missing_glyph` draws one invisible glyph 0 with empty text first, on the first page, for each font that shows missing glyphs. Every missing character then gets its own span, written by krilla inside the text object, where poppler places it right.
+  - Wrapping the glyphs in spans of my own didn't work: poppler takes a span's position from the text position when it begins, which is before `BT`.
+- Right to left, pdftotext turns the characters of one glyph around (lam-alef comes out as alef-lam, the fatha before its beh). krilla already writes `/ReversedChars` for right-to-left runs, and ToUnicode holds the text as written, as the spec wants. ActualText around such runs made poppler lose letters, so I dropped it. The test checks every character of right-to-left words, and left-to-right words exactly.
+- Tests:
+  - `text::gives_marks_and_ligatures_their_text` (é in NFD, lam-alef, alef-lam-alef-meem, beh + fatha, shin + points, a conjunct no font has, a line break)
+  - `exact.rs`: `pdf_text_keeps_marks_and_ligatures` (with Noto Sans Devanagari when installed) and `pdf_text_keeps_what_no_font_has` (the text, and every word where it was laid out)
+  - Without the fix, pdftotext lost the marks, the lam and the conjunct.
+
+### Task 11: S3, the shared font store
+
+- `FontFile` keeps the fontique `Blob` itself (its clones keep its id) and the family it was added for.
+- `Fonts::share()` makes a new `FontContext` over the same blobs (each file registered once), clones the faces (`Arc` data), and makes a new `LayoutContext`. Nothing is copied.
+- `Fonts::sources()` lists each file once, with its family, for a worker to make the same fonts.
+- wasm: `withFontsOf`, `fontFileCount`, `fontFile` and `fontFileFamily` (`SEAM.md` S3).
+- Test `engines_share_their_fonts`:
+  - every file's data is `Arc::ptr_eq` between the two engines, with the same blob ids and stacks
+  - the sources come in order, with the fallback's family
+  - the shared engine's PDF is byte-identical to a fresh engine's, and so are the fragments
+
+### Known quirks (of other tools, not of the PDF)
+
+- pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.
+  - The PDF holds the text as written: ToUnicode per glyph in logical order, and `/ReversedChars` around right-to-left runs, which krilla writes.
+  - Don't chase it in the engine. `pdf_text_keeps_marks_and_ligatures` therefore checks right-to-left words by their characters, not their order.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 

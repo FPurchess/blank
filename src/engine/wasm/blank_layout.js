@@ -1,6 +1,12 @@
 /* @ts-self-types="./blank_layout.d.ts" */
 
 export class LayoutEngine {
+    static __wrap(ptr) {
+        const obj = Object.create(LayoutEngine.prototype);
+        obj.__wbg_ptr = ptr;
+        LayoutEngineFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -112,6 +118,45 @@ export class LayoutEngine {
     }
     clearImages() {
         wasm.layoutengine_clearImages(this.__wbg_ptr);
+    }
+    /**
+     * how many font files the engine has, each once, in the order they
+     * came: the ones it was made with, then the ones `addFont` added
+     * @returns {number}
+     */
+    fontFileCount() {
+        const ret = wasm.layoutengine_fontFileCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * the family a font file was added for with `addFont`, or "" for the
+     * ones the engine was made with (and for none)
+     * @param {number} index
+     * @returns {string}
+     */
+    fontFileFamily(index) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_fontFileFamily(this.__wbg_ptr, index);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * a font file's bytes, e.g. to make the same engine in a worker; empty
+     * for none
+     * @param {number} index
+     * @returns {Uint8Array}
+     */
+    fontFile(index) {
+        const ret = wasm.layoutengine_fontFile(this.__wbg_ptr, index);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
     }
     /**
      * a glyph's outline as an SVG path, in font units with y up
@@ -324,7 +369,6 @@ export class LayoutEngine {
         return v2;
     }
     /**
-     * sets the page; the pages that changed, as `update` gives them
      * @param {string} json
      * @returns {Uint32Array}
      */
@@ -454,6 +498,19 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * sets the page; the pages that changed, as `update` gives them
+     * an engine with the fonts of `other`, fallbacks added with `addFont`
+     * included, without copying their files, e.g. for an export; it has
+     * its own page, items and images
+     * @param {LayoutEngine} other
+     * @returns {LayoutEngine}
+     */
+    static withFontsOf(other) {
+        _assertClass(other, LayoutEngine);
+        const ret = wasm.layoutengine_withFontsOf(other.__wbg_ptr);
+        return LayoutEngine.__wrap(ret);
+    }
+    /**
      * @param {number} page
      * @param {number} x
      * @param {number} y
@@ -515,6 +572,12 @@ function __wbg_get_imports() {
 const LayoutEngineFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_layoutengine_free(ptr, 1));
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
 
 function getArrayF32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;

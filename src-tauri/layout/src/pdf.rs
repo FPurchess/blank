@@ -12,6 +12,7 @@ use krilla::metadata::Metadata;
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::Fill;
+use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph};
 use krilla::Document;
 
@@ -51,6 +52,23 @@ fn fill(role: Role) -> Fill {
     }
 }
 
+/// The missing glyph (0) stands for every character a font doesn't have,
+/// and readers take no text from it, so the text of those characters would
+/// be lost for copying and searching. krilla writes a glyph whose text
+/// differs from the text it gave the glyph before in an actual text span,
+/// which readers take the text from. So this gives the missing glyph an
+/// empty text first, with an invisible one: every character shown with it
+/// then gets its own span.
+fn unmap_missing_glyph(surface: &mut Surface, font: Font) {
+    surface.set_fill(Some(Fill {
+        paint: rgb::Color::new(0, 0, 0).into(),
+        opacity: NormalizedF32::ZERO,
+        rule: Default::default(),
+    }));
+    let glyph = KrillaGlyph::new(GlyphId::new(0), 0.0, 0.0, 0.0, 0.0, 0..0, None);
+    surface.draw_glyphs(Point::from_xy(0.0, 0.0), &[glyph], font, "", 1.0, false);
+}
+
 /// writes the document's pages as a PDF
 pub fn write(
     engine: &mut Engine,
@@ -66,6 +84,17 @@ pub fn write(
         .collect();
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let (width, height) = (engine.settings.width, engine.settings.height);
+    // the fonts whose missing glyph the document shows, for what no font has
+    let mut missing: Vec<usize> = vec![];
+    for page_index in 0..engine.pages.len() {
+        for op in engine.page_ops(page_index, true) {
+            if let Op::Glyphs { run, .. } = op {
+                if run.glyphs.iter().any(|glyph| glyph.id == 0) && !missing.contains(&run.font) {
+                    missing.push(run.font);
+                }
+            }
+        }
+    }
     for page_index in 0..engine.pages.len() {
         let ops = engine.page_ops(page_index, true);
         let settings = PageSettings::from_wh(width, height).ok_or("the page has no size")?;
@@ -73,6 +102,11 @@ pub fn write(
         let mut links = vec![];
         {
             let mut surface = page.surface();
+            if page_index == 0 {
+                for font in missing.iter().filter_map(|&font| fonts.get(font)?.clone()) {
+                    unmap_missing_glyph(&mut surface, font);
+                }
+            }
             for op in ops {
                 match op {
                     Op::Rect { x, y, w, h, role } => {
