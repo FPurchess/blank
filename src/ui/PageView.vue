@@ -302,6 +302,16 @@ const onMouseDown = (event: MouseEvent) => {
 const move = pageMove({
   view: editor.view,
   posAt: (event) => pointerAt(event).pos,
+  inView: (event) => {
+    const box = scroller.value?.getBoundingClientRect();
+    return (
+      !!box &&
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom
+    );
+  },
   press: (clientX, clientY) => {
     if (!pageEngine || !layout.value) return;
     const { x, y } = deskPoint(clientX, clientY);

@@ -6,6 +6,9 @@ import { schema } from "../markdown";
 import { pageDropCaret } from "../state";
 import { doc, p } from "../test/editor";
 import { pageMove } from "./pageMove";
+import { documentFields } from "../layout/bands";
+import { hidePages, showPages } from "../test/engine";
+import { testLayout } from "../test/layout";
 
 // "hello world" with "world" selected
 const selected = () => {
@@ -35,10 +38,12 @@ describe("moving the selected text on the pages", () => {
   let view: EditorView;
   // positions by x: the pointer at x hits position x
   const press = vi.fn();
+  // the view spans x 0 to 100
   const moveOn = () =>
     pageMove({
       view,
       posAt: (event) => event.clientX,
+      inView: (event) => event.clientX >= 0 && event.clientX <= 100,
       press,
     });
 
@@ -46,10 +51,15 @@ describe("moving the selected text on the pages", () => {
     view = new EditorView(document.createElement("div"), {
       state: selected(),
     });
+    // the pages, where the drop caret shows
+    const engine = showPages();
+    engine.setSettings(testLayout(), documentFields(view.state.doc));
+    engine.sync(view.state.doc, () => undefined);
     press.mockReset();
   });
   afterEach(() => {
     view.destroy();
+    hidePages();
     pageDropCaret.value = null;
   });
 
@@ -60,6 +70,20 @@ describe("moving the selected text on the pages", () => {
     move.move(pointer(4));
     move.up(pointer(3));
     expect(view.state.doc.textContent).toBe("heworldllo ");
+    expect(press).not.toHaveBeenCalled();
+  });
+
+  it("is cancelled when the pointer lets go outside the view", () => {
+    const move = moveOn();
+    move.down(pointer(9));
+    move.mouseDown(mouse(1), false);
+    move.move(pointer(4));
+    expect(pageDropCaret.value).not.toBeNull();
+    // out of the view, the drop caret goes
+    move.move(pointer(500));
+    expect(pageDropCaret.value).toBeNull();
+    move.up(pointer(500));
+    expect(view.state.doc.textContent).toBe("hello world");
     expect(press).not.toHaveBeenCalled();
   });
 

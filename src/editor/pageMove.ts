@@ -19,6 +19,8 @@ export interface MoveTarget {
   view: EditorView;
   // the position a point of the window hits, null off the text
   posAt(event: MouseEvent): number | null;
+  // whether a point of the window is on the page view, where text drops
+  inView(event: MouseEvent): boolean;
   // places the caret where a press without a move was, as a click would
   press(x: number, y: number): void;
   // keeps the pointer's events coming while it's outside the view
@@ -72,7 +74,10 @@ export const pageMove = (target: MoveTarget): PageMove => {
       );
       if (!moving.dragging && far < DRAG_START) return;
       moving.dragging = true;
-      showDropAt(target.view, target.posAt(event));
+      showDropAt(
+        target.view,
+        target.inView(event) ? target.posAt(event) : null,
+      );
     },
     up(event) {
       const was = moving;
@@ -80,6 +85,9 @@ export const pageMove = (target: MoveTarget): PageMove => {
       if (!was) return;
       if (was.dragging) {
         showDropAt(target.view, null);
+        // let go outside the view, the move is cancelled, as ProseMirror
+        // cancels a drop outside the editor
+        if (!target.inView(event)) return;
         const pos = target.posAt(event);
         if (pos !== null) dropMoved(target.view, pos, dragCopies(event));
         return;
