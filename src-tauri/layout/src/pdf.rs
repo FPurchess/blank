@@ -350,29 +350,40 @@ fn attempt(
                     }
                     _ => ContentTag::Span(SpanTag::empty()),
                 };
+                // what can't be drawn is left out before its tag opens: a
+                // tagged section must be closed on every path
+                let drawable = match &op {
+                    Op::Rect { x, y, w, h, .. } => {
+                        Rect::from_xywh(*x, *y, w.max(0.01), h.max(0.01)).is_some()
+                    }
+                    Op::Glyphs { run, .. } => fonts.get(run.font).is_some(),
+                    _ => true,
+                };
+                if !drawable {
+                    continue;
+                }
                 let id = surface.start_tagged(tag);
                 if !matches!(part, Part::Decoration | Part::Band { .. }) {
                     ids.entry(part).or_default().push(id);
                 }
                 match op {
                     Op::Rect { x, y, w, h, role } => {
-                        let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) else {
-                            continue;
-                        };
+                        let rect = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01));
                         let mut builder = PathBuilder::new();
-                        builder.push_rect(rect);
+                        if let Some(rect) = rect {
+                            builder.push_rect(rect);
+                        }
                         if let Some(path) = builder.finish() {
                             surface.set_fill(Some(fill(role)));
                             surface.draw_path(&path);
                         }
                     }
                     Op::Glyphs { run, role, text } => {
-                        // a font that can't be embedded is left out
-                        let Some(font) = fonts.get(run.font) else {
-                            continue;
-                        };
-                        surface.set_fill(Some(fill(role)));
-                        draw_run(&mut surface, &run.glyphs, font, &text, run.size);
+                        // a font that can't be embedded is left out (above)
+                        if let Some(font) = fonts.get(run.font) {
+                            surface.set_fill(Some(fill(role)));
+                            draw_run(&mut surface, &run.glyphs, font, &text, run.size);
+                        }
                     }
                     Op::Image {
                         src,
@@ -645,5 +656,18 @@ mod tests {
         if let Some(text) = text_of(&written.bytes, "variable") {
             assert!(text.contains('\u{1f980}'), "{text:?}");
         }
+    }
+
+    #[test]
+    fn leaves_out_a_skipped_font_without_panicking() {
+        // what write_with does once krilla failed on a font: write again
+        // without it. Its runs are left out, and their tags with them.
+        let mut engine = engine(vec![paragraph(1, "hello"), paragraph(8, "world")]);
+        let skipped = Skipped {
+            images: vec![],
+            fonts: vec![0],
+        };
+        let written = attempt(&mut engine, &HashMap::new(), &info(), "", &skipped);
+        assert!(written.is_ok());
     }
 }
