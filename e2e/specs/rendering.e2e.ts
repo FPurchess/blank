@@ -189,8 +189,11 @@ describe("rendering", () => {
     await type("qz");
     await waitForRepaint(far, farBefore);
     await waitForInk("farmarkerqz", { offset: 9, length: 2 });
-    // and the page before it shows the same as before
-    expect((await paintedInk("inkcheck")).share).toBeGreaterThan(0.02);
+    // and back on the first page, it shows what it showed before: painted
+    // again or drawn from its bitmap, in the same ink
+    const again = await waitForInk("inkcheck", {}, light.share * 0.8);
+    expect(Math.abs(again.share - light.share)).toBeLessThan(0.01);
+    expect(luminance(again.ink!)).toBeLessThan(0.2);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -32,7 +32,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] M3. The bands as strip canvases sized to the margins, painted with a y origin and not kept as bitmaps. At 2× in "pages", the 192 MB cache kept 7 pages before (14 bitmaps, 199.6 MB) and keeps 14 after (`PageFrame.test.ts`, "keeps a dozen sheets")
 - [x] M2. E2E ink checks after an edit prove the repaint, not old pixels: `waitForRepaint` compares a fingerprint of the line (`inkPrint`) from before the edit; with the body's repaint switched off the check times out
 - [x] M5. The engine-failure spec places the caret first, checks nothing failed before the key, and types and finds a word of its own
-- [ ] M6. The last rendering check waits and compares with the first reading
+- [x] M6. The last rendering check waits for the first page and compares its ink with the first reading
 - [ ] Selection: the selected text in a contrasting colour, on a layer of its own, at 4.5:1 in every theme
 - [ ] 1. The edge line follows `engineMissing` at runtime
 - [ ] 3. The view keeps its place when the header or properties room changes
