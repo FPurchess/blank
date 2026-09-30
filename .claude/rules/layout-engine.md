@@ -57,7 +57,6 @@ The wasm API between Rust (`model.rs`, `wasm.rs`) and TypeScript (`flatten.ts`, 
 ## Known limits
 
 - No justification, hyphenation or widow and orphan control. Headings keep only their first line with the next block.
-- Images, lists and quotes inside table cells are laid out as plain paragraphs (an image as a placeholder character).
 - Emoji are the monochrome Noto Emoji, in the text's colour; colour glyphs (COLR, bitmaps) aren't painted.
 - Chinese, Japanese, Korean and symbols Blank's fonts lack come from the system's fonts, so another machine can lay the same document out differently, and a machine without such a font shows boxes on screen and in the PDF. Fonts whose licence forbids embedding a subset are skipped (see CLAUDE.md, Gotchas).
 - The text is painted from unhinted outlines with grayscale anti-aliasing on whole-pixel baselines: a shade lighter than the webview's text at 1×, no subpixel anti-aliasing.
