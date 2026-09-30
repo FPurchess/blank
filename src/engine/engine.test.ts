@@ -33,7 +33,7 @@ describe("PageEngine", () => {
     engine.setSettings(testLayout(), documentFields(node));
     let progress = 0;
     engine.onProgress = () => progress++;
-    engine.sync(node, noSizes, false, null, true);
+    engine.sync(node, noSizes, { progressive: true });
     expect(engine.laying).toBe(true);
     expect(engine.pages()).toBeLessThan(full.pages());
     expect(engine.pages()).toBeGreaterThan(1);
@@ -46,7 +46,7 @@ describe("PageEngine", () => {
     // an edit while it lays out finishes the rest first
     const again = testEngine();
     again.setSettings(testLayout(), documentFields(node));
-    again.sync(node, noSizes, false, null, true);
+    again.sync(node, noSizes, { progressive: true });
     const typed = node.replace(3, 3, doc(p("x")).slice(1, 2));
     again.sync(typed, noSizes);
     expect(again.laying).toBe(false);

@@ -5,8 +5,9 @@ import { shallowRef } from "vue";
 import type { DocumentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
 import {
+  type Change,
   diff,
-  flatten,
+  flattenBlocks,
   type FlatRecord,
   type FrozenWidths,
   type ImageSizes,
@@ -147,6 +148,47 @@ export const forgetEngineFailure = () => {
 
 const EMPTY_DISPLAY: PageDisplay = { r: [], i: [], l: [], g: [] };
 
+// what changed in a document since the one the engine laid out
+export interface Changes {
+  // the document the ranges count from
+  from: Node;
+  // the parts of the new document that changed since, from and to
+  ranges: readonly (readonly [number, number])[];
+}
+
+export interface SyncOptions {
+  // flattens the whole document again, even the same one
+  force?: boolean;
+  frozen?: FrozenWidths | null;
+  // lays out a long document's first pages first, see FIRST_ITEMS
+  progressive?: boolean;
+  changes?: Changes | null;
+  // what else the images' sizes depend on, e.g. the room for the text and
+  // the document's folder; a new one flattens the whole document again
+  sizesKey?: string;
+  // top-level blocks to flatten again, e.g. those whose image loaded
+  blocks?: readonly number[];
+}
+
+// flattening more blocks than this again costs about as much as flattening
+// all of them, which then compares cheaper
+const MAX_BLOCKS = 64;
+
+/**
+ * blockAt returns the top-level block at a position of `doc`, or the one
+ * after it at a boundary
+ */
+const blockAt = (doc: Node, pos: number) =>
+  doc.resolve(Math.max(0, Math.min(pos, doc.content.size))).index(0);
+
+// where each block's records start, from `start`, and where the last ends
+const startsOf = (blocks: FlatRecord[][], start: number) => {
+  const starts = [start];
+  for (const block of blocks)
+    starts.push(starts[starts.length - 1] + block.length);
+  return starts;
+};
+
 // how many items the first layout of a long document lays out before the
 // pages show, a few pages' worth, and then at a time
 const FIRST_ITEMS = 60;
@@ -160,7 +202,11 @@ const CHUNK_ITEMS = 80;
  */
 export class PageEngine {
   private records: FlatRecord[] = [];
+  // where the records of each top-level block start, and where the last ends
+  private blockStarts: number[] = [];
   private doc: Node | null = null;
+  // what the sizes of the images depend on, see SyncOptions
+  private sizesKey = "";
   private settings = "";
   private frozen = "";
   private displays = new Map<
@@ -280,37 +326,66 @@ export class PageEngine {
   }
 
   /**
-   * sync hands the engine what changed in the document since the last sync
-   * @param sizes the sizes of the loaded images, in points
-   * @param force flattens again even for the same document, e.g. once an
-   *   image's size is known
+   * sync hands the engine what changed in the document since the last sync:
+   * with `changes`, only the top-level blocks they touch are flattened
+   * again, and the engine moves the items after them; without, or when
+   * something else the items depend on changed, the whole document is
+   * flattened and compared with what the engine has
    * @returns whether anything changed
    */
-  sync(
-    doc: Node,
-    sizes: ImageSizes,
-    force = false,
-    frozen: FrozenWidths | null = null,
-    progressive = false,
-  ) {
-    return this.call(false, () =>
-      this.syncNow(doc, sizes, force, frozen, progressive),
-    );
+  sync(doc: Node, sizes: ImageSizes, options: SyncOptions = {}) {
+    return this.call(false, () => this.syncNow(doc, sizes, options));
+  }
+
+  /**
+   * syncedDoc is the document the engine last laid out, which `changes`
+   * count from
+   */
+  get syncedDoc() {
+    return this.doc;
   }
 
   private syncNow(
     doc: Node,
     sizes: ImageSizes,
-    force: boolean,
+    {
+      force = false,
+      frozen = null,
+      progressive = false,
+      changes = null,
+      sizesKey = "",
+      blocks = [],
+    }: SyncOptions,
+  ) {
+    const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
+    const same =
+      !force && frozenKey === this.frozen && sizesKey === this.sizesKey;
+    if (doc === this.doc && same && blocks.length === 0) return false;
+    this.frozen = frozenKey;
+    this.sizesKey = sizesKey;
+    // what is still to lay out goes first, so the engine has all of it
+    this.finish();
+    const ranges = doc === this.doc ? [] : changes?.ranges;
+    if (
+      same &&
+      ranges &&
+      (doc === this.doc || changes?.from === this.doc) &&
+      this.syncBlocks(doc, ranges, blocks, sizes, frozen)
+    )
+      return true;
+    this.syncAll(doc, sizes, frozen, progressive);
+    return true;
+  }
+
+  // flattens the whole document, and hands the engine what differs
+  private syncAll(
+    doc: Node,
+    sizes: ImageSizes,
     frozen: FrozenWidths | null,
     progressive: boolean,
   ) {
-    const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
-    if (doc === this.doc && !force && frozenKey === this.frozen) return false;
-    this.frozen = frozenKey;
-    // what is still to lay out goes first, so the engine has all of it
-    this.finish();
-    const records = flatten(doc, sizes, frozen);
+    const blocks = flattenBlocks(doc, 0, doc.childCount, sizes, frozen);
+    const records = blocks.flat();
     if (this.doc === null) {
       const first = progressive ? records.slice(0, FIRST_ITEMS) : records;
       this.raw.setItems(JSON.stringify(first.map((record) => record.build())));
@@ -320,23 +395,96 @@ export class PageEngine {
       }
     } else {
       const shift = doc.content.size - this.doc.content.size;
-      const change = diff(this.records, records, shift);
-      if (
-        change.delete > 0 ||
-        change.records.length > 0 ||
-        change.shift !== 0
-      ) {
-        this.raw.update(
-          change.start,
-          change.delete,
-          JSON.stringify(change.records.map((record) => record.build())),
-          change.shift,
-        );
-      }
+      this.send(diff(this.records, records, shift), 0);
     }
     this.records = records;
+    this.blockStarts = startsOf(blocks, 0);
+    this.doc = doc;
+  }
+
+  /**
+   * syncBlocks flattens only the top-level blocks the changed ranges of
+   * `doc` touch, and the `extra` ones, and keeps the records of all others.
+   * The engine moves the items after them itself.
+   * @returns false when that isn't cheaper than flattening it all
+   */
+  private syncBlocks(
+    doc: Node,
+    ranges: Changes["ranges"],
+    extra: readonly number[],
+    sizes: ImageSizes,
+    frozen: FrozenWidths | null,
+  ) {
+    const old = this.doc!;
+    const count = doc.childCount;
+    const delta = count - old.childCount;
+    let from = Infinity;
+    let to = -Infinity;
+    for (const [start, end] of ranges) {
+      from = Math.min(from, blockAt(doc, start));
+      to = Math.max(to, blockAt(doc, end));
+    }
+    for (const index of extra) {
+      from = Math.min(from, index);
+      to = Math.max(to, index);
+    }
+    if (from === Infinity) {
+      // e.g. only the frontmatter changed, which the settings bring
+      if (delta !== 0) return false;
+      this.doc = doc;
+      return true;
+    }
+    from = Math.max(0, Math.min(from, count - 1));
+    to = Math.max(from, Math.min(to, count - 1));
+    let oldTo = to - delta;
+    // the space above a heading depends on the block before it
+    const next = to + 1 < count ? doc.child(to + 1) : null;
+    if (
+      next?.type.name === "heading" &&
+      (delta !== 0 || old.maybeChild(oldTo)?.type !== doc.child(to).type)
+    ) {
+      to++;
+      oldTo++;
+    }
+    if (oldTo < from - 1 || oldTo >= old.childCount) return false;
+    if (to - from + 1 > Math.max(MAX_BLOCKS, count / 2)) return false;
+
+    const fresh = flattenBlocks(doc, from, to + 1, sizes, frozen);
+    const records = fresh.flat();
+    const start = this.blockStarts[from];
+    const end = this.blockStarts[oldTo + 1];
+    const shift = doc.content.size - old.content.size;
+    this.send(diff(this.records.slice(start, end), records, shift), start);
+    // the records after them keep what they are, at their new positions;
+    // they are never built again, since the engine has them already
+    for (let index = end; index < this.records.length; index++)
+      this.records[index].pos += shift;
+    this.records.splice(start, end - start, ...records);
+    const moved = records.length - (end - start);
+    this.blockStarts = [
+      ...this.blockStarts.slice(0, from),
+      // the end of the fresh blocks is where the next block starts
+      ...startsOf(fresh, start).slice(0, -1),
+      ...this.blockStarts.slice(oldTo + 1).map((index) => index + moved),
+    ];
     this.doc = doc;
     return true;
+  }
+
+  // hands the engine a change, whose records start at `offset`
+  private send(change: Change, offset: number) {
+    if (
+      change.delete === 0 &&
+      change.records.length === 0 &&
+      change.shift === 0
+    )
+      return;
+    this.raw.update(
+      offset + change.start,
+      change.delete,
+      JSON.stringify(change.records.map((record) => record.build())),
+      change.shift,
+    );
   }
 
   // the first layout of a long document, laid out a chunk at a time after

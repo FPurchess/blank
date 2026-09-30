@@ -10,7 +10,7 @@ deletes this file on merge.
 - [x] 2. Without the engine, a fully usable plain editor (B3)
 - [x] A. `HEADER_ROOM` above the first page's header in "page ends"
 - [ ] 3. ↑/↓ and End keep the line affinity — waiting for S1
-- [ ] 4. Flatten only the blocks a transaction changed (the shifting part and band versions wait for S6)
+- [ ] 4. Flatten only the blocks a transaction changed: stage 1 done (the changed blocks only, one range per sync); `updateMany` and the body/band displays after S6
 - [x] 5. One unit for the column goal of ↑/↓ and Page Up/Down
 - [x] 6. Keyboard and mouse make cell selections in tables
 - [x] 7. Cells that share a node object get their own positions
@@ -67,3 +67,21 @@ deletes this file on merge.
   size, a computed kept for `PageFrame.vue`'s bitmap key. That key doesn't
   name the document, so the same page and version of another document may
   reuse a stale bitmap.
+
+## Measurements
+
+Task 4, stage 1: ms per keystroke, from `pageEngine.e2e.ts`' "measures
+typing" (44 keys each, debug build under xvfb), mean / p95. The spec
+measures about 1, 20 and 100 pages (54–59 pages as laid out). The machine
+was shared with the other streams' builds and E2E runs, so these are rough:
+the "before" run booted about three times slower than the "after" one.
+
+| pages | layout before | layout after | dispatch before | dispatch after |
+|---|---|---|---|---|
+| 1 | 5.95 / 16 | 1.80 / 6 | 11.51 / 30 | 5.11 / 18 |
+| 20 | 9.27 / 18 | 3.41 / 8 | 15.94 / 38 | 7.60 / 16 |
+| 100 | 4.41 / 7 | 3.70 / 10 | 7.24 / 11 | 12.74 / 29 |
+
+The JS side now flattens only the block typed in (see the spy test in
+`src/engine/incremental.test.ts`); what's left per key is the engine's own
+layout and the painting.

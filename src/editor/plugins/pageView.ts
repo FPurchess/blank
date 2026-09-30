@@ -7,6 +7,7 @@ import {
   TextSelection,
   type Transaction,
 } from "prosemirror-state";
+import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 import { computed, watch } from "vue";
 
@@ -27,6 +28,7 @@ import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
 import { summarize } from "./properties";
+import { displaySrc } from "./images";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { tableGrid } from "../../exporters/table";
@@ -178,15 +180,15 @@ export const frozenWidths = (
 };
 
 /**
- * sync hands the engine the document and the page
- * @param force flattens the document again, e.g. once an image is loaded
+ * sync hands the engine what changed in the document, and the page
+ * @param blocks top-level blocks to flatten again, e.g. once their image
+ *   loaded
  */
 const sync = (
   engine: PageEngine,
   state: EditorState,
   frozen: FrozenWidths | null,
-  force = false,
-  progressive = false,
+  { progressive = false, blocks = [] as readonly number[] } = {},
 ) => {
   const { layout } = pageLayout.value;
   const changed = engine.setSettings(layout, pageFields.value);
@@ -195,13 +197,17 @@ const sync = (
     width: contentWidth,
     height: contentHeight,
   });
-  const laidOut = engine.sync(
-    state.doc,
-    sizes,
-    force || changed,
+  const tracked = pageSyncKey.getState(state);
+  const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
-  );
+    blocks,
+    changes: tracked?.from
+      ? { from: tracked.from, ranges: tracked.ranges }
+      : null,
+    // the room images are fitted into, and the folder relative ones are in
+    sizesKey: `${contentWidth}x${contentHeight}:${path.value ?? ""}`,
+  });
   // an engine that failed has given up, and shows nothing
   if (engine.broken) return;
   if (laidOut || changed || !pageLayoutState.value) {
@@ -210,6 +216,83 @@ const sync = (
     const missing = engine.missing();
     if (missing) void findFonts(missing, language.value);
   }
+};
+
+/**
+ * imageBlocks returns the top-level blocks of `doc` with an image from one
+ * of `urls`
+ */
+const imageBlocks = (doc: Node, urls: ReadonlySet<string>) => {
+  const blocks: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    let found = false;
+    block.descendants((node) => {
+      if (found) return false;
+      if (node.type.name === "image") {
+        const url = displaySrc(node.attrs.src as string, path.value);
+        found = url !== null && urls.has(url);
+      }
+      return !found;
+    });
+    if (found) blocks.push(index);
+  });
+  return blocks;
+};
+
+// what changed in the document since the engine laid it out: the ranges of
+// the current document, counted from `from`, the document the engine has
+export interface TrackedChanges {
+  from: Node | null;
+  ranges: [number, number][];
+}
+
+export const pageSyncKey = new PluginKey<TrackedChanges>("pageSync");
+
+// more changed ranges than this are merged into one
+const MAX_RANGES = 32;
+
+/**
+ * trackChanges adds what a transaction changed to what changed since the
+ * engine laid out the document, which starts again from the document the
+ * engine has
+ */
+export const trackChanges = (
+  tr: Transaction,
+  value: TrackedChanges,
+  before: EditorState,
+  synced: Node | null,
+): TrackedChanges => {
+  const base = before.doc === synced ? { from: before.doc, ranges: [] } : value;
+  if (!tr.docChanged) return base;
+  const ranges: [number, number][] = base.ranges.map(([from, to]) => [
+    tr.mapping.map(from, -1),
+    tr.mapping.map(to, 1),
+  ]);
+  tr.mapping.maps.forEach((map, index) => {
+    const rest = tr.mapping.slice(index + 1);
+    map.forEach((_oldStart, _oldEnd, start, end) => {
+      ranges.push([rest.map(start, -1), rest.map(end, 1)]);
+    });
+  });
+  return { from: base.from, ranges: merged(ranges) };
+};
+
+// the ranges in order, with those that touch joined
+const merged = (ranges: [number, number][]): [number, number][] => {
+  const sorted = ranges
+    .map(([from, to]): [number, number] => [
+      Math.min(from, to),
+      Math.max(from, to),
+    ])
+    .sort((a, b) => a[0] - b[0]);
+  const joined: [number, number][] = [];
+  for (const range of sorted) {
+    const last = joined[joined.length - 1];
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else joined.push(range);
+  }
+  if (joined.length <= MAX_RANGES) return joined;
+  return [[joined[0][0], Math.max(...joined.map(([, to]) => to))]];
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
@@ -226,7 +309,13 @@ export const pageSync = () => {
   let composing: number | null = null;
   // the widths kept of the table the cursor is in
   let frozen: FrozenWidths | null = null;
-  return new Plugin({
+  return new Plugin<TrackedChanges>({
+    key: pageSyncKey,
+    state: {
+      init: () => ({ from: null, ranges: [] }),
+      apply: (tr, value, before) =>
+        trackChanges(tr, value, before, pageEngine?.syncedDoc ?? null),
+    },
     props: {
       handleDOMEvents: {
         compositionstart: (view) => {
@@ -266,7 +355,7 @@ export const pageSync = () => {
           publishLayout(ready);
           publishSelection(ready, view.state, false);
         };
-        sync(ready, view.state, frozen, false, true);
+        sync(ready, view.state, frozen, { progressive: true });
         // an engine that fails on the document gives up before it watches
         if (engine !== ready) return;
         bootMark("layout");
@@ -276,9 +365,11 @@ export const pageSync = () => {
           watch(
             fallbackFonts,
             (fonts) => {
-              if (!ready.addFonts(fonts)) return;
-              timed("layout", () => sync(ready, view.state, frozen, true));
-              if (engine === ready) publishSelection(ready, view.state, false);
+              // the engine lays out again with them itself
+              if (!timed("layout", () => ready.addFonts(fonts))) return;
+              if (engine !== ready) return;
+              publishLayout(ready);
+              publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           ),
@@ -286,9 +377,17 @@ export const pageSync = () => {
           // images, and the document's folder, which relative images are in
           watch(
             [pageLayout, pageFields, loadedImages, path],
-            (_now, [, , , previousPath]) => {
+            ([, , loaded], [, , previousLoaded, previousPath]) => {
               if (path.value !== previousPath) forgetFailures();
-              timed("layout", () => sync(ready, view.state, frozen, true));
+              const fresh = new Set(
+                [...loaded].filter((url) => !previousLoaded?.has(url)),
+              );
+              const blocks = fresh.size
+                ? imageBlocks(view.state.doc, fresh)
+                : [];
+              timed("layout", () =>
+                sync(ready, view.state, frozen, { blocks }),
+              );
               if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },

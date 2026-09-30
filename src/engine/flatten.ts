@@ -190,7 +190,21 @@ export const flatten = (
   doc: Node,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
-): FlatRecord[] => {
+): FlatRecord[] => flattenBlocks(doc, 0, doc.childCount, sizes, frozen).flat();
+
+/**
+ * flattenBlocks returns the records of the document's top-level blocks from
+ * `from` to before `to`, one list for each. A block's records depend only on
+ * it and on the type of the block before it (the space above a heading), so
+ * the blocks a change left alone keep theirs.
+ */
+export const flattenBlocks = (
+  doc: Node,
+  from: number,
+  to: number,
+  sizes: ImageSizes,
+  frozen: FrozenWidths | null = null,
+): FlatRecord[][] => {
   const records: FlatRecord[] = [];
   const quoteOf: number[][] = [];
 
@@ -428,8 +442,13 @@ export const flatten = (
   };
 
   const top: Context = { indent: 0, bars: [], quotes: [], depth: 0, top: true };
-  let previous: Node | null = null;
-  doc.forEach((node, offset, index) => {
+  const blocks: FlatRecord[][] = [];
+  let previous: Node | null = from > 0 ? doc.child(from - 1) : null;
+  let offset = 0;
+  for (let index = 0; index < from; index++)
+    offset += doc.child(index).nodeSize;
+  for (let index = from; index < to; index++) {
+    const node = doc.child(index);
     const heading = node.type.name === "heading";
     const before =
       index === 0
@@ -444,10 +463,13 @@ export const flatten = (
       : node.type.name === "page_break"
         ? 0
         : BLOCK_AFTER;
+    const first = records.length;
     block(node, offset, top, { before, after });
+    blocks.push(records.slice(first));
     previous = node;
-  });
-  return records;
+    offset += node.nodeSize;
+  }
+  return blocks;
 };
 
 /**
