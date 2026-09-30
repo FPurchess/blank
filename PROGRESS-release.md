@@ -11,7 +11,7 @@
 - [x] 8. third-party notices and all font licences ship
 - [x] 9. CI time and caching
 - [x] 10. CLAUDE.md and the rules
-- [ ] 11. `.claude/rules/layout-engine.md`, SPIKE.md reduced to the release
+- [x] 11. `.claude/rules/layout-engine.md`, SPIKE.md reduced to the release
 - [ ] 12. release notes, README
 
 ## Notes for the integrator
