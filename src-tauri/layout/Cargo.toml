@@ -8,9 +8,26 @@ description = "Blank's page layout engine: lays out a document once, for the scr
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["test-hooks"]
+# what only tests use: Engine::words and the wasm's words() and stats().
+# scripts/build-engine.sh builds with the default features, and the TS tests
+# use both; a production build without them needs --no-default-features and
+# a separate build for the tests (see SEAM.md)
+test-hooks = []
+
+# the exactness tests compare the PDF with Engine::words
+[[test]]
+name = "exact"
+required-features = ["test-hooks"]
+
 [dependencies]
 # no system fonts: the engine only knows the fonts it is given, so it lays out
 # the same everywhere, natively and in the webview
+# Parley 0.11 and krilla 0.8.2 need different skrifa/read-fonts (0.44/0.41
+# and 0.42/0.39), so the wasm has both, about 316 KB. Parley 0.10 would match
+# krilla, but a current shaper is worth more. Align once krilla depends on
+# skrifa 0.44 or newer, not before.
 parley = { version = "0.11", default-features = false, features = ["std"] }
 krilla = { version = "0.8", default-features = false, features = ["raster-images"] }
 skrifa = { version = "0.44", default-features = false, features = ["std"] }

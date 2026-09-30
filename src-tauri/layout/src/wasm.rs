@@ -221,7 +221,7 @@ impl LayoutEngine {
             start as usize,
             delete as usize,
             items,
-            shift as i64,
+            i64::from(shift),
         )))
     }
 
@@ -309,9 +309,8 @@ impl LayoutEngine {
     pub fn units_per_em(&self, font: u32) -> f32 {
         self.engine
             .fonts
-            .files
-            .get(font as usize)
-            .map(|file| file.upem)
+            .face(font as usize)
+            .map(|(file, _)| file.upem)
             .unwrap_or(1000.0)
     }
 
@@ -447,7 +446,8 @@ impl LayoutEngine {
     }
 
     /// how much the last change laid out: items, the page it paginated
-    /// from, and the page it settled at (-1 for none)
+    /// from, and the page it settled at (-1 for none); for tests
+    #[cfg(feature = "test-hooks")]
     pub fn stats(&self) -> Vec<i32> {
         let stats = self.engine.stats;
         vec![
@@ -457,7 +457,9 @@ impl LayoutEngine {
         ]
     }
 
-    /// the words as laid out, for checking the PDF against the layout
+    /// the words as laid out, for checking the PDF against the layout; for
+    /// tests
+    #[cfg(feature = "test-hooks")]
     pub fn words(&mut self) -> String {
         let words: Vec<_> = self
             .engine
@@ -526,9 +528,8 @@ impl LayoutEngine {
                     "family": self
                         .engine
                         .fonts
-                        .files
-                        .get(*font)
-                        .map(|file| file.family.as_str())
+                        .face(*font)
+                        .map(|(file, _)| file.family.as_str())
                         .unwrap_or(""),
                 }),
             })

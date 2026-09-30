@@ -1,21 +1,23 @@
 //! Laying out one textblock with Parley: line breaking, bidi, shaping and
 //! the cursor geometry, in points.
 
+use std::sync::Arc;
+
 use parley::{
-    Affinity, Alignment, AlignmentOptions, Cursor, FontFamily, FontStyle, FontWeight, Layout,
-    LineHeight, OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
+    Affinity, Alignment, AlignmentOptions, Cursor, FontStyle, FontWeight, Layout, LineHeight,
+    OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
 };
 
-use crate::fonts::{ink_link, Fonts, Ink, INK_CODE};
+use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
-use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, MEDIUM};
+use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE};
 
 /// A laid out textblock and where it stands in its item.
 pub struct TextBox {
     pub layout: Layout<Ink>,
     /// the text as laid out: a space for an empty block, which still takes
-    /// a line
-    pub text: String,
+    /// a line; shared with the glyph runs painted from it
+    pub text: Arc<str>,
     /// the length of the block's text in ProseMirror positions
     pub len: u32,
     /// the ProseMirror position of its first character
@@ -28,6 +30,12 @@ pub struct TextBox {
     pub style: TextStyle,
     /// the characters no font had a glyph for, see Engine::missing
     pub missing: Vec<char>,
+    /// its lines, as Parley broke them
+    lines: Vec<LineInfo>,
+    /// the font index of each of its runs, by its line and Parley's index
+    /// of the run in it: a face, or an instance of a variable one, see
+    /// `Fonts::font_of`
+    pub run_fonts: Vec<((usize, usize), usize)>,
 }
 
 /// one glyph, positioned on the page
@@ -59,6 +67,7 @@ pub struct GlyphRun {
     pub width: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LineInfo {
     pub top: f32,
     pub bottom: f32,
@@ -96,9 +105,7 @@ impl TextBox {
             } = fonts;
             let mut builder = lcx.ranged_builder(fcx, &laid_text, 1.0, false);
             let family = if style.mono { &*mono_stack } else { &*stack };
-            builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
-                family.to_string().into(),
-            )));
+            builder.push_default(StyleProperty::FontFamily(family_list(family)));
             builder.push_default(StyleProperty::FontSize(style.size));
             builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(style.line)));
             builder.push_default(StyleProperty::FontWeight(FontWeight::new(style.weight)));
@@ -129,7 +136,7 @@ impl TextBox {
         };
         let mut boxed = TextBox {
             layout,
-            text: laid_text,
+            text: laid_text.into(),
             len,
             pos: text.pos,
             links,
@@ -138,6 +145,8 @@ impl TextBox {
             width,
             style,
             missing: vec![],
+            lines: vec![],
+            run_fonts: vec![],
         };
         boxed.layout.break_all_lines(Some(width));
         boxed.layout.align(
@@ -146,8 +155,41 @@ impl TextBox {
                 align_when_overflowing: false,
             },
         );
+        boxed.lines = boxed.read_lines();
         boxed.missing = boxed.notdef();
+        boxed.run_fonts = boxed.fonts_of_runs(fonts);
         boxed
+    }
+
+    /// the font index of each run, at the coordinates Parley set a variable
+    /// font at, e.g. its bold
+    fn fonts_of_runs(&self, fonts: &mut Fonts) -> Vec<((usize, usize), usize)> {
+        let mut found: Vec<((usize, usize), usize)> = vec![];
+        for (line_index, line) in self.layout.lines().enumerate() {
+            for item in line.items() {
+                let PositionedLayoutItem::GlyphRun(run) = item else {
+                    continue;
+                };
+                let parley_run = run.run();
+                let index = (line_index, parley_run.index());
+                if found.iter().any(|(known, _)| *known == index) {
+                    continue;
+                }
+                let variations: Vec<([u8; 4], f32)> = parley_run
+                    .synthesis()
+                    .variation_settings()
+                    .iter()
+                    .map(|(tag, value)| (tag.to_be_bytes(), *value))
+                    .collect();
+                let font = fonts.font_of(
+                    parley_run.font(),
+                    &variations,
+                    parley_run.normalized_coords(),
+                );
+                found.push((index, font));
+            }
+        }
+        found
     }
 
     /// the characters laid out as the missing glyph, which no font has
@@ -187,7 +229,12 @@ impl TextBox {
         self.layout.height()
     }
 
-    pub fn lines(&self) -> Vec<LineInfo> {
+    /// its lines, as Parley broke them
+    pub fn lines(&self) -> &[LineInfo] {
+        &self.lines
+    }
+
+    fn read_lines(&self) -> Vec<LineInfo> {
         self.layout
             .lines()
             .map(|line| {
@@ -272,9 +319,15 @@ impl TextBox {
                 })
                 .collect();
             let ink = run.style().brush;
-            let font = fonts.index_of(parley_run.font());
+            let font = self
+                .run_fonts
+                .iter()
+                .find(|(run, _)| *run == (line_index, index))
+                .map_or_else(|| fonts.index_of(parley_run.font()), |(_, font)| *font);
             let underline = run.style().underline.as_ref().map(|_| {
-                let (offset, thickness) = fonts.files[font].underline;
+                let (offset, thickness) = fonts
+                    .face(font)
+                    .map_or((0.1, 0.05), |(file, _)| file.underline);
                 (offset * size, thickness * size)
             });
             if glyphs.is_empty() && ink & INK_CODE == 0 {
@@ -491,13 +544,13 @@ fn push_span(
     span: &Span,
     range: std::ops::Range<usize>,
     style: &TextStyle,
-    mono_stack: &str,
+    mono_stack: &[String],
     links: &mut Vec<String>,
 ) {
     // inline code in IBM Plex Mono, a little smaller than the text around it
     if span.code && !style.mono {
         builder.push(
-            StyleProperty::FontFamily(FontFamily::Source(mono_stack.to_string().into())),
+            StyleProperty::FontFamily(family_list(mono_stack)),
             range.clone(),
         );
         builder.push(
@@ -510,8 +563,6 @@ fn push_span(
             StyleProperty::FontWeight(FontWeight::new(weight(true, style))),
             range.clone(),
         );
-    } else if style.weight == MEDIUM {
-        // medium headings stay medium
     }
     if span.italic {
         builder.push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
@@ -738,5 +789,86 @@ mod tests {
         // and plain text as it was, a line break standing for no glyph
         assert_eq!(glyph_ranges("ab"), [(0, 1), (1, 2)]);
         assert_eq!(glyph_ranges("a;\nb")[..2], [(0, 1), (1, 2)]);
+    }
+
+    /// the font index and first glyph of a crab, in bold or not, in the
+    /// variable Noto Emoji
+    fn crab(fonts: &mut Fonts, bold: bool) -> (usize, u32) {
+        let mut value = text("\u{1f980}");
+        value.spans = vec![Span {
+            from: 0,
+            to: 2,
+            bold,
+            ..Default::default()
+        }];
+        let boxed = TextBox::new(fonts, &value, 300.0, Alignment::Start);
+        let runs = boxed.glyph_runs(fonts, 0);
+        (runs[0].font, runs[0].glyphs[0].id)
+    }
+
+    #[test]
+    fn sets_variable_fonts_at_their_coordinates() {
+        let mut fonts = repository_fonts();
+        let emoji = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/NotoEmoji-VariableFont_wght.ttf"
+        ))
+        .unwrap();
+        fonts.add(emoji, "Noto Emoji");
+        let regular = crab(&mut fonts, false);
+        let bold = crab(&mut fonts, true);
+        // the regular weight is the face itself, the bold an instance of it
+        assert_eq!(regular.0, fonts.files.len() - 1);
+        assert_eq!(bold.0, crate::fonts::INSTANCE_BASE);
+        assert_eq!(bold.1, regular.1);
+        assert_eq!(fonts.instances[0].variations, [(*b"wght", 700.0)]);
+        // painted with its own outline
+        let (regular_path, bold_path) = (
+            fonts.glyph_path(regular.0, regular.1),
+            fonts.glyph_path(bold.0, bold.1),
+        );
+        assert!(!bold_path.is_empty());
+        assert_ne!(regular_path, bold_path);
+        assert_eq!(
+            fonts.face(bold.0).unwrap().0.upem,
+            fonts.face(regular.0).unwrap().0.upem
+        );
+        // the same instance again, and its number stays when fonts are
+        // added after it
+        assert_eq!(crab(&mut fonts, true).0, bold.0);
+        let dejavu = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/dejavu-sans-bold.ttf"
+        ))
+        .unwrap();
+        fonts.add(dejavu, "Other");
+        assert_eq!(fonts.glyph_path(bold.0, bold.1), bold_path);
+        assert_eq!(fonts.share().glyph_path(bold.0, bold.1), bold_path);
+    }
+
+    #[test]
+    fn keeps_each_run_in_its_font_on_every_line() {
+        // inline code on several lines: Parley counts the runs of each
+        // line from 0, so a run's font is known by its line and its index
+        let mut fonts = repository_fonts();
+        let words = "press Mod Alt N to jump to it and pick what you meant ".repeat(4);
+        let mut value = text(&words);
+        value.spans = words
+            .match_indices("Alt")
+            .map(|(index, _)| Span {
+                from: index as u32,
+                to: index as u32 + 3,
+                code: true,
+                ..Default::default()
+            })
+            .collect();
+        let boxed = TextBox::new(&mut fonts, &value, 180.0, Alignment::Start);
+        assert!(boxed.line_count() > 3);
+        for line in 0..boxed.line_count() {
+            for run in boxed.glyph_runs(&fonts, line) {
+                let code = run.ink & INK_CODE != 0;
+                assert_eq!(run.font, if code { 10 } else { 0 }, "line {line}");
+            }
+        }
     }
 }

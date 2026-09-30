@@ -10,7 +10,7 @@ Each change gives:
 
 Old forms are kept where that's cheap, so the TS side keeps working with the new wasm until it switches.
 
-Planned, in the order they land: S6 (task 2), S5 (task 3), S1 (task 4), S2 (task 9), S3 (task 11), S4 (tasks 12 and 13).
+In the order they landed: S6 (task 2), S5 (task 3), S1 (task 4), S2 (task 9), S3 (task 11), S4 (tasks 12 and 13), then the font indices of task 14 and `test-hooks` of task 17, which change no shape.
 
 Not a seam change: task 0 (`refactor: split the layout engine into modules by concern`) only moved code.
 
@@ -42,7 +42,7 @@ Everything is additive, so the old TS code keeps working with the new wasm.
   - The pages are paginated once, from the page before the first entry.
   - Out-of-order entries still apply, but paginate from the first page.
   - `update(...)` is `updateMany` with one entry.
-  - Fixed after e9f8ef2 (the next commit, "fix: settle updateMany only on a tail that reaches the old end"): an `updateMany` whose last entry deleted the last items could copy their old fragments and panic. `update` alone was never affected. Merge the fix together with S6 if `updateMany` is used.
+  - Fixed after e9f8ef2, in e2ac963 ("fix: settle updateMany only on a tail that reaches the old end"): an `updateMany` whose last entry deleted the last items could copy their old fragments and panic. `update` alone was never affected. Merge the fix together with S6 if `updateMany` is used.
 - **Positions**: the single `shift` covers every position the engine keeps: the items (texts, breaks, rules, images, tables and their cells) and the text boxes it laid out. Fragments, pages and table grids hold item indices and points, not positions. So unchanged items are never sent again, and there are no block-relative positions.
 - **TS side (engine-editor, engine-ui)**:
   - Repaint a page's body layer when `bodyVersions()[i]` changes, and its band layer when `bandVersions()[i]` changes. Paint them from `pageBody`/`pageBands`.
@@ -75,7 +75,7 @@ The shapes don't change. What changes is how odd values behave:
 
 ## S1: line affinity for ↑/↓, Home and End (task 4)
 
-Commit: `fix: keep the caret on its line at line ends when moving up, down and to the end` (its hash is in the handoff message and the next section).
+Commit: 2285ac5 `fix: keep the caret on its line at line ends when moving up, down and to the end`.
 
 Where a line ends at the position where the next one starts (after a word broken because it is wider than the line), one position has two carets: at the end of one line and at the start of the next. `caret(pos, after)` already paints either one, and now the moves say which one they land on.
 
@@ -94,7 +94,7 @@ Where a line ends at the position where the next one starts (after a word broken
 
 ## S2: block content in table cells (task 9)
 
-Commit: `feat: lay out lists, quotes and images in table cells` (its hash is in the handoff message and the next section).
+Commit: d8a00cf `feat: lay out lists, quotes, code and images in table cells`.
 
 A cell gets `blocks`, used instead of `paragraphs` when it isn't empty. `paragraphs` is still read as before, so the old flatten.ts keeps working.
 
@@ -132,7 +132,7 @@ A cell gets `blocks`, used instead of `paragraphs` when it isn't empty. `paragra
 
 ## S3: one shared font store (task 11)
 
-Commit: `feat: let engines share one store of fonts` (its hash is in the handoff message and the next section).
+Commit: 0a23959 `feat: let engines share one store of fonts`.
 
 The font files live once in the wasm instance, shared by reference (`Arc`) between the engines made from one another. wasm memory never shrinks, so every copy of a 20 MB CJK font used to stay for good.
 
@@ -155,7 +155,7 @@ The font files live once in the wasm instance, shared by reference (`Arc`) betwe
 
 ## S4: `pdf()` takes the language and reports warnings (tasks 12 and 13)
 
-Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and warn about them` (task 12), and `feat: tag the PDF and give it a language and bookmarks` (task 13; its hash is in the handoff message).
+Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and warn about them` (task 12), and 25439ad `feat: tag the PDF and give it a language and bookmarks` (task 13).
 
 | | old | new |
 |---|---|---|
@@ -186,3 +186,25 @@ Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and wa
   - Headers, footers, rules, fills and lines are artifacts.
 - The PDF has bookmarks: one per heading, nested by level, jumping to where it starts.
 - TS side: nothing beyond passing `language` (above). There is no PDF/A: that's the owner's decision.
+
+## Font indices of variable-font instances (task 14)
+
+Commit: 53c9198 `fix: paint and embed glyphs of variable fonts at their coordinates`.
+
+No shape changes. What changes is which numbers `font` can be:
+
+- The `font` of a glyph run (in `page`/`pageBody`/`pageBands`), and what `glyphPath(font, id)` and `unitsPerEm(font)` take, is a **font index**.
+  - Below the number of faces (as before), it's a face of a font file, at its default coordinates.
+  - From `INSTANCE_BASE` = 1 048 576 (2^20) on, it's an instance of a variable face at other coordinates, e.g. the bold of Noto Emoji, whose weight varies.
+- `glyphPath` gives an instance's outline at its coordinates, and `unitsPerEm` its face's.
+- An index never changes its meaning, not even when `addFont` adds faces later, so a cache keyed by `font * 0x10000 + id` (as `engine.ts` has it) stays right.
+- `fontFileCount`/`fontFile`/`fontFileFamily` count files, never instances.
+- TS side: nothing to change. Just don't assume that `font` is less than the number of faces.
+
+## `test-hooks`: the exports only tests use (task 17)
+
+Commit: 2ae1a64 `chore: drop dead code, gate the test exports and check the casts`.
+
+- `stats()` and `words()` (and `Engine::words`) are behind the cargo feature `test-hooks`, which is **on by default**. So `scripts/build-engine.sh` builds them as before, and `src/engine/engine.test.ts:73` (`raw.stats()`) and `src/engine/exact.test.ts` (`raw.words()`) keep working.
+- Leaving them out of the production wasm is a later release decision (the coordinator's call, not part of these tasks). It needs `--no-default-features` in the production build and a separate build with the feature for the TS tests. The crate builds and passes clippy both ways.
+- Removed, and not exported: `Engine::lines`, which nothing used.

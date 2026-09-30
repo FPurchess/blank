@@ -182,10 +182,7 @@ impl Engine {
         let (index, _) = best?;
         let boxed = &texts[index];
         let mut local_y = item_y - boxed.y;
-        if let Some(info) = unit
-            .line
-            .and_then(|line| boxed.lines().into_iter().nth(line))
-        {
+        if let Some(info) = unit.line.and_then(|line| boxed.lines().get(line)) {
             local_y = local_y.clamp(info.top + 0.5, info.bottom - 0.5);
         }
         Some((frag.item, index, item_x - boxed.x, local_y))
@@ -407,7 +404,7 @@ mod tests {
         assert_eq!(up, pos);
         // from the last line of a page to the first of the next
         let second = engine.pages[1].first.unwrap();
-        let frag = engine.first_frag[second.0] + 0;
+        let frag = engine.first_frag[second.0];
         let previous = engine.frags[engine.pages[0].end - 1];
         let last_line_pos = {
             let boxed = &engine.laid[previous.item].texts[0];

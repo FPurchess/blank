@@ -98,6 +98,96 @@ pub fn sample() -> Vec<Item> {
             pos += 1;
         }
     }
+    items.extend(more_of_the_sample(pos));
+    items
+}
+
+/// a red pixel, the image of the sample
+const PNG: [u8; 69] = [
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0,
+    0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 120, 156, 99, 248, 207, 192, 0, 0, 3, 1,
+    1, 0, 201, 254, 146, 239, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+];
+
+/// the images of the sample, by their src
+fn sample_images() -> std::collections::HashMap<String, blank_layout::pdf::ImageData> {
+    let mut images = std::collections::HashMap::new();
+    images.insert(
+        "pixel.png".to_string(),
+        blank_layout::pdf::ImageData {
+            bytes: PNG.to_vec(),
+            jpeg: false,
+        },
+    );
+    images
+}
+
+/// what else the sample has, from `pos` on: a table with two header rows
+/// and a caption, a code block, combining marks and an image
+fn more_of_the_sample(mut pos: u32) -> Vec<Item> {
+    use blank_layout::model::{Cell, Row};
+    let mut items = vec![];
+    let cell = |text: &str, pos: &mut u32| {
+        let cell = Cell {
+            paragraphs: vec![Text {
+                pos: *pos + 2,
+                text: text.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        *pos += text.encode_utf16().count() as u32 + 4;
+        cell
+    };
+    let table = pos;
+    let mut at = pos + 1;
+    let mut rows = vec![];
+    for (index, texts) in [
+        ["Quarter", "Region", "Sales"],
+        ["", "", "in euros"],
+        ["Q1", "North", "1,200"],
+        ["Q1", "South", "980"],
+        ["Q2", "North", "1,450"],
+    ]
+    .iter()
+    .enumerate()
+    {
+        at += 1;
+        let cells = texts.iter().map(|text| cell(text, &mut at)).collect();
+        at += 1;
+        rows.push(Row {
+            cells,
+            header: index < 2,
+        });
+    }
+    pos = at + 1;
+    items.push(Item {
+        content: Content::Table {
+            pos: table,
+            end: pos,
+            rows,
+            widths: vec![2.0, 3.0, 2.0],
+            caption: Some("Sales by quarter and region".into()),
+        },
+        ..text_item(0, "", "p", 0, vec![])
+    });
+    // no quotes: pdftotext writes them as entities read_words doesn't read
+    let code = "fn main() {\n    let total = 1200 + 980;\n}";
+    items.push(text_item(pos + 1, code, "code", 0, vec![]));
+    pos += code.encode_utf16().count() as u32 + 2;
+    let marks = "A cafe\u{301} with cre\u{300}me bru\u{302}le\u{301}e, as written.";
+    items.push(text_item(pos + 1, marks, "p", 0, vec![]));
+    pos += marks.encode_utf16().count() as u32 + 2;
+    items.push(Item {
+        content: Content::Image {
+            pos,
+            src: "pixel.png".into(),
+            width: 120.0,
+            height: 80.0,
+            alt: "a red pixel".into(),
+        },
+        ..text_item(0, "", "p", 0, vec![])
+    });
     items
 }
 
@@ -158,7 +248,7 @@ fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, S
 pub fn compare(engine: &mut Engine, name: &str) -> Option<usize> {
     let pdf = write(
         engine,
-        &Default::default(),
+        &sample_images(),
         &Info {
             title: "Sample".into(),
             author: "".into(),
@@ -326,18 +416,39 @@ fn the_pdf_holds_tables_with_lists_and_quotes() {
     }
 }
 
+/// what a missing tool means: on CI a failure, as there the checks must
+/// run, and else a skip
+fn missing_tool<T>(tool: &str, package: &str) -> Option<T> {
+    if std::env::var_os("CI").is_some() {
+        panic!("{tool} is missing: install {package}, CI doesn't skip the check");
+    }
+    None
+}
+
+/// the package a tool comes with
+fn package_of(tool: &str) -> &'static str {
+    match tool {
+        "qpdf" => "qpdf",
+        _ => "poppler-utils",
+    }
+}
+
 /// the plain text pdftotext reads from a PDF, or nothing without pdftotext
+/// (only off CI)
 fn read_text(pdf: &[u8], name: &str) -> Option<String> {
     let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
     std::fs::write(&path, pdf).unwrap();
     let out = path.with_extension("txt");
-    let status = Command::new("pdftotext")
+    let status = match Command::new("pdftotext")
         .arg("-enc")
         .arg("UTF-8")
         .arg(&path)
         .arg(&out)
         .status()
-        .ok()?;
+    {
+        Ok(status) => status,
+        Err(_) => return missing_tool("pdftotext", "poppler-utils"),
+    };
     assert!(status.success());
     Some(std::fs::read_to_string(&out).unwrap())
 }
@@ -444,9 +555,12 @@ fn pdf_text_keeps_what_no_font_has() {
     compare(&mut engine, "notdef");
 }
 
-/// what a command prints, or nothing without it
+/// what a command prints, or nothing without it (only off CI)
 fn run(program: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(program).args(args).output().ok()?;
+    let out = match Command::new(program).args(args).output() {
+        Ok(out) => out,
+        Err(_) => return missing_tool(program, package_of(program)),
+    };
     Some(String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
 }
 

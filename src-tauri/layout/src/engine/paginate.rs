@@ -19,11 +19,18 @@ impl Engine {
     /// starts with one of them where an old page did, the rest is as
     /// before. Without one, every item was laid out again, and every page
     /// gets new versions.
+    ///
+    /// Only what changes is worked on: the pages before `from` stay as they
+    /// are, the old pages after the change move over as they are, and band
+    /// texts are only written again where a page's number, the number of
+    /// pages or the chapters changed.
     pub(super) fn paginate_from(&mut self, from: usize, change: Option<Change>) -> Changes {
         let tail = change.as_ref().and_then(|change| change.tail);
-        let from = from.min(self.pages.len());
-        let old_pages = std::mem::take(&mut self.pages);
-        let old_frags = std::mem::take(&mut self.frags);
+        let mut old_pages = std::mem::take(&mut self.pages);
+        let mut old_frags = std::mem::take(&mut self.frags);
+        let old_first_frag = std::mem::take(&mut self.first_frag);
+        let old_chapters = std::mem::take(&mut self.chapters);
+        let from = from.min(old_pages.len());
         let mut from = if change.is_none() { 0 } else { from };
         while from > 0 && old_pages.get(from).is_none_or(|page| page.first.is_none()) {
             from -= 1;
@@ -38,16 +45,26 @@ impl Engine {
             from
         };
         let keep_frags = old_pages.get(from).map(|page| page.start).unwrap_or(0);
+        // what each page had before, for the changes
+        let old_versions: Vec<(u32, u32)> = old_pages
+            .iter()
+            .map(|page| (page.body_version, page.band_version))
+            .collect();
+        let old_count = old_pages.len();
+        // the pages and fragments before `from` stay; the old ones from there
+        // on are what the new ones are compared with and taken from
+        let tail_pages = old_pages.split_off(from);
+        let tail_frags = old_frags.split_off(keep_frags);
         let mut paginator = Paginator {
             items: &self.items,
             laid: &self.laid,
             settings: &self.settings,
-            frags: old_frags[..keep_frags].to_vec(),
-            pages: old_pages[..from].to_vec(),
+            frags: old_frags,
+            pages: old_pages,
             y: 0.0,
             empty: true,
             prev_after: 0.0,
-            old: tail.map(|tail| (tail, &old_pages[..], &old_frags[..])),
+            old: tail.map(|tail| (tail, &tail_pages[..])),
             settled: None,
         };
         paginator.run(start_item, start_unit);
@@ -57,36 +74,94 @@ impl Engine {
             mut pages,
             ..
         } = paginator;
+        // the pages paginated again: whether each has the fragments of the
+        // old page at its index, of items that weren't laid out again, and
+        // what that page had
+        let repaginated: Vec<Option<Before>> = (from..pages.len())
+            .map(|index| {
+                let change = change.as_ref()?;
+                let old = tail_pages.get(index - from)?;
+                let page = &pages[index];
+                let new = &frags[page.start..page.end];
+                let before = tail_frags.get(old.start - keep_frags..old.end - keep_frags)?;
+                let same = new.len() == before.len()
+                    && new.iter().zip(before).all(|(a, b)| {
+                        change.map.old_of(a.item) == Some(b.item)
+                            && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
+                    });
+                Some(Before {
+                    same,
+                    version: old.version,
+                    body_version: old.body_version,
+                    band_version: old.band_version,
+                    bands: old.bands.clone(),
+                })
+            })
+            .collect();
+        // the rest is as before: the old pages, moved
         let mut copied_from = usize::MAX;
+        let mut copied_frags = frags.len();
+        let mut frag_offset = 0i64;
+        let mut old_copied_start = usize::MAX;
         if let (Some(old_index), Some(tail)) = (settled, tail) {
             copied_from = pages.len();
-            let offset = frags.len() as i64 - old_pages[old_index].start as i64;
-            for page in &old_pages[old_index..] {
-                let mut page = page.clone();
-                page.start = (page.start as i64 + offset) as usize;
-                page.end = (page.end as i64 + offset) as usize;
+            copied_frags = frags.len();
+            let mut tail_pages = tail_pages;
+            let start = tail_pages[old_index].start;
+            old_copied_start = start;
+            frag_offset = signed(frags.len()) - signed(start);
+            for mut page in tail_pages.drain(old_index..) {
+                page.start = moved(page.start, frag_offset);
+                page.end = moved(page.end, frag_offset);
                 page.first = page
                     .first
-                    .map(|(item, unit)| ((item as i64 + tail.delta) as usize, unit));
+                    .map(|(item, unit)| (moved(item, tail.delta), unit));
                 pages.push(page);
             }
-            for frag in &old_frags[old_pages[old_index].start..] {
-                frags.push(Frag {
-                    item: (frag.item as i64 + tail.delta) as usize,
+            let copied = &tail_frags[start - keep_frags..];
+            if tail.delta == 0 {
+                frags.extend_from_slice(copied);
+            } else {
+                frags.extend(copied.iter().map(|frag| Frag {
+                    item: moved(frag.item, tail.delta),
                     ..*frag
-                });
+                }));
             }
         }
         self.stats.paginated_from = from;
         self.stats.settled_at = settled.map(|_| copied_from);
-        self.frags = frags;
-        self.pages = pages;
-        self.first_frag = vec![usize::MAX; self.items.len()];
-        for (index, frag) in self.frags.iter().enumerate().rev() {
-            if !frag.repeat {
-                self.first_frag[frag.item] = index;
+        // the first fragment of each item: as before for the items before
+        // the ones paginated again, found for those, and moved for the ones
+        // copied
+        let mut first_frag = old_first_frag[..start_item.min(old_first_frag.len())].to_vec();
+        first_frag.resize(self.items.len(), usize::MAX);
+        if start_unit > 0 {
+            if let Some(&first) = old_first_frag.get(start_item) {
+                first_frag[start_item] = first;
             }
         }
+        for (index, frag) in frags.iter().enumerate().take(copied_frags).skip(keep_frags) {
+            if !frag.repeat && first_frag[frag.item] == usize::MAX {
+                first_frag[frag.item] = index;
+            }
+        }
+        if let (Some(_), Some(tail)) = (settled, tail) {
+            for (item, first) in first_frag.iter_mut().enumerate().skip(tail.start) {
+                if *first != usize::MAX {
+                    continue;
+                }
+                let old = old_first_frag
+                    .get(moved(item, tail.delta.saturating_neg()))
+                    .copied()
+                    .filter(|old| *old != usize::MAX && *old >= old_copied_start);
+                if let Some(old) = old {
+                    *first = moved(old, frag_offset);
+                }
+            }
+        }
+        self.frags = frags;
+        self.pages = pages;
+        self.first_frag = first_frag;
         self.chapters = self
             .items
             .iter()
@@ -99,71 +174,66 @@ impl Engine {
                 _ => None,
             })
             .collect();
-        // new versions for what changed on each page: its body when its
-        // fragments did, or their items were laid out again; its bands when
-        // their texts did
+        // the band texts: every page's where the number of pages or the
+        // chapters changed, else only the pages paginated again have new ones
+        let count = self.pages.len();
+        let all_bands = change.is_none() || count != old_count || self.chapters != old_chapters;
+        let repaginated_end = from + repaginated.len();
         let mut changes = Changes::default();
         let mut body_changed: Vec<usize> = vec![];
         let mut bands_changed: Vec<usize> = vec![];
-        let count = self.pages.len();
         for index in 0..count {
-            let bands = self.band_texts(index);
-            // the old page each part is the same as, if any
-            let (body_source, band_source) = if change.is_none() {
-                (None, None)
-            } else if index < from {
-                (Some(index), Some(index))
-            } else if index >= copied_from {
-                let source = settled.map(|old_index| old_index + index - copied_from);
-                (source, source)
+            let paginated_again = (from..repaginated_end).contains(&index);
+            let bands = if all_bands || paginated_again {
+                Some(self.band_texts(index))
             } else {
-                // paginated again: the same body as the old page if it has
-                // the same fragments, of items that weren't laid out again
-                let same = change.as_ref().is_some_and(|change| {
-                    let Some(old) = old_pages.get(index) else {
-                        return false;
-                    };
-                    let page = &self.pages[index];
-                    let new = &self.frags[page.start..page.end];
-                    let before = &old_frags[old.start..old.end];
-                    new.len() == before.len()
-                        && new.iter().zip(before).all(|(a, b)| {
-                            change.map.old_of(a.item) == Some(b.item)
-                                && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
-                        })
-                });
-                (same.then_some(index), Some(index))
+                None
             };
-            let body = body_source.and_then(|source| old_pages.get(source));
-            let band = band_source
-                .and_then(|source| old_pages.get(source))
-                .filter(|old| old.bands == bands);
             let mut new_version = || {
                 self.next_version += 1;
                 self.next_version
             };
-            let body_version = body
-                .map(|old| old.body_version)
-                .unwrap_or_else(&mut new_version);
-            let band_version = band
-                .map(|old| old.band_version)
-                .unwrap_or_else(&mut new_version);
-            let version = match (body, band) {
-                (Some(old), Some(_)) if body_source == band_source => old.version,
-                _ => new_version(),
+            let page = &self.pages[index];
+            let (body, band, version) = if change.is_none() {
+                (None, None, None)
+            } else if paginated_again {
+                // against the old page at the same index
+                match &repaginated[index - from] {
+                    Some(before) => {
+                        let body = before.same.then_some(before.body_version);
+                        let band =
+                            (bands.as_ref() == Some(&before.bands)).then_some(before.band_version);
+                        let version = (body.is_some() && band.is_some()).then_some(before.version);
+                        (body, band, version)
+                    }
+                    None => (None, None, None),
+                }
+            } else {
+                // a page as it was, moved
+                let band = bands
+                    .as_ref()
+                    .is_none_or(|bands| *bands == page.bands)
+                    .then_some(page.band_version);
+                let version = band.map(|_| page.version);
+                (Some(page.body_version), band, version)
             };
-            let before = old_pages.get(index);
-            if before.map(|old| old.body_version) != Some(body_version) {
+            let body_version = body.unwrap_or_else(&mut new_version);
+            let band_version = band.unwrap_or_else(&mut new_version);
+            let version = version.unwrap_or_else(&mut new_version);
+            let before = old_versions.get(index);
+            if before.map(|old| old.0) != Some(body_version) {
                 body_changed.push(index);
             }
-            if before.map(|old| old.band_version) != Some(band_version) {
+            if before.map(|old| old.1) != Some(band_version) {
                 bands_changed.push(index);
             }
             let page = &mut self.pages[index];
             page.version = version;
             page.body_version = body_version;
             page.band_version = band_version;
-            page.bands = bands;
+            if let Some(bands) = bands {
+                page.bands = bands;
+            }
         }
         let range = |indices: &[usize]| match (indices.first(), indices.last()) {
             (Some(&first), Some(&last)) => first..last + 1,
@@ -173,6 +243,25 @@ impl Engine {
         changes.bands = range(&bands_changed);
         changes
     }
+}
+
+/// what the old page at the index of a page paginated again had
+struct Before {
+    /// the same fragments, of items that weren't laid out again
+    same: bool,
+    version: u32,
+    body_version: u32,
+    band_version: u32,
+    bands: [String; 6],
+}
+
+/// an index moved by `by`, never below 0
+fn moved(index: usize, by: i64) -> usize {
+    usize::try_from(signed(index).saturating_add(by)).unwrap_or(0)
+}
+
+pub(super) fn signed(index: usize) -> i64 {
+    i64::try_from(index).unwrap_or(i64::MAX)
 }
 
 /// what an update changed: which items are the ones before it, where the
@@ -211,7 +300,8 @@ struct Paginator<'a> {
     y: f32,
     empty: bool,
     prev_after: f32,
-    old: Option<(Tail, &'a [Page], &'a [Frag])>,
+    /// the old pages from where pagination started, see `Tail`
+    old: Option<(Tail, &'a [Page])>,
     settled: Option<usize>,
 }
 
@@ -246,9 +336,9 @@ impl Paginator<'_> {
         };
         if !repeat && page.first.is_none() {
             page.first = Some((item, unit));
-            if let Some((tail, old_pages, _)) = self.old {
+            if let Some((tail, old_pages)) = self.old {
                 if item >= tail.start {
-                    let old = ((item as i64 - tail.delta) as usize, unit);
+                    let old = (moved(item, tail.delta.saturating_neg()), unit);
                     let index = old_pages
                         .partition_point(|page| page.first.is_some_and(|first| first < old));
                     if old_pages

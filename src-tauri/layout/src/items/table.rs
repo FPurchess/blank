@@ -410,7 +410,7 @@ pub(super) fn table_units(
             let line_spans = |boxed: &TextBox| {
                 boxed
                     .lines()
-                    .into_iter()
+                    .iter()
                     .map(|line| (boxed.y + line.top, boxed.y + line.bottom))
                     .collect::<Vec<_>>()
             };
@@ -888,10 +888,10 @@ mod tests {
         let bullets = engine
             .page_ops(0, false)
             .iter()
-            .filter(|op| matches!(op, Op::Glyphs { text, role: Role::Text, .. } if text.as_str() == "•"))
+            .filter(|op| matches!(op, Op::Glyphs { text, role: Role::Text, .. } if &**text == "•"))
             .count();
         assert_eq!(bullets, 2);
-        assert!(engine.laid[0].texts.iter().all(|text| text.text != "•"));
+        assert!(engine.laid[0].texts.iter().all(|text| &*text.text != "•"));
         // the caret is in the list's text
         assert!(engine.caret(6, false).is_some());
         assert_eq!(engine.missing(), Vec::<char>::new());

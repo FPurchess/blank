@@ -16,11 +16,20 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 11. S3: one shared font store
 - [x] 12. S4: failed image decodes and broken fonts in the PDF
 - [x] 13. Tags, `/Lang` and bookmarks in the PDF
-- [ ] 14. Variable-font coordinates
-- [ ] 15. Fallback families as a list, not CSS
-- [ ] 16. Waste in `page_ops` and per keystroke
-- [ ] 17. Dead and test-only code
-- [ ] 18. The exactness tests prove more
+- [x] 14. Variable-font coordinates
+- [x] 15. Fallback families as a list, not CSS
+- [x] 16. Waste in `page_ops` and per keystroke
+- [x] 17. Dead and test-only code
+- [x] 18. The exactness tests prove more
+
+## Done when (checked at 5d24264)
+
+- `cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout`: 72 unit tests (1 ignored, the timing) and 6 exact tests pass, with poppler installed, so `exact.rs` doesn't skip. With `CI=1` a missing tool fails.
+- `cargo clippy --manifest-path src-tauri/Cargo.toml -p blank-layout --target wasm32-unknown-unknown` is clean, also with `--no-default-features`.
+- With the wasm built locally (`bun run engine:build`, not committed): `bun run lint`, `bun run format:check` and `bun run test` pass (2235 tests). Every seam change is additive, so no TS test broke.
+- `cd e2e && E2E_PORT=4501 xvfb-run -a bunx wdio run ./wdio.conf.ts --spec specs/pages.e2e.ts --spec specs/pageEngine.e2e.ts --spec specs/tables.e2e.ts --spec specs/bands.e2e.ts`: 4 of 4 spec files, 44 tests, pass in 5 min 17 s.
+- `SEAM.md` lists every seam change with its commit: S6, S5, S1, S2, S3, S4, the font indices and `test-hooks`.
+- There's no graphify graph for this project (no `graphify-out/`), so there was nothing to update.
 
 ## Notes
 
@@ -225,6 +234,69 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
     - every word is still where it was laid out (`compare`)
 - pdfinfo prints "Syntax Error: Suspects object is wrong type (boolean)" for krilla's `/MarkInfo << /Suspects false >>`, which is valid PDF. That's poppler's message, not a fault in the file (see "Known quirks").
 
+### Task 14: variable fonts
+
+- Verified first (a probe on the variable Noto Emoji): 🦀 in bold comes from Parley as synthesis `wght 700`, normalized coordinate 16384 (1.0), in the same face as the regular one. It was painted and embedded with the default outlines.
+- `Fonts::instances`:
+  - an `Instance` is a face with its variations (for krilla) and normalized coordinates (for skrifa)
+  - numbered from `INSTANCE_BASE` (2^20), so no index ever changes when faces are added
+  - `Fonts::font_of` finds or adds the instance of a run (coordinates all 0 means the face itself)
+  - `Fonts::face` resolves an index
+- `TextBox::run_fonts` holds each run's font index by (line, Parley's run index). The run index counts per line, as I found out when the welcome document's TS exact test caught words in the wrong font. `keeps_each_run_in_its_font_on_every_line` now pins it down.
+- `glyph_path` draws at the instance's coordinates (`LocationRef`). `unitsPerEm` and the underline come from its face.
+- The PDF's fonts (`PdfFonts`) embed each instance with `Font::new_variable` at its variations.
+- Tests:
+  - `text::tests::sets_variable_fonts_at_their_coordinates`: bold is an instance with wght 700 and its own outline; the same instance again; its number and outline stay after `add`, and in `share()`
+  - `pdf::tests::embeds_the_instances_of_variable_fonts`: an instance is a PDF font of its own, found back by `index_of`; the emoji is in the PDF's text
+- Finding for the owner: Parley's other synthesis, `embolden` and `skew` (fake bold and slant for a font without those faces, e.g. a system CJK font), isn't applied either, on screen or in the PDF. Bold Chinese shows regular. Not part of this task.
+
+### Task 15: families as a list
+
+- `Fonts::stack`/`mono_stack` are lists of names, and `fonts::family_list` gives Parley a `FontFamily::List` of `FontFamilyName::Named`. `add` keeps a name as it is, where it used to replace commas.
+- What CSS did with odd names (probed with parlance's `parse_css_list`): a name that starts with a quote ends the list with an "unterminated string" error, which drops every family after it. A comma split the name in two. Balanced quotes and other characters were fine.
+- Test `fonts::tests::takes_any_family_name`: a fallback named `"Quoted, and with a comma`, then Noto Emoji. The arrow comes from DejaVu, 🦀 from Noto Emoji, and the name is one entry, added once. With the CSS string, 🦀 was missing.
+
+### Task 16: waste per keystroke
+
+- `TextBox::text` is an `Arc<str>`, shared with every `Op::Glyphs` painted from it, so `page_ops` no longer copies a paragraph's text per glyph run. The PDF path takes it as `&str`.
+- `TextBox` computes its lines once, and `lines()` returns `&[LineInfo]`. `push_text_ops` and the table's slicing called it for every line, which was O(L²).
+- `paginate_from`:
+  - moves the pages and fragments before the restart (`split_off`) instead of copying them
+  - moves the old tail pages over (`drain`, their bands with them) instead of cloning them, and copies the tail's fragments in one go when the item indices don't move
+  - keeps `first_frag` of the items before the restart, finds it for the fragments paginated again, and works it out for the copied tail from the old values
+  - expands band texts only for the pages paginated again, unless the number of pages or the chapters changed (then for every page)
+- The property test (random edits through `update` and `update_many` against a fresh layout, versions both ways) passes, also with 2000 edits in release.
+
+### Task 17: dead and test-only code
+
+- Removed `Engine::lines`, which nothing used, the empty `else if style.weight == MEDIUM {}` in `push_span`, and a `+ 0` in a test.
+- The cargo feature `test-hooks` (on by default, as agreed with the coordinator) gates `Engine::words`/`text_layer`, and the wasm's `words()` and `stats()`. `tests/exact.rs` has `required-features = ["test-hooks"]`. The crate builds, and passes wasm32 clippy, with and without it.
+- Casts:
+  - positions move through `model::shift_pos` (checked, clamped to 0..=u32::MAX)
+  - indices through `paginate::moved`/`signed` (checked, never below 0, `saturating_neg`)
+  - wasm's `shift` goes through `i64::from`
+  - no `as i64`/`as usize`/`as u32` on a signed value is left in the tail shifting
+- skrifa:
+  - The wasm has skrifa 0.42/read-fonts 0.39 (krilla 0.8.2, the newest krilla) and 0.44/0.41 (Parley 0.11.1).
+  - The only aligned pair is Parley 0.10.0 with krilla 0.8.2. It built with no code change and passed every cargo test, and the raw wasm shrank from 4.29 to 3.97 MB (−316 KB, about 7%).
+  - Decision, with the coordinator: stay on Parley 0.11, since a current shaper (harfrust 0.12, fontique 0.11) is worth more in a major release. Align once krilla depends on skrifa 0.44 or newer. The comment next to the dependencies in `Cargo.toml` says so.
+- clippy on wasm32 is clean. `--all-targets` has only the `type_complexity` warning in `tests/exact.rs` `read_words`, which is engine-release's to change.
+
+### Task 18: the exactness sample
+
+- `sample()` has, after its chapters (`more_of_the_sample`):
+  - a table of three columns with two header rows, widths and a caption
+  - a code block
+  - a paragraph with NFD marks (`cafe\u{301}`, `cre\u{300}me bru\u{302}le\u{301}e`)
+  - an image, a red pixel handed over as `ImageData` (`sample_images`). `compare` writes the PDF with it: one line changed, from `Default::default()`.
+- `the_pdf_holds_the_layout` and `…_on_other_paper` check every word of that on the page, line and spot it was laid out. `pdfimages` lists the embedded pixel.
+- Not in the sample:
+  - Arabic: pdftotext turns the characters of one right-to-left glyph around (see "Known quirks"), so its words can't match word for word. `pdf_text_keeps_marks_and_ligatures` checks Arabic and Hebrew by their characters.
+  - Quotes (`"` and `'`) in the text: pdftotext writes them as entities, which `read_words` doesn't read back. I left `read_words` alone, since engine-release changes it.
+- `read_words` and the skip guard are untouched.
+- `exact.rs` has 6 tests: the sample on two papers, cell blocks, marks and ligatures, what no font has, and the tagged PDF.
+- On CI, a missing pdftotext, pdfinfo or qpdf fails the checks that need it, with the package to install. Locally they skip, as engine-release gated `read_words`: `missing_tool` in `exact.rs`, and `text_of` in the PDF's unit tests. Checked by running both ways with the tools off `PATH`.
+
 ### Known quirks (of other tools, not of the PDF)
 
 - pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.
@@ -234,11 +306,32 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
-`update_timing` (`--ignored`), the best of 5 runs of 40 updates, and here the best of 3 such runs. The machine was shared with other builds (load average about 35), so differences below about 30% are noise. Task 1's code and task 2's code were run alternately.
+`update_timing` (`--ignored`), the best of 5 runs of 40 updates, and here the best of 3 such runs. The machine was shared with other builds, so differences below about 30% are noise.
 
-| pages | after task 1 | after task 2 | after task 16 |
-|---|---|---|---|
-| 1 | 0.147 | 0.139 | |
-| 39 | 0.165 | 0.166 | |
-| 200 | 0.311 | 0.286 | |
-| 823 | 1.019 | 1.267 | |
+For tasks 1 and 2, task 1's code and task 2's were run alternately (load average about 35). The test then also timed its own bookkeeping: it shifted its copy of every item after the change.
+
+| pages | after task 1 | after task 2 |
+|---|---|---|
+| 1 | 0.147 | 0.139 |
+| 39 | 0.165 | 0.166 |
+| 200 | 0.311 | 0.286 |
+| 823 | 1.019 | 1.267 |
+
+For task 16, the test times only the engine: the typed paragraphs are made before the clock starts. Task 15's code (161c36c) and task 16's were run alternately, at a load average of about 5.
+
+| pages | before task 16 | after task 16 |
+|---|---|---|
+| 1 | 0.089 | 0.115 |
+| 39 | 0.131 | 0.133 |
+| 200 | 0.244 | 0.180 |
+| 823 | 0.689 | 0.415 |
+
+At 823 pages, a keystroke goes (before task 16, from a profile with timers) to:
+- about 180 µs laying out the paragraph, which is inherent
+- about 250 µs moving the positions of the items and text boxes after it
+- about 400 µs paginating
+  - Before task 16 that was: copying the pages and fragments before the change (54 µs), copying the old tail (89 µs), rebuilding `first_frag` and the chapters (92 µs), and the band texts and versions of every page (115 µs).
+  - Task 16 removes most of that; see below.
+- The 1-page difference (tens of µs) is within the noise here.
+- What's left grows with the document: moving the positions of the items after the change, and walking the copied tail's items for `first_frag`. Both are simple loops over integers.
+  - Moving positions touches every text box after the change, which is cache misses more than work. Block-relative positions would avoid it, but at this speed that isn't worth a seam change.

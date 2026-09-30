@@ -408,7 +408,7 @@ export class LayoutEngine {
     }
     /**
      * how much the last change laid out: items, the page it paginated
-     * from, and the page it settled at (-1 for none)
+     * from, and the page it settled at (-1 for none); for tests
      * @returns {Int32Array}
      */
     stats() {
@@ -546,7 +546,8 @@ export class LayoutEngine {
         return v1;
     }
     /**
-     * the words as laid out, for checking the PDF against the layout
+     * the words as laid out, for checking the PDF against the layout; for
+     * tests
      * @returns {string}
      */
     words() {

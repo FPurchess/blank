@@ -417,7 +417,7 @@ impl Item {
 
     /// moves the item by `delta` positions, when text before it changed
     pub fn shift(&mut self, delta: i64) {
-        let moved = |pos: &mut u32| *pos = (*pos as i64 + delta).max(0) as u32;
+        let moved = |pos: &mut u32| *pos = shift_pos(*pos, delta);
         match &mut self.content {
             Content::Text(text) => moved(&mut text.pos),
             Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => {
@@ -499,6 +499,11 @@ impl Item {
     }
 }
 
+/// a position moved by `delta`, within what a position can be
+pub fn shift_pos(pos: u32, delta: i64) -> u32 {
+    u32::try_from(i64::from(pos).saturating_add(delta).max(0)).unwrap_or(u32::MAX)
+}
+
 /// the length of `text` in UTF-16 code units, which ProseMirror counts
 pub fn utf16_len(text: &str) -> u32 {
     text.encode_utf16().count() as u32
@@ -532,6 +537,15 @@ fn floor_char(text: &str, mut byte: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shifts_positions_within_their_range() {
+        assert_eq!(shift_pos(5, 3), 8);
+        assert_eq!(shift_pos(5, -9), 0);
+        assert_eq!(shift_pos(u32::MAX, 1), u32::MAX);
+        assert_eq!(shift_pos(0, i64::MIN), 0);
+        assert_eq!(shift_pos(1, i64::MAX), u32::MAX);
+    }
 
     #[test]
     fn maps_utf16_and_bytes() {

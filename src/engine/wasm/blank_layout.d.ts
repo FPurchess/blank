@@ -123,7 +123,7 @@ export class LayoutEngine {
     setSettings(json: string): Uint32Array;
     /**
      * how much the last change laid out: items, the page it paginated
-     * from, and the page it settled at (-1 for none)
+     * from, and the page it settled at (-1 for none); for tests
      */
     stats(): Int32Array;
     /**
@@ -172,7 +172,8 @@ export class LayoutEngine {
     static withFontsOf(other: LayoutEngine): LayoutEngine;
     word(page: number, x: number, y: number): Uint32Array;
     /**
-     * the words as laid out, for checking the PDF against the layout
+     * the words as laid out, for checking the PDF against the layout; for
+     * tests
      */
     words(): string;
 }
