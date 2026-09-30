@@ -143,6 +143,17 @@ describe("moving the selected text on the pages", () => {
     }
   });
 
+  it("forgets a move whose button was let go where the view didn't see it", () => {
+    const move = moveOn();
+    move.down(pointer(9));
+    move.move(pointer(4));
+    expect(pageDropCaret.value).not.toBeNull();
+    move.move(pointer(3, { buttons: 0 }));
+    expect(pageDropCaret.value).toBeNull();
+    move.up(pointer(3));
+    expect(view.state.doc.textContent).toBe("hello world");
+  });
+
   it("forgets a move that's cancelled", () => {
     const move = moveOn();
     move.down(pointer(9));

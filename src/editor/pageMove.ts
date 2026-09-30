@@ -72,6 +72,8 @@ export const pageMove = (target: MoveTarget): PageMove => {
     },
     move(event) {
       if (!moving) return;
+      // the button was let go where the view didn't see it
+      if (!(event.buttons & 1)) return cancel();
       const far = Math.hypot(
         event.clientX - moving.x,
         event.clientY - moving.y,

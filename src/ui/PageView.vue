@@ -446,6 +446,7 @@ onUnmounted(() => {
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="cancelMove"
+    @lostpointercapture="cancelMove"
     @dragover="onDragOver"
     @dragleave="showDropAt(editor.view, null)"
     @drop="onDrop"
