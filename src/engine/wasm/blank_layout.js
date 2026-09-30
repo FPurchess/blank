@@ -37,6 +37,16 @@ export class LayoutEngine {
         wasm.layoutengine_addImage(this.__wbg_ptr, ptr0, len0, ptr1, len1, jpeg);
     }
     /**
+     * each page's header and footer change with its band version
+     * @returns {Uint32Array}
+     */
+    bandVersions() {
+        const ret = wasm.layoutengine_bandVersions(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * the text of a page's header and footer slots: left, center and right
      * of the header, then of the footer
      * @param {number} page
@@ -53,6 +63,17 @@ export class LayoutEngine {
         } finally {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
+    }
+    /**
+     * each page's body, without its header and footer, changes with its
+     * body version
+     * @returns {Uint32Array}
+     */
+    bodyVersions() {
+        const ret = wasm.layoutengine_bodyVersions(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
     }
     /**
      * where the text of each page ends, from its top edge
@@ -165,6 +186,40 @@ export class LayoutEngine {
         return this;
     }
     /**
+     * only a page's header and footer, as `page` gives them
+     * @param {number} page
+     * @returns {string}
+     */
+    pageBands(page) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_pageBands(this.__wbg_ptr, page);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * what a page shows besides its header and footer, as `page` gives it
+     * @param {number} page
+     * @returns {string}
+     */
+    pageBody(page) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_pageBody(this.__wbg_ptr, page);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * @returns {number}
      */
     pageCount() {
@@ -183,7 +238,8 @@ export class LayoutEngine {
         return v1;
     }
     /**
-     * what a page shows: rectangles, images, links and glyph runs
+     * what a page shows: rectangles, images, links and glyph runs, of its
+     * body and its header and footer
      * @param {number} page
      * @returns {string}
      */
@@ -231,26 +287,36 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * replaces all items; the pages that changed, as `update` gives them
      * @param {string} json
+     * @returns {Uint32Array}
      */
     setItems(json) {
         const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.layoutengine_setItems(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
         }
+        var v2 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
     }
     /**
+     * sets the page; the pages that changed, as `update` gives them
      * @param {string} json
+     * @returns {Uint32Array}
      */
     setSettings(json) {
         const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.layoutengine_setSettings(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
         }
+        var v2 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
     }
     /**
      * how much the last change laid out: items, the page it paginated
@@ -285,18 +351,43 @@ export class LayoutEngine {
         return ret;
     }
     /**
+     * several updates at once, `[[start, delete, items, shift], …]` in
+     * document order, each counting the items as the ones before it left
+     * them; the pages that changed, as `update` gives them
+     * @param {string} json
+     * @returns {Uint32Array}
+     */
+    updateMany(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_updateMany(this.__wbg_ptr, ptr0, len0);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v2 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
+    }
+    /**
+     * replaces `delete` items from `start` with the items in `json`, and
+     * moves the ones after them by `shift`; the pages that changed: the
+     * body's from and to (exclusive), then the bands', from == to for none
      * @param {number} start
      * @param {number} _delete
      * @param {string} json
      * @param {number} shift
+     * @returns {Uint32Array}
      */
     update(start, _delete, json, shift) {
         const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.layoutengine_update(this.__wbg_ptr, start, _delete, ptr0, len0, shift);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
         }
+        var v2 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
     }
     /**
      * what each page shows changes with its version
