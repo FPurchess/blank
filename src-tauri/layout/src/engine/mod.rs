@@ -204,7 +204,8 @@ impl Engine {
         }
         // the items as runs of (length, index before the updates), with
         // None for new ones
-        let mut runs: Vec<(usize, Option<usize>)> = vec![(self.items.len(), Some(0))];
+        let old_count = self.items.len();
+        let mut runs: Vec<(usize, Option<usize>)> = vec![(old_count, Some(0))];
         let mut restart_page = None;
         let mut previous_end = 0;
         let mut laid_out = 0;
@@ -247,11 +248,11 @@ impl Engine {
             }
             at += length;
         }
-        // the items after the last change are the old ones, moved: once a
-        // page starts with one of them as an old page did, the rest is as
-        // before
+        // the items after the last change are the old ones, moved, up to
+        // the old last one: once a page starts with one of them as an old
+        // page did, the rest is as before
         let tail = match runs.last() {
-            Some(&(length, Some(old))) if length > 0 => Some(Tail {
+            Some(&(length, Some(old))) if length > 0 && old + length == old_count => Some(Tail {
                 start: at - length,
                 delta: (at - length) as i64 - old as i64,
             }),

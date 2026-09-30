@@ -42,6 +42,7 @@ Everything is additive, so the old TS code keeps working with the new wasm.
   - The pages are paginated once, from the page before the first entry.
   - Out-of-order entries still apply, but paginate from the first page.
   - `update(...)` is `updateMany` with one entry.
+  - Fixed after e9f8ef2 (the next commit, "fix: settle updateMany only on a tail that reaches the old end"): an `updateMany` whose last entry deleted the last items could copy their old fragments and panic. `update` alone was never affected. Merge the fix together with S6 if `updateMany` is used.
 - **Positions**: the single `shift` covers every position the engine keeps: the items (texts, breaks, rules, images, tables and their cells) and the text boxes it laid out. Fragments, pages and table grids hold item indices and points, not positions. So unchanged items are never sent again, and there are no block-relative positions.
 - **TS side (engine-editor, engine-ui)**:
   - Repaint a page's body layer when `bodyVersions()[i]` changes, and its band layer when `bandVersions()[i]` changes. Paint them from `pageBody`/`pageBands`.

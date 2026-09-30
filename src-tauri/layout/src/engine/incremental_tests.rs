@@ -658,6 +658,34 @@ fn a_new_font_changes_every_body() {
 }
 
 #[test]
+fn update_many_ending_in_a_deletion_at_the_end() {
+    // the unchanged items between the changes aren't a tail that settles:
+    // the old pages after them still hold the deleted last item
+    use super::test_support::{document, engine, paragraph};
+    let items = document(&[LONG; 60]);
+    let mut incremental = engine(items.clone());
+    let mut changed = items[5].clone();
+    if let Content::Text(text) = &mut changed.content {
+        text.text.insert(0, 'x');
+    }
+    let last = items[59].to() - items[59].from() + 2;
+    incremental.update_many(vec![
+        (5, 1, vec![changed.clone()], 1),
+        (59, 1, vec![], -(last as i64)),
+    ]);
+    let mut expected = items;
+    expected[5] = changed;
+    expected.pop();
+    for item in &mut expected[6..] {
+        item.shift(1);
+    }
+    let full = engine(expected.clone());
+    assert_eq!(incremental.items, expected);
+    assert_eq!(incremental.frags, full.frags);
+    let _ = paragraph;
+}
+
+#[test]
 fn splices_runs_of_items() {
     let mut runs = vec![(10, Some(0))];
     super::splice_runs(&mut runs, 3, 2, 1);
