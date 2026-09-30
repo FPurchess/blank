@@ -110,4 +110,23 @@ describe("Canvas2DPainter", () => {
     painter.release(painter.surface(canvas)!);
     expect([canvas.width, canvas.height]).toEqual([0, 0]);
   });
+
+  it("paints the selected text only within the selection, over its fill", () => {
+    const { painter, surface, calls } = setUp();
+    painter.paint(surface, DISPLAY, {
+      scale: 2,
+      ratio: 1,
+      x: 10,
+      y: 10,
+      color: "white",
+      within: [{ x: 12, y: 18, width: 10, height: 5 }],
+      fill: "blue",
+    });
+    const order = calls.map((call) => call[0]);
+    // clipped to the rectangle, in device pixels, filled, then the text,
+    // and the clip taken away again
+    expect(calls).toContainEqual(["clipRect", 4, 16, 20, 10]);
+    expect(order.indexOf("clip")).toBeLessThan(order.indexOf("fill"));
+    expect(order[order.length - 1]).toBe("restore");
+  });
 });

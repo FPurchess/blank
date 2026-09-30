@@ -11,7 +11,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 6. A swappable painter (`src/ui/painter/`; jsdom canvases record paints, `src/test/canvas.ts`)
 - [x] 7. A visible selection in every theme: `--selection-color` at ≥ 3:1 per theme (`src/scss/themes.test.ts`), painted under the text: sheets, selection, the transparent canvases, caret, in DOM order.
   - WebKitGTK doesn't apply `mix-blend-mode` over the pages, and a z-index on the canvases made WebKit composite them and crash in Skia's GPU shaders under xvfb, so neither is used.
-  - For the owner: a solid colour between text and paper leaves text over the selection at text-to-paper / selection-to-paper, 2.07:1 in green (6.4:1 / 3.1:1), 2.6:1 in blue. The test asks for 2:1.
+  - Superseded by the selected text in a colour of its own (Review fixes, Selection).
 - [x] 8. Contrast of the faint marks: `$faint-text-opacity` (0.6) for the page ends, page 1's header, the bands at rest and the page break label, ≥ 3:1 in every theme; the page number keeps only it
 - [x] 9. Reduced motion: the caret keeps still and the strips, hints and faded pages change at once under `prefers-reduced-motion: reduce` (`src/scss/motion.test.ts`)
 - [x] 10. Shadows and the desk in dark themes: `--desk-color`, `--sheet-edge`, `--sheet-shadow` per theme, a darker desk and black shadows without blur (unit test, and a pixel check of the desk against the sheet in every theme in `pageEngine.e2e.ts`)
@@ -33,7 +33,16 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] M2. E2E ink checks after an edit prove the repaint, not old pixels: `waitForRepaint` compares a fingerprint of the line (`inkPrint`) from before the edit; with the body's repaint switched off the check times out
 - [x] M5. The engine-failure spec places the caret first, checks nothing failed before the key, and types and finds a word of its own
 - [x] M6. The last rendering check waits for the first page and compares its ink with the first reading
-- [ ] Selection: the selected text in a contrasting colour, on a layer of its own, at 4.5:1 in every theme
+- [x] Selection: with the focus, each page with a selection paints a layer of its own over its text: the selection rects filled with `--selection-color`, and the glyphs within them in `--selection-text-color`, clipped to the rects, painted again only when that page's selection changes; without the focus, the lighter `--selection-inactive-color` stays under the text in its usual colour. Shots per theme: `e2e/screenshots/selection-<theme>.png` (from `rendering.e2e.ts`, which also checks both ratios on screen).
+
+  | theme | selection | selected text | selection : paper | text : selection | dimmed : paper | text : dimmed |
+  |---|---|---|---|---|---|---|
+  | light | `#3874d6` | `#ffffff` | 4.54 | 4.54 | 2.0 | 7.5 |
+  | dark | `#6782a8` | `#11191f` | 4.51 | 4.51 | 2.0 | 7.2 |
+  | black | `#637a9f` | `#0a0a0f` | 4.54 | 4.54 | 2.0 | 8.9 |
+  | red | `#8b9cc7` | `#532728` | 4.54 | 4.54 | 2.0 | 4.8 |
+  | green | `#87a8d4` | `#323f37` | 4.52 | 4.52 | 2.0 | 3.2 |
+  | blue | `#7c9bcc` | `#25324c` | 4.52 | 4.52 | 2.0 | 4.1 |
 - [ ] 1. The edge line follows `engineMissing` at runtime
 - [ ] 3. The view keeps its place when the header or properties room changes
 - [ ] 4. A switch renders the target range right away

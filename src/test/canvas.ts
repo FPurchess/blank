@@ -25,6 +25,11 @@ export const recordingContext = (
     drawImage: (image: unknown, ...args: number[]) =>
       calls.push(["image", image, ...args]),
     fill: (path: unknown) => calls.push(["fill", path]),
+    save: () => calls.push(["save"]),
+    restore: () => calls.push(["restore"]),
+    beginPath: () => calls.push(["beginPath"]),
+    rect: (...args: number[]) => calls.push(["clipRect", ...args]),
+    clip: () => calls.push(["clip"]),
   };
   return { context: context as unknown as CanvasRenderingContext2D, calls };
 };

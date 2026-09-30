@@ -72,20 +72,22 @@ describe("the caret and the selection on the pages", () => {
     expect(view().querySelector(".page-caret")).toBeNull();
   });
 
-  it("dims the selection while the editor hasn't the focus", async () => {
+  it("dims the selection under the text while the editor hasn't the focus", async () => {
     pageSelection.value = [{ page: 0, x: 80, y: 90, width: 50, height: 16 }];
     editor.dom.dispatchEvent(new FocusEvent("focus"));
     await nextTick();
-    const selected = () => view().querySelector(".page-selection")!;
-    expect(selected().classList.contains("inactive")).toBe(false);
+    // with the focus the page paints it over its text, in its own colours
+    expect(view().querySelector(".page-selection")).toBeNull();
+    expect(view().querySelector(".page-selected")).not.toBeNull();
     editor.dom.dispatchEvent(new FocusEvent("blur"));
     await nextTick();
-    expect(selected().classList.contains("inactive")).toBe(true);
+    const dimmed = view().querySelector(".page-selection")!;
+    expect(dimmed.classList.contains("inactive")).toBe(true);
+    expect(view().querySelector(".page-selected")).toBeNull();
     // under the pages' text: before the frames, which paint over it
     const frame = view().querySelector(".page-frame")!;
     expect(
-      selected().compareDocumentPosition(frame) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      dimmed.compareDocumentPosition(frame) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 

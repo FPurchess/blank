@@ -370,6 +370,9 @@ export interface ScreenStats extends Ink {
   // the most common colour in the box, and the mean of all of it
   background: Rgb;
   mean: Rgb;
+  // the colour farthest from the most common one, e.g. the core of the
+  // glyphs over a selection, whose edges blend with it
+  farthest: Rgb;
 }
 
 /**
@@ -414,11 +417,17 @@ export const screenStats = async (box: Box): Promise<ScreenStats> => {
         ];
         let inked = 0;
         const sum = [0, 0, 0];
+        let farthest: Rgb = background;
+        let far = 0;
         for (let index = 0; index < data.length; index += 4) {
           const distance =
             Math.abs(data[index] - background[0]) +
             Math.abs(data[index + 1] - background[1]) +
             Math.abs(data[index + 2] - background[2]);
+          if (distance > far) {
+            far = distance;
+            farthest = [data[index], data[index + 1], data[index + 2]];
+          }
           if (distance < 40) continue;
           inked++;
           for (let channel = 0; channel < 3; channel++)
@@ -429,6 +438,7 @@ export const screenStats = async (box: Box): Promise<ScreenStats> => {
           ink: inked ? [sum[0] / inked, sum[1] / inked, sum[2] / inked] : null,
           background,
           mean: mean as Rgb,
+          farthest,
         });
       };
       image.src = `data:image/png;base64,${png}`;
@@ -554,28 +564,6 @@ export const doubleClickAt = async (x: number, y: number) => {
   await browser.executeAsync((done: () => void) => {
     requestAnimationFrame(() => requestAnimationFrame(() => done()));
   });
-};
-
-/**
- * selectionColor returns the colour the pages show the selection in: the
- * most common one in the first selected box, whatever the text in it
- */
-export const selectionColor = async () => {
-  const box = await browser.execute(() => {
-    const rect = document
-      .querySelector("#page-view .page-selection")
-      ?.getBoundingClientRect();
-    return rect
-      ? {
-          left: rect.left + 1,
-          right: rect.right - 1,
-          top: rect.top + 1,
-          bottom: rect.bottom - 1,
-        }
-      : null;
-  });
-  if (!box) throw new Error("no selection is shown on the pages");
-  return (await screenStats(box)).background;
 };
 
 /**

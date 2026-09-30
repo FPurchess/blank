@@ -17,7 +17,6 @@ import {
   pressMod,
   restartApp,
   screenStats,
-  selectionColor,
   textBox,
   type,
   waitForInk,
@@ -161,14 +160,18 @@ describe("rendering", () => {
       { timeoutMsg: "the text isn't painted light in the dark theme" },
     );
 
-    // a selected word stands out from the page, in both themes
+    // a selected word stands out from the page, and reads over the
+    // selection, in every theme; the shots are for looking at
     const selected = await boxOf("inkcheck");
     await doubleClickAt(
       selected.left + 4,
       (selected.top + selected.bottom) / 2,
     );
-    for (const theme of ["dark", "light"]) {
+    for (const theme of ["light", "dark", "black", "red", "green", "blue"]) {
       await themeTo(theme);
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
       const paper = (
         await screenStats({
           left: frame + 1,
@@ -177,8 +180,18 @@ describe("rendering", () => {
           bottom: selected.bottom,
         })
       ).background;
-      expect(contrast(await selectionColor(), paper)).toBeGreaterThanOrEqual(3);
+      const word = await screenStats(selected);
+      expect([theme, contrast(word.background, paper) >= 3]).toEqual([
+        theme,
+        true,
+      ]);
+      expect([theme, contrast(word.farthest, word.background) >= 4.5]).toEqual([
+        theme,
+        true,
+      ]);
+      await browser.saveScreenshot(path.join(SHOTS, `selection-${theme}.png`));
     }
+    await themeTo("light");
 
     // far down, a page painted when it comes into view
     await waitForInk("farmarker");

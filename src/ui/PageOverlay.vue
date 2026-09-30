@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from "vue";
+import { computed } from "vue";
 
-import { useEditor } from "../editor/handle";
 import { type FrameLayout, onDesk } from "../engine/frames";
 import { caretLine } from "./pageViewModel";
 import {
@@ -25,8 +24,9 @@ const props = defineProps<{
   layer: "under" | "over";
   // device pixels per CSS pixel, which the caret is drawn on
   ratio: number;
+  // whether the editor has the focus, see PageView.vue
+  focused: boolean;
 }>();
-const editor = useEditor();
 
 const placed = (rects: PageRect[]) =>
   rects.flatMap((rect, index) => {
@@ -51,27 +51,17 @@ const drop = computed(() => {
 });
 
 const under = computed(() => props.layer === "under");
-const rects = computed(() => (under.value ? placed(pageSelection.value) : []));
+// with the focus the pages paint the selection over their text themselves
+// (PageFrame.vue), without it dimmed under it here
+const rects = computed(() =>
+  under.value && !props.focused ? placed(pageSelection.value) : [],
+);
 const nodes = computed(() =>
   under.value ? [] : placed(pageNodeSelection.value),
 );
 const composing = computed(() =>
   under.value ? [] : placed(pageComposition.value),
 );
-
-// a test view has no DOM
-const dom = editor.view.dom as HTMLElement | undefined;
-const focused = shallowRef(!dom || document.activeElement === dom);
-const onFocus = () => (focused.value = true);
-const onBlur = () => (focused.value = false);
-onMounted(() => {
-  dom?.addEventListener("focus", onFocus);
-  dom?.addEventListener("blur", onBlur);
-});
-onUnmounted(() => {
-  dom?.removeEventListener("focus", onFocus);
-  dom?.removeEventListener("blur", onBlur);
-});
 
 const box = (rect: {
   left: number;

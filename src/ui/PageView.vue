@@ -33,6 +33,7 @@ import {
   pageLayoutState,
   pageScrollRequest,
   type PageScrollRequest,
+  pageSelection,
   pageView,
   pageViewport,
 } from "../state";
@@ -50,7 +51,7 @@ import {
   visibleRange,
 } from "../engine/frames";
 import { layerVersions } from "./pageLayers";
-import { anchorTop, scrollFor, viewAnchor } from "./pageViewModel";
+import { anchorTop, scrollFor, selectedOn, viewAnchor } from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -142,6 +143,7 @@ type ShownFrame = Frame & {
   bandVersion: number;
   nextBandVersion: number;
   near: boolean;
+  selected: string;
 };
 // the frames shown before, by page, reused while their values stay the
 // same, so a sync that changed one page makes no new objects for the others
@@ -169,6 +171,11 @@ const frames = computed(() => {
           ? (versions.bands[frame.page + 1] ?? 0)
           : -1,
       near: frame.page < shownFirst || frame.page > shownLast,
+      // painted over the text while the editor has the focus, and dimmed
+      // under it without (PageOverlay.vue)
+      selected: focused.value
+        ? selectedOn(pageSelection.value, frame.page)
+        : "",
     };
     const before = shownFrames.get(frame.page);
     const shown = before && sameFrame(before, made) ? before : made;
@@ -177,6 +184,22 @@ const frames = computed(() => {
   });
   shownFrames = next;
   return list;
+});
+
+// whether the editor has the focus: the caret shows then, and the selection
+// is painted over the text; without it the selection dims, as the
+// webview's own does. A test view has no DOM.
+const dom = editor.view.dom as HTMLElement | undefined;
+const focused = shallowRef(!dom || document.activeElement === dom);
+const onFocus = () => (focused.value = true);
+const onBlur = () => (focused.value = false);
+onMounted(() => {
+  dom?.addEventListener("focus", onFocus);
+  dom?.addEventListener("blur", onBlur);
+});
+onUnmounted(() => {
+  dom?.removeEventListener("focus", onFocus);
+  dom?.removeEventListener("blur", onBlur);
 });
 
 // the device's pixels per CSS pixel, which the pages are painted at, e.g.
@@ -539,7 +562,12 @@ onUnmounted(() => {
           }"
         />
       </template>
-      <PageOverlay :layout="layout" layer="under" :ratio="ratio" />
+      <PageOverlay
+        :layout="layout"
+        layer="under"
+        :ratio="ratio"
+        :focused="focused"
+      />
       <PageFrame
         v-for="frame in frames"
         :key="frame.page"
@@ -547,6 +575,7 @@ onUnmounted(() => {
         :body-version="frame.bodyVersion"
         :band-version="frame.bandVersion"
         :next-band-version="frame.nextBandVersion"
+        :selected="frame.selected"
         :top="frame.top"
         :left="frame.left"
         :width="frame.width"
@@ -559,7 +588,12 @@ onUnmounted(() => {
         :ratio="ratio"
       />
       <PageMarks :layout="layout" :pages="shownPages" />
-      <PageOverlay :layout="layout" layer="over" :ratio="ratio" />
+      <PageOverlay
+        :layout="layout"
+        layer="over"
+        :ratio="ratio"
+        :focused="focused"
+      />
       <PageFirstHeader :layout="layout" />
       <PageProperties :layout="layout" />
     </div>

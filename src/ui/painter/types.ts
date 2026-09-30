@@ -15,6 +15,10 @@ export interface PaintOptions {
   y: number;
   // the theme's text colour, as CSS
   color: string;
+  // only within these rectangles of the page, in points, over `fill`: the
+  // selected text in its own colour over the selection
+  within?: { x: number; y: number; width: number; height: number }[];
+  fill?: string;
 }
 
 // a painted page kept for later; what it holds is the painter's own

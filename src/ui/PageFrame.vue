@@ -17,8 +17,19 @@ import { bootMark, record } from "../engine/perf";
 import { pageLayout, pageLayoutState, path, theme } from "../state";
 import { bitmapKey, engineId, pageBitmaps, paintQueue } from "./pageBitmaps";
 import { painter, type Surface } from "./painter";
-import { frameRenders, type Layer, layerDisplay } from "./pageLayers";
-import { bandTitle, endMark } from "./pageViewModel";
+import {
+  frameRenders,
+  type Layer,
+  layerDisplay,
+  type ThemeColors,
+  themeColors,
+} from "./pageLayers";
+import {
+  bandTitle,
+  endMark,
+  type PageBox,
+  selectedBoxes,
+} from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends. Its props
@@ -43,6 +54,9 @@ const props = defineProps<{
   sheet: boolean;
   // just outside the view, which paints after the pages in view
   near: boolean;
+  // the selection's rectangles on the page while the editor has the focus,
+  // see selectedOn; "" for none
+  selected: string;
   // device pixels per CSS pixel
   ratio: number;
 }>();
@@ -50,6 +64,7 @@ const props = defineProps<{
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const headerCanvas = useTemplateRef<HTMLCanvasElement>("headerCanvas");
 const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
+const selectedCanvas = useTemplateRef<HTMLCanvasElement>("selectedCanvas");
 const editor = useEditor();
 
 // a double click on a header or footer opens its strip, which takes the
@@ -65,17 +80,6 @@ const marginTop = computed(() =>
 const marginBottom = computed(() =>
   props.sheet ? (pageLayoutState.value?.margins.bottom ?? 0) * props.scale : 0,
 );
-
-// the theme's text colour, read once for each theme
-const colors = new Map<string, string>();
-const colorOf = (element: HTMLElement) => {
-  let color = colors.get(theme.value);
-  if (!color) {
-    color = getComputedStyle(element).color;
-    colors.set(theme.value, color);
-  }
-  return color;
-};
 
 // which of the images the page's text shows are loaded, e.g. "10", so the
 // page paints again when one of its own loads, not when any image does
@@ -93,6 +97,15 @@ const imagesShown = computed(() => {
  * header and footer of a sheet. Each is painted apart, when its own version
  * changes, and kept as a bitmap of its own.
  */
+// what a layer paints in: the colour of its text, and where it paints only
+// within rectangles over a fill, e.g. the selection
+interface Look {
+  key: string;
+  color: string;
+  within?: PageBox[];
+  fill?: string;
+}
+
 // where a layer's canvas lies on the page, when it isn't all of it: from
 // `top` CSS pixels down, `height` high
 interface Strip {
@@ -107,6 +120,7 @@ const layerOf = ({
   version,
   images,
   strip,
+  look,
 }: {
   // tells its paint jobs and bitmaps apart from the page's other layers
   name: string;
@@ -116,9 +130,17 @@ const layerOf = ({
   images: () => string;
   // a strip of the page, or null for all of it
   strip: () => Strip | null;
+  // how it is painted, e.g. only the selected text in its own colour; also
+  // what tells its bitmaps apart
+  look?: (colors: ThemeColors) => Look;
 }) => {
-  // a strip is a few glyphs, painted again rather than kept as a bitmap
-  const keeps = !strip();
+  // a strip is a few glyphs, painted again rather than kept as a bitmap, and
+  // so is a look of its own, the selection
+  const keeps = !strip() && !look;
+  const lookOf = (canvas: HTMLCanvasElement) => {
+    const colors = themeColors(theme.value, canvas);
+    return look ? look(colors) : { key: "", color: colors.text };
+  };
   // what the canvas shows now, so the same isn't drawn twice
   let shown = "";
   // the canvas as the painter paints into it, taken when it's there
@@ -145,7 +167,7 @@ const layerOf = ({
 
   const paintInto = (
     target: Surface,
-    color: string,
+    shows: Look,
     ratio: number,
     top: number,
   ) => {
@@ -158,7 +180,9 @@ const layerOf = ({
       x: props.x,
       // the page's point at the strip's top
       y: props.y + top / props.scale,
-      color,
+      color: shows.color,
+      within: shows.within,
+      fill: shows.fill,
     });
     record("paint", performance.now() - start);
     bootMark("pages");
@@ -188,6 +212,7 @@ const layerOf = ({
       shown = "";
     }
     if (place) canvas.style.top = `${top}px`;
+    const shows = lookOf(canvas);
     const key = bitmapKey({
       engine: engineId(pageEngine),
       layer: name,
@@ -200,7 +225,7 @@ const layerOf = ({
       x: props.x,
       y: props.y + top / props.scale,
       theme: theme.value,
-      images: images(),
+      images: `${images()}${shows.key}`,
     });
     if (key === shown) return;
     const target = surfaceOf(canvas);
@@ -213,7 +238,7 @@ const layerOf = ({
     }
     // without snapshots, e.g. in tests: right away
     if (!painter.snapshots) {
-      paintInto(target, colorOf(canvas), ratio, top);
+      paintInto(target, shows, ratio, top);
       shown = key;
       return;
     }
@@ -229,7 +254,7 @@ const layerOf = ({
           canvas.height !== height
         )
           return;
-        paintInto(target, colorOf(canvas), ratio, top);
+        paintInto(target, lookOf(canvas), ratio, top);
         shown = key;
       },
     });
@@ -291,7 +316,24 @@ const footer = layerOf({
   }),
 });
 const bands = [header, footer];
-const layers = [body, ...bands];
+// the selected text over the selection, in colours of its own, which only
+// a page with a selection has, painted again when it changes (see
+// src/scss/themes.test.ts for the contrast)
+const selectedText = layerOf({
+  name: "selected",
+  layer: "body",
+  element: () => selectedCanvas.value,
+  version: () => props.bodyVersion,
+  images: () => imagesShown.value,
+  strip: () => null,
+  look: (colors) => ({
+    key: props.selected,
+    color: colors.selectedText,
+    within: selectedBoxes(props.selected),
+    fill: colors.selection,
+  }),
+});
+const layers = [body, ...bands, selectedText];
 
 onMounted(() => layers.forEach((layer) => layer.paint()));
 // what they show is kept for when the page comes back, and their canvases
@@ -311,6 +353,11 @@ const shownAt = () => [
 watch(() => [props.bodyVersion, imagesShown.value, ...shownAt()], body.paint, {
   flush: "post",
 });
+watch(
+  () => [props.selected, props.bodyVersion, imagesShown.value, ...shownAt()],
+  selectedText.paint,
+  { flush: "post" },
+);
 watch(
   () => [
     props.bandVersion,
@@ -357,6 +404,12 @@ const mark = computed(() => {
   >
     <!-- its size is set when it's painted, in device pixels -->
     <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
+    <canvas
+      v-if="selected"
+      ref="selectedCanvas"
+      class="page-canvas page-selected"
+      aria-hidden="true"
+    />
     <template v-if="sheet">
       <canvas
         ref="headerCanvas"

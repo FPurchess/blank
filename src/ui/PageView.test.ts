@@ -100,7 +100,10 @@ describe("page view", () => {
     // on whole device pixels
     const ratio = window.devicePixelRatio || 1;
     expect(Number.isInteger(parseFloat(caret.style.width) * ratio)).toBe(true);
-    expect(view().querySelectorAll(".page-selection")).toHaveLength(1);
+    // with the focus (a test view counts as focused), the page paints the
+    // selected text over the selection itself
+    expect(view().querySelectorAll(".page-selection")).toHaveLength(0);
+    expect(view().querySelectorAll(".page-selected")).toHaveLength(1);
   });
 
   it("places the caret where it is clicked", async () => {

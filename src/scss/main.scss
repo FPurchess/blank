@@ -1300,6 +1300,14 @@ body.without-engine {
   display: block;
 }
 
+// the selected text in colours of its own over the selection, on a page
+// with a selection while the editor has the focus (see src/ui/PageFrame.vue)
+.page-selected {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 // the header and footer of a sheet, painted apart from its text over it,
 // in strips as high as the margins (see src/ui/pageLayers.ts; the top is set
 // where they are painted); positioned without a z-index, so they make no

@@ -26,18 +26,19 @@ describe("the themes", () => {
   it.each(themes)("show the selection on the pages in %s", (theme) => {
     const { background, text, color } = colorsOf(theme);
     const selected = color("selection-color");
+    const selectedText = color("selection-text-color");
     const dimmed = color("selection-inactive-color");
-    // the selection stands out from the page
+    // the selection stands out from the page, and the selected text, in a
+    // colour of its own over it, reads as well as body text should
     expect(contrast(selected, background)).toBeGreaterThanOrEqual(3);
-    // and its text, painted over it, stays readable: a colour between the
-    // text's and the page's leaves the text what is left of their contrast,
-    // e.g. about 6.4 / 3 in the green theme
-    expect(contrast(text, selected)).toBeGreaterThanOrEqual(2);
-    // dimmed, it's still clearly there, and fainter
+    expect(contrast(selectedText, selected)).toBeGreaterThanOrEqual(4.5);
+    // dimmed, it's still clearly there under the text in its usual colour,
+    // and fainter
     expect(contrast(dimmed, background)).toBeGreaterThanOrEqual(1.8);
     expect(contrast(dimmed, background)).toBeLessThan(
       contrast(selected, background),
     );
+    expect(contrast(text, dimmed)).toBeGreaterThanOrEqual(3);
   });
 });
 

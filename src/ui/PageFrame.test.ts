@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 
 import { type PageEngine, setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
-import { pageLayoutState, pageView, theme } from "../state";
+import { pageLayoutState, pageSelection, pageView, theme } from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { flushPromises } from "../test/async";
@@ -27,7 +27,11 @@ const pageOf = (canvas: HTMLCanvasElement) =>
   Number(canvas.closest<HTMLElement>(".page-frame")!.dataset.page);
 
 const layerOf = (canvas: HTMLCanvasElement) =>
-  canvas.classList.contains("page-bands") ? "bands" : "body";
+  canvas.classList.contains("page-bands")
+    ? "bands"
+    : canvas.classList.contains("page-selected")
+      ? "selected"
+      : "body";
 
 // a painter that records the pages it paints and shows: the pages of the
 // text, and the layers as "page:layer"
@@ -111,6 +115,7 @@ describe("the pages and the painter", () => {
     setPageEngine(null);
     pageLayoutState.value = null;
     pageView.value = "page-ends";
+    pageSelection.value = [];
     pageBitmaps.clear();
     document.body.replaceChildren();
     // what the queue still waits for runs on the fake timers, or it would
@@ -318,6 +323,39 @@ describe("the pages and the painter", () => {
     expect(origins.get(header)).toBe(0);
     // within half a point: the frame width it was measured from is rounded
     expect(origins.get(footer)).toBeCloseTo(top / scale, 0);
+  });
+
+  it("paints the selected text over the selection on its page only", async () => {
+    const { fake, layers } = recorder();
+    const within: unknown[] = [];
+    setPainter({
+      ...fake,
+      paint: (surface, display, options) => {
+        if (surface.canvas.classList.contains("page-selected"))
+          within.push(options.within);
+        fake.paint(surface, display, options);
+      },
+    });
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    layers.length = 0;
+    expect(view().querySelector(".page-selected")).toBeNull();
+    // a word selected on the second page (the test view counts as focused)
+    pageSelection.value = [{ page: 1, x: 80, y: 90, width: 50, height: 16 }];
+    await paintQueued();
+    const selected = view().querySelectorAll(".page-selected");
+    expect(selected).toHaveLength(1);
+    expect(selected[0].closest<HTMLElement>(".page-frame")!.dataset.page).toBe(
+      "2",
+    );
+    expect(within).toEqual([[{ x: 80, y: 90, width: 50, height: 16 }]]);
+    // the text itself isn't painted again for it
+    expect(layers).toEqual(["2:selected"]);
+    // and gone with the selection
+    pageSelection.value = [];
+    await paintQueued();
+    expect(view().querySelector(".page-selected")).toBeNull();
   });
 
   it("keeps a dozen sheets or more at 2×", async () => {

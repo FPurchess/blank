@@ -2,9 +2,11 @@
   --color: #c6c7b3;
   --background-color: #323f37;
   --spelling-color: #ff8f80;
-  // the selection on the pages, under the text (see src/scss/themes.test.ts),
-  // and dimmed while the editor hasn't the focus
-  --selection-color: #6f8ba8;
+  // the selection on the pages and the selected text over it, and the
+  // selection dimmed under the text while the editor hasn't the focus (see
+  // src/scss/themes.test.ts)
+  --selection-color: #87a8d4;
+  --selection-text-color: #323f37;
   --selection-inactive-color: #566c7a;
   // the desk the sheets of "pages" lie on, a shade darker the paper, and the
   // sheets' edge and shadow, in black

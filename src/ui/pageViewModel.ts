@@ -171,3 +171,40 @@ export const pageLabel = (
   layout: Layout,
 ) =>
   `Page ${formatNumber(pageNumber(layout, position.page), layout.numberStyle)} of ${position.pages}`;
+
+// a rectangle on a page, in points
+export interface PageBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * selectedOn returns the selection's rectangles on `page` as one string,
+ * e.g. "72,90,50,16", so a page shows its selection again only when that
+ * string changes; "" for none
+ */
+export const selectedOn = (
+  rects: readonly (PageBox & { page: number })[],
+  page: number,
+) =>
+  rects
+    .filter((rect) => rect.page === page)
+    .map((rect) =>
+      [rect.x, rect.y, rect.width, rect.height]
+        .map((value) => Math.round(value * 100) / 100)
+        .join(","),
+    )
+    .join(";");
+
+/**
+ * selectedBoxes reads the rectangles selectedOn wrote
+ */
+export const selectedBoxes = (selected: string): PageBox[] =>
+  selected
+    ? selected.split(";").map((rect) => {
+        const [x, y, width, height] = rect.split(",").map(Number);
+        return { x, y, width, height };
+      })
+    : [];

@@ -54,6 +54,24 @@ export const paintDisplay = (
   context.clearRect(0, 0, context.canvas.width, context.canvas.height);
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
+  if (options.within) {
+    // what lies outside the rectangles isn't painted, and they're filled
+    context.save();
+    context.beginPath();
+    for (const rect of options.within) {
+      context.rect(
+        Math.round(px(rect.x)),
+        Math.round(py(rect.y)),
+        Math.round(px(rect.x + rect.width)) - Math.round(px(rect.x)),
+        Math.round(py(rect.y + rect.height)) - Math.round(py(rect.y)),
+      );
+    }
+    context.clip();
+    if (options.fill) {
+      context.fillStyle = options.fill;
+      context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+    }
+  }
   context.fillStyle = options.color;
   for (const [x, y, w, h, role] of display.r) {
     context.globalAlpha = ROLE_OPACITY[role] ?? 1;
@@ -90,6 +108,7 @@ export const paintDisplay = (
   }
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.globalAlpha = 1;
+  if (options.within) context.restore();
 };
 
 /**
