@@ -156,8 +156,10 @@ export const openTableMenu = (view: EditorView, anchor: Anchor) => {
 /**
  * contextMenuPlugin shows Blank's context menu instead of the webview's: on
  * a right click on the pages (see src/editor/pagePointer.ts), the ContextMenu
- * key and the shortcut. Shift + right click still shows the webview's menu,
- * e.g. for system services.
+ * key and the shortcut. Shift + right click shows the webview's menu in the
+ * editor without the pages, e.g. for the input methods and the emoji picker;
+ * on the pages it opens Blank's menu, since the webview's has nothing to
+ * offer there.
  */
 export const contextMenuPlugin = () =>
   new Plugin({

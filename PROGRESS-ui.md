@@ -52,7 +52,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 9. "Page N of M" shows the physical position (the owner's choice); a stable, visually hidden live region (`#ui-page-spoken`) says only "Page N" when the page changes (`StatusBars.test.ts` lists it in the bar)
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
 - [ ] 11. The test gaps
-- [ ] 2. Shift + right click: the docs and comments say what each path does
+- [x] 2. Shift + right click: `spelling.md`, `nativeMenu.ts` and `contextMenu.ts` say it opens the system menu in the editor without the pages and Blank's menu on the pages
 
 ## Waiting on
 

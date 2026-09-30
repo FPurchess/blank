@@ -28,7 +28,7 @@ Right-click a word you added to change your mind:
 | **Remove from Dictionary** | Underlines the word again.                                             |
 | **Edit in Dictionary…**    | Lets you correct the word you added, e.g. _Kubernets_ to _Kubernetes_. |
 
-The menu also has the usual editing commands: undo and redo, cut, copy, paste, paste as plain text, delete and select all. Hold `Shift` while you right-click for the system's own menu.
+The menu also has the usual editing commands: undo and redo, cut, copy, paste, paste as plain text, delete and select all. Without the page view, hold `Shift` while you right-click for the system's own menu, with its input methods and emoji. On your pages, `Shift` and a right-click opens Blank's menu too.
 
 ## Use the keyboard
 
