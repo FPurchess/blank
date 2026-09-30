@@ -18,7 +18,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 11. The page number where a page ends: the page's number as the pages are numbered (style, start number), shown unless its footer's settings hold `{page}`
 - [x] 12. Shift + right click opens Blank's menu too
 - [x] 13. Bands open on a double click; a press on them still reaches the plugins (`PAGE_PRESS`) and leaves the selection
-- [ ] 14. Small UI details
+- [x] 14. Small UI details: the caret on whole device pixels, "Page N of M" numbered as the pages are and announced (`role="status"`), long band text cut with an ellipsis, the text cursor only over the pages
 - [ ] 15. Unit test gaps
 - [ ] 16. E2E for engine-editor's fixes
 - [ ] 17. Docs and GIFs

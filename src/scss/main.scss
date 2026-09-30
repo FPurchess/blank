@@ -1262,7 +1262,7 @@ body.without-engine {
   overflow-y: auto;
   color: var(--color);
   background-color: var(--background-color);
-  cursor: text;
+  cursor: default;
   user-select: none;
 
   &.pages {
@@ -1275,8 +1275,10 @@ body.without-engine {
   position: relative;
 }
 
+// text is where the pages are, not the desk around them
 .page-frame {
   position: absolute;
+  cursor: text;
   // a page lays out on its own, so one that comes into view or changes
   // lays out none of the others
   contain: layout style;
@@ -1318,6 +1320,14 @@ $page-end-height: 64px;
   grid-template-columns: 1fr 1fr 1fr;
   min-height: 1.3em;
   padding: 0 24px;
+
+  // a long one stays on its line, cut short
+  span {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 
   span:nth-child(2) {
     text-align: center;
@@ -1518,7 +1528,8 @@ body.band-editing #page-view {
 }
 
 // Ctrl (Cmd) + click opens the link under the pointer
-#page-view.follow-links {
+#page-view.follow-links,
+#page-view.follow-links .page-frame {
   cursor: pointer;
 }
 
@@ -1534,10 +1545,9 @@ body.band-editing #page-view {
   cursor: pointer;
 }
 
+// its width and place on whole device pixels are set where it's drawn
 .page-caret {
   position: absolute;
-  width: 1.5px;
-  margin-left: -0.75px;
   background-color: var(--color);
   pointer-events: none;
   animation: page-caret-blink 1.1s steps(1) 0.5s infinite;

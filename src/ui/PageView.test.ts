@@ -97,6 +97,9 @@ describe("page view", () => {
     await nextTick();
     const caret = view().querySelector<HTMLElement>(".page-caret")!;
     expect(parseFloat(caret.style.height)).toBeGreaterThan(20);
+    // on whole device pixels
+    const ratio = window.devicePixelRatio || 1;
+    expect(Number.isInteger(parseFloat(caret.style.width) * ratio)).toBe(true);
     expect(view().querySelectorAll(".page-selection")).toHaveLength(1);
   });
 
@@ -381,8 +384,9 @@ describe("page view", () => {
     dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
     pageCaret.value = { page: 1, x: 100, y: 100, width: 0, height: 20 };
     await nextTick();
-    expect(
-      document.getElementById("ui-page-number")!.textContent!.trim(),
-    ).toMatch(/^Page 2 of \d+$/);
+    const status = document.getElementById("ui-page-number")!;
+    expect(status.textContent!.trim()).toMatch(/^Page 2 of \d+$/);
+    // screen readers are told the page, as they read the text, not the pages
+    expect(status.getAttribute("role")).toBe("status");
   });
 });

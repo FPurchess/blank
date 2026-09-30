@@ -464,7 +464,7 @@ onUnmounted(() => {
           }"
         />
       </template>
-      <PageOverlay :layout="layout" layer="under" />
+      <PageOverlay :layout="layout" layer="under" :ratio="ratio" />
       <PageFrame
         v-for="frame in frames"
         :key="frame.page"
@@ -484,7 +484,7 @@ onUnmounted(() => {
         :ratio="ratio"
       />
       <PageMarks :layout="layout" :pages="shownPages" />
-      <PageOverlay :layout="layout" layer="over" />
+      <PageOverlay :layout="layout" layer="over" :ratio="ratio" />
       <PageFirstHeader :layout="layout" />
       <PageProperties :layout="layout" />
     </div>

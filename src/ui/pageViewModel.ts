@@ -159,3 +159,26 @@ export const anchorTop = (layout: FrameLayout, anchor: ViewAnchor) => {
   const y = Math.min(Math.max(anchor.y, frame.y), frame.y + frame.h);
   return Math.max(0, frame.top + (y - frame.y) * layout.scale);
 };
+
+/**
+ * caretLine returns where the caret at `left` is drawn: 1.5 pixels wide
+ * rounded to whole device pixels, and on them, so it isn't blurred across
+ * two
+ * @param ratio device pixels per CSS pixel
+ */
+export const caretLine = (left: number, ratio: number) => {
+  const width = Math.max(1, Math.round(1.5 * ratio));
+  const start = Math.round(left * ratio - width / 2);
+  return { left: start / ratio, width: width / ratio };
+};
+
+/**
+ * pageLabel returns "Page N of M" as the bar shows it: the page with the
+ * number it shows, e.g. "iv" or from the number the first page starts at,
+ * and how many there are
+ */
+export const pageLabel = (
+  position: { page: number; pages: number },
+  layout: Layout,
+) =>
+  `Page ${formatNumber(pageNumber(layout, position.page), layout.numberStyle)} of ${position.pages}`;

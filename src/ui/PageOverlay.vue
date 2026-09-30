@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, shallowRef } from "vue";
 
 import { useEditor } from "../editor/handle";
 import { type FrameLayout, onDesk } from "../engine/frames";
+import { caretLine } from "./pageViewModel";
 import {
   pageCaret,
   pageComposition,
@@ -18,7 +19,12 @@ import {
 // it, as in the webview's own text.
 // The page view shows it in two layers: the selection under the text (the
 // pages are transparent but for their text), the rest over it.
-const props = defineProps<{ layout: FrameLayout; layer: "under" | "over" }>();
+const props = defineProps<{
+  layout: FrameLayout;
+  layer: "under" | "over";
+  // device pixels per CSS pixel, which the caret is drawn on
+  ratio: number;
+}>();
 const editor = useEditor();
 
 const placed = (rects: PageRect[]) =>
@@ -27,11 +33,13 @@ const placed = (rects: PageRect[]) =>
     return box ? [{ ...box, key: index }] : [];
   });
 
-const caret = computed(() =>
-  pageCaret.value && props.layer === "over"
-    ? onDesk(props.layout, pageCaret.value)
-    : null,
-);
+const caret = computed(() => {
+  const box =
+    pageCaret.value && props.layer === "over"
+      ? onDesk(props.layout, pageCaret.value)
+      : null;
+  return box && { ...box, ...caretLine(box.left, props.ratio) };
+});
 const under = computed(() => props.layer === "under");
 const rects = computed(() => (under.value ? placed(pageSelection.value) : []));
 const nodes = computed(() =>
@@ -94,6 +102,7 @@ const box = (rect: {
     class="page-caret"
     :style="{
       left: `${caret.left}px`,
+      width: `${caret.width}px`,
       top: `${caret.top}px`,
       height: `${caret.height}px`,
     }"

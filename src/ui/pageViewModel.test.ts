@@ -4,8 +4,10 @@ import type { FrameLayout } from "../engine/frames";
 import { testLayout } from "../test/layout";
 import {
   anchorTop,
+  caretLine,
   endMark,
   firstHeaderPlace,
+  pageLabel,
   propertiesPlace,
   scrollFor,
   viewAnchor,
@@ -200,5 +202,38 @@ describe("viewAnchor and anchorTop", () => {
     expect(anchorTop(ends, { page: 1, y: 10 })).toBe(714);
     expect(anchorTop(ends, { page: 1, y: 800 })).toBe(714 + 400);
     expect(anchorTop(ends, { page: 7, y: 0 })).toBeNull();
+  });
+});
+
+describe("caretLine", () => {
+  it.each([1, 1.5, 2])(
+    "draws the caret on whole device pixels at %s×",
+    (ratio) => {
+      const { left, width } = caretLine(100.3, ratio);
+      expect(Number.isInteger(Math.round(left * ratio * 1000) / 1000)).toBe(
+        true,
+      );
+      expect(Number.isInteger(Math.round(width * ratio * 1000) / 1000)).toBe(
+        true,
+      );
+      expect(width * ratio).toBeGreaterThanOrEqual(1);
+      // around the spot, within a device pixel
+      expect(Math.abs(left + width / 2 - 100.3)).toBeLessThanOrEqual(1 / ratio);
+    },
+  );
+});
+
+describe("pageLabel", () => {
+  it("numbers the page as the pages are numbered", () => {
+    expect(pageLabel({ page: 2, pages: 10 }, testLayout())).toBe(
+      "Page 2 of 10",
+    );
+    expect(
+      pageLabel({ page: 4, pages: 10 }, testLayout({ numberStyle: "i" })),
+    ).toBe("Page iv of 10");
+    // the first page counts from 5; "of" counts every page, as {pages} does
+    expect(
+      pageLabel({ page: 1, pages: 3 }, testLayout({ startNumber: 5 })),
+    ).toBe("Page 5 of 3");
   });
 });
