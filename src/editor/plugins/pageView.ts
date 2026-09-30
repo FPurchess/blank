@@ -310,8 +310,6 @@ const PAGE_STEP = 0.85;
 export const pageSync = () => {
   // where the text being composed starts, while an input method composes
   let composing: number | null = null;
-  // the widths kept of the table the cursor is in
-  let frozen: FrozenWidths | null = null;
   return new Plugin<TrackedChanges>({
     key: pageSyncKey,
     state: {
@@ -333,6 +331,9 @@ export const pageSync = () => {
       },
     },
     view(view) {
+      // the widths kept of the table the cursor is in, for this view's
+      // document only: a new document gets a new view
+      let frozen: FrozenWidths | null = null;
       let engine: PageEngine | null = null;
       let stops: (() => void)[] = [];
       // the engine gave up (see PageEngine.call): the editor shows the text

@@ -20,7 +20,7 @@ deletes this file on merge.
 - [ ] 11. The PDF waits for fallback glyphs
 - [ ] 12. The hidden `TableView` no longer freezes columns
 - [x] 13. Page setup and field watchers lay out on the new state
-- [ ] 14. `frozen` is reset with the plugin view
+- [x] 14. `frozen` is reset with the plugin view
 - [ ] 15. Share the fonts between engines — waiting for S3
 - [ ] 16. Test hooks only in dev and E2E builds
 - [ ] 17. Dead code, and a parity test of the bands

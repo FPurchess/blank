@@ -41,6 +41,8 @@ import { forgetImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
+import { applyDocument } from "../document";
+import { tableGrid } from "../../exporters/table";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
@@ -508,5 +510,45 @@ describe("laying out a keystroke", () => {
     expect(view.state.doc.firstChild!.textContent).toBe("Titleabcde");
     expect(perfSamples().layout).toHaveLength(5);
     view.destroy();
+  });
+});
+
+describe("the kept widths of a table", () => {
+  afterEach(() => hidePages());
+
+  it("are the new document's own after another is opened", () => {
+    const engine = showPages();
+    const first = doc(table(tr(td("a"), td("a much longer cell"))), p("x"));
+    const mounted = mount(first);
+    // the cursor in the table keeps its widths
+    const into = (at: number) =>
+      mounted.view.dispatch(
+        mounted.view.state.tr.setSelection(
+          TextSelection.create(mounted.view.state.doc, at),
+        ),
+      );
+    into(4);
+
+    const second = doc(
+      table(tr(td("a cell that is much longer"), td("b"))),
+      p("x"),
+    );
+    const sent: { kind: string; widths?: number[] }[] = [];
+    const update = engine.raw.update.bind(engine.raw);
+    vi.spyOn(engine.raw, "update").mockImplementation(
+      (start, count, json, shift) => {
+        sent.push(...JSON.parse(json));
+        return update(start, count, json, shift);
+      },
+    );
+    // the new document starts with the cursor in its table
+    mounted.view.updateState(applyDocument(mounted.view.state, second));
+    into(6);
+
+    const tables = sent.filter((item) => item.kind === "table");
+    const widths = tables[tables.length - 1]?.widths;
+    expect(widths).toEqual(tableGrid(second.firstChild!).widths);
+    expect(widths).not.toEqual(tableGrid(first.firstChild!).widths);
+    mounted.view.destroy();
   });
 });
