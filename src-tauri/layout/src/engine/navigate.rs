@@ -2,6 +2,7 @@
 //! where the caret goes up, down and to the ends of a line.
 
 use super::Engine;
+use crate::model::Content;
 use crate::text::TextBox;
 
 /// how a position is shown: as a caret in text, or as a whole node
@@ -227,12 +228,27 @@ impl Engine {
                 let boxed = &self.laid[item].texts[text];
                 let (line, ..) = boxed.caret(pos, after);
                 let unit = self.unit_of_text(item, text, line);
-                // a table cell has several lines in one unit
-                let target = if down { line + 1 } else { line.wrapping_sub(1) };
-                if self.laid[item].units[unit].line.is_none() && target < boxed.line_count() {
-                    let x = goal - self.settings.margins.left - boxed.x;
-                    let (pos, after) = boxed.hit_line(target, x);
-                    return Some((Hit::Text(pos), after));
+                // a table's row has the lines of its cells in one unit: the
+                // next line of the box, or else the next paragraph of the
+                // cell, before the next unit
+                if self.laid[item].units[unit].line.is_none() {
+                    let target = if down { line + 1 } else { line.wrapping_sub(1) };
+                    if target < boxed.line_count() {
+                        let x = goal - self.settings.margins.left - boxed.x;
+                        let (pos, after) = boxed.hit_line(target, x);
+                        return Some((Hit::Text(pos), after));
+                    }
+                    if let Some(other) = self.box_in_column(item, unit, text, down) {
+                        let other_box = &self.laid[item].texts[other];
+                        let target = if down {
+                            0
+                        } else {
+                            other_box.line_count().saturating_sub(1)
+                        };
+                        let x = goal - self.settings.margins.left - other_box.x;
+                        let (pos, after) = other_box.hit_line(target, x);
+                        return Some((Hit::Text(pos), after));
+                    }
                 }
                 self.frag_of(item, unit)?
             }
@@ -247,9 +263,19 @@ impl Engine {
                 continue;
             }
             if unit.texts.is_empty() {
+                // a table's caption isn't text to move through, and the
+                // table's cells come after it
+                let laid = &self.laid[frag.item];
+                let caption = frag.unit == 0
+                    && laid.label.is_some()
+                    && matches!(self.items[frag.item].content, Content::Table { .. });
+                if caption {
+                    continue;
+                }
                 return Some((Hit::Node(self.items[frag.item].from()), false));
             }
-            // the first or last line of the text box under the goal
+            // the text box under the goal: the first of a cell going down,
+            // the last going up
             let texts = &self.laid[frag.item].texts;
             let item_x = goal - self.settings.margins.left;
             let index = unit.texts.clone().min_by(|&a, &b| {
@@ -260,17 +286,66 @@ impl Engine {
                         (item_x - boxed.x - boxed.width).max(0.0)
                     }
                 };
-                distance(&texts[a]).total_cmp(&distance(&texts[b]))
+                let (a, b) = (&texts[a], &texts[b]);
+                let by_y = if down {
+                    a.y.total_cmp(&b.y)
+                } else {
+                    b.y.total_cmp(&a.y)
+                };
+                distance(a).total_cmp(&distance(b)).then(by_y)
             })?;
             let boxed = &texts[index];
+            // its first or last line this unit shows: a slice of a row
+            // taller than a page shows only some
+            let shown: Vec<usize> = boxed
+                .lines()
+                .iter()
+                .enumerate()
+                .filter(|(_, info)| unit.shows(boxed.y + info.top, boxed.y + info.bottom))
+                .map(|(line, _)| line)
+                .collect();
             let line = match unit.line {
                 Some(line) => line,
-                None if down => 0,
-                None => boxed.line_count().saturating_sub(1),
+                None if down => shown.first().copied().unwrap_or(0),
+                None => shown
+                    .last()
+                    .copied()
+                    .unwrap_or(boxed.line_count().saturating_sub(1)),
             };
             let (pos, after) = boxed.hit_line(line, item_x - boxed.x);
             return Some((Hit::Text(pos), after));
         }
+    }
+
+    /// the nearest text box of a unit below (`down`) or above the box
+    /// `text`, in its column: the next or previous paragraph of a cell
+    fn box_in_column(&self, item: usize, unit: usize, text: usize, down: bool) -> Option<usize> {
+        let texts = &self.laid[item].texts;
+        let current = &texts[text];
+        let (left, right) = (current.x, current.x + current.width);
+        let (top, bottom) = (current.y, current.y + current.height());
+        self.laid[item].units[unit]
+            .texts
+            .clone()
+            .filter(|&other| other != text)
+            .filter(|&other| {
+                let boxed = &texts[other];
+                let overlaps = boxed.x < right && left < boxed.x + boxed.width;
+                let beyond = if down {
+                    boxed.y >= bottom - 0.01
+                } else {
+                    boxed.y + boxed.height() <= top + 0.01
+                };
+                overlaps && beyond
+            })
+            .min_by(|&a, &b| {
+                let (a, b) = (texts[a].y, texts[b].y);
+                if down {
+                    a.total_cmp(&b)
+                } else {
+                    b.total_cmp(&a)
+                }
+            })
     }
 
     /// the start or end of the line the caret at `pos` is painted on (as
@@ -424,5 +499,85 @@ mod tests {
         // last character
         let last = engine.items[0].to();
         assert_eq!(engine.line_edge(last - 1, false, true), Some((last, false)));
+    }
+
+    /// a table of a cell with two paragraphs, "first" (3..8) and "second"
+    /// (10..16), over a cell "third" (23..28)
+    fn two_paragraph_cell() -> Engine {
+        use crate::model::{Cell, Row, Text};
+        let paragraphs = vec![
+            Text {
+                pos: 3,
+                text: "first".into(),
+                ..Default::default()
+            },
+            Text {
+                pos: 10,
+                text: "second".into(),
+                ..Default::default()
+            },
+        ];
+        let rows = vec![
+            Row {
+                cells: vec![Cell {
+                    paragraphs,
+                    ..Default::default()
+                }],
+                header: false,
+            },
+            Row {
+                cells: vec![cell(23, "third")],
+                header: false,
+            },
+        ];
+        engine(vec![table_item(rows, None)])
+    }
+
+    fn text_hit(found: Option<(Hit, bool)>) -> u32 {
+        match found {
+            Some((Hit::Text(pos), _)) => pos,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn multi_paragraph_cell_down_arrow() {
+        let engine = two_paragraph_cell();
+        let goal = engine.caret(5, false).unwrap().1;
+        let down = text_hit(engine.vertical(5, false, true, goal));
+        assert!((10..=16).contains(&down), "{down}");
+        // and on to the next row
+        let next = text_hit(engine.vertical(down, false, true, goal));
+        assert!((23..=28).contains(&next), "{next}");
+    }
+
+    #[test]
+    fn multi_paragraph_cell_up_arrow() {
+        let engine = two_paragraph_cell();
+        let goal = engine.caret(25, false).unwrap().1;
+        let up = text_hit(engine.vertical(25, false, false, goal));
+        assert!((10..=16).contains(&up), "{up}");
+        let up = text_hit(engine.vertical(up, false, false, goal));
+        assert!((3..=8).contains(&up), "{up}");
+    }
+
+    #[test]
+    fn down_arrow_over_captioned_table() {
+        use crate::model::{Content, Row};
+        let rows = vec![Row {
+            cells: vec![cell(23, "cell")],
+            header: false,
+        }];
+        let mut table = table_item(rows, Some("The caption"));
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 20;
+        }
+        let engine = engine(vec![paragraph(1, "above"), table]);
+        let goal = engine.caret(3, false).unwrap().1;
+        let down = text_hit(engine.vertical(3, false, true, goal));
+        assert!((23..=27).contains(&down), "{down}");
+        // and back up over the caption, into the paragraph
+        let up = text_hit(engine.vertical(down, false, false, goal));
+        assert!((1..=6).contains(&up), "{up}");
     }
 }

@@ -293,7 +293,7 @@ impl Paginator<'_> {
     }
 
     /// the height a run of headings from `index` needs with the first unit
-    /// of what follows them
+    /// of what follows them, and the units that stay with that
     fn keep_height(&self, index: usize) -> f32 {
         let mut height = 0.0;
         let mut current = index;
@@ -302,7 +302,14 @@ impl Paginator<'_> {
                 height += self.items[current - 1].after + self.items[current].before;
             }
             if self.items[current].heading_level() == 0 {
-                height += self.laid[current].units[0].height;
+                // its first unit, with the units that stay with it, e.g. a
+                // table's caption, its header rows and its first row
+                let units = &self.laid[current].units;
+                let mut last = 0;
+                while units[last].keep_next && last + 1 < units.len() {
+                    last += 1;
+                }
+                height += units[last].top + units[last].height - units[0].top;
                 return height;
             }
             height += self.laid[current].height();
@@ -340,7 +347,8 @@ impl Paginator<'_> {
             for unit_index in first_unit..laid.units.len() {
                 let unit = &laid.units[unit_index];
                 let mut y = if unit_index == first_unit {
-                    let gap = if self.empty || first_unit > 0 {
+                    // no space above a page break, which takes no room
+                    let gap = if self.empty || first_unit > 0 || is_break {
                         0.0
                     } else {
                         self.prev_after + item.before
@@ -359,7 +367,9 @@ impl Paginator<'_> {
                     next += 1;
                     needed = laid.units[next].top + laid.units[next].height - unit.top;
                 }
-                if !fresh && y + needed > bottom + EPSILON {
+                // a page break never goes to a new page itself: the page it
+                // ends is the one it is on
+                if !fresh && !is_break && y + needed > bottom + EPSILON {
                     self.open_page();
                     y = self.y;
                 }
@@ -377,7 +387,7 @@ impl Paginator<'_> {
                     return;
                 }
             }
-            self.prev_after = item.after;
+            self.prev_after = if is_break { 0.0 } else { item.after };
             if is_break && index > 0 {
                 self.open_page();
             }
@@ -585,5 +595,75 @@ mod tests {
         let full = test_support::engine(expected);
         assert_eq!(engine.frags, full.frags);
         assert_eq!(engine.pages.len(), full.pages.len());
+    }
+
+    fn page_break(pos: u32) -> Item {
+        Item {
+            content: Content::Break { pos },
+            ..paragraph(0, "")
+        }
+    }
+
+    #[test]
+    fn break_near_bottom_has_no_blank_page() {
+        // a paragraph whose space below reaches past the bottom of the page,
+        // then a page break: the break stays on the first page
+        let settings = Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        let line = crate::style::text_style("p").line;
+        let mut first = paragraph(1, "x");
+        first.after = room - line + 10.0;
+        let engine = engine(vec![first, page_break(4), paragraph(6, "next")]);
+        assert_eq!(engine.pages.len(), 2);
+        assert_eq!(engine.page_of_frag(engine.first_frag[1]), 0);
+        assert_eq!(engine.page_of_frag(engine.first_frag[2]), 1);
+    }
+
+    #[test]
+    fn page_break_at_end() {
+        // as in Word, where the break is "page break before" on an empty
+        // paragraph after it: the document ends with an empty page
+        let engine = engine(vec![paragraph(1, "text"), page_break(7)]);
+        assert_eq!(engine.pages.len(), 2);
+        assert_eq!(engine.pages[1].start, engine.pages[1].end);
+        // and two breaks in a row leave an empty page between them
+        let engine = test_support::engine(vec![
+            paragraph(1, "text"),
+            page_break(7),
+            page_break(8),
+            paragraph(10, "after"),
+        ]);
+        assert_eq!(engine.pages.len(), 3);
+        assert_eq!(engine.page_of_frag(engine.first_frag[3]), 2);
+    }
+
+    #[test]
+    fn heading_stays_with_captioned_table() {
+        use crate::model::Row;
+        let settings = Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        let heading_height = crate::style::text_style("h3").line;
+        let line = crate::style::text_style("p").line;
+        // under the heading, room for the table's caption, but not for its
+        // header row and first row as well
+        let spare = 30.0;
+        let mut first = paragraph(1, "x");
+        first.after = room - line - 16.0 - heading_height - spare;
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(40 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut table = table_item(rows, Some("The caption"));
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 30;
+        }
+        let engine = engine(vec![first, heading(4, 3, "Heading"), table]);
+        let caption = engine.laid[2].units[0].height;
+        assert!(caption < spare, "the caption alone fits: {caption}");
+        let heading_page = engine.page_of_frag(engine.first_frag[1]);
+        let table_page = engine.page_of_frag(engine.first_frag[2]);
+        assert_eq!((heading_page, table_page), (1, 1));
     }
 }
