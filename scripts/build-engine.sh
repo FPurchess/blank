@@ -21,7 +21,7 @@ cd "$(dirname "$0")/.."
 fail() { echo "error: $*" >&2; exit 1; }
 
 RUST_VERSION=1.98.1
-BINARYEN_VERSION=132
+BINARYEN_VERSION=132.0.0
 
 is_pinned() { rustc --version 2>/dev/null | grep -q "^rustc $RUST_VERSION "; }
 if [ -z "${ALLOW_OTHER_TOOLCHAIN:-}" ]; then
@@ -47,8 +47,11 @@ command -v wasm-bindgen >/dev/null ||
 command -v bun >/dev/null || fail "bun is missing, it runs binaryen's wasm-opt"
 
 root=$(pwd)
-target="${CARGO_TARGET_DIR:-src-tauri/target}"
-[[ "$target" = /* ]] || target="$root/$target"
+# where cargo builds, as it resolves CARGO_TARGET_DIR and a target-dir in
+# a cargo config
+target=$(cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 --no-deps |
+  bun -e 'console.log(JSON.parse(await Bun.stdin.text()).target_directory)')
+[ -n "$target" ] || fail "cargo metadata gave no target directory"
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 sysroot="$(rustc --print sysroot)"
 commit="$(rustc -vV | sed -n 's/^commit-hash: //p')"
