@@ -43,7 +43,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
   | red | `#8b9cc7` | `#532728` | 4.54 | 4.54 | 2.0 | 4.8 |
   | green | `#87a8d4` | `#323f37` | 4.52 | 4.52 | 2.0 | 3.2 |
   | blue | `#7c9bcc` | `#25324c` | 4.52 | 4.52 | 2.0 | 4.1 |
-- [ ] 1. The edge line follows `engineMissing` at runtime
+- [x] 1. The edge line follows `engineMissing` at runtime (engine-editor sets it in `useFallbackEditor`; until then the class at boot still works)
 - [ ] 3. The view keeps its place when the header or properties room changes
 - [ ] 4. A switch renders the target range right away
 - [ ] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
