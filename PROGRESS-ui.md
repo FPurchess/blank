@@ -54,6 +54,38 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [ ] 11. The test gaps
 - [x] 2. Shift + right click: `spelling.md`, `nativeMenu.ts` and `contextMenu.ts` say it opens the system menu in the editor without the pages and Blank's menu on the pages
 
+## Where it stands (2026-10-01, 00:10), and what's next
+
+Done and committed tonight (after 2af95a1, the tables docs): M4 0692409, M3 3356a08, M2 4ff1bec, M5 6874f42, M6 8b1b44e, selection ca36ab2, minor 1 639af62, 3 e7aba64, 4 c463ebd, 6 f44a4fc, 7 1b200ee, 8 dbfefda, 9 28e3d88, 2 3f33644. Each passed lint, format:check and the unit tests in the pre-commit hook. The E2E specs each item touches passed on a fresh build (M2's check also failed as it should with the body's repaint switched off). The full E2E suite has not run since M4.
+
+Next, in this order:
+1. Minor 10:
+   - move `layerOf` out of `PageFrame.vue` into a `.ts` module next to it
+   - put `frameRenders` behind `__TEST_HOOKS__`
+   - make the page break's opacity in "page ends" (`main.scss`, `#page-view.page-ends .page-break-mark`, `opacity: 0.6`) a theme variable, or `$faint-text-opacity`
+   - reword "a click" to "a double click" in `.claude/rules/headers-and-footers.md:97/100` (ask the integrator first: `.claude/rules` isn't ours)
+   - the colour cache is done: module-level `themeColors` in `pageLayers.ts`, with the selection
+2. Minor 11, the test gaps:
+   - a lower bound for the typing paint count, and the page count asserted
+   - a real signal that the layout is done, instead of the 1 s settle
+   - `waitForInk` minimums raised, and the header check reading only `.page-bands`
+   - `expectGridPainted` in a `waitUntil`
+   - the single-click check waiting past the double-click time
+   - `screenStats` clamping at the right and bottom
+   - End on a long URL also checking that x moved
+   - `motion.test` collecting every animation and transition
+   - `PageFrame.test` "bands only" checking every mounted page, and renders `toBe(1)`
+   - the recording canvas recording `globalAlpha` and `fillStyle`
+   - `parseColor` throwing on NaN
+3. Minor 5, once engine-editor's line has landed: switch `headBox` in `PageView.vue` to `pageHeadBox`, adding this line to `src/state/pageView.ts` right after `pageCaret`, identical:
+   `// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages`
+   `export const pageHeadBox = shallowRef<PageRect | null>(null);`
+4. Then the full check: `bun run lint`, `bun run format:check`, `bun run test:coverage`, the full E2E suite (`cd e2e && E2E_PORT=4521 xvfb-run -a bunx wdio run ./wdio.conf.ts`), and `make docs-screenshots` (the selection only shows in the E2E shots, `e2e/screenshots/selection-<theme>.png`, so the docs' stills shouldn't change; check).
+
+For others:
+- M1 (a press on a band inside a selection collapses it) is with engine-editor, in `pageMove.ts`, with the `ignores` option. `BANDS` stays in `PageView.vue`.
+- A flake that isn't ours: `src/main.test.ts` once reported an unhandled "document is not defined" from the 100 ms focus timer in `src/editor/index.ts:105`, which fired after jsdom was torn down (every test passed; the next run was clean). For engine-editor.
+
 ## Waiting on
 
 - Merged cells and block content in cells: the limit line at `docs/guide/tables.md:140` stays until the integrator says.
