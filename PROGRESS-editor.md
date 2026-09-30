@@ -28,6 +28,70 @@ deletes this file on merge.
 - [x] 19. The Word export's font loader recovers from a failed fetch
 - [x] 20. Incremental layout equals a fresh one on real transactions
 
+## Review fixes (resume here)
+
+The integrator's list after the self-review, one commit each, in order. The
+branch starts at bcf725b (fast-forward).
+
+Done:
+- [x] B1 marks and attribute steps (9854f42)
+- [x] M1 settings after an appended transaction (768c433)
+- [x] M3 triple click (691a031; the drag machine is `src/editor/pageMove.ts`)
+- [x] M2 only a trap breaks the instance, and gives up the page engine (a575ddf)
+- [x] M4 a move let go outside the view is cancelled (dcdf83a, 39af364 with
+  `e2e/specs/pageMove.e2e.ts`: triple click, move, let go on the bottom bar)
+- [x] M7 a press a plugin took moves nothing (66e4946)
+- [x] M8 a press on a band keeps the selection (4b42bf1, `BANDS` verbatim)
+- [x] M5 handles and toolbar follow a relayout (44b17be)
+- [x] m11 `engineMissing` (7b24134)
+- [x] M9 `pageHeadBox` (729ac5b)
+- [x] M10 already prevented by the serialized lookups; test kept, plus
+  `asked` keyed by language (m9 part) (ae78c1e)
+- [x] m1 no pages published by a failed engine (83757d2)
+- [x] m2 lost moves are cancelled (fd47f76)
+- [x] m5 cell selections grow from their anchor cell; Shift+Home/End/PageUp/
+  PageDown leave them to the editor (0b52acc)
+- [x] roman numerals above 3999 are arabic, as in Rust (acdf3bb)
+- [x] m8 warning names once each; the worker's free is guarded (a2e333e)
+- [x] m9 images forgotten when another document opens; a 60 s worker timeout
+  (e7a6d01)
+- [x] m10 `SyncOptions.force` dropped (eae906b)
+- [x] m6 the marker on a cell's first text piece (fd733a5)
+- [x] m3 text from other apps shows where it drops (28fe97e)
+
+Next, in this order:
+1. The flake engine-release saw in `src/main.test.ts`: the 100 ms focus timer
+   in `src/editor/index.ts` (~105) fires after jsdom is torn down. Clear it
+   when the editor is disposed (or guard `document`), with a fake-timer test.
+2. m9 rest: avoid the second worker run after a trap for a document with
+   characters not looked up yet. Proposal: a two-step worker protocol (the
+   worker lays out and reports `missing`, then gets the fonts and writes the
+   PDF), or pass the fonts found for the page engine's last `missing`.
+3. m10 rest: set `path` after `updateState` in `applyDocument` callers
+   (`src/editor/document.ts`: 58, 72, 110, 172 and the openers that call
+   `view.updateState`), so opening a file doesn't lay out the old document
+   once more. Take the table re-flatten on entering/leaving a table only if
+   small (the frozen key forces a full flatten; the table's block would do).
+4. m7: after a mid-session engine failure, scroll the now visible editor to
+   the selection (`scrollIntoView` in a rAF after a failure teardown).
+5. m4: edge scrolling while moving text (reuse `edgeStep`/`scrollAtEdges`
+   in `PageView.vue` for `pageMove`), and a stale drop caret after a wheel
+   scroll mid-move.
+6. M6: an E2E that presses the ContextMenu key in the plain editor
+   (`blank.engine=off`, `restartApp`) to see whether WebKitGTK's key event
+   reaches `nativePointer` as a right click; fix only if it reproduces,
+   else record it here.
+7. Test gaps: the Page Down goal test should start mid-line (goal ≠ x); the
+   handles scroll test should check the new box; cover `breakForTest` and
+   the strict rethrow; make `InProcessWorker` in `pdf.test.ts` respect
+   transfer lists (detach the transferred buffers).
+8. Re-check `.claude/rules/tables.md` and `editor-boundary.md` (engine-release
+   fixed them in 29b771b) against these fixes: `pageMove.ts`, `pageHeadBox`,
+   `engineMissing`, the trap rule, and the handles watching the layout.
+9. At the end: lint, format, unit tests with coverage, and the nine specs
+   plus `tables.e2e.ts` and `pageMove.e2e.ts`; report the hashes to the
+   integrator.
+
 ## Notes for the other streams
 
 - engine-ui: every call into the engine goes through `PageEngine`'s guard.
@@ -120,6 +184,10 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   the worker. Any other error of the page view's engine gives up that
   engine alone (the instance stays usable for exports); any other error of
   an export is that export's own and fails it, without a worker.
+- engine-core (follow-up, not waited for): image blocks in table cells
+  (S2) have no `indent`, `marker` or `bars`, so an image in a list item or a
+  quote in a cell stands at the cell's left without them. The TS side puts
+  the list marker on the item's first text piece meanwhile.
 
 ## Verification
 
