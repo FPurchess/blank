@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { browser, $, expect } from "@wdio/globals";
 
-import { clickAt, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickAt,
+  focusEditor,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 // Without the layout engine, e.g. when its wasm can't start, the editor shows
 // the text itself and everything but the pages keeps working. The debug
@@ -99,16 +106,23 @@ describe("when the layout engine fails while running", () => {
   it("goes on in the editor without it", async () => {
     await restartApp();
     await expect($("#page-view .page-canvas")).toBeExisting();
+    // the caret at the end of the text, placed through the engine while it
+    // still works
+    await focusEditor();
     // a debug hook of engine-editor's that makes the engine's next call fail
     await browser.execute(() =>
       (
         window as unknown as { blankBreakEngine: () => void }
       ).blankBreakEngine(),
     );
-    await $("#page-view").click();
-    await type("x");
+    // nothing has called it yet
+    await expect($("body")).not.toHaveElementClass("without-engine");
+    // a word the welcome document doesn't have, typed into the failing
+    // engine's layout
+    await type(" zqk");
     await expect($("body")).toHaveElementClass("without-engine");
+    // the editor takes over and shows it
     await expect($("#editor")).toBeDisplayed();
-    await expect($("#editor")).toHaveText(expect.stringContaining("x"));
+    await expect($("#editor")).toHaveText(expect.stringContaining("zqk"));
   });
 });
