@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
-import { setPageEngine } from "../engine/engine";
+import { type PageEngine, setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
 import { pageLayoutState, pageView } from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
@@ -10,6 +10,7 @@ import { flushPromises } from "../test/async";
 import { testLayout } from "../test/layout";
 import { bootApp } from "./mount";
 import { pageBitmaps } from "./pageBitmaps";
+import { frameRenders } from "./pageLayers";
 import { painter, type Painter, setPainter } from "./painter";
 
 // The pages paint through the painter, and only it knows how: a painter that
@@ -25,14 +26,23 @@ const view = () => document.getElementById("page-view")!;
 const pageOf = (canvas: HTMLCanvasElement) =>
   Number(canvas.closest<HTMLElement>(".page-frame")!.dataset.page);
 
-// a painter that records the pages it paints and shows
+const layerOf = (canvas: HTMLCanvasElement) =>
+  canvas.classList.contains("page-bands") ? "bands" : "body";
+
+// a painter that records the pages it paints and shows: the pages of the
+// text, and the layers as "page:layer"
 const recorder = () => {
   const painted: number[] = [];
+  const layers: string[] = [];
   const shown: number[] = [];
   const fake: Painter = {
     snapshots: true,
     surface: (canvas) => ({ canvas }),
-    paint: (surface) => painted.push(pageOf(surface.canvas)),
+    paint: (surface) => {
+      const layer = layerOf(surface.canvas);
+      layers.push(`${pageOf(surface.canvas)}:${layer}`);
+      if (layer === "body") painted.push(pageOf(surface.canvas));
+    },
     clear: () => {},
     snapshot: async (surface) => ({
       width: surface.canvas.width,
@@ -40,22 +50,29 @@ const recorder = () => {
     }),
     show: (surface) => shown.push(pageOf(surface.canvas)),
   };
-  return { fake, painted, shown };
+  return { fake, painted, layers, shown };
 };
 
-const layOut = () => {
-  const engine = testEngine();
-  engine.setSettings(testLayout(), documentFields(node));
-  engine.sync(node, () => undefined);
-  setPageEngine(engine);
+// what the editor's plugin publishes once the engine laid out `laidOut`
+const publish = (engine: PageEngine) => {
   pageLayoutState.value = {
     width: 595.28,
     height: 841.89,
     margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
     pages: engine.pages(),
     versions: engine.raw.versions(),
+    bodyVersions: engine.raw.bodyVersions(),
+    bandVersions: engine.raw.bandVersions(),
     bottoms: engine.raw.bottoms(),
   };
+};
+
+const layOut = (settings = testLayout(), laidOut = node) => {
+  const engine = testEngine();
+  engine.setSettings(settings, documentFields(laidOut));
+  engine.sync(laidOut, () => undefined);
+  setPageEngine(engine);
+  publish(engine);
   return engine;
 };
 
@@ -121,11 +138,74 @@ describe("the pages and the painter", () => {
     await paintQueued();
     painted.length = 0;
     const state = pageLayoutState.value!;
-    const versions = state.versions.slice();
-    versions[1] += 1;
-    pageLayoutState.value = { ...state, versions };
+    const bodyVersions = state.bodyVersions!.slice();
+    bodyVersions[1] += 1;
+    pageLayoutState.value = { ...state, bodyVersions };
     await paintQueued();
     expect(painted).toEqual([2]);
+  });
+
+  it("paints only the first page when its text is typed into", async () => {
+    const { fake, layers } = recorder();
+    setPainter(fake);
+    // on the sheets, which paint their headers and footers too
+    pageView.value = "pages";
+    const engine = layOut(
+      testLayout({
+        footer: { left: "", center: "{page} of {pages}", right: "" },
+      }),
+    );
+    expect(engine.pages()).toBeGreaterThan(10);
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    // "Title" becomes "Titles", then "Titless"; the first edit after the
+    // first layout still gives every page a new version (reported to the
+    // engine), the second is what typing does
+    let typed = createState(node, { cursor: 7 });
+    for (const step of [0, 1]) {
+      if (step === 1) {
+        await paintQueued();
+        layers.length = 0;
+      }
+      typed = typed.apply(typed.tr.insertText("s", 7 + step));
+      engine.sync(typed.doc, () => undefined);
+      publish(engine);
+    }
+    const renders = frameRenders.count;
+    await paintQueued();
+    expect(layers).toEqual(["1:body"]);
+    // and only its frame rendered again
+    expect(frameRenders.count - renders).toBeLessThanOrEqual(1);
+  });
+
+  it("paints only the headers and footers of the others when a page is added", async () => {
+    const { fake, layers } = recorder();
+    setPainter(fake);
+    pageView.value = "pages";
+    const engine = layOut(
+      testLayout({
+        footer: { left: "", center: "{page} of {pages}", right: "" },
+      }),
+    );
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const pages = engine.pages();
+    layers.length = 0;
+    // enough at the end for another page, added as typing adds it, so the
+    // pages before keep their text
+    const state = createState(node);
+    const longer = state.apply(
+      state.tr.insert(
+        node.content.size,
+        Array.from({ length: 30 }, () => p(LONG)),
+      ),
+    ).doc;
+    engine.sync(longer, () => undefined);
+    publish(engine);
+    expect(engine.pages()).toBe(pages + 1);
+    await paintQueued();
+    // the pages in view: page 1 and those after it, near the top
+    expect(layers).toContain("1:bands");
+    expect(layers.filter((layer) => layer.endsWith(":body"))).toEqual([]);
   });
 
   it("shows a page that comes back into view from what it kept", async () => {

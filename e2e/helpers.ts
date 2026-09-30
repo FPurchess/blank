@@ -294,7 +294,7 @@ export const boxOf = async (
 /**
  * canvasInk reads the pixels of the pages' canvases in `box`: a pixel shows
  * ink where it isn't transparent, since a page paints its text over nothing
- * (the sheet's colour is the frame's). It reads what the canvases show,
+ * (the sheet's colour is under it). It reads what the canvases show,
  * painted or drawn from a kept bitmap.
  */
 const canvasInk = (box: Box) =>
@@ -302,10 +302,16 @@ const canvasInk = (box: Box) =>
     let total = 0;
     let inked = 0;
     const sum = [0, 0, 0];
-    for (const canvas of document.querySelectorAll<HTMLCanvasElement>(
-      "#page-view .page-canvas",
+    // a frame's canvases lie over each other, its text and its header and
+    // footer, so a pixel counts once, with the ink of either
+    for (const frame of document.querySelectorAll<HTMLElement>(
+      "#page-view .page-frame",
     )) {
-      const rect = canvas.getBoundingClientRect();
+      const canvases = [
+        ...frame.querySelectorAll<HTMLCanvasElement>(".page-canvas"),
+      ];
+      if (!canvases.length) continue;
+      const rect = canvases[0].getBoundingClientRect();
       const left = Math.max(box.left, rect.left);
       const top = Math.max(box.top, rect.top);
       const right = Math.min(box.right, rect.right);
@@ -313,22 +319,28 @@ const canvasInk = (box: Box) =>
       if (right <= left || bottom <= top || !rect.width || !rect.height)
         continue;
       // device pixels of the canvas per CSS pixel
-      const sx = canvas.width / rect.width;
-      const sy = canvas.height / rect.height;
+      const sx = canvases[0].width / rect.width;
+      const sy = canvases[0].height / rect.height;
       const x = Math.floor((left - rect.left) * sx);
       const y = Math.floor((top - rect.top) * sy);
       const width = Math.max(1, Math.ceil((right - left) * sx));
       const height = Math.max(1, Math.ceil((bottom - top) * sy));
-      const { data } = canvas
-        .getContext("2d")!
-        .getImageData(x, y, width, height);
-      for (let index = 0; index < data.length; index += 4) {
+      const layers = canvases.map(
+        (canvas) =>
+          canvas.getContext("2d")!.getImageData(x, y, width, height).data,
+      );
+      for (let index = 0; index < layers[0].length; index += 4) {
         total++;
+        // the layer on top, which is the one seen
+        const shown = layers
+          .slice()
+          .reverse()
+          .find((data) => data[index + 3] >= 24);
         // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
-        if (data[index + 3] < 24) continue;
+        if (!shown) continue;
         inked++;
         for (let channel = 0; channel < 3; channel++)
-          sum[channel] += data[index + channel];
+          sum[channel] += shown[index + channel];
       }
     }
     return { total, inked, sum };

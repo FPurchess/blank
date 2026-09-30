@@ -37,7 +37,14 @@ import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
-import { frameLayout, keptRange, onDesk, visibleRange } from "../engine/frames";
+import {
+  type Frame,
+  frameLayout,
+  keptRange,
+  onDesk,
+  visibleRange,
+} from "../engine/frames";
+import { layerVersions } from "./pageLayers";
 import { anchorTop, scrollFor, viewAnchor } from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
@@ -124,20 +131,47 @@ const inView = computed(() =>
     : "",
 );
 
+// a frame as a page frame shows it, all plain values
+type ShownFrame = Frame & {
+  bodyVersion: number;
+  bandVersion: number;
+  nextBandVersion: number;
+  near: boolean;
+};
+// the frames shown before, by page, reused while their values stay the
+// same, so a sync that changed one page makes no new objects for the others
+let shownFrames = new Map<number, ShownFrame>();
+const sameFrame = (a: ShownFrame, b: ShownFrame) =>
+  (Object.keys(a) as (keyof ShownFrame)[]).every((key) => a[key] === b[key]);
+
 const frames = computed(() => {
   const state = pageLayoutState.value;
-  if (!layout.value || !state || !range.value) return [];
+  if (!layout.value || !state || !range.value)
+    return ((shownFrames = new Map()), []);
   const [first, last] = range.value.split("-").map(Number);
   const [shownFirst, shownLast] = inView.value
     ? inView.value.split("-").map(Number)
     : [Infinity, -Infinity];
-  return layout.value.frames.slice(first, last + 1).map((frame) => ({
-    ...frame,
-    version: state.versions[frame.page] ?? 0,
-    near: frame.page < shownFirst || frame.page > shownLast,
-    nextVersion:
-      frame.page + 1 < state.pages ? (state.versions[frame.page + 1] ?? 0) : -1,
-  }));
+  const versions = layerVersions(state, pageEngine);
+  const next = new Map<number, ShownFrame>();
+  const list = layout.value.frames.slice(first, last + 1).map((frame) => {
+    const made: ShownFrame = {
+      ...frame,
+      bodyVersion: versions.body[frame.page] ?? 0,
+      bandVersion: versions.bands[frame.page] ?? 0,
+      nextBandVersion:
+        frame.page + 1 < state.pages
+          ? (versions.bands[frame.page + 1] ?? 0)
+          : -1,
+      near: frame.page < shownFirst || frame.page > shownLast,
+    };
+    const before = shownFrames.get(frame.page);
+    const shown = before && sameFrame(before, made) ? before : made;
+    next.set(frame.page, shown);
+    return shown;
+  });
+  shownFrames = next;
+  return list;
 });
 
 // the device's pixels per CSS pixel, which the pages are painted at, e.g.
@@ -429,8 +463,9 @@ onUnmounted(() => {
         v-for="frame in frames"
         :key="frame.page"
         :page="frame.page"
-        :version="frame.version"
-        :next-version="frame.nextVersion"
+        :body-version="frame.bodyVersion"
+        :band-version="frame.bandVersion"
+        :next-band-version="frame.nextBandVersion"
         :top="frame.top"
         :left="frame.left"
         :width="frame.width"

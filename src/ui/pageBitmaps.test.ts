@@ -61,6 +61,7 @@ describe("bitmapKey", () => {
   it("tells apart what changes a painted page", () => {
     const parts = {
       engine: 1,
+      layer: "body",
       page: 1,
       version: 3,
       width: 100,
@@ -81,6 +82,8 @@ describe("bitmapKey", () => {
       { scale: 1.25 },
       { images: 1 },
       { engine: 2 },
+      { layer: "bands" },
+      { images: "10" },
     ])
       expect(bitmapKey({ ...parts, ...change })).not.toBe(key);
   });

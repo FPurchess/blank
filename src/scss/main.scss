@@ -1297,6 +1297,15 @@ body.without-engine {
   display: block;
 }
 
+// the header and footer of a sheet, painted apart from its text over it
+// (see src/ui/pageLayers.ts); positioned without a z-index, so it makes no
+// layer of its own
+.page-bands {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 // where a page of "page ends" ends: its footer, then the next page's header
 // (MARK_HEIGHT in src/engine/frames.ts)
 $page-end-height: 64px;

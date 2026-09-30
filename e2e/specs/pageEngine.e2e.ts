@@ -385,12 +385,12 @@ describe("page view", () => {
     await browser.saveScreenshot(path.join(SHOTS, "engine-coverage.png"));
   });
 
-  // two chapters of four paragraphs fill about a page
-  // about 2.7 chapters of four paragraphs fill a page
+  const TYPED = "the quick brown fox jumps over the lazy dog ";
+  // about two chapters of four paragraphs fill a page
   for (const [name, chapters] of [
     ["1", 1],
-    ["40", 108],
-    ["200", 540],
+    ["40", 80],
+    ["200", 400],
   ] as const) {
     it(`measures typing on about ${name} pages`, async function () {
       // a long document takes a while to open
@@ -432,7 +432,7 @@ describe("page view", () => {
         ).blankPageViewPerf(true),
       );
       await startLatency();
-      await type("the quick brown fox jumps over the lazy dog ");
+      await type(TYPED);
       await browser.executeAsync((done: () => void) => setTimeout(done, 300));
       const perf = (await browser.execute(() =>
         (
@@ -462,6 +462,9 @@ describe("page view", () => {
         paint: summary(perf.paint),
       };
       console.log(`MEASURE ${name}: ${JSON.stringify(result)}`);
+      // typing on the first page paints that page, not the others: about a
+      // paint a key, and a few more where the text first changes
+      expect(perf.paint.length).toBeLessThanOrEqual(TYPED.length + 4);
       fs.appendFileSync(
         path.join(SHOTS, "engine-measurements.jsonl"),
         JSON.stringify({ name, ...result }) + "\n",

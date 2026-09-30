@@ -166,6 +166,8 @@ export const engineId = (engine: object) => {
  */
 export const bitmapKey = (parts: {
   engine: number;
+  // the layer of the page, e.g. its text or its header and footer
+  layer: string;
   page: number;
   version: number;
   width: number;
@@ -175,10 +177,12 @@ export const bitmapKey = (parts: {
   x: number;
   y: number;
   theme: string;
-  images: number;
+  // which of its images are loaded
+  images: number | string;
 }) =>
   [
     parts.engine,
+    parts.layer,
     parts.page,
     parts.version,
     parts.width,
