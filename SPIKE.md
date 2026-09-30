@@ -29,8 +29,10 @@ For the metainfo's `<release version="3.0.0">` (one paragraph, as for 2.x):
 > screen where it ends in the PDF, with "Page N of M" in the bottom bar, as
 > page ends (the new default) or as sheets on a desk (Mod-Alt-V). A new PDF
 > engine sets code in IBM Plex Mono, emoji in monochrome Noto Emoji, and
-> Chinese, Japanese, Korean and other scripts in the fonts on your computer,
-> and splits long table rows across pages. Mod+click opens links. Your
+> Chinese, Japanese, Korean and other scripts in the fonts on your computer.
+> Table cells hold lists, quotes, code and images, and a row too tall for a
+> page goes on over the next ones, under the repeated header rows. Mod+click
+> opens links. Your
 > markdown files and settings stay as they are; Blank now needs macOS 11 or
 > newer.
 
@@ -52,14 +54,18 @@ For the GitHub release:
 >   - Chinese, Japanese, Korean and other scripts Blank's fonts lack, and
 >     symbols like 𝐀, use the fonts on your computer, so the same document
 >     can lay out differently on another machine.
->   - Table rows longer than a page are split across pages.
+>   - **Tables:** a row that doesn't fit on what's left of a page moves
+>     whole to the next one, with the header rows repeated above it. A row
+>     taller than a whole page goes on over the next pages, split between
+>     its lines, with the header rows above each part.
+>   - A table cell can hold several paragraphs, bulleted and numbered lists
+>     (nested too), quotes, code blocks and images. Images fit the cell's
+>     width, and one that can't be loaded shows its alt text, on screen and
+>     in the PDF alike.
 > - `Mod`+click opens a link.
-> - **Known limits:** no hyphenation or justification yet. Images, lists and
->   quotes inside table cells are laid out as plain text.
+> - **Known limits:** no hyphenation or justification yet.
 > - **Requirements:** macOS 11 (Big Sur) or newer.
 > - Your markdown files and your settings are unchanged.
-
-Before pasting, check the split table rows and the known limits against engine-core's table tasks: at 8efdc17 rows never split.
 
 ## Decisions for the owner
 
