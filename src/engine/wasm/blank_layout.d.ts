@@ -101,9 +101,17 @@ export class LayoutEngine {
      */
     page(page: number): string;
     /**
-     * the document as a PDF
+     * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
      */
-    pdf(title: string, author: string): Uint8Array;
+    pdfWarnings(): string;
+    /**
+     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+     * none if left out or empty). An image that can't be decoded shows its
+     * alt text, and a font that can't be embedded is left out: see
+     * `pdfWarnings`
+     */
+    pdf(title: string, author: string, language?: string | null): Uint8Array;
     /**
      * the selection's rectangles: page, x, y, width and height each
      */
@@ -197,7 +205,8 @@ export interface InitOutput {
     readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
-    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+    readonly layoutengine_pdfWarnings: (a: number) => [number, number];
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];

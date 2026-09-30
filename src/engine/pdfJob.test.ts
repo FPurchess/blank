@@ -53,6 +53,36 @@ describe("writePdf", () => {
     expect(result.missing).toBe("");
   });
 
+  it("writes the language, and what it left out", () => {
+    testEngine();
+    const { job } = jobOf(doc(p("Grüezi")));
+    const result = writePdf(LayoutEngine, {
+      ...job,
+      language: "de-CH",
+      images: [{ src: "x.png", bytes: new Uint8Array([1, 2, 3]), jpeg: false }],
+      items: JSON.stringify([
+        ...JSON.parse(job.items),
+        {
+          kind: "image",
+          pos: 9,
+          src: "x.png",
+          width: 30,
+          height: 20,
+          alt: "x",
+          indent: 0,
+          before: 0,
+          after: 0,
+          bars: [],
+          barsContinue: false,
+        },
+      ]),
+    });
+    expect(new TextDecoder("latin1").decode(result.pdf)).toMatch(
+      /\/Lang\s*\(de-CH\)/,
+    );
+    expect(result.warnings).toEqual([{ kind: "image", src: "x.png" }]);
+  });
+
   it("tells which characters no font has", () => {
     testEngine();
     const { job } = jobOf(doc(p("中文")));

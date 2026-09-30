@@ -29,6 +29,8 @@ pub enum Op {
     },
     Image {
         src: String,
+        /// what stands in its place where it can't be shown
+        alt: String,
         x: f32,
         y: f32,
         w: f32,
@@ -41,6 +43,32 @@ pub enum Op {
         w: f32,
         h: f32,
     },
+}
+
+/// which part of the document an op draws, for the PDF's tags: the text
+/// and images of an item, or what is only drawn with it
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Part {
+    /// drawn with an item, but not its content: rules, table lines and
+    /// fills, quote bars, the fill of code, the line under a link
+    Decoration,
+    /// a text box of an item, see `Laid::texts`
+    Text { item: usize, text: usize },
+    /// the list marker of an item
+    Marker { item: usize },
+    /// a table's caption, or the alt text shown for an image that isn't
+    /// loaded, see `Laid::label`
+    Label { item: usize },
+    /// the image of an item
+    Image { item: usize },
+    /// a list marker or alt text in a table's cell, see `Laid::extras`
+    Extra { item: usize, extra: usize },
+    /// an image in a table's cell, see `Laid::cell_images`
+    CellImage { item: usize, image: usize },
+    /// a link in the text of an item
+    Link { item: usize },
+    /// the header or the footer of the page
+    Band { footer: bool },
 }
 
 impl Engine {
@@ -56,6 +84,23 @@ impl Engine {
 
     /// what a page shows besides its header and footer
     pub fn body_ops(&self, page: usize) -> Vec<Op> {
+        self.body_parts(page)
+            .into_iter()
+            .map(|(op, _)| op)
+            .collect()
+    }
+
+    /// a page's header and footer
+    pub fn band_ops(&mut self, page: usize) -> Vec<Op> {
+        self.band_parts(page)
+            .into_iter()
+            .map(|(op, _)| op)
+            .collect()
+    }
+
+    /// what a page shows besides its header and footer, with the part of
+    /// the document each op draws
+    pub fn body_parts(&self, page: usize) -> Vec<(Op, Part)> {
         let mut ops = vec![];
         let left = self.settings.margins.left;
         let range = self.frags_on(page);
@@ -67,7 +112,23 @@ impl Engine {
             let dx = left;
             let dy = frag.y - unit.top;
             for deco in &unit.decos {
-                ops.push(deco_op(deco.moved(dx, dy)));
+                let part = match deco {
+                    Deco::Image { x, y, .. } => match item.content {
+                        Content::Table { .. } => laid
+                            .cell_images
+                            .iter()
+                            .position(|image| {
+                                image.unit == frag.unit && image.x == *x && image.y == *y
+                            })
+                            .map_or(Part::Decoration, |image| Part::CellImage {
+                                item: frag.item,
+                                image,
+                            }),
+                        _ => Part::Image { item: frag.item },
+                    },
+                    Deco::Rect { .. } => Part::Decoration,
+                };
+                ops.push((deco_op(deco.moved(dx, dy)), part));
             }
             // quote bars, down to the next item in the quote on this page
             if !item.bars.is_empty() {
@@ -80,18 +141,20 @@ impl Engine {
                     }
                 }
                 for bar in &item.bars {
-                    ops.push(Op::Rect {
+                    let op = Op::Rect {
                         x: left + bar,
                         y: frag.y,
                         w: BAR,
                         h: height,
                         role: Role::Text,
-                    });
+                    };
+                    ops.push((op, Part::Decoration));
                 }
             }
             if frag.unit == 0 && !frag.repeat {
                 if let Some(marker) = &laid.marker {
-                    push_text_ops(&mut ops, &self.fonts, marker, 0, dx, dy, Role::Text);
+                    let part = Part::Marker { item: frag.item };
+                    push_text_ops(&mut ops, &self.fonts, marker, 0, dx, dy, Role::Text, part);
                 }
                 if let Some(label) = &laid.label {
                     // a table's caption is text; an image's alt text a hint
@@ -100,8 +163,9 @@ impl Engine {
                     } else {
                         Role::Hint
                     };
+                    let part = Part::Label { item: frag.item };
                     for line in 0..label.line_count() {
-                        push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, role);
+                        push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, role, part);
                     }
                 }
             }
@@ -112,18 +176,27 @@ impl Engine {
                     None => 0..boxed.line_count(),
                 };
                 let infos = boxed.lines();
+                let part = Part::Text {
+                    item: frag.item,
+                    text,
+                };
                 for line in lines {
                     let info = &infos[line];
                     if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
-                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, Role::Text);
+                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, Role::Text, part);
                     }
                 }
             }
             // the list markers and alt texts in a table's cells
-            for (boxed, role) in &laid.extras[unit.extras.clone()] {
+            for extra in unit.extras.clone() {
+                let (boxed, role) = &laid.extras[extra];
+                let part = Part::Extra {
+                    item: frag.item,
+                    extra,
+                };
                 for (line, info) in boxed.lines().iter().enumerate() {
                     if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
-                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, *role);
+                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, *role, part);
                     }
                 }
             }
@@ -131,12 +204,25 @@ impl Engine {
         ops
     }
 
-    /// a page's header and footer
-    pub fn band_ops(&mut self, page: usize) -> Vec<Op> {
+    /// a page's header and footer, with which of them each op draws
+    pub fn band_parts(&mut self, page: usize) -> Vec<(Op, Part)> {
         let mut ops = vec![];
+        let middle = self.settings.height / 2.0;
         for (boxed, dx, dy) in &self.band_boxes(page) {
+            let part = Part::Band {
+                footer: *dy > middle,
+            };
             for line in 0..boxed.line_count() {
-                push_text_ops(&mut ops, &self.fonts, boxed, line, *dx, *dy, Role::Band);
+                push_text_ops(
+                    &mut ops,
+                    &self.fonts,
+                    boxed,
+                    line,
+                    *dx,
+                    *dy,
+                    Role::Band,
+                    part,
+                );
             }
         }
         ops
@@ -181,23 +267,56 @@ impl Engine {
 fn deco_op(deco: Deco) -> Op {
     match deco {
         Deco::Rect { x, y, w, h, role } => Op::Rect { x, y, w, h, role },
-        Deco::Image { src, x, y, w, h } => Op::Image { src, x, y, w, h },
+        Deco::Image {
+            src,
+            alt,
+            x,
+            y,
+            w,
+            h,
+        } => Op::Image {
+            src,
+            alt,
+            x,
+            y,
+            w,
+            h,
+        },
     }
 }
 
+/// the ops of a line of a text box: its glyphs, as `part`, and what is
+/// drawn with them, the fill of inline code, the line under a link and the
+/// link
+#[allow(clippy::too_many_arguments)]
 fn push_text_ops(
-    ops: &mut Vec<Op>,
+    ops: &mut Vec<(Op, Part)>,
     fonts: &Fonts,
     boxed: &TextBox,
     line: usize,
     dx: f32,
     dy: f32,
     role: Role,
+    part: Part,
 ) {
     let (ox, oy) = (dx + boxed.x, dy + boxed.y);
     let lines = boxed.lines();
     let Some(info) = lines.get(line) else {
         return;
+    };
+    let link_part = match part {
+        Part::Text { item, .. }
+        | Part::Marker { item }
+        | Part::Label { item }
+        | Part::Image { item }
+        | Part::Extra { item, .. }
+        | Part::CellImage { item, .. }
+        | Part::Link { item } => Part::Link { item },
+        other => other,
+    };
+    let decoration = match part {
+        Part::Band { .. } => part,
+        _ => Part::Decoration,
     };
     for mut run in boxed.glyph_runs(fonts, line) {
         for glyph in &mut run.glyphs {
@@ -207,16 +326,17 @@ fn push_text_ops(
         run.baseline += oy;
         run.x += ox;
         if run.ink & INK_CODE != 0 {
-            ops.push(Op::Rect {
+            let op = Op::Rect {
                 x: run.x - 1.0,
                 y: oy + info.top,
                 w: run.width + 2.0,
                 h: info.bottom - info.top,
                 role: Role::CodeFill,
-            });
+            };
+            ops.push((op, decoration));
         }
         if let Some((offset, thickness)) = run.underline {
-            ops.push(Op::Rect {
+            let op = Op::Rect {
                 x: run.x,
                 y: run.baseline + offset,
                 w: run.width,
@@ -226,25 +346,28 @@ fn push_text_ops(
                 } else {
                     role
                 },
-            });
+            };
+            ops.push((op, decoration));
         }
         if let Some(href) = boxed.link_of(run.ink) {
-            ops.push(Op::Link {
+            let op = Op::Link {
                 href: href.to_string(),
                 x: run.x,
                 y: oy + info.top,
                 w: run.width,
                 h: info.bottom - info.top,
-            });
+            };
+            ops.push((op, link_part));
         }
         if run.glyphs.is_empty() {
             continue;
         }
-        ops.push(Op::Glyphs {
+        let op = Op::Glyphs {
             run,
             role,
             text: boxed.text.clone(),
-        });
+        };
+        ops.push((op, part));
     }
 }
 
