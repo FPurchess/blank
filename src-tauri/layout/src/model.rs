@@ -44,11 +44,53 @@ fn paragraph() -> String {
     "p".into()
 }
 
+/// A textblock in a table cell, with where it stands in the cell: in a
+/// list, with its marker, or in a quote, with its bars.
+#[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct CellText {
+    #[serde(flatten)]
+    pub text: Text,
+    /// from the left of the cell's text, in points
+    #[serde(default)]
+    pub indent: f32,
+    /// a list marker, "•" or "3.", set right-aligned before the indent
+    #[serde(default)]
+    pub marker: Option<String>,
+    /// quote bars, by their distance from the left of the cell's text
+    #[serde(default)]
+    pub bars: Vec<f32>,
+}
+
+/// A block of a table cell: a textblock, or an image, which is fitted to
+/// the width of the cell.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum CellBlock {
+    Text(CellText),
+    Image {
+        pos: u32,
+        src: String,
+        /// in points, as the image's own size gives it; 0 while it isn't
+        /// loaded
+        #[serde(default)]
+        width: f32,
+        #[serde(default)]
+        height: f32,
+        #[serde(default)]
+        alt: String,
+    },
+}
+
 /// A cell of a table.
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Cell {
+    /// its paragraphs, when it holds nothing else; see `blocks`
     #[serde(default)]
     pub paragraphs: Vec<Text>,
+    /// its blocks, with lists, quotes and images; used instead of
+    /// `paragraphs` when there are any
+    #[serde(default)]
+    pub blocks: Vec<CellBlock>,
     #[serde(default)]
     pub header: bool,
     /// left, center or right
@@ -67,6 +109,26 @@ pub struct Cell {
 
 fn one_u32() -> u32 {
     1
+}
+
+impl Cell {
+    /// what the cell holds: its blocks, or else its paragraphs
+    pub fn blocks(&self) -> std::borrow::Cow<'_, [CellBlock]> {
+        if !self.blocks.is_empty() {
+            return std::borrow::Cow::Borrowed(&self.blocks);
+        }
+        std::borrow::Cow::Owned(
+            self.paragraphs
+                .iter()
+                .map(|text| {
+                    CellBlock::Text(CellText {
+                        text: text.clone(),
+                        ..Default::default()
+                    })
+                })
+                .collect(),
+        )
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
@@ -369,6 +431,12 @@ impl Item {
                         for paragraph in &mut cell.paragraphs {
                             moved(&mut paragraph.pos);
                         }
+                        for block in &mut cell.blocks {
+                            match block {
+                                CellBlock::Text(text) => moved(&mut text.text.pos),
+                                CellBlock::Image { pos, .. } => moved(pos),
+                            }
+                        }
                     }
                 }
             }
@@ -393,9 +461,30 @@ impl Item {
                 *width = width.clamp(0.0, f32::MAX);
                 *height = height.clamp(0.0, f32::MAX);
             }
-            Content::Table { widths, .. } => {
+            Content::Table { widths, rows, .. } => {
                 for share in widths {
                     *share = finite(*share, 0.0, 0.0, f32::MAX);
+                }
+                for block in rows
+                    .iter_mut()
+                    .flat_map(|row| &mut row.cells)
+                    .flat_map(|cell| &mut cell.blocks)
+                {
+                    match block {
+                        CellBlock::Text(text) => {
+                            text.indent = finite(text.indent, 0.0, 0.0, MAX_PAGE);
+                            for bar in &mut text.bars {
+                                *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
+                            }
+                        }
+                        CellBlock::Image { width, height, .. } => {
+                            if !(width.is_finite() && height.is_finite()) {
+                                (*width, *height) = (0.0, 0.0);
+                            }
+                            *width = width.clamp(0.0, f32::MAX);
+                            *height = height.clamp(0.0, f32::MAX);
+                        }
+                    }
                 }
             }
             _ => {}
@@ -455,6 +544,46 @@ mod tests {
         assert_eq!(utf16_of_byte(text, 3), 2);
         assert_eq!(utf16_of_byte(text, 7), 4);
         assert_eq!(utf16_of_byte(text, 8), 5);
+    }
+
+    #[test]
+    fn reads_the_blocks_of_cells() {
+        let item: Item = serde_json::from_str(
+            r#"{"kind":"table","pos":0,"end":40,"rows":[{"cells":[{"blocks":[
+                {"kind":"text","pos":3,"text":"one","indent":18,"marker":"•"},
+                {"kind":"text","pos":9,"text":"said","style":"p","indent":12,"bars":[0]},
+                {"kind":"image","pos":15,"src":"a.png","width":40,"height":30,"alt":"a cat"}
+            ]},{"paragraphs":[{"pos":20,"text":"plain"}]}]}]}"#,
+        )
+        .unwrap();
+        let Content::Table { rows, .. } = &item.content else {
+            panic!("a table");
+        };
+        let blocks = rows[0].cells[0].blocks();
+        assert_eq!(blocks.len(), 3);
+        let CellBlock::Text(first) = &blocks[0] else {
+            panic!("text");
+        };
+        assert_eq!(
+            (first.text.pos, first.indent, first.marker.as_deref()),
+            (3, 18.0, Some("•"))
+        );
+        assert_eq!(first.text.style, "p");
+        assert!(matches!(&blocks[2], CellBlock::Image { pos: 15, width, .. } if *width == 40.0));
+        // the paragraphs of a cell without blocks are its blocks
+        let plain = rows[0].cells[1].blocks();
+        assert!(matches!(&plain[0], CellBlock::Text(text) if text.text.text == "plain"));
+        // and they move with the table
+        let mut moved = item.clone();
+        moved.shift(5);
+        let Content::Table { rows, .. } = &moved.content else {
+            panic!("a table");
+        };
+        assert!(matches!(
+            &rows[0].cells[0].blocks[2],
+            CellBlock::Image { pos: 20, .. }
+        ));
+        assert!(matches!(&rows[0].cells[0].blocks[0], CellBlock::Text(text) if text.text.pos == 8));
     }
 
     #[test]
