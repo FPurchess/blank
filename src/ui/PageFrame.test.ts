@@ -256,15 +256,17 @@ describe("the pages and the painter", () => {
     expect(released).toEqual([]);
     pageView.value = "page-ends";
     await paintQueued();
-    // each sheet's bands canvas, and only that
-    expect(released.filter((layer) => layer === "bands")).toHaveLength(sheets);
+    // each sheet's header and footer strips, and only those
+    expect(released.filter((layer) => layer === "bands")).toHaveLength(
+      2 * sheets,
+    );
     expect(released).not.toContain("body");
     layers.length = 0;
     // back on the sheets, the new canvases are painted
     pageView.value = "pages";
     await paintQueued();
     expect(layers.filter((layer) => layer.endsWith(":bands")).length).toBe(
-      view().querySelectorAll(".page-frame").length,
+      2 * view().querySelectorAll(".page-frame").length,
     );
   });
 
@@ -279,6 +281,69 @@ describe("the pages and the painter", () => {
     await flushPromises();
     // after the copy of what it showed was taken
     expect(released).toContain("body");
+  });
+
+  // 7 before the headers and footers were strips, each page with a second
+  // bitmap as large as the sheet; 14 since
+  it("paints the header and footer in strips as high as the margins", async () => {
+    const origins = new Map<HTMLCanvasElement, number>();
+    const { fake } = recorder();
+    setPainter({
+      ...fake,
+      paint: (surface, display, options) => {
+        origins.set(surface.canvas, options.y);
+        fake.paint(surface, display, options);
+      },
+    });
+    pageView.value = "pages";
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const frame = view().querySelector<HTMLElement>(".page-frame")!;
+    const scale = parseFloat(frame.style.width) / 595.28;
+    const margin = 70.87 * scale;
+    const header =
+      frame.querySelector<HTMLCanvasElement>(".page-bands.header")!;
+    const footer =
+      frame.querySelector<HTMLCanvasElement>(".page-bands.footer")!;
+    // as high as the margins, not the sheet
+    expect(Math.abs(header.height - margin)).toBeLessThanOrEqual(1);
+    expect(Math.abs(footer.height - margin)).toBeLessThanOrEqual(1);
+    // the footer's strip lies at the bottom of the sheet, and paints the
+    // page from the point at its top
+    const top = parseFloat(footer.style.top);
+    expect(
+      Math.abs(top + margin - parseFloat(frame.style.height)),
+    ).toBeLessThanOrEqual(1);
+    expect(origins.get(header)).toBe(0);
+    // within half a point: the frame width it was measured from is rounded
+    expect(origins.get(footer)).toBeCloseTo(top / scale, 0);
+  });
+
+  it("keeps a dozen sheets or more at 2×", async () => {
+    const { fake } = recorder();
+    setPainter(fake);
+    const ratio = window.devicePixelRatio;
+    window.devicePixelRatio = 2;
+    try {
+      pageView.value = "pages";
+      layOut();
+      dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+      await paintQueued();
+      // down the desk, a view at a time, so every sheet comes and goes
+      const desk = view().querySelector<HTMLElement>(".page-desk")!;
+      for (let top = 0; top < parseFloat(desk.style.height); top += 600) {
+        await scrollTo(top);
+        await paintQueued();
+        await flushPromises();
+      }
+      const pages = new Set(
+        [...pageBitmaps.keys()].map((key) => key.split("|")[2]),
+      );
+      expect(pages.size).toBeGreaterThanOrEqual(12);
+    } finally {
+      window.devicePixelRatio = ratio;
+    }
   });
 
   it("paints again when the pages are shown at another size", async () => {

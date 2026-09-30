@@ -48,7 +48,8 @@ const props = defineProps<{
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const bandsCanvas = useTemplateRef<HTMLCanvasElement>("bandsCanvas");
+const headerCanvas = useTemplateRef<HTMLCanvasElement>("headerCanvas");
+const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
 const editor = useEditor();
 
 // a double click on a header or footer opens its strip, which takes the
@@ -92,12 +93,32 @@ const imagesShown = computed(() => {
  * header and footer of a sheet. Each is painted apart, when its own version
  * changes, and kept as a bitmap of its own.
  */
-const layerOf = (
-  layer: Layer,
-  element: () => HTMLCanvasElement | null,
-  version: () => number,
-  images: () => string,
-) => {
+// where a layer's canvas lies on the page, when it isn't all of it: from
+// `top` CSS pixels down, `height` high
+interface Strip {
+  top: number;
+  height: number;
+}
+
+const layerOf = ({
+  name,
+  layer,
+  element,
+  version,
+  images,
+  strip,
+}: {
+  // tells its paint jobs and bitmaps apart from the page's other layers
+  name: string;
+  layer: Layer;
+  element: () => HTMLCanvasElement | null;
+  version: () => number;
+  images: () => string;
+  // a strip of the page, or null for all of it
+  strip: () => Strip | null;
+}) => {
+  // a strip is a few glyphs, painted again rather than kept as a bitmap
+  const keeps = !strip();
   // what the canvas shows now, so the same isn't drawn twice
   let shown = "";
   // the canvas as the painter paints into it, taken when it's there
@@ -120,9 +141,14 @@ const layerOf = (
   };
   // a layer has its own place in the queue, so a newer request replaces one
   // that hasn't run yet
-  const job = () => `${layer}:${props.page}`;
+  const job = () => `${name}:${props.page}`;
 
-  const paintInto = (target: Surface, color: string, ratio: number) => {
+  const paintInto = (
+    target: Surface,
+    color: string,
+    ratio: number,
+    top: number,
+  ) => {
     const engine = pageEngine;
     if (!engine) return;
     const start = performance.now();
@@ -130,7 +156,8 @@ const layerOf = (
       scale: props.scale,
       ratio,
       x: props.x,
-      y: props.y,
+      // the page's point at the strip's top
+      y: props.y + top / props.scale,
       color,
     });
     record("paint", performance.now() - start);
@@ -148,8 +175,11 @@ const layerOf = (
     const { ratio } = props;
     // a device pixel for each pixel of the canvas, which is shown at
     // exactly its size, so nothing scales it and blurs the text
+    const place = strip();
+    // on a whole device pixel, where the painting starts
+    const top = place ? Math.round(place.top * ratio) / ratio : 0;
     const width = Math.round(props.width * ratio);
-    const height = Math.round(props.height * ratio);
+    const height = Math.round((place ? place.height : props.height) * ratio);
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -157,9 +187,10 @@ const layerOf = (
       canvas.style.height = `${height / ratio}px`;
       shown = "";
     }
+    if (place) canvas.style.top = `${top}px`;
     const key = bitmapKey({
       engine: engineId(pageEngine),
-      layer,
+      layer: name,
       page: props.page,
       version: version(),
       width,
@@ -167,14 +198,14 @@ const layerOf = (
       scale: props.scale,
       ratio,
       x: props.x,
-      y: props.y,
+      y: props.y + top / props.scale,
       theme: theme.value,
       images: images(),
     });
     if (key === shown) return;
     const target = surfaceOf(canvas);
     if (!target) return;
-    const cached = pageBitmaps.get(key);
+    const cached = keeps ? pageBitmaps.get(key) : undefined;
     if (cached) {
       painter.show(target, cached);
       shown = key;
@@ -182,7 +213,7 @@ const layerOf = (
     }
     // without snapshots, e.g. in tests: right away
     if (!painter.snapshots) {
-      paintInto(target, colorOf(canvas), ratio);
+      paintInto(target, colorOf(canvas), ratio, top);
       shown = key;
       return;
     }
@@ -198,7 +229,7 @@ const layerOf = (
           canvas.height !== height
         )
           return;
-        paintInto(target, colorOf(canvas), ratio);
+        paintInto(target, colorOf(canvas), ratio, top);
         shown = key;
       },
     });
@@ -212,7 +243,8 @@ const layerOf = (
   const keep = () => {
     const kept = surface;
     if (!element() || !shown || !kept) return release();
-    if (!painter.snapshots || pageBitmaps.get(shown)) return release();
+    if (!keeps || !painter.snapshots || pageBitmaps.get(shown))
+      return release();
     const key = shown;
     paintQueue.cancel(job());
     surface = null;
@@ -229,21 +261,37 @@ const layerOf = (
   return { paint, keep };
 };
 
-const body = layerOf(
-  "body",
-  () => canvas.value,
-  () => props.bodyVersion,
-  () => imagesShown.value,
-);
-// the header and footer on a sheet; "page ends" shows them where each page
-// ends, as text
-const bands = layerOf(
-  "bands",
-  () => bandsCanvas.value,
-  () => props.bandVersion,
-  () => "",
-);
-const layers = [body, bands];
+const body = layerOf({
+  name: "body",
+  layer: "body",
+  element: () => canvas.value,
+  version: () => props.bodyVersion,
+  images: () => imagesShown.value,
+  strip: () => null,
+});
+// the header and footer on a sheet, in strips as high as the margins they
+// sit in; "page ends" shows them where each page ends, as text
+const header = layerOf({
+  name: "header",
+  layer: "bands",
+  element: () => headerCanvas.value,
+  version: () => props.bandVersion,
+  images: () => "",
+  strip: () => ({ top: 0, height: marginTop.value }),
+});
+const footer = layerOf({
+  name: "footer",
+  layer: "bands",
+  element: () => footerCanvas.value,
+  version: () => props.bandVersion,
+  images: () => "",
+  strip: () => ({
+    top: props.height - marginBottom.value,
+    height: marginBottom.value,
+  }),
+});
+const bands = [header, footer];
+const layers = [body, ...bands];
 
 onMounted(() => layers.forEach((layer) => layer.paint()));
 // what they show is kept for when the page comes back, and their canvases
@@ -263,9 +311,17 @@ const shownAt = () => [
 watch(() => [props.bodyVersion, imagesShown.value, ...shownAt()], body.paint, {
   flush: "post",
 });
-watch(() => [props.bandVersion, props.sheet, ...shownAt()], bands.paint, {
-  flush: "post",
-});
+watch(
+  () => [
+    props.bandVersion,
+    props.sheet,
+    marginTop.value,
+    marginBottom.value,
+    ...shownAt(),
+  ],
+  () => bands.forEach((band) => band.paint()),
+  { flush: "post" },
+);
 
 // how often the frames render, for the tests that keep one from rendering
 // when nothing it shows changed
@@ -301,12 +357,18 @@ const mark = computed(() => {
   >
     <!-- its size is set when it's painted, in device pixels -->
     <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
-    <canvas
-      v-if="sheet"
-      ref="bandsCanvas"
-      class="page-canvas page-bands"
-      aria-hidden="true"
-    />
+    <template v-if="sheet">
+      <canvas
+        ref="headerCanvas"
+        class="page-canvas page-bands header"
+        aria-hidden="true"
+      />
+      <canvas
+        ref="footerCanvas"
+        class="page-canvas page-bands footer"
+        aria-hidden="true"
+      />
+    </template>
     <template v-if="sheet">
       <div
         class="page-band header"

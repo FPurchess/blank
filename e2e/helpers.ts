@@ -302,46 +302,62 @@ const canvasInk = (box: Box) =>
     let total = 0;
     let inked = 0;
     const sum = [0, 0, 0];
-    // a frame's canvases lie over each other, its text and its header and
-    // footer, so a pixel counts once, with the ink of either
+    // a frame's canvases lie over each other, its text and the strips of
+    // its header and footer, so a pixel counts once, with the ink on top
     for (const frame of document.querySelectorAll<HTMLElement>(
       "#page-view .page-frame",
     )) {
       const canvases = [
         ...frame.querySelectorAll<HTMLCanvasElement>(".page-canvas"),
       ];
-      if (!canvases.length) continue;
-      const rect = canvases[0].getBoundingClientRect();
-      const left = Math.max(box.left, rect.left);
-      const top = Math.max(box.top, rect.top);
-      const right = Math.min(box.right, rect.right);
-      const bottom = Math.min(box.bottom, rect.bottom);
-      if (right <= left || bottom <= top || !rect.width || !rect.height)
-        continue;
-      // device pixels of the canvas per CSS pixel
-      const sx = canvases[0].width / rect.width;
-      const sy = canvases[0].height / rect.height;
-      const x = Math.floor((left - rect.left) * sx);
-      const y = Math.floor((top - rect.top) * sy);
-      const width = Math.max(1, Math.ceil((right - left) * sx));
-      const height = Math.max(1, Math.ceil((bottom - top) * sy));
-      const layers = canvases.map(
-        (canvas) =>
-          canvas.getContext("2d")!.getImageData(x, y, width, height).data,
-      );
-      for (let index = 0; index < layers[0].length; index += 4) {
-        total++;
-        // the layer on top, which is the one seen
-        const shown = layers
-          .slice()
-          .reverse()
-          .find((data) => data[index + 3] >= 24);
-        // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
-        if (!shown) continue;
-        inked++;
-        for (let channel = 0; channel < 3; channel++)
-          sum[channel] += shown[index + channel];
+      const base = canvases[0]?.getBoundingClientRect();
+      if (!base?.width || !base.height) continue;
+      const left = Math.max(box.left, base.left);
+      const top = Math.max(box.top, base.top);
+      const right = Math.min(box.right, base.right);
+      const bottom = Math.min(box.bottom, base.bottom);
+      if (right <= left || bottom <= top) continue;
+      // device pixels per CSS pixel, the same for all of the frame's
+      const ratio = canvases[0].width / base.width;
+      const columns = Math.max(1, Math.ceil((right - left) * ratio));
+      const rows = Math.max(1, Math.ceil((bottom - top) * ratio));
+      total += columns * rows;
+      // the colour seen at each device pixel of the box, by row and column
+      const seen = new Map<number, number[]>();
+      for (const canvas of canvases) {
+        const rect = canvas.getBoundingClientRect();
+        const x0 = Math.max(left, rect.left);
+        const y0 = Math.max(top, rect.top);
+        const x1 = Math.min(right, rect.right);
+        const y1 = Math.min(bottom, rect.bottom);
+        if (x1 <= x0 || y1 <= y0) continue;
+        const x = Math.floor((x0 - rect.left) * ratio);
+        const y = Math.floor((y0 - rect.top) * ratio);
+        const width = Math.max(1, Math.ceil((x1 - x0) * ratio));
+        const height = Math.max(1, Math.ceil((y1 - y0) * ratio));
+        const { data } = canvas
+          .getContext("2d")!
+          .getImageData(x, y, width, height);
+        // where this part lies in the box
+        const column0 = Math.round((x0 - left) * ratio);
+        const row0 = Math.round((y0 - top) * ratio);
+        for (let row = 0; row < height; row++) {
+          for (let column = 0; column < width; column++) {
+            const index = (row * width + column) * 4;
+            // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
+            if (data[index + 3] < 24) continue;
+            seen.set((row0 + row) * columns + column0 + column, [
+              data[index],
+              data[index + 1],
+              data[index + 2],
+            ]);
+          }
+        }
       }
+      inked += seen.size;
+      for (const color of seen.values())
+        for (let channel = 0; channel < 3; channel++)
+          sum[channel] += color[channel];
     }
     return { total, inked, sum };
   }, box);

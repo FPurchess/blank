@@ -29,7 +29,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 From the self-review (the integrator's order; M1 is with engine-editor):
 
 - [x] M4. A removed bands canvas is freed: `Painter.release`, called when a layer's canvas goes and after a leaving page's copy is taken
-- [ ] M3. The bands as strip canvases sized to the margins, not kept as bitmaps; the cache's page count at 2× before and after
+- [x] M3. The bands as strip canvases sized to the margins, painted with a y origin and not kept as bitmaps. At 2× in "pages", the 192 MB cache kept 7 pages before (14 bitmaps, 199.6 MB) and keeps 14 after (`PageFrame.test.ts`, "keeps a dozen sheets")
 - [ ] M2. E2E ink checks after an edit prove the repaint, not old pixels
 - [ ] M5. The engine-failure spec types and finds a token of its own
 - [ ] M6. The last rendering check waits and compares with the first reading

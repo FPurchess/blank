@@ -1300,12 +1300,12 @@ body.without-engine {
   display: block;
 }
 
-// the header and footer of a sheet, painted apart from its text over it
-// (see src/ui/pageLayers.ts); positioned without a z-index, so it makes no
-// layer of its own
+// the header and footer of a sheet, painted apart from its text over it,
+// in strips as high as the margins (see src/ui/pageLayers.ts; the top is set
+// where they are painted); positioned without a z-index, so they make no
+// layer of their own
 .page-bands {
   position: absolute;
-  top: 0;
   left: 0;
 }
 

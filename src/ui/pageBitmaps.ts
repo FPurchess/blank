@@ -56,6 +56,11 @@ export class BitmapCache {
     return this.bitmaps.size;
   }
 
+  // the keys of what it keeps, the least recently used first
+  keys() {
+    return this.bitmaps.keys();
+  }
+
   get used() {
     return this.bytes;
   }
