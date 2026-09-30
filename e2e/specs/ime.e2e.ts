@@ -26,9 +26,12 @@ describe("input methods", () => {
     await type("e9");
     await browser.keys(Key.Space);
 
+    // some input stacks end an empty composition first, e.g. on CI
     await expect(
-      browser.execute(
-        () => (window as unknown as { compositions: string[] }).compositions,
+      browser.execute(() =>
+        (window as unknown as { compositions: string[] }).compositions.filter(
+          (data) => data !== "",
+        ),
       ),
     ).resolves.toEqual(["é"]);
     await expect(editorText("#editor h1")).resolves.toEqual([
