@@ -31,8 +31,7 @@ For the metainfo's `<release version="3.0.0">` (one paragraph, as for 2.x):
 > engine sets code in IBM Plex Mono, emoji in monochrome Noto Emoji, and
 > Chinese, Japanese, Korean and other scripts in the fonts on your computer.
 > Table cells hold lists, quotes, code and images, and a row too tall for a
-> page goes on over the next ones, under the repeated header rows. Mod+click
-> opens links. Your
+> page goes on over the next ones, under the repeated header rows. Your
 > markdown files and settings stay as they are; Blank now needs macOS 11 or
 > newer.
 
@@ -62,7 +61,7 @@ For the GitHub release:
 >     (nested too), quotes, code blocks and images. Images fit the cell's
 >     width, and one that can't be loaded shows its alt text, on screen and
 >     in the PDF alike.
-> - `Mod`+click opens a link.
+> - `Mod`+click still opens links, now on the pages too.
 > - **Known limits:** no hyphenation or justification yet.
 > - **Requirements:** macOS 11 (Big Sur) or newer.
 > - Your markdown files and your settings are unchanged.
@@ -104,7 +103,7 @@ macOS, Apple Silicon and Intel):
       screen; links work, and title and author are in its properties.
 - [ ] Chinese, Japanese, Korean, emoji and maths letters (𝐀) show on screen
       and in the PDF.
-- [ ] Mod+click opens a link.
+- [ ] Mod+click on a link on the pages opens it.
 - [ ] Spell check underlines on the pages, and a right click offers the
       suggestions.
 - [ ] Tables: the toolbar and the handles sit on the painted table, and a long
