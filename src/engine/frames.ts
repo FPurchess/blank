@@ -15,6 +15,9 @@ export const VIEW_TOP = 56;
 // more room above the first page for the line with the document's
 // properties
 export const PROPERTIES_ROOM = 28;
+// room above the first page's text in "page ends" for its header, between
+// the properties' room and the first frame
+export const HEADER_ROOM = 20;
 export const VIEW_BOTTOM = 72;
 // between the sheets, and around them
 export const SHEET_GAP = 24;
@@ -68,6 +71,9 @@ export interface FrameLayout {
   frames: Frame[];
   // the desk's height
   height: number;
+  // the room above the first frame for the first page's header, in "page
+  // ends"; 0 in "pages", whose sheets show their headers
+  headerRoom: number;
 }
 
 /**
@@ -106,7 +112,7 @@ export const frameLayout = (
       layout.pages * (sheetHeight + SHEET_GAP) -
       SHEET_GAP +
       VIEW_BOTTOM;
-    return { mode, scale, frames: frames.map(snapped), height };
+    return { mode, scale, frames: frames.map(snapped), height, headerRoom: 0 };
   }
   const { margins } = layout;
   const shown = layout.width - margins.left - margins.right + 2 * BLEED;
@@ -115,7 +121,8 @@ export const frameLayout = (
     Math.min(TEXT_SCALE, (width - 2 * DESK_SIDE) / shown),
   );
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
-  let top = viewTop;
+  const headerRoom = layout.header ? HEADER_ROOM : 0;
+  let top = viewTop + headerRoom;
   for (let page = 0; page < layout.pages; page++) {
     const bottom = Math.max(layout.bottoms[page] ?? 0, margins.top + MIN_TEXT);
     const h = bottom - margins.top;
@@ -137,6 +144,7 @@ export const frameLayout = (
     scale,
     frames: frames.map(snapped),
     height: top - MARK_HEIGHT + VIEW_BOTTOM,
+    headerRoom,
   };
 };
 

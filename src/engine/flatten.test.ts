@@ -1,4 +1,12 @@
-import type { Node } from "prosemirror-model";
+import { type Node, Slice } from "prosemirror-model";
+import { EditorState } from "prosemirror-state";
+import {
+  CellSelection,
+  handlePaste,
+  TableMap,
+  tableEditing,
+} from "prosemirror-tables";
+import { EditorView } from "prosemirror-view";
 import { describe, expect, it } from "vitest";
 
 import { schema } from "../markdown";
@@ -205,5 +213,165 @@ describe("diff", () => {
       delete: 0,
       records: [],
     });
+  });
+});
+
+describe("the positions of table cells", () => {
+  // the position of each cell's paragraph, as the engine gets it
+  const paragraphs = (node: Node) =>
+    items(node).flatMap((item) =>
+      item.kind === "table"
+        ? item.rows.flatMap((row) =>
+            row.cells.flatMap((cell) =>
+              cell.paragraphs.map((paragraph) => paragraph.pos),
+            ),
+          )
+        : [],
+    );
+
+  // the same, from ProseMirror
+  const expected = (node: Node, tablePos: number) => {
+    const found: number[] = [];
+    const table = node.nodeAt(tablePos)!;
+    const map = TableMap.get(table);
+    new Set(map.map).forEach((offset) =>
+      found.push(tablePos + 1 + offset + 1 + 1),
+    );
+    return found;
+  };
+
+  it("are their own for cells that share a node", () => {
+    const cell = td("x");
+    const node = doc(table(tr(cell, cell)));
+    expect(paragraphs(node)).toEqual([4, 9]);
+    expect(paragraphs(node)).toEqual(expected(node, 0));
+    expect(node.resolve(9).parent.textContent).toBe("x");
+  });
+
+  it("are their own after a cell is pasted into a larger selection", () => {
+    let state = EditorState.create({
+      schema,
+      doc: doc(table(tr(td("a"), td("b")), tr(td("c"), td("d")))),
+      plugins: [tableEditing()],
+    });
+    const map = TableMap.get(state.doc.firstChild!);
+    state = state.apply(
+      state.tr.setSelection(
+        CellSelection.create(state.doc, 1 + map.map[0], 1 + map.map[3]),
+      ),
+    );
+    const view = new EditorView(document.createElement("div"), { state });
+    // one copied cell, which prosemirror-tables repeats over the selection
+    const copied = new Slice(
+      schema.node("table", null, [tr(td("z"))]).content,
+      1,
+      1,
+    );
+    expect(
+      handlePaste(view, new Event("paste") as ClipboardEvent, copied),
+    ).toBe(true);
+
+    const node = view.state.doc;
+    expect(node.textContent).toBe("zzzz");
+    // the node prosemirror-tables pastes in every cell
+    const [first, second] = node.firstChild!.firstChild!.children;
+    expect(first).toBe(second);
+    expect(paragraphs(node)).toEqual(expected(node, 0));
+    view.destroy();
+  });
+});
+
+describe("what a table cell holds", () => {
+  // the blocks of the first cell of the table at the start of `node`
+  const cellOf = (content: Node[], sizes: ImageSizes = noSizes) => {
+    const node = doc(table(tr(td(content), td("b"))));
+    const [item] = flatten(node, sizes).map((record) => record.build());
+    if (item.kind !== "table") throw new Error("no table");
+    return { node, cell: item.rows[0].cells[0] };
+  };
+  const image = (src: string, alt = "") =>
+    schema.nodes.image.create({ src, alt });
+
+  it("is paragraphs when it holds only text", () => {
+    const { cell } = cellOf([p("one"), p("two")]);
+    expect(cell.blocks).toBeUndefined();
+    expect(cell.paragraphs.map((paragraph) => paragraph.text)).toEqual([
+      "one",
+      "two",
+    ]);
+  });
+
+  it("holds a list's items with their markers and indent", () => {
+    const { node, cell } = cellOf([
+      ul(li(p("flour")), li(p("sugar"), p("fine"))),
+      ol(li(p("mix"))),
+    ]);
+    expect(cell.paragraphs).toEqual([]);
+    expect(
+      cell.blocks!.map((block) =>
+        block.kind === "text"
+          ? [block.text, block.indent, block.marker ?? null]
+          : [],
+      ),
+    ).toEqual([
+      ["flour", LIST_INDENT, "•"],
+      ["sugar", LIST_INDENT, "•"],
+      ["fine", LIST_INDENT, null],
+      ["mix", LIST_INDENT, "1."],
+    ]);
+    // at ProseMirror's positions
+    for (const block of cell.blocks!) {
+      if (block.kind !== "text") continue;
+      expect(node.textBetween(block.pos, block.pos + block.text.length)).toBe(
+        block.text,
+      );
+    }
+  });
+
+  it("holds a quote's paragraphs with its bar", () => {
+    const { cell } = cellOf([p("said"), blockquote(p("quoted"))]);
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ text: "said", indent: 0, bars: [] }),
+      expect.objectContaining({
+        text: "quoted",
+        indent: QUOTE_INDENT,
+        bars: [0],
+      }),
+    ]);
+  });
+
+  it("holds images, at their size once it's known, around their text", () => {
+    const { node, cell } = cellOf(
+      [para(schema.text("a cat "), image("cat.png", "a cat"))],
+      (src) => (src === "cat.png" ? { width: 120, height: 80 } : undefined),
+    );
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ kind: "text", text: "a cat " }),
+      {
+        kind: "image",
+        pos: 10,
+        src: "cat.png",
+        width: 120,
+        height: 80,
+        alt: "a cat",
+      },
+    ]);
+    expect(node.nodeAt(10)?.type.name).toBe("image");
+  });
+
+  it("keeps code blocks set as code", () => {
+    const { cell } = cellOf([
+      schema.node("code_block", null, [schema.text("x = 1")]),
+    ]);
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ kind: "text", style: "code", text: "x = 1" }),
+    ]);
+  });
+
+  it("changes the table's record once the image in it loads", () => {
+    const node = doc(table(tr(td([para(image("cat.png"))]))));
+    const [before] = flatten(node, noSizes);
+    const [after] = flatten(node, () => ({ width: 10, height: 10 }));
+    expect(after.key).not.toBe(before.key);
   });
 });

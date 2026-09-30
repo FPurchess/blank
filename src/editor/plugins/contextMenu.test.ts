@@ -16,7 +16,13 @@ import {
 } from "../../state";
 import type { Spellchecker } from "../../spellcheck/types";
 import { caretBox } from "../../engine/geometry";
-import { PAGE_MENU, PAGE_PRESS, sendPagePointer } from "../pagePointer";
+import {
+  nativePointer,
+  PAGE_MENU,
+  PAGE_PRESS,
+  sendPagePointer,
+} from "../pagePointer";
+import { forgetEngineFailure, useFallbackEditor } from "../../engine/engine";
 import { spellcheck as spellcheckPlugin } from "./spellcheck";
 import {
   contextMenuPlugin,
@@ -47,7 +53,7 @@ let view: EditorView;
  * the pages land at the doc position given, and the caret at a position is
  * 10 px per position from the left.
  */
-const setup = async (spell = checker()) => {
+const setup = async (spell = checker(), native = false) => {
   spellchecker.value = spell;
   view = new EditorView(
     document.body.appendChild(document.createElement("div")),
@@ -55,7 +61,12 @@ const setup = async (spell = checker()) => {
       state: EditorState.create({
         schema,
         doc: doc(p("blank wrng text")),
-        plugins: [history(), contextMenuPlugin(), spellcheckPlugin()],
+        plugins: [
+          history(),
+          ...(native ? [nativePointer()] : []),
+          contextMenuPlugin(),
+          spellcheckPlugin(),
+        ],
       }),
     },
   );
@@ -326,5 +337,56 @@ describe("openTableMenu", () => {
     expect(contextMenu.value).toBeNull();
     expect(focus).toHaveBeenCalled();
     tableView.destroy();
+  });
+});
+
+describe("the context menu without the engine", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    contextMenu.value = null;
+    useFallbackEditor("unavailable");
+  });
+  afterEach(() => {
+    contextMenu.value = null;
+    view?.destroy();
+    forgetEngineFailure();
+  });
+
+  it("moves the selection to a right click and opens there", async () => {
+    await setup(checker(), true);
+    vi.spyOn(view, "posAtCoords").mockReturnValue({ pos: 13, inside: -1 });
+
+    fire("mousedown", { button: 2, clientX: 130, clientY: 25 });
+    fire("contextmenu", { button: 2, clientX: 130, clientY: 25 });
+
+    expect(view.state.selection.head).toBe(13);
+    expect(contextMenu.value?.keyboard).toBe(false);
+    expect(contextMenu.value?.anchor).toEqual({
+      left: 130,
+      top: 25,
+      bottom: 25,
+    });
+  });
+
+  it("leaves the ContextMenu key's event to the menu, at the cursor", async () => {
+    await setup(checker(), true);
+
+    fire("contextmenu", { button: 0, clientX: 0, clientY: 0 });
+
+    expect(contextMenu.value?.keyboard).toBe(true);
+  });
+
+  it("leaves the webview's menu to Shift", async () => {
+    await setup(checker(), true);
+
+    const event = fire("contextmenu", {
+      button: 2,
+      clientX: 130,
+      clientY: 25,
+      shiftKey: true,
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(contextMenu.value).toBeNull();
   });
 });

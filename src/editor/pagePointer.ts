@@ -1,4 +1,11 @@
+import { type EditorState, Plugin, TextSelection } from "prosemirror-state";
+import { dropPoint } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
+
+import { engineless, pageEngine } from "../engine/engine";
+import { pageDropCaret } from "../state";
+import { pageDrop } from "./commands/pageDrop";
+import { pasteText } from "./plugins/tables/clipboard";
 
 // What the pointer does on the painted pages, told to the editor's plugins.
 // The editor's own DOM is hidden and gets no mouse events, so the page view
@@ -47,4 +54,129 @@ export const sendPagePointer = (
   // a test view has no DOM
   view.dom?.dispatchEvent(event);
   return event.defaultPrevented;
+};
+
+/**
+ * pointerOf returns what a mouse event on the editor's own DOM hits, while
+ * the editor shows the text itself. The link is left out: openLink opens a
+ * link clicked in the editor by itself.
+ */
+const pointerOf = (view: EditorView, event: MouseEvent): PagePointer => ({
+  pos:
+    view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? null,
+  link: null,
+  x: event.clientX,
+  y: event.clientY,
+  button: event.button,
+  shiftKey: event.shiftKey,
+  ctrlKey: event.ctrlKey,
+  metaKey: event.metaKey,
+  altKey: event.altKey,
+});
+
+/**
+ * nativePointer hands the plugins the presses and right clicks on the
+ * editor's own DOM as the page view's events, while there is no engine and
+ * the editor shows the text itself, so they work the same without the pages.
+ * It comes before contextMenu, which takes the ContextMenu key's event.
+ */
+export const nativePointer = () =>
+  new Plugin({
+    props: {
+      handleDOMEvents: {
+        mousedown: (view, event) => {
+          if (!engineless()) return false;
+          if (!sendPagePointer(view, PAGE_PRESS, pointerOf(view, event)))
+            return false;
+          // a plugin took the press, so ProseMirror leaves the selection
+          event.preventDefault();
+          return true;
+        },
+        contextmenu: (view, event) => {
+          if (!engineless() || event.shiftKey) return false;
+          // the ContextMenu key's event, which contextMenu handles
+          if (event.button !== 2 && event.clientX === 0 && event.clientY === 0)
+            return false;
+          event.preventDefault();
+          sendPagePointer(view, PAGE_MENU, pointerOf(view, event));
+          return true;
+        },
+      },
+    },
+  });
+
+/**
+ * moveCandidate tells whether a press at `pos` lands in the selected text,
+ * where it may start dragging it
+ */
+export const moveCandidate = (state: EditorState, pos: number | null) => {
+  const { selection } = state;
+  return (
+    pos !== null &&
+    selection instanceof TextSelection &&
+    !selection.empty &&
+    pos > selection.from &&
+    pos < selection.to
+  );
+};
+
+const mac =
+  typeof navigator !== "undefined" &&
+  /Mac|iP(hone|ad)/.test(navigator.platform);
+
+/**
+ * dragCopies tells whether a drag copies the text rather than moving it:
+ * with Option held on macOS and Ctrl elsewhere, as in ProseMirror
+ */
+export const dragCopies = (event: { altKey: boolean; ctrlKey: boolean }) =>
+  mac ? event.altKey : event.ctrlKey;
+
+/**
+ * showDropAt shows where the dragged selection would drop, or nothing for
+ * null
+ */
+export const showDropAt = (view: EditorView, pos: number | null) => {
+  if (pos === null) {
+    pageDropCaret.value = null;
+    return;
+  }
+  const at =
+    dropPoint(view.state.doc, pos, view.state.selection.content()) ?? pos;
+  pageDropCaret.value = pageEngine?.caret(at) ?? null;
+};
+
+/**
+ * dropMoved drops the selected text dragged on the pages at `pos`: moves
+ * it there, or copies it
+ */
+export const dropMoved = (view: EditorView, pos: number, copy: boolean) => {
+  pageDropCaret.value = null;
+  const { selection } = view.state;
+  return pageDrop(
+    selection.content(),
+    pos,
+    copy ? null : { from: selection.from, to: selection.to },
+  )(view.state, view.dispatch);
+};
+
+/**
+ * dropExternal puts what another app dropped on the pages at `pos`, as a
+ * paste there would
+ */
+export const dropExternal = (
+  view: EditorView,
+  pos: number,
+  data: Pick<DataTransfer, "getData">,
+) => {
+  pageDropCaret.value = null;
+  const html = data.getData("text/html");
+  const text = data.getData("text/plain");
+  if (!html && !text) return false;
+  const $pos = view.state.doc.resolve(
+    Math.max(0, Math.min(pos, view.state.doc.content.size)),
+  );
+  view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)));
+  if (html) view.pasteHTML(html);
+  else pasteText(view, text, false);
+  return true;
 };

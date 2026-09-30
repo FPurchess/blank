@@ -6,6 +6,7 @@ import { tablePicker } from "../../../state";
 import { DEFAULT_SIZE } from "./pickerSize";
 import { toolsKey } from "../../plugins/tables/tools";
 import { insertTable } from "./insert";
+import { headAfter } from "../../plugins/pageView";
 
 /**
  * tableKey is the one key for tables: outside a table it opens the picker
@@ -25,7 +26,7 @@ export const tableKey = (): Command => (state, dispatch, view) => {
   if (!insertTable(DEFAULT_SIZE.cols, DEFAULT_SIZE.rows)(state)) return false;
   if (!dispatch || !view) return true;
 
-  const caret = caretBox(state.selection.head);
+  const caret = caretBox(state.selection.head, headAfter(state));
   const anchor = caret
     ? { left: caret.left, top: caret.top, bottom: caret.bottom }
     : { left: 0, top: 0, bottom: 0 };

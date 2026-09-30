@@ -10,9 +10,15 @@ import { describePaper, layoutWarnings } from "../../layout/describe";
 import { resolveLayout } from "../../layout/resolve";
 import { localeUnit } from "../../layout/paper";
 import { extname } from "../../paths";
-import { path } from "../../state";
+import { engineStatus } from "../../engine/engine";
+import { announce, path } from "../../state";
 import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
+
+// what the PDF export says while the layout engine couldn't start, e.g.
+// where the webview can't run it, or when the user switched it off
+export const PDF_UNAVAILABLE =
+  "The PDF export needs the page layout, which couldn't start.";
 
 /**
  * isEmpty checks whether the document has neither text nor images
@@ -41,6 +47,16 @@ export default (
     }
 
     const extension = filters?.[0]?.extensions[0];
+
+    // the PDF is written from the engine's layout. After the engine failed
+    // while Blank ran, the export still works with one of its own (see
+    // src/engine/pdf.ts).
+    const status = engineStatus();
+    if (extension === "pdf" && (status === "off" || status === "unavailable")) {
+      sendNotification({ title, body: PDF_UNAVAILABLE });
+      announce(PDF_UNAVAILABLE);
+      return true;
+    }
 
     (async () => {
       const dest = await save({

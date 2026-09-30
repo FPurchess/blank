@@ -1,10 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
-import { doc, h, p } from "../test/editor";
+import { doc, h, p, table, td, tr } from "../test/editor";
+import { schema } from "../markdown";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
-import { settingsOf } from "./engine";
+import {
+  bootEngine,
+  engineless,
+  engineStatus,
+  forgetEngineFailure,
+  pageEngine,
+  settingsOf,
+} from "./engine";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
@@ -26,7 +34,7 @@ describe("PageEngine", () => {
     engine.setSettings(testLayout(), documentFields(node));
     let progress = 0;
     engine.onProgress = () => progress++;
-    engine.sync(node, noSizes, false, null, true);
+    engine.sync(node, noSizes, { progressive: true });
     expect(engine.laying).toBe(true);
     expect(engine.pages()).toBeLessThan(full.pages());
     expect(engine.pages()).toBeGreaterThan(1);
@@ -39,7 +47,7 @@ describe("PageEngine", () => {
     // an edit while it lays out finishes the rest first
     const again = testEngine();
     again.setSettings(testLayout(), documentFields(node));
-    again.sync(node, noSizes, false, null, true);
+    again.sync(node, noSizes, { progressive: true });
     const typed = node.replace(3, 3, doc(p("x")).slice(1, 2));
     again.sync(typed, noSizes);
     expect(again.laying).toBe(false);
@@ -132,5 +140,113 @@ describe("PageEngine", () => {
       numberStyle: "1",
     });
     expect(settings.width).toBeCloseTo(595.28, 1);
+  });
+});
+
+describe("bootEngine", () => {
+  afterEach(() => {
+    localStorage.removeItem("blank.engine");
+    forgetEngineFailure();
+  });
+
+  it("starts Blank as a plain editor when the engine is switched off", async () => {
+    localStorage.setItem("blank.engine", "off");
+    const fetching = vi.fn();
+    vi.stubGlobal("fetch", fetching);
+
+    expect(await bootEngine()).toBeNull();
+
+    expect(fetching).not.toHaveBeenCalled();
+    expect(pageEngine).toBeNull();
+    expect(engineless()).toBe(true);
+    expect(engineStatus()).toBe("off");
+    expect(document.body.classList).toContain("without-engine");
+  });
+
+  it("loads the engine when the storage can't be read", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    const fetching = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    vi.stubGlobal("fetch", fetching);
+
+    await expect(bootEngine()).rejects.toThrow("offline");
+
+    expect(fetching).toHaveBeenCalled();
+    expect(engineStatus()).toBe("ready");
+  });
+});
+
+describe("the body and the bands of a page", () => {
+  it("are read again only when their own versions change", () => {
+    const layout = {
+      ...testLayout(),
+      footer: { left: "", center: "Page {page}", right: "" },
+    };
+    const node = doc(p("Some text"));
+    const engine = testEngine();
+    engine.setSettings(layout, documentFields(node));
+    engine.sync(node, noSizes);
+    const body = engine.bodyDisplay(0, engine.bodyVersions()[0]);
+    const bands = engine.bandDisplay(0, engine.bandVersions()[0]);
+    expect(body.g.length).toBeGreaterThan(0);
+    expect(bands.g.length).toBeGreaterThan(0);
+    // the same page, both layers
+    const glyphs = (display: { g: number[][] }) =>
+      display.g.reduce((sum, run) => sum + (run.length - 3) / 3, 0);
+    expect(glyphs(body) + glyphs(bands)).toBe(
+      glyphs(engine.display(0, engine.versions()[0])),
+    );
+
+    const typed = doc(p("Some more text"));
+    engine.sync(typed, noSizes);
+    expect(engine.bandDisplay(0, engine.bandVersions()[0])).toBe(bands);
+    expect(engine.bodyDisplay(0, engine.bodyVersions()[0])).not.toBe(body);
+  });
+});
+
+describe("an image in a table cell", () => {
+  // a table whose first cell holds an image of `size`, in points
+  const laidOut = (size: { width: number; height: number }) => {
+    const image = schema.nodes.image.create({ src: "x.png", alt: "x" });
+    const node = doc(
+      table(
+        tr(
+          td([schema.node("paragraph", null, [image])]),
+          td("a much longer text in the second column of the table"),
+        ),
+      ),
+    );
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    engine.sync(node, (src) => (src === "x.png" ? size : undefined));
+    const [shown] = engine.display(0, engine.versions()[0]).i;
+    const grid = engine.tableGrid(0)!;
+    return { engine, shown, cellWidth: grid.columns[1] - grid.columns[0] };
+  };
+
+  it("keeps the size of an image that fits its cell", () => {
+    const { shown } = laidOut({ width: 3 * 0.75, height: 2 * 0.75 });
+    expect(shown[0]).toBe("x.png");
+    expect(shown[3]).toBeCloseTo(2.25);
+    expect(shown[4]).toBeCloseTo(1.5);
+  });
+
+  it("fits a large image to its cell", () => {
+    const { shown, cellWidth } = laidOut({ width: 3000, height: 750 });
+    // the cell's width, less its padding
+    expect(shown[3]).toBeLessThan(cellWidth);
+    expect(shown[3]).toBeGreaterThan(cellWidth - 2 * 11);
+    expect(shown[4]).toBeCloseTo(shown[3] / 4);
+  });
+
+  it("has a box, for a selection of it", () => {
+    const { engine, shown } = laidOut({ width: 30, height: 20 });
+    // the table, row, cell and paragraph open before it
+    const [box] = engine.boxes(4, 5);
+    expect(box).toMatchObject({ page: 0 });
+    expect(box.width).toBeCloseTo(shown[3]);
   });
 });

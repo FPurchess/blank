@@ -12,7 +12,8 @@ import {
 // holds the EditorView itself, only this handle, so a component can work with
 // whichever editor it's placed in (e.g. later a header's or a footnote's).
 export interface EditorHandle {
-  // the view, e.g. for coordsAtPos or nodeDOM; don't change its DOM
+  // the view, e.g. to run a command or give it the focus; measure the text
+  // through src/engine/geometry.ts, and don't change its DOM
   readonly view: EditorView;
   // the editor's state, replaced on every transaction, for computeds such as
   // whether a command can run or a mark is active

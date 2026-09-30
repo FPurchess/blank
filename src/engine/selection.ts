@@ -48,10 +48,13 @@ export const cellRects = (
 
 /**
  * shownSelection returns what the page view shows of `selection`
+ * @param after paints a caret at the end of a line where the next one
+ *   starts at the same position, see PageEngine.caret
  */
 export const shownSelection = (
   engine: PageEngine,
   selection: Selection,
+  after = false,
 ): ShownSelection => {
   if (selection instanceof CellSelection) {
     return { caret: null, rects: cellRects(engine, selection), nodes: [] };
@@ -64,7 +67,11 @@ export const shownSelection = (
     };
   }
   if (selection.empty) {
-    return { caret: engine.caret(selection.head), rects: [], nodes: [] };
+    return {
+      caret: engine.caret(selection.head, after),
+      rects: [],
+      nodes: [],
+    };
   }
   return {
     caret: null,

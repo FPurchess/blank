@@ -73,9 +73,13 @@ export const bootMark = (step: string) => {
   boot[step] ??= Math.round(performance.now());
 };
 
-if (typeof window !== "undefined") {
+/**
+ * exposePerf lets E2E tests read the measurements, through
+ * `window.blankPageViewPerf` and `window.blankBootTimes`
+ */
+export const exposePerf = () => {
   Object.assign(window, {
     blankPageViewPerf: perfSamples,
     blankBootTimes: () => ({ ...boot }),
   });
-}
+};

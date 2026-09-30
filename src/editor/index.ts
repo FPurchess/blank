@@ -25,6 +25,8 @@ import {
   tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
+import { nativePointer } from "./pagePointer";
+import { setGeometryView } from "../engine/geometry";
 import { createEditorHandle, syncPlugin } from "./handle";
 import { timed } from "../engine/perf";
 
@@ -41,6 +43,8 @@ export const bootEditor = async () => {
       plugins: [
         // lays out first, so the other plugins' views measure the new layout
         pageSync(),
+        // without the engine, the clicks on the editor's own text
+        nativePointer(),
         history(),
         languagePicker(),
         tablePickerKeys(),
@@ -92,6 +96,7 @@ export const bootEditor = async () => {
       });
     },
   });
+  setGeometryView(view);
   const editor = createEditorHandle(view);
   sync = editor.sync;
   transaction.value = view.state.tr;

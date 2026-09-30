@@ -22,11 +22,17 @@ export interface PageLayoutState {
   // changes when what a page shows changes, so only those pages are
   // painted again
   versions: Uint32Array;
+  // the versions of each page's text and of its header and footer, which change apart (see SEAM.md)
+  bodyVersions?: Uint32Array;
+  bandVersions?: Uint32Array;
   // where the text of each page ends, from its top edge
   bottoms: Float32Array;
   // whether the line with the document's properties shows above the first
   // page (see src/ui/PageProperties.vue), which takes room there
   properties?: boolean;
+  // whether the first page has header text, which "page ends" shows in the
+  // room above its first frame
+  header?: boolean;
 }
 
 // null until the engine laid out the document
@@ -55,6 +61,10 @@ export const pageNodeSelection = shallowRef<PageRect[]>([]);
 // the text being composed with an input method, which the page view
 // underlines; empty while nothing is composed
 export const pageComposition = shallowRef<PageRect[]>([]);
+
+// where dragged text would drop, which the page view paints as a caret;
+// null while no text is dragged
+export const pageDropCaret = shallowRef<PageRect | null>(null);
 
 // the page the selection's head is on, counted from 1, and how many there
 // are, for "Page N of M"

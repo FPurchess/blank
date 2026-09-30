@@ -27,6 +27,7 @@ import { setCaption } from "../../commands/table/format";
 import { tableKeyBinding } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 import { blockBoxes, caretPage } from "../../../engine/geometry";
+import { engineless } from "../../../engine/engine";
 import { tableAround } from "./util";
 
 /**
@@ -284,6 +285,11 @@ export const tableTools = () => {
     view(view) {
       // the page view scrolled, resized or switched
       const stop = watch(pageViewport, () => publish(view), { flush: "sync" });
+      // without the engine, the editor itself scrolls
+      const scrolled = () => {
+        if (engineless()) publish(view);
+      };
+      window.addEventListener("scroll", scrolled, true);
       publish(view);
       return {
         update: (view) => {
@@ -297,6 +303,7 @@ export const tableTools = () => {
         },
         destroy: () => {
           stop();
+          window.removeEventListener("scroll", scrolled, true);
           tableToolbar.value = null;
         },
       };

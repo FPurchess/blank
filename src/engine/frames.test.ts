@@ -5,9 +5,11 @@ import {
   BLEED,
   frameLayout,
   frameNear,
+  HEADER_ROOM,
   MARK_HEIGHT,
   onDesk,
   pointOnPage,
+  PROPERTIES_ROOM,
   SHEET_GAP,
   TEXT_SCALE,
   VIEW_TOP,
@@ -121,5 +123,41 @@ describe("keptRange", () => {
     // far away: only what is near
     expect(keptRange("2-5", "9-11", "8-12")).toBe("9-11");
     expect(keptRange("2-5", "", "")).toBe("");
+  });
+});
+
+describe("the room for the first page's header", () => {
+  const tops = (placed: ReturnType<typeof frameLayout>) =>
+    placed.frames.map((frame) => frame.top);
+
+  it("is none without a header", () => {
+    const placed = frameLayout(layout, "page-ends", 800);
+    expect(placed.headerRoom).toBe(0);
+    expect(placed.frames[0].top).toBe(VIEW_TOP);
+  });
+
+  it("moves the frames and the desk down in page ends", () => {
+    const without = frameLayout(layout, "page-ends", 800);
+    const placed = frameLayout({ ...layout, header: true }, "page-ends", 800);
+    expect(placed.headerRoom).toBe(HEADER_ROOM);
+    expect(placed.frames[0].top).toBe(VIEW_TOP + HEADER_ROOM);
+    expect(tops(placed)).toEqual(tops(without).map((top) => top + HEADER_ROOM));
+    expect(placed.height).toBe(without.height + HEADER_ROOM);
+  });
+
+  it("comes below the room for the properties", () => {
+    const placed = frameLayout(
+      { ...layout, header: true, properties: true },
+      "page-ends",
+      800,
+    );
+    expect(placed.frames[0].top).toBe(VIEW_TOP + PROPERTIES_ROOM + HEADER_ROOM);
+  });
+
+  it("is none on sheets, which show their headers", () => {
+    const without = frameLayout(layout, "pages", 800);
+    const placed = frameLayout({ ...layout, header: true }, "pages", 800);
+    expect(placed.headerRoom).toBe(0);
+    expect(tops(placed)).toEqual(tops(without));
   });
 });

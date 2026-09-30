@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Plugin } from "prosemirror-state";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Plugin, TextSelection } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 
@@ -8,8 +8,14 @@ import {
   announcement,
   contextMenu,
   tableHandles as handles,
+  tableToolbar,
 } from "../../../state";
-import { tableGeometry } from "../../../engine/geometry";
+import { setGeometryView, tableGeometry } from "../../../engine/geometry";
+import {
+  forgetEngineFailure,
+  PageEngine,
+  useFallbackEditor,
+} from "../../../engine/engine";
 import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import { hidePages, showPages } from "../../../test/engine";
 import { cellTexts, selectedText } from "../../../test/tables";
@@ -236,5 +242,89 @@ describe("tableHandles", () => {
     view = new EditorView(document.createElement("div"), {
       state: createState(grid()),
     });
+  });
+});
+
+describe("the table handles and toolbar without the engine", () => {
+  beforeEach(() => {
+    announcement.value = null;
+    contextMenu.value = null;
+    useFallbackEditor("unavailable");
+    // the editor shows the text itself, where every box is the same here
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(10, 20, 100, 40),
+    );
+    view = editor();
+    setGeometryView(view);
+  });
+
+  afterEach(() => {
+    view.destroy();
+    setGeometryView(null);
+    forgetEngineFailure();
+  });
+
+  it("places them at the editor's own table", () => {
+    // the cursor in the table
+    view.dispatch(
+      view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, TABLE + 4),
+      ),
+    );
+    expect(tableToolbar.value?.anchor).toEqual({
+      left: 10,
+      top: 20,
+      right: 110,
+      bottom: 60,
+    });
+
+    hover(50, 40);
+    expect(handles.value).not.toBeNull();
+    expect(state().box).toMatchObject({ left: 10, right: 110 });
+  });
+
+  it("places them again when the editor scrolls", () => {
+    hover(50, 40);
+    const first = handles.value;
+    window.dispatchEvent(new Event("scroll"));
+    expect(handles.value).not.toBe(first);
+  });
+});
+
+describe("measuring the tables under the mouse", () => {
+  const LONG =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+  // five tables, a page or so apart
+  const apart = () =>
+    doc(
+      ...Array.from({ length: 5 }, (_, index) => [
+        table(tr(th(`T${index}`), th("b")), tr(td("c"), td("d"))),
+        ...Array.from({ length: 12 }, () => p(LONG)),
+      ]).flat(),
+    );
+
+  beforeEach(() => {
+    showPages("pages");
+  });
+  afterEach(() => {
+    view.destroy();
+    hidePages();
+  });
+
+  it("measures each table near the mouse once while the layout stays", () => {
+    view = editor(apart());
+    const { box } = tableGeometry(0)!.pieces[0];
+    const measure = vi.spyOn(PageEngine.prototype, "tableGrid");
+
+    for (let move = 0; move < 10; move++)
+      hover((box.left + box.right) / 2, box.top + 2 + move);
+
+    expect(handles.value).not.toBeNull();
+    // the tables on the first page and the next, each once
+    expect(measure.mock.calls.length).toBeGreaterThan(0);
+    expect(measure.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(new Set(measure.mock.calls.map(([pos]) => pos)).size).toBe(
+      measure.mock.calls.length,
+    );
   });
 });

@@ -19,8 +19,32 @@ export interface EngineText {
   top: boolean;
 }
 
+// a block in a table cell, where it stands in the cell's text
+export type EngineCellBlock =
+  | (EngineText & {
+      // points from the left of the cell's text
+      indent: number;
+      // a list item's marker, on its first paragraph
+      marker?: string;
+      // quote bars, by their distance from the left of the cell's text
+      bars: number[];
+    })
+  | {
+      kind: "image";
+      pos: number;
+      src: string;
+      // at its own size, which the engine fits to the cell; 0 × 0 while it
+      // isn't loaded
+      width: number;
+      height: number;
+      alt: string;
+    };
+
 export interface EngineCell {
+  // the cell's paragraphs, when it holds nothing else
   paragraphs: EngineText[];
+  // what it holds otherwise: lists, quotes and images, see SEAM.md S2
+  blocks?: EngineCellBlock[];
   header: boolean;
   align?: string;
   // the first column it covers, and how many columns and rows
