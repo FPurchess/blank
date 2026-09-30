@@ -24,3 +24,11 @@
 - Task 8: `make notices` (`bun run notices`, `scripts/build-notices.ts`) needs cargo-about 0.9.2 (`cargo install cargo-about --version 0.9.2 --locked --features cli`). It writes `public/THIRD-PARTY-NOTICES.txt` (219 crate licence texts for the native targets and wasm32, 98 npm production packages), which `bun run build` copies to `dist/`. The engine check fails when it's out of date, so run `make notices` after any change to Cargo.lock or bun.lockb, including engine-core's. For engine-ui: link the notices from the docs.
 - Task 9: the engine check caches with rust-cache and installs wasm-bindgen-cli and cargo-about as prebuilt binaries (taiki-e/install-action), from `.github/actions/engine`. test-on-pr already caches through setup-rust-toolchain. publish-tauri stays uncached, so the installers build from scratch. docs.yml's checkout@v4 is left as it is (out of scope).
 - Task 10: these docs describe code that isn't on the base yet: the `coordsAtPos` fallback and `localStorage["blank.engine"] = "off"` in editor-boundary.md (engine-editor), `__TEST_HOOKS__` in CLAUDE.md's E2E section (engine-editor's vite.config.ts), and the pixel reads in ui-testing.md (engine-ui). Check them at integration. `src/scss/main.scss:1284` still says "see SPIKE.md"; that's engine-ui's file, and it should point to `.claude/rules/layout-engine.md` ("Scrolling").
+
+## Done when (checked on aff73a5, after merging spike/page-view-engine at 2c68fa7)
+
+- [x] `bun run lint`, `bun run format:check`, `bun run test` (2235 tests)
+- [x] `bun run test:rust` (the workspace), and `CI=1 cargo test -p blank-layout` with poppler
+- [x] `make engine` twice: byte-identical, and identical to the committed wasm at 2c68fa7 (not staged)
+- [x] actionlint on all workflows
+- [x] E2E on port 4531: launch, rendering, pageEngine: 3/3 passed
