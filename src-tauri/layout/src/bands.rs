@@ -12,7 +12,7 @@ pub const BAND_LINE: f32 = BAND_SIZE * 1.3;
 
 /// the number a page shows, `page` counted from 1
 pub fn page_number(settings: &Settings, page: usize) -> i64 {
-    page as i64 + settings.start_number as i64 - 1
+    (page as i64).saturating_add(settings.start_number) - 1
 }
 
 /// the header and footer of a page: the first page's own or none, those of
@@ -53,9 +53,13 @@ const ROMAN: [(i64, &str); 13] = [
     (1, "i"),
 ];
 
+/// the largest number roman numerals write without a bar over them
+pub const LARGEST_ROMAN: i64 = 3999;
+
 /// writes a page number in a style: 4, iv or IV; roman numerals start at 1
+/// and end at LARGEST_ROMAN, and numbers outside are written in arabic
 pub fn format_number(number: i64, style: &str) -> String {
-    if style == "1" || number < 1 {
+    if style == "1" || !(1..=LARGEST_ROMAN).contains(&number) {
         return number.to_string();
     }
     let mut rest = number;
@@ -180,6 +184,22 @@ mod tests {
         assert_eq!(format_number(4, "i"), "iv");
         assert_eq!(format_number(1994, "I"), "MCMXCIV");
         assert_eq!(format_number(0, "i"), "0");
+        assert_eq!(format_number(3999, "I"), "MMMCMXCIX");
+        assert_eq!(format_number(4000, "i"), "4000");
+    }
+
+    #[test]
+    fn writes_huge_page_numbers_in_arabic_at_once() {
+        // one "m" per thousand took 11.8 s for a page at 200000000
+        let started = std::time::Instant::now();
+        assert_eq!(format_number(200_000_000, "i"), "200000000");
+        assert_eq!(format_number(i64::MAX, "I"), i64::MAX.to_string());
+        assert!(started.elapsed().as_millis() < 10);
+        let settings = Settings {
+            start_number: i64::MAX,
+            ..Default::default()
+        };
+        assert_eq!(page_number(&settings, 5), i64::MAX - 1);
     }
 
     #[test]

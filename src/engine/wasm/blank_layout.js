@@ -145,7 +145,24 @@ export class LayoutEngine {
         return v1;
     }
     /**
-     * the start or end of the line a position is on, -1 for none
+     * the start or end of the line the caret at `pos` is painted on (as
+     * `after` says): [pos, after], where `after` is 1 if the caret there is
+     * to be painted at the end of its line, e.g. after a word broken where
+     * it is wider than the line; [] for none
+     * @param {number} pos
+     * @param {boolean} after
+     * @param {boolean} end
+     * @returns {Float64Array}
+     */
+    lineBoundary(pos, after, end) {
+        const ret = wasm.layoutengine_lineBoundary(this.__wbg_ptr, pos, after, end);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * the start or end of the line a position is on, -1 for none; see
+     * `lineBoundary`, which also tells how to paint the caret there
      * @param {number} pos
      * @param {boolean} end
      * @returns {number}
@@ -171,7 +188,8 @@ export class LayoutEngine {
         }
     }
     /**
-     * the fonts' files one after the other, with their lengths
+     * the fonts' files one after the other, with their lengths; throws if
+     * the lengths reach past the bytes
      * @param {Uint8Array} bytes
      * @param {Uint32Array} lengths
      */
@@ -181,7 +199,10 @@ export class LayoutEngine {
         const ptr1 = passArray32ToWasm0(lengths, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.layoutengine_new(ptr0, len0, ptr1, len1);
-        this.__wbg_ptr = ret;
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        this.__wbg_ptr = ret[0];
         LayoutEngineFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
@@ -400,6 +421,27 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * the position a line up or down from the caret at `pos`, painted as
+     * `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+     * text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+     * where the caret at the new position is to be painted at the end of
+     * its line, 0 else
+     * @param {number} pos
+     * @param {boolean} after
+     * @param {boolean} down
+     * @param {number} goal
+     * @returns {Float64Array}
+     */
+    verticalAt(pos, after, down, goal) {
+        const ret = wasm.layoutengine_verticalAt(this.__wbg_ptr, pos, after, down, goal);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * the position a line up or down from `pos`, nearest to `goal`: [0,
+     * pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+     * which also tells how to paint the caret there
      * @param {number} pos
      * @param {boolean} down
      * @param {number} goal
@@ -450,6 +492,9 @@ function __wbg_get_imports() {
         },
         __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
+        },
+        __wbg_error_035268df37369d3d: function(arg0, arg1) {
+            console.error(getStringFromWasm0(arg0, arg1));
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;

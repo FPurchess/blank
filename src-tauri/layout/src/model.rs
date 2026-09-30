@@ -1,7 +1,7 @@
 //! What the engine gets: the blocks of the document, flattened into items by
 //! `src/engine/flatten.ts`, and the page they are laid out on.
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// A run of text with the same marks. Offsets count UTF-16 code units from
 /// the start of the item's text, like ProseMirror positions do.
@@ -217,8 +217,9 @@ pub struct Settings {
     pub even_pages: Option<Bands>,
     #[serde(default = "arabic")]
     pub number_style: String,
-    #[serde(default = "one")]
-    pub start_number: i32,
+    /// the number the first page shows, see `read_start_number`
+    #[serde(default = "one", deserialize_with = "read_start_number")]
+    pub start_number: i64,
     #[serde(default)]
     pub fields: Fields,
 }
@@ -227,9 +228,38 @@ fn arabic() -> String {
     "1".into()
 }
 
-fn one() -> i32 {
+fn one() -> i64 {
     1
 }
+
+/// how far a start number reaches: far beyond any document, and far from
+/// where adding the page count could overflow
+pub const START_NUMBER_LIMIT: i64 = 1_000_000_000;
+
+/// reads any JSON number as a start number: whole, and within
+/// ±START_NUMBER_LIMIT, as JS hands over whatever the frontmatter holds
+fn read_start_number<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, D::Error> {
+    let number = f64::deserialize(deserializer)?;
+    Ok(if number.is_finite() {
+        (number.trunc() as i64).clamp(-START_NUMBER_LIMIT, START_NUMBER_LIMIT)
+    } else {
+        1
+    })
+}
+
+/// a number as it may be: finite, else `fallback`, and within `min..=max`
+fn finite(value: f32, fallback: f32, min: f32, max: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(min, max)
+    } else {
+        fallback
+    }
+}
+
+/// the smallest and largest page, in points: the room for a line of text,
+/// and the largest page a PDF can have (200 inches)
+pub const MIN_PAGE: f32 = 36.0;
+pub const MAX_PAGE: f32 = 14_400.0;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -257,6 +287,38 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// the settings as the engine can lay out with them, whatever JS handed
+    /// over: a page of MIN_PAGE to MAX_PAGE points, margins that leave
+    /// MIN_PAGE of it for the text, and a number style it knows
+    pub fn sanitize(&mut self) {
+        let default = Settings::default();
+        self.width = finite(self.width, default.width, MIN_PAGE, MAX_PAGE);
+        self.height = finite(self.height, default.height, MIN_PAGE, MAX_PAGE);
+        let margins = &mut self.margins;
+        for margin in [
+            &mut margins.top,
+            &mut margins.right,
+            &mut margins.bottom,
+            &mut margins.left,
+        ] {
+            *margin = finite(*margin, 0.0, 0.0, MAX_PAGE);
+        }
+        // opposite margins shrink alike until the text has its room
+        let fit = |a: &mut f32, b: &mut f32, size: f32| {
+            let room = size - MIN_PAGE;
+            if *a + *b > room {
+                let scale = room / (*a + *b);
+                *a *= scale;
+                *b *= scale;
+            }
+        };
+        fit(&mut margins.left, &mut margins.right, self.width);
+        fit(&mut margins.top, &mut margins.bottom, self.height);
+        if !["1", "i", "I"].contains(&self.number_style.as_str()) {
+            self.number_style = "1".into();
+        }
+    }
+
     pub fn content_width(&self) -> f32 {
         self.width - self.margins.left - self.margins.right
     }
@@ -283,8 +345,10 @@ impl Item {
     /// the last ProseMirror position the item stands for
     pub fn to(&self) -> u32 {
         match &self.content {
-            Content::Text(text) => text.pos + utf16_len(&text.text),
-            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => pos + 1,
+            Content::Text(text) => text.pos.saturating_add(utf16_len(&text.text)),
+            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => {
+                pos.saturating_add(1)
+            }
             Content::Table { end, .. } => *end,
         }
     }
@@ -308,6 +372,33 @@ impl Item {
                     }
                 }
             }
+        }
+    }
+
+    /// the item as the engine can lay it out, whatever JS handed over:
+    /// finite, non-negative spaces, indents, bars and table widths, and an
+    /// image with a size that isn't finite as one that isn't loaded
+    pub fn sanitize(&mut self) {
+        self.indent = finite(self.indent, 0.0, 0.0, MAX_PAGE);
+        self.before = finite(self.before, 0.0, 0.0, MAX_PAGE);
+        self.after = finite(self.after, 0.0, 0.0, MAX_PAGE);
+        for bar in &mut self.bars {
+            *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
+        }
+        match &mut self.content {
+            Content::Image { width, height, .. } => {
+                if !(width.is_finite() && height.is_finite()) {
+                    (*width, *height) = (0.0, 0.0);
+                }
+                *width = width.clamp(0.0, f32::MAX);
+                *height = height.clamp(0.0, f32::MAX);
+            }
+            Content::Table { widths, .. } => {
+                for share in widths {
+                    *share = finite(*share, 0.0, 0.0, f32::MAX);
+                }
+            }
+            _ => {}
         }
     }
 

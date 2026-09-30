@@ -52,7 +52,7 @@ impl Engine {
                 continue;
             }
             for (index, boxed) in laid.texts.iter().enumerate() {
-                let (start, end) = (boxed.pos, boxed.pos + boxed.len);
+                let (start, end) = (boxed.pos, boxed.pos.saturating_add(boxed.len));
                 if end < from || start > to {
                     continue;
                 }

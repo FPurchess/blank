@@ -13,9 +13,10 @@ export const layoutengine_caret: (a: number, b: number, c: number) => [number, n
 export const layoutengine_clearImages: (a: number) => void;
 export const layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
+export const layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_lineEdge: (a: number, b: number, c: number) => number;
 export const layoutengine_missing: (a: number) => [number, number];
-export const layoutengine_new: (a: number, b: number, c: number, d: number) => number;
+export const layoutengine_new: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const layoutengine_page: (a: number, b: number) => [number, number];
 export const layoutengine_pageBands: (a: number, b: number) => [number, number];
 export const layoutengine_pageBody: (a: number, b: number) => [number, number];
@@ -32,6 +33,7 @@ export const layoutengine_update: (a: number, b: number, c: number, d: number, e
 export const layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];
 export const layoutengine_versions: (a: number) => [number, number];
 export const layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
+export const layoutengine_verticalAt: (a: number, b: number, c: number, d: number, e: number) => [number, number];
 export const layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_words: (a: number) => [number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;

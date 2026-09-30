@@ -11,6 +11,10 @@ use crate::model::Text;
 use crate::style::{CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, TABLE_LINE};
 use crate::text::TextBox;
 
+/// the most columns a table has: a merged cell may say it covers any
+/// number, e.g. from an HTML table, and the grid is laid out in memory
+pub const MAX_COLUMNS: u32 = 1000;
+
 /// the space between the paragraphs of a cell
 const CELL_PARAGRAPH_GAP: f32 = 8.0;
 /// the space between a caption and its table
@@ -49,10 +53,10 @@ pub(super) fn table_units(
     let columns = rows
         .iter()
         .flat_map(|row| {
-            row.cells
-                .iter()
-                .enumerate()
-                .map(|(index, cell)| cell.col.unwrap_or(index as u32) + cell.colspan.max(1))
+            row.cells.iter().enumerate().map(|(index, cell)| {
+                let (col, colspan) = place(cell, index);
+                col + colspan
+            })
         })
         .max()
         .unwrap_or(1)
@@ -95,8 +99,9 @@ pub(super) fn table_units(
     let mut cells: Vec<PlacedCell> = vec![];
     for (row_index, row) in rows.iter().enumerate() {
         for (index, cell) in row.cells.iter().enumerate() {
-            let col = cell.col.map(|col| col as usize).unwrap_or(index);
-            let colspan = (cell.colspan.max(1) as usize).min(columns.saturating_sub(col).max(1));
+            let (col, colspan) = place(cell, index);
+            let (col, colspan) = (col as usize, colspan as usize);
+            let colspan = colspan.min(columns.saturating_sub(col).max(1));
             let rowspan = (cell.rowspan.max(1) as usize).min(rows.len() - row_index);
             let x = edge(col);
             let inner = (edge(col + colspan) - x - 2.0 * CELL_PADDING_X).max(10.0);
@@ -310,6 +315,16 @@ pub(super) fn table_units(
         label,
         columns: edges,
     }
+}
+
+/// the first column a cell covers and how many, within MAX_COLUMNS
+fn place(cell: &crate::model::Cell, index: usize) -> (u32, u32) {
+    let col = cell
+        .col
+        .unwrap_or(index.min(u32::MAX as usize) as u32)
+        .min(MAX_COLUMNS - 1);
+    let colspan = cell.colspan.clamp(1, MAX_COLUMNS - col);
+    (col, colspan)
 }
 
 /// the part of a decoration from `from` to `to`, or nothing
