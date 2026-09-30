@@ -226,9 +226,14 @@ impl TextBox {
             };
             let parley_run = run.run();
             let index = parley_run.index();
+            let ranges = cluster_ranges(parley_run);
             let mut clustered: Vec<(parley::Glyph, std::ops::Range<usize>)> = vec![];
             for cluster in parley_run.visual_clusters() {
                 let range = cluster.text_range();
+                let range = ranges
+                    .iter()
+                    .find(|(own, _)| *own == range)
+                    .map_or(range, |(_, text)| text.clone());
                 for glyph in cluster.glyphs() {
                     clustered.push((glyph, range.clone()));
                 }
@@ -307,7 +312,7 @@ impl TextBox {
         if self.empty() {
             return self.pos;
         }
-        self.pos + utf16_of_byte(&self.text, byte)
+        self.pos.saturating_add(utf16_of_byte(&self.text, byte))
     }
 
     /// where the cursor stands at a position: its line and rectangle in the
@@ -355,11 +360,19 @@ impl TextBox {
     pub fn line_bounds(&self, line: usize) -> (u32, u32) {
         let lines = self.lines();
         let Some(info) = lines.get(line) else {
-            return (self.pos, self.pos + self.len);
+            return (self.pos, self.pos.saturating_add(self.len));
+        };
+        (self.pos_of(info.start), self.pos_of(self.end_byte(line)))
+    }
+
+    /// the byte a line ends at: before the space or line break it ends
+    /// with, unless it is the last line
+    fn end_byte(&self, line: usize) -> usize {
+        let lines = self.lines();
+        let Some(info) = lines.get(line) else {
+            return self.text.len();
         };
         let mut end = info.end;
-        // before the space or line break the line ends with, unless it is
-        // the last line
         if line + 1 < lines.len() {
             while end > info.start && self.text[..end].ends_with(|c: char| c.is_whitespace()) {
                 end = self.text[..end]
@@ -369,7 +382,34 @@ impl TextBox {
                     .unwrap_or(info.start);
             }
         }
-        (self.pos_of(info.start), self.pos_of(end))
+        end
+    }
+
+    /// the end of a line, and whether the caret there must be painted with
+    /// the line before it (`after`, as `caret` takes it): true where a word
+    /// wider than the line was broken, so the line's end is also where the
+    /// next one starts
+    pub fn line_end(&self, line: usize) -> (u32, bool) {
+        let end = self.end_byte(line);
+        let next_start = self.lines().get(line + 1).map(|next| next.start);
+        (self.pos_of(end), next_start == Some(end))
+    }
+
+    /// the position on a line nearest to `x`, in the box's coordinates, and
+    /// whether the caret there is painted on this line as the end of it
+    /// (`after`). Past the end of the line, that is its end, never the
+    /// start of the next line.
+    pub fn hit_line(&self, line: usize, x: f32) -> (u32, bool) {
+        let lines = self.lines();
+        let Some(info) = lines.get(line) else {
+            return (self.pos, false);
+        };
+        let cursor = Cursor::from_point(&self.layout, x, (info.top + info.bottom) / 2.0);
+        let byte = cursor.index();
+        if line + 1 < lines.len() && byte >= self.end_byte(line) {
+            return self.line_end(line);
+        }
+        (self.pos_of(byte), false)
     }
 
     /// the selection's rectangles between two byte indexes, in the box's
@@ -393,6 +433,57 @@ impl TextBox {
             })
             .collect()
     }
+}
+
+/// the text each cluster with glyphs stands for, by the cluster's own
+/// range: its own text, and that of the clusters without glyphs that
+/// continue its ligature, a combining mark or the other letters of a
+/// ligature (lam-alef, a conjunct). Parley gives those no glyphs, so their
+/// text would be lost in the PDF, for copying and searching. In a run left
+/// to right they follow the cluster they belong to, and right to left they
+/// come before it, in the order of the text. Other clusters without glyphs,
+/// e.g. a line break, stand for no glyph's text.
+fn cluster_ranges(
+    run: &parley::Run<'_, Ink>,
+) -> Vec<(std::ops::Range<usize>, std::ops::Range<usize>)> {
+    let clusters: Vec<(std::ops::Range<usize>, bool, bool)> = run
+        .clusters()
+        .map(|cluster| {
+            (
+                cluster.text_range(),
+                cluster.glyphs().next().is_some(),
+                cluster.is_ligature_continuation(),
+            )
+        })
+        .collect();
+    let mut ranges: Vec<(std::ops::Range<usize>, std::ops::Range<usize>)> = clusters
+        .iter()
+        .filter(|(_, glyphs, _)| *glyphs)
+        .map(|(range, ..)| (range.clone(), range.clone()))
+        .collect();
+    if ranges.is_empty() {
+        return ranges;
+    }
+    let bearers: Vec<usize> = (0..clusters.len())
+        .filter(|&index| clusters[index].1)
+        .collect();
+    for (index, (range, glyphs, continuation)) in clusters.iter().enumerate() {
+        if *glyphs || !continuation {
+            continue;
+        }
+        let before = bearers.iter().rposition(|&bearer| bearer < index);
+        let after = bearers.iter().position(|&bearer| bearer > index);
+        let owner = if run.is_rtl() {
+            after.or(before)
+        } else {
+            before.or(after)
+        };
+        if let Some(owner) = owner {
+            let text = &mut ranges[owner].1;
+            *text = text.start.min(range.start)..text.end.max(range.end);
+        }
+    }
+    ranges
 }
 
 fn push_span(
@@ -605,5 +696,47 @@ mod tests {
         let link = runs.iter().find(|run| run.underline.is_some()).unwrap();
         assert_eq!(boxed.link_of(link.ink), Some("https://example.com"));
         assert!(link.underline.unwrap().0 > 0.0);
+    }
+
+    /// the text ranges of a line's glyphs, in the order they are painted
+    fn glyph_ranges(value: &str) -> Vec<(u32, u32)> {
+        let mut fonts = repository_fonts();
+        let boxed = TextBox::new(&mut fonts, &text(value), 300.0, Alignment::Start);
+        boxed
+            .glyph_runs(&fonts, 0)
+            .iter()
+            .flat_map(|run| run.glyphs.iter().map(|glyph| (glyph.start, glyph.end)))
+            .collect()
+    }
+
+    #[test]
+    fn gives_marks_and_ligatures_their_text() {
+        // é as e and a combining acute: one glyph for both
+        assert_eq!(glyph_ranges("e\u{301}x"), [(0, 3), (3, 4)]);
+        // lam-alef: one glyph for both letters, right to left
+        assert_eq!(glyph_ranges("\u{644}\u{627}"), [(0, 4)]);
+        // alef, lam-alef, meem: the lam goes with the alef after it
+        assert_eq!(
+            glyph_ranges("\u{627}\u{644}\u{627}\u{645}"),
+            [(6, 8), (2, 6), (0, 2)]
+        );
+        // beh with a fatha: two glyphs, both for the two characters
+        assert_eq!(
+            glyph_ranges("\u{628}\u{64e}\u{628}"),
+            [(4, 6), (0, 4), (0, 4)]
+        );
+        // shin with two points: three glyphs for all three
+        assert_eq!(
+            glyph_ranges("\u{5e9}\u{5b8}\u{5c1}"),
+            [(0, 6), (0, 6), (0, 6)]
+        );
+        // a conjunct no font has: its missing glyphs stand for all of it
+        assert_eq!(
+            glyph_ranges("\u{915}\u{94d}\u{937}"),
+            [(0, 6), (0, 6), (6, 9)]
+        );
+        // and plain text as it was, a line break standing for no glyph
+        assert_eq!(glyph_ranges("ab"), [(0, 1), (1, 2)]);
+        assert_eq!(glyph_ranges("a;\nb")[..2], [(0, 1), (1, 2)]);
     }
 }

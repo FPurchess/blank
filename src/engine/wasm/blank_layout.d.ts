@@ -39,6 +39,21 @@ export class LayoutEngine {
     caret(pos: number, after: boolean): Float32Array;
     clearImages(): void;
     /**
+     * how many font files the engine has, each once, in the order they
+     * came: the ones it was made with, then the ones `addFont` added
+     */
+    fontFileCount(): number;
+    /**
+     * the family a font file was added for with `addFont`, or "" for the
+     * ones the engine was made with (and for none)
+     */
+    fontFileFamily(index: number): string;
+    /**
+     * a font file's bytes, e.g. to make the same engine in a worker; empty
+     * for none
+     */
+    fontFile(index: number): Uint8Array;
+    /**
      * a glyph's outline as an SVG path, in font units with y up
      */
     glyphPath(font: number, glyph: number): string;
@@ -47,7 +62,15 @@ export class LayoutEngine {
      */
     hit(page: number, x: number, y: number): Float64Array;
     /**
-     * the start or end of the line a position is on, -1 for none
+     * the start or end of the line the caret at `pos` is painted on (as
+     * `after` says): [pos, after], where `after` is 1 if the caret there is
+     * to be painted at the end of its line, e.g. after a word broken where
+     * it is wider than the line; [] for none
+     */
+    lineBoundary(pos: number, after: boolean, end: boolean): Float64Array;
+    /**
+     * the start or end of the line a position is on, -1 for none; see
+     * `lineBoundary`, which also tells how to paint the caret there
      */
     lineEdge(pos: number, end: boolean): number;
     /**
@@ -55,7 +78,8 @@ export class LayoutEngine {
      */
     missing(): string;
     /**
-     * the fonts' files one after the other, with their lengths
+     * the fonts' files one after the other, with their lengths; throws if
+     * the lengths reach past the bytes
      */
     constructor(bytes: Uint8Array, lengths: Uint32Array);
     /**
@@ -77,9 +101,17 @@ export class LayoutEngine {
      */
     page(page: number): string;
     /**
-     * the document as a PDF
+     * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
      */
-    pdf(title: string, author: string): Uint8Array;
+    pdfWarnings(): string;
+    /**
+     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+     * none if left out or empty). An image that can't be decoded shows its
+     * alt text, and a font that can't be embedded is left out: see
+     * `pdfWarnings`
+     */
+    pdf(title: string, author: string, language?: string | null): Uint8Array;
     /**
      * the selection's rectangles: page, x, y, width and height each
      */
@@ -88,9 +120,6 @@ export class LayoutEngine {
      * replaces all items; the pages that changed, as `update` gives them
      */
     setItems(json: string): Uint32Array;
-    /**
-     * sets the page; the pages that changed, as `update` gives them
-     */
     setSettings(json: string): Uint32Array;
     /**
      * how much the last change laid out: items, the page it paginated
@@ -120,7 +149,27 @@ export class LayoutEngine {
      * what each page shows changes with its version
      */
     versions(): Uint32Array;
+    /**
+     * the position a line up or down from the caret at `pos`, painted as
+     * `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+     * text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+     * where the caret at the new position is to be painted at the end of
+     * its line, 0 else
+     */
+    verticalAt(pos: number, after: boolean, down: boolean, goal: number): Float64Array;
+    /**
+     * the position a line up or down from `pos`, nearest to `goal`: [0,
+     * pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+     * which also tells how to paint the caret there
+     */
     vertical(pos: number, down: boolean, goal: number): Float64Array;
+    /**
+     * sets the page; the pages that changed, as `update` gives them
+     * an engine with the fonts of `other`, fallbacks added with `addFont`
+     * included, without copying their files, e.g. for an export; it has
+     * its own page, items and images
+     */
+    static withFontsOf(other: LayoutEngine): LayoutEngine;
     word(page: number, x: number, y: number): Uint32Array;
     /**
      * the words as laid out, for checking the PDF against the layout
@@ -142,17 +191,22 @@ export interface InitOutput {
     readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_clearImages: (a: number) => void;
+    readonly layoutengine_fontFile: (a: number, b: number) => [number, number];
+    readonly layoutengine_fontFileCount: (a: number) => number;
+    readonly layoutengine_fontFileFamily: (a: number, b: number) => [number, number];
     readonly layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineEdge: (a: number, b: number, c: number) => number;
     readonly layoutengine_missing: (a: number) => [number, number];
-    readonly layoutengine_new: (a: number, b: number, c: number, d: number) => number;
+    readonly layoutengine_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly layoutengine_page: (a: number, b: number) => [number, number];
     readonly layoutengine_pageBands: (a: number, b: number) => [number, number];
     readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
-    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+    readonly layoutengine_pdfWarnings: (a: number) => [number, number];
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];
@@ -163,6 +217,8 @@ export interface InitOutput {
     readonly layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_versions: (a: number) => [number, number];
     readonly layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly layoutengine_verticalAt: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly layoutengine_withFontsOf: (a: number) => number;
     readonly layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_words: (a: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;

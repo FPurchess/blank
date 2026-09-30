@@ -1,6 +1,12 @@
 /* @ts-self-types="./blank_layout.d.ts" */
 
 export class LayoutEngine {
+    static __wrap(ptr) {
+        const obj = Object.create(LayoutEngine.prototype);
+        obj.__wbg_ptr = ptr;
+        LayoutEngineFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -114,6 +120,45 @@ export class LayoutEngine {
         wasm.layoutengine_clearImages(this.__wbg_ptr);
     }
     /**
+     * how many font files the engine has, each once, in the order they
+     * came: the ones it was made with, then the ones `addFont` added
+     * @returns {number}
+     */
+    fontFileCount() {
+        const ret = wasm.layoutengine_fontFileCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * the family a font file was added for with `addFont`, or "" for the
+     * ones the engine was made with (and for none)
+     * @param {number} index
+     * @returns {string}
+     */
+    fontFileFamily(index) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_fontFileFamily(this.__wbg_ptr, index);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * a font file's bytes, e.g. to make the same engine in a worker; empty
+     * for none
+     * @param {number} index
+     * @returns {Uint8Array}
+     */
+    fontFile(index) {
+        const ret = wasm.layoutengine_fontFile(this.__wbg_ptr, index);
+        var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v1;
+    }
+    /**
      * a glyph's outline as an SVG path, in font units with y up
      * @param {number} font
      * @param {number} glyph
@@ -145,7 +190,24 @@ export class LayoutEngine {
         return v1;
     }
     /**
-     * the start or end of the line a position is on, -1 for none
+     * the start or end of the line the caret at `pos` is painted on (as
+     * `after` says): [pos, after], where `after` is 1 if the caret there is
+     * to be painted at the end of its line, e.g. after a word broken where
+     * it is wider than the line; [] for none
+     * @param {number} pos
+     * @param {boolean} after
+     * @param {boolean} end
+     * @returns {Float64Array}
+     */
+    lineBoundary(pos, after, end) {
+        const ret = wasm.layoutengine_lineBoundary(this.__wbg_ptr, pos, after, end);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * the start or end of the line a position is on, -1 for none; see
+     * `lineBoundary`, which also tells how to paint the caret there
      * @param {number} pos
      * @param {boolean} end
      * @returns {number}
@@ -171,7 +233,8 @@ export class LayoutEngine {
         }
     }
     /**
-     * the fonts' files one after the other, with their lengths
+     * the fonts' files one after the other, with their lengths; throws if
+     * the lengths reach past the bytes
      * @param {Uint8Array} bytes
      * @param {Uint32Array} lengths
      */
@@ -181,7 +244,10 @@ export class LayoutEngine {
         const ptr1 = passArray32ToWasm0(lengths, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.layoutengine_new(ptr0, len0, ptr1, len1);
-        this.__wbg_ptr = ret;
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        this.__wbg_ptr = ret[0];
         LayoutEngineFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
@@ -256,23 +322,46 @@ export class LayoutEngine {
         }
     }
     /**
-     * the document as a PDF
+     * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+     * @returns {string}
+     */
+    pdfWarnings() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_pdfWarnings(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+     * none if left out or empty). An image that can't be decoded shows its
+     * alt text, and a font that can't be embedded is left out: see
+     * `pdfWarnings`
      * @param {string} title
      * @param {string} author
+     * @param {string | null} [language]
      * @returns {Uint8Array}
      */
-    pdf(title, author) {
+    pdf(title, author, language) {
         const ptr0 = passStringToWasm0(title, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(author, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        var ptr2 = isLikeNone(language) ? 0 : passStringToWasm0(language, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len2 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }
-        var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v3;
+        return v4;
     }
     /**
      * the selection's rectangles: page, x, y, width and height each
@@ -303,7 +392,6 @@ export class LayoutEngine {
         return v2;
     }
     /**
-     * sets the page; the pages that changed, as `update` gives them
      * @param {string} json
      * @returns {Uint32Array}
      */
@@ -400,6 +488,27 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * the position a line up or down from the caret at `pos`, painted as
+     * `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+     * text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+     * where the caret at the new position is to be painted at the end of
+     * its line, 0 else
+     * @param {number} pos
+     * @param {boolean} after
+     * @param {boolean} down
+     * @param {number} goal
+     * @returns {Float64Array}
+     */
+    verticalAt(pos, after, down, goal) {
+        const ret = wasm.layoutengine_verticalAt(this.__wbg_ptr, pos, after, down, goal);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * the position a line up or down from `pos`, nearest to `goal`: [0,
+     * pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+     * which also tells how to paint the caret there
      * @param {number} pos
      * @param {boolean} down
      * @param {number} goal
@@ -410,6 +519,19 @@ export class LayoutEngine {
         var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
         return v1;
+    }
+    /**
+     * sets the page; the pages that changed, as `update` gives them
+     * an engine with the fonts of `other`, fallbacks added with `addFont`
+     * included, without copying their files, e.g. for an export; it has
+     * its own page, items and images
+     * @param {LayoutEngine} other
+     * @returns {LayoutEngine}
+     */
+    static withFontsOf(other) {
+        _assertClass(other, LayoutEngine);
+        const ret = wasm.layoutengine_withFontsOf(other.__wbg_ptr);
+        return LayoutEngine.__wrap(ret);
     }
     /**
      * @param {number} page
@@ -451,6 +573,9 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
+        __wbg_error_035268df37369d3d: function(arg0, arg1) {
+            console.error(getStringFromWasm0(arg0, arg1));
+        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -470,6 +595,12 @@ function __wbg_get_imports() {
 const LayoutEngineFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_layoutengine_free(ptr, 1));
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
 
 function getArrayF32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
@@ -538,6 +669,10 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
 }
 
 function passArray32ToWasm0(arg, malloc) {

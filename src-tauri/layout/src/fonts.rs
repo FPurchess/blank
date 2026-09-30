@@ -23,9 +23,16 @@ pub fn ink_link(ink: Ink) -> Option<usize> {
 }
 
 /// a face of a font file: a collection (.ttc) has several
+#[derive(Clone)]
 pub struct FontFile {
+    /// the file, shared by its faces and by every engine that shares the
+    /// fonts, see `Fonts::share`
     pub data: Arc<Vec<u8>>,
-    pub blob: u64,
+    /// the file as Parley knows it; its clones keep its id
+    pub blob: Blob<u8>,
+    /// the family it was added as a fallback for, see `Fonts::add`; empty
+    /// for the fonts the engine was made with
+    pub family: String,
     /// which face of the file it is
     pub index: u32,
     pub upem: f32,
@@ -44,21 +51,20 @@ pub struct Fonts {
 }
 
 /// reads the faces of a font file: their units per em and underlines
-fn faces_of(fcx: &mut FontContext, bytes: Vec<u8>) -> Vec<FontFile> {
+fn faces_of(fcx: &mut FontContext, bytes: Vec<u8>, family: &str) -> Vec<FontFile> {
     let data = Arc::new(bytes);
     let blob = Blob::new(data.clone());
-    let id = blob.id();
-    fcx.collection.register_fonts(blob, None);
+    fcx.collection.register_fonts(blob.clone(), None);
     let count = match skrifa::raw::FileRef::new(&data) {
         Ok(skrifa::raw::FileRef::Collection(collection)) => collection.len(),
         _ => 1,
     };
     (0..count)
-        .map(|index| face_of(data.clone(), id, index))
+        .map(|index| face_of(data.clone(), blob.clone(), family, index))
         .collect()
 }
 
-fn face_of(data: Arc<Vec<u8>>, blob: u64, index: u32) -> FontFile {
+fn face_of(data: Arc<Vec<u8>>, blob: Blob<u8>, family: &str, index: u32) -> FontFile {
     let (upem, underline) = match FontRef::from_index(&data, index) {
         Ok(font) => {
             let upem = font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
@@ -74,10 +80,32 @@ fn face_of(data: Arc<Vec<u8>>, blob: u64, index: u32) -> FontFile {
     FontFile {
         data,
         blob,
+        family: family.to_string(),
         index,
         upem,
         underline,
     }
+}
+
+/// the font files laid one after the other in `bytes`, by their lengths;
+/// an error if the lengths reach past the bytes
+pub fn split_files(bytes: &[u8], lengths: &[u32]) -> Result<Vec<Vec<u8>>, String> {
+    let mut files = vec![];
+    let mut start = 0usize;
+    for length in lengths {
+        let end = start
+            .checked_add(*length as usize)
+            .filter(|end| *end <= bytes.len())
+            .ok_or_else(|| {
+                format!(
+                    "the font lengths add up to more than the {} bytes given",
+                    bytes.len()
+                )
+            })?;
+        files.push(bytes[start..end].to_vec());
+        start = end;
+    }
+    Ok(files)
 }
 
 impl Fonts {
@@ -91,7 +119,7 @@ impl Fonts {
         };
         let files = files
             .into_iter()
-            .flat_map(|bytes| faces_of(&mut fcx, bytes))
+            .flat_map(|bytes| faces_of(&mut fcx, bytes, ""))
             .collect();
         Fonts {
             files,
@@ -105,7 +133,7 @@ impl Fonts {
     /// adds a font for what the others lack, e.g. a system font for Chinese
     /// or an emoji font, as the last fallback of text and code
     pub fn add(&mut self, bytes: Vec<u8>, family: &str) {
-        let faces = faces_of(&mut self.fcx, bytes);
+        let faces = faces_of(&mut self.fcx, bytes, family);
         self.files.extend(faces);
         let family = family.replace(',', " ");
         if !self.stack.split(", ").any(|known| known == family) {
@@ -119,8 +147,52 @@ impl Fonts {
         let id = font.data.id();
         self.files
             .iter()
-            .position(|file| file.blob == id && file.index == font.index)
+            .position(|file| file.blob.id() == id && file.index == font.index)
             .unwrap_or(0)
+    }
+
+    /// the same fonts for another engine, without a copy of their files:
+    /// the files are shared, only what lays text out is its own
+    pub fn share(&self) -> Fonts {
+        let mut fcx = FontContext {
+            collection: Collection::new(CollectionOptions {
+                shared: false,
+                system_fonts: false,
+            }),
+            source_cache: SourceCache::default(),
+        };
+        for (index, file) in self.files.iter().enumerate() {
+            // a collection's faces are one file
+            let first = self.files[..index]
+                .iter()
+                .all(|other| other.blob.id() != file.blob.id());
+            if first {
+                fcx.collection.register_fonts(file.blob.clone(), None);
+            }
+        }
+        Fonts {
+            files: self.files.clone(),
+            fcx,
+            lcx: LayoutContext::new(),
+            stack: self.stack.clone(),
+            mono_stack: self.mono_stack.clone(),
+        }
+    }
+
+    /// the font files, each once, with the family each fallback was added
+    /// for (empty for the fonts the engine was made with), in the order
+    /// they came: what makes the same fonts in another instance
+    pub fn sources(&self) -> Vec<(&Arc<Vec<u8>>, &str)> {
+        let mut sources: Vec<(&Arc<Vec<u8>>, &str)> = vec![];
+        for file in &self.files {
+            if !sources
+                .iter()
+                .any(|(data, _)| Arc::ptr_eq(data, &file.data))
+            {
+                sources.push((&file.data, &file.family));
+            }
+        }
+        sources
     }
 
     /// the outline of a glyph as an SVG path, in font units with y up
@@ -192,3 +264,22 @@ pub const FONT_FILES: [&str; 14] = [
     "IBMPlexMono-Bold.ttf",
     "IBMPlexMono-BoldItalic.ttf",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn splits_font_files_by_their_lengths() {
+        let bytes = [1, 2, 3, 4, 5];
+        assert_eq!(
+            split_files(&bytes, &[2, 3]).unwrap(),
+            vec![vec![1, 2], vec![3, 4, 5]]
+        );
+        assert_eq!(split_files(&bytes, &[]).unwrap(), Vec::<Vec<u8>>::new());
+        // lengths past the end, or adding up past what a usize holds
+        assert!(split_files(&bytes, &[2, 4]).is_err());
+        assert!(split_files(&bytes, &[u32::MAX, u32::MAX]).is_err());
+        assert!(split_files(&[], &[1]).is_err());
+    }
+}

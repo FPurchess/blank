@@ -13,7 +13,7 @@ use crate::style::{MARKER_GAP, RULE};
 use crate::text::TextBox;
 
 use table::table_units;
-pub use table::TableSpec;
+pub use table::{TableSpec, MAX_COLUMNS};
 
 /// what the colours of the screen and the PDF stand for
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +43,9 @@ pub enum Deco {
     },
     Image {
         src: String,
+        /// what stands in its place where it can't be shown, e.g. in a PDF
+        /// it couldn't be decoded for
+        alt: String,
         x: f32,
         y: f32,
         w: f32,
@@ -60,8 +63,16 @@ impl Deco {
                 h: *h,
                 role: *role,
             },
-            Deco::Image { src, x, y, w, h } => Deco::Image {
+            Deco::Image {
+                src,
+                alt,
+                x,
+                y,
+                w,
+                h,
+            } => Deco::Image {
                 src: src.clone(),
+                alt: alt.clone(),
                 x: x + dx,
                 y: y + dy,
                 w: *w,
@@ -95,6 +106,9 @@ pub struct Unit {
     pub keep_next: bool,
     /// drawn with the unit, in the item's coordinates
     pub decos: Vec<Deco>,
+    /// the text drawn with the unit that isn't text of the document, e.g.
+    /// the list markers and alt texts in a table's cells: in `Laid::extras`
+    pub extras: Range<usize>,
 }
 
 impl Unit {
@@ -122,6 +136,42 @@ pub struct Laid {
     /// for a table: where each column starts and where the last one ends,
     /// in the item's coordinates
     pub columns: Vec<f32>,
+    /// for a table: the list markers and alt texts in its cells, with what
+    /// they are painted as, see `Unit::extras`
+    pub extras: Vec<(TextBox, Role)>,
+    /// for a table: the images in its cells
+    pub cell_images: Vec<CellImage>,
+    /// for a table: its cells, in the order of its rows
+    pub cells: Vec<TableCell>,
+}
+
+/// a cell of a table as laid out: where it is in the grid, and what of the
+/// table's is in it
+#[derive(Clone, Debug, PartialEq)]
+pub struct TableCell {
+    pub row: usize,
+    pub col: usize,
+    /// a header cell, or a cell of a header row
+    pub header: bool,
+    /// its text boxes, in `Laid::texts`
+    pub texts: Range<usize>,
+    /// its list markers and alt texts, in `Laid::extras`
+    pub extras: Range<usize>,
+    /// its images, in `Laid::cell_images`
+    pub images: Vec<usize>,
+}
+
+/// an image in a table's cell: its position, the unit it is drawn with,
+/// and where, in the item's coordinates
+#[derive(Clone, Debug, PartialEq)]
+pub struct CellImage {
+    pub pos: u32,
+    pub alt: String,
+    pub unit: usize,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 impl Laid {
@@ -158,6 +208,7 @@ impl Laid {
                         h,
                         vec![Deco::Image {
                             src: src.clone(),
+                            alt: alt.clone(),
                             x: item.indent,
                             y: 0.0,
                             w,
@@ -211,11 +262,13 @@ impl Laid {
             let marker_width = boxed.layout.width();
             boxed.x = item.indent - MARKER_GAP - marker_width;
             // on the baseline of the first line
-            let baseline = match (&item.content, first.line) {
-                (Content::Text(_), Some(_)) => laid.texts[0].lines()[0].baseline,
-                _ => boxed.lines()[0].baseline,
+            let first_baseline =
+                |boxed: &TextBox| boxed.lines().first().map_or(0.0, |line| line.baseline);
+            let baseline = match (&item.content, first.line, laid.texts.first()) {
+                (Content::Text(_), Some(_), Some(text)) => first_baseline(text),
+                _ => first_baseline(&boxed),
             };
-            boxed.y = baseline - boxed.lines()[0].baseline;
+            boxed.y = baseline - first_baseline(&boxed);
             laid.marker = Some(boxed);
         }
         laid
@@ -232,6 +285,9 @@ impl Laid {
             marker: None,
             label: None,
             columns: vec![],
+            extras: vec![],
+            cell_images: vec![],
+            cells: vec![],
         }
     }
 
@@ -276,5 +332,8 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         marker: None,
         label: None,
         columns: vec![],
+        extras: vec![],
+        cell_images: vec![],
+        cells: vec![],
     }
 }

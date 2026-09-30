@@ -1,6 +1,8 @@
 //! The engine: keeps the laid out items of a document, paginates them, and
 //! answers where positions are and what a page shows.
 
+#[cfg(test)]
+mod boundary_tests;
 mod display;
 #[cfg(test)]
 mod incremental_tests;
@@ -11,7 +13,7 @@ mod select;
 pub(crate) mod test_support;
 mod text_layer;
 
-pub use display::Op;
+pub use display::{Op, Part};
 pub use navigate::Hit;
 pub use select::{GridRow, TableGrid};
 pub use text_layer::Word;
@@ -114,7 +116,8 @@ impl Engine {
     }
 
     /// sets the page and lays out everything again, if it changed
-    pub fn set_settings(&mut self, settings: Settings) -> Changes {
+    pub fn set_settings(&mut self, mut settings: Settings) -> Changes {
+        settings.sanitize();
         if settings == self.settings {
             return Changes::default();
         }
@@ -153,7 +156,14 @@ impl Engine {
     pub fn missing(&self) -> Vec<char> {
         let mut missing: Vec<char> = vec![];
         for laid in &self.laid {
-            for boxed in laid.texts.iter().chain(&laid.label).chain(&laid.marker) {
+            let extras = laid.extras.iter().map(|(boxed, _)| boxed);
+            for boxed in laid
+                .texts
+                .iter()
+                .chain(&laid.label)
+                .chain(&laid.marker)
+                .chain(extras)
+            {
                 for char in &boxed.missing {
                     if !missing.contains(char) {
                         missing.push(*char);
@@ -165,7 +175,8 @@ impl Engine {
     }
 
     /// replaces all items
-    pub fn set_items(&mut self, items: Vec<Item>) -> Changes {
+    pub fn set_items(&mut self, mut items: Vec<Item>) -> Changes {
+        items.iter_mut().for_each(Item::sanitize);
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
         self.stats = Stats {
@@ -200,11 +211,13 @@ impl Engine {
         }
         // the items as runs of (length, index before the updates), with
         // None for new ones
-        let mut runs: Vec<(usize, Option<usize>)> = vec![(self.items.len(), Some(0))];
+        let old_count = self.items.len();
+        let mut runs: Vec<(usize, Option<usize>)> = vec![(old_count, Some(0))];
         let mut restart_page = None;
         let mut previous_end = 0;
         let mut laid_out = 0;
-        for (start, delete, inserted, shift) in changes {
+        for (start, delete, mut inserted, shift) in changes {
+            inserted.iter_mut().for_each(Item::sanitize);
             let start = start.min(self.items.len());
             let delete = delete.min(self.items.len() - start);
             let count = inserted.len();
@@ -225,6 +238,9 @@ impl Engine {
                     for text in &mut laid.texts {
                         text.pos = (text.pos as i64 + shift).max(0) as u32;
                     }
+                    for image in &mut laid.cell_images {
+                        image.pos = (image.pos as i64 + shift).max(0) as u32;
+                    }
                 }
             }
             splice_runs(&mut runs, start, delete, count);
@@ -242,11 +258,11 @@ impl Engine {
             }
             at += length;
         }
-        // the items after the last change are the old ones, moved: once a
-        // page starts with one of them as an old page did, the rest is as
-        // before
+        // the items after the last change are the old ones, moved, up to
+        // the old last one: once a page starts with one of them as an old
+        // page did, the rest is as before
         let tail = match runs.last() {
-            Some(&(length, Some(old))) if length > 0 => Some(Tail {
+            Some(&(length, Some(old))) if length > 0 && old + length == old_count => Some(Tail {
                 start: at - length,
                 delta: (at - length) as i64 - old as i64,
             }),
@@ -328,7 +344,7 @@ fn splice_runs(runs: &mut Vec<(usize, Option<usize>)>, start: usize, delete: usi
 #[cfg(test)]
 mod tests {
     use super::test_support::*;
-    use super::Op;
+    use super::{Engine, Op};
 
     #[test]
     fn tells_what_no_font_has_and_takes_fonts_for_it() {
@@ -369,5 +385,52 @@ mod tests {
         )
         .unwrap();
         assert!(pdf.len() > 1000);
+    }
+
+    #[test]
+    fn engines_share_their_fonts() {
+        let mut page = engine(document(&[LONG; 12]));
+        let dejavu = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/dejavu-sans-bold.ttf"
+        ))
+        .unwrap();
+        page.add_font(dejavu, "Fallback");
+        let mut export = Engine::new(page.fonts.share());
+        // the same files, not copies of them
+        assert_eq!(export.fonts.files.len(), page.fonts.files.len());
+        for (a, b) in export.fonts.files.iter().zip(&page.fonts.files) {
+            assert!(std::sync::Arc::ptr_eq(&a.data, &b.data));
+            assert_eq!(a.blob.id(), b.blob.id());
+        }
+        assert_eq!(export.fonts.stack, page.fonts.stack);
+        // what makes the same fonts elsewhere: each file once, with the
+        // family of the fallback
+        let sources = page.fonts.sources();
+        assert_eq!(sources.len(), crate::fonts::FONT_FILES.len() + 1);
+        assert!(sources[..crate::fonts::FONT_FILES.len()]
+            .iter()
+            .all(|(_, family)| family.is_empty()));
+        assert_eq!(sources.last().unwrap().1, "Fallback");
+        // and the PDF of an engine that shares the fonts is the PDF of one
+        // with its own
+        let mut fresh = Engine::new(crate::fonts::repository_fonts());
+        let dejavu = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/dejavu-sans-bold.ttf"
+        ))
+        .unwrap();
+        fresh.add_font(dejavu, "Fallback");
+        let items = page.items.clone();
+        export.set_items(items.clone());
+        fresh.set_items(items);
+        let info = crate::pdf::Info {
+            title: "Shared".into(),
+            author: String::new(),
+        };
+        let shared = crate::pdf::write(&mut export, &Default::default(), &info).unwrap();
+        let own = crate::pdf::write(&mut fresh, &Default::default(), &info).unwrap();
+        assert!(shared == own, "the PDFs differ");
+        assert_eq!(export.frags, page.frags);
     }
 }

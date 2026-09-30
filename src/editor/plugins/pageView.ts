@@ -7,6 +7,7 @@ import {
   TextSelection,
   type Transaction,
 } from "prosemirror-state";
+import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 import { computed, watch } from "vue";
 
@@ -14,19 +15,31 @@ import {
   pageEngine,
   pageEngineReady,
   type Hit,
+  type Move,
   type PageEngine,
 } from "../../engine/engine";
-import { caretBox, hitAt, viewBox } from "../../engine/geometry";
-import { imageSizes, imagesLoaded } from "../../engine/images";
+import {
+  caretBox,
+  hitAt,
+  pageBoxInWindow,
+  viewBox,
+} from "../../engine/geometry";
+import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
 import { summarize } from "./properties";
+import { displaySrc } from "./images";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { tableGrid } from "../../exporters/table";
 import type { FrozenWidths } from "../../engine/flatten";
-import { TableMap } from "prosemirror-tables";
+import {
+  CellSelection,
+  cellAround,
+  inSameTable,
+  TableMap,
+} from "prosemirror-tables";
 import { pageGeometry } from "../../layout/resolve";
 import {
   frontmatter,
@@ -40,6 +53,7 @@ import {
   pageScrollRequest,
   pageSelection,
   path,
+  transaction,
 } from "../../state";
 
 // The page view's side of the editor: keeps the layout engine in step with
@@ -56,7 +70,18 @@ export interface PageViewState {
   by: "pointer" | "vertical" | "page" | null;
   // for "page": how far below the top of the view the head stays, in px
   at?: number;
+  // the caret at the head is painted at the end of its line, where the next
+  // line starts at the same position; set by ↑↓, Home and End, and false
+  // after any other change of the selection
+  after?: boolean;
 }
+
+/**
+ * headAfter tells whether the caret at the head of `state`'s selection is
+ * painted at the end of its line, see PageViewState
+ */
+export const headAfter = (state: EditorState) =>
+  pageViewKey.getState(state)?.after ?? false;
 
 export const pageViewKey = new PluginKey<PageViewState>("pageView");
 
@@ -71,8 +96,20 @@ export const selectionAt = (
 ): Selection => {
   const { doc } = state;
   const pos = Math.max(0, Math.min(hit.pos, doc.content.size));
-  if (anchor !== undefined)
+  if (anchor !== undefined) {
+    // from one cell of a table into another selects whole cells, as a drag
+    // or Shift + arrow keys did in the editor before the page view
+    const $anchorCell = cellAround(doc.resolve(anchor));
+    const $headCell = cellAround(doc.resolve(pos));
+    if (
+      $anchorCell &&
+      $headCell &&
+      $anchorCell.pos !== $headCell.pos &&
+      inSameTable($anchorCell, $headCell)
+    )
+      return CellSelection.create(doc, $anchorCell.pos, $headCell.pos);
     return TextSelection.between(doc.resolve(anchor), doc.resolve(pos));
+  }
   if (hit.node) {
     const node = doc.nodeAt(pos);
     if (node && NodeSelection.isSelectable(node))
@@ -96,9 +133,13 @@ const publishLayout = (engine: PageEngine) => {
     height,
     margins,
     pages: engine.pages(),
-    versions: engine.raw.versions(),
-    bottoms: engine.raw.bottoms(),
+    versions: engine.versions(),
+    bodyVersions: engine.bodyVersions(),
+    bandVersions: engine.bandVersions(),
+    bottoms: engine.bottoms(),
     properties: hasProperties.value,
+    // the header's left, center and right slots of the first page
+    header: engine.bands(0).slice(0, 3).some(Boolean),
   };
 };
 
@@ -113,11 +154,12 @@ const publishSelection = (
   at?: number,
 ) => {
   const { selection } = state;
-  const shown = shownSelection(engine, selection);
+  const after = headAfter(state);
+  const shown = shownSelection(engine, selection, after);
   pageCaret.value = shown.caret;
   pageSelection.value = shown.rects;
   pageNodeSelection.value = shown.nodes;
-  const head = shown.caret ?? engine.caret(selection.head);
+  const head = shown.caret ?? engine.caret(selection.head, after);
   if (scroll && head)
     pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
 };
@@ -154,15 +196,15 @@ export const frozenWidths = (
 };
 
 /**
- * sync hands the engine the document and the page
- * @param force flattens the document again, e.g. once an image is loaded
+ * sync hands the engine what changed in the document, and the page
+ * @param blocks top-level blocks to flatten again, e.g. once their image
+ *   loaded
  */
 const sync = (
   engine: PageEngine,
   state: EditorState,
   frozen: FrozenWidths | null,
-  force = false,
-  progressive = false,
+  { progressive = false, blocks = [] as readonly number[] } = {},
 ) => {
   const { layout } = pageLayout.value;
   const changed = engine.setSettings(layout, pageFields.value);
@@ -171,19 +213,102 @@ const sync = (
     width: contentWidth,
     height: contentHeight,
   });
-  const laidOut = engine.sync(
-    state.doc,
-    sizes,
-    force || changed,
+  const tracked = pageSyncKey.getState(state);
+  const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
-  );
+    blocks,
+    changes: tracked?.from
+      ? { from: tracked.from, ranges: tracked.ranges }
+      : null,
+    // the room images are fitted into, and the folder relative ones are in
+    sizesKey: `${contentWidth}x${contentHeight}:${path.value ?? ""}`,
+  });
+  // an engine that failed has given up, and shows nothing
+  if (engine.broken) return;
   if (laidOut || changed || !pageLayoutState.value) {
     publishLayout(engine);
     // fonts for what Blank's fonts lack, which lay out again once found
     const missing = engine.missing();
     if (missing) void findFonts(missing, language.value);
   }
+};
+
+/**
+ * imageBlocks returns the top-level blocks of `doc` with an image from one
+ * of `urls`
+ */
+const imageBlocks = (doc: Node, urls: ReadonlySet<string>) => {
+  const blocks: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    let found = false;
+    block.descendants((node) => {
+      if (found) return false;
+      if (node.type.name === "image") {
+        const url = displaySrc(node.attrs.src as string, path.value);
+        found = url !== null && urls.has(url);
+      }
+      return !found;
+    });
+    if (found) blocks.push(index);
+  });
+  return blocks;
+};
+
+// what changed in the document since the engine laid it out: the ranges of
+// the current document, counted from `from`, the document the engine has
+export interface TrackedChanges {
+  from: Node | null;
+  ranges: [number, number][];
+}
+
+export const pageSyncKey = new PluginKey<TrackedChanges>("pageSync");
+
+// more changed ranges than this are merged into one
+const MAX_RANGES = 32;
+
+/**
+ * trackChanges adds what a transaction changed to what changed since the
+ * engine laid out the document, which starts again from the document the
+ * engine has
+ */
+export const trackChanges = (
+  tr: Transaction,
+  value: TrackedChanges,
+  before: EditorState,
+  synced: Node | null,
+): TrackedChanges => {
+  const base = before.doc === synced ? { from: before.doc, ranges: [] } : value;
+  if (!tr.docChanged) return base;
+  const ranges: [number, number][] = base.ranges.map(([from, to]) => [
+    tr.mapping.map(from, -1),
+    tr.mapping.map(to, 1),
+  ]);
+  tr.mapping.maps.forEach((map, index) => {
+    const rest = tr.mapping.slice(index + 1);
+    map.forEach((_oldStart, _oldEnd, start, end) => {
+      ranges.push([rest.map(start, -1), rest.map(end, 1)]);
+    });
+  });
+  return { from: base.from, ranges: merged(ranges) };
+};
+
+// the ranges in order, with those that touch joined
+const merged = (ranges: [number, number][]): [number, number][] => {
+  const sorted = ranges
+    .map(([from, to]): [number, number] => [
+      Math.min(from, to),
+      Math.max(from, to),
+    ])
+    .sort((a, b) => a[0] - b[0]);
+  const joined: [number, number][] = [];
+  for (const range of sorted) {
+    const last = joined[joined.length - 1];
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else joined.push(range);
+  }
+  if (joined.length <= MAX_RANGES) return joined;
+  return [[joined[0][0], Math.max(...joined.map(([, to]) => to))]];
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
@@ -198,9 +323,13 @@ const PAGE_STEP = 0.85;
 export const pageSync = () => {
   // where the text being composed starts, while an input method composes
   let composing: number | null = null;
-  // the widths kept of the table the cursor is in
-  let frozen: FrozenWidths | null = null;
-  return new Plugin({
+  return new Plugin<TrackedChanges>({
+    key: pageSyncKey,
+    state: {
+      init: () => ({ from: null, ranges: [] }),
+      apply: (tr, value, before) =>
+        trackChanges(tr, value, before, pageEngine?.syncedDoc ?? null),
+    },
     props: {
       handleDOMEvents: {
         compositionstart: (view) => {
@@ -215,8 +344,26 @@ export const pageSync = () => {
       },
     },
     view(view) {
+      // the widths kept of the table the cursor is in, for this view's
+      // document only: a new document gets a new view
+      let frozen: FrozenWidths | null = null;
       let engine: PageEngine | null = null;
-      const stops: (() => void)[] = [];
+      let stops: (() => void)[] = [];
+      // the engine gave up (see PageEngine.call): the editor shows the text
+      const teardown = () => {
+        stops.forEach((stop) => stop());
+        stops = [];
+        if (engine) {
+          engine.onProgress = null;
+          engine.finish();
+        }
+        engine = null;
+        pageLayoutState.value = null;
+        pageCaret.value = null;
+        pageSelection.value = [];
+        pageNodeSelection.value = [];
+        pageComposition.value = [];
+      };
       const start = (ready: PageEngine) => {
         engine = ready;
         // a long document lays out its first pages first, and the rest a
@@ -225,7 +372,9 @@ export const pageSync = () => {
           publishLayout(ready);
           publishSelection(ready, view.state, false);
         };
-        sync(ready, view.state, frozen, false, true);
+        sync(ready, view.state, frozen, { progressive: true });
+        // an engine that fails on the document gives up before it watches
+        if (engine !== ready) return;
         bootMark("layout");
         publishSelection(ready, view.state, false);
         stops.push(
@@ -233,53 +382,69 @@ export const pageSync = () => {
           watch(
             fallbackFonts,
             (fonts) => {
-              if (!ready.addFonts(fonts)) return;
-              timed("layout", () => sync(ready, view.state, frozen, true));
+              // the engine lays out again with them itself
+              if (!timed("layout", () => ready.addFonts(fonts))) return;
+              if (engine !== ready) return;
+              publishLayout(ready);
               publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           ),
-          // the page setup, the fields of headers and footers, loaded images
+          // the page setup, the fields of headers and footers, loaded
+          // images, and the document's folder, which relative images are in
           watch(
-            [pageLayout, pageFields, imagesLoaded],
-            () => {
-              timed("layout", () => sync(ready, view.state, frozen, true));
-              publishSelection(ready, view.state, false);
+            [pageLayout, pageFields, loadedImages, path],
+            ([, , loaded], [, , previousLoaded, previousPath]) => {
+              if (path.value !== previousPath) forgetFailures();
+              const fresh = new Set(
+                [...loaded].filter((url) => !previousLoaded?.has(url)),
+              );
+              // the page setup and the fields follow the transaction being
+              // dispatched, which the view doesn't have yet: its update lays
+              // out once, with them
+              const pending = transaction.value;
+              if (!fresh.size && pending && pending.doc !== view.state.doc)
+                return;
+              const blocks = fresh.size
+                ? imageBlocks(view.state.doc, fresh)
+                : [];
+              timed("layout", () =>
+                sync(ready, view.state, frozen, { blocks }),
+              );
+              if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           ),
         );
       };
-      // the engine loads while the editor boots
+      // the engine loads while the editor boots, and is gone once it failed
+      const watching = watch(
+        pageEngineReady,
+        (ready) => {
+          if (!ready) teardown();
+          else if (!engine) start(ready);
+        },
+        { flush: "sync" },
+      );
       if (pageEngine) start(pageEngine);
-      else {
-        const waiting = watch(
-          pageEngineReady,
-          (ready) => {
-            if (!ready || engine) return;
-            waiting();
-            start(ready);
-          },
-          { flush: "sync" },
-        );
-        stops.push(waiting);
-      }
       return {
         update(view, previous) {
-          if (!engine) return;
+          const current = engine;
+          if (!current) return;
           const docChanged = view.state.doc !== previous.doc;
           // a move into or out of a table freezes or relaxes its columns
           const moved = !view.state.selection.eq(previous.selection);
-          if (docChanged || moved)
+          if (docChanged || moved) {
             timed("layout", () => {
               frozen = frozenWidths(view.state, frozen);
-              sync(engine!, view.state, frozen);
+              sync(current, view.state, frozen);
             });
-          if (docChanged || moved) {
+            // the engine may have failed on the change and given up
+            if (engine !== current) return;
             const by = pageViewKey.getState(view.state);
             timed("caret", () =>
               publishSelection(
-                engine!,
+                current,
                 view.state,
                 by?.by !== "pointer",
                 by?.at,
@@ -287,20 +452,12 @@ export const pageSync = () => {
             );
           }
           if (composing !== null) {
-            publishComposition(engine, view.state, composing);
+            publishComposition(current, view.state, composing);
           }
         },
         destroy() {
-          stops.forEach((stop) => stop());
-          if (engine) {
-            engine.onProgress = null;
-            engine.finish();
-          }
-          pageLayoutState.value = null;
-          pageCaret.value = null;
-          pageSelection.value = [];
-          pageNodeSelection.value = [];
-          pageComposition.value = [];
+          watching();
+          teardown();
         },
       };
     },
@@ -316,11 +473,12 @@ export const pageView = () => {
     selection: Selection,
     by: PageViewState["by"],
     at?: number,
+    after = false,
   ) => {
     view.dispatch(
       view.state.tr
         .setSelection(selection)
-        .setMeta(pageViewKey, { by, at } satisfies PageViewState)
+        .setMeta(pageViewKey, { by, at, after } satisfies PageViewState)
         .scrollIntoView(),
     );
   };
@@ -329,18 +487,28 @@ export const pageView = () => {
    * page moves the head a view's height up or down, and scrolls as far, so
    * it stays where it is in the view
    */
-  const page = (view: EditorView, down: boolean, extend: boolean) => {
+  const page = (
+    view: EditorView,
+    engine: PageEngine,
+    down: boolean,
+    extend: boolean,
+  ) => {
     const { selection, doc } = view.state;
-    const caret = caretBox(selection.head);
+    const after = headAfter(view.state);
+    const onPage = engine.caret(selection.head, after);
+    const caret = caretBox(selection.head, after);
     const box = viewBox();
-    if (!caret || !box) return false;
+    if (!onPage || !caret || !box) return false;
+    // the column is kept in points, as ↑ and ↓ keep it
+    const current = goal ?? onPage.x;
+    const column =
+      pageBoxInWindow({ ...onPage, x: current, width: 0 })?.left ?? caret.left;
     const step = Math.max(40, (box.bottom - box.top) * PAGE_STEP);
     const middle = (caret.top + caret.bottom) / 2;
-    const hit = hitAt(goal ?? caret.left, middle + (down ? step : -step));
+    const hit = hitAt(column, middle + (down ? step : -step));
     const edge = down ? Selection.atEnd(doc).to : 0;
     const target =
       hit && hit.pos !== selection.head ? hit : { node: false, pos: edge };
-    const current = goal ?? caret.left;
     move(
       view,
       selectionAt(view.state, target, extend ? selection.anchor : undefined),
@@ -355,10 +523,13 @@ export const pageView = () => {
     key: pageViewKey,
     state: {
       init: () => ({ by: null }),
-      apply: (tr: Transaction) =>
-        (tr.getMeta(pageViewKey) as PageViewState | undefined) ?? {
-          by: null,
-        },
+      apply: (tr: Transaction, value) => {
+        const meta = tr.getMeta(pageViewKey) as PageViewState | undefined;
+        if (meta) return meta;
+        // a transaction that moves nothing keeps how the caret is painted
+        if (!tr.selectionSet && !tr.docChanged) return value;
+        return { by: null };
+      },
     },
     view: () => ({
       update(view, previous) {
@@ -379,18 +550,22 @@ export const pageView = () => {
           return false;
         const { selection } = view.state;
         const down = VERTICAL[event.key];
+        // prosemirror-tables' tableEditing grows a cell selection by cells
+        if (down !== undefined && selection instanceof CellSelection)
+          return false;
+        const after = headAfter(view.state);
         if (down !== undefined) {
-          const caret = engine.caret(selection.head);
+          const caret = engine.caret(selection.head, after);
           if (!caret) return false;
           goal ??= caret.x;
-          const hit = engine.vertical(selection.head, down, goal);
           const target =
-            hit ??
+            engine.verticalAt(selection.head, after, down, goal) ??
             // from the first or last line to the start or end
             ({
               node: false,
               pos: down ? Selection.atEnd(view.state.doc).to : 0,
-            } satisfies Hit);
+              after: false,
+            } satisfies Move);
           const current = goal;
           move(
             view,
@@ -400,31 +575,40 @@ export const pageView = () => {
               event.shiftKey ? selection.anchor : undefined,
             ),
             "vertical",
+            undefined,
+            target.after,
           );
           goal = current;
           return true;
         }
         if (event.key === "PageUp" || event.key === "PageDown") {
-          return page(view, event.key === "PageDown", event.shiftKey);
+          return page(view, engine, event.key === "PageDown", event.shiftKey);
         }
         if (event.key === "Home" || event.key === "End") {
-          const edge = engine.lineEdge(selection.head, event.key === "End");
+          const edge = engine.lineBoundary(
+            selection.head,
+            after,
+            event.key === "End",
+          );
           if (edge === null) return false;
           move(
             view,
             selectionAt(
               view.state,
-              { node: false, pos: edge },
+              { node: false, pos: edge.pos },
               event.shiftKey ? selection.anchor : undefined,
             ),
             null,
+            undefined,
+            edge.after,
           );
           return true;
         }
         return false;
       },
-      // the page view scrolls to the caret it paints
-      handleScrollToSelection: () => true,
+      // the page view scrolls to the caret it paints; without the engine,
+      // the editor scrolls to its own
+      handleScrollToSelection: () => pageEngine !== null,
     },
   });
 };

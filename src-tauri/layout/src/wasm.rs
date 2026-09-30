@@ -7,14 +7,33 @@ use std::fmt::Write;
 use wasm_bindgen::prelude::*;
 
 use crate::engine::{Changes, Engine, Hit, Op};
-use crate::fonts::Fonts;
+use crate::fonts::{split_files, Fonts};
 use crate::model::{Item, Settings};
-use crate::pdf::{self, ImageData, Info};
+use crate::pdf::{self, ImageData, Info, Warning};
 
 #[wasm_bindgen]
 pub struct LayoutEngine {
     engine: Engine,
     images: HashMap<String, ImageData>,
+    /// what went wrong in the last PDF, see `pdfWarnings`
+    warnings: Vec<Warning>,
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// writes a panic to the console before the instance traps: with `panic =
+/// "abort"` it would trap without a word, and every later call would throw
+fn report_panics() {
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            console_error(&format!("the layout engine panicked: {info}"));
+        }));
+    });
 }
 
 fn error(message: impl std::fmt::Display) -> JsError {
@@ -64,7 +83,9 @@ fn display(ops: Vec<Op>) -> String {
                 }
                 let _ = write!(rects, "{}]", role as u8);
             }
-            Op::Image { src, x, y, w, h } => {
+            Op::Image {
+                src, x, y, w, h, ..
+            } => {
                 separate(&mut images);
                 images.push('[');
                 string(&mut images, &src);
@@ -114,23 +135,64 @@ fn string(out: &mut String, value: &str) {
 
 #[wasm_bindgen]
 impl LayoutEngine {
-    /// the fonts' files one after the other, with their lengths
+    /// the fonts' files one after the other, with their lengths; throws if
+    /// the lengths reach past the bytes
     #[wasm_bindgen(constructor)]
-    pub fn new(bytes: &[u8], lengths: &[u32]) -> LayoutEngine {
-        let mut files = vec![];
-        let mut start = 0usize;
-        for length in lengths {
-            let end = start + *length as usize;
-            files.push(bytes[start..end].to_vec());
-            start = end;
-        }
-        LayoutEngine {
+    pub fn new(bytes: &[u8], lengths: &[u32]) -> Result<LayoutEngine, JsError> {
+        report_panics();
+        let files = split_files(bytes, lengths).map_err(error)?;
+        Ok(LayoutEngine {
             engine: Engine::new(Fonts::new(files)),
             images: HashMap::new(),
-        }
+            warnings: vec![],
+        })
     }
 
     /// sets the page; the pages that changed, as `update` gives them
+    /// an engine with the fonts of `other`, fallbacks added with `addFont`
+    /// included, without copying their files, e.g. for an export; it has
+    /// its own page, items and images
+    #[wasm_bindgen(js_name = withFontsOf)]
+    pub fn with_fonts_of(other: &LayoutEngine) -> LayoutEngine {
+        report_panics();
+        LayoutEngine {
+            engine: Engine::new(other.engine.fonts.share()),
+            images: HashMap::new(),
+            warnings: vec![],
+        }
+    }
+
+    /// how many font files the engine has, each once, in the order they
+    /// came: the ones it was made with, then the ones `addFont` added
+    #[wasm_bindgen(js_name = fontFileCount)]
+    pub fn font_file_count(&self) -> u32 {
+        self.engine.fonts.sources().len() as u32
+    }
+
+    /// a font file's bytes, e.g. to make the same engine in a worker; empty
+    /// for none
+    #[wasm_bindgen(js_name = fontFile)]
+    pub fn font_file(&self, index: u32) -> Vec<u8> {
+        self.engine
+            .fonts
+            .sources()
+            .get(index as usize)
+            .map(|(data, _)| data.as_ref().clone())
+            .unwrap_or_default()
+    }
+
+    /// the family a font file was added for with `addFont`, or "" for the
+    /// ones the engine was made with (and for none)
+    #[wasm_bindgen(js_name = fontFileFamily)]
+    pub fn font_file_family(&self, index: u32) -> String {
+        self.engine
+            .fonts
+            .sources()
+            .get(index as usize)
+            .map(|(_, family)| family.to_string())
+            .unwrap_or_default()
+    }
+
     #[wasm_bindgen(js_name = setSettings)]
     pub fn set_settings(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
         let settings: Settings = serde_json::from_str(json).map_err(error)?;
@@ -273,17 +335,53 @@ impl LayoutEngine {
         }
     }
 
+    /// the position a line up or down from `pos`, nearest to `goal`: [0,
+    /// pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+    /// which also tells how to paint the caret there
     pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Vec<f64> {
-        hit(self.engine.vertical(pos, down, goal))
+        hit(self
+            .engine
+            .vertical(pos, false, down, goal)
+            .map(|(hit, _)| hit))
     }
 
-    /// the start or end of the line a position is on, -1 for none
+    /// the position a line up or down from the caret at `pos`, painted as
+    /// `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+    /// text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+    /// where the caret at the new position is to be painted at the end of
+    /// its line, 0 else
+    #[wasm_bindgen(js_name = verticalAt)]
+    pub fn vertical_at(&self, pos: u32, after: bool, down: bool, goal: f32) -> Vec<f64> {
+        match self.engine.vertical(pos, after, down, goal) {
+            Some((found, after)) => {
+                let mut values = hit(Some(found));
+                values.push(if after { 1.0 } else { 0.0 });
+                values
+            }
+            None => vec![],
+        }
+    }
+
+    /// the start or end of the line a position is on, -1 for none; see
+    /// `lineBoundary`, which also tells how to paint the caret there
     #[wasm_bindgen(js_name = lineEdge)]
     pub fn line_edge(&self, pos: u32, end: bool) -> f64 {
         self.engine
-            .line_edge(pos, end)
-            .map(|pos| pos as f64)
+            .line_edge(pos, false, end)
+            .map(|(pos, _)| pos as f64)
             .unwrap_or(-1.0)
+    }
+
+    /// the start or end of the line the caret at `pos` is painted on (as
+    /// `after` says): [pos, after], where `after` is 1 if the caret there is
+    /// to be painted at the end of its line, e.g. after a word broken where
+    /// it is wider than the line; [] for none
+    #[wasm_bindgen(js_name = lineBoundary)]
+    pub fn line_boundary(&self, pos: u32, after: bool, end: bool) -> Vec<f64> {
+        match self.engine.line_edge(pos, after, end) {
+            Some((pos, after)) => vec![pos as f64, if after { 1.0 } else { 0.0 }],
+            None => vec![],
+        }
     }
 
     /// the selection's rectangles: page, x, y, width and height each
@@ -391,12 +489,50 @@ impl LayoutEngine {
         self.images.clear();
     }
 
-    /// the document as a PDF
-    pub fn pdf(&mut self, title: &str, author: &str) -> Result<Vec<u8>, JsError> {
+    /// the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+    /// none if left out or empty). An image that can't be decoded shows its
+    /// alt text, and a font that can't be embedded is left out: see
+    /// `pdfWarnings`
+    pub fn pdf(
+        &mut self,
+        title: &str,
+        author: &str,
+        language: Option<String>,
+    ) -> Result<Vec<u8>, JsError> {
         let info = Info {
             title: title.to_string(),
             author: author.to_string(),
         };
-        pdf::write(&mut self.engine, &self.images, &info).map_err(error)
+        let language = language.unwrap_or_default();
+        self.warnings.clear();
+        let written =
+            pdf::write_with(&mut self.engine, &self.images, &info, &language).map_err(error)?;
+        self.warnings = written.warnings;
+        Ok(written.bytes)
+    }
+
+    /// what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+    /// …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+    #[wasm_bindgen(js_name = pdfWarnings)]
+    pub fn pdf_warnings(&self) -> String {
+        let warnings: Vec<serde_json::Value> = self
+            .warnings
+            .iter()
+            .map(|warning| match warning {
+                Warning::Image(src) => serde_json::json!({ "kind": "image", "src": src }),
+                Warning::Font(font) => serde_json::json!({
+                    "kind": "font",
+                    "font": font,
+                    "family": self
+                        .engine
+                        .fonts
+                        .files
+                        .get(*font)
+                        .map(|file| file.family.as_str())
+                        .unwrap_or(""),
+                }),
+            })
+            .collect();
+        serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into())
     }
 }

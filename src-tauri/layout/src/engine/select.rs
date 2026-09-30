@@ -52,7 +52,7 @@ impl Engine {
                 continue;
             }
             for (index, boxed) in laid.texts.iter().enumerate() {
-                let (start, end) = (boxed.pos, boxed.pos + boxed.len);
+                let (start, end) = (boxed.pos, boxed.pos.saturating_add(boxed.len));
                 if end < from || start > to {
                     continue;
                 }
@@ -126,12 +126,19 @@ impl Engine {
     /// of it is, as the items of a node are within the node.
     pub fn boxes(&self, from: u32, to: u32) -> Vec<(usize, f32, f32, f32, f32)> {
         let mut boxes: Vec<(usize, f32, f32, f32, f32)> = vec![];
-        let start = self.items.partition_point(|item| item.from() < from);
+        // from the item `from` is in, which may be a table with images in
+        // its cells
+        let start = self
+            .items
+            .partition_point(|item| item.from() < from)
+            .saturating_sub(1);
         for item in start..self.items.len() {
             if self.items[item].from() > to {
                 break;
             }
-            if self.items[item].to() > to {
+            if self.items[item].from() < from || self.items[item].to() > to {
+                // not all of it, but maybe images in its cells
+                self.cell_image_boxes(item, from, to, &mut boxes);
                 continue;
             }
             let Some(first) = self.first_frag.get(item).copied() else {
@@ -164,6 +171,34 @@ impl Engine {
             }
         }
         boxes
+    }
+
+    /// the boxes of the images in a table's cells from `from` to `to`
+    fn cell_image_boxes(
+        &self,
+        item: usize,
+        from: u32,
+        to: u32,
+        boxes: &mut Vec<(usize, f32, f32, f32, f32)>,
+    ) {
+        let laid = &self.laid[item];
+        for image in &laid.cell_images {
+            if image.pos < from || image.pos.saturating_add(1) > to {
+                continue;
+            }
+            let Some(frag_index) = self.frag_of(item, image.unit) else {
+                continue;
+            };
+            let frag = self.frags[frag_index];
+            let unit = &laid.units[image.unit];
+            boxes.push((
+                self.page_of_frag(frag_index),
+                self.settings.margins.left + image.x,
+                frag.y - unit.top + image.y,
+                image.w,
+                image.h,
+            ));
+        }
     }
 
     /// how the table at `pos` is laid out: where its columns are, on the

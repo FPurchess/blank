@@ -1,9 +1,25 @@
-import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
+import { joinBackward, lift, splitBlock, wrapIn } from "prosemirror-commands";
+import { history, redo, undo } from "prosemirror-history";
+import { sinkListItem, wrapInList } from "prosemirror-schema-list";
+import {
+  type Command,
+  EditorState,
+  NodeSelection,
+  type Plugin,
+  Selection,
+  TextSelection,
+} from "prosemirror-state";
+import { CellSelection, tableEditing, TableMap } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { sendNotification } from "@tauri-apps/plugin-notification";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  pageFields,
+  pageLayout,
+  path,
+  transaction,
   pageCaret,
   pageComposition,
   pageLayoutState,
@@ -11,22 +27,42 @@ import {
   pageScrollRequest,
   pageSelection,
 } from "../../state";
-import { doc, keyEvent, p, table, td, tr } from "../../test/editor";
-import { pageEngine } from "../../engine/engine";
-import { hidePages, showPages } from "../../test/engine";
+import {
+  blockquote,
+  doc,
+  docWithFrontmatter,
+  h,
+  li,
+  ul,
+  keyEvent,
+  p,
+  table,
+  td,
+  tr,
+} from "../../test/editor";
+import {
+  ENGINE_FAILED,
+  forgetEngineFailure,
+  pageEngine,
+} from "../../engine/engine";
+import { hidePages, showPages, testEngine } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
+import { forgetImages } from "../../engine/images";
+import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
+import { applyDocument } from "../document";
+import { tableGrid } from "../../exporters/table";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
 
 // an editor with the page view's plugins, on the pages the app shows
-const mount = (node = doc(p(LONG), p(LONG))) => {
+const mount = (node = doc(p(LONG), p(LONG)), plugins: Plugin[] = []) => {
   let state = EditorState.create({
     schema,
     doc: node,
-    plugins: [pageSync(), pageView()],
+    plugins: [pageSync(), pageView(), ...plugins],
   });
   state = state.apply(
     state.tr.setSelection(TextSelection.create(state.doc, 5)),
@@ -100,6 +136,25 @@ describe("pageView plugin", () => {
     expect(end).toBeLessThan(LONG.length);
     mounted.press("Home");
     expect(mounted.view.state.selection.head).toBe(1);
+  });
+
+  it("keeps the column of ↑ and ↓ for Page Down", () => {
+    // lines alike, so every line has the same caret positions
+    const mounted = mount(
+      doc(...Array.from({ length: 80 }, () => p("abcdefghij klmnopqrst"))),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    const start = pageCaret.value!;
+    mounted.press("ArrowDown");
+    expect(pageCaret.value!.x).toBeCloseTo(start.x, 3);
+    const before = mounted.view.state.selection.head;
+    expect(mounted.press("PageDown")).toBe(true);
+    expect(mounted.view.state.selection.head).toBeGreaterThan(before + 100);
+    // within a pixel of the page view, in points
+    const scale = 18 / 11;
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
+    mounted.press("PageUp");
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
   });
 
   it("moves a view's height with Page Up and Down, keeping its place", () => {
@@ -198,4 +253,490 @@ describe("selectionAt", () => {
       node.content.size - 1,
     );
   });
+});
+
+describe("an engine that fails", () => {
+  const trap = () => {
+    throw new WebAssembly.RuntimeError("unreachable");
+  };
+  let destroy = () => {};
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    destroy();
+    destroy = () => {};
+    hidePages();
+    forgetEngineFailure();
+  });
+
+  it("lets editing go on without the pages, and tells the user once", () => {
+    const engine = showPages();
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+    vi.spyOn(engine.raw, "update").mockImplementation(trap);
+
+    mounted.view.dispatch(mounted.view.state.tr.insertText("a", 1));
+    mounted.view.dispatch(mounted.view.state.tr.insertText("b", 1));
+
+    expect(mounted.view.state.doc.firstChild!.textContent).toMatch(/^baLorem/);
+    expect(document.body.classList).toContain("without-engine");
+    expect(pageEngine).toBeNull();
+    expect(pageLayoutState.value).toBeNull();
+    expect(pageCaret.value).toBeNull();
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(ENGINE_FAILED);
+    // the keys the page view moved by are the editor's own again
+    expect(mounted.press("ArrowDown")).toBe(false);
+  });
+
+  it("mounts the editor when the first layout fails", () => {
+    const engine = showPages();
+    vi.spyOn(engine.raw, "setItems").mockImplementation(trap);
+
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+
+    expect(pageLayoutState.value).toBeNull();
+    expect(document.body.classList).toContain("without-engine");
+    mounted.view.dispatch(mounted.view.state.tr.insertText("typed ", 1));
+    expect(mounted.view.state.doc.textContent).toMatch(/^typed /);
+  });
+});
+
+describe("the page view's plugins without the engine", () => {
+  it("let the editor scroll to its own selection", () => {
+    hidePages();
+    const mounted = mount();
+    expect(
+      mounted.view.someProp("handleScrollToSelection", (f) =>
+        f(mounted.view),
+      ) ?? false,
+    ).toBe(false);
+    expect(mounted.press("ArrowDown")).toBe(false);
+    mounted.view.destroy();
+  });
+
+  it("scroll to the caret they paint while the engine runs", () => {
+    showPages();
+    const mounted = mount();
+    expect(
+      mounted.view.someProp("handleScrollToSelection", (f) => f(mounted.view)),
+    ).toBe(true);
+    mounted.view.destroy();
+    hidePages();
+  });
+});
+
+describe("the first page's header", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+  });
+
+  const publish = (frontmatter: string) => {
+    const node = docWithFrontmatter(frontmatter, p("text"));
+    // the page setup comes from the document of the last transaction
+    transaction.value = EditorState.create({ schema, doc: node }).tr;
+    showPages();
+    const mounted = mount(node);
+    const header = pageLayoutState.value?.header;
+    mounted.view.destroy();
+    return header;
+  };
+
+  it("is published when the first page has header text", () => {
+    expect(publish("page:\n  header:\n    left: Report")).toBe(true);
+  });
+
+  it("isn't without a header, or with a plain first page", () => {
+    expect(publish("title: x")).toBe(false);
+    expect(
+      publish("page:\n  header:\n    left: Report\n  first-page: plain"),
+    ).toBe(false);
+  });
+});
+
+describe("cell selections", () => {
+  // three rows of two cells; the cursor at 5 is in the first cell
+  const grid = () =>
+    doc(
+      table(
+        tr(td("aa"), td("bb")),
+        tr(td("cc"), td("dd")),
+        tr(td("ee"), td("ff")),
+      ),
+    );
+  // where the cell in `row` and `column` starts
+  const cellPos = (
+    node: ReturnType<typeof grid>,
+    row: number,
+    column: number,
+  ) => 1 + TableMap.get(node.firstChild!).map[row * 2 + column];
+
+  beforeEach(() => showPages());
+  afterEach(() => hidePages());
+
+  it("selects whole cells with Shift + ↓ and ↑ across cells", () => {
+    const mounted = mount(grid(), [tableEditing()]);
+    const node = mounted.view.state.doc;
+
+    expect(mounted.press("Shift-ArrowDown")).toBe(true);
+    let selection = mounted.view.state.selection;
+    expect(selection).toBeInstanceOf(CellSelection);
+    expect((selection as CellSelection).$anchorCell.pos).toBe(
+      cellPos(node, 0, 0),
+    );
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 0),
+    );
+
+    // prosemirror-tables grows the cell selection from there
+    expect(mounted.press("Shift-ArrowDown")).toBe(true);
+    selection = mounted.view.state.selection;
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 2, 0),
+    );
+    expect(mounted.press("Shift-ArrowUp")).toBe(true);
+    selection = mounted.view.state.selection;
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 0),
+    );
+    mounted.view.destroy();
+  });
+
+  it("selects cells when the pointer drags into another cell", () => {
+    const node = grid();
+    const state = EditorState.create({ schema, doc: node });
+    const inOther = cellPos(node, 1, 1) + 2;
+    const selection = selectionAt(state, { node: false, pos: inOther }, 5);
+    expect(selection).toBeInstanceOf(CellSelection);
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 1),
+    );
+
+    let dispatched: EditorState | null = null;
+    pageSelect({ node: false, pos: inOther }, 5)(state, (tr) => {
+      dispatched = state.apply(tr);
+    });
+    expect(dispatched!.selection).toBeInstanceOf(CellSelection);
+  });
+
+  it("selects text within one cell", () => {
+    const state = EditorState.create({ schema, doc: grid() });
+    const selection = selectionAt(state, { node: false, pos: 6 }, 4);
+    expect(selection).toBeInstanceOf(TextSelection);
+    expect([selection.from, selection.to]).toEqual([4, 6]);
+  });
+});
+
+describe("images on the pages", () => {
+  let loads: { src: string; load: () => void }[] = [];
+
+  beforeEach(() => {
+    loads = [];
+    vi.stubGlobal(
+      "Image",
+      class {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        naturalWidth = 0;
+        naturalHeight = 0;
+        set src(src: string) {
+          loads.push({
+            src,
+            load: () => {
+              this.naturalWidth = 300;
+              this.naturalHeight = 150;
+              this.onload?.();
+            },
+          });
+        }
+      },
+    );
+    path.value = null;
+    showPages();
+  });
+  afterEach(() => {
+    hidePages();
+    forgetImages();
+    path.value = null;
+  });
+
+  it("shows an untitled document's relative image once it's saved", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    const mounted = mount(
+      doc(p("text"), schema.node("paragraph", null, image)),
+    );
+    const shownImages = () =>
+      pageEngine!.display(0, pageLayoutState.value!.versions[0]).i;
+
+    // no folder to look for it in
+    expect(loads).toEqual([]);
+
+    path.value = "/docs/report.md";
+    expect(loads).toHaveLength(1);
+    loads[0].load();
+
+    const [shown] = shownImages();
+    expect(shown[0]).toBe("img.png");
+    // 300 × 150 px at 96 dpi
+    expect(shown[3]).toBeCloseTo(225);
+    expect(shown[4]).toBeCloseTo(112.5);
+    mounted.view.destroy();
+  });
+});
+
+describe("laying out a keystroke", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+  });
+
+  it("lays out once per key in the heading the title comes from", () => {
+    showPages();
+    let state = EditorState.create({
+      schema,
+      doc: doc(h(1, "Title"), p("text")),
+      plugins: [pageSync(), pageView()],
+    });
+    state = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, 6)),
+    );
+    transaction.value = state.tr;
+    // as bootEditor dispatches: the transaction is published first
+    const view: EditorView = new EditorView(document.createElement("div"), {
+      state,
+      dispatchTransaction(tr) {
+        transaction.value = tr;
+        view.updateState(view.state.apply(tr));
+      },
+    });
+    perfSamples(true);
+
+    for (const key of "abcde") view.dispatch(view.state.tr.insertText(key));
+
+    expect(view.state.doc.firstChild!.textContent).toBe("Titleabcde");
+    expect(perfSamples().layout).toHaveLength(5);
+    view.destroy();
+  });
+});
+
+describe("the kept widths of a table", () => {
+  afterEach(() => hidePages());
+
+  it("are the new document's own after another is opened", () => {
+    const engine = showPages();
+    const first = doc(table(tr(td("a"), td("a much longer cell"))), p("x"));
+    const mounted = mount(first);
+    // the cursor in the table keeps its widths
+    const into = (at: number) =>
+      mounted.view.dispatch(
+        mounted.view.state.tr.setSelection(
+          TextSelection.create(mounted.view.state.doc, at),
+        ),
+      );
+    into(4);
+
+    const second = doc(
+      table(tr(td("a cell that is much longer"), td("b"))),
+      p("x"),
+    );
+    const sent: { kind: string; widths?: number[] }[] = [];
+    const update = engine.raw.update.bind(engine.raw);
+    vi.spyOn(engine.raw, "update").mockImplementation(
+      (start, count, json, shift) => {
+        sent.push(...JSON.parse(json));
+        return update(start, count, json, shift);
+      },
+    );
+    // the new document starts with the cursor in its table
+    mounted.view.updateState(applyDocument(mounted.view.state, second));
+    into(6);
+
+    const tables = sent.filter((item) => item.kind === "table");
+    const widths = tables[tables.length - 1]?.widths;
+    expect(widths).toEqual(tableGrid(second.firstChild!).widths);
+    expect(widths).not.toEqual(tableGrid(first.firstChild!).widths);
+    mounted.view.destroy();
+  });
+});
+
+describe("the line a caret is on", () => {
+  // a word wider than a line, which the engine breaks: each of its lines
+  // ends where the next one starts
+  const URL = `https://example.com/${"abcdefghij".repeat(40)}`;
+  let destroy = () => {};
+
+  beforeEach(() => showPages());
+  afterEach(() => {
+    destroy();
+    hidePages();
+  });
+
+  it("keeps End on the line it's pressed on, twice", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    const start = pageCaret.value!;
+
+    expect(mounted.press("End")).toBe(true);
+    const end = mounted.view.state.selection.head;
+    expect(end).toBeLessThan(URL.length);
+    expect(pageCaret.value!.y).toBe(start.y);
+    expect(pageCaret.value!.x).toBeGreaterThan(start.x);
+
+    mounted.press("End");
+    expect(mounted.view.state.selection.head).toBe(end);
+    expect(pageCaret.value!.y).toBe(start.y);
+
+    // Home goes back to the start of that line
+    mounted.press("Home");
+    expect(mounted.view.state.selection.head).toBe(1);
+  });
+
+  it("visits each line once going down and up from a line's end", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    mounted.view.dispatch(
+      mounted.view.state.tr.setSelection(
+        TextSelection.create(mounted.view.state.doc, 1),
+      ),
+    );
+    const first = pageCaret.value!.y;
+    mounted.press("End");
+    const lines = [pageCaret.value!.y];
+    // at the end of the first line, not at the start of the second
+    expect(lines[0]).toBe(first);
+    for (let key = 0; key < 2; key++) {
+      mounted.press("ArrowDown");
+      lines.push(pageCaret.value!.y);
+    }
+    const back: number[] = [];
+    for (let key = 0; key < 2; key++) {
+      mounted.press("ArrowUp");
+      back.push(pageCaret.value!.y);
+    }
+
+    // one line at a time: down, then the same lines back up
+    const step = lines[1] - lines[0];
+    expect(step).toBeGreaterThan(5);
+    expect(lines[2] - lines[1]).toBeCloseTo(step, 3);
+    expect(back).toEqual([lines[1], lines[0]]);
+  });
+
+  it("forgets it once the caret moves another way", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    mounted.press("End");
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBe(true);
+    // a transaction that moves nothing keeps it
+    mounted.view.dispatch(mounted.view.state.tr.setMeta("other", true));
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBe(true);
+    mounted.view.dispatch(mounted.view.state.tr.insertText("x"));
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBeFalsy();
+  });
+});
+
+describe("the pages after many real edits", () => {
+  // a seeded random number generator (mulberry32), so a failure repeats
+  const random = (seed: number) => () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const start = () =>
+    doc(
+      h(1, "Title"),
+      p("First paragraph with some words in it"),
+      blockquote(p("quoted"), p("more quoted")),
+      ul(li(p("one")), li(p("two"))),
+      h(2, "Section"),
+      table(tr(td("a"), td("b")), tr(td("c"), td("d"))),
+      p("Last paragraph"),
+    );
+
+  afterEach(() => hidePages());
+
+  it(
+    "are what a fresh layout gives, with every caret",
+    { timeout: 180_000 },
+    () => {
+      const engine = showPages();
+      const view = new EditorView(document.createElement("div"), {
+        state: EditorState.create({
+          schema,
+          doc: start(),
+          plugins: [pageSync(), pageView(), history()],
+        }),
+      });
+      const next = random(930);
+      const run = (command: Command) => command(view.state, view.dispatch);
+      const select = () =>
+        view.dispatch(
+          view.state.tr.setSelection(
+            Selection.near(
+              view.state.doc.resolve(
+                Math.floor(next() * view.state.doc.content.size),
+              ),
+            ),
+          ),
+        );
+      const edits: (() => void)[] = [
+        () => (select(), view.dispatch(view.state.tr.insertText("typed "))),
+        () => (select(), run(splitBlock)),
+        () => {
+          select();
+          const { $head } = view.state.selection;
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.create(view.state.doc, $head.start()),
+            ),
+          );
+          run(joinBackward);
+        },
+        () => (select(), run(wrapIn(schema.nodes.blockquote))),
+        () => (select(), run(lift)),
+        () => (select(), run(wrapInList(schema.nodes.bullet_list))),
+        () => (select(), run(sinkListItem(schema.nodes.list_item))),
+        () => run(undo),
+        () => run(redo),
+      ];
+
+      // the same as a fresh engine lays out, with the caret at every place
+      const expectFresh = (step: number) => {
+        // out of a table, whose widths are kept while the cursor is in it
+        view.dispatch(
+          view.state.tr.setSelection(Selection.atStart(view.state.doc)),
+        );
+        const fresh = testEngine();
+        fresh.setSettings(pageLayout.value.layout, pageFields.value);
+        fresh.sync(view.state.doc, () => undefined);
+        expect(engine.pages(), `after ${step}`).toBe(fresh.pages());
+        const ours = engine.versions();
+        const theirs = fresh.versions();
+        for (let page = 0; page < fresh.pages(); page++)
+          expect(engine.display(page, ours[page]), `after ${step}`).toEqual(
+            fresh.display(page, theirs[page]),
+          );
+        for (let pos = 0; pos <= view.state.doc.content.size; pos++)
+          for (const after of [false, true])
+            expect(engine.caret(pos, after), `after ${step} at ${pos}`).toEqual(
+              fresh.caret(pos, after),
+            );
+        fresh.free();
+      };
+
+      for (let step = 1; step <= 300; step++) {
+        // another document now and then, as opening one does
+        if (step % 100 === 0)
+          view.updateState(applyDocument(view.state, start()));
+        else edits[Math.floor(next() * edits.length)]();
+        expectFresh(step);
+      }
+      view.destroy();
+    },
+  );
 });

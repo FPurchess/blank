@@ -258,3 +258,296 @@ fn the_pdf_holds_the_layout_on_other_paper() {
     engine.set_items(sample());
     compare(&mut engine, "a5");
 }
+
+/// a table whose cells hold a list, a quote and paragraphs, after some text
+fn table_with_blocks() -> Vec<Item> {
+    use blank_layout::model::{Cell, CellBlock, CellText, Row};
+    let text = |pos: u32, text: &str, indent: f32, marker: Option<&str>, bars: Vec<f32>| {
+        CellBlock::Text(CellText {
+            text: Text {
+                pos,
+                text: text.into(),
+                ..Default::default()
+            },
+            indent,
+            marker: marker.map(String::from),
+            bars,
+        })
+    };
+    let cell = |blocks: Vec<CellBlock>| Cell {
+        blocks,
+        ..Default::default()
+    };
+    let rows = vec![
+        Row {
+            cells: vec![
+                cell(vec![text(3, "Ingredients", 0.0, None, vec![])]),
+                cell(vec![text(20, "Steps", 0.0, None, vec![])]),
+            ],
+            header: true,
+        },
+        Row {
+            cells: vec![
+                cell(vec![
+                    text(40, "flour and water", 18.0, Some("•"), vec![]),
+                    text(60, "a pinch of salt", 18.0, Some("•"), vec![]),
+                ]),
+                cell(vec![
+                    text(80, "Knead it well, then let it rest.", 0.0, None, vec![]),
+                    text(
+                        120,
+                        "Patience is the secret ingredient.",
+                        12.0,
+                        None,
+                        vec![0.0],
+                    ),
+                ]),
+            ],
+            header: false,
+        },
+    ];
+    vec![
+        text_item(200, "Bread", "h1", 1, vec![]),
+        Item {
+            content: Content::Table {
+                pos: 210,
+                end: 400,
+                rows,
+                widths: vec![],
+                caption: Some("A simple recipe".into()),
+            },
+            ..text_item(0, "", "p", 0, vec![])
+        },
+    ]
+}
+
+#[test]
+fn the_pdf_holds_tables_with_lists_and_quotes() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(table_with_blocks());
+    if let Some(count) = compare(&mut engine, "cell-blocks") {
+        // the list markers are laid out and in the PDF too
+        assert!(count >= 20, "{count} words");
+    }
+}
+
+/// the plain text pdftotext reads from a PDF, or nothing without pdftotext
+fn read_text(pdf: &[u8], name: &str) -> Option<String> {
+    let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
+    std::fs::write(&path, pdf).unwrap();
+    let out = path.with_extension("txt");
+    let status = Command::new("pdftotext")
+        .arg("-enc")
+        .arg("UTF-8")
+        .arg(&path)
+        .arg(&out)
+        .status()
+        .ok()?;
+    assert!(status.success());
+    Some(std::fs::read_to_string(&out).unwrap())
+}
+
+fn pdf_of(engine: &mut Engine) -> Vec<u8> {
+    write(
+        engine,
+        &Default::default(),
+        &Info {
+            title: String::new(),
+            author: String::new(),
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn pdf_text_keeps_marks_and_ligatures() {
+    // NFD marks, Arabic with lam-alef and a mark, and Hebrew points, all
+    // in DejaVu Sans; and a Devanagari conjunct in Noto Sans Devanagari if
+    // this system has it
+    let devanagari = "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf";
+    let mut lines = vec![
+        "cafe\u{301} and e\u{301}x",
+        "\u{627}\u{644}\u{633}\u{644}\u{627}\u{645} \u{628}\u{64e}\u{628}",
+        "\u{5e9}\u{5b8}\u{5c1}\u{5dc}\u{5d5}\u{5b9}\u{5dd}",
+    ];
+    let mut engine = Engine::new(repository_fonts());
+    match std::fs::read(devanagari) {
+        Ok(bytes) => {
+            engine.fonts.add(bytes, "Noto Sans Devanagari");
+            lines.push("\u{915}\u{94d}\u{937}\u{92e}\u{93e}");
+        }
+        Err(_) => eprintln!("no Noto Sans Devanagari, skipping the conjunct"),
+    }
+    let mut pos = 0;
+    let items: Vec<Item> = lines
+        .iter()
+        .map(|line| {
+            let item = text_item(pos + 1, line, "p", 0, vec![]);
+            pos += line.encode_utf16().count() as u32 + 2;
+            item
+        })
+        .collect();
+    engine.set_items(items);
+    let Some(text) = read_text(&pdf_of(&mut engine), "marks") else {
+        eprintln!("pdftotext is missing, skipping the check");
+        return;
+    };
+    let text: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !('\u{202a}'..='\u{202e}').contains(c))
+        .collect();
+    for line in lines {
+        for word in line.split(' ') {
+            let rtl = word.chars().any(|c| ('\u{590}'..='\u{6ff}').contains(&c));
+            if rtl {
+                // every letter and mark is there. pdftotext turns the
+                // letters of one glyph around right to left (lam-alef, a
+                // letter with its marks), while the PDF has them as they are
+                // written, as its ToUnicode mapping must
+                let mut expected: Vec<char> = word.chars().collect();
+                expected.sort();
+                let found = text.chars().collect::<Vec<_>>();
+                let found = found.windows(expected.len()).any(|window| {
+                    let mut window = window.to_vec();
+                    window.sort();
+                    window == expected
+                });
+                assert!(found, "{word:?} is not in {text:?}");
+            } else {
+                // left to right exactly, the marks composed or not
+                assert!(
+                    text.contains(word) || text.contains(&compose(word)),
+                    "{word:?} is not in {text:?}"
+                );
+            }
+        }
+    }
+}
+
+/// é from e and a combining acute, the only composition the checks need
+fn compose(word: &str) -> String {
+    word.replace("e\u{301}", "\u{e9}")
+}
+
+#[test]
+fn pdf_text_keeps_what_no_font_has() {
+    // Chinese, which no font of the repository has: laid out with the
+    // missing glyph, and still in the PDF's text where it was laid out
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_items(vec![text_item(
+        1,
+        "plain \u{4e2d}\u{6587}\u{5b57} text \u{4e2d}",
+        "p",
+        0,
+        vec![],
+    )]);
+    assert!(!engine.missing().is_empty());
+    let pdf = pdf_of(&mut engine);
+    if let Some(text) = read_text(&pdf, "notdef") {
+        assert!(text.contains("\u{4e2d}\u{6587}\u{5b57}"), "{text:?}");
+    }
+    compare(&mut engine, "notdef");
+}
+
+/// what a command prints, or nothing without it
+fn run(program: &str, args: &[&str]) -> Option<String> {
+    let out = Command::new(program).args(args).output().ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
+}
+
+#[test]
+fn pdf_is_tagged() {
+    use blank_layout::pdf::write_with;
+    let mut items = sample();
+    let end = items.last().unwrap().to();
+    items.extend(table_with_blocks().into_iter().map(|mut item| {
+        item.shift(end as i64);
+        item
+    }));
+    // a quote, and an image that isn't loaded
+    let end = items.last().unwrap().to();
+    let mut quote = text_item(end + 2, "To be or not to be.", "p", 0, vec![]);
+    quote.indent = 12.0;
+    quote.bars = vec![0.0];
+    items.push(quote);
+    items.push(Item {
+        content: Content::Image {
+            pos: end + 30,
+            src: "missing.png".into(),
+            width: 0.0,
+            height: 0.0,
+            alt: "a map of the town".into(),
+        },
+        ..text_item(0, "", "p", 0, vec![])
+    });
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(items);
+    let written = write_with(
+        &mut engine,
+        &Default::default(),
+        &Info {
+            title: "Sample".into(),
+            author: "".into(),
+        },
+        "en-GB",
+    )
+    .unwrap();
+    assert!(written.warnings.is_empty());
+    let path = std::env::temp_dir().join("blank-layout-tagged.pdf");
+    std::fs::write(&path, &written.bytes).unwrap();
+    let path = path.to_str().unwrap();
+    let Some(info) = run("pdfinfo", &[path]) else {
+        eprintln!("pdfinfo is missing, skipping the check");
+        return;
+    };
+    let tagged = info.lines().find(|line| line.starts_with("Tagged:"));
+    assert!(tagged.is_some_and(|line| line.ends_with("yes")), "{info}");
+    if let Some(check) = run("qpdf", &["--check", path]) {
+        assert!(
+            check.contains("No syntax or stream encoding errors"),
+            "{check}"
+        );
+        // the language, the bookmarks and the structure, in the uncompressed file
+        let plain = std::env::temp_dir().join("blank-layout-tagged-qdf.pdf");
+        let plain = plain.to_str().unwrap();
+        run("qpdf", &["--qdf", "--object-streams=disable", path, plain]);
+        let bytes = std::fs::read(plain).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("/Lang (en-GB)"), "no /Lang");
+        assert!(text.contains("/Outlines"), "no bookmarks");
+        assert!(
+            text.contains("/Title (Chapter 1)"),
+            "no bookmark for the first chapter"
+        );
+        assert!(
+            text.contains("/Alt (a map of the town)"),
+            "no alt text on the figure"
+        );
+        for role in [
+            "/H1",
+            "/H2",
+            "/P",
+            "/L",
+            "/LI",
+            "/Lbl",
+            "/LBody",
+            "/Table",
+            "/TR",
+            "/TH",
+            "/TD",
+            "/Caption",
+            "/BlockQuote",
+            "/Figure",
+            "/Link",
+        ] {
+            assert!(
+                text.contains(&format!("/S {role}")),
+                "no {role} in the structure"
+            );
+        }
+    }
+    // and its text is where it was laid out, as without tags
+    compare(&mut engine, "tagged");
+}
