@@ -34,35 +34,37 @@ The integrator's list after the self-review, one commit each, in order. The
 branch starts at bcf725b (fast-forward).
 
 Done:
+
 - [x] B1 marks and attribute steps (9854f42)
 - [x] M1 settings after an appended transaction (768c433)
 - [x] M3 triple click (691a031; the drag machine is `src/editor/pageMove.ts`)
 - [x] M2 only a trap breaks the instance, and gives up the page engine (a575ddf)
 - [x] M4 a move let go outside the view is cancelled (dcdf83a, 39af364 with
-  `e2e/specs/pageMove.e2e.ts`: triple click, move, let go on the bottom bar)
+      `e2e/specs/pageMove.e2e.ts`: triple click, move, let go on the bottom bar)
 - [x] M7 a press a plugin took moves nothing (66e4946)
 - [x] M8 a press on a band keeps the selection (4b42bf1, `BANDS` verbatim)
 - [x] M5 handles and toolbar follow a relayout (44b17be)
 - [x] m11 `engineMissing` (7b24134)
 - [x] M9 `pageHeadBox` (729ac5b)
 - [x] M10 already prevented by the serialized lookups; test kept, plus
-  `asked` keyed by language (m9 part) (ae78c1e)
+      `asked` keyed by language (m9 part) (ae78c1e)
 - [x] m1 no pages published by a failed engine (83757d2)
 - [x] m2 lost moves are cancelled (fd47f76)
 - [x] m5 cell selections grow from their anchor cell; Shift+Home/End/PageUp/
-  PageDown leave them to the editor (0b52acc)
+      PageDown leave them to the editor (0b52acc)
 - [x] roman numerals above 3999 are arabic, as in Rust (acdf3bb)
 - [x] m8 warning names once each; the worker's free is guarded (a2e333e)
 - [x] m9 images forgotten when another document opens; a 60 s worker timeout
-  (e7a6d01)
+      (e7a6d01)
 - [x] m10 `SyncOptions.force` dropped (eae906b)
 - [x] m6 the marker on a cell's first text piece (fd733a5)
 - [x] m3 text from other apps shows where it drops (28fe97e)
+- [x] the `main.test.ts` flake: the first-focus timer skips a gone editor
 
 Next, in this order:
-1. The flake engine-release saw in `src/main.test.ts`: the 100 ms focus timer
-   in `src/editor/index.ts` (~105) fires after jsdom is torn down. Clear it
-   when the editor is disposed (or guard `document`), with a fake-timer test.
+
+1. Done (see below): the 100 ms first-focus timer in `src/editor/index.ts`
+   skips an editor that's gone or a torn-down jsdom.
 2. m9 rest: avoid the second worker run after a trap for a document with
    characters not looked up yet. Proposal: a two-step worker protocol (the
    worker lays out and reports `missing`, then gets the fonts and writes the
@@ -192,6 +194,7 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
 ## Verification
 
 At `51f76b9`:
+
 - `bun run lint`, `bun run format:check`, `bun run test` (150 files, 2328
   tests) and `bun run test:coverage` (95.7 % statements, 90.7 % branches).
 - `cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout`: 61 + 3
