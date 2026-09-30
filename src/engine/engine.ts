@@ -17,7 +17,7 @@ import { FONT_URLS } from "./fonts";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
-import { packFonts } from "./pdfJob";
+import { packFonts, type PdfWarning } from "./pdfJob";
 import type { EngineItem } from "./types";
 
 // The layout engine (src-tauri/layout, built for the webview by
@@ -682,8 +682,25 @@ export class PageEngine {
     this.call(undefined, () => this.raw.addImage(src, bytes, jpeg));
   }
 
-  pdf(title: string, author: string) {
-    return this.call(new Uint8Array(), () => this.raw.pdf(title, author));
+  /**
+   * pdf writes the PDF of the layout
+   * @param language the document's language as a BCP 47 tag, e.g. "de-CH",
+   *   which screen readers read it in; none when it isn't known
+   */
+  pdf(title: string, author: string, language?: string) {
+    return this.call(new Uint8Array(), () =>
+      this.raw.pdf(title, author, language ?? null),
+    );
+  }
+
+  /**
+   * pdfWarnings returns what the last PDF left out
+   */
+  pdfWarnings(): PdfWarning[] {
+    return this.call(
+      [],
+      () => JSON.parse(this.raw.pdfWarnings()) as PdfWarning[],
+    );
   }
 
   /**

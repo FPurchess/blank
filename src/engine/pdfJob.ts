@@ -16,13 +16,22 @@ export interface PdfJob {
   items: string;
   title: string;
   author: string;
+  // a BCP 47 tag, see PageEngine.pdf
+  language?: string;
 }
+
+// what a PDF left out: an image it couldn't decode, which shows its alt
+// text instead, or a font it couldn't embed ("" for one of Blank's own)
+export type PdfWarning =
+  | { kind: "image"; src: string }
+  | { kind: "font"; font: number; family: string };
 
 export interface PdfResult {
   pdf: Uint8Array;
   pages: number;
   // the characters no font had, for a second job with more fonts
   missing: string;
+  warnings: PdfWarning[];
 }
 
 /**
@@ -59,9 +68,10 @@ export const writePdf = (
     engine.setSettings(job.settings);
     engine.setItems(job.items);
     return {
-      pdf: engine.pdf(job.title, job.author),
+      pdf: engine.pdf(job.title, job.author, job.language ?? null),
       pages: engine.pageCount(),
       missing: engine.missing(),
+      warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],
     };
   } finally {
     engine.free();

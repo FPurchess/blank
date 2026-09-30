@@ -18,7 +18,7 @@ import { fallbackFonts, findFonts } from "./fallback";
 import { language } from "../state";
 import { flatten, type ImageSizes } from "./flatten";
 import { fittedSize } from "./images";
-import type { PdfJob, PdfResult } from "./pdfJob";
+import type { PdfJob, PdfResult, PdfWarning } from "./pdfJob";
 import type { PdfReply } from "./pdfWorker";
 
 // The PDF, written by the layout engine with krilla from the same layout
@@ -73,9 +73,10 @@ const onSharedEngine = async ({
       engine.addFonts(fallbackFonts.value);
     }
     return {
-      pdf: engine.pdf(fields.title, fields.author),
+      pdf: engine.pdf(fields.title, fields.author, pdfLanguage()),
       pages: engine.pages(),
       missing: engine.missing(),
+      warnings: engine.pdfWarnings(),
     };
   } finally {
     engine.free();
@@ -152,7 +153,69 @@ const jobOf = (
   items: JSON.stringify(flatten(doc, sizes).map((record) => record.build())),
   title: fields.title,
   author: fields.author,
+  language: pdfLanguage(),
 });
+
+/**
+ * pdfLanguage returns the document's language as a BCP 47 tag: the
+ * language setting, an ISO 639-1 code ("de") or a dictionary's regional tag
+ * ("de-CH"); none when it isn't one
+ */
+export const pdfLanguage = () => {
+  const tag = language.value.trim();
+  return /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/i.test(tag) ? tag : undefined;
+};
+
+/**
+ * imageNames returns what to call the images of `doc` in a warning: a file
+ * by its path, an image in the document itself by its alt text
+ */
+const imageNames = (doc: Node) => {
+  const alts = new Map<string, string>();
+  doc.descendants((node) => {
+    if (node.type.name === "image")
+      alts.set(
+        node.attrs.src as string,
+        (node.attrs.alt as string | null) ?? "",
+      );
+  });
+  return (src: string) =>
+    src.startsWith("data:") ? alts.get(src) || "an image in the document" : src;
+};
+
+/**
+ * describeWarnings tells in plain words what the PDF left out
+ * @param nameOf what to call an image, by its src
+ */
+export const describeWarnings = (
+  warnings: readonly PdfWarning[],
+  nameOf: (src: string) => string = (src) => src,
+) => {
+  const images = warnings.flatMap((warning) =>
+    warning.kind === "image" ? [nameOf(warning.src)] : [],
+  );
+  const fonts = warnings.flatMap((warning) =>
+    warning.kind === "font" ? [warning.family || "one of Blank's fonts"] : [],
+  );
+  const described: string[] = [];
+  if (images.length === 1)
+    described.push(
+      `1 image couldn't be read and shows its alt text: ${images[0]}`,
+    );
+  else if (images.length > 1)
+    described.push(
+      `${images.length} images couldn't be read and show their alt text: ${images.join(", ")}`,
+    );
+  if (fonts.length === 1)
+    described.push(
+      `1 font couldn't be embedded, so its text is left out: ${fonts[0]}`,
+    );
+  else if (fonts.length > 1)
+    described.push(
+      `${fonts.length} fonts couldn't be embedded, so their text is left out: ${fonts.join(", ")}`,
+    );
+  return described;
+};
 
 const toPDF: exporterFunc = async (state, { docPath, layout }) => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
@@ -178,7 +241,10 @@ const toPDF: exporterFunc = async (state, { docPath, layout }) => {
   result ??= await inWorker(prepared);
   return {
     contents: result.pdf,
-    warnings: failureWarning(failures),
+    warnings: [
+      ...failureWarning(failures),
+      ...describeWarnings(result.warnings, imageNames(state.doc)),
+    ],
     pages: result.pages,
   };
 };
