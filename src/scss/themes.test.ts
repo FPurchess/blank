@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { themes } from "../state/appearance";
-import { contrast, parseColor, themeVariables } from "./contrast";
+import {
+  contrast,
+  mix,
+  parseColor,
+  scssNumber,
+  themeVariables,
+} from "./contrast";
 
 // what each theme shows the page view in, as the theme files set it
 const colorsOf = (theme: string) => {
@@ -31,6 +37,19 @@ describe("the themes", () => {
     expect(contrast(dimmed, background)).toBeLessThan(
       contrast(selected, background),
     );
+  });
+});
+
+describe("the faint text beside the pages", () => {
+  const opacity = scssNumber("main.scss", "faint-text-opacity");
+
+  it.each(themes)("reads at 3:1 at least in %s", (theme) => {
+    const { background, text } = colorsOf(theme);
+    // the bands where a page ends and at rest, its number, and the label of
+    // a page break, all at the same opacity
+    expect(
+      contrast(mix(text, background, opacity), background),
+    ).toBeGreaterThanOrEqual(3);
   });
 });
 

@@ -569,6 +569,11 @@ $bar-height: 44px;
   }
 }
 
+// the opacity of the faint text beside the text of the pages: the bands at
+// rest, where a page ends and the label of a page break. At least 3:1 on the
+// page in every theme (src/scss/themes.test.ts)
+$faint-text-opacity: 0.6;
+
 // a header or footer at rest: one faint line, like it prints
 .band-line {
   display: grid;
@@ -577,7 +582,7 @@ $bar-height: 44px;
   min-height: $band-height;
   align-items: center;
   font-size: 0.75rem;
-  opacity: 0.45;
+  opacity: $faint-text-opacity;
   background-color: var(--background-color);
   cursor: pointer;
   transition: opacity 150ms;
@@ -1339,17 +1344,27 @@ $page-end-height: 64px;
   gap: 4px;
   font-size: 11px;
   letter-spacing: 0.04em;
-  opacity: 0.45;
+  opacity: $faint-text-opacity;
   pointer-events: none;
 
   .band {
     @extend %page-band-text;
   }
 
+  // the dashed line, fainter than the text on it, which keeps the opacity
+  // of the mark
   .line {
     position: relative;
-    border-top: 1px dashed var(--color);
-    opacity: 0.6;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      border-top: 1px dashed var(--color);
+      opacity: 0.6;
+    }
 
     .number {
       position: absolute;
@@ -1370,7 +1385,7 @@ $page-end-height: 64px;
   align-items: end;
   font-size: 11px;
   letter-spacing: 0.04em;
-  opacity: 0.45;
+  opacity: $faint-text-opacity;
   cursor: pointer;
 
   &:hover {
@@ -1477,7 +1492,7 @@ body.band-editing #page-view {
   position: absolute;
   pointer-events: none;
   border-top: 1px dashed var(--color);
-  opacity: 0.45;
+  opacity: $faint-text-opacity;
 
   &::after {
     content: "Page break";
