@@ -66,8 +66,8 @@ pub struct Fonts {
     pub lcx: LayoutContext<Ink>,
     /// the families text is set in, in order, with the fallbacks added for
     /// what they lack; and the same for code
-    pub stack: String,
-    pub mono_stack: String,
+    pub stack: Vec<String>,
+    pub mono_stack: Vec<String>,
 }
 
 /// reads the faces of a font file: their units per em and underlines
@@ -146,8 +146,8 @@ impl Fonts {
             instances: vec![],
             fcx,
             lcx: LayoutContext::new(),
-            stack: FONT_STACK.into(),
-            mono_stack: MONO_STACK.into(),
+            stack: FONT_STACK.iter().map(|family| family.to_string()).collect(),
+            mono_stack: MONO_STACK.iter().map(|family| family.to_string()).collect(),
         }
     }
 
@@ -156,10 +156,11 @@ impl Fonts {
     pub fn add(&mut self, bytes: Vec<u8>, family: &str) {
         let faces = faces_of(&mut self.fcx, bytes, family);
         self.files.extend(faces);
-        let family = family.replace(',', " ");
-        if !self.stack.split(", ").any(|known| known == family) {
-            self.stack = format!("{}, {family}", self.stack);
-            self.mono_stack = format!("{}, {family}", self.mono_stack);
+        // a name of the list as it is, whatever it holds: quotes and commas
+        // are part of it
+        if !self.stack.iter().any(|known| known == family) {
+            self.stack.push(family.to_string());
+            self.mono_stack.push(family.to_string());
         }
     }
 
@@ -312,8 +313,20 @@ pub fn repository_fonts() -> Fonts {
 
 /// the families text is set in: IBM Plex Sans, and DejaVu Sans for what it
 /// lacks, e.g. arrows; and code in IBM Plex Mono
-pub const FONT_STACK: &str = "IBM Plex Sans, DejaVu Sans";
-pub const MONO_STACK: &str = "IBM Plex Mono, IBM Plex Sans, DejaVu Sans";
+pub const FONT_STACK: [&str; 2] = ["IBM Plex Sans", "DejaVu Sans"];
+pub const MONO_STACK: [&str; 3] = ["IBM Plex Mono", "IBM Plex Sans", "DejaVu Sans"];
+
+/// a list of families for Parley, each by its name: no CSS to parse, so
+/// any name works, quotes and commas in it included
+pub fn family_list(names: &[String]) -> parley::FontFamily<'static> {
+    parley::FontFamily::List(
+        names
+            .iter()
+            .map(|name| parley::FontFamilyName::Named(name.clone().into()))
+            .collect::<Vec<_>>()
+            .into(),
+    )
+}
 
 /// the font files, in the order src/engine/fonts.ts loads them
 pub const FONT_FILES: [&str; 14] = [
@@ -349,5 +362,44 @@ mod tests {
         assert!(split_files(&bytes, &[2, 4]).is_err());
         assert!(split_files(&bytes, &[u32::MAX, u32::MAX]).is_err());
         assert!(split_files(&[], &[1]).is_err());
+    }
+
+    #[test]
+    fn takes_any_family_name() {
+        use crate::model::Text;
+        use crate::text::TextBox;
+        let read = |name: &str| {
+            std::fs::read(format!("{}/../../fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
+        };
+        let mut fonts = repository_fonts();
+        // a family whose name starts with a quote, then the emoji font: as
+        // CSS, the unterminated string would end the list there, and the
+        // emoji would be lost
+        let family = "\"Quoted, and with a comma";
+        fonts.add(read("dejavu-sans-bold.ttf"), family);
+        fonts.add(read("NotoEmoji-VariableFont_wght.ttf"), "Noto Emoji");
+        assert_eq!(fonts.stack[FONT_STACK.len()], family);
+        assert_eq!(fonts.stack.len(), FONT_STACK.len() + 2);
+        let text = Text {
+            pos: 1,
+            text: "a \u{21d2} \u{1f980}".into(),
+            ..Default::default()
+        };
+        let boxed = TextBox::new(&mut fonts, &text, 300.0, parley::Alignment::Start);
+        assert!(boxed.missing.is_empty(), "{:?}", boxed.missing);
+        let used: Vec<usize> = boxed
+            .glyph_runs(&fonts, 0)
+            .iter()
+            .map(|run| run.font)
+            .collect();
+        // Plex, DejaVu Sans for the arrow, and Noto Emoji for the crab
+        let emoji = fonts.files.len() - 1;
+        assert!(
+            used.contains(&0) && used.contains(&6) && used.contains(&emoji),
+            "{used:?}"
+        );
+        // and the same name again is added once
+        fonts.add(read("dejavu-sans-bold.ttf"), family);
+        assert_eq!(fonts.stack.len(), FONT_STACK.len() + 2);
     }
 }

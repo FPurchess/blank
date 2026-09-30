@@ -17,7 +17,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 12. S4: failed image decodes and broken fonts in the PDF
 - [x] 13. Tags, `/Lang` and bookmarks in the PDF
 - [x] 14. Variable-font coordinates
-- [ ] 15. Fallback families as a list, not CSS
+- [x] 15. Fallback families as a list, not CSS
 - [ ] 16. Waste in `page_ops` and per keystroke
 - [ ] 17. Dead and test-only code
 - [ ] 18. The exactness tests prove more
@@ -240,6 +240,12 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `text::tests::sets_variable_fonts_at_their_coordinates`: bold is an instance with wght 700 and its own outline; the same instance again; its number and outline stay after `add`, and in `share()`
   - `pdf::tests::embeds_the_instances_of_variable_fonts`: an instance is a PDF font of its own, found back by `index_of`; the emoji is in the PDF's text
 - Finding for the owner: Parley's other synthesis, `embolden` and `skew` (fake bold and slant for a font without those faces, e.g. a system CJK font), isn't applied either, on screen or in the PDF. Bold Chinese shows regular. Not part of this task.
+
+### Task 15: families as a list
+
+- `Fonts::stack`/`mono_stack` are lists of names, and `fonts::family_list` gives Parley a `FontFamily::List` of `FontFamilyName::Named`. `add` keeps a name as it is, where it used to replace commas.
+- What CSS did with odd names (probed with parlance's `parse_css_list`): a name that starts with a quote ends the list with an "unterminated string" error, which drops every family after it. A comma split the name in two. Balanced quotes and other characters were fine.
+- Test `fonts::tests::takes_any_family_name`: a fallback named `"Quoted, and with a comma`, then Noto Emoji. The arrow comes from DejaVu, 🦀 from Noto Emoji, and the name is one entry, added once. With the CSS string, 🦀 was missing.
 
 ### Known quirks (of other tools, not of the PDF)
 

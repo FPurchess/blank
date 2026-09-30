@@ -2,11 +2,11 @@
 //! the cursor geometry, in points.
 
 use parley::{
-    Affinity, Alignment, AlignmentOptions, Cursor, FontFamily, FontStyle, FontWeight, Layout,
-    LineHeight, OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
+    Affinity, Alignment, AlignmentOptions, Cursor, FontStyle, FontWeight, Layout, LineHeight,
+    OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
 };
 
-use crate::fonts::{ink_link, Fonts, Ink, INK_CODE};
+use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
 use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, MEDIUM};
 
@@ -100,9 +100,7 @@ impl TextBox {
             } = fonts;
             let mut builder = lcx.ranged_builder(fcx, &laid_text, 1.0, false);
             let family = if style.mono { &*mono_stack } else { &*stack };
-            builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
-                family.to_string().into(),
-            )));
+            builder.push_default(StyleProperty::FontFamily(family_list(family)));
             builder.push_default(StyleProperty::FontSize(style.size));
             builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(style.line)));
             builder.push_default(StyleProperty::FontWeight(FontWeight::new(style.weight)));
@@ -534,13 +532,13 @@ fn push_span(
     span: &Span,
     range: std::ops::Range<usize>,
     style: &TextStyle,
-    mono_stack: &str,
+    mono_stack: &[String],
     links: &mut Vec<String>,
 ) {
     // inline code in IBM Plex Mono, a little smaller than the text around it
     if span.code && !style.mono {
         builder.push(
-            StyleProperty::FontFamily(FontFamily::Source(mono_stack.to_string().into())),
+            StyleProperty::FontFamily(family_list(mono_stack)),
             range.clone(),
         );
         builder.push(
