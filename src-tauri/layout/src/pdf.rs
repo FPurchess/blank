@@ -355,6 +355,9 @@ fn attempt(
                     Part::Band { footer: true } => {
                         ContentTag::Artifact(Artifact::new(ArtifactType::Footer, None))
                     }
+                    Part::Repeat => {
+                        ContentTag::Artifact(Artifact::new(ArtifactType::PaginationOther, None))
+                    }
                     _ => ContentTag::Span(SpanTag::empty()),
                 };
                 // what can't be drawn is left out before its tag opens: a
@@ -370,7 +373,7 @@ fn attempt(
                     continue;
                 }
                 let id = surface.start_tagged(tag);
-                if !matches!(part, Part::Decoration | Part::Band { .. }) {
+                if !matches!(part, Part::Decoration | Part::Band { .. } | Part::Repeat) {
                     ids.entry(part).or_default().push(id);
                 }
                 match op {
@@ -439,8 +442,14 @@ fn attempt(
                 let target = Target::Action(Action::Link(LinkAction::new(href.clone())));
                 let annotation =
                     Annotation::new_link(LinkAnnotation::new(rect, target), Some(href));
-                let id = page.add_tagged_annotation(annotation);
-                ids.entry(part).or_default().push(id);
+                // a repeated row's links are artifacts' too: only the
+                // first ones are in the structure
+                if part == Part::Repeat {
+                    page.add_annotation(annotation);
+                } else {
+                    let id = page.add_tagged_annotation(annotation);
+                    ids.entry(part).or_default().push(id);
+                }
             }
         }
         page.finish();
@@ -739,5 +748,45 @@ mod tests {
             }
         }
         assert!(checked > 0, "no mark with an offset");
+    }
+
+    #[test]
+    fn puts_repeated_header_rows_in_the_structure_once() {
+        use crate::engine::test_support::{cell, table_item};
+        use crate::model::Row;
+        let mut rows = vec![Row {
+            cells: vec![cell(3, "Heading")],
+            header: true,
+        }];
+        for index in 0..120u32 {
+            rows.push(Row {
+                cells: vec![cell(20 + index * 10, "row")],
+                header: false,
+            });
+        }
+        let mut engine = engine(vec![table_item(rows, None)]);
+        assert!(engine.pages.len() > 2);
+        // on the pages after the first, the header row is a repeat
+        let header = Part::Text { item: 0, text: 0 };
+        for page in 1..engine.pages.len() {
+            let parts = engine.body_parts(page);
+            assert!(parts.iter().all(|(_, part)| *part != header), "page {page}");
+            assert!(
+                parts.iter().any(|(_, part)| *part == Part::Repeat),
+                "page {page}"
+            );
+        }
+        let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
+        let path = std::env::temp_dir().join("blank-layout-unit-repeats.pdf");
+        std::fs::write(&path, pdf).unwrap();
+        let Ok(out) = std::process::Command::new("pdfinfo")
+            .arg("-struct-text")
+            .arg(&path)
+            .output()
+        else {
+            return;
+        };
+        let structure = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(structure.matches("\"Heading\"").count(), 1, "{structure}");
     }
 }

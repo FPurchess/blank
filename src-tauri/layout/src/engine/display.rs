@@ -69,6 +69,9 @@ pub enum Part {
     Link { item: usize },
     /// the header or the footer of the page
     Band { footer: bool },
+    /// a table's header rows, repeated on a page the table goes on: they
+    /// are in the structure once, where they first are
+    Repeat,
 }
 
 impl Engine {
@@ -128,6 +131,11 @@ impl Engine {
                     },
                     Deco::Rect { .. } => Part::Decoration,
                 };
+                let part = if frag.repeat && part != Part::Decoration {
+                    Part::Repeat
+                } else {
+                    part
+                };
                 ops.push((deco_op(deco.moved(dx, dy)), part));
             }
             // quote bars, down to the next item in the quote on this page
@@ -176,9 +184,13 @@ impl Engine {
                     None => 0..boxed.line_count(),
                 };
                 let infos = boxed.lines();
-                let part = Part::Text {
-                    item: frag.item,
-                    text,
+                let part = if frag.repeat {
+                    Part::Repeat
+                } else {
+                    Part::Text {
+                        item: frag.item,
+                        text,
+                    }
                 };
                 for line in lines {
                     let info = &infos[line];
@@ -190,9 +202,13 @@ impl Engine {
             // the list markers and alt texts in a table's cells
             for extra in unit.extras.clone() {
                 let (boxed, role) = &laid.extras[extra];
-                let part = Part::Extra {
-                    item: frag.item,
-                    extra,
+                let part = if frag.repeat {
+                    Part::Repeat
+                } else {
+                    Part::Extra {
+                        item: frag.item,
+                        extra,
+                    }
                 };
                 for (line, info) in boxed.lines().iter().enumerate() {
                     if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
