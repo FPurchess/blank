@@ -168,8 +168,6 @@ export interface Changes {
 }
 
 export interface SyncOptions {
-  // flattens the whole document again, even the same one
-  force?: boolean;
   frozen?: FrozenWidths | null;
   // lays out a long document's first pages first, see FIRST_ITEMS
   progressive?: boolean;
@@ -478,7 +476,6 @@ export class PageEngine {
     doc: Node,
     sizes: ImageSizes,
     {
-      force = false,
       frozen = null,
       progressive = false,
       changes = null,
@@ -487,8 +484,7 @@ export class PageEngine {
     }: SyncOptions,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
-    const same =
-      !force && frozenKey === this.frozen && sizesKey === this.sizesKey;
+    const same = frozenKey === this.frozen && sizesKey === this.sizesKey;
     if (doc === this.doc && same && blocks.length === 0) return false;
     this.frozen = frozenKey;
     this.sizesKey = sizesKey;
