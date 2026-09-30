@@ -351,16 +351,24 @@ export class PageEngine {
       }
       return run();
     } catch (error) {
+      // a trap leaves the wasm instance unusable, for every engine of it
+      const trap = error instanceof WebAssembly.RuntimeError;
+      if (trap) {
+        instanceBroken = true;
+        if (this !== pageEngine) pageEngine?.fail(error);
+      }
+      // an export's error that isn't a trap is the export's own
+      if (this.strict && !trap) throw error;
       this.fail(error);
       if (this.strict) throw error;
       return fallback;
     }
   }
 
-  // gives the engine up after its first error
+  // gives the engine up after its first error; for the page view's engine,
+  // the editor then shows the text itself
   private fail(error: unknown) {
     this.broken = true;
-    instanceBroken = true;
     clearTimeout(this.timer);
     this.pending = null;
     this.onProgress = null;

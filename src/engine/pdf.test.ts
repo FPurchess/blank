@@ -36,7 +36,7 @@ import { handleJob, type PdfReply } from "./pdfWorker";
 import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
 import * as pdfJob from "./pdfJob";
-import { baseFonts, setPageEngine } from "./engine";
+import { baseFonts, pageEngine, setPageEngine } from "./engine";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -220,6 +220,32 @@ describe("the PDF export after the engine trapped", () => {
       expect(text).toContain("Findings");
     },
   );
+
+  it("fails on an error of its own that isn't a trap, without a worker", async () => {
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(() => {
+      throw new Error("the image x.png can't be written");
+    });
+    await expect(exportIt()).rejects.toThrow(
+      "the image x.png can't be written",
+    );
+    expect(engineInstanceBroken()).toBe(false);
+    expect(jobs).toEqual([]);
+  });
+
+  it("gives up the page view's engine after a trap, which shares the instance", async () => {
+    const page = testEngine();
+    setPageEngine(page);
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+
+    const { pages } = await exportIt();
+
+    expect(pages).toBe(1);
+    expect(jobs).toHaveLength(1);
+    expect(page.broken).toBe(true);
+    expect(pageEngine).toBeNull();
+    expect(document.body.classList).toContain("without-engine");
+    setPageEngine(null);
+  });
 
   it("goes straight to the worker once the instance is broken", async () => {
     vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);

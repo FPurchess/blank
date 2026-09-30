@@ -113,6 +113,14 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   as they were: reading them back out of the store while healthy would make
   that same one JS copy, and after a trap it can't be read.
 
+- For the rules (engine failures): only a `WebAssembly.RuntimeError` (a
+  trap) marks the wasm instance broken. A trap in any engine of it, the PDF
+  export's included, gives up the page view's engine too, since they share
+  the instance: the editor shows the text itself, and the export goes on in
+  the worker. Any other error of the page view's engine gives up that
+  engine alone (the instance stays usable for exports); any other error of
+  an export is that export's own and fails it, without a worker.
+
 ## Verification
 
 At `51f76b9`:
