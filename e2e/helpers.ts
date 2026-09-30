@@ -557,6 +557,26 @@ export const pressMod = async (...keys: string[]) => {
 };
 
 /**
+ * pressShift presses `key` with Shift held, as separate actions:
+ * WebKitWebDriver drops the Shift of `browser.keys`
+ */
+export const pressShift = async (key: string) => {
+  await browser.performActions([
+    {
+      type: "key",
+      id: "keyboard",
+      actions: [
+        { type: "keyDown", value: Key.Shift },
+        { type: "keyDown", value: key },
+        { type: "keyUp", value: key },
+        { type: "keyUp", value: Key.Shift },
+      ],
+    },
+  ]);
+  await browser.releaseActions();
+};
+
+/**
  * types the given text. Every char is sent as separate key action, since WebKitWebDriver
  * drops consecutive identical chars within a single action (e.g. "ll" becomes "l")
  * @param text text to type
