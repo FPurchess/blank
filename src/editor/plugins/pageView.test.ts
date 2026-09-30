@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  path,
   transaction,
   pageCaret,
   pageComposition,
@@ -35,6 +36,7 @@ import {
 } from "../../engine/engine";
 import { hidePages, showPages } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
+import { forgetImages } from "../../engine/images";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 
@@ -412,5 +414,62 @@ describe("cell selections", () => {
     const selection = selectionAt(state, { node: false, pos: 6 }, 4);
     expect(selection).toBeInstanceOf(TextSelection);
     expect([selection.from, selection.to]).toEqual([4, 6]);
+  });
+});
+
+describe("images on the pages", () => {
+  let loads: { src: string; load: () => void }[] = [];
+
+  beforeEach(() => {
+    loads = [];
+    vi.stubGlobal(
+      "Image",
+      class {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        naturalWidth = 0;
+        naturalHeight = 0;
+        set src(src: string) {
+          loads.push({
+            src,
+            load: () => {
+              this.naturalWidth = 300;
+              this.naturalHeight = 150;
+              this.onload?.();
+            },
+          });
+        }
+      },
+    );
+    path.value = null;
+    showPages();
+  });
+  afterEach(() => {
+    hidePages();
+    forgetImages();
+    path.value = null;
+  });
+
+  it("shows an untitled document's relative image once it's saved", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    const mounted = mount(
+      doc(p("text"), schema.node("paragraph", null, image)),
+    );
+    const shownImages = () =>
+      pageEngine!.display(0, pageLayoutState.value!.versions[0]).i;
+
+    // no folder to look for it in
+    expect(loads).toEqual([]);
+
+    path.value = "/docs/report.md";
+    expect(loads).toHaveLength(1);
+    loads[0].load();
+
+    const [shown] = shownImages();
+    expect(shown[0]).toBe("img.png");
+    // 300 × 150 px at 96 dpi
+    expect(shown[3]).toBeCloseTo(225);
+    expect(shown[4]).toBeCloseTo(112.5);
+    mounted.view.destroy();
   });
 });

@@ -1,7 +1,6 @@
 import type { Node } from "prosemirror-model";
 
 import type { exporterFunc } from "../exporters/types";
-import { fitBox } from "../images/fit";
 import {
   failureWarning,
   type PreparedImage,
@@ -9,7 +8,6 @@ import {
 } from "../images/prepare";
 import { documentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
-import { POINTS_PER_PIXEL } from "../layout/units";
 import {
   baseFonts,
   engineInstanceBroken,
@@ -18,6 +16,7 @@ import {
 } from "./engine";
 import { fallbackFonts } from "./fallback";
 import { flatten, type ImageSizes } from "./flatten";
+import { fittedSize } from "./images";
 import type { PdfJob, PdfResult } from "./pdfJob";
 import type { PdfReply } from "./pdfWorker";
 
@@ -30,20 +29,13 @@ import type { PdfReply } from "./pdfWorker";
  * sizesOf returns the sizes the images of the PDF are laid out with, the
  * same as on screen (see imageSizes)
  */
-const sizesOf =
+export const sizesOf =
   (images: Map<string, PreparedImage>, layout: Layout): ImageSizes =>
   (src) => {
     const image = images.get(src);
     if (!image) return undefined;
     const { contentWidth, contentHeight } = pageGeometry(layout);
-    return fitBox(
-      {
-        width: image.width * POINTS_PER_PIXEL,
-        height: image.height * POINTS_PER_PIXEL,
-      },
-      contentWidth,
-      contentHeight,
-    );
+    return fittedSize(image, { width: contentWidth, height: contentHeight });
   };
 
 interface Prepared {

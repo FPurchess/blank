@@ -22,7 +22,7 @@ import {
   pageBoxInWindow,
   viewBox,
 } from "../../engine/geometry";
-import { imageSizes, imagesLoaded } from "../../engine/images";
+import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
@@ -282,10 +282,12 @@ export const pageSync = () => {
             },
             { flush: "sync" },
           ),
-          // the page setup, the fields of headers and footers, loaded images
+          // the page setup, the fields of headers and footers, loaded
+          // images, and the document's folder, which relative images are in
           watch(
-            [pageLayout, pageFields, imagesLoaded],
-            () => {
+            [pageLayout, pageFields, loadedImages, path],
+            (_now, [, , , previousPath]) => {
+              if (path.value !== previousPath) forgetFailures();
               timed("layout", () => sync(ready, view.state, frozen, true));
               if (engine === ready) publishSelection(ready, view.state, false);
             },

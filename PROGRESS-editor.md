@@ -15,7 +15,7 @@ deletes this file on merge.
 - [x] 6. Keyboard and mouse make cell selections in tables
 - [x] 7. Cells that share a node object get their own positions
 - [ ] 8. Images, lists and quotes in table cells — waiting for S2
-- [ ] 9. Image cache by resolved URL, retried, and no counter
+- [x] 9. Image cache by resolved URL, retried, and no counter
 - [ ] 10. Drag and drop of text
 - [ ] 11. The PDF waits for fallback glyphs
 - [ ] 12. The hidden `TableView` no longer freezes columns
@@ -61,3 +61,9 @@ deletes this file on merge.
 - engine-ui: `PageLayoutState.header` (added here word for word as agreed)
   is filled from `engine.bands(0)`; `FrameLayout.headerRoom` is
   `HEADER_ROOM` (20) in "page ends" when it's set, else 0.
+- engine-ui: the page view's images are known by their url
+  (`displaySrc(src, path)`). `loadedImages` (`src/engine/images.ts`) is the
+  set of loaded urls, replaced whole with each; `imagesLoaded` is now its
+  size, a computed kept for `PageFrame.vue`'s bitmap key. That key doesn't
+  name the document, so the same page and version of another document may
+  reuse a stale bitmap.

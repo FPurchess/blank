@@ -24,7 +24,11 @@ import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
 import { flushPromises } from "../test/async";
 import { engineInstanceBroken, forgetEngineFailure } from "./engine";
-import toPDF from "./pdf";
+import toPDF, { sizesOf } from "./pdf";
+import { prepareImages } from "../images/prepare";
+import { documentFields } from "../layout/bands";
+import { pageGeometry } from "../layout/resolve";
+import { forgetImages, imageSizes, loadedImage } from "./images";
 import { handleJob, type PdfReply } from "./pdfWorker";
 import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
@@ -236,5 +240,50 @@ describe("the PDF export after the engine trapped", () => {
       title: "PDF-Export",
       body: "Failed to export file: the page layout failed while writing the PDF: no worker",
     });
+  });
+});
+
+describe("the PDF's images", () => {
+  afterEach(() => forgetImages());
+
+  it("are laid out as the page view lays them out", async () => {
+    const src = `data:image/png;base64,${IMAGES.png}`;
+    const node = parseMarkdown(`Text\n\n![a dot](${src})\n\nMore`);
+    const layout = testLayout();
+    const fields = documentFields(node);
+
+    const { images } = await prepareImages(node, null, ["image/png"]);
+    const pdf = testEngine();
+    pdf.setSettings(layout, fields);
+    pdf.sync(node, sizesOf(images, layout));
+
+    // the page view's, once the webview loaded the image
+    let loaded: (() => void) | null = null;
+    vi.stubGlobal(
+      "Image",
+      class {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        naturalWidth = 3;
+        naturalHeight = 2;
+        set src(_src: string) {
+          loaded = () => this.onload?.();
+        }
+      },
+    );
+    loadedImage(src, null);
+    loaded!();
+    const { contentWidth, contentHeight } = pageGeometry(layout);
+    const screen = testEngine();
+    screen.setSettings(layout, fields);
+    screen.sync(
+      node,
+      imageSizes(null, { width: contentWidth, height: contentHeight }),
+    );
+
+    expect(screen.pages()).toBe(pdf.pages());
+    const shown = (engine: typeof pdf) => engine.display(0, 1).i;
+    expect(shown(screen)).toHaveLength(1);
+    expect(shown(screen)).toEqual(shown(pdf));
   });
 });
