@@ -201,8 +201,9 @@ impl Laid {
                 ..
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
-                    // an image never is wider than the room it has
-                    let scale = (inner / image_width).min(1.0);
+                    // an image never is wider than the room it has, nor
+                    // taller than a page's
+                    let scale = (inner / image_width).min(room / height).min(1.0);
                     let (w, h) = (image_width * scale, height * scale);
                     Laid::single(
                         h,

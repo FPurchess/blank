@@ -199,8 +199,11 @@ pub(super) fn table_units(
                         alt,
                     } => {
                         if *image_width > 0.0 && *image_height > 0.0 {
-                            // never wider than the cell
-                            let scale = (inner / image_width).min(1.0);
+                            // never wider than the cell, nor taller than a
+                            // page, as a row's slices don't cut it
+                            let scale = (inner / image_width)
+                                .min((room - 2.0 * CELL_PADDING_Y) / image_height)
+                                .min(1.0);
                             let (w, h) = (image_width * scale, image_height * scale);
                             decos.push(Deco::Image {
                                 src: src.clone(),
@@ -1057,5 +1060,34 @@ mod tests {
             .collect();
         // IBM Plex Mono
         assert_eq!(fonts, [10]);
+    }
+
+    #[test]
+    fn keeps_images_within_the_page() {
+        // taller than a page, at the top and in a cell: scaled down to the
+        // room, keeping their shape
+        let tall = Item {
+            content: Content::Image {
+                pos: 0,
+                src: "tall.png".into(),
+                width: 100.0,
+                height: 2000.0,
+                alt: String::new(),
+            },
+            ..crate::engine::test_support::paragraph(0, "")
+        };
+        let engine = test_support::engine(vec![tall]);
+        let bottom = engine.settings.content_bottom();
+        assert!(
+            engine.pages[0].bottom <= bottom + 0.01,
+            "{}",
+            engine.pages[0].bottom
+        );
+        let in_cell = block_table(vec![vec![image_block(5, 100.0, 2000.0)]]);
+        for page in &in_cell.pages {
+            assert!(page.bottom <= bottom + 0.01, "{}", page.bottom);
+        }
+        let image = &in_cell.laid[0].cell_images[0];
+        assert!((image.w / image.h - 0.05).abs() < 1e-4);
     }
 }
