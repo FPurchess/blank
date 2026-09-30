@@ -24,7 +24,12 @@ import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
 import { flushPromises } from "../test/async";
 import { engineInstanceBroken, forgetEngineFailure } from "./engine";
-import toPDF, { describeWarnings, pdfLanguage, sizesOf } from "./pdf";
+import toPDF, {
+  describeWarnings,
+  pdfLanguage,
+  sizesOf,
+  WORKER_TIMEOUT,
+} from "./pdf";
 import { language } from "../state";
 import { prepareImages } from "../images/prepare";
 import { documentFields } from "../layout/bands";
@@ -230,6 +235,23 @@ describe("the PDF export after the engine trapped", () => {
     );
     expect(engineInstanceBroken()).toBe(false);
     expect(jobs).toEqual([]);
+  });
+
+  it("gives up a worker that doesn't answer", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    // a worker that never answers
+    const hanging = vi
+      .spyOn(InProcessWorker.prototype, "postMessage")
+      .mockImplementation(() => {});
+    const done = exportIt().then(
+      () => "written",
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(WORKER_TIMEOUT + 1);
+    expect(await done).toMatch(/took too long/);
+    hanging.mockRestore();
+    vi.useRealTimers();
   });
 
   it("gives up the page view's engine after a trap, which shares the instance", async () => {

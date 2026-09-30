@@ -56,7 +56,7 @@ import {
 } from "../../engine/engine";
 import { hidePages, showPages, testEngine } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
-import { forgetImages } from "../../engine/images";
+import { forgetImages, loadedImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
@@ -536,6 +536,25 @@ describe("images on the pages", () => {
     // 300 × 150 px at 96 dpi
     expect(shown[3]).toBeCloseTo(225);
     expect(shown[4]).toBeCloseTo(112.5);
+    mounted.view.destroy();
+  });
+
+  it("loads the images of another document again", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    path.value = "/docs/report.md";
+    const mounted = mount(
+      doc(p("some text"), schema.node("paragraph", null, image)),
+    );
+    loads[0].load();
+    expect(loadedImages.value.size).toBe(1);
+    // opened: the same src may be another picture, or changed on disk
+    mounted.view.updateState(
+      applyDocument(
+        mounted.view.state,
+        doc(schema.node("paragraph", null, image)),
+      ),
+    );
+    expect(loads).toHaveLength(2);
     mounted.view.destroy();
   });
 
