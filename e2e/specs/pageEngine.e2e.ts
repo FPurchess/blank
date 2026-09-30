@@ -386,12 +386,15 @@ describe("page view", () => {
   });
 
   // two chapters of four paragraphs fill about a page
+  // about 2.7 chapters of four paragraphs fill a page
   for (const [name, chapters] of [
     ["1", 1],
-    ["20", 40],
-    ["100", 200],
+    ["40", 108],
+    ["200", 540],
   ] as const) {
-    it(`measures typing on about ${name} pages`, async () => {
+    it(`measures typing on about ${name} pages`, async function () {
+      // a long document takes a while to open
+      this.timeout(240_000);
       const file = path.join(dir, `long-${name}.md`);
       fs.writeFileSync(
         file,
@@ -408,7 +411,18 @@ describe("page view", () => {
           window as unknown as { blankBootTimes: () => Record<string, number> }
         ).blankBootTimes(),
       );
-      const pages = await $("#ui-page-number").getText();
+      // a long document is laid out a chunk at a time: until its last page
+      let pages = "";
+      await browser.waitUntil(
+        async () => {
+          const now = await $("#ui-page-number").getText();
+          await browser.pause(1000);
+          const settled = now === pages;
+          pages = now;
+          return settled;
+        },
+        { timeout: 120_000, interval: 0 },
+      );
       await clickOnPage(1, 44, 58);
       await browser.execute(() =>
         (
