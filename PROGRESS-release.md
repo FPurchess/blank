@@ -5,6 +5,7 @@
 - [x] 3. B5: the exactness tests fail without poppler on CI
 - [x] 4. macOS minimum version
 - [x] 5. skip system fonts whose licence forbids embedding
+- [x] 3b. (from the integrator) the `test` job installs `fonts-noto-cjk`, and exact.test.ts fails on CI without it instead of laying the Chinese out without a font. e2e.yml doesn't need it: pageEngine.e2e.ts only takes a screenshot of the Chinese.
 - [ ] 6. `fallback_fonts` off the main thread
 - [ ] 7. system fallback for Common-script characters
 - [ ] 8. third-party notices and all font licences ship

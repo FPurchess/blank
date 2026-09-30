@@ -21,11 +21,12 @@ jobs:
         with:
           node-version: 24
 
-      # pdftotext and pdfinfo, which check the engine's PDF against its layout
-      - name: install poppler
+      # pdftotext and pdfinfo, which check the engine's PDF against its
+      # layout, and the Chinese font src/engine/exact.test.ts lays out with
+      - name: install poppler and a CJK font
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y poppler-utils fonts-noto-cjk
 
       - run: |
           bun install

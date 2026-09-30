@@ -199,6 +199,10 @@ describe.runIf(hasPdftotext)("the PDF holds the layout", () => {
     ];
     if (existsSync(CJK)) {
       fonts.push({ family: "Noto Sans CJK SC", bytes: readFileSync(CJK) });
+    } else if (process.env.CI) {
+      throw new Error(
+        `${CJK} is missing: install fonts-noto-cjk, CI doesn't skip the Chinese`,
+      );
     }
     const engine = testEngine();
     engine.addFonts(fonts);
