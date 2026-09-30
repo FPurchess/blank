@@ -9,7 +9,7 @@ import { testEngine } from "../test/engine";
 import { flushPromises } from "../test/async";
 import { testLayout } from "../test/layout";
 import { bootApp } from "./mount";
-import { pageBitmaps } from "./pageBitmaps";
+import { pageBitmaps, paintQueue } from "./pageBitmaps";
 import { frameRenders } from "./pageLayers";
 import { painter, type Painter, setPainter } from "./painter";
 
@@ -381,6 +381,27 @@ describe("the pages and the painter", () => {
       expect(pages.size).toBeGreaterThanOrEqual(12);
     } finally {
       window.devicePixelRatio = ratio;
+    }
+  });
+
+  it("drops a paint asked for by a change undone before it ran", async () => {
+    const { fake, painted } = recorder();
+    setPainter(fake);
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    painted.length = 0;
+    try {
+      // dark and back within one frame: the pages show light already
+      theme.value = "dark";
+      await nextTick();
+      theme.value = "light";
+      await nextTick();
+      expect(paintQueue.pending).toBe(0);
+      await paintQueued();
+      expect(painted).toEqual([]);
+    } finally {
+      theme.value = "light";
     }
   });
 

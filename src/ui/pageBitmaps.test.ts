@@ -113,6 +113,29 @@ const manual = () => {
 };
 
 describe("PaintQueue", () => {
+  it("paints the others when one fails", () => {
+    const { scheduler, frames, job } = manual();
+    const queue = new PaintQueue(scheduler);
+    const ran: string[] = [];
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    queue.request({
+      key: "broken",
+      priority: 0,
+      run: () => {
+        throw new Error("no context");
+      },
+    });
+    queue.request(job("after", 0, ran));
+    frames.shift()!();
+    expect(ran).toEqual(["after"]);
+    expect(queue.pending).toBe(0);
+    expect(error).toHaveBeenCalled();
+    // and it keeps painting
+    queue.request(job("later", 0, ran));
+    frames.shift()!();
+    expect(ran).toEqual(["after", "later"]);
+  });
+
   it("paints in the next frame, the pages in view first", () => {
     const { scheduler, frames, tasks, job } = manual();
     const queue = new PaintQueue(scheduler);

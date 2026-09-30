@@ -33,10 +33,9 @@ export class BitmapCache {
     this.delete(key);
     this.bitmaps.set(key, bitmap);
     this.bytes += bitmap.width * bitmap.height * 4;
-    for (const [oldest, old] of this.bitmaps) {
+    for (const oldest of this.bitmaps.keys()) {
       if (this.bytes <= this.limit || oldest === key) break;
       this.delete(oldest);
-      void old;
     }
   }
 
@@ -134,7 +133,12 @@ export class PaintQueue {
       const urgent = inFrame && job.priority < this.urgent;
       if (!urgent && this.scheduler.now() - start > FRAME_BUDGET) break;
       this.jobs.delete(job.key);
-      job.run();
+      // one that fails leaves the others to paint
+      try {
+        job.run();
+      } catch (error) {
+        console.error("painting a page failed", error);
+      }
     }
     if (this.jobs.size === 0) return;
     // the rest after the frame, in a task of its own

@@ -227,11 +227,14 @@ const layerOf = ({
       theme: theme.value,
       images: `${images()}${shows.key}`,
     });
-    if (key === shown) return;
+    // what it shows already, e.g. after a change undone before its paint:
+    // a paint still queued for the change would show the wrong key
+    if (key === shown) return paintQueue.cancel(job());
     const target = surfaceOf(canvas);
     if (!target) return;
     const cached = keeps ? pageBitmaps.get(key) : undefined;
     if (cached) {
+      paintQueue.cancel(job());
       painter.show(target, cached);
       shown = key;
       return;
