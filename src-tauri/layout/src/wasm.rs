@@ -144,6 +144,49 @@ impl LayoutEngine {
     }
 
     /// sets the page; the pages that changed, as `update` gives them
+    /// an engine with the fonts of `other`, fallbacks added with `addFont`
+    /// included, without copying their files, e.g. for an export; it has
+    /// its own page, items and images
+    #[wasm_bindgen(js_name = withFontsOf)]
+    pub fn with_fonts_of(other: &LayoutEngine) -> LayoutEngine {
+        report_panics();
+        LayoutEngine {
+            engine: Engine::new(other.engine.fonts.share()),
+            images: HashMap::new(),
+        }
+    }
+
+    /// how many font files the engine has, each once, in the order they
+    /// came: the ones it was made with, then the ones `addFont` added
+    #[wasm_bindgen(js_name = fontFileCount)]
+    pub fn font_file_count(&self) -> u32 {
+        self.engine.fonts.sources().len() as u32
+    }
+
+    /// a font file's bytes, e.g. to make the same engine in a worker; empty
+    /// for none
+    #[wasm_bindgen(js_name = fontFile)]
+    pub fn font_file(&self, index: u32) -> Vec<u8> {
+        self.engine
+            .fonts
+            .sources()
+            .get(index as usize)
+            .map(|(data, _)| data.as_ref().clone())
+            .unwrap_or_default()
+    }
+
+    /// the family a font file was added for with `addFont`, or "" for the
+    /// ones the engine was made with (and for none)
+    #[wasm_bindgen(js_name = fontFileFamily)]
+    pub fn font_file_family(&self, index: u32) -> String {
+        self.engine
+            .fonts
+            .sources()
+            .get(index as usize)
+            .map(|(_, family)| family.to_string())
+            .unwrap_or_default()
+    }
+
     #[wasm_bindgen(js_name = setSettings)]
     pub fn set_settings(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
         let settings: Settings = serde_json::from_str(json).map_err(error)?;

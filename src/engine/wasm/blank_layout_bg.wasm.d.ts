@@ -11,6 +11,9 @@ export const layoutengine_bottoms: (a: number) => [number, number];
 export const layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_caret: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_clearImages: (a: number) => void;
+export const layoutengine_fontFile: (a: number, b: number) => [number, number];
+export const layoutengine_fontFileCount: (a: number) => number;
+export const layoutengine_fontFileFamily: (a: number, b: number) => [number, number];
 export const layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
@@ -34,6 +37,7 @@ export const layoutengine_updateMany: (a: number, b: number, c: number) => [numb
 export const layoutengine_versions: (a: number) => [number, number];
 export const layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_verticalAt: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+export const layoutengine_withFontsOf: (a: number) => number;
 export const layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
 export const layoutengine_words: (a: number) => [number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;

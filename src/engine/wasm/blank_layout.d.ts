@@ -39,6 +39,21 @@ export class LayoutEngine {
     caret(pos: number, after: boolean): Float32Array;
     clearImages(): void;
     /**
+     * how many font files the engine has, each once, in the order they
+     * came: the ones it was made with, then the ones `addFont` added
+     */
+    fontFileCount(): number;
+    /**
+     * the family a font file was added for with `addFont`, or "" for the
+     * ones the engine was made with (and for none)
+     */
+    fontFileFamily(index: number): string;
+    /**
+     * a font file's bytes, e.g. to make the same engine in a worker; empty
+     * for none
+     */
+    fontFile(index: number): Uint8Array;
+    /**
      * a glyph's outline as an SVG path, in font units with y up
      */
     glyphPath(font: number, glyph: number): string;
@@ -97,9 +112,6 @@ export class LayoutEngine {
      * replaces all items; the pages that changed, as `update` gives them
      */
     setItems(json: string): Uint32Array;
-    /**
-     * sets the page; the pages that changed, as `update` gives them
-     */
     setSettings(json: string): Uint32Array;
     /**
      * how much the last change laid out: items, the page it paginated
@@ -143,6 +155,13 @@ export class LayoutEngine {
      * which also tells how to paint the caret there
      */
     vertical(pos: number, down: boolean, goal: number): Float64Array;
+    /**
+     * sets the page; the pages that changed, as `update` gives them
+     * an engine with the fonts of `other`, fallbacks added with `addFont`
+     * included, without copying their files, e.g. for an export; it has
+     * its own page, items and images
+     */
+    static withFontsOf(other: LayoutEngine): LayoutEngine;
     word(page: number, x: number, y: number): Uint32Array;
     /**
      * the words as laid out, for checking the PDF against the layout
@@ -164,6 +183,9 @@ export interface InitOutput {
     readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_clearImages: (a: number) => void;
+    readonly layoutengine_fontFile: (a: number, b: number) => [number, number];
+    readonly layoutengine_fontFileCount: (a: number) => number;
+    readonly layoutengine_fontFileFamily: (a: number, b: number) => [number, number];
     readonly layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
@@ -187,6 +209,7 @@ export interface InitOutput {
     readonly layoutengine_versions: (a: number) => [number, number];
     readonly layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_verticalAt: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly layoutengine_withFontsOf: (a: number) => number;
     readonly layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_words: (a: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
