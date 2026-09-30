@@ -221,7 +221,7 @@ impl LayoutEngine {
             start as usize,
             delete as usize,
             items,
-            shift as i64,
+            i64::from(shift),
         )))
     }
 
@@ -446,7 +446,8 @@ impl LayoutEngine {
     }
 
     /// how much the last change laid out: items, the page it paginated
-    /// from, and the page it settled at (-1 for none)
+    /// from, and the page it settled at (-1 for none); for tests
+    #[cfg(feature = "test-hooks")]
     pub fn stats(&self) -> Vec<i32> {
         let stats = self.engine.stats;
         vec![
@@ -456,7 +457,9 @@ impl LayoutEngine {
         ]
     }
 
-    /// the words as laid out, for checking the PDF against the layout
+    /// the words as laid out, for checking the PDF against the layout; for
+    /// tests
+    #[cfg(feature = "test-hooks")]
     pub fn words(&mut self) -> String {
         let words: Vec<_> = self
             .engine

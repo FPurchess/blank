@@ -151,7 +151,7 @@ impl Engine {
                     continue;
                 }
                 let old = old_first_frag
-                    .get(moved(item, -tail.delta))
+                    .get(moved(item, tail.delta.saturating_neg()))
                     .copied()
                     .filter(|old| *old != usize::MAX && *old >= old_copied_start);
                 if let Some(old) = old {
@@ -260,7 +260,7 @@ fn moved(index: usize, by: i64) -> usize {
     usize::try_from(signed(index).saturating_add(by)).unwrap_or(0)
 }
 
-fn signed(index: usize) -> i64 {
+pub(super) fn signed(index: usize) -> i64 {
     i64::try_from(index).unwrap_or(i64::MAX)
 }
 
@@ -338,7 +338,7 @@ impl Paginator<'_> {
             page.first = Some((item, unit));
             if let Some((tail, old_pages)) = self.old {
                 if item >= tail.start {
-                    let old = ((item as i64 - tail.delta) as usize, unit);
+                    let old = (moved(item, tail.delta.saturating_neg()), unit);
                     let index = old_pages
                         .partition_point(|page| page.first.is_some_and(|first| first < old));
                     if old_pages

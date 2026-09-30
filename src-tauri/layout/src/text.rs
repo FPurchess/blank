@@ -10,7 +10,7 @@ use parley::{
 
 use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
-use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, MEDIUM};
+use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE};
 
 /// A laid out textblock and where it stands in its item.
 pub struct TextBox {
@@ -563,8 +563,6 @@ fn push_span(
             StyleProperty::FontWeight(FontWeight::new(weight(true, style))),
             range.clone(),
         );
-    } else if style.weight == MEDIUM {
-        // medium headings stay medium
     }
     if span.italic {
         builder.push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());

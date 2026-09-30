@@ -11,17 +11,19 @@ mod paginate;
 mod select;
 #[cfg(test)]
 pub(crate) mod test_support;
+#[cfg(feature = "test-hooks")]
 mod text_layer;
 
 pub use display::{Op, Part};
 pub use navigate::Hit;
 pub use select::{GridRow, TableGrid};
+#[cfg(feature = "test-hooks")]
 pub use text_layer::Word;
 
 use crate::bands::{bands_on, chapter_on, expand_slots, Chapter, Values};
 use crate::fonts::Fonts;
 use crate::items::Laid;
-use crate::model::{Item, Settings};
+use crate::model::{shift_pos, Item, Settings};
 use paginate::{Change, ItemMap, Tail};
 
 /// a unit of an item placed on a page, at `y` from the page's top edge
@@ -236,10 +238,10 @@ impl Engine {
                 }
                 for laid in &mut self.laid[start + count..] {
                     for text in &mut laid.texts {
-                        text.pos = (text.pos as i64 + shift).max(0) as u32;
+                        text.pos = shift_pos(text.pos, shift);
                     }
                     for image in &mut laid.cell_images {
-                        image.pos = (image.pos as i64 + shift).max(0) as u32;
+                        image.pos = shift_pos(image.pos, shift);
                     }
                 }
             }
@@ -264,7 +266,7 @@ impl Engine {
         let tail = match runs.last() {
             Some(&(length, Some(old))) if length > 0 && old + length == old_count => Some(Tail {
                 start: at - length,
-                delta: (at - length) as i64 - old as i64,
+                delta: paginate::signed(at - length) - paginate::signed(old),
             }),
             _ => None,
         };

@@ -19,7 +19,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 14. Variable-font coordinates
 - [x] 15. Fallback families as a list, not CSS
 - [x] 16. Waste in `page_ops` and per keystroke
-- [ ] 17. Dead and test-only code
+- [x] 17. Dead and test-only code
 - [ ] 18. The exactness tests prove more
 
 ## Notes
@@ -257,6 +257,21 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - keeps `first_frag` of the items before the restart, finds it for the fragments paginated again, and works it out for the copied tail from the old values
   - expands band texts only for the pages paginated again, unless the number of pages or the chapters changed (then for every page)
 - The property test (random edits through `update` and `update_many` against a fresh layout, versions both ways) passes, also with 2000 edits in release.
+
+### Task 17: dead and test-only code
+
+- Removed `Engine::lines`, which nothing used, the empty `else if style.weight == MEDIUM {}` in `push_span`, and a `+ 0` in a test.
+- The cargo feature `test-hooks` (on by default, as agreed with the coordinator) gates `Engine::words`/`text_layer`, and the wasm's `words()` and `stats()`. `tests/exact.rs` has `required-features = ["test-hooks"]`. The crate builds, and passes wasm32 clippy, with and without it.
+- Casts:
+  - positions move through `model::shift_pos` (checked, clamped to 0..=u32::MAX)
+  - indices through `paginate::moved`/`signed` (checked, never below 0, `saturating_neg`)
+  - wasm's `shift` goes through `i64::from`
+  - no `as i64`/`as usize`/`as u32` on a signed value is left in the tail shifting
+- skrifa:
+  - The wasm has skrifa 0.42/read-fonts 0.39 (krilla 0.8.2, the newest krilla) and 0.44/0.41 (Parley 0.11.1).
+  - The only aligned pair is Parley 0.10.0 with krilla 0.8.2. It built with no code change and passed every cargo test, and the raw wasm shrank from 4.29 to 3.97 MB (−316 KB, about 7%).
+  - Decision, with the coordinator: stay on Parley 0.11, since a current shaper (harfrust 0.12, fontique 0.11) is worth more in a major release. Align once krilla depends on skrifa 0.44 or newer. The comment next to the dependencies in `Cargo.toml` says so.
+- clippy on wasm32 is clean. `--all-targets` has only the `type_complexity` warning in `tests/exact.rs` `read_words`, which is engine-release's to change.
 
 ### Known quirks (of other tools, not of the PDF)
 

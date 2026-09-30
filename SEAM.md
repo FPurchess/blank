@@ -200,3 +200,11 @@ No shape changes. What changes is which numbers `font` can be:
 - An index never changes its meaning, not even when `addFont` adds faces later, so a cache keyed by `font * 0x10000 + id` (as `engine.ts` has it) stays right.
 - `fontFileCount`/`fontFile`/`fontFileFamily` count files, never instances.
 - TS side: nothing to change. Just don't assume that `font` is less than the number of faces.
+
+## `test-hooks`: the exports only tests use (task 17)
+
+Commit: `chore: drop dead code, gate the test exports and check the casts` (its hash is in the handoff message).
+
+- `stats()` and `words()` (and `Engine::words`) are behind the cargo feature `test-hooks`, which is **on by default**. So `scripts/build-engine.sh` builds them as before, and `src/engine/engine.test.ts:73` (`raw.stats()`) and `src/engine/exact.test.ts` (`raw.words()`) keep working.
+- Leaving them out of the production wasm is a later release decision (the coordinator's call, not part of these tasks). It needs `--no-default-features` in the production build and a separate build with the feature for the TS tests. The crate builds and passes clippy both ways.
+- Removed, and not exported: `Engine::lines`, which nothing used.

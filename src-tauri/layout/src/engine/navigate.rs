@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(up, pos);
         // from the last line of a page to the first of the next
         let second = engine.pages[1].first.unwrap();
-        let frag = engine.first_frag[second.0] + 0;
+        let frag = engine.first_frag[second.0];
         let previous = engine.frags[engine.pages[0].end - 1];
         let last_line_pos = {
             let boxed = &engine.laid[previous.item].texts[0];
