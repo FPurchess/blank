@@ -324,8 +324,11 @@ export const tableHandles = () => {
       };
       window.addEventListener("mousemove", move);
       document.documentElement.addEventListener("mouseleave", leave);
-      // the page view scrolled, resized or switched
-      const stop = watch(pageViewport, () => publish(view), { flush: "sync" });
+      // the page view scrolled, resized or switched, or the pages were laid
+      // out again, e.g. once an image above loaded
+      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
+        flush: "sync",
+      });
       // without the engine, the editor itself scrolls
       const scrolled = () => {
         if (engineless()) publish(view);

@@ -4,6 +4,8 @@ import { CellSelection } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 
 import { columnPercents } from "../../../markdown/tables";
+import { config } from "../../../config";
+import { allMargins } from "../../../layout/settings";
 import {
   announcement,
   contextMenu,
@@ -326,5 +328,37 @@ describe("measuring the tables under the mouse", () => {
     expect(new Set(measure.mock.calls.map(([pos]) => pos)).size).toBe(
       measure.mock.calls.length,
     );
+  });
+});
+
+describe("the handles after the pages are laid out again", () => {
+  let saved: typeof config.value;
+
+  beforeEach(() => {
+    saved = config.value;
+    announcement.value = null;
+    showPages("pages");
+    view = editor();
+  });
+  afterEach(() => {
+    view.destroy();
+    hidePages();
+    config.value = saved;
+  });
+
+  it("move with the table, without a transaction or a scroll", () => {
+    hover();
+    const before = state().box;
+    // wider margins in blank.json: the table moves on its page
+    config.value = {
+      ...saved,
+      layout: { page: { ...saved.layout.page, margins: allMargins(150) } },
+    };
+    const now = tableGeometry(TABLE)!.pieces[0].box;
+    expect(now.left).toBeGreaterThan(before.left);
+    // as the pages show it now, or gone where the mouse left it
+    const shown = handles.value?.box ?? null;
+    expect(shown).not.toEqual(before);
+    if (shown) expect(shown).toEqual(now);
   });
 });
