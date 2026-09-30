@@ -50,6 +50,9 @@ export interface PageRect {
 // the caret, null while the selection isn't empty or a node is selected
 export const pageCaret = shallowRef<PageRect | null>(null);
 
+// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages
+export const pageHeadBox = shallowRef<PageRect | null>(null);
+
 // the selection's rectangles, empty while it is a caret: the text of a
 // range, or the selected cells
 export const pageSelection = shallowRef<PageRect[]>([]);

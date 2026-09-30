@@ -56,6 +56,7 @@ import {
   language,
   pageCaret,
   pageComposition,
+  pageHeadBox,
   pageFields,
   pageLayout,
   pageLayoutState,
@@ -170,6 +171,16 @@ const publishSelection = (
   pageSelection.value = shown.rects;
   pageNodeSelection.value = shown.nodes;
   const head = shown.caret ?? engine.caret(selection.head, after);
+  const now = pageHeadBox.value;
+  if (
+    !head ||
+    !now ||
+    head.page !== now.page ||
+    head.x !== now.x ||
+    head.y !== now.y ||
+    head.height !== now.height
+  )
+    pageHeadBox.value = head;
   if (scroll && head)
     pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
 };
@@ -387,6 +398,7 @@ export const pageSync = () => {
         engine = null;
         pageLayoutState.value = null;
         pageCaret.value = null;
+        pageHeadBox.value = null;
         pageSelection.value = [];
         pageNodeSelection.value = [];
         pageComposition.value = [];

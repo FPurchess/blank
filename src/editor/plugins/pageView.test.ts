@@ -25,6 +25,7 @@ import { schema } from "../../markdown";
 import {
   engineMissing,
   pageFields,
+  pageHeadBox,
   pageLayout,
   path,
   transaction,
@@ -666,6 +667,20 @@ describe("the line a caret is on", () => {
     expect(step).toBeGreaterThan(5);
     expect(lines[2] - lines[1]).toBeCloseTo(step, 3);
     expect(back).toEqual([lines[1], lines[0]]);
+  });
+
+  it("publishes where the head is painted, on its own line", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    const start = pageHeadBox.value!;
+    mounted.press("End");
+    // the end of the first line, where the second one starts too
+    expect(pageHeadBox.value!.y).toBe(start.y);
+    expect(pageHeadBox.value).toEqual(pageCaret.value);
+    // a range's head too, where no caret is painted
+    mounted.press("Shift-Home");
+    expect(pageCaret.value).toBeNull();
+    expect(pageHeadBox.value).toMatchObject({ page: 0, y: start.y });
   });
 
   it("forgets it once the caret moves another way", () => {
