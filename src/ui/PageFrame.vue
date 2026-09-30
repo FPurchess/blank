@@ -15,7 +15,7 @@ import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { bootMark, record } from "../engine/perf";
-import { pageLayoutState, path, theme } from "../state";
+import { pageLayout, pageLayoutState, path, theme } from "../state";
 import { bitmapKey, engineId, pageBitmaps, paintQueue } from "./pageBitmaps";
 import { painter, type Surface } from "./painter";
 import { frameRenders, type Layer, layerDisplay } from "./pageLayers";
@@ -258,7 +258,12 @@ const mark = computed(() => {
   if (props.sheet || !engine) return null;
   void props.bandVersion;
   const next = props.nextBandVersion >= 0 ? engine.bands(props.page + 1) : null;
-  return endMark(props.page, engine.bands(props.page), next);
+  return endMark(
+    props.page,
+    engine.bands(props.page),
+    next,
+    pageLayout.value.layout,
+  );
 });
 </script>
 

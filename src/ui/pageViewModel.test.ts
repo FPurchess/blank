@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FrameLayout } from "../engine/frames";
+import { testLayout } from "../test/layout";
 import {
   anchorTop,
   endMark,
@@ -32,17 +33,55 @@ describe("scrollFor", () => {
 });
 
 describe("endMark", () => {
+  const footer = (center: string) =>
+    testLayout({ footer: { left: "", center, right: "" } });
+
   it("shows the footer, the number without one, and the next header", () => {
     const bands = ["T", "", "", "", "2 of 5", ""];
-    expect(endMark(1, bands, ["Next", "", "", "", "", ""])).toEqual({
+    expect(
+      endMark(
+        1,
+        bands,
+        ["Next", "", "", "", "", ""],
+        footer("{page} of {pages}"),
+      ),
+    ).toEqual({
       footer: ["", "2 of 5", ""],
       number: "",
       header: ["Next", "", ""],
     });
-    expect(endMark(1, ["", "", "", "", "", ""], null)).toMatchObject({
+    expect(
+      endMark(1, ["", "", "", "", "", ""], null, testLayout()),
+    ).toMatchObject({
       number: "2",
       header: ["", "", ""],
     });
+  });
+
+  it("numbers the page as the pages are numbered", () => {
+    const empty = ["", "", "", "", "", ""];
+    // roman numerals, where the footer has none
+    expect(
+      endMark(1, empty, null, testLayout({ numberStyle: "i" })).number,
+    ).toBe("ii");
+    // and not twice where it has: "ii" and "2" aren't the same text
+    expect(
+      endMark(1, ["", "", "", "", "ii", ""], null, {
+        ...footer("{page}"),
+        numberStyle: "i",
+      }).number,
+    ).toBe("");
+    // from the number the first page starts at
+    expect(endMark(0, empty, null, testLayout({ startNumber: 5 })).number).toBe(
+      "5",
+    );
+    // a footer that reads a number that isn't the page's
+    expect(
+      endMark(1, ["", "", "", "", "Chapter 2", ""], null, footer("Chapter 2"))
+        .number,
+    ).toBe("2");
+    // nor is a written {page}
+    expect(endMark(1, empty, null, footer("{{page}")).number).toBe("2");
   });
 });
 

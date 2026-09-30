@@ -1,7 +1,10 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { formatShortcut } from "../editor/keyBindings";
 import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
-import type { Band } from "../layout/bands";
+import { type Band, bandsOn, formatNumber, pageNumber } from "../layout/bands";
+import type { Layout } from "../layout/resolve";
+import { SLOTS } from "../layout/settings";
+import { segments } from "../layout/tokens";
 
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
@@ -26,21 +29,32 @@ export const scrollFor = (
 
 /**
  * endMark returns what the mark at the end of a page shows: its footer,
- * with its number when the footer has none, and the next page's header
+ * with its number when the footer doesn't show it, and the next page's
+ * header
+ * @param page the page, counted from 0
  * @param bands the band texts of the page and of the next, see
  *   PageEngine.bands
+ * @param layout the document's page setup, which numbers the pages
  */
 export const endMark = (
   page: number,
   bands: string[],
   next: string[] | null,
+  layout: Layout,
 ) => {
-  const footer = bands.slice(3, 6);
-  const number = String(page + 1);
-  const hasNumber = footer.some((slot) => slot.includes(number));
+  // the footer's settings say whether it shows the number, whatever its
+  // text reads, e.g. "Chapter 2" on page 2
+  const footer = bandsOn(layout, page + 1).footer;
+  const shown = SLOTS.some((slot) =>
+    segments(footer[slot]).some(
+      (segment) => typeof segment !== "string" && segment.field === "page",
+    ),
+  );
   return {
-    footer,
-    number: hasNumber ? "" : `${page + 1}`,
+    footer: bands.slice(3, 6),
+    number: shown
+      ? ""
+      : formatNumber(pageNumber(layout, page + 1), layout.numberStyle),
     header: next ? next.slice(0, 3) : ["", "", ""],
   };
 };

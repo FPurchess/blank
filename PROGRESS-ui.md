@@ -15,7 +15,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 8. Contrast of the faint marks: `$faint-text-opacity` (0.6) for the page ends, page 1's header, the bands at rest and the page break label, ≥ 3:1 in every theme; the page number keeps only it
 - [x] 9. Reduced motion: the caret keeps still and the strips, hints and faded pages change at once under `prefers-reduced-motion: reduce` (`src/scss/motion.test.ts`)
 - [x] 10. Shadows and the desk in dark themes: `--desk-color`, `--sheet-edge`, `--sheet-shadow` per theme, a darker desk and black shadows without blur (unit test, and a pixel check of the desk against the sheet in every theme in `pageEngine.e2e.ts`)
-- [ ] 11. The page number where a page ends
+- [x] 11. The page number where a page ends: the page's number as the pages are numbered (style, start number), shown unless its footer's settings hold `{page}`
 - [ ] 12. Shift + right click
 - [ ] 13. Bands open on a double click
 - [ ] 14. Small UI details
