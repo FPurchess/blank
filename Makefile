@@ -145,6 +145,8 @@ release: ## Publish origin/main by pushing it to the release branch (DRY_RUN=1 o
 		fail "nothing to release, release is already at origin/main"; \
 	git merge-base --is-ancestor origin/release origin/main || \
 		fail "origin/release is not an ancestor of origin/main"; \
+	bash scripts/check-engine-ci.sh "$$(git rev-parse origin/main)" || \
+		fail "release only what the engine check passed on"; \
 	echo "Releasing v$$v at $$(git log -1 --format='%h %s' origin/main)"; \
 	echo "Changes since the last release:"; \
 	git log --oneline origin/release..origin/main; \

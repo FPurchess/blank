@@ -1,0 +1,38 @@
+name: "check the layout engine"
+description: "Tests the layout engine and fails when the committed wasm isn't what its sources build"
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        # RUST_VERSION in scripts/build-engine.sh
+        toolchain: 1.98.1
+        targets: wasm32-unknown-unknown
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src-tauri -> target
+
+    # the version of the wasm-bindgen crate in src-tauri/Cargo.lock
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen-cli@0.2.129
+
+    # pdftotext and pdfinfo, which check the engine's PDF against its layout
+    - name: install poppler
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y poppler-utils
+
+    - name: test the engine
+      shell: bash
+      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout
+
+    - name: check the committed wasm
+      shell: bash
+      run: |
+        bash scripts/build-engine.sh
+        git diff --exit-code --stat src/engine/wasm ||
+          { echo "::error::src/engine/wasm isn't what the engine's sources build: run make engine"; exit 1; }

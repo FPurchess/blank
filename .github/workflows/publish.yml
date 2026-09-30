@@ -5,7 +5,16 @@ on:
       - release
 
 jobs:
+  # a release never ships a wasm that isn't what the engine's sources build
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/engine
+
   publish-tauri:
+    needs: engine
     strategy:
       fail-fast: false
       matrix:
