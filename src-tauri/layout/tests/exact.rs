@@ -443,3 +443,105 @@ fn pdf_text_keeps_what_no_font_has() {
     }
     compare(&mut engine, "notdef");
 }
+
+/// what a command prints, or nothing without it
+fn run(program: &str, args: &[&str]) -> Option<String> {
+    let out = Command::new(program).args(args).output().ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
+}
+
+#[test]
+fn pdf_is_tagged() {
+    use blank_layout::pdf::write_with;
+    let mut items = sample();
+    let end = items.last().unwrap().to();
+    items.extend(table_with_blocks().into_iter().map(|mut item| {
+        item.shift(end as i64);
+        item
+    }));
+    // a quote, and an image that isn't loaded
+    let end = items.last().unwrap().to();
+    let mut quote = text_item(end + 2, "To be or not to be.", "p", 0, vec![]);
+    quote.indent = 12.0;
+    quote.bars = vec![0.0];
+    items.push(quote);
+    items.push(Item {
+        content: Content::Image {
+            pos: end + 30,
+            src: "missing.png".into(),
+            width: 0.0,
+            height: 0.0,
+            alt: "a map of the town".into(),
+        },
+        ..text_item(0, "", "p", 0, vec![])
+    });
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(items);
+    let written = write_with(
+        &mut engine,
+        &Default::default(),
+        &Info {
+            title: "Sample".into(),
+            author: "".into(),
+        },
+        "en-GB",
+    )
+    .unwrap();
+    assert!(written.warnings.is_empty());
+    let path = std::env::temp_dir().join("blank-layout-tagged.pdf");
+    std::fs::write(&path, &written.bytes).unwrap();
+    let path = path.to_str().unwrap();
+    let Some(info) = run("pdfinfo", &[path]) else {
+        eprintln!("pdfinfo is missing, skipping the check");
+        return;
+    };
+    let tagged = info.lines().find(|line| line.starts_with("Tagged:"));
+    assert!(tagged.is_some_and(|line| line.ends_with("yes")), "{info}");
+    if let Some(check) = run("qpdf", &["--check", path]) {
+        assert!(
+            check.contains("No syntax or stream encoding errors"),
+            "{check}"
+        );
+        // the language, the bookmarks and the structure, in the uncompressed file
+        let plain = std::env::temp_dir().join("blank-layout-tagged-qdf.pdf");
+        let plain = plain.to_str().unwrap();
+        run("qpdf", &["--qdf", "--object-streams=disable", path, plain]);
+        let bytes = std::fs::read(plain).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("/Lang (en-GB)"), "no /Lang");
+        assert!(text.contains("/Outlines"), "no bookmarks");
+        assert!(
+            text.contains("/Title (Chapter 1)"),
+            "no bookmark for the first chapter"
+        );
+        assert!(
+            text.contains("/Alt (a map of the town)"),
+            "no alt text on the figure"
+        );
+        for role in [
+            "/H1",
+            "/H2",
+            "/P",
+            "/L",
+            "/LI",
+            "/Lbl",
+            "/LBody",
+            "/Table",
+            "/TR",
+            "/TH",
+            "/TD",
+            "/Caption",
+            "/BlockQuote",
+            "/Figure",
+            "/Link",
+        ] {
+            assert!(
+                text.contains(&format!("/S {role}")),
+                "no {role} in the structure"
+            );
+        }
+    }
+    // and its text is where it was laid out, as without tags
+    compare(&mut engine, "tagged");
+}

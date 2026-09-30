@@ -14,8 +14,8 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 9. S2: lists, quotes and images in table cells
 - [x] 10. The PDF text layer keeps combining marks and ligature parts
 - [x] 11. S3: one shared font store
-- [ ] 12. S4: failed image decodes and broken fonts in the PDF
-- [ ] 13. Tags, `/Lang` and bookmarks in the PDF
+- [x] 12. S4: failed image decodes and broken fonts in the PDF
+- [x] 13. Tags, `/Lang` and bookmarks in the PDF
 - [ ] 14. Variable-font coordinates
 - [ ] 15. Fallback families as a list, not CSS
 - [ ] 16. Waste in `page_ops` and per keystroke
@@ -187,11 +187,50 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - the sources come in order, with the fallback's family
   - the shared engine's PDF is byte-identical to a fresh engine's, and so are the fragments
 
+### Task 12: failed images and fonts in the PDF
+
+- `pdf::write_with(engine, images, info, language) -> Written { bytes, warnings }`. `write` still returns the bytes, for `exact.rs` and old callers.
+- krilla checks a PNG's or JPEG's header in `from_png`/`from_jpeg`, but decodes it only in `document.finish()`, which then fails the whole document with `KrillaError::Image`.
+  - `write_with` therefore writes again without the image krilla names (found by `Image` equality among the loaded ones), and does the same for `KrillaError::Font` (found among the fonts), at most once for each image and font.
+- An image that can't be shown gets its alt text, laid out with style `alt` in its box (`paint_alt`), as many lines as fit and at least one. `Deco::Image`/`Op::Image` carry the `alt`.
+- Fonts: the review said a font without an outline table fails the whole export. I couldn't reproduce that with krilla 0.8.2:
+  - Tried: Noto Color Emoji (CBDT); Noto Emoji without `glyf`/`loca`/`gvar`, without `hmtx`, `cmap`, `head` or `maxp`; DejaVu Sans without `glyf`/`loca` as the only font for ⇒.
+  - All wrote without an error, because krilla draws glyphs without outlines as Type3 glyphs. Its "font is missing an outline table" error is only on the CID path.
+  - The retry stays as a safety net, and `writes_a_font_without_outlines` pins the behaviour down. engine-release filters such fonts at the source anyway.
+- `language` sets the document's `/Lang` (`Metadata::language`). Task 13 adds the tags.
+- Tests:
+  - `pdf::tests::writes_the_alt_text_of_images_it_cant_decode`: a good PNG; a corrupt one (header right, pixels broken, found in `finish`); garbage (found up front); and one never handed over. Two warnings, and every alt text in pdftotext's text except the good one's.
+  - `pdf::tests::writes_a_font_without_outlines`
+
+### Task 13: tags, `/Lang` and bookmarks
+
+- `display.rs` builds `(Op, Part)` pairs (`body_parts`, `band_parts`), and `body_ops`/`band_ops` drop the parts.
+  - A `Part` names what an op draws: a text box, marker, label (caption or alt text), image, cell extra, cell image or link of an item, or a decoration or band.
+  - Cell images are found among `Laid::cell_images` by their unit and place.
+- `pdf.rs` draws each op in a tagged span (decorations, bands and the invisible missing glyph as artifacts), and links as tagged annotations. It collects the identifiers by part.
+- `pdf/tags.rs` builds the tag tree from the items:
+  - `Builder` nests lists (by indent, with markers) and quotes (by bars) as flatten.ts flattens them.
+  - Tables use `Laid::cells` (row, column, header, their boxes, extras and images).
+  - Anything drawn that no item holds goes into a final `Div`, so nothing is lost.
+- `outline_entries` (public, for the test) and `outline` give the bookmarks, nested by level, with an `XyzDestination` at each heading's first fragment.
+- `TagTree::with_lang` and `Metadata::language` set the language. No PDF/A.
+- A cell of a header row is a header cell (`TableCell::header`), as a table's header row is in Markdown.
+- Tests:
+  - `pdf::tags::tests::bookmarks_the_headings` (levels, pages, places)
+  - `pdf::tags::tests::nests_lists_and_quotes`
+  - `exact.rs` `pdf_is_tagged`:
+    - pdfinfo says "Tagged: yes", and `qpdf --check` is clean
+    - `/Lang (en-GB)`, `/Outlines` and the bookmark "Chapter 1" are there
+    - every role is there: H1, H2, P, L, LI, Lbl, LBody, Table, TR, TH, TD, Caption, BlockQuote, Figure (with its `/Alt`) and Link
+    - every word is still where it was laid out (`compare`)
+- pdfinfo prints "Syntax Error: Suspects object is wrong type (boolean)" for krilla's `/MarkInfo << /Suspects false >>`, which is valid PDF. That's poppler's message, not a fault in the file (see "Known quirks").
+
 ### Known quirks (of other tools, not of the PDF)
 
 - pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.
   - The PDF holds the text as written: ToUnicode per glyph in logical order, and `/ReversedChars` around right-to-left runs, which krilla writes.
   - Don't chase it in the engine. `pdf_text_keeps_marks_and_ligatures` therefore checks right-to-left words by their characters, not their order.
+- pdfinfo complains "Suspects object is wrong type (boolean)" about `/Suspects false` in `/MarkInfo`, a boolean as the PDF spec has it. `qpdf --check` is clean.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 

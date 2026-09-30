@@ -13,7 +13,7 @@ mod select;
 pub(crate) mod test_support;
 mod text_layer;
 
-pub use display::Op;
+pub use display::{Op, Part};
 pub use navigate::Hit;
 pub use select::{GridRow, TableGrid};
 pub use text_layer::Word;

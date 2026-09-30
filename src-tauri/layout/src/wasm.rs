@@ -9,12 +9,14 @@ use wasm_bindgen::prelude::*;
 use crate::engine::{Changes, Engine, Hit, Op};
 use crate::fonts::{split_files, Fonts};
 use crate::model::{Item, Settings};
-use crate::pdf::{self, ImageData, Info};
+use crate::pdf::{self, ImageData, Info, Warning};
 
 #[wasm_bindgen]
 pub struct LayoutEngine {
     engine: Engine,
     images: HashMap<String, ImageData>,
+    /// what went wrong in the last PDF, see `pdfWarnings`
+    warnings: Vec<Warning>,
 }
 
 #[wasm_bindgen]
@@ -81,7 +83,9 @@ fn display(ops: Vec<Op>) -> String {
                 }
                 let _ = write!(rects, "{}]", role as u8);
             }
-            Op::Image { src, x, y, w, h } => {
+            Op::Image {
+                src, x, y, w, h, ..
+            } => {
                 separate(&mut images);
                 images.push('[');
                 string(&mut images, &src);
@@ -140,6 +144,7 @@ impl LayoutEngine {
         Ok(LayoutEngine {
             engine: Engine::new(Fonts::new(files)),
             images: HashMap::new(),
+            warnings: vec![],
         })
     }
 
@@ -153,6 +158,7 @@ impl LayoutEngine {
         LayoutEngine {
             engine: Engine::new(other.engine.fonts.share()),
             images: HashMap::new(),
+            warnings: vec![],
         }
     }
 
@@ -483,12 +489,50 @@ impl LayoutEngine {
         self.images.clear();
     }
 
-    /// the document as a PDF
-    pub fn pdf(&mut self, title: &str, author: &str) -> Result<Vec<u8>, JsError> {
+    /// the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+    /// none if left out or empty). An image that can't be decoded shows its
+    /// alt text, and a font that can't be embedded is left out: see
+    /// `pdfWarnings`
+    pub fn pdf(
+        &mut self,
+        title: &str,
+        author: &str,
+        language: Option<String>,
+    ) -> Result<Vec<u8>, JsError> {
         let info = Info {
             title: title.to_string(),
             author: author.to_string(),
         };
-        pdf::write(&mut self.engine, &self.images, &info).map_err(error)
+        let language = language.unwrap_or_default();
+        self.warnings.clear();
+        let written =
+            pdf::write_with(&mut self.engine, &self.images, &info, &language).map_err(error)?;
+        self.warnings = written.warnings;
+        Ok(written.bytes)
+    }
+
+    /// what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+    /// …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+    #[wasm_bindgen(js_name = pdfWarnings)]
+    pub fn pdf_warnings(&self) -> String {
+        let warnings: Vec<serde_json::Value> = self
+            .warnings
+            .iter()
+            .map(|warning| match warning {
+                Warning::Image(src) => serde_json::json!({ "kind": "image", "src": src }),
+                Warning::Font(font) => serde_json::json!({
+                    "kind": "font",
+                    "font": font,
+                    "family": self
+                        .engine
+                        .fonts
+                        .files
+                        .get(*font)
+                        .map(|file| file.family.as_str())
+                        .unwrap_or(""),
+                }),
+            })
+            .collect();
+        serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into())
     }
 }

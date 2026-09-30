@@ -152,3 +152,37 @@ The font files live once in the wasm instance, shared by reference (`Arc`) betwe
   - Pass the files with family `""` to `new LayoutEngine(bytes, lengths)` in their order, then `addFont(fontFile(i), fontFileFamily(i))` for the others, in their order.
   - This gives the same font indices and the same layout. `addFont` lays out again, which is cheap before `setItems`.
 - A PDF from an engine that shares the fonts is byte for byte the PDF of an engine with its own copies (cargo test `engines_share_their_fonts`).
+
+## S4: `pdf()` takes the language and reports warnings (tasks 12 and 13)
+
+Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and warn about them` (task 12), and `feat: tag the PDF and give it a language and bookmarks` (task 13; its hash is in the handoff message).
+
+| | old | new |
+|---|---|---|
+| `pdf(title, author)` | `Uint8Array`; a failed image was left blank, or failed the whole export | `pdf(title, author, language?)` → `Uint8Array`. `language` is a BCP 47 tag (`"de"`, `"de-CH"`), optional: without it the PDF has no `/Lang` |
+| `pdfWarnings()` | — | JSON of what went wrong in the last `pdf()`: `[{"kind":"image","src":"…"}, {"kind":"font","font":7,"family":"Noto Sans CJK SC"}]`, `[]` for nothing |
+
+- **Images**:
+  - An image handed over with `addImage` that can't be decoded shows its alt text (or its src) in italics in its box, as the screen shows an image that isn't loaded, and gets an `image` warning, once per src.
+  - This holds both when its header can't be read and when only its pixels are broken: krilla finds the latter only while writing, so the engine writes the PDF again without it.
+  - An image that was never handed over also shows its alt text, without a warning, since `prepareImages` already reports it.
+- **Fonts**: a font krilla can't embed would be left out, with a `font` warning and its `family` (empty for the fonts the engine was made with), and the rest written. krilla 0.8.2 draws the glyphs of fonts without outline tables as Type3 glyphs, so none of the tried cases fails any more (see `PROGRESS-core.md`, task 12).
+- **TS side (engine-editor)**:
+  - `src/engine/pdf.ts` passes the document's language, the `language` setting, as the third argument.
+  - Add `JSON.parse(raw.pdfWarnings())` to the export's `warnings`, e.g. "The image cat.png couldn't be put into the PDF", next to `failureWarning(failures)`.
+  - Old callers of `pdf(title, author)` still work.
+
+### Task 13: what the language and the tags give
+
+- With `language`, the PDF's catalog has `/Lang`, and so does its structure's root. Screen readers read it in that language.
+- The PDF is tagged (`pdfinfo`: "Tagged: yes"):
+  - headings `H1`–`H6` (the heading text as their title)
+  - paragraphs `P`, code blocks `P` > `Code`
+  - lists `L` (numbered when the marker ends in "."), nested by indent, of `LI` > `Lbl` (the marker) + `LBody`
+  - quotes `BlockQuote`, nested by their bars
+  - tables `Table` > `Caption`, `TR` > `TH` (header cells and the cells of header rows) / `TD` > `P` and `Figure`
+  - images `Figure` with their alt text (or src)
+  - links `Link` with the link annotation
+  - Headers, footers, rules, fills and lines are artifacts.
+- The PDF has bookmarks: one per heading, nested by level, jumping to where it starts.
+- TS side: nothing beyond passing `language` (above). There is no PDF/A: that's the owner's decision.

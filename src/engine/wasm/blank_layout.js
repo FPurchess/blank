@@ -322,23 +322,46 @@ export class LayoutEngine {
         }
     }
     /**
-     * the document as a PDF
+     * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
+     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+     * @returns {string}
+     */
+    pdfWarnings() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_pdfWarnings(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
+     * none if left out or empty). An image that can't be decoded shows its
+     * alt text, and a font that can't be embedded is left out: see
+     * `pdfWarnings`
      * @param {string} title
      * @param {string} author
+     * @param {string | null} [language]
      * @returns {Uint8Array}
      */
-    pdf(title, author) {
+    pdf(title, author, language) {
         const ptr0 = passStringToWasm0(title, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(author, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        var ptr2 = isLikeNone(language) ? 0 : passStringToWasm0(language, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len2 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }
-        var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v3;
+        return v4;
     }
     /**
      * the selection's rectangles: page, x, y, width and height each
@@ -646,6 +669,10 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
 }
 
 function passArray32ToWasm0(arg, malloc) {
