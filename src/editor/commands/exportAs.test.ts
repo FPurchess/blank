@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { schema } from "../../markdown";
 
 import { save } from "@tauri-apps/plugin-dialog";
@@ -6,13 +6,14 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import type { exporterFunc } from "../../exporters";
-import { path } from "../../state";
+import { announcement, path } from "../../state";
+import { forgetEngineFailure, useFallbackEditor } from "../../engine/engine";
 import { config } from "../../config";
 import { layoutOf } from "../../layout/resolve";
 import { DEFAULT_PAGE } from "../../layout/settings";
 import { createState, doc, docWithFrontmatter, p } from "../../test/editor";
 import { flushPromises } from "../../test/async";
-import exportAs from "./exportAs";
+import exportAs, { PDF_UNAVAILABLE } from "./exportAs";
 
 const title = "PDF-Export";
 const filters = [{ name: "PDF-File", extensions: ["pdf"] }];
@@ -242,5 +243,43 @@ describe("command.exportAs", () => {
       title,
       body: "Failed to export file: forbidden path",
     });
+  });
+});
+
+describe("the PDF export without the engine", () => {
+  afterEach(() => forgetEngineFailure());
+
+  it.each(["off", "unavailable"] as const)(
+    "tells that it needs the page layout, which is %s",
+    (status) => {
+      useFallbackEditor(status);
+      const exporter = createExporter();
+
+      expect(exportAs(title, exporter, filters)(state)).toBe(true);
+
+      expect(sendNotification).toHaveBeenCalledWith({
+        title,
+        body: PDF_UNAVAILABLE,
+      });
+      expect(announcement.value?.text).toBe(PDF_UNAVAILABLE);
+      expect(save).not.toHaveBeenCalled();
+      expect(exporter).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still exports after the engine failed while Blank ran", () => {
+    useFallbackEditor("failed");
+    vi.mocked(save).mockResolvedValue(null);
+    exportAs(title, createExporter(), filters)(state);
+    expect(save).toHaveBeenCalled();
+  });
+
+  it("exports to Word without the engine", () => {
+    useFallbackEditor("unavailable");
+    vi.mocked(save).mockResolvedValue(null);
+    exportAs(title, createExporter(), [{ name: "Word", extensions: ["docx"] }])(
+      state,
+    );
+    expect(save).toHaveBeenCalled();
   });
 });

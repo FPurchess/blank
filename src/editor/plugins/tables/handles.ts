@@ -12,6 +12,7 @@ import {
   tablePositions,
   type TablePiece,
 } from "../../../engine/geometry";
+import { engineless } from "../../../engine/engine";
 import {
   pageViewport,
   type Point,
@@ -247,6 +248,11 @@ export const tableHandles = () => {
       document.documentElement.addEventListener("mouseleave", leave);
       // the page view scrolled, resized or switched
       const stop = watch(pageViewport, () => publish(view), { flush: "sync" });
+      // without the engine, the editor itself scrolls
+      const scrolled = () => {
+        if (engineless()) publish(view);
+      };
+      window.addEventListener("scroll", scrolled, true);
       return {
         update: (view, previous) => {
           // a change to the table or what's selected in it
@@ -259,6 +265,7 @@ export const tableHandles = () => {
           window.removeEventListener("mousemove", move);
           document.documentElement.removeEventListener("mouseleave", leave);
           stop();
+          window.removeEventListener("scroll", scrolled, true);
           clear();
         },
       };

@@ -254,3 +254,27 @@ describe("an engine that fails", () => {
     expect(mounted.view.state.doc.textContent).toMatch(/^typed /);
   });
 });
+
+describe("the page view's plugins without the engine", () => {
+  it("let the editor scroll to its own selection", () => {
+    hidePages();
+    const mounted = mount();
+    expect(
+      mounted.view.someProp("handleScrollToSelection", (f) =>
+        f(mounted.view),
+      ) ?? false,
+    ).toBe(false);
+    expect(mounted.press("ArrowDown")).toBe(false);
+    mounted.view.destroy();
+  });
+
+  it("scroll to the caret they paint while the engine runs", () => {
+    showPages();
+    const mounted = mount();
+    expect(
+      mounted.view.someProp("handleScrollToSelection", (f) => f(mounted.view)),
+    ).toBe(true);
+    mounted.view.destroy();
+    hidePages();
+  });
+});

@@ -432,8 +432,9 @@ export const pageView = () => {
         }
         return false;
       },
-      // the page view scrolls to the caret it paints
-      handleScrollToSelection: () => true,
+      // the page view scrolls to the caret it paints; without the engine,
+      // the editor scrolls to its own
+      handleScrollToSelection: () => pageEngine !== null,
     },
   });
 };

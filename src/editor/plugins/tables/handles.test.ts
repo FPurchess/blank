@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Plugin } from "prosemirror-state";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Plugin, TextSelection } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 
@@ -8,8 +8,10 @@ import {
   announcement,
   contextMenu,
   tableHandles as handles,
+  tableToolbar,
 } from "../../../state";
-import { tableGeometry } from "../../../engine/geometry";
+import { setGeometryView, tableGeometry } from "../../../engine/geometry";
+import { forgetEngineFailure, useFallbackEditor } from "../../../engine/engine";
 import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import { hidePages, showPages } from "../../../test/engine";
 import { cellTexts, selectedText } from "../../../test/tables";
@@ -236,5 +238,51 @@ describe("tableHandles", () => {
     view = new EditorView(document.createElement("div"), {
       state: createState(grid()),
     });
+  });
+});
+
+describe("the table handles and toolbar without the engine", () => {
+  beforeEach(() => {
+    announcement.value = null;
+    contextMenu.value = null;
+    useFallbackEditor("unavailable");
+    // the editor shows the text itself, where every box is the same here
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(10, 20, 100, 40),
+    );
+    view = editor();
+    setGeometryView(view);
+  });
+
+  afterEach(() => {
+    view.destroy();
+    setGeometryView(null);
+    forgetEngineFailure();
+  });
+
+  it("places them at the editor's own table", () => {
+    // the cursor in the table
+    view.dispatch(
+      view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, TABLE + 4),
+      ),
+    );
+    expect(tableToolbar.value?.anchor).toEqual({
+      left: 10,
+      top: 20,
+      right: 110,
+      bottom: 60,
+    });
+
+    hover(50, 40);
+    expect(handles.value).not.toBeNull();
+    expect(state().box).toMatchObject({ left: 10, right: 110 });
+  });
+
+  it("places them again when the editor scrolls", () => {
+    hover(50, 40);
+    const first = handles.value;
+    window.dispatchEvent(new Event("scroll"));
+    expect(handles.value).not.toBe(first);
   });
 });

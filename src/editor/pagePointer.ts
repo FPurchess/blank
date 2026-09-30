@@ -1,4 +1,7 @@
+import { Plugin } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
+
+import { engineless } from "../engine/engine";
 
 // What the pointer does on the painted pages, told to the editor's plugins.
 // The editor's own DOM is hidden and gets no mouse events, so the page view
@@ -48,3 +51,52 @@ export const sendPagePointer = (
   view.dom?.dispatchEvent(event);
   return event.defaultPrevented;
 };
+
+/**
+ * pointerOf returns what a mouse event on the editor's own DOM hits, while
+ * the editor shows the text itself. The link is left out: openLink opens a
+ * link clicked in the editor by itself.
+ */
+const pointerOf = (view: EditorView, event: MouseEvent): PagePointer => ({
+  pos:
+    view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? null,
+  link: null,
+  x: event.clientX,
+  y: event.clientY,
+  button: event.button,
+  shiftKey: event.shiftKey,
+  ctrlKey: event.ctrlKey,
+  metaKey: event.metaKey,
+  altKey: event.altKey,
+});
+
+/**
+ * nativePointer hands the plugins the presses and right clicks on the
+ * editor's own DOM as the page view's events, while there is no engine and
+ * the editor shows the text itself, so they work the same without the pages.
+ * It comes before contextMenu, which takes the ContextMenu key's event.
+ */
+export const nativePointer = () =>
+  new Plugin({
+    props: {
+      handleDOMEvents: {
+        mousedown: (view, event) => {
+          if (!engineless()) return false;
+          if (!sendPagePointer(view, PAGE_PRESS, pointerOf(view, event)))
+            return false;
+          // a plugin took the press, so ProseMirror leaves the selection
+          event.preventDefault();
+          return true;
+        },
+        contextmenu: (view, event) => {
+          if (!engineless() || event.shiftKey) return false;
+          // the ContextMenu key's event, which contextMenu handles
+          if (event.button !== 2 && event.clientX === 0 && event.clientY === 0)
+            return false;
+          event.preventDefault();
+          sendPagePointer(view, PAGE_MENU, pointerOf(view, event));
+          return true;
+        },
+      },
+    },
+  });

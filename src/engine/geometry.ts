@@ -1,4 +1,6 @@
 import type { Node } from "prosemirror-model";
+import { NodeSelection } from "prosemirror-state";
+import { TableMap } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import {
@@ -9,7 +11,13 @@ import {
   type PageViewport,
   pageViewport,
 } from "../state/pageView";
-import { pageEngine, type Hit, type PageBox, type PageEngine } from "./engine";
+import {
+  engineless,
+  pageEngine,
+  type Hit,
+  type PageBox,
+  type PageEngine,
+} from "./engine";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
@@ -18,6 +26,10 @@ import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
 // hits. The editor's own DOM is hidden (see src/editor/hidden.ts), so
 // everything that places itself at the text measures here, from the layout
 // the engine made, never from that DOM.
+//
+// Without the engine, the editor shows the text itself, as before the page
+// view: then its own DOM is what the user sees, and the geometry measures it
+// (see measured below).
 
 // a box in the window, in CSS pixels
 export interface Box {
@@ -83,6 +95,136 @@ const framesNow = (): {
   return { frames: cached.frames, viewport };
 };
 
+// the editor, which the geometry measures without the engine
+let editorView: EditorView | null = null;
+
+/**
+ * setGeometryView sets the editor the geometry measures while there is no
+ * engine, when it shows the text itself
+ */
+export const setGeometryView = (view: EditorView | null) => {
+  editorView = view;
+};
+
+// the editor to measure, while it shows the text itself
+const measured = () => (engineless() ? editorView : null);
+
+const boxOf = ({ left, top, right, bottom }: Box): Box => ({
+  left,
+  top,
+  right,
+  bottom,
+});
+
+// the smallest box around all of `boxes`
+const around = (boxes: Box[]): Box => ({
+  left: Math.min(...boxes.map((box) => box.left)),
+  top: Math.min(...boxes.map((box) => box.top)),
+  right: Math.max(...boxes.map((box) => box.right)),
+  bottom: Math.max(...boxes.map((box) => box.bottom)),
+});
+
+// the editor's DOM measures positions it doesn't show (e.g. inside a node
+// view) with an error
+const tryMeasure = <T>(measure: () => T, fallback: T): T => {
+  try {
+    return measure();
+  } catch {
+    return fallback;
+  }
+};
+
+const shownCaret = (view: EditorView, pos: number, after: boolean) =>
+  tryMeasure<Box | null>(() => {
+    const { left, top, bottom } = view.coordsAtPos(pos, after ? -1 : 1);
+    return { left, top, right: left, bottom };
+  }, null);
+
+const shownRange = (view: EditorView, from: number, to: number) =>
+  tryMeasure<Box[]>(() => {
+    const start = view.domAtPos(from);
+    const end = view.domAtPos(to);
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    return [...range.getClientRects()].map(boxOf);
+  }, []);
+
+const shownBlocks = (view: EditorView, from: number, to: number) => {
+  const boxes: Box[] = [];
+  view.state.doc.nodesBetween(from, to, (_node, pos) => {
+    const dom = view.nodeDOM(pos);
+    if (!(dom instanceof Element)) return true;
+    boxes.push(boxOf(dom.getBoundingClientRect()));
+    return false;
+  });
+  return boxes.length ? [{ ...around(boxes), page: 0 }] : [];
+};
+
+const shownTable = (view: EditorView, pos: number): TableGeometry | null => {
+  const table = view.state.doc.nodeAt(pos);
+  const dom = view.nodeDOM(pos);
+  if (table?.type.name !== "table" || !(dom instanceof Element)) return null;
+  const map = TableMap.get(table);
+  const start = pos + 1;
+  const rows: number[] = [];
+  let bottom = 0;
+  let rowPos = start;
+  table.forEach((row) => {
+    const element = view.nodeDOM(rowPos);
+    if (element instanceof Element) {
+      const box = element.getBoundingClientRect();
+      rows.push(box.top);
+      bottom = box.bottom;
+    }
+    rowPos += row.nodeSize;
+  });
+  const whole = (dom.querySelector("table") ?? dom).getBoundingClientRect();
+  const columns: number[] = [];
+  for (let column = 0; column < map.width; column++) {
+    let left = columns[column - 1] ?? whole.left;
+    for (let row = 0; row < map.height; row++) {
+      const offset = map.map[row * map.width + column];
+      if (map.findCell(offset).left !== column) continue;
+      const cell = view.nodeDOM(start + offset);
+      if (cell instanceof Element) left = cell.getBoundingClientRect().left;
+      break;
+    }
+    columns.push(left);
+  }
+  columns.push(whole.right);
+  if (!rows.length) rows.push(whole.top);
+  rows.push(bottom || whole.bottom);
+  return {
+    rowCount: map.height,
+    pieces: [
+      {
+        page: 0,
+        box: {
+          left: columns[0],
+          right: whole.right,
+          top: rows[0],
+          bottom: rows[rows.length - 1],
+        },
+        firstRow: 0,
+        rows,
+        columns,
+      },
+    ],
+  };
+};
+
+const shownHit = (view: EditorView, x: number, y: number): Hit | null => {
+  const found = tryMeasure(() => view.posAtCoords({ left: x, top: y }), null);
+  if (!found) return null;
+  if (found.inside >= 0) {
+    const node = view.state.doc.nodeAt(found.inside);
+    if (node?.isLeaf && !node.isText && NodeSelection.isSelectable(node))
+      return { node: true, pos: found.inside };
+  }
+  return { node: false, pos: found.pos };
+};
+
 const ready = (): {
   engine: PageEngine;
   frames: FrameLayout;
@@ -119,6 +261,8 @@ const toWindow = (
  */
 export const caretBox = (pos: number, after = false): Box | null => {
   const shown = ready();
+  const view = shown ? null : measured();
+  if (view) return shownCaret(view, pos, after);
   const caret = shown?.engine.caret(pos, after);
   if (!shown || !caret) return null;
   return toWindow(shown.frames, shown.viewport, caret);
@@ -128,14 +272,17 @@ export const caretBox = (pos: number, after = false): Box | null => {
  * caretPage returns the page the caret at `pos` is on, counted from 0
  */
 export const caretPage = (pos: number): number | null =>
-  pageEngine?.caret(pos)?.page ?? null;
+  pageEngine?.caret(pos)?.page ?? (measured() ? 0 : null);
 
 /**
  * rangeRects returns the rectangles of the text from `from` to `to`
  */
 export const rangeRects = (from: number, to: number): Box[] => {
   const shown = ready();
-  if (!shown) return [];
+  if (!shown) {
+    const view = measured();
+    return view ? shownRange(view, from, to) : [];
+  }
   return shown.engine
     .selection(from, to)
     .flatMap((rect) => toWindow(shown.frames, shown.viewport, rect) ?? []);
@@ -147,7 +294,10 @@ export const rangeRects = (from: number, to: number): Box[] => {
  */
 export const blockBoxes = (from: number, to: number): PageBlock[] => {
   const shown = ready();
-  if (!shown) return [];
+  if (!shown) {
+    const view = measured();
+    return view ? shownBlocks(view, from, to) : [];
+  }
   return shown.engine.boxes(from, to).flatMap((rect) => {
     const box = toWindow(shown.frames, shown.viewport, rect);
     return box ? [{ ...box, page: rect.page }] : [];
@@ -160,6 +310,8 @@ export const blockBoxes = (from: number, to: number): PageBlock[] => {
  */
 export const tableGeometry = (pos: number): TableGeometry | null => {
   const shown = ready();
+  const view = shown ? null : measured();
+  if (view) return shownTable(view, pos);
   const grid = shown?.engine.tableGrid(pos);
   if (!shown || !grid) return null;
   const { frames, viewport } = shown;
@@ -204,7 +356,10 @@ export const tableGeometry = (pos: number): TableGeometry | null => {
  */
 export const hitAt = (x: number, y: number): Hit | null => {
   const shown = ready();
-  if (!shown) return null;
+  if (!shown) {
+    const view = measured();
+    return view ? shownHit(view, x, y) : null;
+  }
   const { frames, viewport } = shown;
   const point = pointOnPage(
     frames,
