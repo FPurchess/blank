@@ -8,7 +8,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 3. B2 / S5: no panic from JS input
 - [x] 4. B4 / S1: line affinity for ↑/↓ and End
 - [x] 5. Up/Down through the paragraphs of a cell, and past a table's caption
-- [ ] 6. A page break near the bottom makes no blank page
+- [x] 6. A page break near the bottom makes no blank page
 - [ ] 7. A row nearly a page tall under repeated header rows
 - [ ] 8. A heading stays with a captioned table
 - [ ] 9. S2: lists, quotes and images in table cells
@@ -115,6 +115,15 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - A sliced row starts from the first or last line that slice shows.
 - The text-less caption unit is skipped, so ↓ above a captioned table lands in its first cell, and ↑ from there goes back into the text above.
 - Tests: `multi_paragraph_cell_down_arrow`, `multi_paragraph_cell_up_arrow` and `down_arrow_over_captioned_table`. All three failed before, as the probes did (24 / 6 / `Node(20)`).
+
+### Task 6: page breaks
+
+- A `Break` gets no space above it and no fit check. It ends the page it is on, even when the space below the paragraph before it reaches past the bottom.
+- Decision, matching the Word export (`src/exporters/docx/index.ts:155-173`):
+  - A trailing page break makes an empty last page.
+  - Two breaks in a row leave an empty page.
+  - A break at the very start still makes no empty first page.
+- Tests: `break_near_bottom_has_no_blank_page` (3 pages before, 2 now) and `page_break_at_end`.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
