@@ -45,6 +45,22 @@ export interface Frame {
   h: number;
 }
 
+/**
+ * snapped returns a frame on whole pixels, so its canvas isn't shown between
+ * the device's pixels, which would blur it
+ */
+const snapped = (frame: Frame): Frame => {
+  const left = Math.round(frame.left);
+  const top = Math.round(frame.top);
+  return {
+    ...frame,
+    left,
+    top,
+    width: Math.round(frame.left + frame.width) - left,
+    height: Math.round(frame.top + frame.height) - top,
+  };
+};
+
 export interface FrameLayout {
   mode: PageViewMode;
   // CSS pixels per point
@@ -90,7 +106,7 @@ export const frameLayout = (
       layout.pages * (sheetHeight + SHEET_GAP) -
       SHEET_GAP +
       VIEW_BOTTOM;
-    return { mode, scale, frames, height };
+    return { mode, scale, frames: frames.map(snapped), height };
   }
   const { margins } = layout;
   const shown = layout.width - margins.left - margins.right + 2 * BLEED;
@@ -116,7 +132,12 @@ export const frameLayout = (
     });
     top += h * scale + MARK_HEIGHT;
   }
-  return { mode, scale, frames, height: top - MARK_HEIGHT + VIEW_BOTTOM };
+  return {
+    mode,
+    scale,
+    frames: frames.map(snapped),
+    height: top - MARK_HEIGHT + VIEW_BOTTOM,
+  };
 };
 
 /**

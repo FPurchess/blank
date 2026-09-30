@@ -48,8 +48,12 @@ export const paintPage = (
   context.fillStyle = options.color;
   for (const [x, y, w, h, role] of display.r) {
     context.globalAlpha = ROLE_OPACITY[role] ?? 1;
-    // lines stay at least a device pixel thick
-    context.fillRect(px(x), py(y), Math.max(w * k, 1), Math.max(h * k, 1));
+    // on whole device pixels, so lines are crisp, and at least one thick
+    const left = Math.round(px(x));
+    const top = Math.round(py(y));
+    const width = Math.max(Math.round(px(x + w)) - left, 1);
+    const height = Math.max(Math.round(py(y + h)) - top, 1);
+    context.fillRect(left, top, width, height);
   }
   context.globalAlpha = 1;
   for (const [src, x, y, w, h] of display.i) {
@@ -61,7 +65,17 @@ export const paintPage = (
     context.globalAlpha = ROLE_OPACITY[role] ?? 1;
     const s = (size / options.unitsPerEm(font)) * k;
     for (let index = 3; index + 2 < run.length; index += 3) {
-      context.setTransform(s, 0, 0, -s, px(run[index + 1]), py(run[index + 2]));
+      // the baseline on a whole device pixel, as the webview sets its text,
+      // so the horizontal strokes are sharp; across it the glyphs keep the
+      // layout's positions
+      context.setTransform(
+        s,
+        0,
+        0,
+        -s,
+        px(run[index + 1]),
+        Math.round(py(run[index + 2])),
+      );
       context.fill(options.glyph(font, run[index]));
     }
   }

@@ -196,6 +196,36 @@ step.
   page), and `exact.test.ts` with a long URL and a long word in a heading, a
   paragraph, a link, a list item, a table cell and the header (0.05 pt).
 
+- **Check (asked by the owner): the fonts and the rendering.**
+  - Fonts: regular text is IBM Plex Sans in its six faces with DejaVu Sans
+    only for characters Plex lacks, as on main (`fonts/`, and the woff2
+    copies for the webview's own text: the bars, the page-end marks, the
+    properties line, the dialogs, all on main's CSS font stack). Code is set
+    in IBM Plex Mono, as asked for this spike. Noto Emoji and the system's
+    fonts come in only for characters none of these has. Verified: a Rust
+    test of the face each style gets (regular, italic, medium, medium
+    italic, bold, bold italic, mono), and `pdffonts` on an exported PDF in
+    `pdf.test.ts`: IBMPlexSans, -Bold, -BoldItalic, -Italic, -Medm (IBM's
+    own name of the Medium face) and DejaVuSans for "⇒", nothing else.
+  - Rendering: the canvases were sized by devicePixelRatio already, but a
+    frame could sit between pixels (fractional left and top in "page
+    ends"), and a canvas be shown a fraction larger than its backing store
+    (`ceil`), both of which blur. Now the frames are on whole pixels, each
+    canvas is shown at exactly its backing size divided by the ratio, lines
+    and underlines are filled on whole device pixels, and each glyph's
+    baseline is snapped to a device pixel (x keeps the layout's position),
+    as the webview does. Glyphs are filled as anti-aliased outlines (the
+    canvas's own grayscale anti-aliasing), and image smoothing is on for
+    pictures.
+  - Compared with `e2e/specs/rendering.e2e.ts`: a painted line and the same
+    words set by the webview right below it, at 1× and at 2× (`GDK_SCALE=2`
+    under xvfb), in `e2e/screenshots/render-1x.png`, `render-2x.png` and the
+    enlarged `render-compare.png` (git-ignored like the other E2E
+    screenshots). Both are smooth and anti-aliased at 1× and 2×; at 1× the
+    painted text is a shade lighter than the webview's, which hints and
+    darkens its stems, and its spaces and figures are set as the PDF has
+    them, not as the webview does.
+
 ### In progress
 
 - 9. Tests, CI and docs.

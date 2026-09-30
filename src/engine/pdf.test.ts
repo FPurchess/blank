@@ -54,6 +54,43 @@ const exportIt = async () => {
   return toPDF(state, { docPath: null, layout: testLayout() });
 };
 
+describe("the PDF's fonts", () => {
+  beforeEach(() => testEngine());
+
+  it.runIf(has("pdffonts"))(
+    "are IBM Plex Sans in its faces, with DejaVu Sans only for what it lacks",
+    async () => {
+      const doc = parseMarkdown(
+        "# A medium heading\n\nRegular, **bold**, *italic*, ***both***, and ⇒.\n",
+      );
+      const state = EditorState.create({ schema, doc });
+      const { contents } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      const file = join(dir, "fonts.pdf");
+      writeFileSync(file, contents);
+      const listed = execFileSync("pdffonts", [file], { encoding: "utf8" });
+      // the names without the subset prefix, e.g. "ABCDEF+"
+      const names = listed
+        .split("\n")
+        .slice(2)
+        .map((line) => line.split(/\s+/)[0]?.replace(/^[A-Z]{6}\+/, ""))
+        .filter(Boolean)
+        .sort();
+      expect(names).toEqual([
+        "DejaVuSans",
+        "IBMPlexSans",
+        "IBMPlexSans-Bold",
+        "IBMPlexSans-BoldItalic",
+        "IBMPlexSans-Italic",
+        // IBM's own PostScript name of the Medium face
+        "IBMPlexSans-Medm",
+      ]);
+    },
+  );
+});
+
 describe("the PDF export", () => {
   beforeEach(() => {
     // the engine and its fonts, as the app has loaded them

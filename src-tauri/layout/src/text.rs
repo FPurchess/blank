@@ -539,6 +539,36 @@ mod tests {
     }
 
     #[test]
+    fn sets_every_style_in_its_own_face_of_plex() {
+        let mut fonts = repository_fonts();
+        // the faces by their place in FONT_FILES
+        let face = |fonts: &mut Fonts, style: &str, span: Option<Span>| {
+            let mut value = text("Words");
+            value.style = style.into();
+            value.spans = span.into_iter().collect();
+            let boxed = TextBox::new(fonts, &value, 300.0, Alignment::Start);
+            let runs = boxed.glyph_runs(fonts, 0);
+            runs.iter().map(|run| run.font).collect::<Vec<_>>()
+        };
+        let whole = |bold: bool, italic: bool| {
+            Some(Span {
+                from: 0,
+                to: 5,
+                bold,
+                italic,
+                ..Default::default()
+            })
+        };
+        assert_eq!(face(&mut fonts, "p", None), [0]);
+        assert_eq!(face(&mut fonts, "p", whole(false, true)), [1]);
+        assert_eq!(face(&mut fonts, "h1", None), [2]);
+        assert_eq!(face(&mut fonts, "h1", whole(false, true)), [3]);
+        assert_eq!(face(&mut fonts, "p", whole(true, false)), [4]);
+        assert_eq!(face(&mut fonts, "p", whole(true, true)), [5]);
+        assert_eq!(face(&mut fonts, "code", None), [10]);
+    }
+
+    #[test]
     fn falls_back_to_dejavu() {
         let mut fonts = repository_fonts();
         let boxed = TextBox::new(&mut fonts, &text("a ⇒ b"), 300.0, Alignment::Start);

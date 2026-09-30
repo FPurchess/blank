@@ -51,12 +51,18 @@ const paint = () => {
   if (!element || !engine) return;
   const start = performance.now();
   const ratio = window.devicePixelRatio || 1;
-  const width = Math.ceil(props.width * ratio);
-  const height = Math.ceil(props.height * ratio);
+  // a device pixel for each pixel of the canvas, which is shown at exactly
+  // its size, so nothing scales it and blurs the text
+  const width = Math.round(props.width * ratio);
+  const height = Math.round(props.height * ratio);
   if (element.width !== width) element.width = width;
   if (element.height !== height) element.height = height;
+  element.style.width = `${width / ratio}px`;
+  element.style.height = `${height / ratio}px`;
   const context = element.getContext("2d");
   if (!context) return;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   const color = getComputedStyle(element).color;
   paintPage(context, engine.display(props.page, props.version), {
     scale: props.scale,
@@ -110,12 +116,8 @@ const mark = computed(() => {
       height: `${height}px`,
     }"
   >
-    <canvas
-      ref="canvas"
-      class="page-canvas"
-      aria-hidden="true"
-      :style="{ width: `${width}px`, height: `${height}px` }"
-    />
+    <!-- its size is set when it's painted, in device pixels -->
+    <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
     <template v-if="margins">
       <div
         class="page-band header"
