@@ -17,6 +17,7 @@ import {
 import { EditorView } from "prosemirror-view";
 
 import { createEditorHandle } from "../editor/handle";
+import { PAGE_PRESS } from "../editor/pagePointer";
 import { contextMenuPlugin } from "../editor/plugins/contextMenu";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
@@ -174,7 +175,7 @@ describe("page view", () => {
     editor.destroy();
   });
 
-  it("opens the strip of a band clicked on a sheet or where a page ends", async () => {
+  it("opens the strip of a band double-clicked on a sheet or where a page ends", async () => {
     layOut();
     const editor = new EditorView(document.createElement("div"), {
       state: createState(node, { cursor: 3 }),
@@ -182,16 +183,32 @@ describe("page view", () => {
     dispose = bootApp(createEditorHandle(editor).handle);
     pageView.value = "pages";
     await nextTick();
-    frames()[0]
-      .querySelector<HTMLElement>(".page-band.footer")!
-      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const footer = frames()[0].querySelector<HTMLElement>(".page-band.footer")!;
+    // a press there reaches the editor's plugins, e.g. to close a picker,
+    // and leaves the selection as it is
+    const presses: Event[] = [];
+    editor.dom.addEventListener(PAGE_PRESS, (event) => presses.push(event));
+    footer.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        detail: 1,
+      }),
+    );
+    expect(presses).toHaveLength(1);
+    expect(editor.state.selection.head).toBe(3);
+    // a single click opens nothing, a double click the strip
+    footer.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toBeNull();
+    footer.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(bandEditor.value).toMatchObject({ band: "footer" });
     bandEditor.value = null;
     pageView.value = "page-ends";
     await nextTick();
     frames()[0]
       .querySelector<HTMLElement>(".page-end .band.header")!
-      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(bandEditor.value).toMatchObject({ band: "header" });
     bandEditor.value = null;
     editor.destroy();

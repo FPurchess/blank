@@ -337,6 +337,9 @@ const pointerAt = (event: MouseEvent): PagePointer => {
   };
 };
 
+// the headers and footers on the pages, which open their strips
+const BANDS = ".page-band, .page-end .band, .page-first-header";
+
 let anchor: number | null = null;
 // the last point of a drag, in the window, for scrolling at the edges
 let dragAt: { x: number; y: number } | null = null;
@@ -349,6 +352,9 @@ const onMouseDown = (event: MouseEvent) => {
   // the editor's plugins see the press first, e.g. to close a picker
   if (sendPagePointer(editor.view, PAGE_PRESS, pointerAt(event))) return;
   if (event.button !== 0) return;
+  // a header or footer opens on a double click, and a press on it leaves
+  // the selection where it is
+  if ((event.target as Element).closest?.(BANDS)) return;
   const { x, y } = deskPoint(event.clientX, event.clientY);
   anchor = press({ engine: pageEngine, editor, layout: layout.value }, x, y, {
     count: Math.min(event.detail || 1, 3),

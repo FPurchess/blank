@@ -52,7 +52,8 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const bandsCanvas = useTemplateRef<HTMLCanvasElement>("bandsCanvas");
 const editor = useEditor();
 
-// a click on a header or footer opens its strip, which takes the focus
+// a double click on a header or footer opens its strip, which takes the
+// focus, as in Word; a single one there leaves the text as it is
 const openBand = (band: Band) => editor.run(editBand(band), { focus: false });
 
 // the header and footer margins of a sheet, in pixels, 0 where the page
@@ -293,24 +294,21 @@ const mark = computed(() => {
         :title="bandTitle('header')"
         aria-hidden="true"
         :style="{ height: `${marginTop}px` }"
-        @mousedown.prevent.stop
-        @click="openBand('header')"
+        @dblclick="openBand('header')"
       />
       <div
         class="page-band footer"
         :title="bandTitle('footer')"
         aria-hidden="true"
         :style="{ height: `${marginBottom}px` }"
-        @mousedown.prevent.stop
-        @click="openBand('footer')"
+        @dblclick="openBand('footer')"
       />
     </template>
     <div v-if="mark" class="page-end" aria-hidden="true">
       <div
         class="band footer"
         :title="bandTitle('footer')"
-        @mousedown.prevent.stop
-        @click="openBand('footer')"
+        @dblclick="openBand('footer')"
       >
         <span v-for="(slot, index) in mark.footer" :key="index">{{
           slot
@@ -323,8 +321,7 @@ const mark = computed(() => {
         v-if="nextBandVersion >= 0"
         class="band header"
         :title="bandTitle('header')"
-        @mousedown.prevent.stop
-        @click="openBand('header')"
+        @dblclick="openBand('header')"
       >
         <span v-for="(slot, index) in mark.header" :key="index">{{
           slot

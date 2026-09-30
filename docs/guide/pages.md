@@ -43,7 +43,7 @@ For more, point at the top or bottom edge and click **+ Header** or **+ Footer**
 
 <img class="shot" src="/screenshots/header-footer.gif" alt="A click on Page numbers at the bottom edge numbers the pages; Mod Alt H opens the header, where Chapter goes on the left, Page 3 of 12 on the right, and First Page None leaves the title page plain" />
 
-`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** where each page ends. A click on a header or footer there, or on a sheet's top or bottom margin, opens it again, and `Mod` `Z` in your text undoes the whole change.
+`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page and where each page ends. Double-click a header or footer there, or a sheet's top or bottom margin, to open it again. `Mod` `Z` in your text undoes the whole change.
 
 ### The first page and even pages {#first-and-even-pages}
 

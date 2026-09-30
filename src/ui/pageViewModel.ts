@@ -110,10 +110,10 @@ export const firstHeaderPlace = (layout: FrameLayout) => {
 
 /**
  * bandTitle returns the tooltip of a header or footer on the pages, which
- * opens its strip
+ * opens its strip on a double click
  */
 export const bandTitle = (band: Band) =>
-  `Edit the ${band} (${formatShortcut(
+  `Double-click to edit the ${band} (${formatShortcut(
     getKeyBinding(
       band === "header"
         ? CommandIdentifier.EDIT_HEADER

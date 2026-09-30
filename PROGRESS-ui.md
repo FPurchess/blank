@@ -17,7 +17,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 10. Shadows and the desk in dark themes: `--desk-color`, `--sheet-edge`, `--sheet-shadow` per theme, a darker desk and black shadows without blur (unit test, and a pixel check of the desk against the sheet in every theme in `pageEngine.e2e.ts`)
 - [x] 11. The page number where a page ends: the page's number as the pages are numbered (style, start number), shown unless its footer's settings hold `{page}`
 - [x] 12. Shift + right click opens Blank's menu too
-- [ ] 13. Bands open on a double click
+- [x] 13. Bands open on a double click; a press on them still reaches the plugins (`PAGE_PRESS`) and leaves the selection
 - [ ] 14. Small UI details
 - [ ] 15. Unit test gaps
 - [ ] 16. E2E for engine-editor's fixes

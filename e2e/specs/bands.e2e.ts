@@ -96,7 +96,10 @@ describe("header and footer", () => {
   });
 
   it("opens a strip from where the page ends", async () => {
+    // a single click leaves it closed, as a click beside the text does
     await $(".page-end .band.footer").click();
+    await expect(strip()).not.toExist();
+    await $(".page-end .band.footer").doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("footer");
     await browser.keys(Key.Escape);
@@ -106,7 +109,7 @@ describe("header and footer", () => {
   it("opens a strip from the margin of a sheet", async () => {
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("pages");
-    await $(".page-band.header").click();
+    await $(".page-band.header").doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("header");
     await browser.saveScreenshot(

@@ -27,7 +27,7 @@ const parts = computed(() => slots.value.split("\u0000"));
 const shown = computed(() => parts.value.some(Boolean));
 const place = computed(() => firstHeaderPlace(props.layout));
 
-// a click opens its strip, which takes the focus
+// a double click opens its strip, which takes the focus
 const open = () => editor.run(editBand("header"), { focus: false });
 </script>
 
@@ -43,8 +43,7 @@ const open = () => editor.run(editBand("header"), { focus: false });
       width: `${place.width}px`,
       height: `${place.height}px`,
     }"
-    @mousedown.prevent.stop
-    @click="open"
+    @dblclick="open"
   >
     <span v-for="(slot, index) in parts" :key="index">{{ slot }}</span>
   </div>
