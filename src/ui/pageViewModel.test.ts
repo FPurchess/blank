@@ -5,6 +5,7 @@ import { testLayout } from "../test/layout";
 import {
   anchorTop,
   caretLine,
+  movesPages,
   endMark,
   firstHeaderPlace,
   pageLabel,
@@ -239,5 +240,17 @@ describe("pageLabel", () => {
     expect(
       pageLabel({ page: 1, pages: 3 }, testLayout({ startNumber: 5 })),
     ).toBe("Page 5 of 3");
+  });
+});
+
+describe("movesPages", () => {
+  it("tells a layout that moves the pages from one that keeps them", () => {
+    expect(movesPages(pageEnds, { ...pageEnds })).toBe(false);
+    expect(movesPages(pages, pageEnds)).toBe(true);
+    expect(movesPages({ ...pageEnds, scale: 2 }, pageEnds)).toBe(true);
+    // the header of the first page takes room above it
+    expect(movesPages({ ...pageEnds, headerRoom: 20 }, pageEnds)).toBe(true);
+    const lower = { ...frame, ...place, top: 128 };
+    expect(movesPages({ ...pageEnds, frames: [lower] }, pageEnds)).toBe(true);
   });
 });

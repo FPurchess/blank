@@ -51,7 +51,13 @@ import {
   visibleRange,
 } from "../engine/frames";
 import { layerVersions } from "./pageLayers";
-import { anchorTop, scrollFor, selectedOn, viewAnchor } from "./pageViewModel";
+import {
+  anchorTop,
+  movesPages,
+  scrollFor,
+  selectedOn,
+  viewAnchor,
+} from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -236,14 +242,15 @@ onUnmounted(() => {
 });
 listenOnWindow("resize", () => measure());
 
-// the view keeps the spot of the page at its top when it switches, or when
-// a resize shows the pages at another scale. Before the new layout renders,
+// the view keeps the spot of the page at its top when it switches, when a
+// resize shows the pages at another scale, or when the room above the first
+// page changes, e.g. for its header. Before the new layout renders,
 // so the scroll is still the one the old layout was shown at; typing lays
 // out anew on every key, but keeps the view and the scale.
 watch(layout, (next, previous) => {
   const element = scroller.value;
   if (!element || !next || !previous) return;
-  if (next.mode === previous.mode && next.scale === previous.scale) return;
+  if (!movesPages(next, previous)) return;
   const anchor = viewAnchor(previous, element.scrollTop);
   if (!anchor) return;
   void nextTick(() => {

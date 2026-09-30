@@ -330,6 +330,22 @@ describe("page view", () => {
     });
   });
 
+  it("keeps the place when the first page gets room for its header", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    const third = shown("page-ends").frames[2];
+    view().scrollTop = third.top + 30;
+    const before = viewAnchor(shown("page-ends"), view().scrollTop)!;
+    // a header typed into the first page: 20 px more above it
+    pageLayoutState.value = { ...pageLayoutState.value!, header: true };
+    await nextTick();
+    await nextTick();
+    const after = viewAnchor(shown("page-ends"), view().scrollTop)!;
+    expect(after.page).toBe(2);
+    expect(after.y).toBeCloseTo(before.y, 0);
+  });
+
   it("keeps the place when a resize shows the pages at another scale", async () => {
     layOut();
     dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));

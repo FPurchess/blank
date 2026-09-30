@@ -208,3 +208,15 @@ export const selectedBoxes = (selected: string): PageBox[] =>
         return { x, y, width, height };
       })
     : [];
+
+/**
+ * movesPages returns whether a new layout shows the pages elsewhere on the
+ * desk: in the other view, at another scale, or below more or less room
+ * above the first page, e.g. for its header; typing lays out anew on every
+ * key but leaves them where they are
+ */
+export const movesPages = (next: FrameLayout, previous: FrameLayout) =>
+  next.mode !== previous.mode ||
+  next.scale !== previous.scale ||
+  next.headerRoom !== previous.headerRoom ||
+  next.frames[0]?.top !== previous.frames[0]?.top;
