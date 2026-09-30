@@ -308,14 +308,23 @@ const BANDS = ".page-band, .page-end .band, .page-first-header";
 const move = pageMove({
   view: editor.view,
   posAt: (event) => pointerAt(event).pos,
-  inView: (event) => {
-    const box = scroller.value?.getBoundingClientRect();
-    return (
+  // on the pages the view shows: in the window, not on the bars over it
+  inView: ({ clientX: x, clientY: y }) => {
+    const within = (box?: DOMRect) =>
       !!box &&
-      event.clientX >= box.left &&
-      event.clientX <= box.right &&
-      event.clientY >= box.top &&
-      event.clientY <= box.bottom
+      x >= box.left &&
+      x <= box.right &&
+      y >= box.top &&
+      y <= box.bottom;
+    return (
+      within(scroller.value?.getBoundingClientRect()) &&
+      x >= 0 &&
+      y >= 0 &&
+      x <= window.innerWidth &&
+      y <= window.innerHeight &&
+      !["ui-top", "ui-bottom"].some((id) =>
+        within(document.getElementById(id)?.getBoundingClientRect()),
+      )
     );
   },
   press: (clientX, clientY) => {
