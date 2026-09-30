@@ -286,7 +286,10 @@ const onMouseDown = (event: MouseEvent) => {
   // the hidden editor keeps the focus
   event.preventDefault();
   // the editor's plugins see the press first, e.g. to close a picker
-  if (sendPagePointer(editor.view, PAGE_PRESS, pointerAt(event))) return;
+  if (sendPagePointer(editor.view, PAGE_PRESS, pointerAt(event))) {
+    move.mouseDown(event, true);
+    return;
+  }
   if (event.button !== 0) return;
   // a press in the selected text may move it, see onPointerDown
   if (move.mouseDown(event, false)) return;

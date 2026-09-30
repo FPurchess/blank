@@ -106,6 +106,17 @@ describe("moving the selected text on the pages", () => {
     expect(press).not.toHaveBeenCalled();
   });
 
+  it("moves nothing after a press a plugin took, e.g. a link opened", () => {
+    const move = moveOn();
+    move.down(pointer(9, { ctrlKey: true }));
+    expect(move.mouseDown(mouse(1), true)).toBe(true);
+    move.move(pointer(3, { ctrlKey: true }));
+    move.up(pointer(3, { ctrlKey: true }));
+    expect(view.state.doc.textContent).toBe("hello world");
+    expect(view.state.selection.from).toBe(7);
+    expect(press).not.toHaveBeenCalled();
+  });
+
   it("starts only in the selected text, with the first button, without Shift", () => {
     const move = moveOn();
     for (const event of [

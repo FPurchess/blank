@@ -60,11 +60,12 @@ export const pageMove = (target: MoveTarget): PageMove => {
       moving = { x: event.clientX, y: event.clientY, dragging: false };
       target.capture?.(event);
     },
-    mouseDown(event) {
+    mouseDown(event, taken) {
+      // a press a plugin took, e.g. to open a link, moves nothing; nor does
       // the second or third click of a double or triple click, whose press
       // selects a word or a line, even inside the selection
-      if (event.detail > 1) moving = null;
-      return moving !== null;
+      if (taken || event.detail > 1) moving = null;
+      return taken || moving !== null;
     },
     move(event) {
       if (!moving) return;
