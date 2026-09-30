@@ -45,19 +45,52 @@ export const endMark = (
   };
 };
 
+// the room above the first page for its header in "page ends", until
+// frames.ts keeps it (HEADER_ROOM, FrameLayout.headerRoom): the header sits
+// in the room above the first page there is anyway
+const FALLBACK_ROOM = 20;
+
+/**
+ * headerRoom returns the room the layout keeps above the first page for
+ * its header, in pixels
+ */
+export const headerRoom = (layout: FrameLayout) =>
+  (layout as FrameLayout & { headerRoom?: number }).headerRoom;
+
+// in "page ends" a frame shows some room beside the text
+const insetOf = (layout: FrameLayout) =>
+  layout.mode === "pages" ? 0 : BLEED * layout.scale;
+
 /**
  * propertiesPlace returns where the line with the document's properties
- * goes: right above the first page's text, as wide as it
+ * goes: right above the first page's text and its header, as wide as it
  */
 export const propertiesPlace = (layout: FrameLayout) => {
   const first = layout.frames[0];
   if (!first) return null;
-  // in "page ends" the frame shows some room beside the text
-  const inset = layout.mode === "pages" ? 0 : BLEED * layout.scale;
+  const inset = insetOf(layout);
   return {
     left: first.left + inset,
-    top: first.top - PROPERTIES_ROOM - 4,
+    top: first.top - (headerRoom(layout) ?? 0) - PROPERTIES_ROOM - 4,
     width: first.width - 2 * inset,
+  };
+};
+
+/**
+ * firstHeaderPlace returns where the first page's header goes in "page
+ * ends": right above its text, as wide as it. The sheets of "pages" show
+ * it themselves.
+ */
+export const firstHeaderPlace = (layout: FrameLayout) => {
+  const first = layout.frames[0];
+  if (!first || layout.mode === "pages") return null;
+  const inset = insetOf(layout);
+  const room = headerRoom(layout) ?? FALLBACK_ROOM;
+  return {
+    left: first.left + inset,
+    top: first.top - room,
+    width: first.width - 2 * inset,
+    height: room,
   };
 };
 

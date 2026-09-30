@@ -30,6 +30,7 @@ import {
   pageView,
   pageViewport,
 } from "../state";
+import PageFirstHeader from "./PageFirstHeader.vue";
 import PageFrame from "./PageFrame.vue";
 import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
@@ -398,6 +399,7 @@ onUnmounted(() => {
       />
       <PageMarks :layout="layout" :pages="shownPages" />
       <PageOverlay :layout="layout" />
+      <PageFirstHeader :layout="layout" />
       <PageProperties :layout="layout" />
     </div>
   </div>

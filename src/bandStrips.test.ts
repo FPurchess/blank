@@ -129,6 +129,23 @@ describe("band strips", () => {
       expect(edge("footer").hidden).toBe(false);
     });
 
+    it("shows the header at the edge when there are no pages to show it", () => {
+      // without the layout engine, the editor shows the text itself
+      dispose();
+      document.body.classList.add("without-engine");
+      dispose = bootBandStrips(editor);
+      publish('page:\n  header: { left: "{title}" }');
+
+      expect(edge("header").hidden).toBe(false);
+      expect(edge("header").querySelector(".band-line")!.textContent).toBe(
+        "Report",
+      );
+      // it hides while its strip is open
+      open();
+      expect(edge("header").hidden).toBe(true);
+      document.body.classList.remove("without-engine");
+    });
+
     it("shows a band only the first or even pages have", () => {
       publish('page:\n  first-page:\n    header: { left: "ACME" }');
 

@@ -2,7 +2,7 @@
 
 The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged.
 
-- [ ] 1. Page 1's header in "page ends", and the edge line without the engine
+- [x] 1. Page 1's header in "page ends" (`PageFirstHeader.vue`), and the edge line without the engine
 - [ ] 2. A pixel helper, and checks of what is painted
 - [ ] 3. Restore the weakened E2E checks
 - [ ] 4. The view keeps its place when it switches or resizes

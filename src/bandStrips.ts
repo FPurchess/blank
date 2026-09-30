@@ -453,15 +453,19 @@ export const bootBandStrips = (editor: EditorHandle) => {
       },
       { flush: "sync", immediate: true },
     );
-    // the pages show the bands themselves, on the sheets or where each page
-    // ends (src/ui/PageFrame.vue), and open their strips on a click; the
-    // edges only offer to add one, near the bars
+    // the pages show the bands themselves, on the sheets, where each page
+    // ends and above the first page (src/ui/PageFrame.vue,
+    // PageFirstHeader.vue), and open their strips on a click; the edges
+    // only offer to add one, near the bars. Without the layout engine there
+    // are no pages, and the edges show the bands.
+    const withoutPages = document.body.classList.contains("without-engine");
     watch(
       [bandEditor, atRest],
       ([request, bands]) => {
         for (const band of BANDS) {
           edges[band].element.hidden =
-            request?.band === band || bands[band] !== undefined;
+            request?.band === band ||
+            (bands[band] !== undefined && !withoutPages);
         }
       },
       { flush: "sync", immediate: true },

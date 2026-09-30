@@ -1298,6 +1298,23 @@ body.without-engine {
 // (MARK_HEIGHT in src/engine/frames.ts)
 $page-end-height: 64px;
 
+// the three slots of a header or footer shown beside the pages: left,
+// centre and right
+%page-band-text {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  min-height: 1.3em;
+  padding: 0 24px;
+
+  span:nth-child(2) {
+    text-align: center;
+  }
+
+  span:nth-child(3) {
+    text-align: right;
+  }
+}
+
 .page-end {
   position: absolute;
   top: 100%;
@@ -1314,18 +1331,7 @@ $page-end-height: 64px;
   pointer-events: none;
 
   .band {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    min-height: 1.3em;
-    padding: 0 24px;
-
-    span:nth-child(2) {
-      text-align: center;
-    }
-
-    span:nth-child(3) {
-      text-align: right;
-    }
+    @extend %page-band-text;
   }
 
   .line {
@@ -1340,6 +1346,23 @@ $page-end-height: 64px;
       padding: 0 0.5em;
       background-color: var(--background-color);
     }
+  }
+}
+
+// the first page's header in "page ends", above its text, like the bands
+// where a page ends
+.page-first-header {
+  @extend %page-band-text;
+  position: absolute;
+  box-sizing: border-box;
+  align-items: end;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0.45;
+  cursor: pointer;
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 8%, transparent);
   }
 }
 

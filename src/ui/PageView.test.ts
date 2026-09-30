@@ -211,6 +211,53 @@ describe("page view", () => {
     vi.useRealTimers();
   });
 
+  it("shows the header of a one-page document above its text", async () => {
+    const short = doc(p("One page."));
+    const engine = testEngine();
+    const header = { left: "Head", center: "", right: "Page {page}" };
+    engine.setSettings(testLayout({ header }), documentFields(short));
+    engine.sync(short, () => undefined);
+    setPageEngine(engine);
+    pageLayoutState.value = {
+      width: 595.28,
+      height: 841.89,
+      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
+      pages: engine.pages(),
+      versions: engine.raw.versions(),
+      bottoms: engine.raw.bottoms(),
+      header: true,
+    };
+    dispose = bootApp(createTestHandle(createState(short, { cursor: 1 })));
+    await nextTick();
+    const shown = view().querySelector<HTMLElement>(".page-first-header")!;
+    expect([...shown.children].map((slot) => slot.textContent)).toEqual([
+      "Head",
+      "",
+      "Page 1",
+    ]);
+    // above the text of the first page
+    expect(parseFloat(shown.style.top)).toBeLessThan(
+      parseFloat(frames()[0].style.top),
+    );
+    // the sheets show it themselves
+    pageView.value = "pages";
+    await nextTick();
+    expect(view().querySelector(".page-first-header")).toBeNull();
+    // a plain first page has none
+    pageView.value = "page-ends";
+    engine.setSettings(
+      testLayout({ header, firstPage: "plain" }),
+      documentFields(short),
+    );
+    pageLayoutState.value = {
+      ...pageLayoutState.value,
+      versions: engine.raw.versions(),
+      header: false,
+    };
+    await nextTick();
+    expect(view().querySelector(".page-first-header")).toBeNull();
+  });
+
   it("shows the page of the caret in the bottom bar", async () => {
     layOut();
     dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));

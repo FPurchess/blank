@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { endMark, scrollFor } from "./pageViewModel";
+import type { FrameLayout } from "../engine/frames";
+import {
+  endMark,
+  firstHeaderPlace,
+  propertiesPlace,
+  scrollFor,
+} from "./pageViewModel";
+
+// two frames of "page ends" at 1.5 px per point, and of "pages"
+const frame = { page: 0, top: 100, left: 40, width: 600, height: 900 };
+const place = { x: 0, y: 0, w: 400, h: 600 };
+const pageEnds: FrameLayout = {
+  mode: "page-ends",
+  scale: 1.5,
+  frames: [{ ...frame, ...place }],
+  height: 1200,
+};
+const pages: FrameLayout = { ...pageEnds, mode: "pages" };
 
 describe("scrollFor", () => {
   it("scrolls only as far as needed", () => {
@@ -24,5 +41,35 @@ describe("endMark", () => {
       number: "2",
       header: ["", "", ""],
     });
+  });
+});
+
+describe("firstHeaderPlace", () => {
+  it("puts the first page's header right above its text in page ends", () => {
+    // the frame shows 24 pt beside the text
+    expect(firstHeaderPlace(pageEnds)).toEqual({
+      left: 76,
+      top: 80,
+      width: 528,
+      height: 20,
+    });
+    // in the room the layout keeps for it
+    expect(
+      firstHeaderPlace({ ...pageEnds, headerRoom: 22 } as FrameLayout),
+    ).toMatchObject({ top: 78, height: 22 });
+  });
+
+  it("leaves the header to the sheets in pages", () => {
+    expect(firstHeaderPlace(pages)).toBeNull();
+    expect(firstHeaderPlace({ ...pageEnds, frames: [] })).toBeNull();
+  });
+});
+
+describe("propertiesPlace", () => {
+  it("puts the properties above the first page and its header", () => {
+    expect(propertiesPlace(pages)).toEqual({ left: 40, top: 68, width: 600 });
+    expect(
+      propertiesPlace({ ...pageEnds, headerRoom: 20 } as FrameLayout),
+    ).toEqual({ left: 76, top: 48, width: 528 });
   });
 });

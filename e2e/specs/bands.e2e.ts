@@ -77,6 +77,8 @@ describe("header and footer", () => {
 
     await expect(strip()).not.toExist();
     await expect(bandText("header", "left")).resolves.toBe("report");
+    // the first page has none, so nothing shows above its text
+    await expect($(".page-first-header")).not.toExist();
     await pressMod("s");
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n---\n\n# report\n\ntext.',
@@ -152,5 +154,22 @@ describe("header and footer", () => {
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n  even-pages:\n    footer: {center: "{page}"}\n  number-style: i\n---\n\n# report\n\ntext.',
     );
+  });
+
+  it("shows the first page's header above its text", async () => {
+    const file = path.join(fixtureDir, "header.md");
+    fs.writeFileSync(
+      file,
+      '---\npage:\n  header: {left: "{title}", right: "draft"}\n---\n\n# report\n\ntext.\n',
+    );
+    await restartApp([file]);
+    const header = $(".page-first-header");
+    await expect(header).toBeDisplayed();
+    await expect(header).toHaveText(expect.stringContaining("report"));
+    await expect(header).toHaveText(expect.stringContaining("draft"));
+    // above the text of the first page
+    const text = await $('.page-frame[data-page="1"]').getLocation("y");
+    const top = await header.getLocation("y");
+    expect(top).toBeLessThan(text);
   });
 });
