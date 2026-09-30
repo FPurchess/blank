@@ -13,11 +13,13 @@ impl Engine {
             .min(self.pages.len().saturating_sub(1))
     }
 
-    /// paginates from the start of page `from`. With `tail`, the items from
-    /// `tail.start` on are the ones that were there before, moved by
-    /// `tail.delta`: once a page starts with one of them where an old page
-    /// did, the rest is as before.
-    pub(super) fn paginate_from(&mut self, from: usize, tail: Option<Tail>) {
+    /// paginates from the start of page `from`. With a `change`, the items
+    /// from `change.tail.start` on are the ones that were there before,
+    /// moved by `change.tail.delta`: once a page starts with one of them
+    /// where an old page did, the rest is as before. Without one, every item
+    /// was laid out again, and every page gets a new version.
+    pub(super) fn paginate_from(&mut self, from: usize, change: Option<Change>) {
+        let tail = change.as_ref().map(|change| change.tail);
         let from = from.min(self.pages.len());
         let old_pages = std::mem::take(&mut self.pages);
         let old_frags = std::mem::take(&mut self.frags);
@@ -96,17 +98,32 @@ impl Engine {
                 _ => None,
             })
             .collect();
-        // new versions for the pages paginated again, and for the pages whose
-        // headers or footers changed
+        // new versions for the pages whose fragments changed, and for the
+        // pages whose headers or footers changed
         let count = self.pages.len();
         for index in 0..count {
             let bands = self.band_texts(index);
-            let source = if index < from {
+            let source = if change.is_none() {
+                None
+            } else if index < from {
                 Some(index)
             } else if index >= copied_from {
                 settled.map(|old_index| old_index + index - copied_from)
             } else {
-                None
+                // paginated again: the same as the old page if it has the
+                // same fragments, of items that weren't laid out again
+                change.as_ref().and_then(|change| {
+                    let old = old_pages.get(index)?;
+                    let page = &self.pages[index];
+                    let new = &self.frags[page.start..page.end];
+                    let before = &old_frags[old.start..old.end];
+                    let same = new.len() == before.len()
+                        && new.iter().zip(before).all(|(a, b)| {
+                            change.map.old_of(a.item) == Some(b.item)
+                                && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
+                        });
+                    same.then_some(index)
+                })
             };
             let kept = source
                 .and_then(|source| old_pages.get(source))
@@ -118,6 +135,27 @@ impl Engine {
             });
             self.pages[index].bands = bands;
         }
+    }
+}
+
+/// what an update changed: which items are the ones before it, where the
+/// unchanged tail starts
+pub(super) struct Change {
+    pub(super) tail: Tail,
+    pub(super) map: ItemMap,
+}
+
+/// which items are the ones that were there before an update: runs of
+/// `(new start, new end, old start)`, in order
+pub(super) struct ItemMap(pub(super) Vec<(usize, usize, usize)>);
+
+impl ItemMap {
+    /// the old index of an item, if it was there before
+    pub(super) fn old_of(&self, new: usize) -> Option<usize> {
+        self.0
+            .iter()
+            .find(|(start, end, _)| (*start..*end).contains(&new))
+            .map(|(start, _, old)| old + (new - start))
     }
 }
 
@@ -175,7 +213,14 @@ impl Paginator<'_> {
                         .get(index)
                         .is_some_and(|page| page.first == Some(old))
                     {
-                        // the rest is as before: drop this page, the old
+                        // the rest is as before. That holds because a page
+                        // starts the same way wherever it opens (at the top,
+                        // empty, with no space above), and what is placed on
+                        // it from here only looks ahead: at the units an item
+                        // keeps together and at what follows a heading, all
+                        // of them old items moved by `delta`. The bands, the
+                        // chapters and the page count are worked out again
+                        // afterwards. So drop this page, and the old
                         // ones follow from here
                         let page = self.pages.pop().unwrap();
                         self.frags.truncate(page.start);

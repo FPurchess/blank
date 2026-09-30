@@ -2,6 +2,8 @@
 //! answers where positions are and what a page shows.
 
 mod display;
+#[cfg(test)]
+mod incremental_tests;
 mod navigate;
 mod paginate;
 mod select;
@@ -18,7 +20,7 @@ use crate::bands::{bands_on, chapter_on, expand_slots, Chapter, Values};
 use crate::fonts::Fonts;
 use crate::items::Laid;
 use crate::model::{Item, Settings};
-use paginate::Tail;
+use paginate::{Change, ItemMap, Tail};
 
 /// a unit of an item placed on a page, at `y` from the page's top edge
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -164,11 +166,13 @@ impl Engine {
         while earliest > 0 && self.items[earliest - 1].heading_level() > 0 {
             earliest -= 1;
         }
+        // and at the page before it, where what follows may flow back to
         let restart_page = if earliest < self.first_frag.len() {
             self.page_of_frag(self.first_frag[earliest])
         } else {
             self.pages.len().saturating_sub(1)
-        };
+        }
+        .saturating_sub(1);
         let laid: Vec<Laid> = inserted.iter().map(|item| self.lay_out(item)).collect();
         let count = inserted.len();
         self.items.splice(start..start + delete, inserted);
@@ -187,11 +191,17 @@ impl Engine {
             laid_out: count,
             ..Default::default()
         };
-        let tail = Tail {
-            start: start + count,
-            delta: count as i64 - delete as i64,
+        let change = Change {
+            tail: Tail {
+                start: start + count,
+                delta: count as i64 - delete as i64,
+            },
+            map: ItemMap(vec![
+                (0, start, 0),
+                (start + count, self.items.len(), start + delete),
+            ]),
         };
-        self.paginate_from(restart_page, Some(tail));
+        self.paginate_from(restart_page, Some(change));
     }
 
     fn band_texts(&self, page: usize) -> [String; 6] {

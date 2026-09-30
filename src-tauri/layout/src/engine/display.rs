@@ -12,7 +12,7 @@ use crate::style::BAR;
 use crate::text::{GlyphRun, TextBox};
 
 /// what the page shows, in points from its top left corner
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Op {
     Glyphs {
         run: GlyphRun,

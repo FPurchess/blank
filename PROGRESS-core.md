@@ -3,7 +3,7 @@
 The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes this file on merge.
 
 - [x] 0. Split `engine.rs` into `engine/` and `items.rs` into `items/`, as a pure move
-- [ ] 1. B1: incremental re-layout equals a full layout
+- [x] 1. B1: incremental re-layout equals a full layout
 - [ ] 2. S6: changed page ranges, body and band versions, `updateMany`
 - [ ] 3. B2 / S5: no panic from JS input
 - [ ] 4. B4 / S1: line affinity for ↑/↓ and End
@@ -44,3 +44,30 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - The wasm (`blank_layout.wasm` before wasm-bindgen, from `bun run engine:build`): the code section is 3,145,645 bytes in both, with 4165 functions. The data section grew by 192 bytes, from the longer file paths of the panic locations.
   - Method: `wasm-tools strip --all`, then `wasm-tools print`, dropping the data segments. Types were canonicalized by signature, and every `i32.const` and load/store `offset` that points into the data (≥ 1 MiB) was masked. The text still differs from function 298 on, because LTO orders the functions differently (legacy mangling puts the impl's module path into the symbol names).
   - With function numbers and call targets normalized too, the multisets of function bodies are identical: 0 bodies only before, 0 only after. So only the order and the addresses of panic locations changed.
+
+### Task 1: incremental equals full
+
+- `update` starts paginating at the page before the change's first fragment, so what follows can flow back onto it.
+  - Pagination only looks ahead within an item and from a run of headings to what follows it, and `update` already walks back over the headings.
+- Keeping versions:
+  - A page paginated again keeps its version when it has the old page's fragments, of items that weren't laid out again (`ItemMap`).
+  - So the extra page isn't painted again.
+  - `add_font`, `set_settings` and `set_items` still give every page a new version.
+- The settled shortcut is sound: a page starts the same way wherever it opens, and what is placed on it from there only looks ahead at old items. The comment in `Paginator::place` says why.
+- `incremental_equals_full` (`engine/incremental_tests.rs`):
+  - 4 settings × 25 random edits by default
+  - The settings: new pages before chapters, bands with `{page} of {pages}` and `{chapter}`, and a small page.
+  - The edits: paragraphs, headings, list items, quotes, breaks, rules, images (loaded, not loaded, taller than the page), and tables (header rows, captions, rows taller than a page).
+  - After each edit it compares the items, the text positions, the laid-out count, fragments, pages and `page_ops` with a fresh engine, and checks the versions both ways.
+  - Against the old code it fails at step 20 of the first run.
+  - `BLANK_PROPERTY_STEPS=2000 cargo test --release` (8000 edits) passed in 18 min.
+  - Mutation checks: never keeping a repaginated page's version, and keeping it unconditionally, each fail the version assertions.
+
+### Timings: ms per `update`, one character typed into the middle paragraph, release
+
+| pages | after task 1 | after task 2 | after task 16 |
+|---|---|---|---|
+| 1 | 0.210 | | |
+| 39 | 0.287 | | |
+| 200 | 0.453 | | |
+| 823 | 1.766 | | |
