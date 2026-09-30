@@ -48,8 +48,19 @@ export const perfSamples = (clear = false) => {
   return copy;
 };
 
+// when each step of the start-up was done, in ms since the window opened
+const boot: Record<string, number> = {};
+
+/**
+ * bootMark notes when a step of the start-up was done, the first time
+ */
+export const bootMark = (step: string) => {
+  boot[step] ??= Math.round(performance.now());
+};
+
 if (typeof window !== "undefined") {
-  (
-    window as unknown as { blankPageViewPerf: typeof perfSamples }
-  ).blankPageViewPerf = perfSamples;
+  Object.assign(window, {
+    blankPageViewPerf: perfSamples,
+    blankBootTimes: () => ({ ...boot }),
+  });
 }

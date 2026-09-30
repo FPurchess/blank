@@ -398,6 +398,13 @@ describe("page view", () => {
       await restartApp([file]);
       await expect($("#page-view .page-canvas")).toBeExisting();
       const bootMs = Date.now() - booted;
+      // when each step of the start-up was done, in ms since the window
+      // opened, see bootMark
+      const boot = await browser.execute(() =>
+        (
+          window as unknown as { blankBootTimes: () => Record<string, number> }
+        ).blankBootTimes(),
+      );
       const pages = await $("#ui-page-number").getText();
       await clickOnPage(1, 44, 58);
       await browser.execute(() =>
@@ -429,6 +436,7 @@ describe("page view", () => {
         pages,
         frames: (await frames()).length,
         bootMs,
+        boot,
         work: summary(latency.work),
         frame: summary(latency.frame),
         dispatch: summary(perf.dispatch),

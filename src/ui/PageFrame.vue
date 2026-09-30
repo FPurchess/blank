@@ -6,7 +6,7 @@ import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
-import { record } from "../engine/perf";
+import { bootMark, record } from "../engine/perf";
 import { pageLayoutState, path, theme } from "../state";
 import { paintPage } from "./paintPage";
 import { bandTitle, endMark } from "./pageViewModel";
@@ -69,6 +69,7 @@ const paint = () => {
     image: (src) => loadedImage(src, path.value)?.image ?? null,
   });
   record("paint", performance.now() - start);
+  bootMark("pages");
 };
 
 onMounted(paint);

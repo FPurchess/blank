@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
 import { doc, h, p } from "../test/editor";
@@ -15,6 +15,38 @@ const long = (count: number) =>
   doc(h(1, "Title"), ...Array.from({ length: count }, () => p(LONG)));
 
 describe("PageEngine", () => {
+  it("lays out the first pages of a long document first, then the rest", () => {
+    vi.useFakeTimers();
+    const node = long(300);
+    const full = testEngine();
+    full.setSettings(testLayout(), documentFields(node));
+    full.sync(node, noSizes);
+
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    let progress = 0;
+    engine.onProgress = () => progress++;
+    engine.sync(node, noSizes, false, null, true);
+    expect(engine.laying).toBe(true);
+    expect(engine.pages()).toBeLessThan(full.pages());
+    expect(engine.pages()).toBeGreaterThan(1);
+    vi.runAllTimers();
+    expect(engine.laying).toBe(false);
+    expect(progress).toBeGreaterThan(1);
+    expect(engine.pages()).toBe(full.pages());
+    expect(engine.raw.bottoms()).toEqual(full.raw.bottoms());
+
+    // an edit while it lays out finishes the rest first
+    const again = testEngine();
+    again.setSettings(testLayout(), documentFields(node));
+    again.sync(node, noSizes, false, null, true);
+    const typed = node.replace(3, 3, doc(p("x")).slice(1, 2));
+    again.sync(typed, noSizes);
+    expect(again.laying).toBe(false);
+    expect(again.pages()).toBe(full.pages());
+    vi.useRealTimers();
+  });
+
   it("lays out a document on pages", () => {
     const engine = testEngine();
     const node = long(60);

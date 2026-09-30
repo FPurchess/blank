@@ -10,10 +10,15 @@ import {
 import type { EditorView } from "prosemirror-view";
 import { computed, watch } from "vue";
 
-import { pageEngine, type Hit, type PageEngine } from "../../engine/engine";
+import {
+  pageEngine,
+  pageEngineReady,
+  type Hit,
+  type PageEngine,
+} from "../../engine/engine";
 import { caretBox, hitAt, viewBox } from "../../engine/geometry";
 import { imageSizes, imagesLoaded } from "../../engine/images";
-import { timed } from "../../engine/perf";
+import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
 import { summarize } from "./properties";
@@ -157,6 +162,7 @@ const sync = (
   state: EditorState,
   frozen: FrozenWidths | null,
   force = false,
+  progressive = false,
 ) => {
   const { layout } = pageLayout.value;
   const changed = engine.setSettings(layout, pageFields.value);
@@ -165,7 +171,13 @@ const sync = (
     width: contentWidth,
     height: contentHeight,
   });
-  const laidOut = engine.sync(state.doc, sizes, force || changed, frozen);
+  const laidOut = engine.sync(
+    state.doc,
+    sizes,
+    force || changed,
+    frozen,
+    progressive,
+  );
   if (laidOut || changed || !pageLayoutState.value) {
     publishLayout(engine);
     // fonts for what Blank's fonts lack, which lay out again once found
@@ -203,47 +215,74 @@ export const pageSync = () => {
       },
     },
     view(view) {
-      const engine = pageEngine;
-      if (!engine) return {};
-      sync(engine, view.state, frozen);
-      publishSelection(engine, view.state, false);
-      // fonts found for what Blank's fonts lack
-      const stopFonts = watch(
-        fallbackFonts,
-        (fonts) => {
-          if (!engine.addFonts(fonts)) return;
-          timed("layout", () => sync(engine, view.state, frozen, true));
-          publishSelection(engine, view.state, false);
-        },
-        { flush: "sync" },
-      );
-      // the page setup, the fields of headers and footers, loaded images
-      const stop = watch(
-        [pageLayout, pageFields, imagesLoaded],
-        () => {
-          timed("layout", () => sync(engine, view.state, frozen, true));
-          publishSelection(engine, view.state, false);
-        },
-        { flush: "sync" },
-      );
+      let engine: PageEngine | null = null;
+      const stops: (() => void)[] = [];
+      const start = (ready: PageEngine) => {
+        engine = ready;
+        // a long document lays out its first pages first, and the rest a
+        // chunk at a time, which each shows as it comes
+        ready.onProgress = () => {
+          publishLayout(ready);
+          publishSelection(ready, view.state, false);
+        };
+        sync(ready, view.state, frozen, false, true);
+        bootMark("layout");
+        publishSelection(ready, view.state, false);
+        stops.push(
+          // fonts found for what Blank's fonts lack
+          watch(
+            fallbackFonts,
+            (fonts) => {
+              if (!ready.addFonts(fonts)) return;
+              timed("layout", () => sync(ready, view.state, frozen, true));
+              publishSelection(ready, view.state, false);
+            },
+            { flush: "sync" },
+          ),
+          // the page setup, the fields of headers and footers, loaded images
+          watch(
+            [pageLayout, pageFields, imagesLoaded],
+            () => {
+              timed("layout", () => sync(ready, view.state, frozen, true));
+              publishSelection(ready, view.state, false);
+            },
+            { flush: "sync" },
+          ),
+        );
+      };
+      // the engine loads while the editor boots
+      if (pageEngine) start(pageEngine);
+      else {
+        const waiting = watch(
+          pageEngineReady,
+          (ready) => {
+            if (!ready || engine) return;
+            waiting();
+            start(ready);
+          },
+          { flush: "sync" },
+        );
+        stops.push(waiting);
+      }
       return {
         update(view, previous) {
+          if (!engine) return;
           const docChanged = view.state.doc !== previous.doc;
           // a move into or out of a table freezes or relaxes its columns
           const moved = !view.state.selection.eq(previous.selection);
           if (docChanged || moved)
             timed("layout", () => {
               frozen = frozenWidths(view.state, frozen);
-              sync(engine, view.state, frozen);
+              sync(engine!, view.state, frozen);
             });
-          if (docChanged || !view.state.selection.eq(previous.selection)) {
-            const moved = pageViewKey.getState(view.state);
+          if (docChanged || moved) {
+            const by = pageViewKey.getState(view.state);
             timed("caret", () =>
               publishSelection(
-                engine,
+                engine!,
                 view.state,
-                moved?.by !== "pointer",
-                moved?.at,
+                by?.by !== "pointer",
+                by?.at,
               ),
             );
           }
@@ -252,8 +291,11 @@ export const pageSync = () => {
           }
         },
         destroy() {
-          stop();
-          stopFonts();
+          stops.forEach((stop) => stop());
+          if (engine) {
+            engine.onProgress = null;
+            engine.finish();
+          }
           pageLayoutState.value = null;
           pageCaret.value = null;
           pageSelection.value = [];

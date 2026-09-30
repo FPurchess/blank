@@ -1231,6 +1231,24 @@ $strip-height: 90px;
   caret-color: transparent;
 }
 
+// if the layout engine can't load, the editor shows the text itself, as
+// before the page view
+body.without-engine {
+  #editor {
+    position: static;
+    width: auto;
+    max-width: 1200px;
+    opacity: 1;
+    pointer-events: auto;
+    caret-color: auto;
+    transform: none !important;
+  }
+
+  #page-view {
+    display: none;
+  }
+}
+
 #page-view {
   position: fixed;
   inset: 0;

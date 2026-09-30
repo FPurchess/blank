@@ -172,13 +172,25 @@ step.
     reads lines as the hidden editor breaks them (640 px wide, the webview's
     font), which are not the painted lines.
 
+- 8. **Performance:**
+  - The engine (wasm and fonts) starts loading first, in parallel with the
+    config and storage, and is awaited just before the editor renders
+    (letting the editor render first delayed the wasm compile behind the
+    webview's layout of the hidden editor: slower for long documents).
+  - A long document lays out its first 60 items (a few pages) before the
+    pages show, and the rest 80 items at a time between other work
+    (`PageEngine.sync(…, progressive)`, `onProgress`); "Page 1 of 59"
+    grows to the full count. Any edit lays out the rest first.
+  - If the engine can't load, `body.without-engine` shows the editor itself.
+  - Start-up steps are marked (`bootMark`, `window.blankBootTimes`).
+  - Measured, see "Measurements" below.
+
 ### In progress
 
-- 8. Performance.
+- 9. Tests, CI and docs.
 
 ### Open
 
-- 8. Performance: start-up, work per key on 100 pages.
 - 9. E2E, docs shots, CI, coverage, user docs.
 
 ## How to try it
@@ -371,8 +383,28 @@ as mean / p95, and `performance.now()` there is only accurate to about 1 ms.
 - **Hiding the editor with `content-visibility: auto`** to skip laying it out
   made typing on 100 pages much slower (74 ms per key), so I dropped it.
 - **Boot:** about 2.6 s (1 page) to 4.2 s (100 pages) until the pages show,
-  under xvfb. That includes loading 3 MB of wasm and 4 MB of TTFs, and the first
-  full layout.
+  under xvfb, measured from the WebDriver session start. That includes loading
+  3 MB of wasm and 4 MB of TTFs, and the first full layout.
+- **After step 8** (same setup, times from the window opening, from
+  `window.blankBootTimes`):
+
+  | document | engine ready | first layout | pages painted | UI booted | work per key (mean / p95) |
+  |---|---|---|---|---|---|
+  | 1 page, before | 433 | 526 | 1366 | 1456 | 9.6 / 13 |
+  | 1 page, after | 344 | 416 | 1073 | 1143 | 6.3 / 13 |
+  | 20 pages, before | 556 | 773 | 1690 | 1882 | 13.4 / 17 |
+  | 20 pages, after | 340 | 456 | 1171 | 1324 | 9.4 / 15 |
+  | 100 pages, before | 453 | 1046 | 2071 | 2639 | 19.8 / 36 |
+  | 100 pages, after | 369 | 552 | 1340 | 1856 | 14.1 / 19 |
+
+  Most of the time between the first layout and the painted pages is the
+  webview's first style and layout of the hidden editor's DOM (a forced
+  `getComputedStyle` in the first paint took ~2 s in one slow run), which
+  today's app pays too for its visible editor. I didn't build main's app to
+  measure it side by side (other worktrees were off limits); by the marks,
+  the engine adds about 150–200 ms (wasm compile, fonts, first layout)
+  before the editor, and the 100-page document shows its pages about
+  0.7 s sooner than before this step. Runs vary by ±20 % under xvfb.
 - **wasm size** (`src/engine/wasm/blank_layout_bg.wasm`):
 
   | build | size | gzip |

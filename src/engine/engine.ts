@@ -1,4 +1,5 @@
 import type { Node } from "prosemirror-model";
+import { shallowRef } from "vue";
 
 import type { DocumentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
@@ -13,6 +14,7 @@ import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
+import { bootMark } from "./perf";
 
 // The layout engine (src-tauri/layout, built for the webview by
 // scripts/build-engine.sh) and what it needs: its fonts, the document as
@@ -98,6 +100,11 @@ export const settingsOf = (layout: Layout, fields: DocumentFields) => {
   };
 };
 
+// how many items the first layout of a long document lays out before the
+// pages show, a few pages' worth, and then at a time
+const FIRST_ITEMS = 60;
+const CHUNK_ITEMS = 80;
+
 /**
  * PageEngine keeps the engine in step with a document: only what changed
  * is handed to it
@@ -167,15 +174,21 @@ export class PageEngine {
     sizes: ImageSizes,
     force = false,
     frozen: FrozenWidths | null = null,
+    progressive = false,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
     if (doc === this.doc && !force && frozenKey === this.frozen) return false;
     this.frozen = frozenKey;
+    // what is still to lay out goes first, so the engine has all of it
+    this.finish();
     const records = flatten(doc, sizes, frozen);
     if (this.doc === null) {
-      this.raw.setItems(
-        JSON.stringify(records.map((record) => record.build())),
-      );
+      const first = progressive ? records.slice(0, FIRST_ITEMS) : records;
+      this.raw.setItems(JSON.stringify(first.map((record) => record.build())));
+      if (first.length < records.length) {
+        this.pending = { records, next: first.length };
+        this.later();
+      }
     } else {
       const shift = doc.content.size - this.doc.content.size;
       const change = diff(this.records, records, shift);
@@ -195,6 +208,52 @@ export class PageEngine {
     this.records = records;
     this.doc = doc;
     return true;
+  }
+
+  // the first layout of a long document, laid out a chunk at a time after
+  // its first pages (see sync), and a callback after each chunk
+  private pending: { records: FlatRecord[]; next: number } | null = null;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  onProgress: (() => void) | null = null;
+
+  /**
+   * laying tells whether the engine is still laying out the rest of the
+   * document, after its first pages
+   */
+  get laying() {
+    return this.pending !== null;
+  }
+
+  // lays out the next `count` records of the rest
+  private append(count: number) {
+    const pending = this.pending;
+    if (!pending) return;
+    const chunk = pending.records.slice(pending.next, pending.next + count);
+    this.raw.update(
+      pending.next,
+      0,
+      JSON.stringify(chunk.map((record) => record.build())),
+      0,
+    );
+    pending.next += chunk.length;
+    if (pending.next >= pending.records.length) this.pending = null;
+  }
+
+  // lays out the rest a chunk at a time, between the webview's other work
+  private later() {
+    this.timer = setTimeout(() => {
+      this.append(CHUNK_ITEMS);
+      this.onProgress?.();
+      if (this.pending) this.later();
+    });
+  }
+
+  /**
+   * finish lays out the rest of the document now
+   */
+  finish() {
+    clearTimeout(this.timer);
+    if (this.pending) this.append(Infinity);
   }
 
   pages() {
@@ -344,11 +403,12 @@ let loading: Promise<Uint8Array[]> | null = null;
 export const loadEngine = async () => {
   loading ??= (async () => {
     const [, ...fonts] = await Promise.all([
-      init({ module_or_path: wasmUrl }),
+      init({ module_or_path: wasmUrl }).then(() => bootMark("wasm")),
       ...FONT_URLS.map(
         async (url) => new Uint8Array(await (await fetch(url)).arrayBuffer()),
       ),
     ]);
+    bootMark("fonts");
     fontFiles = fonts as Uint8Array[];
     return fontFiles;
   })();
@@ -364,12 +424,15 @@ export const newEngine = async () =>
 // the engine of the page view, see bootEngine
 export let pageEngine: PageEngine | null = null;
 
+// the same, for what waits for it to load, e.g. the editor's pageSync
+export const pageEngineReady = shallowRef<PageEngine | null>(null);
+
 /**
- * bootEngine loads the page view's engine before the editor starts, which
- * lays out its first document with it
+ * bootEngine loads the page view's engine. It starts first and loads while
+ * the rest boots; the editor lays out its document once it's there.
  */
 export const bootEngine = async () => {
-  pageEngine = await loadEngine();
+  setPageEngine(await loadEngine());
   return pageEngine;
 };
 
@@ -378,4 +441,5 @@ export const bootEngine = async () => {
  */
 export const setPageEngine = (engine: PageEngine | null) => {
   pageEngine = engine;
+  pageEngineReady.value = engine;
 };

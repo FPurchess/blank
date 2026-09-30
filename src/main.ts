@@ -6,6 +6,7 @@ import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootEngine } from "./engine/engine";
 import { exposeGeometry } from "./engine/geometry";
+import { bootMark } from "./engine/perf";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
@@ -33,15 +34,31 @@ const showBootError = (error: unknown) => {
 (async () => {
   let editorReady = false;
   try {
+    bootMark("start");
+    // the page view's layout engine loads while the rest boots; the editor
+    // lays out its document once it's there. Without it, the editor shows
+    // the text itself.
+    const engine = bootEngine().then(
+      () => bootMark("engine"),
+      (error: unknown) => {
+        console.error("failed to load the layout engine", error);
+        document.body.classList.add("without-engine");
+      },
+    );
     bootState();
     await bootConfig();
+    bootMark("config");
     await bootStorage();
-    // the page view's layout engine, which lays out the first document
-    await bootEngine();
+    bootMark("storage");
+    // the engine compiles best while nothing else runs, before the editor
+    // renders its document
+    await engine;
     const editor = await bootEditor();
+    bootMark("editor");
     editorReady = true;
     exposeGeometry(() => editor.view.state.doc);
     bootUI(editor);
+    bootMark("ui");
     // doesn't wait for the dictionary, which may need a download
     bootSpellcheck();
   } catch (error) {

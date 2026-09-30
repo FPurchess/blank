@@ -55,16 +55,28 @@ describe("main", () => {
 
       // the UI works with the editor through the handle bootEditor returns
       expect(bootUI).toHaveBeenCalledWith(editor);
+      // the engine loads in the background from the start
       const order = [
+        bootEngine,
         bootConfig,
         bootStorage,
-        bootEngine,
         bootEditor,
         bootUI,
       ].map((boot) => vi.mocked(boot).mock.invocationCallOrder[0]);
       expect(order).toEqual([...order].sort((a, b) => a - b));
     },
   );
+  it("lets the editor show the text if the engine can't load", async () => {
+    vi.mocked(bootEngine).mockRejectedValue(new Error("no wasm"));
+
+    await importMain();
+    await flushPromises();
+
+    expect(document.body.classList).toContain("without-engine");
+    expect(bootUI).toHaveBeenCalled();
+    document.body.classList.remove("without-engine");
+  });
+
   it.each([
     ["config", bootConfig],
     ["storage", bootStorage],
