@@ -43,6 +43,9 @@ pub enum Deco {
     },
     Image {
         src: String,
+        /// what stands in its place where it can't be shown, e.g. in a PDF
+        /// it couldn't be decoded for
+        alt: String,
         x: f32,
         y: f32,
         w: f32,
@@ -60,8 +63,16 @@ impl Deco {
                 h: *h,
                 role: *role,
             },
-            Deco::Image { src, x, y, w, h } => Deco::Image {
+            Deco::Image {
+                src,
+                alt,
+                x,
+                y,
+                w,
+                h,
+            } => Deco::Image {
                 src: src.clone(),
+                alt: alt.clone(),
                 x: x + dx,
                 y: y + dy,
                 w: *w,
@@ -178,6 +189,7 @@ impl Laid {
                         h,
                         vec![Deco::Image {
                             src: src.clone(),
+                            alt: alt.clone(),
                             x: item.indent,
                             y: 0.0,
                             w,

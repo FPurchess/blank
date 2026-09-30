@@ -203,6 +203,7 @@ pub(super) fn table_units(
                             let (w, h) = (image_width * scale, image_height * scale);
                             decos.push(Deco::Image {
                                 src: src.clone(),
+                                alt: alt.clone(),
                                 x: left,
                                 y,
                                 w,
@@ -940,7 +941,9 @@ mod tests {
             .decos
             .iter()
             .filter_map(|deco| match deco {
-                Deco::Image { src, x, y, w, h } => Some((src.clone(), *x, *y, *w, *h)),
+                Deco::Image {
+                    src, x, y, w, h, ..
+                } => Some((src.clone(), *x, *y, *w, *h)),
                 _ => None,
             })
             .collect();

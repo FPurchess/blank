@@ -29,6 +29,8 @@ pub enum Op {
     },
     Image {
         src: String,
+        /// what stands in its place where it can't be shown
+        alt: String,
         x: f32,
         y: f32,
         w: f32,
@@ -181,7 +183,21 @@ impl Engine {
 fn deco_op(deco: Deco) -> Op {
     match deco {
         Deco::Rect { x, y, w, h, role } => Op::Rect { x, y, w, h, role },
-        Deco::Image { src, x, y, w, h } => Op::Image { src, x, y, w, h },
+        Deco::Image {
+            src,
+            alt,
+            x,
+            y,
+            w,
+            h,
+        } => Op::Image {
+            src,
+            alt,
+            x,
+            y,
+            w,
+            h,
+        },
     }
 }
 

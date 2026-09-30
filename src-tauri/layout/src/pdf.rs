@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
+use krilla::error::KrillaError;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
 use krilla::metadata::Metadata;
@@ -15,9 +16,13 @@ use krilla::paint::Fill;
 use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph};
 use krilla::Document;
+use parley::Alignment;
 
 use crate::engine::{Engine, Op};
+use crate::fonts::Fonts;
 use crate::items::Role;
+use crate::model::Text;
+use crate::text::{Glyph, TextBox};
 
 /// an image's file, by its src
 pub struct ImageData {
@@ -69,20 +74,173 @@ fn unmap_missing_glyph(surface: &mut Surface, font: Font) {
     surface.draw_glyphs(Point::from_xy(0.0, 0.0), &[glyph], font, "", 1.0, false);
 }
 
+/// what went wrong in a PDF that was still written
+#[derive(Clone, Debug, PartialEq)]
+pub enum Warning {
+    /// an image, by its src, that couldn't be decoded: its alt text is in
+    /// its place
+    Image(String),
+    /// a font, by its index in `Fonts::files`, that couldn't be embedded:
+    /// the text set in it is left out
+    Font(usize),
+}
+
+/// a PDF, and what went wrong in it
+pub struct Written {
+    pub bytes: Vec<u8>,
+    pub warnings: Vec<Warning>,
+}
+
 /// writes the document's pages as a PDF
 pub fn write(
     engine: &mut Engine,
     images: &HashMap<String, ImageData>,
     info: &Info,
 ) -> Result<Vec<u8>, String> {
+    Ok(write_with(engine, images, info, "")?.bytes)
+}
+
+/// the images and fonts to leave out, which krilla failed on
+#[derive(Default)]
+struct Skipped {
+    images: Vec<String>,
+    fonts: Vec<usize>,
+}
+
+/// why writing the PDF failed
+enum Failed {
+    Image(String),
+    Font(usize),
+    Other(String),
+}
+
+/// writes the document's pages as a PDF in `language` (a BCP 47 tag, or
+/// empty for none), with what went wrong: an image that can't be decoded
+/// shows its alt text, and a font that can't be embedded is left out, so
+/// neither fails the whole PDF
+pub fn write_with(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+    language: &str,
+) -> Result<Written, String> {
+    let mut skipped = Skipped::default();
+    // krilla tells what it fails on only once it writes the document, so
+    // write it again without that, once for each image and font at most
+    for _ in 0..=images.len() + engine.fonts.files.len() {
+        match attempt(engine, images, info, language, &skipped) {
+            Ok((bytes, undecoded)) => {
+                let mut warnings: Vec<Warning> = vec![];
+                for src in undecoded.into_iter().chain(skipped.images.iter().cloned()) {
+                    if !warnings.contains(&Warning::Image(src.clone())) {
+                        warnings.push(Warning::Image(src));
+                    }
+                }
+                warnings.extend(skipped.fonts.iter().map(|&font| Warning::Font(font)));
+                return Ok(Written { bytes, warnings });
+            }
+            Err(Failed::Image(src)) if !skipped.images.contains(&src) => skipped.images.push(src),
+            Err(Failed::Font(font)) if !skipped.fonts.contains(&font) => skipped.fonts.push(font),
+            Err(Failed::Image(src)) => return Err(format!("the image {src} can't be written")),
+            Err(Failed::Font(font)) => return Err(format!("the font {font} can't be written")),
+            Err(Failed::Other(message)) => return Err(message),
+        }
+    }
+    Err("the PDF can't be written".into())
+}
+
+/// draws glyphs laid out on the page, from where the first one stands
+fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, size: f32) {
+    let Some(first) = glyphs.first() else {
+        return;
+    };
+    let glyphs: Vec<KrillaGlyph> = glyphs
+        .iter()
+        .map(|glyph| {
+            KrillaGlyph::new(
+                GlyphId::new(glyph.id),
+                glyph.advance / size,
+                glyph.dx / size,
+                glyph.dy / size,
+                0.0,
+                glyph.start as usize..glyph.end as usize,
+                None,
+            )
+        })
+        .collect();
+    surface.draw_glyphs(
+        Point::from_xy(first.x - first.dx, first.y - first.dy),
+        &glyphs,
+        font.clone(),
+        text,
+        size,
+        false,
+    );
+}
+
+/// paints what stands for an image that can't be shown in its box: its alt
+/// text, as the screen shows an image that isn't loaded, as many lines of
+/// it as the box holds, and at least the first
+#[allow(clippy::too_many_arguments)]
+fn paint_alt(
+    surface: &mut Surface,
+    engine_fonts: &mut Fonts,
+    fonts: &[Option<Font>],
+    alt: &str,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) {
+    let text = Text {
+        pos: 0,
+        text: alt.to_string(),
+        style: "alt".into(),
+        ..Default::default()
+    };
+    let boxed = TextBox::new(engine_fonts, &text, w.max(20.0), Alignment::Start);
+    surface.set_fill(Some(fill(Role::Hint)));
+    for (line, info) in boxed.lines().iter().enumerate() {
+        if line > 0 && info.bottom > h {
+            break;
+        }
+        for mut run in boxed.glyph_runs(engine_fonts, line) {
+            let Some(Some(font)) = fonts.get(run.font) else {
+                continue;
+            };
+            for glyph in &mut run.glyphs {
+                glyph.x += x;
+                glyph.y += y;
+            }
+            draw_run(surface, &run.glyphs, font, &boxed.text, run.size);
+        }
+    }
+}
+
+/// writes the PDF once, leaving out what is skipped: its bytes and the
+/// images it couldn't decode, or what it failed on
+fn attempt(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+    language: &str,
+    skipped: &Skipped,
+) -> Result<(Vec<u8>, Vec<String>), Failed> {
     let mut document = Document::new();
     let fonts: Vec<Option<Font>> = engine
         .fonts
         .files
         .iter()
-        .map(|file| Font::new(file.data.clone().into(), file.index))
+        .enumerate()
+        .map(|(index, file)| {
+            if skipped.fonts.contains(&index) {
+                return None;
+            }
+            Font::new(file.data.clone().into(), file.index)
+        })
         .collect();
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
+    let mut undecoded: Vec<String> = vec![];
     let (width, height) = (engine.settings.width, engine.settings.height);
     // the fonts whose missing glyph the document shows, for what no font has
     let mut missing: Vec<usize> = vec![];
@@ -97,7 +255,8 @@ pub fn write(
     }
     for page_index in 0..engine.pages.len() {
         let ops = engine.page_ops(page_index, true);
-        let settings = PageSettings::from_wh(width, height).ok_or("the page has no size")?;
+        let settings = PageSettings::from_wh(width, height)
+            .ok_or_else(|| Failed::Other("the page has no size".into()))?;
         let mut page = document.start_page_with(settings);
         let mut links = vec![];
         {
@@ -121,54 +280,48 @@ pub fn write(
                         }
                     }
                     Op::Glyphs { run, role, text } => {
+                        // a font that can't be embedded is left out
                         let Some(Some(font)) = fonts.get(run.font) else {
                             continue;
                         };
-                        let Some(first) = run.glyphs.first() else {
-                            continue;
-                        };
-                        let size = run.size;
-                        let glyphs: Vec<KrillaGlyph> = run
-                            .glyphs
-                            .iter()
-                            .map(|glyph| {
-                                KrillaGlyph::new(
-                                    GlyphId::new(glyph.id),
-                                    glyph.advance / size,
-                                    glyph.dx / size,
-                                    glyph.dy / size,
-                                    0.0,
-                                    glyph.start as usize..glyph.end as usize,
-                                    None,
-                                )
-                            })
-                            .collect();
                         surface.set_fill(Some(fill(role)));
-                        surface.draw_glyphs(
-                            Point::from_xy(first.x - first.dx, first.y - first.dy),
-                            &glyphs,
-                            font.clone(),
-                            &text,
-                            size,
-                            false,
-                        );
+                        draw_run(&mut surface, &run.glyphs, font, &text, run.size);
                     }
-                    Op::Image { src, x, y, w, h } => {
+                    Op::Image {
+                        src,
+                        alt,
+                        x,
+                        y,
+                        w,
+                        h,
+                    } => {
                         let image = loaded.entry(src.clone()).or_insert_with(|| {
+                            if skipped.images.contains(&src) {
+                                return None;
+                            }
                             let data = images.get(&src)?;
                             let bytes = data.bytes.clone().into();
-                            if data.jpeg {
-                                Image::from_jpeg(bytes, true).ok()
+                            let image = if data.jpeg {
+                                Image::from_jpeg(bytes, true)
                             } else {
-                                Image::from_png(bytes, true).ok()
+                                Image::from_png(bytes, true)
+                            };
+                            if image.is_err() {
+                                undecoded.push(src.clone());
                             }
+                            image.ok()
                         });
-                        let (Some(image), Some(size)) = (image.clone(), Size::from_wh(w, h)) else {
-                            continue;
-                        };
-                        surface.push_transform(&Transform::from_translate(x, y));
-                        surface.draw_image(image, size);
-                        surface.pop();
+                        match (image.clone(), Size::from_wh(w, h)) {
+                            (Some(image), Some(size)) => {
+                                surface.push_transform(&Transform::from_translate(x, y));
+                                surface.draw_image(image, size);
+                                surface.pop();
+                            }
+                            _ => {
+                                let alt = if alt.is_empty() { &src } else { &alt };
+                                paint_alt(&mut surface, &mut engine.fonts, &fonts, alt, x, y, w, h);
+                            }
+                        }
                     }
                     Op::Link { href, x, y, w, h } => links.push((href, x, y, w, h)),
                 }
@@ -193,6 +346,178 @@ pub fn write(
     if !info.author.is_empty() {
         metadata = metadata.authors(vec![info.author.clone()]);
     }
+    if !language.is_empty() {
+        metadata = metadata.language(language.to_string());
+    }
     document.set_metadata(metadata);
-    document.finish().map_err(|error| format!("{error:?}"))
+    match document.finish() {
+        Ok(bytes) => Ok((bytes, undecoded)),
+        Err(KrillaError::Image(image, ..)) => {
+            let src = loaded
+                .iter()
+                .find(|(_, loaded)| loaded.as_ref() == Some(&image))
+                .map(|(src, _)| src.clone());
+            match src {
+                Some(src) => Err(Failed::Image(src)),
+                None => Err(Failed::Other("an image can't be written".into())),
+            }
+        }
+        Err(KrillaError::Font(font, message)) => {
+            match fonts.iter().position(|known| known.as_ref() == Some(&font)) {
+                Some(index) => Err(Failed::Font(index)),
+                None => Err(Failed::Other(format!(
+                    "a font can't be embedded: {message}"
+                ))),
+            }
+        }
+        Err(error) => Err(Failed::Other(format!("{error:?}"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::test_support::{engine, paragraph};
+    use crate::model::{Content, Item};
+
+    /// a red pixel
+    const PNG: [u8; 69] = [
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2,
+        0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 120, 156, 99, 248, 207, 192, 0, 0,
+        3, 1, 1, 0, 201, 254, 146, 239, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ];
+    /// a PNG whose header is right and whose pixels aren't
+    const CORRUPT_PNG: [u8; 63] = [
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2,
+        0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 6, 73, 68, 65, 84, 120, 156, 255, 255, 255, 255, 29,
+        202, 124, 158, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ];
+
+    fn image(pos: u32, src: &str) -> Item {
+        Item {
+            content: Content::Image {
+                pos,
+                src: src.into(),
+                width: 120.0,
+                height: 60.0,
+                alt: format!("the picture {src}"),
+            },
+            ..paragraph(0, "")
+        }
+    }
+
+    fn info() -> Info {
+        Info {
+            title: String::new(),
+            author: String::new(),
+        }
+    }
+
+    /// the plain text of a PDF, if pdftotext is there
+    fn text_of(pdf: &[u8], name: &str) -> Option<String> {
+        let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
+        std::fs::write(&path, pdf).unwrap();
+        let out = std::process::Command::new("pdftotext")
+            .args(["-enc", "UTF-8"])
+            .arg(&path)
+            .arg("-")
+            .output()
+            .ok()?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    #[test]
+    fn writes_the_alt_text_of_images_it_cant_decode() {
+        let mut engine = engine(vec![
+            paragraph(1, "before"),
+            image(9, "good.png"),
+            image(10, "corrupt.png"),
+            image(11, "garbage.png"),
+            image(12, "absent.png"),
+        ]);
+        let mut images = HashMap::new();
+        for (src, bytes) in [
+            ("good.png", PNG.to_vec()),
+            ("corrupt.png", CORRUPT_PNG.to_vec()),
+            ("garbage.png", b"not a picture".to_vec()),
+        ] {
+            images.insert(src.to_string(), ImageData { bytes, jpeg: false });
+        }
+        let written = write_with(&mut engine, &images, &info(), "").unwrap();
+        // the ones handed over that can't be decoded, each once; the absent
+        // one is what the caller already knows it couldn't load
+        assert_eq!(
+            written.warnings,
+            [
+                Warning::Image("garbage.png".into()),
+                Warning::Image("corrupt.png".into())
+            ]
+        );
+        if let Some(text) = text_of(&written.bytes, "images") {
+            for src in ["corrupt.png", "garbage.png", "absent.png"] {
+                assert!(
+                    text.contains(&format!("the picture {src}")),
+                    "{src}: {text:?}"
+                );
+            }
+            assert!(!text.contains("the picture good.png"), "{text:?}");
+        }
+    }
+
+    /// a font file without some of its tables
+    fn without_tables(bytes: &[u8], drop: &[&[u8; 4]]) -> Vec<u8> {
+        let count = u16::from_be_bytes([bytes[4], bytes[5]]) as usize;
+        let records: Vec<&[u8]> = (0..count)
+            .map(|index| &bytes[12 + index * 16..28 + index * 16])
+            .filter(|record| !drop.iter().any(|tag| &record[..4] == *tag))
+            .collect();
+        let mut out = bytes[..12].to_vec();
+        out[4..6].copy_from_slice(&(records.len() as u16).to_be_bytes());
+        let mut data: Vec<u8> = vec![];
+        let start = 12 + records.len() * 16;
+        for record in &records {
+            let offset = u32::from_be_bytes(record[8..12].try_into().unwrap()) as usize;
+            let length = u32::from_be_bytes(record[12..16].try_into().unwrap()) as usize;
+            out.extend_from_slice(&record[..8]);
+            out.extend_from_slice(&((start + data.len()) as u32).to_be_bytes());
+            out.extend_from_slice(&record[12..16]);
+            data.extend_from_slice(&bytes[offset..offset + length]);
+            while !data.len().is_multiple_of(4) {
+                data.push(0);
+            }
+        }
+        out.extend(data);
+        out
+    }
+
+    #[test]
+    fn writes_a_font_without_outlines() {
+        // krilla 0.8.2 draws the glyphs of a font without outlines as Type3
+        // glyphs; were it to fail on a font, that font is left out with a
+        // warning (see write_with), and the rest is written
+        let emoji = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/NotoEmoji-VariableFont_wght.ttf"
+        ))
+        .unwrap();
+        let broken = without_tables(&emoji, &[b"glyf", b"loca", b"gvar"]);
+        let mut engine = engine(vec![paragraph(1, "a crab \u{1f980} here")]);
+        engine.add_font(broken, "Noto Emoji");
+        let index = engine.fonts.files.len() - 1;
+        let uses_it = (0..engine.pages.len()).any(|page| {
+            engine
+                .page_ops(page, false)
+                .iter()
+                .any(|op| matches!(op, Op::Glyphs { run, .. } if run.font == index))
+        });
+        assert!(uses_it, "the emoji is set in the broken font");
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "").unwrap();
+        if let Some(text) = text_of(&written.bytes, "font") {
+            assert!(text.contains("a crab"), "{text:?}");
+        }
+        assert!(written
+            .warnings
+            .iter()
+            .all(|warning| *warning == Warning::Font(index)));
+    }
 }
