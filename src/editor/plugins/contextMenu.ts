@@ -10,6 +10,7 @@ import {
 } from "../../state";
 import { words } from "../../spellcheck/tokenize";
 import { caretBox } from "../../engine/geometry";
+import { headAfter } from "./pageView";
 import { PAGE_MENU, PAGE_PRESS, type PagePointerEvent } from "../pagePointer";
 import { buildMenu, type MenuTarget, tableMenu } from "../contextMenu/model";
 import { type Misspelling, misspellingAt } from "./spellcheck";
@@ -96,7 +97,10 @@ export const openContextMenu = (
   const at = target.misspelling?.from ?? pos;
   let where = anchor;
   if (!where) {
-    const caret = caretBox(at);
+    const caret = caretBox(
+      at,
+      at === view.state.selection.head && headAfter(view.state),
+    );
     where = caret
       ? { left: caret.left, top: caret.top, bottom: caret.bottom }
       : { left: 0, top: 0, bottom: 0 };

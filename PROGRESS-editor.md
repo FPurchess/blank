@@ -9,7 +9,7 @@ deletes this file on merge.
 - [x] B. `blank.engine=off` starts Blank without the engine
 - [x] 2. Without the engine, a fully usable plain editor (B3)
 - [x] A. `HEADER_ROOM` above the first page's header in "page ends"
-- [ ] 3. ↑/↓ and End keep the line affinity — waiting for S1
+- [x] 3. ↑/↓ and End keep the line affinity (S1)
 - [x] 4. Flatten only the blocks a transaction changed; changes apart go in one `updateMany`, and the body and bands have displays of their own (S6)
 - [x] 5. One unit for the column goal of ↑/↓ and Page Up/Down
 - [x] 6. Keyboard and mouse make cell selections in tables

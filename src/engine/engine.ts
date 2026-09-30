@@ -31,6 +31,13 @@ export interface Hit {
   pos: number;
 }
 
+// a move of the caret: where it lands, and, where a line ends at the
+// position the next one starts, whether it's painted at the end of the line
+// before (`after`, as caret takes it)
+export interface Move extends Hit {
+  after: boolean;
+}
+
 const toHit = (values: Float64Array): Hit | null =>
   values.length === 2 ? { node: values[0] === 1, pos: values[1] } : null;
 
@@ -832,6 +839,36 @@ export class PageEngine {
     return this.call(null, () => {
       const values = this.raw.word(page, x, y);
       return values.length === 2 ? { from: values[0], to: values[1] } : null;
+    });
+  }
+
+  /**
+   * verticalAt returns where ↑ or ↓ moves the caret, from the line it's
+   * painted on (see caret's `after`), and how to paint it there
+   */
+  verticalAt(
+    pos: number,
+    after: boolean,
+    down: boolean,
+    goal: number,
+  ): Move | null {
+    return this.call(null, () => {
+      const values = this.raw.verticalAt(pos, after, down, goal);
+      if (values.length !== 3) return null;
+      return { node: values[0] === 1, pos: values[1], after: values[2] === 1 };
+    });
+  }
+
+  /**
+   * lineBoundary returns the start or end of the line the caret is painted
+   * on, and how to paint the caret there
+   */
+  lineBoundary(pos: number, after: boolean, end: boolean) {
+    return this.call(null, () => {
+      const values = this.raw.lineBoundary(pos, after, end);
+      return values.length === 2
+        ? { pos: values[0], after: values[1] === 1 }
+        : null;
     });
   }
 

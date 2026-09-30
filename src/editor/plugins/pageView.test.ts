@@ -552,3 +552,78 @@ describe("the kept widths of a table", () => {
     mounted.view.destroy();
   });
 });
+
+describe("the line a caret is on", () => {
+  // a word wider than a line, which the engine breaks: each of its lines
+  // ends where the next one starts
+  const URL = `https://example.com/${"abcdefghij".repeat(40)}`;
+  let destroy = () => {};
+
+  beforeEach(() => showPages());
+  afterEach(() => {
+    destroy();
+    hidePages();
+  });
+
+  it("keeps End on the line it's pressed on, twice", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    const start = pageCaret.value!;
+
+    expect(mounted.press("End")).toBe(true);
+    const end = mounted.view.state.selection.head;
+    expect(end).toBeLessThan(URL.length);
+    expect(pageCaret.value!.y).toBe(start.y);
+    expect(pageCaret.value!.x).toBeGreaterThan(start.x);
+
+    mounted.press("End");
+    expect(mounted.view.state.selection.head).toBe(end);
+    expect(pageCaret.value!.y).toBe(start.y);
+
+    // Home goes back to the start of that line
+    mounted.press("Home");
+    expect(mounted.view.state.selection.head).toBe(1);
+  });
+
+  it("visits each line once going down and up from a line's end", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    mounted.view.dispatch(
+      mounted.view.state.tr.setSelection(
+        TextSelection.create(mounted.view.state.doc, 1),
+      ),
+    );
+    const first = pageCaret.value!.y;
+    mounted.press("End");
+    const lines = [pageCaret.value!.y];
+    // at the end of the first line, not at the start of the second
+    expect(lines[0]).toBe(first);
+    for (let key = 0; key < 2; key++) {
+      mounted.press("ArrowDown");
+      lines.push(pageCaret.value!.y);
+    }
+    const back: number[] = [];
+    for (let key = 0; key < 2; key++) {
+      mounted.press("ArrowUp");
+      back.push(pageCaret.value!.y);
+    }
+
+    // one line at a time: down, then the same lines back up
+    const step = lines[1] - lines[0];
+    expect(step).toBeGreaterThan(5);
+    expect(lines[2] - lines[1]).toBeCloseTo(step, 3);
+    expect(back).toEqual([lines[1], lines[0]]);
+  });
+
+  it("forgets it once the caret moves another way", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    mounted.press("End");
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBe(true);
+    // a transaction that moves nothing keeps it
+    mounted.view.dispatch(mounted.view.state.tr.setMeta("other", true));
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBe(true);
+    mounted.view.dispatch(mounted.view.state.tr.insertText("x"));
+    expect(pageViewKey.getState(mounted.view.state)?.after).toBeFalsy();
+  });
+});

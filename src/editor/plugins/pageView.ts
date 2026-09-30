@@ -15,6 +15,7 @@ import {
   pageEngine,
   pageEngineReady,
   type Hit,
+  type Move,
   type PageEngine,
 } from "../../engine/engine";
 import {
@@ -69,7 +70,18 @@ export interface PageViewState {
   by: "pointer" | "vertical" | "page" | null;
   // for "page": how far below the top of the view the head stays, in px
   at?: number;
+  // the caret at the head is painted at the end of its line, where the next
+  // line starts at the same position; set by ↑↓, Home and End, and false
+  // after any other change of the selection
+  after?: boolean;
 }
+
+/**
+ * headAfter tells whether the caret at the head of `state`'s selection is
+ * painted at the end of its line, see PageViewState
+ */
+export const headAfter = (state: EditorState) =>
+  pageViewKey.getState(state)?.after ?? false;
 
 export const pageViewKey = new PluginKey<PageViewState>("pageView");
 
@@ -142,11 +154,12 @@ const publishSelection = (
   at?: number,
 ) => {
   const { selection } = state;
-  const shown = shownSelection(engine, selection);
+  const after = headAfter(state);
+  const shown = shownSelection(engine, selection, after);
   pageCaret.value = shown.caret;
   pageSelection.value = shown.rects;
   pageNodeSelection.value = shown.nodes;
-  const head = shown.caret ?? engine.caret(selection.head);
+  const head = shown.caret ?? engine.caret(selection.head, after);
   if (scroll && head)
     pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
 };
@@ -460,11 +473,12 @@ export const pageView = () => {
     selection: Selection,
     by: PageViewState["by"],
     at?: number,
+    after = false,
   ) => {
     view.dispatch(
       view.state.tr
         .setSelection(selection)
-        .setMeta(pageViewKey, { by, at } satisfies PageViewState)
+        .setMeta(pageViewKey, { by, at, after } satisfies PageViewState)
         .scrollIntoView(),
     );
   };
@@ -480,8 +494,9 @@ export const pageView = () => {
     extend: boolean,
   ) => {
     const { selection, doc } = view.state;
-    const onPage = engine.caret(selection.head);
-    const caret = caretBox(selection.head);
+    const after = headAfter(view.state);
+    const onPage = engine.caret(selection.head, after);
+    const caret = caretBox(selection.head, after);
     const box = viewBox();
     if (!onPage || !caret || !box) return false;
     // the column is kept in points, as ↑ and ↓ keep it
@@ -508,10 +523,13 @@ export const pageView = () => {
     key: pageViewKey,
     state: {
       init: () => ({ by: null }),
-      apply: (tr: Transaction) =>
-        (tr.getMeta(pageViewKey) as PageViewState | undefined) ?? {
-          by: null,
-        },
+      apply: (tr: Transaction, value) => {
+        const meta = tr.getMeta(pageViewKey) as PageViewState | undefined;
+        if (meta) return meta;
+        // a transaction that moves nothing keeps how the caret is painted
+        if (!tr.selectionSet && !tr.docChanged) return value;
+        return { by: null };
+      },
     },
     view: () => ({
       update(view, previous) {
@@ -535,18 +553,19 @@ export const pageView = () => {
         // prosemirror-tables' tableEditing grows a cell selection by cells
         if (down !== undefined && selection instanceof CellSelection)
           return false;
+        const after = headAfter(view.state);
         if (down !== undefined) {
-          const caret = engine.caret(selection.head);
+          const caret = engine.caret(selection.head, after);
           if (!caret) return false;
           goal ??= caret.x;
-          const hit = engine.vertical(selection.head, down, goal);
           const target =
-            hit ??
+            engine.verticalAt(selection.head, after, down, goal) ??
             // from the first or last line to the start or end
             ({
               node: false,
               pos: down ? Selection.atEnd(view.state.doc).to : 0,
-            } satisfies Hit);
+              after: false,
+            } satisfies Move);
           const current = goal;
           move(
             view,
@@ -556,6 +575,8 @@ export const pageView = () => {
               event.shiftKey ? selection.anchor : undefined,
             ),
             "vertical",
+            undefined,
+            target.after,
           );
           goal = current;
           return true;
@@ -564,16 +585,22 @@ export const pageView = () => {
           return page(view, engine, event.key === "PageDown", event.shiftKey);
         }
         if (event.key === "Home" || event.key === "End") {
-          const edge = engine.lineEdge(selection.head, event.key === "End");
+          const edge = engine.lineBoundary(
+            selection.head,
+            after,
+            event.key === "End",
+          );
           if (edge === null) return false;
           move(
             view,
             selectionAt(
               view.state,
-              { node: false, pos: edge },
+              { node: false, pos: edge.pos },
               event.shiftKey ? selection.anchor : undefined,
             ),
             null,
+            undefined,
+            edge.after,
           );
           return true;
         }
