@@ -29,6 +29,7 @@ import { pageEngine } from "../engine/engine";
 import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
+  engineMissing,
   pageCaret,
   pageLayoutState,
   pageScrollRequest,
@@ -50,6 +51,7 @@ import {
   onDesk,
   visibleRange,
 } from "../engine/frames";
+import { pageBitmaps } from "./pageBitmaps";
 import { layerVersions } from "./pageLayers";
 import {
   anchorTop,
@@ -206,6 +208,11 @@ onMounted(() => {
 onUnmounted(() => {
   dom?.removeEventListener("focus", onFocus);
   dom?.removeEventListener("blur", onBlur);
+});
+
+// without the engine no page is shown again: what was kept of them goes
+watch(engineMissing, (missing) => {
+  if (missing) pageBitmaps.clear();
 });
 
 // the device's pixels per CSS pixel, which the pages are painted at, e.g.

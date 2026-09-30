@@ -16,6 +16,9 @@ export type Bitmap = Snapshot;
 export class BitmapCache {
   private bitmaps = new Map<string, Bitmap>();
   private bytes = 0;
+  // the key each slot holds, e.g. a page's text at a scale, whose older
+  // bitmap no page shows any more once it holds a newer one
+  private slots = new Map<string, string>();
 
   constructor(private limit: number) {}
 
@@ -29,7 +32,15 @@ export class BitmapCache {
     return bitmap;
   }
 
-  set(key: string, bitmap: Bitmap) {
+  /**
+   * set keeps `bitmap` by `key`, in place of what `slot` held before
+   */
+  set(key: string, bitmap: Bitmap, slot?: string) {
+    if (slot !== undefined) {
+      const before = this.slots.get(slot);
+      if (before !== undefined && before !== key) this.delete(before);
+      this.slots.set(slot, key);
+    }
     this.delete(key);
     this.bitmaps.set(key, bitmap);
     this.bytes += bitmap.width * bitmap.height * 4;
@@ -49,6 +60,7 @@ export class BitmapCache {
 
   clear() {
     for (const key of [...this.bitmaps.keys()]) this.delete(key);
+    this.slots.clear();
   }
 
   get size() {

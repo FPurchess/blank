@@ -3,7 +3,13 @@ import { nextTick } from "vue";
 
 import { type PageEngine, setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
-import { pageLayoutState, pageSelection, pageView, theme } from "../state";
+import {
+  engineMissing,
+  pageLayoutState,
+  pageSelection,
+  pageView,
+  theme,
+} from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { flushPromises } from "../test/async";
@@ -381,6 +387,25 @@ describe("the pages and the painter", () => {
       expect(pages.size).toBeGreaterThanOrEqual(12);
     } finally {
       window.devicePixelRatio = ratio;
+    }
+  });
+
+  it("forgets the kept pages once the engine is missing", async () => {
+    const { fake } = recorder();
+    setPainter(fake);
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const desk = view().querySelector<HTMLElement>(".page-desk")!;
+    await scrollTo(parseFloat(desk.style.height));
+    await flushPromises();
+    expect(pageBitmaps.size).toBeGreaterThan(0);
+    try {
+      engineMissing.value = true;
+      await nextTick();
+      expect(pageBitmaps.size).toBe(0);
+    } finally {
+      engineMissing.value = false;
     }
   });
 

@@ -47,7 +47,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 3. The view keeps its place when the header or properties room changes (`movesPages`)
 - [x] 4. A switch renders the target range right away (the watcher sets `scrollTop` before the render; no test can tell it apart in jsdom's small documents, the switch test still covers the result)
 - [x] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
-- [ ] 7. The bitmap cache is cleared on an engine change and drops a page's superseded key
+- [x] 7. The bitmap cache is cleared once the engine is missing (`engineMissing`) and keeps one bitmap per page layer and scale, the newest
 - [ ] 8. Less work per key in the first header and the overlay's under layer
 - [ ] 9. "Page N of M": a stable live region, announcing a change of page only
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording

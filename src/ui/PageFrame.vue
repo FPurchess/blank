@@ -279,7 +279,8 @@ const layerOf = ({
     // freed once the copy is taken
     painter.snapshot(kept).then(
       (snapshot) => {
-        if (snapshot) pageBitmaps.set(key, snapshot);
+        // in place of what the layer showed before at this scale
+        if (snapshot) pageBitmaps.set(key, snapshot, `${job()}:${props.scale}`);
         painter.release(kept);
       },
       () => painter.release(kept),

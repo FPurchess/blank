@@ -38,6 +38,19 @@ describe("BitmapCache", () => {
     expect(cache.used).toBe(0);
   });
 
+  it("keeps one bitmap for each slot, the newest", () => {
+    const cache = new BitmapCache(10_000);
+    const old = bitmap(5, 5);
+    cache.set("page 1 v3", old, "page 1");
+    cache.set("page 2 v1", bitmap(5, 5), "page 2");
+    cache.set("page 1 v4", bitmap(5, 5), "page 1");
+    expect(cache.get("page 1 v3")).toBeUndefined();
+    expect(old.close).toHaveBeenCalled();
+    expect(cache.size).toBe(2);
+    cache.clear();
+    expect(cache.size).toBe(0);
+  });
+
   it("replaces the bitmap of a key", () => {
     const cache = new BitmapCache(10_000);
     const old = bitmap(5, 5);
