@@ -448,6 +448,33 @@ describe("cell selections", () => {
     expect(dispatched!.selection).toBeInstanceOf(CellSelection);
   });
 
+  it("grows a cell selection from the cell it started in", () => {
+    const node = grid();
+    let state = EditorState.create({ schema, doc: node });
+    state = state.apply(
+      state.tr.setSelection(
+        CellSelection.create(node, cellPos(node, 0, 0), cellPos(node, 0, 1)),
+      ),
+    );
+    // Shift + click in (1, 1)
+    const selection = selectionAt(
+      state,
+      { node: false, pos: cellPos(node, 1, 1) + 2 },
+      state.selection.anchor,
+    ) as CellSelection;
+    expect(selection.$anchorCell.pos).toBe(cellPos(node, 0, 0));
+    expect(selection.$headCell.pos).toBe(cellPos(node, 1, 1));
+  });
+
+  it("leaves a cell selection to the editor on other keys", () => {
+    const mounted = mount(grid(), [tableEditing()]);
+    mounted.press("Shift-ArrowDown");
+    expect(mounted.view.state.selection).toBeInstanceOf(CellSelection);
+    for (const key of ["Shift-End", "Shift-Home", "Shift-PageDown"])
+      expect(mounted.press(key)).toBe(false);
+    mounted.view.destroy();
+  });
+
   it("selects text within one cell", () => {
     const state = EditorState.create({ schema, doc: grid() });
     const selection = selectionAt(state, { node: false, pos: 6 }, 4);

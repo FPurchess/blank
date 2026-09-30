@@ -110,7 +110,12 @@ export const selectionAt = (
   if (anchor !== undefined) {
     // from one cell of a table into another selects whole cells, as a drag
     // or Shift + arrow keys did in the editor before the page view
-    const $anchorCell = cellAround(doc.resolve(anchor));
+    // a cell selection grows from the cell it started in
+    const { selection } = state;
+    const $anchorCell =
+      selection instanceof CellSelection && anchor === selection.anchor
+        ? selection.$anchorCell
+        : cellAround(doc.resolve(anchor));
     const $headCell = cellAround(doc.resolve(pos));
     if (
       $anchorCell &&
@@ -596,9 +601,9 @@ export const pageView = () => {
           return false;
         const { selection } = view.state;
         const down = VERTICAL[event.key];
-        // prosemirror-tables' tableEditing grows a cell selection by cells
-        if (down !== undefined && selection instanceof CellSelection)
-          return false;
+        // prosemirror-tables' tableEditing grows a cell selection by
+        // cells; the other keys leave it to the editor
+        if (selection instanceof CellSelection) return false;
         const after = headAfter(view.state);
         if (down !== undefined) {
           const caret = engine.caret(selection.head, after);
