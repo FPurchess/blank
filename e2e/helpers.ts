@@ -57,7 +57,8 @@ export const restartApp = async (args: string[] = []) => {
 
 /**
  * clicks where the pages show the end of the text of the editor's element at
- * `selector` (the `index`th match), as a click right of its last line does,
+ * `selector` (the `index`th match, from the end if negative), as a click
+ * right of its last line does,
  * and waits until the editor has taken in where the cursor went
  */
 export const clickInto = async (
@@ -75,7 +76,9 @@ export const clickInto = async (
           };
         }
       ).blankGeometry;
-      const element = document.querySelectorAll(selector)[index];
+      const all = document.querySelectorAll(selector);
+      // from the end for a negative index
+      const element = all[index < 0 ? all.length + index : index];
       if (!element) return done(null);
       const pos = geometry.endOf(element);
       const view = document.getElementById("page-view")!;
@@ -93,13 +96,17 @@ export const clickInto = async (
     index,
   );
   if (!box) throw new Error(`${selector} isn't painted on the pages`);
+  await clickAt(box.left, (box.top + box.bottom) / 2, button);
+};
+
+/**
+ * clickAt clicks with the pointer at `x`, `y` in the viewport, and waits
+ * until the page has run the events it queued
+ */
+export const clickAt = async (x: number, y: number, button: 0 | 1 | 2 = 0) => {
   await browser
     .action("pointer")
-    .move({
-      x: Math.round(box.left),
-      y: Math.round((box.top + box.bottom) / 2),
-      origin: "viewport",
-    })
+    .move({ x: Math.round(x), y: Math.round(y), origin: "viewport" })
     .down({ button })
     .up({ button })
     .perform();
@@ -143,12 +150,11 @@ export const expectEditorText = async (
 };
 
 /**
- * focusEditor gives the editor the focus, as a click on the pages does
+ * focusEditor gives the editor the focus with a click on the pages, at the
+ * end of the text
  */
 export const focusEditor = async () => {
-  await browser.execute(() =>
-    document.querySelector<HTMLElement>("#editor")!.focus(),
-  );
+  await clickInto("#editor > :is(p, h1, h2, h3, h4, h5, h6)", -1);
 };
 
 /**
@@ -207,19 +213,7 @@ export const clickText = async (
   }: { offset?: number; index?: number; button?: 0 | 1 | 2 } = {},
 ) => {
   const box = await textBox(text, offset, index);
-  await browser
-    .action("pointer")
-    .move({
-      x: Math.round(box.left + 1),
-      y: Math.round((box.top + box.bottom) / 2),
-      origin: "viewport",
-    })
-    .down({ button })
-    .up({ button })
-    .perform();
-  await browser.executeAsync((done: () => void) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => done()));
-  });
+  await clickAt(box.left + 1, (box.top + box.bottom) / 2, button);
 };
 
 /**
@@ -330,7 +324,8 @@ const canvasInk = (box: Box) =>
         .getImageData(x, y, width, height);
       for (let index = 0; index < data.length; index += 4) {
         total++;
-        if (data[index + 3] < 64) continue;
+        // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
+        if (data[index + 3] < 24) continue;
         inked++;
         for (let channel = 0; channel < 3; channel++)
           sum[channel] += data[index + channel];

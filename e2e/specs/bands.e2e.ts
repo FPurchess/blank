@@ -12,6 +12,7 @@ import {
   pressMod,
   restartApp,
   type,
+  waitForInk,
 } from "../helpers.ts";
 
 const strip = () => $("#band-editor");
@@ -171,5 +172,27 @@ describe("header and footer", () => {
     const text = await $('.page-frame[data-page="1"]').getLocation("y");
     const top = await header.getLocation("y");
     expect(top).toBeLessThan(text);
+    // on the sheet it is painted in the top margin
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    const sheet = await browser.execute(() =>
+      document
+        .querySelector('.page-frame[data-page="1"]')!
+        .getBoundingClientRect()
+        .toJSON(),
+    );
+    await waitForInk(
+      {
+        left: sheet.left + 8,
+        right: sheet.right - 8,
+        top: sheet.top + 8,
+        // above the text, which starts at the margin of 2.5 cm
+        bottom: sheet.top + 80,
+      },
+      {},
+      0.003,
+    );
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
   });
 });

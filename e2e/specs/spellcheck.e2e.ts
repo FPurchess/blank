@@ -6,7 +6,9 @@ import {
   editorText,
   expectEditorText,
   focusEditor,
+  boxOf,
   Key,
+  paintedInk,
   pressMod,
   restartApp,
   type,
@@ -21,8 +23,12 @@ const status = () => $("#ui-spellcheck");
 const flagged = async () =>
   (await editorText("#editor .spelling-error")).join(" ");
 
+// the underlines the pages show under misspelled words
+const marks = () => $$("#page-view .page-misspelling");
+
 /**
- * expectFlagged waits until exactly the words in `expected` are flagged
+ * expectFlagged waits until exactly the words in `expected` are flagged,
+ * and the pages underline as many
  */
 const expectFlagged = async (expected: string) => {
   let last = "";
@@ -31,6 +37,43 @@ const expectFlagged = async (expected: string) => {
     .catch(() => {
       throw new Error(`flagged "${last}" instead of "${expected}"`);
     });
+  const words = expected ? expected.split(" ").length : 0;
+  await browser.waitUntil(async () => (await marks().length) === words, {
+    timeoutMsg: `the pages don't underline ${words} words`,
+  });
+};
+
+/**
+ * expectUnderlined checks that the pages show the wavy line under `word`:
+ * a mark under its painted box, whose bottom has ink in the spelling colour
+ */
+const expectUnderlined = async (word: string) => {
+  const box = await boxOf(word);
+  const underline = await browser.execute((box) => {
+    for (const mark of document.querySelectorAll(
+      "#page-view .page-misspelling",
+    )) {
+      const rect = mark.getBoundingClientRect();
+      if (
+        rect.right > box.left &&
+        rect.left < box.right &&
+        rect.bottom > box.top &&
+        rect.top < box.bottom
+      )
+        return {
+          left: rect.left,
+          right: rect.right,
+          top: rect.bottom - 4,
+          bottom: rect.bottom,
+        };
+    }
+    return null;
+  }, box);
+  expect(underline).not.toBeNull();
+  const { share, ink } = await paintedInk(underline!, { source: "screen" });
+  expect(share).toBeGreaterThan(0.1);
+  // red rather than the text's colour
+  expect(ink![0]).toBeGreaterThan(ink![2] + 40);
 };
 
 /**
@@ -41,6 +84,7 @@ const rightClick = async (word: string) => {
     async () => (await editorText("#editor .spelling-error")).includes(word),
     { timeoutMsg: `${word} isn't flagged` },
   );
+  await expectUnderlined(word);
   await clickText(word, { offset: 1, button: 2 });
   await expect(menu()).toBeDisplayed();
   // the items move once slow suggestions arrive

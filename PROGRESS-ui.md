@@ -2,9 +2,10 @@
 
 The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged.
 
+- [x] 0. CI E2E fixes from the integrator (high priority): screenshots directory (5c17d97), empty composition and column width (f9bbb9a)
 - [x] 1. Page 1's header in "page ends" (`PageFirstHeader.vue`), and the edge line without the engine
 - [x] 2. A pixel helper, and checks of what is painted (`paintedInk`, `waitForInk`, `screenColor` in `e2e/helpers.ts`)
-- [ ] 3. Restore the weakened E2E checks
+- [x] 3. Restore the weakened E2E checks (real clicks in `focusEditor`, painted grid lines, underlines and header)
 - [ ] 4. The view keeps its place when it switches or resizes
 - [ ] 5. Repaint only the pages that changed, with the bands as their own layer (after S6)
 - [x] 6. A swappable painter (`src/ui/painter/`; jsdom canvases record paints, `src/test/canvas.ts`)

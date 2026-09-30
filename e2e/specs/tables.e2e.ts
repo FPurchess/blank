@@ -8,6 +8,7 @@ import {
   clickInto,
   expectEditorText,
   Key,
+  paintedInk,
   paste,
   pressMod,
   restartApp,
@@ -46,6 +47,43 @@ const tableLayout = () =>
     const { box, rows, columns } = geometry.tables()[0].pieces[0];
     return { box, rows, columns };
   });
+
+/**
+ * expectGridPainted checks that the pages paint the lines of the first
+ * table where its geometry says they are: a line between each two columns
+ * and one along the bottom of each row (see items.rs), each a thin strip
+ * with ink, and more of it than a strip beside the line
+ */
+const expectGridPainted = async () => {
+  const { box, rows, columns } = await tableLayout();
+  for (const x of columns.slice(1, -1)) {
+    const along = await paintedInk({
+      left: x - 1,
+      right: x + 2,
+      top: box.top + 3,
+      bottom: box.bottom - 3,
+    });
+    // inside the cell, left of the line, where the cell's padding is
+    const beside = await paintedInk({
+      left: x - 7,
+      right: x - 4,
+      top: box.top + 3,
+      bottom: box.bottom - 3,
+    });
+    expect(along.share).toBeGreaterThan(0.2);
+    expect(along.share).toBeGreaterThan(beside.share + 0.1);
+  }
+  // the lines sit on the inside of each row's bottom edge
+  for (const y of rows.slice(1)) {
+    const along = await paintedInk({
+      left: box.left + 3,
+      right: box.right - 3,
+      top: y - 2,
+      bottom: y + 1,
+    });
+    expect(along.share).toBeGreaterThan(0.2);
+  }
+};
 
 describe("tables", () => {
   let dir: string;
@@ -360,6 +398,8 @@ describe("tables", () => {
       expect(Math.abs(widths[0] - 25)).toBeLessThanOrEqual(1);
       expect(Math.abs(widths[1] - 75)).toBeLessThanOrEqual(1);
       expect(widths[0] + widths[1]).toBeCloseTo(100, 0);
+      // the lines are painted where the columns are now
+      await expectGridPainted();
 
       await browser
         .action("pointer")
