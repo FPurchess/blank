@@ -5,10 +5,10 @@ use std::ops::Range;
 
 use parley::Alignment;
 
-use super::{Deco, Laid, Role, Unit};
+use super::{CellImage, Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
-use crate::model::Text;
-use crate::style::{CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, TABLE_LINE};
+use crate::model::{CellBlock, Text};
+use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
 use crate::text::TextBox;
 
 /// the most columns a table has: a merged cell may say it covers any
@@ -34,6 +34,12 @@ struct PlacedCell {
     rowspan: usize,
     header: bool,
     texts: Range<usize>,
+    /// its list markers and alt texts, in `Laid::extras`
+    extras: Range<usize>,
+    /// its quote bars and images, from the top of its row
+    decos: Vec<Deco>,
+    /// its images: their positions and places, from the top of its row
+    images: Vec<(u32, f32, f32, f32, f32)>,
     /// how high its content is, with the padding
     height: f32,
 }
@@ -97,6 +103,7 @@ pub(super) fn table_units(
 
     // the cells, laid out in their widths, from the top of their rows
     let mut cells: Vec<PlacedCell> = vec![];
+    let mut extras: Vec<(TextBox, Role)> = vec![];
     for (row_index, row) in rows.iter().enumerate() {
         for (index, cell) in row.cells.iter().enumerate() {
             let (col, colspan) = place(cell, index);
@@ -111,20 +118,118 @@ pub(super) fn table_units(
                 _ => Alignment::Start,
             };
             let first = texts.len();
+            let first_extra = extras.len();
+            let left = x + CELL_PADDING_X;
+            let mut decos = vec![];
+            let mut images = vec![];
             let mut y = CELL_PADDING_Y;
-            for (paragraph_index, paragraph) in cell.paragraphs.iter().enumerate() {
-                let mut paragraph = paragraph.clone();
-                if cell.header && paragraph.style == "p" {
-                    paragraph.style = "th".into();
-                }
-                let mut boxed = TextBox::new(fonts, &paragraph, inner, alignment);
-                if paragraph_index > 0 {
+            let blocks = cell.blocks();
+            for (block_index, block) in blocks.iter().enumerate() {
+                if block_index > 0 {
                     y += CELL_PARAGRAPH_GAP;
                 }
-                boxed.x = x + CELL_PADDING_X;
-                boxed.y = y;
-                y += boxed.height();
-                texts.push(boxed);
+                match block {
+                    CellBlock::Text(block) => {
+                        let mut paragraph = block.text.clone();
+                        if cell.header && paragraph.style == "p" {
+                            paragraph.style = "th".into();
+                        }
+                        let indent = block.indent.clamp(0.0, (inner - 10.0).max(0.0));
+                        let mut boxed =
+                            TextBox::new(fonts, &paragraph, (inner - indent).max(10.0), alignment);
+                        boxed.x = left + indent;
+                        boxed.y = y;
+                        if let Some(marker) = &block.marker {
+                            let text = Text {
+                                pos: 0,
+                                text: marker.clone(),
+                                style: paragraph.style.clone(),
+                                ..Default::default()
+                            };
+                            let mut marked = TextBox::new(fonts, &text, 100.0, Alignment::Start);
+                            // right-aligned before the indent, on the
+                            // baseline of the first line
+                            let baseline = |boxed: &TextBox| {
+                                boxed.lines().first().map_or(0.0, |line| line.baseline)
+                            };
+                            marked.x = boxed.x - MARKER_GAP - marked.layout.width();
+                            marked.y = y + baseline(&boxed) - baseline(&marked);
+                            extras.push((marked, Role::Text));
+                        }
+                        // the bars reach down to the next block when it is
+                        // in the same quote
+                        let height = boxed.height();
+                        // a code block on its fill, as outside a table
+                        if paragraph.style == "code" {
+                            decos.push(Deco::Rect {
+                                x: boxed.x - 4.0,
+                                y,
+                                w: boxed.width + 8.0,
+                                h: height,
+                                role: Role::CodeFill,
+                            });
+                        }
+                        let next_bars = match blocks.get(block_index + 1) {
+                            Some(CellBlock::Text(next)) => next.bars.as_slice(),
+                            _ => &[],
+                        };
+                        for bar in &block.bars {
+                            let reach = if next_bars.contains(bar) {
+                                CELL_PARAGRAPH_GAP
+                            } else {
+                                0.0
+                            };
+                            decos.push(Deco::Rect {
+                                x: left + bar,
+                                y,
+                                w: BAR,
+                                h: height + reach,
+                                role: Role::Text,
+                            });
+                        }
+                        y += height;
+                        texts.push(boxed);
+                    }
+                    CellBlock::Image {
+                        pos,
+                        src,
+                        width: image_width,
+                        height: image_height,
+                        alt,
+                    } => {
+                        if *image_width > 0.0 && *image_height > 0.0 {
+                            // never wider than the cell
+                            let scale = (inner / image_width).min(1.0);
+                            let (w, h) = (image_width * scale, image_height * scale);
+                            decos.push(Deco::Image {
+                                src: src.clone(),
+                                x: left,
+                                y,
+                                w,
+                                h,
+                            });
+                            images.push((*pos, left, y, w, h));
+                            y += h;
+                        } else {
+                            // until it is loaded: its alt text, or its src
+                            let text = Text {
+                                pos: 0,
+                                text: if alt.is_empty() {
+                                    src.clone()
+                                } else {
+                                    alt.clone()
+                                },
+                                style: "alt".into(),
+                                ..Default::default()
+                            };
+                            let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
+                            label.x = left;
+                            label.y = y;
+                            y += label.height();
+                            extras.push((label, Role::Hint));
+                        }
+                    }
+                }
             }
             cells.push(PlacedCell {
                 row: row_index,
@@ -133,6 +238,9 @@ pub(super) fn table_units(
                 rowspan,
                 header: cell.header,
                 texts: first..texts.len(),
+                extras: first_extra..extras.len(),
+                decos,
+                images,
                 height: y + CELL_PADDING_Y,
             });
         }
@@ -154,11 +262,20 @@ pub(super) fn table_units(
     for height in &heights {
         tops.push(tops[tops.len() - 1] + height);
     }
-    for cell in &cells {
+    for cell in &mut cells {
+        let top = tops[cell.row];
         for index in cell.texts.clone() {
-            texts[index].y += tops[cell.row];
+            texts[index].y += top;
+        }
+        for index in cell.extras.clone() {
+            extras[index].0.y += top;
+        }
+        cell.decos = cell.decos.iter().map(|deco| deco.moved(0.0, top)).collect();
+        for image in &mut cell.images {
+            image.2 += top;
         }
     }
+    let mut cell_images = vec![];
 
     // the header rows, whose last one has a stronger line under it, unless
     // the table has no other rows
@@ -237,17 +354,46 @@ pub(super) fn table_units(
             .map(|cell| cell.texts.clone())
             .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
             .unwrap_or(0..0);
+        let group_extras = group
+            .iter()
+            .map(|cell| cell.extras.clone())
+            .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
+            .unwrap_or(0..0);
+        // the quote bars and images of the cells, over their fills and lines
+        decos.extend(group.iter().flat_map(|cell| cell.decos.iter().cloned()));
+        let group_images: Vec<(u32, f32, f32, f32, f32)> = group
+            .iter()
+            .flat_map(|cell| cell.images.iter().copied())
+            .collect();
         let header = end <= header_rows;
         let row_edges: Vec<(usize, f32, f32)> = (start..end)
             .map(|row| (row, tops[row], tops[row + 1]))
             .collect();
         let (y0, y1) = (tops[start], tops[end]);
-        if room <= 0.0 || y1 - y0 <= room + 0.01 {
+        // the room the group has: on the pages the table goes on, that is
+        // under its header rows, which repeat above it
+        let row_room = if header_rows > 0 && !header {
+            slice_room(false)
+        } else {
+            room
+        };
+        if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
+            for &(pos, x, y, w, h) in &group_images {
+                cell_images.push(CellImage {
+                    pos,
+                    unit: units.len(),
+                    x,
+                    y,
+                    w,
+                    h,
+                });
+            }
             units.push(Unit {
                 top: y0,
                 height: y1 - y0,
                 header,
                 texts: group_texts,
+                extras: group_extras,
                 rows: row_edges,
                 // the header rows stay with the first row
                 keep_next: header,
@@ -256,17 +402,25 @@ pub(super) fn table_units(
             });
         } else {
             // taller than a page: sliced between each of its lines, so the
-            // row starts on the page it comes to and fills the pages after
+            // row starts on the page it comes to and fills the pages after.
+            // An image, and the lines of alt texts, aren't cut either.
+            let line_spans = |boxed: &TextBox| {
+                boxed
+                    .lines()
+                    .into_iter()
+                    .map(|line| (boxed.y + line.top, boxed.y + line.bottom))
+                    .collect::<Vec<_>>()
+            };
             let lines: Vec<(f32, f32)> = group_texts
                 .clone()
-                .flat_map(|index| {
-                    let boxed = &texts[index];
-                    boxed
-                        .lines()
-                        .into_iter()
-                        .map(|line| (boxed.y + line.top, boxed.y + line.bottom))
-                        .collect::<Vec<_>>()
-                })
+                .flat_map(|index| line_spans(&texts[index]))
+                .chain(
+                    group_extras
+                        .clone()
+                        .filter(|&index| extras[index].1 == Role::Hint)
+                        .flat_map(|index| line_spans(&extras[index].0)),
+                )
+                .chain(group_images.iter().map(|&(_, _, y, _, h)| (y, y + h)))
                 .collect();
             let mut from = y0;
             while from < y1 - 0.01 {
@@ -286,11 +440,24 @@ pub(super) fn table_units(
                         .fold(f32::NAN, f32::min)
                 };
                 let to = if to.is_nan() { limit } else { to };
+                for &(pos, x, y, w, h) in &group_images {
+                    if y >= from - 0.01 && y < to - 0.01 {
+                        cell_images.push(CellImage {
+                            pos,
+                            unit: units.len(),
+                            x,
+                            y,
+                            w,
+                            h,
+                        });
+                    }
+                }
                 units.push(Unit {
                     top: from,
                     height: to - from,
                     header,
                     texts: group_texts.clone(),
+                    extras: group_extras.clone(),
                     clip: Some((from, to)),
                     rows: row_edges
                         .iter()
@@ -314,6 +481,8 @@ pub(super) fn table_units(
         marker: None,
         label,
         columns: edges,
+        extras,
+        cell_images,
     }
 }
 
@@ -327,10 +496,14 @@ fn place(cell: &crate::model::Cell, index: usize) -> (u32, u32) {
     (col, colspan)
 }
 
-/// the part of a decoration from `from` to `to`, or nothing
+/// the part of a decoration from `from` to `to`, or nothing; an image is
+/// drawn whole, with the slice it starts in
 fn clipped(deco: &Deco, from: f32, to: f32) -> Option<Deco> {
     let Deco::Rect { x, y, w, h, role } = deco else {
-        return Some(deco.clone());
+        let Deco::Image { y, .. } = deco else {
+            return Some(deco.clone());
+        };
+        return (*y >= from - 0.01 && *y < to - 0.01).then(|| deco.clone());
     };
     let top = y.max(from);
     let bottom = (y + h).min(to);
@@ -346,8 +519,10 @@ fn clipped(deco: &Deco, from: f32, to: f32) -> Option<Deco> {
 #[cfg(test)]
 mod tests {
     use crate::engine::test_support::{self, *};
-    use crate::engine::{Hit, Op};
+    use crate::engine::{Engine, Hit, Op};
+    use crate::items::{Deco, Role};
     use crate::model::{Content, Item, Text};
+    use crate::text::TextBox;
 
     #[test]
     fn repeats_table_headers() {
@@ -560,5 +735,301 @@ mod tests {
         // one row on each page it is on, besides the header rows
         let body: Vec<_> = grid.rows.iter().filter(|row| row.row == 1).collect();
         assert_eq!(body.len(), after.pages.len());
+    }
+
+    #[test]
+    fn nearly_page_tall_row_under_repeated_header() {
+        use crate::model::Row;
+        let settings = crate::model::Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        // a row of hard lines, as tall as the page less than its header row:
+        // it fits a page alone, but not under the header row repeated above
+        for lines in 30..60 {
+            let tall = vec!["x"; lines].join("\n");
+            let rows = vec![
+                Row {
+                    cells: vec![cell(3, "Head")],
+                    header: true,
+                },
+                Row {
+                    cells: vec![cell(12, "first")],
+                    header: false,
+                },
+                Row {
+                    cells: vec![cell(22, &tall)],
+                    header: false,
+                },
+            ];
+            let engine = engine(vec![table_item(rows, None)]);
+            let grid = engine.table_grid(0).unwrap();
+            let header = grid.rows[0].height;
+            let laid = &engine.laid[0];
+            let tall_height = laid.texts[2].height() + 2.0 * crate::style::CELL_PADDING_Y;
+            if tall_height <= room - header || tall_height > room {
+                continue;
+            }
+            let bottom = engine.settings.content_bottom();
+            for (index, frag) in engine.frags.iter().enumerate() {
+                let unit = &laid.units[frag.unit];
+                assert!(
+                    frag.y + unit.height <= bottom + 0.01,
+                    "fragment {index} ends at {} below {bottom}",
+                    frag.y + unit.height
+                );
+            }
+            // every line of the row is shown once
+            let shown: usize = (0..engine.pages.len())
+                .map(|page| {
+                    let mut engine = test_support::engine(engine.items.clone());
+                    engine
+                        .page_ops(page, false)
+                        .iter()
+                        .filter(
+                            |op| matches!(op, Op::Glyphs { text, .. } if text.starts_with("x\n")),
+                        )
+                        .count()
+                })
+                .sum();
+            assert_eq!(shown, laid.texts[2].line_count());
+            return;
+        }
+        panic!("no row of the height");
+    }
+
+    fn text_block(
+        pos: u32,
+        text: &str,
+        indent: f32,
+        marker: Option<&str>,
+        bars: Vec<f32>,
+    ) -> crate::model::CellBlock {
+        crate::model::CellBlock::Text(crate::model::CellText {
+            text: Text {
+                pos,
+                text: text.into(),
+                ..Default::default()
+            },
+            indent,
+            marker: marker.map(String::from),
+            bars,
+        })
+    }
+
+    fn image_block(pos: u32, width: f32, height: f32) -> crate::model::CellBlock {
+        crate::model::CellBlock::Image {
+            pos,
+            src: format!("{width}.png"),
+            width,
+            height,
+            alt: "a cat".into(),
+        }
+    }
+
+    fn block_table(blocks: Vec<Vec<crate::model::CellBlock>>) -> Engine {
+        use crate::model::{Cell, Row};
+        let cells = blocks
+            .into_iter()
+            .map(|blocks| Cell {
+                blocks,
+                ..Default::default()
+            })
+            .collect();
+        test_support::engine(vec![table_item(
+            vec![Row {
+                cells,
+                header: false,
+            }],
+            None,
+        )])
+    }
+
+    #[test]
+    fn lays_out_a_list_in_a_cell() {
+        let mut engine = block_table(vec![vec![
+            text_block(5, "one", 18.0, Some("•"), vec![]),
+            text_block(12, "two", 18.0, Some("•"), vec![]),
+        ]]);
+        let laid = &engine.laid[0];
+        let left = laid.columns[0] + crate::style::CELL_PADDING_X;
+        assert_eq!(laid.texts.len(), 2);
+        assert!((laid.texts[0].x - left - 18.0).abs() < 0.01);
+        assert!(laid.texts[1].y > laid.texts[0].y + laid.texts[0].height());
+        // a marker before each, right-aligned before the indent, on the
+        // baseline of its first line
+        assert_eq!(laid.extras.len(), 2);
+        for (marker, text) in laid.extras.iter().map(|(boxed, _)| boxed).zip(&laid.texts) {
+            assert!(marker.x + marker.layout.width() <= text.x - crate::style::MARKER_GAP + 0.01);
+            let baseline = |boxed: &TextBox| boxed.y + boxed.lines()[0].baseline;
+            assert!((baseline(marker) - baseline(text)).abs() < 0.01);
+        }
+        assert_eq!(laid.units[0].extras, 0..2);
+        // painted with the text, not as text of the document
+        let bullets = engine
+            .page_ops(0, false)
+            .iter()
+            .filter(|op| matches!(op, Op::Glyphs { text, role: Role::Text, .. } if text.as_str() == "•"))
+            .count();
+        assert_eq!(bullets, 2);
+        assert!(engine.laid[0].texts.iter().all(|text| text.text != "•"));
+        // the caret is in the list's text
+        assert!(engine.caret(6, false).is_some());
+        assert_eq!(engine.missing(), Vec::<char>::new());
+    }
+
+    #[test]
+    fn lays_out_a_quote_in_a_cell() {
+        let mut engine = block_table(vec![vec![
+            text_block(5, "said", 12.0, None, vec![0.0]),
+            text_block(12, "more", 12.0, None, vec![0.0]),
+            text_block(19, "after", 0.0, None, vec![]),
+        ]]);
+        let laid = &engine.laid[0];
+        let left = laid.columns[0] + crate::style::CELL_PADDING_X;
+        let (first, second) = (&laid.texts[0], &laid.texts[1]);
+        let bars: Vec<(f32, f32, f32)> = laid.units[0]
+            .decos
+            .iter()
+            .filter_map(|deco| match deco {
+                Deco::Rect {
+                    x,
+                    y,
+                    h,
+                    role: Role::Text,
+                    w,
+                } if (*w - crate::style::BAR).abs() < 0.01 => Some((*x, *y, *h)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(bars.len(), 2);
+        // one bar down the quote, from its first line to its last, without
+        // a gap between its paragraphs
+        assert!((bars[0].0 - left).abs() < 0.01);
+        assert!((bars[0].1 - first.y).abs() < 0.01);
+        assert!((bars[0].1 + bars[0].2 - second.y).abs() < 0.01);
+        assert!((bars[1].1 + bars[1].2 - second.y - second.height()).abs() < 0.01);
+        let rects = engine
+            .page_ops(0, false)
+            .iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Op::Rect {
+                        role: Role::Text,
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(rects, 2);
+    }
+
+    #[test]
+    fn fits_images_to_their_cells() {
+        let mut engine = block_table(vec![
+            vec![
+                text_block(5, "small", 0.0, None, vec![]),
+                image_block(12, 50.0, 40.0),
+            ],
+            vec![image_block(20, 4000.0, 2000.0)],
+        ]);
+        let laid = &engine.laid[0];
+        let inner = |column: usize| {
+            laid.columns[column + 1] - laid.columns[column] - 2.0 * crate::style::CELL_PADDING_X
+        };
+        let images: Vec<(String, f32, f32, f32, f32)> = laid.units[0]
+            .decos
+            .iter()
+            .filter_map(|deco| match deco {
+                Deco::Image { src, x, y, w, h } => Some((src.clone(), *x, *y, *w, *h)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(images.len(), 2);
+        // a small one as it is, under the text of its cell
+        let (_, x, y, w, h) = images[0].clone();
+        assert_eq!((w, h), (50.0, 40.0));
+        assert!((x - laid.columns[0] - crate::style::CELL_PADDING_X).abs() < 0.01);
+        assert!(y >= laid.texts[0].y + laid.texts[0].height() + 7.99);
+        // a wide one scaled down to its cell, keeping its shape
+        let (_, _, _, w, h) = images[1].clone();
+        assert!((w - inner(1)).abs() < 0.01, "{w} {}", inner(1));
+        assert!((h - w / 2.0).abs() < 0.01);
+        // the row is as high as its tallest cell
+        let row = laid.units[0].height;
+        assert!((row - h - 2.0 * crate::style::CELL_PADDING_Y).abs() < 0.01);
+        // painted, and boxed for a node selection of it
+        let ops = engine.page_ops(0, false);
+        assert_eq!(
+            ops.iter()
+                .filter(|op| matches!(op, Op::Image { .. }))
+                .count(),
+            2
+        );
+        let boxes = engine.boxes(12, 13);
+        assert_eq!(boxes.len(), 1);
+        let (page, bx, by, bw, bh) = boxes[0];
+        assert_eq!(page, 0);
+        assert!((bx - engine.settings.margins.left - x).abs() < 0.01);
+        assert!((by - engine.frags[0].y - y).abs() < 0.01);
+        assert_eq!((bw, bh), (50.0, 40.0));
+        // the positions move with the table
+        engine.update(0, 0, vec![paragraph(0, "")], 7);
+        assert_eq!(engine.laid[1].cell_images[0].pos, 19);
+        assert_eq!(engine.boxes(19, 20).len(), 1);
+    }
+
+    #[test]
+    fn shows_the_alt_text_of_an_image_in_a_cell_not_loaded() {
+        let mut engine = block_table(vec![vec![image_block(5, 0.0, 0.0)]]);
+        let hints: Vec<String> = engine
+            .page_ops(0, false)
+            .iter()
+            .filter_map(|op| match op {
+                Op::Glyphs {
+                    text,
+                    role: Role::Hint,
+                    ..
+                } => Some(text.to_string()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(hints, ["a cat"]);
+        assert!(engine.laid[0].texts.is_empty());
+        assert!(engine.laid[0].units[0].height > 20.0);
+    }
+
+    #[test]
+    fn sets_a_code_block_in_a_cell_on_its_fill() {
+        let mut code = text_block(5, "let x = 1;", 0.0, None, vec![]);
+        if let crate::model::CellBlock::Text(block) = &mut code {
+            block.text.style = "code".into();
+        }
+        let mut engine = block_table(vec![vec![code]]);
+        let boxed = &engine.laid[0].texts[0];
+        let (y, height) = (boxed.y, boxed.height());
+        let fill = engine.laid[0].units[0]
+            .decos
+            .iter()
+            .find_map(|deco| match deco {
+                Deco::Rect {
+                    y,
+                    h,
+                    role: Role::CodeFill,
+                    ..
+                } => Some((*y, *h)),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(fill, (y, height));
+        let fonts: Vec<usize> = engine
+            .page_ops(0, false)
+            .iter()
+            .filter_map(|op| match op {
+                Op::Glyphs { run, .. } => Some(run.font),
+                _ => None,
+            })
+            .collect();
+        // IBM Plex Mono
+        assert_eq!(fonts, [10]);
     }
 }

@@ -95,6 +95,9 @@ pub struct Unit {
     pub keep_next: bool,
     /// drawn with the unit, in the item's coordinates
     pub decos: Vec<Deco>,
+    /// the text drawn with the unit that isn't text of the document, e.g.
+    /// the list markers and alt texts in a table's cells: in `Laid::extras`
+    pub extras: Range<usize>,
 }
 
 impl Unit {
@@ -122,6 +125,23 @@ pub struct Laid {
     /// for a table: where each column starts and where the last one ends,
     /// in the item's coordinates
     pub columns: Vec<f32>,
+    /// for a table: the list markers and alt texts in its cells, with what
+    /// they are painted as, see `Unit::extras`
+    pub extras: Vec<(TextBox, Role)>,
+    /// for a table: the images in its cells
+    pub cell_images: Vec<CellImage>,
+}
+
+/// an image in a table's cell: its position, the unit it is drawn with,
+/// and where, in the item's coordinates
+#[derive(Clone, Debug, PartialEq)]
+pub struct CellImage {
+    pub pos: u32,
+    pub unit: usize,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 impl Laid {
@@ -234,6 +254,8 @@ impl Laid {
             marker: None,
             label: None,
             columns: vec![],
+            extras: vec![],
+            cell_images: vec![],
         }
     }
 
@@ -278,5 +300,7 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         marker: None,
         label: None,
         columns: vec![],
+        extras: vec![],
+        cell_images: vec![],
     }
 }

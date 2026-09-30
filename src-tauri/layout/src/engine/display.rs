@@ -119,6 +119,14 @@ impl Engine {
                     }
                 }
             }
+            // the list markers and alt texts in a table's cells
+            for (boxed, role) in &laid.extras[unit.extras.clone()] {
+                for (line, info) in boxed.lines().iter().enumerate() {
+                    if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
+                        push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, *role);
+                    }
+                }
+            }
         }
         ops
     }
