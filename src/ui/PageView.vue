@@ -27,6 +27,7 @@ import {
   pageCaret,
   pageLayoutState,
   pageScrollRequest,
+  type PageScrollRequest,
   pageView,
   pageViewport,
 } from "../state";
@@ -37,7 +38,7 @@ import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
 import { frameLayout, keptRange, onDesk, visibleRange } from "../engine/frames";
-import { scrollFor } from "./pageViewModel";
+import { anchorTop, scrollFor, viewAnchor } from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -173,23 +174,36 @@ onUnmounted(() => {
 });
 listenOnWindow("resize", () => measure());
 
-// the view keeps its place on the page when it switches or resizes
-watch(pageView, async () => {
-  await nextTick();
-  scrollToCaret(true);
+// the view keeps the spot of the page at its top when it switches, or when
+// a resize shows the pages at another scale. Before the new layout renders,
+// so the scroll is still the one the old layout was shown at; typing lays
+// out anew on every key, but keeps the view and the scale.
+watch(layout, (next, previous) => {
+  const element = scroller.value;
+  if (!element || !next || !previous) return;
+  if (next.mode === previous.mode && next.scale === previous.scale) return;
+  const anchor = viewAnchor(previous, element.scrollTop);
+  if (!anchor) return;
+  void nextTick(() => {
+    const top = anchorTop(next, anchor);
+    if (top === null || !scroller.value) return;
+    scroller.value.scrollTop = top;
+    measure(false);
+  });
 });
 
-const scrollToCaret = (center = false) => {
+/**
+ * serve brings the spot a request asks for into view, as it asks: that far
+ * below the top of the view, or just into it
+ */
+const serve = (request: PageScrollRequest) => {
   const element = scroller.value;
-  const request = pageScrollRequest.value ?? pageCaret.value;
-  if (!element || !layout.value || !request) return;
+  if (!element || !layout.value) return;
   const rect = onDesk(layout.value, { ...request, width: 0 });
   if (!rect) return;
-  const at = pageScrollRequest.value?.at;
-  const target = center
-    ? Math.max(0, rect.top - element.clientHeight / 2)
-    : at !== undefined
-      ? Math.max(0, rect.top - at)
+  const target =
+    request.at !== undefined
+      ? Math.max(0, rect.top - request.at)
       : scrollFor(rect, element.scrollTop, element.clientHeight);
   if (target !== null && target !== element.scrollTop) {
     element.scrollTop = target;
@@ -197,12 +211,27 @@ const scrollToCaret = (center = false) => {
   }
 };
 
-watch(pageScrollRequest, () => scrollToCaret(), { flush: "post" });
+// a request is served once, and then cleared, so an old one never moves the
+// view again, e.g. after a click far from it
+watch(
+  pageScrollRequest,
+  (request) => {
+    if (!request) return;
+    serve(request);
+    pageScrollRequest.value = null;
+  },
+  { flush: "post" },
+);
 
-// the hidden editor's caret follows the painted one, for the IME's window
+// the head of the selection, where the caret is or a range ends
+const headBox = () =>
+  pageCaret.value ?? pageEngine?.caret(editor.state.value.selection.head);
+
+// the hidden editor's caret follows the painted one, for the IME's window,
+// or the head of a range
 const align = () => {
   const element = scroller.value;
-  const caret = pageCaret.value;
+  const caret = headBox();
   if (!element || !layout.value || !caret) return;
   const rect = onDesk(layout.value, { ...caret, width: 0 });
   if (!rect) return;

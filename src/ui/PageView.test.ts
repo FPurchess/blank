@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, watch } from "vue";
 
 import { setPageEngine } from "../engine/engine";
+import { frameLayout } from "../engine/frames";
 import { documentFields } from "../layout/bands";
 import {
   bandEditor,
   contextMenu,
   pageCaret,
   pageLayoutState,
+  pageScrollRequest,
   pageView,
   pageSelection,
   pageViewport,
@@ -20,6 +22,7 @@ import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import { bootApp } from "./mount";
+import { viewAnchor } from "./pageViewModel";
 import { alignHiddenEditor } from "../editor/hidden";
 
 vi.mock("../editor/hidden", () => ({ alignHiddenEditor: vi.fn() }));
@@ -62,6 +65,7 @@ describe("page view", () => {
     pageLayoutState.value = null;
     pageCaret.value = null;
     pageSelection.value = [];
+    pageScrollRequest.value = null;
     pageView.value = "page-ends";
     document.body.replaceChildren();
   });
@@ -256,6 +260,90 @@ describe("page view", () => {
     };
     await nextTick();
     expect(view().querySelector(".page-first-header")).toBeNull();
+  });
+
+  // the layout the view shows in `mode`, at jsdom's window width
+  const shown = (mode: "page-ends" | "pages") =>
+    frameLayout(pageLayoutState.value!, mode, window.innerWidth);
+
+  it("keeps the page at the top of the view when it switches", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    // a request from typing on the first page, served and gone
+    pageScrollRequest.value = { page: 0, x: 80, y: 100, width: 0, height: 16 };
+    await nextTick();
+    expect(pageScrollRequest.value).toBeNull();
+    // then scrolled far from it, a bit into the third page
+    const third = shown("page-ends").frames[2];
+    view().scrollTop = third.top + 30;
+    const before = viewAnchor(shown("page-ends"), view().scrollTop)!;
+    expect(before.page).toBe(2);
+    pageView.value = "pages";
+    await nextTick();
+    await nextTick();
+    const after = viewAnchor(shown("pages"), view().scrollTop)!;
+    expect(after.page).toBe(2);
+    expect(after.y).toBeCloseTo(before.y, 0);
+    // and back
+    pageView.value = "page-ends";
+    await nextTick();
+    await nextTick();
+    expect(viewAnchor(shown("page-ends"), view().scrollTop)).toMatchObject({
+      page: 2,
+    });
+  });
+
+  it("keeps the place when a resize shows the pages at another scale", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    const third = shown("page-ends").frames[2];
+    view().scrollTop = third.top + 30;
+    const before = viewAnchor(shown("page-ends"), view().scrollTop)!;
+    const width = window.innerWidth;
+    try {
+      window.innerWidth = 500;
+      window.dispatchEvent(new Event("resize"));
+      await nextTick();
+      await nextTick();
+      expect(shown("page-ends").scale).not.toBe(
+        frameLayout(pageLayoutState.value!, "page-ends", width).scale,
+      );
+      const after = viewAnchor(shown("page-ends"), view().scrollTop)!;
+      expect(after.page).toBe(2);
+      expect(after.y).toBeCloseTo(before.y, 0);
+    } finally {
+      window.innerWidth = width;
+    }
+  });
+
+  it("aligns the input method at the head of a range", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    const engine = layOut();
+    // a range from the first paragraph into the second
+    const state = createState(node, { cursor: [10, 200] });
+    dispose = bootApp(createTestHandle(state));
+    pageCaret.value = null;
+    pageSelection.value = [{ page: 0, x: 80, y: 90, width: 50, height: 16 }];
+    await nextTick();
+    vi.mocked(alignHiddenEditor).mockClear();
+    // a layout of its own, which the view aligns after
+    pageLayoutState.value = { ...pageLayoutState.value! };
+    await nextTick();
+    vi.advanceTimersByTime(200);
+    expect(alignHiddenEditor).toHaveBeenCalled();
+    const [, , y] =
+      vi.mocked(alignHiddenEditor).mock.calls[
+        vi.mocked(alignHiddenEditor).mock.calls.length - 1
+      ];
+    const head = engine.caret(state.selection.head)!;
+    const frame = shown("page-ends").frames[head.page];
+    expect(y).toBeCloseTo(
+      frame.top + (head.y - frame.y) * shown("page-ends").scale,
+      0,
+    );
+    vi.useRealTimers();
   });
 
   it("shows the page of the caret in the bottom bar", async () => {

@@ -106,3 +106,42 @@ export const bandTitle = (band: Band) =>
         : CommandIdentifier.EDIT_FOOTER,
     ),
   )})`;
+
+// a spot on a page, in points from its top edge, e.g. the one at the top of
+// the view
+export interface ViewAnchor {
+  page: number;
+  y: number;
+}
+
+/**
+ * viewAnchor returns the spot of a page at `scrollTop` on the desk: on the
+ * first page that reaches below it, where the view's top edge crosses it, or
+ * its top if the edge is above it, e.g. over the mark where a page ends.
+ * Null above the first page, where the view shows the start of the desk
+ * whatever the layout.
+ */
+export const viewAnchor = (
+  layout: FrameLayout,
+  scrollTop: number,
+): ViewAnchor | null => {
+  if (scrollTop <= (layout.frames[0]?.top ?? 0)) return null;
+  const frame = layout.frames.find(
+    (frame) => frame.top + frame.height > scrollTop,
+  );
+  if (!frame) return null;
+  const into = Math.max(0, scrollTop - frame.top) / layout.scale;
+  return { page: frame.page, y: frame.y + Math.min(into, frame.h) };
+};
+
+/**
+ * anchorTop returns where to scroll so that `anchor` is at the top of the
+ * view, e.g. after the view switched: a spot the frame doesn't show, like the
+ * top margin in "page ends", goes to the frame's nearest edge
+ */
+export const anchorTop = (layout: FrameLayout, anchor: ViewAnchor) => {
+  const frame = layout.frames[anchor.page];
+  if (!frame) return null;
+  const y = Math.min(Math.max(anchor.y, frame.y), frame.y + frame.h);
+  return Math.max(0, frame.top + (y - frame.y) * layout.scale);
+};

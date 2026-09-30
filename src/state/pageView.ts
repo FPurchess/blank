@@ -75,7 +75,8 @@ export const pagePosition = computed(() => {
 
 // asks the page view to bring a spot into view, e.g. the selection's head
 // after a key moved it; with `at`, to show it that many pixels below the top
-// of the view, e.g. for Page Down. A new object each time.
+// of the view, e.g. for Page Down. A new object each time, which the page
+// view clears once it brought it into view.
 export type PageScrollRequest = PageRect & { at?: number };
 export const pageScrollRequest = shallowRef<PageScrollRequest | null>(null);
 

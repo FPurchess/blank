@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { clickInto, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  Key,
+  pressMod,
+  restartApp,
+  topPage,
+  type,
+} from "../helpers.ts";
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
@@ -162,5 +169,35 @@ describe("page setup", () => {
     await browser.keys(Key.Escape);
 
     await expect($("#page-setup")).not.toExist();
+  });
+
+  it("keeps the page at the top of the view when the view switches", async () => {
+    const file = path.join(fixtureDir, "long.md");
+    fs.writeFileSync(
+      file,
+      Array.from(
+        { length: 300 },
+        (_, index) =>
+          `Paragraph ${index + 1}: writing is thinking on paper, and every line ends where the layout says it ends.\n`,
+      ).join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    // well into the document, where only the pages near the view are shown
+    await browser.executeAsync((done: () => void) => {
+      const view = document.getElementById("page-view")!;
+      view.scrollTop = view.scrollHeight * 0.45;
+      requestAnimationFrame(() => requestAnimationFrame(() => done()));
+    });
+    const before = await topPage();
+    expect(before).toBeGreaterThan(5);
+    for (const mode of ["pages", "page-ends"]) {
+      await pressMod(Key.Alt, "v");
+      await expect($("#page-view")).toHaveElementClass(mode);
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      expect(await topPage()).toBe(before);
+    }
   });
 });
