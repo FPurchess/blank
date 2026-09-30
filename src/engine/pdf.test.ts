@@ -29,6 +29,8 @@ import { prepareImages } from "../images/prepare";
 import { documentFields } from "../layout/bands";
 import { pageGeometry } from "../layout/resolve";
 import { forgetImages, imageSizes, loadedImage } from "./images";
+import { fallbackFonts, forgetFallbacks } from "./fallback";
+import { readFileSync } from "node:fs";
 import { handleJob, type PdfReply } from "./pdfWorker";
 import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
@@ -286,4 +288,44 @@ describe("the PDF's images", () => {
     expect(shown(screen)).toHaveLength(1);
     expect(shown(screen)).toEqual(shown(pdf));
   });
+});
+
+describe("the PDF's fallback fonts", () => {
+  afterEach(() => forgetFallbacks());
+
+  it.runIf(has("pdffonts"))(
+    "has the font for an emoji the page view never showed",
+    async () => {
+      testEngine();
+      // Blank's emoji font, as the webview fetches it
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              readFileSync(
+                join(
+                  import.meta.dirname,
+                  "../../fonts/NotoEmoji-VariableFont_wght.ttf",
+                ),
+              ),
+            ),
+        ),
+      );
+      // a crab, which DejaVu Sans lacks, unlike 😀
+      const doc = parseMarkdown("Crab 🦀\n");
+      const state = EditorState.create({ schema, doc });
+
+      const { contents } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+
+      expect(fallbackFonts.value.map((font) => font.family)).toHaveLength(1);
+      const file = join(dir, "emoji.pdf");
+      writeFileSync(file, contents);
+      const listed = execFileSync("pdffonts", [file], { encoding: "utf8" });
+      expect(listed).toMatch(/NotoEmoji/);
+    },
+  );
 });

@@ -57,6 +57,38 @@ describe("fallback fonts", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("looks again for what a lookup that failed was to find", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("busy"));
+    expect(await findFonts("中", "zh")).toEqual([]);
+
+    const found = await findFonts("中", "zh");
+    expect(found.map((font) => font.family)).toEqual([
+      "Noto Sans CJK SC",
+      "Noto Sans CJK SC",
+    ]);
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("looks again for emoji once their font loads", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
+    expect(await findFonts("😀", "en")).toEqual([]);
+    expect((await findFonts("😀", "en")).map((font) => font.family)).toEqual([
+      EMOJI_FAMILY,
+    ]);
+  });
+
+  it("looks up one at a time, so the same characters load once", async () => {
+    const [first, second] = await Promise.all([
+      findFonts("中", "zh"),
+      findFonts("中", "zh"),
+    ]);
+    expect(first).toHaveLength(2);
+    expect(second).toEqual([]);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
   it("goes on without what it can't find or read", async () => {
     vi.mocked(invoke).mockRejectedValue(new Error("no fonts"));
     vi.mocked(fetch).mockRejectedValue(new Error("offline"));

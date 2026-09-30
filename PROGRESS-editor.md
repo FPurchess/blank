@@ -17,7 +17,7 @@ deletes this file on merge.
 - [ ] 8. Images, lists and quotes in table cells — waiting for S2
 - [x] 9. Image cache by resolved URL, retried, and no counter
 - [x] 10. Drag and drop of text
-- [ ] 11. The PDF waits for fallback glyphs
+- [x] 11. The PDF waits for fallback glyphs
 - [x] 12. The hidden `TableView` no longer freezes columns
 - [x] 13. Page setup and field watchers lay out on the new state
 - [x] 14. `frozen` is reset with the plugin view

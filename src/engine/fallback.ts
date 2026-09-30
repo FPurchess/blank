@@ -19,7 +19,8 @@ export interface FallbackFont {
 // the fonts added, for new engines, e.g. the PDF export's
 export const fallbackFonts = shallowRef<readonly FallbackFont[]>([]);
 
-// the characters already looked for, found or not
+// the characters already looked for, found or not; not those whose lookup
+// failed, which are looked for again
 const asked = new Set<string>();
 
 const EMOJI = /\p{Extended_Pictographic}/u;
@@ -43,34 +44,52 @@ interface SystemFont {
   path: string;
 }
 
+// the lookup running, which the next one waits for: one for the same
+// characters then finds them looked for, and the fonts loaded
+let running: Promise<unknown> = Promise.resolve();
+
 /**
- * findFonts loads the fonts for the characters of `missing`
+ * findFonts loads the fonts for the characters of `missing`. A lookup that
+ * fails is tried again the next time.
  * @param language the document's language, which picks e.g. the Chinese or
  *   Japanese forms of Han characters
  * @returns the fonts it found, none if it looked for them all before
  */
-export const findFonts = async (
+export const findFonts = (
+  missing: string,
+  language: string,
+): Promise<FallbackFont[]> => {
+  const next = running.then(() => lookUp(missing, language));
+  running = next.catch(() => {});
+  return next;
+};
+
+const lookUp = async (
   missing: string,
   language: string,
 ): Promise<FallbackFont[]> => {
   const { emoji, other } = missingOf(missing);
-  for (const char of [...emoji, ...other]) asked.add(char);
   const found: FallbackFont[] = [];
   const known = (family: string) =>
     [...fallbackFonts.value, ...found].some((font) => font.family === family);
-  if (emoji.length && !known(EMOJI_FAMILY)) {
+  const lookedFor = (chars: string[]) =>
+    chars.forEach((char) => asked.add(char));
+  if (emoji.length && known(EMOJI_FAMILY)) lookedFor(emoji);
+  else if (emoji.length) {
     try {
       const response = await fetch(EMOJI_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       found.push({
         family: EMOJI_FAMILY,
         bytes: new Uint8Array(await response.arrayBuffer()),
       });
+      lookedFor(emoji);
     } catch (error) {
       console.error("failed to load the emoji font", error);
     }
   }
   if (other.length) {
-    let fonts: SystemFont[] = [];
+    let fonts: SystemFont[] | null = null;
     try {
       fonts = await invoke<SystemFont[]>("fallback_fonts", {
         text: other.join(""),
@@ -79,15 +98,19 @@ export const findFonts = async (
     } catch (error) {
       console.error("failed to find system fonts", error);
     }
-    for (const font of fonts) {
+    let read = fonts !== null;
+    for (const font of fonts ?? []) {
       if (known(font.family) && !found.some((f) => f.family === font.family))
         continue;
       try {
         found.push({ family: font.family, bytes: await readFile(font.path) });
       } catch (error) {
+        read = false;
         console.error(`failed to read ${font.path}`, error);
       }
     }
+    // no font for them is an answer too, which asking again won't change
+    if (read) lookedFor(other);
   }
   if (found.length) fallbackFonts.value = [...fallbackFonts.value, ...found];
   return found;

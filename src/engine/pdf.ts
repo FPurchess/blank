@@ -14,7 +14,8 @@ import {
   newEngine,
   settingsOf,
 } from "./engine";
-import { fallbackFonts } from "./fallback";
+import { fallbackFonts, findFonts } from "./fallback";
+import { language } from "../state";
 import { flatten, type ImageSizes } from "./flatten";
 import { fittedSize } from "./images";
 import type { PdfJob, PdfResult } from "./pdfJob";
@@ -64,6 +65,13 @@ const onSharedEngine = async ({
     }
     engine.setSettings(layout, fields);
     engine.sync(doc, sizes);
+    // fonts for what Blank's fonts lack, e.g. emoji pasted just now, which
+    // the engine lays out again with
+    const missing = engine.missing();
+    if (missing) {
+      await findFonts(missing, language.value);
+      engine.addFonts(fallbackFonts.value);
+    }
     return {
       pdf: engine.pdf(fields.title, fields.author),
       pages: engine.pages(),
@@ -114,28 +122,37 @@ export const runPdfWorker = (job: PdfJob) =>
   });
 
 /**
- * inWorker writes the PDF with a wasm instance of its own
+ * inWorker writes the PDF with a wasm instance of its own, and with the
+ * fonts for what Blank's fonts lack, which it tells
  */
-const inWorker = async ({
-  doc,
-  layout,
-  fields,
-  images,
-  sizes,
-}: Prepared): Promise<PdfResult> =>
-  runPdfWorker({
-    fonts: await baseFonts(),
-    fallbacks: [...fallbackFonts.value],
-    images: [...images].map(([src, image]) => ({
-      src,
-      bytes: image.bytes,
-      jpeg: image.mime === "image/jpeg",
-    })),
-    settings: JSON.stringify(settingsOf(layout, fields)),
-    items: JSON.stringify(flatten(doc, sizes).map((record) => record.build())),
-    title: fields.title,
-    author: fields.author,
-  });
+const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
+  const fonts = await baseFonts();
+  const result = await runPdfWorker(jobOf(prepared, fonts));
+  if (!result.missing) return result;
+  // again with the fonts for what Blank's fonts lack, if any were found
+  const known = fallbackFonts.value.length;
+  await findFonts(result.missing, language.value);
+  return fallbackFonts.value.length > known
+    ? runPdfWorker(jobOf(prepared, fonts))
+    : result;
+};
+
+const jobOf = (
+  { doc, layout, fields, images, sizes }: Prepared,
+  fonts: Uint8Array[],
+): PdfJob => ({
+  fonts,
+  fallbacks: [...fallbackFonts.value],
+  images: [...images].map(([src, image]) => ({
+    src,
+    bytes: image.bytes,
+    jpeg: image.mime === "image/jpeg",
+  })),
+  settings: JSON.stringify(settingsOf(layout, fields)),
+  items: JSON.stringify(flatten(doc, sizes).map((record) => record.build())),
+  title: fields.title,
+  author: fields.author,
+});
 
 const toPDF: exporterFunc = async (state, { docPath, layout }) => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
