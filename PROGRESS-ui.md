@@ -48,7 +48,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 4. A switch renders the target range right away (the watcher sets `scrollTop` before the render; no test can tell it apart in jsdom's small documents, the switch test still covers the result)
 - [x] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
 - [x] 7. The bitmap cache is cleared once the engine is missing (`engineMissing`) and keeps one bitmap per page layer and scale, the newest
-- [ ] 8. Less work per key in the first header and the overlay's under layer
+- [x] 8. Less work per key: the first header reads the engine only when page 1's band version changes and only in "page ends", and the overlay reads its layer before the refs
 - [ ] 9. "Page N of M": a stable live region, announcing a change of page only
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
 - [ ] 11. The test gaps

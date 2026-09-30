@@ -36,7 +36,7 @@ const placed = (rects: PageRect[]) =>
 
 const caret = computed(() => {
   const box =
-    pageCaret.value && props.layer === "over"
+    props.layer === "over" && pageCaret.value
       ? onDesk(props.layout, pageCaret.value)
       : null;
   return box && { ...box, ...caretLine(box.left, props.ratio) };
@@ -44,7 +44,7 @@ const caret = computed(() => {
 // where dragged text would drop, as a caret that doesn't blink
 const drop = computed(() => {
   const box =
-    pageDropCaret.value && props.layer === "over"
+    props.layer === "over" && pageDropCaret.value
       ? onDesk(props.layout, pageDropCaret.value)
       : null;
   return box && { ...box, ...caretLine(box.left, props.ratio) };
@@ -53,6 +53,7 @@ const drop = computed(() => {
 const under = computed(() => props.layer === "under");
 // with the focus the pages paint the selection over their text themselves
 // (PageFrame.vue), without it dimmed under it here
+// the layer is read first, so the other layer doesn't follow the refs
 const rects = computed(() =>
   under.value && !props.focused ? placed(pageSelection.value) : [],
 );

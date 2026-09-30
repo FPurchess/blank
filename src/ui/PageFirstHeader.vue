@@ -15,17 +15,27 @@ import { bandTitle, firstHeaderPlace } from "./pageViewModel";
 const props = defineProps<{ layout: FrameLayout }>();
 const editor = useEditor();
 
-// the header's slots as one string, so typing doesn't render it again
+const place = computed(() => firstHeaderPlace(props.layout));
+// whether it shows here at all, which changes far less than where
+const here = computed(() => place.value !== null);
+// the first page's band version, which changes only with its header and
+// footer, not with every key typed
+const version = computed(
+  () =>
+    pageLayoutState.value?.bandVersions?.[0] ??
+    pageLayoutState.value?.versions[0] ??
+    0,
+);
+// the header's slots as one string, read from the engine only where the
+// header shows, and again only when its version changes
 const slots = computed(() => {
   const engine = pageEngine;
-  // the layout the header is read from
-  void pageLayoutState.value;
-  if (!engine) return "";
+  void version.value;
+  if (!engine || !here.value) return "";
   return engine.bands(0).slice(0, 3).join("\u0000");
 });
 const parts = computed(() => slots.value.split("\u0000"));
 const shown = computed(() => parts.value.some(Boolean));
-const place = computed(() => firstHeaderPlace(props.layout));
 
 // a double click opens its strip, which takes the focus
 const open = () => editor.run(editBand("header"), { focus: false });
@@ -33,7 +43,7 @@ const open = () => editor.run(editBand("header"), { focus: false });
 
 <template>
   <div
-    v-if="shown && place"
+    v-if="place && shown"
     class="page-first-header"
     aria-hidden="true"
     :title="bandTitle('header')"

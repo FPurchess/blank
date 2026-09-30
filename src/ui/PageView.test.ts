@@ -279,6 +279,19 @@ describe("page view", () => {
     expect(parseFloat(shown.style.top)).toBeLessThan(
       parseFloat(frames()[0].style.top),
     );
+    // typing doesn't read the header again, only a change of the first
+    // page's header and footer does
+    const bands = vi.spyOn(engine, "bands");
+    pageLayoutState.value = { ...pageLayoutState.value! };
+    await nextTick();
+    expect(bands).not.toHaveBeenCalled();
+    pageLayoutState.value = {
+      ...pageLayoutState.value!,
+      bandVersions: new Uint32Array([999]),
+    };
+    await nextTick();
+    expect(bands).toHaveBeenCalledWith(0);
+    bands.mockRestore();
     // the sheets show it themselves
     pageView.value = "pages";
     await nextTick();
