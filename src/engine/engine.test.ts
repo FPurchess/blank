@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
-import { doc, h, p } from "../test/editor";
+import { doc, h, p, table, td, tr } from "../test/editor";
+import { schema } from "../markdown";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import {
@@ -203,5 +204,49 @@ describe("the body and the bands of a page", () => {
     engine.sync(typed, noSizes);
     expect(engine.bandDisplay(0, engine.bandVersions()[0])).toBe(bands);
     expect(engine.bodyDisplay(0, engine.bodyVersions()[0])).not.toBe(body);
+  });
+});
+
+describe("an image in a table cell", () => {
+  // a table whose first cell holds an image of `size`, in points
+  const laidOut = (size: { width: number; height: number }) => {
+    const image = schema.nodes.image.create({ src: "x.png", alt: "x" });
+    const node = doc(
+      table(
+        tr(
+          td([schema.node("paragraph", null, [image])]),
+          td("a much longer text in the second column of the table"),
+        ),
+      ),
+    );
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    engine.sync(node, (src) => (src === "x.png" ? size : undefined));
+    const [shown] = engine.display(0, engine.versions()[0]).i;
+    const grid = engine.tableGrid(0)!;
+    return { engine, shown, cellWidth: grid.columns[1] - grid.columns[0] };
+  };
+
+  it("keeps the size of an image that fits its cell", () => {
+    const { shown } = laidOut({ width: 3 * 0.75, height: 2 * 0.75 });
+    expect(shown[0]).toBe("x.png");
+    expect(shown[3]).toBeCloseTo(2.25);
+    expect(shown[4]).toBeCloseTo(1.5);
+  });
+
+  it("fits a large image to its cell", () => {
+    const { shown, cellWidth } = laidOut({ width: 3000, height: 750 });
+    // the cell's width, less its padding
+    expect(shown[3]).toBeLessThan(cellWidth);
+    expect(shown[3]).toBeGreaterThan(cellWidth - 2 * 11);
+    expect(shown[4]).toBeCloseTo(shown[3] / 4);
+  });
+
+  it("has a box, for a selection of it", () => {
+    const { engine, shown } = laidOut({ width: 30, height: 20 });
+    // the table, row, cell and paragraph open before it
+    const [box] = engine.boxes(4, 5);
+    expect(box).toMatchObject({ page: 0 });
+    expect(box.width).toBeCloseTo(shown[3]);
   });
 });

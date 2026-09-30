@@ -329,3 +329,27 @@ describe("the PDF's fallback fonts", () => {
     },
   );
 });
+
+describe("the PDF's tables", () => {
+  it.runIf(has("pdfimages"))("embed the images in their cells", async () => {
+    testEngine();
+    const doc = parseMarkdown(
+      [
+        `| Picture | Name |`,
+        `|---|---|`,
+        `| ![a dot](data:image/png;base64,${IMAGES.png}) | a dot |`,
+      ].join("\n"),
+    );
+    const state = EditorState.create({ schema, doc });
+    const { contents } = await toPDF(state, {
+      docPath: null,
+      layout: testLayout(),
+    });
+    const file = join(dir, "table.pdf");
+    writeFileSync(file, contents);
+    const images = execFileSync("pdfimages", ["-list", file], {
+      encoding: "utf8",
+    });
+    expect(images).toMatch(/^\s*1\s+0\s+image\s+3\s+2\s/m);
+  });
+});

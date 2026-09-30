@@ -280,3 +280,98 @@ describe("the positions of table cells", () => {
     view.destroy();
   });
 });
+
+describe("what a table cell holds", () => {
+  // the blocks of the first cell of the table at the start of `node`
+  const cellOf = (content: Node[], sizes: ImageSizes = noSizes) => {
+    const node = doc(table(tr(td(content), td("b"))));
+    const [item] = flatten(node, sizes).map((record) => record.build());
+    if (item.kind !== "table") throw new Error("no table");
+    return { node, cell: item.rows[0].cells[0] };
+  };
+  const image = (src: string, alt = "") =>
+    schema.nodes.image.create({ src, alt });
+
+  it("is paragraphs when it holds only text", () => {
+    const { cell } = cellOf([p("one"), p("two")]);
+    expect(cell.blocks).toBeUndefined();
+    expect(cell.paragraphs.map((paragraph) => paragraph.text)).toEqual([
+      "one",
+      "two",
+    ]);
+  });
+
+  it("holds a list's items with their markers and indent", () => {
+    const { node, cell } = cellOf([
+      ul(li(p("flour")), li(p("sugar"), p("fine"))),
+      ol(li(p("mix"))),
+    ]);
+    expect(cell.paragraphs).toEqual([]);
+    expect(
+      cell.blocks!.map((block) =>
+        block.kind === "text"
+          ? [block.text, block.indent, block.marker ?? null]
+          : [],
+      ),
+    ).toEqual([
+      ["flour", LIST_INDENT, "•"],
+      ["sugar", LIST_INDENT, "•"],
+      ["fine", LIST_INDENT, null],
+      ["mix", LIST_INDENT, "1."],
+    ]);
+    // at ProseMirror's positions
+    for (const block of cell.blocks!) {
+      if (block.kind !== "text") continue;
+      expect(node.textBetween(block.pos, block.pos + block.text.length)).toBe(
+        block.text,
+      );
+    }
+  });
+
+  it("holds a quote's paragraphs with its bar", () => {
+    const { cell } = cellOf([p("said"), blockquote(p("quoted"))]);
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ text: "said", indent: 0, bars: [] }),
+      expect.objectContaining({
+        text: "quoted",
+        indent: QUOTE_INDENT,
+        bars: [0],
+      }),
+    ]);
+  });
+
+  it("holds images, at their size once it's known, around their text", () => {
+    const { node, cell } = cellOf(
+      [para(schema.text("a cat "), image("cat.png", "a cat"))],
+      (src) => (src === "cat.png" ? { width: 120, height: 80 } : undefined),
+    );
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ kind: "text", text: "a cat " }),
+      {
+        kind: "image",
+        pos: 10,
+        src: "cat.png",
+        width: 120,
+        height: 80,
+        alt: "a cat",
+      },
+    ]);
+    expect(node.nodeAt(10)?.type.name).toBe("image");
+  });
+
+  it("keeps code blocks set as code", () => {
+    const { cell } = cellOf([
+      schema.node("code_block", null, [schema.text("x = 1")]),
+    ]);
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ kind: "text", style: "code", text: "x = 1" }),
+    ]);
+  });
+
+  it("changes the table's record once the image in it loads", () => {
+    const node = doc(table(tr(td([para(image("cat.png"))]))));
+    const [before] = flatten(node, noSizes);
+    const [after] = flatten(node, () => ({ width: 10, height: 10 }));
+    expect(after.key).not.toBe(before.key);
+  });
+});

@@ -14,7 +14,7 @@ deletes this file on merge.
 - [x] 5. One unit for the column goal of ↑/↓ and Page Up/Down
 - [x] 6. Keyboard and mouse make cell selections in tables
 - [x] 7. Cells that share a node object get their own positions
-- [ ] 8. Images, lists and quotes in table cells — waiting for S2
+- [x] 8. Images, lists and quotes in table cells (S2)
 - [x] 9. Image cache by resolved URL, retried, and no counter
 - [x] 10. Drag and drop of text
 - [x] 11. The PDF waits for fallback glyphs

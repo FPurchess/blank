@@ -1,7 +1,13 @@
 import type { Mark, Node } from "prosemirror-model";
 
 import { tableGrid } from "../exporters/table";
-import type { Content, EngineItem, EngineSpan, EngineText } from "./types";
+import type {
+  Content,
+  EngineCellBlock,
+  EngineItem,
+  EngineSpan,
+  EngineText,
+} from "./types";
 
 // Flattens a ProseMirror document into the items the layout engine lays out
 // one after the other: every textblock, rule, page break, image and table,
@@ -131,6 +137,132 @@ const textOf = (
 };
 
 /**
+ * pieces splits a textblock's children around its images, which stand on
+ * lines of their own
+ * @param pos the position of the textblock
+ */
+const pieces = (node: Node, pos: number) => {
+  const runs: { children: Node[]; pos: number; image?: Node }[] = [];
+  let run: Node[] = [];
+  let runPos = pos + 1;
+  node.forEach((child, offset) => {
+    if (child.type.name === "image") {
+      if (run.length) runs.push({ children: run, pos: runPos });
+      runs.push({ children: [], pos: pos + 1 + offset, image: child });
+      run = [];
+      runPos = pos + 1 + offset + 1;
+      return;
+    }
+    run.push(child);
+  });
+  if (run.length || runs.length === 0)
+    runs.push({ children: run, pos: runPos });
+  return runs;
+};
+
+// whether a cell holds more than paragraphs of text
+const holdsBlocks = (cell: Node) => {
+  let blocks = false;
+  cell.descendants((node) => {
+    if (blocks) return false;
+    blocks =
+      node.type.name === "image" ||
+      (node.isBlock && !node.isTextblock) ||
+      (node.isTextblock && node.type.name !== "paragraph");
+    return !blocks;
+  });
+  return blocks;
+};
+
+/**
+ * cellBlocks builds what a cell holds: its textblocks with where they stand
+ * in lists and quotes, and its images
+ * @param pos the position of the cell
+ */
+const cellBlocks = (
+  cell: Node,
+  pos: number,
+  sizes: ImageSizes,
+): EngineCellBlock[] => {
+  const blocks: EngineCellBlock[] = [];
+  const walk = (
+    node: Node,
+    at: number,
+    indent: number,
+    bars: number[],
+    depth: number,
+    marker?: string,
+  ) => {
+    const name = node.type.name;
+    if (node.isTextblock) {
+      pieces(node, at).forEach((piece, index) => {
+        if (piece.image) {
+          const src = piece.image.attrs.src as string;
+          const size = sizes(src);
+          blocks.push({
+            kind: "image",
+            pos: piece.pos,
+            src,
+            width: size?.width ?? 0,
+            height: size?.height ?? 0,
+            alt: (piece.image.attrs.alt as string | null) ?? "",
+          });
+          return;
+        }
+        blocks.push({
+          ...textOf(node, piece.children, piece.pos, false),
+          indent,
+          bars,
+          ...(index === 0 && marker ? { marker } : {}),
+        });
+      });
+    } else if (name === "blockquote") {
+      node.forEach((child, offset, index) =>
+        walk(
+          child,
+          at + 1 + offset,
+          indent + QUOTE_INDENT,
+          [...bars, indent],
+          depth,
+          index === 0 ? marker : undefined,
+        ),
+      );
+    } else if (name === "bullet_list" || name === "ordered_list") {
+      const start = (node.attrs.order as number | undefined) ?? 1;
+      node.forEach((item, offset, index) => {
+        const bullet =
+          name === "ordered_list"
+            ? `${start + index}.`
+            : BULLETS[depth % BULLETS.length];
+        item.forEach((child, childOffset, childIndex) =>
+          walk(
+            child,
+            at + 1 + offset + 1 + childOffset,
+            indent + LIST_INDENT,
+            bars,
+            depth + 1,
+            childIndex === 0 ? bullet : undefined,
+          ),
+        );
+      });
+    } else {
+      node.forEach((child, offset, index) =>
+        walk(
+          child,
+          at + 1 + offset,
+          indent,
+          bars,
+          depth,
+          index === 0 ? marker : undefined,
+        ),
+      );
+    }
+  };
+  cell.forEach((child, offset) => walk(child, pos + 1 + offset, 0, [], 0));
+  return blocks;
+};
+
+/**
  * tableOf builds a table: its rows, header rows, cells and column widths
  * @param pos the position of the table
  */
@@ -138,6 +270,7 @@ const tableOf = (
   node: Node,
   pos: number,
   widths: number[] | undefined,
+  sizes: ImageSizes,
 ): Content => {
   const grid = tableGrid(node);
   const caption = node.attrs.caption as string | null;
@@ -148,16 +281,19 @@ const tableOf = (
       const paragraphs: EngineText[] = [];
       // the cell's position: the table's content, then its rows and cells
       const cellPos = pos + 1 + cell.offset;
-      cell.node.descendants((child, offset) => {
-        if (!child.isTextblock) return true;
-        paragraphs.push(
-          textOf(child, child.children, cellPos + 1 + offset + 1, false),
-        );
-        return false;
-      });
+      const blocks = holdsBlocks(cell.node)
+        ? cellBlocks(cell.node, cellPos, sizes)
+        : undefined;
+      if (!blocks)
+        cell.node.forEach((child, offset) => {
+          paragraphs.push(
+            textOf(child, child.children, cellPos + 1 + offset + 1, false),
+          );
+        });
       return [
         {
           paragraphs,
+          ...(blocks ? { blocks } : {}),
           header: cell.header,
           align: (cell.node.attrs.align as string | null) ?? undefined,
           col: cell.col,
@@ -279,8 +415,16 @@ export const flattenBlocks = (
     }
     if (name === "table") {
       const widths = frozen?.pos === pos ? frozen.widths : undefined;
-      push(node, pos, context, space, () => tableOf(node, pos, widths), {
-        key: widths ? widths.join(" ") : "",
+      // the sizes of its images, which come once they're loaded
+      const images: string[] = [];
+      node.descendants((child) => {
+        if (child.type.name !== "image") return true;
+        const size = sizes(child.attrs.src as string);
+        images.push(size ? `${size.width}x${size.height}` : "?");
+        return false;
+      });
+      push(node, pos, context, space, () => tableOf(node, pos, widths, sizes), {
+        key: [widths ? widths.join(" ") : "", ...images].join("|"),
       });
       return;
     }
@@ -383,21 +527,7 @@ export const flattenBlocks = (
     space: Space,
     marker?: string,
   ) => {
-    const runs: { children: Node[]; pos: number; image?: Node }[] = [];
-    let run: Node[] = [];
-    let runPos = pos + 1;
-    node.forEach((child, offset) => {
-      if (child.type.name === "image") {
-        if (run.length) runs.push({ children: run, pos: runPos });
-        runs.push({ children: [], pos: pos + 1 + offset, image: child });
-        run = [];
-        runPos = pos + 1 + offset + 1;
-        return;
-      }
-      run.push(child);
-    });
-    if (run.length || runs.length === 0)
-      runs.push({ children: run, pos: runPos });
+    const runs = pieces(node, pos);
     runs.forEach((piece, index) => {
       const pieceSpace = {
         before: index === 0 ? space.before : 0,
