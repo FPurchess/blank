@@ -7,6 +7,7 @@ import { caretLine } from "./pageViewModel";
 import {
   pageCaret,
   pageComposition,
+  pageDropCaret,
   pageNodeSelection,
   pageSelection,
   type PageRect,
@@ -40,6 +41,15 @@ const caret = computed(() => {
       : null;
   return box && { ...box, ...caretLine(box.left, props.ratio) };
 });
+// where dragged text would drop, as a caret that doesn't blink
+const drop = computed(() => {
+  const box =
+    pageDropCaret.value && props.layer === "over"
+      ? onDesk(props.layout, pageDropCaret.value)
+      : null;
+  return box && { ...box, ...caretLine(box.left, props.ratio) };
+});
+
 const under = computed(() => props.layer === "under");
 const rects = computed(() => (under.value ? placed(pageSelection.value) : []));
 const nodes = computed(() =>
@@ -95,6 +105,16 @@ const box = (rect: {
     :key="rect.key"
     class="page-composition"
     :style="box(rect)"
+  />
+  <div
+    v-if="drop"
+    class="page-caret page-drop-caret"
+    :style="{
+      left: `${drop.left}px`,
+      width: `${drop.width}px`,
+      top: `${drop.top}px`,
+      height: `${drop.height}px`,
+    }"
   />
   <div
     v-if="caret && focused"

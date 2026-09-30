@@ -1553,6 +1553,11 @@ body.band-editing #page-view {
   animation: page-caret-blink 1.1s steps(1) 0.5s infinite;
 }
 
+// where dragged text would drop: the caret's colour, still, in any theme
+.page-drop-caret {
+  animation: none;
+}
+
 @keyframes page-caret-blink {
   50% {
     opacity: 0;

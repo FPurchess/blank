@@ -5,7 +5,12 @@ import { EditorView } from "prosemirror-view";
 import { createEditorHandle } from "../editor/handle";
 import { setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
-import { pageCaret, pageLayoutState, pageSelection } from "../state";
+import {
+  pageCaret,
+  pageDropCaret,
+  pageLayoutState,
+  pageSelection,
+} from "../state";
 import { createState, doc, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
@@ -50,6 +55,7 @@ describe("the caret and the selection on the pages", () => {
     setPageEngine(null);
     pageLayoutState.value = null;
     pageCaret.value = null;
+    pageDropCaret.value = null;
     pageSelection.value = [];
     document.body.replaceChildren();
   });
@@ -81,5 +87,15 @@ describe("the caret and the selection on the pages", () => {
       selected().compareDocumentPosition(frame) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("shows where dragged text would drop, focused or not", async () => {
+    pageDropCaret.value = { page: 0, x: 120, y: 100, width: 0, height: 16 };
+    editor.dom.dispatchEvent(new FocusEvent("blur"));
+    await nextTick();
+    expect(view().querySelector(".page-drop-caret")).not.toBeNull();
+    pageDropCaret.value = null;
+    await nextTick();
+    expect(view().querySelector(".page-drop-caret")).toBeNull();
   });
 });
