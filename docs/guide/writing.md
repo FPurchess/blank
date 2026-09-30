@@ -1,6 +1,6 @@
 # Writing in Blank
 
-Blank shows your text as it will look, not as markdown syntax. There are no toolbars: you format with [keyboard shortcuts](./shortcuts) or by typing markdown, which Blank turns into formatting as you go.
+Blank shows your text as it will look, not as markdown syntax, and on the lines and pages it will have on paper (see [Pages](./pages#on-the-screen)). There are no toolbars: you format with [keyboard shortcuts](./shortcuts) or by typing markdown, which Blank turns into formatting as you go.
 
 <img class="shot" src="/screenshots/theme-light.png" alt="A document in Blank's light theme" />
 
@@ -22,6 +22,8 @@ At the start of an empty line, type one of these to turn the line into a block:
 Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
 
 Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` and plain URLs become formatting once you finish the word. See [Autocorrect](./autocorrect) for everything Blank corrects.
+
+Code is set in IBM Plex Mono, on the screen and in the PDF. `Mod` + Click opens a link. Emoji show in black and white, in the colour of your text, and Chinese, Japanese, Korean and other scripts in the fonts your computer has for them, so they look on paper as they do on the screen. A word too long for the line, like a long web address, continues on the next one.
 
 ## Tables
 

@@ -4,20 +4,20 @@
 
 ## Files
 
-| Command         | Shortcut          |
-| --------------- | ----------------- |
-| New file        | `Mod` `N`         |
-| Open file       | `Mod` `O`         |
-| Save            | `Mod` `S`         |
-| Save as         | `Mod` `Shift` `S` |
-| Export as PDF   | `Mod` `Alt` `P`   |
-| Export as Word  | `Mod` `Alt` `W`   |
-| Page setup      | `Mod` `Alt` `U`   |
-| Edit header     | `Mod` `Alt` `H`   |
-| Edit footer     | `Mod` `Alt` `F`   |
-| Pages or page ends | `Mod` `Alt` `V` |
-| Cycle themes    | `Mod` `Alt` `T`   |
-| Choose language | `Mod` `Alt` `L`   |
+| Command                                         | Shortcut          |
+| ----------------------------------------------- | ----------------- |
+| New file                                        | `Mod` `N`         |
+| Open file                                       | `Mod` `O`         |
+| Save                                            | `Mod` `S`         |
+| Save as                                         | `Mod` `Shift` `S` |
+| Export as PDF                                   | `Mod` `Alt` `P`   |
+| Export as Word                                  | `Mod` `Alt` `W`   |
+| Page setup                                      | `Mod` `Alt` `U`   |
+| Edit header                                     | `Mod` `Alt` `H`   |
+| Edit footer                                     | `Mod` `Alt` `F`   |
+| [Pages or page ends](./pages#on-the-screen)     | `Mod` `Alt` `V`   |
+| Cycle themes                                    | `Mod` `Alt` `T`   |
+| Choose language                                 | `Mod` `Alt` `L`   |
 
 ## Editing
 
@@ -26,6 +26,8 @@
 | Undo              | `Mod` `Z`         |
 | Redo              | `Mod` `Shift` `Z` |
 | Insert line break | `Shift` `Enter`   |
+| A screen up / down | `Page Up` / `Page Down` |
+| Start / end of the line | `Home` / `End` |
 
 ## Blocks
 

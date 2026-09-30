@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 import { $, browser } from "@wdio/globals";
 
 import {
+  editorText,
   focusEditor,
+  textBox,
   Key,
   paste,
   pressMod,
@@ -28,8 +30,18 @@ const outDir = path.resolve(
 const sample = path.join(os.tmpdir(), "on-writing.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 
-const shot = (name: string) =>
-  browser.saveScreenshot(path.join(outDir, `${name}.png`));
+/**
+ * shot takes a still, without the pointer a recording drew and away from
+ * what shows a hover, e.g. the bands where a page ends
+ */
+const shot = async (name: string) => {
+  await showPointer(null);
+  await browser
+    .action("pointer")
+    .move({ x: 4, y: 300, origin: "viewport" })
+    .perform();
+  await browser.saveScreenshot(path.join(outDir, `${name}.png`));
+};
 
 const setTheme = async (theme: string) => {
   while ((await browser.execute(() => document.body.dataset.theme)) !== theme) {
@@ -189,6 +201,34 @@ class Recorder {
   async enter(pause = 0.6) {
     await type(Key.Enter);
     await this.frame(pause);
+  }
+
+  /**
+   * move the mouse to where the pages show the end of the text of the
+   * editor's element at `selector`, and click there
+   */
+  async clickInto(selector: string, seconds = 0.6, move = 0.5) {
+    const at = await browser.execute((selector: string) => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            endOf: (element: Element) => number;
+            caretBox: (
+              pos: number,
+            ) => { left: number; top: number; bottom: number } | null;
+          };
+        }
+      ).blankGeometry;
+      const box = geometry.caretBox(
+        geometry.endOf(document.querySelector(selector)!),
+      )!;
+      return {
+        x: Math.round(box.left),
+        y: Math.round((box.top + box.bottom) / 2),
+      };
+    }, selector);
+    await this.moveTo(at, move);
+    await this.click(seconds);
   }
 
   /** move the mouse onto `element` and click it */
@@ -366,8 +406,10 @@ const showKeys = (keys: string[]) =>
 const addCaretStyle = () =>
   browser.execute(() => {
     const style = document.createElement("style");
+    // the painted caret: shown in every frame while typing, hidden in the
+    // stills and between the blinks of a pause
     style.textContent =
-      ".shots-no-caret .ProseMirror { caret-color: transparent; }";
+      ".page-caret { animation: none; } .shots-no-caret .page-caret { visibility: hidden; }";
     document.head.appendChild(style);
   });
 
@@ -470,7 +512,11 @@ describe("docs screenshots", () => {
       0.8,
     );
     await film.clickOn($("#band-editor").$("button=Done"), 0.6);
-    await film.clickOn($("#editor p"), 0.3);
+    await film.clickInto("#editor p", 0.3);
+    await film.hidePointer();
+    // a second page, whose header shows where the first page ends
+    await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.8);
+    await film.type("The next morning, the sea was calm.");
     await film.pause(2.5);
     film.save(path.join(outDir, "header-footer.gif"), 545);
   });
@@ -490,7 +536,11 @@ describe("docs screenshots", () => {
     await film.clickOn($("#band-editor").$("button=Odd Pages"), 1.2);
     await film.clickOn($("#band-editor").$("button=Even Pages"), 1.2);
     await film.clickOn($("#band-editor").$("button=Done"), 0.6);
-    await film.clickOn($("#editor p"), 0.3);
+    await film.clickInto("#editor p", 0.3);
+    await film.hidePointer();
+    // an even page, whose own header shows where the first page ends
+    await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.8);
+    await film.type("The next morning, the sea was calm.");
     await film.pause(2);
     film.save(path.join(outDir, "even-pages.gif"), 545);
   });
@@ -510,15 +560,21 @@ describe("docs screenshots", () => {
     await pressMod(Key.Alt, "s");
     await expect($("#ui-spellcheck")).toHaveText("Spelling");
     await type("every story begins with a blank page and a singel idea.");
-    await browser.waitUntil(
-      async () => (await $(".spelling-error").getText()) === "singel",
+    await browser.waitUntil(async () =>
+      (await editorText("#editor .spelling-error")).includes("singel"),
     );
     // at the end of the word, so the menu leaves it visible
-    const word = $(".spelling-error");
-    await word.click({
-      button: "right",
-      x: Math.floor((await word.getSize("width")) / 2) - 2,
-    });
+    const word = await textBox("singel", 5);
+    await browser
+      .action("pointer")
+      .move({
+        x: Math.round(word.left),
+        y: Math.round((word.top + word.bottom) / 2),
+        origin: "viewport",
+      })
+      .down({ button: 2 })
+      .up({ button: 2 })
+      .perform();
     await $(`[data-id^="suggestion:"]`).waitForExist();
     await shot("spelling");
 
@@ -629,13 +685,16 @@ describe("docs screenshots", () => {
     );
     // Tab in the last cell adds a row, where two more rows get pasted
     const lastCell = await browser.execute(() => {
-      const cell = document.querySelector(
-        "#editor tr:last-child td:last-child",
-      )!;
-      const rect = cell.getBoundingClientRect();
+      type Piece = { rows: number[]; columns: number[] };
+      const [table] = (
+        window as unknown as {
+          blankGeometry: { tables: () => { pieces: Piece[] }[] };
+        }
+      ).blankGeometry.tables();
+      const { rows, columns } = table.pieces[table.pieces.length - 1];
       return {
-        x: Math.round(rect.left + 30),
-        y: Math.round(rect.top + rect.height / 2),
+        x: Math.round(columns[columns.length - 2] + 30),
+        y: Math.round((rows[rows.length - 2] + rows[rows.length - 1]) / 2),
       };
     });
     await browser.action("pointer").move(lastCell).down().up().perform();
@@ -669,22 +728,21 @@ describe("docs screenshots", () => {
       if (i === 0) await type(Key.Enter);
     }
     await film.pause(0.8);
+    // the painted table, see src/engine/geometry.ts
     const layout = () =>
       browser.execute(() => {
-        const table = document.querySelector("#editor table")!;
-        const box = table.getBoundingClientRect();
-        const rows = [...table.querySelectorAll("tr")].map(
-          (row) => row.getBoundingClientRect().top,
-        );
-        const columns = [...table.querySelectorAll("tr:first-child > *")].map(
-          (cell) => cell.getBoundingClientRect().left,
-        );
-        return {
-          rows: [...rows, box.bottom],
-          columns: [...columns, box.right],
-          left: box.left,
-          bottom: box.bottom,
+        type Piece = {
+          box: { left: number; bottom: number };
+          rows: number[];
+          columns: number[];
         };
+        const [table] = (
+          window as unknown as {
+            blankGeometry: { tables: () => { pieces: Piece[] }[] };
+          }
+        ).blankGeometry.tables();
+        const { box, rows, columns } = table.pieces[0];
+        return { rows, columns, left: box.left, bottom: box.bottom };
       });
     const middle = (lines: number[], i: number) =>
       Math.round((lines[i] + lines[i + 1]) / 2);
