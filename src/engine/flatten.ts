@@ -195,7 +195,9 @@ const cellBlocks = (
   ) => {
     const name = node.type.name;
     if (node.isTextblock) {
-      pieces(node, at).forEach((piece, index) => {
+      // the marker goes on the first text: an image block has none (S2)
+      let marked = false;
+      pieces(node, at).forEach((piece) => {
         if (piece.image) {
           const src = piece.image.attrs.src as string;
           const size = sizes(src);
@@ -213,8 +215,9 @@ const cellBlocks = (
           ...textOf(node, piece.children, piece.pos, false),
           indent,
           bars,
-          ...(index === 0 && marker ? { marker } : {}),
+          ...(!marked && marker ? { marker } : {}),
         });
+        marked = true;
       });
     } else if (name === "blockquote") {
       node.forEach((child, offset, index) =>

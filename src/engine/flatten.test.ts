@@ -359,6 +359,16 @@ describe("what a table cell holds", () => {
     expect(node.nodeAt(10)?.type.name).toBe("image");
   });
 
+  it("keeps a list item's marker when it starts with an image", () => {
+    const { cell } = cellOf([
+      ol(li(para(image("cat.png"), schema.text("after")))),
+    ]);
+    expect(cell.blocks).toEqual([
+      expect.objectContaining({ kind: "image" }),
+      expect.objectContaining({ kind: "text", text: "after", marker: "1." }),
+    ]);
+  });
+
   it("keeps code blocks set as code", () => {
     const { cell } = cellOf([
       schema.node("code_block", null, [schema.text("x = 1")]),
