@@ -9,7 +9,7 @@
 - [x] 6. `fallback_fonts` off the main thread
 - [x] 7. system fallback for Common-script characters
 - [x] 8. third-party notices and all font licences ship
-- [ ] 9. CI time and caching
+- [x] 9. CI time and caching
 - [ ] 10. CLAUDE.md and the rules
 - [ ] 11. `.claude/rules/layout-engine.md`, SPIKE.md reduced to the release
 - [ ] 12. release notes, README
@@ -22,3 +22,4 @@
 - Task 3: the exact.rs guard is in `read_words` (approved), which covers both comparisons; `:253` dropped the `None` silently before.
 - Task 7: characters of no script (Zyyy, Zinh, Zzzz; not whitespace, control or private use) are looked up by the families whose regular font maps them: the math family first, then sans-serif, then all by name. On this machine 𝐀 finds DejaVu Math TeX Gyre. Worst case, a character no font has: about 1 s across 1812 families, on the blocking thread, once per character (fallback.ts never asks twice).
 - Task 8: `make notices` (`bun run notices`, `scripts/build-notices.ts`) needs cargo-about 0.9.2 (`cargo install cargo-about --version 0.9.2 --locked --features cli`). It writes `public/THIRD-PARTY-NOTICES.txt` (219 crate licence texts for the native targets and wasm32, 98 npm production packages), which `bun run build` copies to `dist/`. The engine check fails when it's out of date, so run `make notices` after any change to Cargo.lock or bun.lockb, including engine-core's. For engine-ui: link the notices from the docs.
+- Task 9: the engine check caches with rust-cache and installs wasm-bindgen-cli and cargo-about as prebuilt binaries (taiki-e/install-action), from `.github/actions/engine`. test-on-pr already caches through setup-rust-toolchain. publish-tauri stays uncached, so the installers build from scratch. docs.yml's checkout@v4 is left as it is (out of scope).
