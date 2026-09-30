@@ -22,6 +22,15 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 17. Dead and test-only code
 - [x] 18. The exactness tests prove more
 
+## Done when (checked at 5d24264)
+
+- `cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout`: 72 unit tests (1 ignored, the timing) and 6 exact tests pass, with poppler installed, so `exact.rs` doesn't skip. With `CI=1` a missing tool fails.
+- `cargo clippy --manifest-path src-tauri/Cargo.toml -p blank-layout --target wasm32-unknown-unknown` is clean, also with `--no-default-features`.
+- With the wasm built locally (`bun run engine:build`, not committed): `bun run lint`, `bun run format:check` and `bun run test` pass (2235 tests). Every seam change is additive, so no TS test broke.
+- `cd e2e && E2E_PORT=4501 xvfb-run -a bunx wdio run ./wdio.conf.ts --spec specs/pages.e2e.ts --spec specs/pageEngine.e2e.ts --spec specs/tables.e2e.ts --spec specs/bands.e2e.ts`: 4 of 4 spec files, 44 tests, pass in 5 min 17 s.
+- `SEAM.md` lists every seam change with its commit: S6, S5, S1, S2, S3, S4, the font indices and `test-hooks`.
+- There's no graphify graph for this project (no `graphify-out/`), so there was nothing to update.
+
 ## Notes
 
 ### Task 0: the split
