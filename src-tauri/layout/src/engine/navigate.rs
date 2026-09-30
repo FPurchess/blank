@@ -181,8 +181,10 @@ impl Engine {
         let (index, _) = best?;
         let boxed = &texts[index];
         let mut local_y = item_y - boxed.y;
-        if let Some(line) = unit.line {
-            let info = &boxed.lines()[line];
+        if let Some(info) = unit
+            .line
+            .and_then(|line| boxed.lines().into_iter().nth(line))
+        {
             local_y = local_y.clamp(info.top + 0.5, info.bottom - 0.5);
         }
         Some((frag.item, index, item_x - boxed.x, local_y))
@@ -190,6 +192,9 @@ impl Engine {
 
     /// the position at a point of a page
     pub fn hit(&self, page: usize, x: f32, y: f32) -> Option<Hit> {
+        if !(x.is_finite() && y.is_finite()) {
+            return None;
+        }
         let frag_index = self.frag_near(page, y)?;
         let frag = self.frags[frag_index];
         match self.box_near(frag_index, x, y) {
@@ -200,26 +205,34 @@ impl Engine {
 
     /// the word at a point of a page
     pub fn word(&self, page: usize, x: f32, y: f32) -> Option<(u32, u32)> {
+        if !(x.is_finite() && y.is_finite()) {
+            return None;
+        }
         let frag_index = self.frag_near(page, y)?;
         let (item, text, x, y) = self.box_near(frag_index, x, y)?;
         Some(self.laid[item].texts[text].word(x, y))
     }
 
-    /// the position a line up (`down` false) or down from `pos`, nearest
-    /// to `goal`, the x the movement started at
-    pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Option<Hit> {
+    /// the position a line up (`down` false) or down from the caret at
+    /// `pos` (painted as `after` says, see `caret`), nearest to `goal`, the
+    /// x the movement started at; with whether the caret there is painted
+    /// at the end of its line (`after`)
+    pub fn vertical(&self, pos: u32, after: bool, down: bool, goal: f32) -> Option<(Hit, bool)> {
+        if !goal.is_finite() {
+            return None;
+        }
         let item = self.item_at(pos)?;
         let frag_index = match self.text_at(item, pos) {
             Some(text) => {
                 let boxed = &self.laid[item].texts[text];
-                let (line, ..) = boxed.caret(pos, false);
+                let (line, ..) = boxed.caret(pos, after);
                 let unit = self.unit_of_text(item, text, line);
                 // a table cell has several lines in one unit
                 let target = if down { line + 1 } else { line.wrapping_sub(1) };
                 if self.laid[item].units[unit].line.is_none() && target < boxed.line_count() {
-                    let info = &boxed.lines()[target];
                     let x = goal - self.settings.margins.left - boxed.x;
-                    return Some(Hit::Text(boxed.hit(x, (info.top + info.bottom) / 2.0)));
+                    let (pos, after) = boxed.hit_line(target, x);
+                    return Some((Hit::Text(pos), after));
                 }
                 self.frag_of(item, unit)?
             }
@@ -234,47 +247,46 @@ impl Engine {
                 continue;
             }
             if unit.texts.is_empty() {
-                return Some(Hit::Node(self.items[frag.item].from()));
+                return Some((Hit::Node(self.items[frag.item].from()), false));
             }
             // the first or last line of the text box under the goal
             let texts = &self.laid[frag.item].texts;
             let item_x = goal - self.settings.margins.left;
-            let index = unit
-                .texts
-                .clone()
-                .min_by(|&a, &b| {
-                    let distance = |boxed: &TextBox| {
-                        if item_x < boxed.x {
-                            boxed.x - item_x
-                        } else {
-                            (item_x - boxed.x - boxed.width).max(0.0)
-                        }
-                    };
-                    distance(&texts[a]).total_cmp(&distance(&texts[b]))
-                })
-                .unwrap();
+            let index = unit.texts.clone().min_by(|&a, &b| {
+                let distance = |boxed: &TextBox| {
+                    if item_x < boxed.x {
+                        boxed.x - item_x
+                    } else {
+                        (item_x - boxed.x - boxed.width).max(0.0)
+                    }
+                };
+                distance(&texts[a]).total_cmp(&distance(&texts[b]))
+            })?;
             let boxed = &texts[index];
-            let lines = boxed.lines();
             let line = match unit.line {
                 Some(line) => line,
                 None if down => 0,
-                None => lines.len() - 1,
+                None => boxed.line_count().saturating_sub(1),
             };
-            let info = &lines[line];
-            return Some(Hit::Text(
-                boxed.hit(item_x - boxed.x, (info.top + info.bottom) / 2.0),
-            ));
+            let (pos, after) = boxed.hit_line(line, item_x - boxed.x);
+            return Some((Hit::Text(pos), after));
         }
     }
 
-    /// the start or end of the line `pos` is on
-    pub fn line_edge(&self, pos: u32, end: bool) -> Option<u32> {
+    /// the start or end of the line the caret at `pos` is painted on (as
+    /// `after` says, see `caret`), with whether the caret there is painted
+    /// at the end of its line: at the end of a word broken where it is
+    /// wider than the line, whose next line starts at the same position
+    pub fn line_edge(&self, pos: u32, after: bool, end: bool) -> Option<(u32, bool)> {
         let item = self.item_at(pos)?;
         let text = self.text_at(item, pos)?;
         let boxed = &self.laid[item].texts[text];
-        let (line, ..) = boxed.caret(pos, false);
-        let (start, stop) = boxed.line_bounds(line);
-        Some(if end { stop } else { start })
+        let (line, ..) = boxed.caret(pos, after);
+        Some(if end {
+            boxed.line_end(line)
+        } else {
+            (boxed.line_bounds(line).0, false)
+        })
     }
 }
 
@@ -308,13 +320,13 @@ mod tests {
         let engine = engine(items.clone());
         let pos = items[0].from() + 20;
         let (_, x, y, _) = engine.caret(pos, false).unwrap();
-        let Some(Hit::Text(down)) = engine.vertical(pos, true, x) else {
+        let Some((Hit::Text(down), _)) = engine.vertical(pos, false, true, x) else {
             panic!()
         };
         let (_, x2, y2, _) = engine.caret(down, false).unwrap();
         assert!(y2 > y);
         assert!((x2 - x).abs() < 6.0);
-        let Some(Hit::Text(up)) = engine.vertical(down, false, x) else {
+        let Some((Hit::Text(up), _)) = engine.vertical(down, false, false, x) else {
             panic!()
         };
         assert_eq!(up, pos);
@@ -326,11 +338,91 @@ mod tests {
             let boxed = &engine.laid[previous.item].texts[0];
             boxed.line_bounds(previous.unit).0
         };
-        let Some(Hit::Text(next)) =
-            engine.vertical(last_line_pos, true, engine.settings.margins.left)
+        let Some((Hit::Text(next), _)) =
+            engine.vertical(last_line_pos, false, true, engine.settings.margins.left)
         else {
             panic!()
         };
         assert_eq!(engine.caret(next, false).unwrap().0, 1, "{frag}");
+    }
+
+    /// the line a caret is on, by its height, among the tops of the lines
+    fn line_of(engine: &Engine, pos: u32, after: bool, tops: &[f32]) -> usize {
+        let (_, _, y, _) = engine.caret(pos, after).unwrap();
+        tops.iter()
+            .position(|top| (top - y).abs() < 0.5)
+            .unwrap_or_else(|| panic!("no line at {y}: {tops:?}"))
+    }
+
+    /// a paragraph whose lines are ragged: a full one, one short word, and
+    /// a long word that didn't fit after it
+    fn ragged() -> (Engine, Vec<f32>) {
+        let words: Vec<&str> = LONG.split(' ').collect();
+        for count in 8..words.len() {
+            let full = words[..count].join(" ");
+            for length in (40..120).step_by(4) {
+                let text = format!("{full} ab {}", "x".repeat(length));
+                let engine = engine(vec![paragraph(1, &text)]);
+                let boxed = &engine.laid[0].texts[0];
+                let lines = boxed.lines();
+                if lines.len() == 3 && &boxed.text[lines[1].start..lines[1].end] == "ab " {
+                    let tops = (0..3)
+                        .map(|line| engine.caret(boxed.line_bounds(line).0, false).unwrap().2)
+                        .collect();
+                    return (engine, tops);
+                }
+            }
+        }
+        panic!("no ragged paragraph");
+    }
+
+    #[test]
+    fn moves_up_and_down_along_ragged_lines() {
+        let (engine, tops) = ragged();
+        let boxed = &engine.laid[0].texts[0];
+        // from the end of the first line, right of where the second ends
+        let (start, _) = boxed.line_end(0);
+        let goal = engine.caret(start, false).unwrap().1;
+        let mut at = (start, false);
+        let mut visited = vec![];
+        for down in [true, true, false, false] {
+            let (Hit::Text(pos), after) = engine.vertical(at.0, at.1, down, goal).unwrap() else {
+                panic!("a node");
+            };
+            at = (pos, after);
+            visited.push(line_of(&engine, pos, after, &tops));
+        }
+        assert_eq!(visited, [1, 2, 1, 0]);
+    }
+
+    #[test]
+    fn ends_a_line_broken_inside_a_word_on_that_line() {
+        let engine = engine(vec![paragraph(1, &"a".repeat(300))]);
+        let boxed = &engine.laid[0].texts[0];
+        assert!(boxed.line_count() > 2);
+        let tops: Vec<f32> = (0..boxed.line_count())
+            .map(|line| engine.caret(boxed.line_bounds(line).0, false).unwrap().2)
+            .collect();
+        // End on the first line: its end is where the second starts, and
+        // the caret is painted at the end of the first
+        let (end, after) = engine.line_edge(5, false, true).unwrap();
+        assert!(after);
+        assert_eq!(end, boxed.line_bounds(1).0);
+        assert_eq!(line_of(&engine, end, after, &tops), 0);
+        // a second End stays put
+        assert_eq!(engine.line_edge(end, after, true), Some((end, true)));
+        // Home from there is the start of the first line, not the second
+        assert_eq!(engine.line_edge(end, after, false), Some((1, false)));
+        // down from the end of the first line lands at the end of the
+        // second, painted on the second
+        let goal = engine.caret(end, true).unwrap().1 + 50.0;
+        let (Hit::Text(pos), after) = engine.vertical(end, true, true, goal).unwrap() else {
+            panic!("a node");
+        };
+        assert_eq!(line_of(&engine, pos, after, &tops), 1);
+        // the end of the last line is the end of the text, not before its
+        // last character
+        let last = engine.items[0].to();
+        assert_eq!(engine.line_edge(last - 1, false, true), Some((last, false)));
     }
 }

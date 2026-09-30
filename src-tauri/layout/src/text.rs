@@ -307,7 +307,7 @@ impl TextBox {
         if self.empty() {
             return self.pos;
         }
-        self.pos + utf16_of_byte(&self.text, byte)
+        self.pos.saturating_add(utf16_of_byte(&self.text, byte))
     }
 
     /// where the cursor stands at a position: its line and rectangle in the
@@ -355,11 +355,19 @@ impl TextBox {
     pub fn line_bounds(&self, line: usize) -> (u32, u32) {
         let lines = self.lines();
         let Some(info) = lines.get(line) else {
-            return (self.pos, self.pos + self.len);
+            return (self.pos, self.pos.saturating_add(self.len));
+        };
+        (self.pos_of(info.start), self.pos_of(self.end_byte(line)))
+    }
+
+    /// the byte a line ends at: before the space or line break it ends
+    /// with, unless it is the last line
+    fn end_byte(&self, line: usize) -> usize {
+        let lines = self.lines();
+        let Some(info) = lines.get(line) else {
+            return self.text.len();
         };
         let mut end = info.end;
-        // before the space or line break the line ends with, unless it is
-        // the last line
         if line + 1 < lines.len() {
             while end > info.start && self.text[..end].ends_with(|c: char| c.is_whitespace()) {
                 end = self.text[..end]
@@ -369,7 +377,34 @@ impl TextBox {
                     .unwrap_or(info.start);
             }
         }
-        (self.pos_of(info.start), self.pos_of(end))
+        end
+    }
+
+    /// the end of a line, and whether the caret there must be painted with
+    /// the line before it (`after`, as `caret` takes it): true where a word
+    /// wider than the line was broken, so the line's end is also where the
+    /// next one starts
+    pub fn line_end(&self, line: usize) -> (u32, bool) {
+        let end = self.end_byte(line);
+        let next_start = self.lines().get(line + 1).map(|next| next.start);
+        (self.pos_of(end), next_start == Some(end))
+    }
+
+    /// the position on a line nearest to `x`, in the box's coordinates, and
+    /// whether the caret there is painted on this line as the end of it
+    /// (`after`). Past the end of the line, that is its end, never the
+    /// start of the next line.
+    pub fn hit_line(&self, line: usize, x: f32) -> (u32, bool) {
+        let lines = self.lines();
+        let Some(info) = lines.get(line) else {
+            return (self.pos, false);
+        };
+        let cursor = Cursor::from_point(&self.layout, x, (info.top + info.bottom) / 2.0);
+        let byte = cursor.index();
+        if line + 1 < lines.len() && byte >= self.end_byte(line) {
+            return self.line_end(line);
+        }
+        (self.pos_of(byte), false)
     }
 
     /// the selection's rectangles between two byte indexes, in the box's

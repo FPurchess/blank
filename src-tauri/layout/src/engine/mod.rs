@@ -1,6 +1,8 @@
 //! The engine: keeps the laid out items of a document, paginates them, and
 //! answers where positions are and what a page shows.
 
+#[cfg(test)]
+mod boundary_tests;
 mod display;
 #[cfg(test)]
 mod incremental_tests;
@@ -114,7 +116,8 @@ impl Engine {
     }
 
     /// sets the page and lays out everything again, if it changed
-    pub fn set_settings(&mut self, settings: Settings) -> Changes {
+    pub fn set_settings(&mut self, mut settings: Settings) -> Changes {
+        settings.sanitize();
         if settings == self.settings {
             return Changes::default();
         }
@@ -165,7 +168,8 @@ impl Engine {
     }
 
     /// replaces all items
-    pub fn set_items(&mut self, items: Vec<Item>) -> Changes {
+    pub fn set_items(&mut self, mut items: Vec<Item>) -> Changes {
+        items.iter_mut().for_each(Item::sanitize);
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
         self.stats = Stats {
@@ -204,7 +208,8 @@ impl Engine {
         let mut restart_page = None;
         let mut previous_end = 0;
         let mut laid_out = 0;
-        for (start, delete, inserted, shift) in changes {
+        for (start, delete, mut inserted, shift) in changes {
+            inserted.iter_mut().for_each(Item::sanitize);
             let start = start.min(self.items.len());
             let delete = delete.min(self.items.len() - start);
             let count = inserted.len();
