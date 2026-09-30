@@ -242,7 +242,14 @@ pub(super) fn table_units(
             .map(|row| (row, tops[row], tops[row + 1]))
             .collect();
         let (y0, y1) = (tops[start], tops[end]);
-        if room <= 0.0 || y1 - y0 <= room + 0.01 {
+        // the room the group has: on the pages the table goes on, that is
+        // under its header rows, which repeat above it
+        let row_room = if header_rows > 0 && !header {
+            slice_room(false)
+        } else {
+            room
+        };
+        if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
             units.push(Unit {
                 top: y0,
                 height: y1 - y0,
@@ -560,5 +567,64 @@ mod tests {
         // one row on each page it is on, besides the header rows
         let body: Vec<_> = grid.rows.iter().filter(|row| row.row == 1).collect();
         assert_eq!(body.len(), after.pages.len());
+    }
+
+    #[test]
+    fn nearly_page_tall_row_under_repeated_header() {
+        use crate::model::Row;
+        let settings = crate::model::Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        // a row of hard lines, as tall as the page less than its header row:
+        // it fits a page alone, but not under the header row repeated above
+        for lines in 30..60 {
+            let tall = vec!["x"; lines].join("\n");
+            let rows = vec![
+                Row {
+                    cells: vec![cell(3, "Head")],
+                    header: true,
+                },
+                Row {
+                    cells: vec![cell(12, "first")],
+                    header: false,
+                },
+                Row {
+                    cells: vec![cell(22, &tall)],
+                    header: false,
+                },
+            ];
+            let engine = engine(vec![table_item(rows, None)]);
+            let grid = engine.table_grid(0).unwrap();
+            let header = grid.rows[0].height;
+            let laid = &engine.laid[0];
+            let tall_height = laid.texts[2].height() + 2.0 * crate::style::CELL_PADDING_Y;
+            if tall_height <= room - header || tall_height > room {
+                continue;
+            }
+            let bottom = engine.settings.content_bottom();
+            for (index, frag) in engine.frags.iter().enumerate() {
+                let unit = &laid.units[frag.unit];
+                assert!(
+                    frag.y + unit.height <= bottom + 0.01,
+                    "fragment {index} ends at {} below {bottom}",
+                    frag.y + unit.height
+                );
+            }
+            // every line of the row is shown once
+            let shown: usize = (0..engine.pages.len())
+                .map(|page| {
+                    let mut engine = test_support::engine(engine.items.clone());
+                    engine
+                        .page_ops(page, false)
+                        .iter()
+                        .filter(
+                            |op| matches!(op, Op::Glyphs { text, .. } if text.starts_with("x\n")),
+                        )
+                        .count()
+                })
+                .sum();
+            assert_eq!(shown, laid.texts[2].line_count());
+            return;
+        }
+        panic!("no row of the height");
     }
 }

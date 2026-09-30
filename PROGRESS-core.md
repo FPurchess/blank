@@ -9,7 +9,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 4. B4 / S1: line affinity for ↑/↓ and End
 - [x] 5. Up/Down through the paragraphs of a cell, and past a table's caption
 - [x] 6. A page break near the bottom makes no blank page
-- [ ] 7. A row nearly a page tall under repeated header rows
+- [x] 7. A row nearly a page tall under repeated header rows
 - [ ] 8. A heading stays with a captioned table
 - [ ] 9. S2: lists, quotes and images in table cells
 - [ ] 10. The PDF text layer keeps combining marks and ligature parts
@@ -124,6 +124,12 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - Two breaks in a row leave an empty page.
   - A break at the very start still makes no empty first page.
 - Tests: `break_near_bottom_has_no_blank_page` (3 pages before, 2 now) and `page_break_at_end`.
+
+### Task 7: tall rows under repeated headers
+
+- In a table with header rows, a body row stays whole only if it fits under the header rows (`slice_room(false)`). Otherwise it's sliced between its lines like a row taller than the page.
+- The paginator needed no change: after the repeats a page is no longer fresh, so the fit check runs.
+- Test `nearly_page_tall_row_under_repeated_header`: every fragment ends above the content bottom (before: 777.15 against 771.02), and every line of the row is shown once.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
