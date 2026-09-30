@@ -309,6 +309,17 @@ fn read_start_number<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, 
     })
 }
 
+/// an image's size as it may be: not finite is not loaded (0 × 0), and at
+/// most MAX_IMAGE a side, keeping its shape
+fn image_size(width: &mut f32, height: &mut f32) {
+    if !(width.is_finite() && height.is_finite()) || *width <= 0.0 || *height <= 0.0 {
+        (*width, *height) = (0.0, 0.0);
+        return;
+    }
+    let scale = (MAX_IMAGE / width.max(*height)).min(1.0);
+    (*width, *height) = (*width * scale, *height * scale);
+}
+
 /// a number as it may be: finite, else `fallback`, and within `min..=max`
 fn finite(value: f32, fallback: f32, min: f32, max: f32) -> f32 {
     if value.is_finite() {
@@ -450,20 +461,15 @@ impl Item {
         self.indent = finite(self.indent, 0.0, 0.0, MAX_PAGE);
         self.before = finite(self.before, 0.0, 0.0, MAX_PAGE);
         self.after = finite(self.after, 0.0, 0.0, MAX_PAGE);
+        self.bars.truncate(MAX_BARS);
         for bar in &mut self.bars {
             *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
         }
         match &mut self.content {
-            Content::Image { width, height, .. } => {
-                if !(width.is_finite() && height.is_finite()) {
-                    (*width, *height) = (0.0, 0.0);
-                }
-                *width = width.clamp(0.0, f32::MAX);
-                *height = height.clamp(0.0, f32::MAX);
-            }
+            Content::Image { width, height, .. } => image_size(width, height),
             Content::Table { widths, rows, .. } => {
                 for share in widths {
-                    *share = finite(*share, 0.0, 0.0, f32::MAX);
+                    *share = finite(*share, 0.0, 0.0, 1e6);
                 }
                 for block in rows
                     .iter_mut()
@@ -472,18 +478,13 @@ impl Item {
                 {
                     match block {
                         CellBlock::Text(text) => {
+                            text.bars.truncate(MAX_BARS);
                             text.indent = finite(text.indent, 0.0, 0.0, MAX_PAGE);
                             for bar in &mut text.bars {
                                 *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
                             }
                         }
-                        CellBlock::Image { width, height, .. } => {
-                            if !(width.is_finite() && height.is_finite()) {
-                                (*width, *height) = (0.0, 0.0);
-                            }
-                            *width = width.clamp(0.0, f32::MAX);
-                            *height = height.clamp(0.0, f32::MAX);
-                        }
+                        CellBlock::Image { width, height, .. } => image_size(width, height),
                     }
                 }
             }
@@ -498,6 +499,23 @@ impl Item {
         }
     }
 }
+
+/// a number for JSON, with at most three decimals, which is finer than any
+/// screen; 0 for what isn't finite, which JSON can't hold
+pub fn json_number(value: f32) -> String {
+    let rounded = (f64::from(value) * 1000.0).round() / 1000.0;
+    if rounded.is_finite() {
+        // as an f32 again, so it prints as short as before
+        format!("{}", rounded as f32)
+    } else {
+        "0".into()
+    }
+}
+
+/// the largest size of an image, in points: 35 m, far beyond any page
+pub const MAX_IMAGE: f32 = 100_000.0;
+/// the most quote bars an item has, nested quotes deep
+pub const MAX_BARS: usize = 64;
 
 /// a position moved by `delta`, within what a position can be
 pub fn shift_pos(pos: u32, delta: i64) -> u32 {

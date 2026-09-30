@@ -65,6 +65,13 @@ The shapes don't change. What changes is how odd values behave:
 | margins | as given | not finite → 0, clamped to ≥ 0; opposite margins shrink proportionally until 36 pt are left for the text |
 | item `indent`, `before`, `after`, `bars` | as given | not finite → 0, negative → 0 |
 | image `width`/`height` not finite or negative | laid out with them | the image counts as not loaded (its alt text shows) |
+| image `width`/`height` above 100 000 pt (`MAX_IMAGE`), top-level or in a cell | a cell image of 1e20 pt hung the engine; 1e36 wrote `inf` into the page JSON | scaled down to 100 000 pt on its longer side, keeping its shape |
+| numbers in the page JSON | `inf`/`NaN` possible | always a JSON number, 0 for what isn't finite |
+| `bars` | any number | at most 64 (`MAX_BARS`), top-level and in cells |
+| table `widths` whose sum isn't finite or ≤ 0 | every column at the indent | equal columns |
+| links in one textblock | the 65 536th turned into inline code | at most 65 535, the rest shown as text |
+| a font's units per em outside 16–16384 | used as it is (0: NaN underlines) | 1000 |
+| a band slot | expanded without a limit | at most 1000 characters (`MAX_SLOT`) |
 | table `widths` | as given | not finite or negative → 0 |
 | cell `col`/`colspan` | `u32::MAX` overflowed or allocated the grid | the grid has at most 1000 columns (`MAX_COLUMNS`) |
 | `hit`, `word`, `vertical` with a non-finite x, y or goal | undefined | `[]` (nothing) |

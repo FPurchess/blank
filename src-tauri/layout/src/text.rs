@@ -568,7 +568,12 @@ fn push_span(
         builder.push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
     }
     let mut ink: Ink = 0;
-    if let Some(href) = &span.link {
+    // a link's number shares the ink's bits with code, so no more than fit
+    if let Some(href) = span
+        .link
+        .as_ref()
+        .filter(|_| links.len() < INK_CODE as usize - 1)
+    {
         links.push(href.clone());
         ink |= links.len() as Ink;
         builder.push(StyleProperty::Underline(true), range.clone());

@@ -68,8 +68,8 @@ pub(super) fn table_units(
         .max()
         .unwrap_or(1)
         .max(1) as usize;
-    let shares: Vec<f32> = if table.widths.len() == columns {
-        let total: f32 = table.widths.iter().sum::<f32>().max(f32::EPSILON);
+    let total: f32 = table.widths.iter().sum();
+    let shares: Vec<f32> = if table.widths.len() == columns && total.is_finite() && total > 0.0 {
         table.widths.iter().map(|share| share / total).collect()
     } else {
         vec![1.0 / columns as f32; columns]
@@ -443,6 +443,9 @@ pub(super) fn table_units(
                         .fold(f32::NAN, f32::min)
                 };
                 let to = if to.is_nan() { limit } else { to };
+                // always forward: where a slice can't move on, e.g. past the
+                // precision of f32, the rest of the row is the last slice
+                let to = if to > from { to } else { y1 };
                 for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
                     if y >= from - 0.01 && y < to - 0.01 {
                         cell_images.push(CellImage {
