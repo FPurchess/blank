@@ -12,7 +12,7 @@ deletes this file on merge.
 - [ ] 3. ↑/↓ and End keep the line affinity — waiting for S1
 - [ ] 4. Flatten only the blocks a transaction changed (the shifting part and band versions wait for S6)
 - [ ] 5. One unit for the column goal of ↑/↓ and Page Up/Down
-- [ ] 6. Keyboard and mouse make cell selections in tables
+- [x] 6. Keyboard and mouse make cell selections in tables
 - [x] 7. Cells that share a node object get their own positions
 - [ ] 8. Images, lists and quotes in table cells — waiting for S2
 - [ ] 9. Image cache by resolved URL, retried, and no counter

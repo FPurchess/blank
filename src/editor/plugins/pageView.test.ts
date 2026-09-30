@@ -1,4 +1,10 @@
-import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
+import {
+  EditorState,
+  NodeSelection,
+  type Plugin,
+  TextSelection,
+} from "prosemirror-state";
+import { CellSelection, tableEditing, TableMap } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,11 +42,11 @@ const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
 
 // an editor with the page view's plugins, on the pages the app shows
-const mount = (node = doc(p(LONG), p(LONG))) => {
+const mount = (node = doc(p(LONG), p(LONG)), plugins: Plugin[] = []) => {
   let state = EditorState.create({
     schema,
     doc: node,
-    plugins: [pageSync(), pageView()],
+    plugins: [pageSync(), pageView(), ...plugins],
   });
   state = state.apply(
     state.tr.setSelection(TextSelection.create(state.doc, 5)),
@@ -314,5 +320,78 @@ describe("the first page's header", () => {
     expect(
       publish("page:\n  header:\n    left: Report\n  first-page: plain"),
     ).toBe(false);
+  });
+});
+
+describe("cell selections", () => {
+  // three rows of two cells; the cursor at 5 is in the first cell
+  const grid = () =>
+    doc(
+      table(
+        tr(td("aa"), td("bb")),
+        tr(td("cc"), td("dd")),
+        tr(td("ee"), td("ff")),
+      ),
+    );
+  // where the cell in `row` and `column` starts
+  const cellPos = (
+    node: ReturnType<typeof grid>,
+    row: number,
+    column: number,
+  ) => 1 + TableMap.get(node.firstChild!).map[row * 2 + column];
+
+  beforeEach(() => showPages());
+  afterEach(() => hidePages());
+
+  it("selects whole cells with Shift + ↓ and ↑ across cells", () => {
+    const mounted = mount(grid(), [tableEditing()]);
+    const node = mounted.view.state.doc;
+
+    expect(mounted.press("Shift-ArrowDown")).toBe(true);
+    let selection = mounted.view.state.selection;
+    expect(selection).toBeInstanceOf(CellSelection);
+    expect((selection as CellSelection).$anchorCell.pos).toBe(
+      cellPos(node, 0, 0),
+    );
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 0),
+    );
+
+    // prosemirror-tables grows the cell selection from there
+    expect(mounted.press("Shift-ArrowDown")).toBe(true);
+    selection = mounted.view.state.selection;
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 2, 0),
+    );
+    expect(mounted.press("Shift-ArrowUp")).toBe(true);
+    selection = mounted.view.state.selection;
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 0),
+    );
+    mounted.view.destroy();
+  });
+
+  it("selects cells when the pointer drags into another cell", () => {
+    const node = grid();
+    const state = EditorState.create({ schema, doc: node });
+    const inOther = cellPos(node, 1, 1) + 2;
+    const selection = selectionAt(state, { node: false, pos: inOther }, 5);
+    expect(selection).toBeInstanceOf(CellSelection);
+    expect((selection as CellSelection).$headCell.pos).toBe(
+      cellPos(node, 1, 1),
+    );
+
+    let dispatched: EditorState | null = null;
+    pageSelect({ node: false, pos: inOther }, 5)(state, (tr) => {
+      dispatched = state.apply(tr);
+    });
+    expect(dispatched!.selection).toBeInstanceOf(CellSelection);
+  });
+
+  it("selects text within one cell", () => {
+    const state = EditorState.create({ schema, doc: grid() });
+    const selection = selectionAt(state, { node: false, pos: 6 }, 4);
+    expect(selection).toBeInstanceOf(TextSelection);
+    expect([selection.from, selection.to]).toEqual([4, 6]);
   });
 });

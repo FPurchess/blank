@@ -26,7 +26,12 @@ import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { tableGrid } from "../../exporters/table";
 import type { FrozenWidths } from "../../engine/flatten";
-import { TableMap } from "prosemirror-tables";
+import {
+  CellSelection,
+  cellAround,
+  inSameTable,
+  TableMap,
+} from "prosemirror-tables";
 import { pageGeometry } from "../../layout/resolve";
 import {
   frontmatter,
@@ -71,8 +76,20 @@ export const selectionAt = (
 ): Selection => {
   const { doc } = state;
   const pos = Math.max(0, Math.min(hit.pos, doc.content.size));
-  if (anchor !== undefined)
+  if (anchor !== undefined) {
+    // from one cell of a table into another selects whole cells, as a drag
+    // or Shift + arrow keys did in the editor before the page view
+    const $anchorCell = cellAround(doc.resolve(anchor));
+    const $headCell = cellAround(doc.resolve(pos));
+    if (
+      $anchorCell &&
+      $headCell &&
+      $anchorCell.pos !== $headCell.pos &&
+      inSameTable($anchorCell, $headCell)
+    )
+      return CellSelection.create(doc, $anchorCell.pos, $headCell.pos);
     return TextSelection.between(doc.resolve(anchor), doc.resolve(pos));
+  }
   if (hit.node) {
     const node = doc.nodeAt(pos);
     if (node && NodeSelection.isSelectable(node))
@@ -390,6 +407,9 @@ export const pageView = () => {
           return false;
         const { selection } = view.state;
         const down = VERTICAL[event.key];
+        // prosemirror-tables' tableEditing grows a cell selection by cells
+        if (down !== undefined && selection instanceof CellSelection)
+          return false;
         if (down !== undefined) {
           const caret = engine.caret(selection.head);
           if (!caret) return false;
