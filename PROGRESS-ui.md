@@ -19,7 +19,7 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 12. Shift + right click opens Blank's menu too
 - [x] 13. Bands open on a double click; a press on them still reaches the plugins (`PAGE_PRESS`) and leaves the selection
 - [x] 14. Small UI details: the caret on whole device pixels, "Page N of M" numbered as the pages are and announced (`role="status"`), long band text cut with an ellipsis, the text cursor only over the pages
-- [ ] 15. Unit test gaps
+- [x] 15. Unit test gaps: jsdom canvases record paints (`src/test/canvas.ts`, no getContext warnings), and tests of the theme repaint, the dimmed selection and focus, the marks near the view only, and the view switch (task 4)
 - [ ] 16. E2E for engine-editor's fixes
 - [ ] 17. Docs and GIFs
 

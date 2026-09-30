@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 
 import { type PageEngine, setPageEngine } from "../engine/engine";
 import { documentFields } from "../layout/bands";
-import { pageLayoutState, pageView } from "../state";
+import { pageLayoutState, pageView, theme } from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { flushPromises } from "../test/async";
@@ -219,6 +219,25 @@ describe("the pages and the painter", () => {
     await paintQueued();
     expect(shown).toContain(1);
     expect(painted).not.toContain(1);
+  });
+
+  it("paints every page again in another theme, once each", async () => {
+    const { fake, painted } = recorder();
+    setPainter(fake);
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const pages = [...painted].sort((a, b) => a - b);
+    painted.length = 0;
+    theme.value = "dark";
+    try {
+      await paintQueued();
+      expect([...painted].sort((a, b) => a - b)).toEqual(pages);
+    } finally {
+      theme.value = "light";
+      // the queue runs what that asked for, before the timers are real again
+      await paintQueued();
+    }
   });
 
   it("paints again when the pages are shown at another size", async () => {
