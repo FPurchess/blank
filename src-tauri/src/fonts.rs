@@ -5,7 +5,7 @@
 //! only fonts whose licence allows that are used (see `embeddable`).
 
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use fontique::{
     Collection, CollectionOptions, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, Script,
@@ -13,6 +13,7 @@ use fontique::{
 };
 use read_fonts::{types::Tag, FontRef, TableProvider};
 use serde::Serialize;
+use tauri::State;
 use unicode_script::UnicodeScript;
 
 /// a font file of the system, and the family the engine asks for
@@ -22,9 +23,57 @@ pub struct FallbackFont {
     pub path: String,
 }
 
+/// the system's fonts, found once: that reads every font file of the system,
+/// which takes seconds where there are many
+pub type Fonts = Arc<Mutex<Option<Collection>>>;
+
 #[derive(Default)]
 pub struct FontState {
-    collection: Mutex<Option<Collection>>,
+    pub collection: Fonts,
+}
+
+/// the most of the text looked up at once, in bytes, and of a language tag
+const MAX_TEXT: usize = 64 * 1024;
+const MAX_LANGUAGE: usize = 35;
+
+/// the collection, found if it wasn't yet. A lookup that panicked leaves it
+/// as it was, so it stays usable
+fn collection_of(fonts: &Mutex<Option<Collection>>) -> MutexGuard<'_, Option<Collection>> {
+    let mut collection = fonts.lock().unwrap_or_else(PoisonError::into_inner);
+    collection.get_or_insert_with(|| {
+        Collection::new(CollectionOptions {
+            shared: false,
+            system_fonts: true,
+        })
+    });
+    collection
+}
+
+/// finds the system's fonts ahead of the first lookup, e.g. at start-up
+pub fn warm(fonts: &Mutex<Option<Collection>>) {
+    drop(collection_of(fonts));
+}
+
+/// `text` cut to at most MAX_TEXT bytes, on a character boundary
+fn capped(text: &str) -> &str {
+    let mut end = text.len().min(MAX_TEXT);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
+/// `language` if it looks like a language tag, like "zh" or "zh-Hant-TW"
+fn language_tag(language: &str) -> &str {
+    let valid = language.len() <= MAX_LANGUAGE
+        && language
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-');
+    if valid {
+        language
+    } else {
+        ""
+    }
 }
 
 /// the scripts of `text` that aren't common to all, like punctuation
@@ -136,28 +185,36 @@ fn fonts_for(collection: &mut Collection, script: &str, language: &str) -> Vec<F
 
 /// the system's fonts for the scripts of `text`, in the document's
 /// `language`
-#[tauri::command]
-pub fn fallback_fonts(
-    state: tauri::State<'_, FontState>,
-    text: String,
-    language: String,
-) -> Vec<FallbackFont> {
-    let mut collection = state.collection.lock().unwrap();
-    let collection = collection.get_or_insert_with(|| {
-        Collection::new(CollectionOptions {
-            shared: false,
-            system_fonts: true,
-        })
-    });
-    let mut fonts: Vec<FallbackFont> = vec![];
-    for script in scripts(&text) {
-        for font in fonts_for(collection, &script, &language) {
-            if !fonts.contains(&font) {
-                fonts.push(font);
+pub fn lookup(fonts: &Mutex<Option<Collection>>, text: &str, language: &str) -> Vec<FallbackFont> {
+    let (text, language) = (capped(text), language_tag(language));
+    let mut collection = collection_of(fonts);
+    let Some(collection) = collection.as_mut() else {
+        return vec![];
+    };
+    let mut found: Vec<FallbackFont> = vec![];
+    for script in scripts(text) {
+        for font in fonts_for(collection, &script, language) {
+            if !found.contains(&font) {
+                found.push(font);
             }
         }
     }
-    fonts
+    found
+}
+
+/// the system's fonts for the scripts of `text`, looked up on a thread of
+/// its own: the first lookup finds all of the system's fonts, which would
+/// freeze the window on the main thread
+#[tauri::command]
+pub async fn fallback_fonts(
+    state: State<'_, FontState>,
+    text: String,
+    language: String,
+) -> Result<Vec<FallbackFont>, String> {
+    let fonts = state.collection.clone();
+    tauri::async_runtime::spawn_blocking(move || lookup(&fonts, &text, &language))
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -253,6 +310,58 @@ mod tests {
             ["Latn", "Hani", "Hira", "Hang"]
         );
         assert!(scripts("1, 2; 3.").is_empty());
+    }
+
+    #[test]
+    fn looks_up_from_two_threads_at_once() {
+        let fonts = Fonts::default();
+        let threads: Vec<_> = (0..2)
+            .map(|_| {
+                let fonts = fonts.clone();
+                std::thread::spawn(move || lookup(&fonts, "中文", "zh"))
+            })
+            .collect();
+        let found: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        assert_eq!(found[0], found[1]);
+    }
+
+    #[test]
+    fn looks_up_after_a_lookup_panicked() {
+        let fonts = Fonts::default();
+        warm(&fonts);
+        let poisoned = fonts.clone();
+        let result = std::thread::spawn(move || {
+            let _collection = poisoned.lock().unwrap();
+            panic!("a lookup that panics");
+        })
+        .join();
+        assert!(result.is_err());
+        assert!(fonts.is_poisoned());
+        let found = lookup(&fonts, "中文", "zh");
+        assert_eq!(found, lookup(&fonts, "中文", "zh"));
+        assert!(fonts
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some());
+    }
+
+    #[test]
+    fn caps_the_text_on_a_character_boundary() {
+        // "中" takes 3 bytes, so MAX_TEXT falls inside one
+        let text = "中".repeat(MAX_TEXT);
+        let cut = capped(&text);
+        assert!(cut.len() <= MAX_TEXT && cut.len() > MAX_TEXT - 3);
+        assert!(cut.chars().all(|c| c == '中'));
+        assert_eq!(capped("abc"), "abc");
+        assert!(lookup(&Fonts::default(), &text, "zh").len() <= 2);
+    }
+
+    #[test]
+    fn ignores_what_isnt_a_language_tag() {
+        assert_eq!(language_tag("zh-Hant-TW"), "zh-Hant-TW");
+        assert_eq!(language_tag(""), "");
+        assert_eq!(language_tag("zh; rm -rf"), "");
+        assert_eq!(language_tag(&"a".repeat(MAX_LANGUAGE + 1)), "");
     }
 
     #[test]

@@ -1,6 +1,8 @@
 pub mod fonts;
 pub mod spellcheck;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -20,6 +22,13 @@ pub fn run() {
         )
         .manage(spellcheck::SpellState::default())
         .manage(fonts::FontState::default())
+        // finds the system's fonts while the app starts, so the first
+        // document with e.g. Chinese doesn't wait for it
+        .setup(|app| {
+            let fonts = app.state::<fonts::FontState>().collection.clone();
+            std::thread::spawn(move || fonts::warm(&fonts));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             spellcheck::spellcheck_status,
             spellcheck::spellcheck_install,
