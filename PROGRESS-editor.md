@@ -16,7 +16,7 @@ deletes this file on merge.
 - [x] 7. Cells that share a node object get their own positions
 - [ ] 8. Images, lists and quotes in table cells — waiting for S2
 - [x] 9. Image cache by resolved URL, retried, and no counter
-- [ ] 10. Drag and drop of text
+- [x] 10. Drag and drop of text
 - [ ] 11. The PDF waits for fallback glyphs
 - [x] 12. The hidden `TableView` no longer freezes columns
 - [x] 13. Page setup and field watchers lay out on the new state
@@ -79,6 +79,15 @@ bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   the table. The engine keeps the columns of the table the cursor is in
   (`frozenWidths`). In the fallback editor without the engine, the columns
   now size to their content while typing (accepted by the integrator).
+
+- engine-ui (drag and drop): the hunk in `PageView.vue` adds pointer
+  listeners (`pointerdown`/`pointermove`/`pointerup`/`pointercancel`) that
+  drag the selected text (a press in it, then a move of 4 px), and
+  `dragover`/`dragleave`/`drop` for text from other apps. `onMouseDown`
+  returns early while such a press is pending. `pageDropCaret` (added here
+  word for word) holds where it would drop; please paint it. A drag moves
+  the text, and copies it with Ctrl (Option on macOS), as ProseMirror does.
+  The E2E for it is yours (task 16).
 
 ## Measurements
 

@@ -62,6 +62,10 @@ export const pageNodeSelection = shallowRef<PageRect[]>([]);
 // underlines; empty while nothing is composed
 export const pageComposition = shallowRef<PageRect[]>([]);
 
+// where dragged text would drop, which the page view paints as a caret;
+// null while no text is dragged
+export const pageDropCaret = shallowRef<PageRect | null>(null);
+
 // the page the selection's head is on, counted from 1, and how many there
 // are, for "Page N of M"
 export const pagePosition = computed(() => {
