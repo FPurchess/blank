@@ -316,12 +316,12 @@ The self-review's findings, with the numbers from the report to the coordinator.
 - M4 (f5a30e2): a cell's content is tagged in its reading order (`tags::cell_content`): markers go by their baseline to their text box, lists in cells become L > LI > Lbl + LBody through `Builder`, and images and alt texts are Figures. Test: `exact.rs` `pdf_tags_a_cell_in_its_reading_order`.
 - M5 (1666b4f): a link is tagged around its own text. `Part::Linked {item, text, link}` covers its runs and `Part::Link {…, link}` its annotations, `Ids` keeps the order things were drawn in, and `tags::text_nodes` builds a text box's leaves with one Link per link, inline. Test: `exact.rs` `pdf_tags_links_around_their_text` (48 Links, each with its text before its annotation).
 
-### Where the review fixes stand (stopped at 00:10 on 2026-10-01 for the night)
+### Where the review fixes stand (stopped at 00:17 on 2026-10-01 for the night)
 
 Everything above is committed; nothing is half done in the tree. Next, in this order (the coordinator's list):
 
 1. **M9**: `items/table.rs` slicing, cut search about cubic (2000 lines in one cell take 2.6 s in debug). Merge the lines' intervals once (sorted), take the gaps as the allowed cuts, and walk them with one pointer per slice. The test: a cell of 2000 hard lines laid out within a time bound, with slice for slice the same result as before.
-2. **m1**: `text.rs` `end_byte` trims spaces before a hard break. Trim only at soft breaks (`line.break_reason()`); at a "\n", step back over the newline only. Test: "foo␣␣⏎bar" gives `line_end(0)` = 6, not 4.
+2. ~~**m1**~~, done at 00:17: at a hard break, `end_byte` steps back over the "\n" only, keeping the spaces before it. Soft breaks still trim. Test: `ends_a_line_at_a_hard_break_after_its_spaces`.
 3. **m2**: `TextBox::notdef` reports the base letter for a missing combining mark. Use `cluster_ranges`' widened ranges. Test: `a + U+1AB5` reports U+1AB5.
 4. **m3**: a caption can end up alone. `items/table.rs` decides whether a group is sliced by `row_room`; use `slice_room(start == header_rows)`, so the first body row counts the caption. Test: a row in the window room − headers − caption < row ≤ room − headers (41 hard lines on A4): caption and table on one page.
 5. ~~**m4**~~, done at 00:15: `[Break, H1]` with new-page-before gave a blank first page. A page that holds only breaks stays `empty` now. Test: `page_break_before_a_chapter_at_the_start`.
