@@ -226,13 +226,39 @@ step.
     darkens its stems, and its spaces and figures are set as the PDF has
     them, not as the webview does.
 
+- 9. **Tests, CI and docs:**
+  - All E2E specs run on the page view (15 specs): they read the text
+    through the hidden editor (`expectEditorText`, `editorText`), and click
+    and right-click the painted pages (`clickInto` at the end of an
+    element's painted text, `clickText`), measuring with
+    `window.blankGeometry`. New specs: `ime.e2e.ts`, `rendering.e2e.ts`.
+  - The docs shots are ported the same way and regenerated. Every still and
+    GIF changed, since the text is painted now and set at the width of the
+    page's text column; I looked at each against main's and kept them all.
+    The header and footer GIFs now end on a second page, whose header shows
+    where the first page ends. The stills hide the pointer the recordings
+    drew.
+  - CI: `test-on-pr.yml` runs `cargo test --workspace` on all three
+    platforms (the layout engine and the system fonts too); `test.yml`
+    installs poppler (so `exact.test.ts` and `pdf.test.ts` run) and has a
+    new `engine` job that tests the engine and rebuilds the wasm to check
+    it matches the committed one. `scripts/build-engine.sh` builds it
+    reproducibly (paths mapped, toolchain 1.98.1 pinned): a build from a
+    copy at another path gave the same bytes. Not run on GitHub yet (no
+    push).
+  - Coverage: 96.3 % statements, 91.7 % branches.
+  - User docs: `pages.md` (the two views, Page N of M, Page Up/Down, the
+    bands on the pages), `shortcuts.md`, `writing.md`.
+  - Verified: the full E2E suite, 15/15 specs, under xvfb with
+    `E2E_PORT=4482`.
+
 ### In progress
 
-- 9. Tests, CI and docs.
+- Nothing. See "What doesn't work yet" and the decisions.
 
 ### Open
 
-- 9. E2E, docs shots, CI, coverage, user docs.
+- Nothing of the nine steps; the gaps are listed below.
 
 ## How to try it
 
@@ -350,37 +376,25 @@ step.
 
 ## What doesn't work yet
 
-- **Existing E2E specs:** 12 of 13 fail. They click into or read `#editor`'s
-  visible text, which is hidden now: `getText` is empty, and clicks hit
-  `pointer-events: none`. The new `e2e/specs/pageEngine.e2e.ts` passes. The
-  others need to go through the page view (or read the text with `execute`).
-- **IME:** the hidden editor keeps it, and its caret is moved under the painted
-  caret for the candidate window. This is untested with a real IME: WebDriver
-  can't compose. The text being composed is laid out as it comes in (ProseMirror
-  applies it), but the composition underline isn't painted.
-- **Screen readers:** they read the hidden DOM (`opacity: 0`, in the
-  accessibility tree), and the canvases are `aria-hidden`. The reading order should
-  be the document's. The focus highlight sits on the hidden DOM, not on the painted text.
-  Untested with Orca.
-- **Spell check:** the underlines are decorations of the hidden DOM and aren't
-  painted. The context menu's suggestions work with Shift-F10 and
-  Mod-Alt-N.
-- **Tables:** they are laid out and painted, and you can type and click in
-  cells. The mouse handles are hidden, because they measure the hidden DOM.
-  The table toolbar is placed from the hidden DOM too, so near the caret but
-  not exactly. There is no caption and no rowspan. A row taller than a page
-  overflows it.
-- **Not painted yet:** the frontmatter summary widget, the page-break label,
-  the image placeholder's alt text, and the link-open Mod-click. Right-click
-  on the canvas gives no context menu; Shift-F10 does.
-- **Pointer:** a drag doesn't scroll the view at the edge.
-- **Other:**
-  - Code has no monospace font, the same as today's PDF.
-  - The engine doesn't justify lines or hyphenate.
-  - Headings keep only their first line with the next block. There is no
-    widow/orphan control, the same as pdfmake.
-- The header/footer strips at the window edges still show, as before, and in
-  "pages" they repeat what the sheet already shows.
+The first spike's list is resolved by the parity steps above; what is left:
+
+- **Tables:** images, lists and quotes inside cells are laid out as plain
+  paragraphs (an image shows as a placeholder character).
+- **IME:** the underline while composing and the candidate window's place
+  weren't seen with a real input method (WebKitWebDriver only hands the
+  webview the end of a composition); macOS and Windows input methods are
+  untested.
+- **Screen readers:** Orca itself wasn't run; it reads the lines as the hidden
+  editor breaks them, not as they're painted.
+- **Typography:** no justification, no hyphenation, no widow/orphan control
+  (as with pdfmake). Headings keep only their first line with the next block.
+- **Colour emoji** (see the decisions).
+- **Docs recording:** in `table-mouse.gif` the row move and the "+" don't
+  take, and "Plums" lands in a cell; main's committed GIF shows the same, so
+  it is the recording, not the page view (the same drags pass in
+  `tables.e2e.ts`).
+- The word count in the bottom bar comes from the editor as before; the
+  pages don't count words themselves.
 
 ## Decisions for the owner
 
@@ -468,28 +482,30 @@ as mean / p95, and `performance.now()` there is only accurate to about 1 ms.
 ## Main risks
 
 1. **Two DOMs:** the hidden ProseMirror still does all its DOM work, and the
-   page view paints on top of it. Anything that measures the DOM (table
-   handles and toolbar, spell check, the context menu by mouse, link hovering,
-   node views) has to be ported to the engine's geometry, one by one.
-2. **IME and accessibility:** these rely on a hidden, moved contenteditable,
-   which is a known fragile pattern (SuperDoc, Google Docs' old approach).
-   Composition feedback, the screen reader's focus rectangle, and
-   platform-specific IME behaviour (macOS, Windows) are untested.
-3. **Text rendering:** the glyphs are unhinted outlines on a canvas with
-   grayscale antialiasing. In WebKitGTK at 1× they look good but slightly
-   softer than the webview's own text, on fractional baselines (see the
-   screenshots from `pageEngine.e2e.ts` in `e2e/screenshots/`). There is no
-   subpixel AA, and emoji or colour fonts aren't painted: COLR/bitmap glyphs
-   come out as outlines or nothing.
-4. **Typography is now Blank's own:** everything the browser and pdfmake did
-   (line height, spacing, lists, tables, images, justification, hyphenation,
-   widows) has to be built in the engine. The Word export still follows its own
-   rules, so Word and the PDF can differ.
-5. **Size and start-up:** about 3 MB of wasm plus 4.7 MB of TTFs are
-   bundled (and 2 MB of Noto Emoji, loaded only when needed). The pdfmake
-   VFS is gone. Loading them adds to start-up.
-6. **Tests:** E2E has to move to the page view, and the unit tests need the
-   wasm (committed) plus pdftotext for the exactness check.
+   page view paints on top of it. Every measurement is ported to the engine's
+   geometry now, but any new feature that measures the DOM would measure the
+   wrong place; the rule in `editor-boundary.md` says so. The webview's first
+   layout of the hidden editor is still most of the start-up of a long
+   document.
+2. **IME and accessibility:** they rely on a hidden, moved contenteditable,
+   a known fragile pattern (SuperDoc, Google Docs' old approach). A real
+   composing input method, the screen reader's focus rectangle and speech,
+   and macOS and Windows are unverified.
+3. **Text rendering:** unhinted outlines with the canvas's grayscale
+   anti-aliasing, on whole-pixel baselines: smooth at 1× and 2×, a shade
+   lighter than the webview's own text at 1×. No subpixel AA; colour glyphs
+   (COLR, bitmaps) aren't painted, hence monochrome emoji.
+4. **Typography is Blank's own:** justification, hyphenation and widows
+   would have to be built in the engine. The Word export follows its own
+   rules, so Word and the PDF can differ (code in Courier New there).
+5. **Size and start-up:** 3.1 MB of wasm plus 4.7 MB of TTFs are bundled
+   (and 2 MB of Noto Emoji, loaded only when needed); pdfmake and its font
+   VFS are gone.
+6. **System fonts** make a document with Chinese, Japanese or Korean lay out
+   by the fonts of the machine it's opened on.
+7. **Tests** need the committed wasm and poppler (pdftotext, pdfinfo,
+   pdffonts, pdfimages); without poppler the exactness checks skip. CI's
+   wasm check depends on the pinned toolchain.
 
 ## Rebuilding
 
@@ -498,8 +514,8 @@ as mean / p95, and `performance.now()` there is only accurate to about 1 ms.
   - `cargo install wasm-bindgen-cli --version 0.2.129 --locked`, which must
     match `wasm-bindgen` in `src-tauri/Cargo.lock`
   - bun, for binaryen's `wasm-opt`
-- `cd src-tauri/layout && cargo test`: 22 unit tests plus `tests/exact.rs`,
-  which needs `pdftotext`.
+- `cd src-tauri/layout && cargo test`: the engine's unit tests plus
+  `tests/exact.rs`, which needs `pdftotext`.
 - `bun run test:rust` now runs the whole workspace.
 - `cd e2e && E2E_PORT=4482 xvfb-run -a bunx wdio run ./wdio.conf.ts --spec specs/pageEngine.e2e.ts`
   runs the page view E2E and prints the measurements.
