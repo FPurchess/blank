@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import { Key, pressMod, restartApp, type, waitForInk } from "../helpers.ts";
 
 // The page view the layout engine paints: typing and clicking on the
 // painted pages, both views, "Page N of M", and how long it all takes.
@@ -141,10 +141,13 @@ describe("page view", () => {
         () => document.querySelector("#editor p")?.textContent ?? "",
       ),
     ).resolves.toMatch(/^xyz Writing/i);
+    // what was typed is painted (autocorrect made it "Xyz")
+    await waitForInk("yz");
     await browser.saveScreenshot(path.join(SHOTS, "engine-typed.png"));
 
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("pages");
+    await waitForInk("yz");
     await browser.saveScreenshot(path.join(SHOTS, "engine-pages.png"));
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("page-ends");

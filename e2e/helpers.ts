@@ -4,7 +4,7 @@ import { Key } from "webdriverio";
 import { application } from "./app.ts";
 
 // the geometry of what the page view paints, see src/engine/geometry.ts
-interface Box {
+export interface Box {
   left: number;
   top: number;
   right: number;
@@ -234,6 +234,272 @@ export const editorText = (selector = "#editor") =>
       ),
     selector,
   );
+
+export type Rgb = [number, number, number];
+
+// what is painted in a box: the share of its pixels that show something,
+// and their mean colour, null where nothing is
+export interface Ink {
+  share: number;
+  ink: Rgb | null;
+}
+
+export interface InkOptions {
+  // the part of the text: from its `offset`th character, `length` of them
+  offset?: number;
+  length?: number;
+  // the `index`th occurrence of the text
+  index?: number;
+  // "canvas" reads the pages' canvases, "screen" a screenshot, which also
+  // has what is shown over them, like the selection and the marks
+  source?: "canvas" | "screen";
+}
+
+/**
+ * boxOf returns the box around where `text` (its part in `options`) is
+ * painted, in viewport px, scrolling it into view first; a box is returned
+ * as it is
+ */
+export const boxOf = async (
+  target: string | Box,
+  { offset = 0, length, index = 0 }: InkOptions = {},
+): Promise<Box> => {
+  if (typeof target !== "string") return target;
+  // scrolls it into view
+  await textBox(target, offset, index);
+  const box = await browser.execute(
+    (text: string, from: number, count: number, index: number) => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            find: (text: string, index: number) => number;
+            rangeRects: (from: number, to: number) => Box[];
+          };
+        }
+      ).blankGeometry;
+      const pos = geometry.find(text, index);
+      if (pos < 0) return null;
+      const rects = geometry.rangeRects(pos + from, pos + from + count);
+      if (!rects.length) return null;
+      return {
+        left: Math.min(...rects.map((rect) => rect.left)),
+        top: Math.min(...rects.map((rect) => rect.top)),
+        right: Math.max(...rects.map((rect) => rect.right)),
+        bottom: Math.max(...rects.map((rect) => rect.bottom)),
+      };
+    },
+    target,
+    offset,
+    length ?? target.length - offset,
+    index,
+  );
+  if (!box) throw new Error(`"${target}" isn't painted on the pages`);
+  return box;
+};
+
+/**
+ * canvasInk reads the pixels of the pages' canvases in `box`: a pixel shows
+ * ink where it isn't transparent, since a page paints its text over nothing
+ * (the sheet's colour is the frame's). It reads what the canvases show,
+ * painted or drawn from a kept bitmap.
+ */
+const canvasInk = (box: Box) =>
+  browser.execute((box: Box) => {
+    let total = 0;
+    let inked = 0;
+    const sum = [0, 0, 0];
+    for (const canvas of document.querySelectorAll<HTMLCanvasElement>(
+      "#page-view .page-canvas",
+    )) {
+      const rect = canvas.getBoundingClientRect();
+      const left = Math.max(box.left, rect.left);
+      const top = Math.max(box.top, rect.top);
+      const right = Math.min(box.right, rect.right);
+      const bottom = Math.min(box.bottom, rect.bottom);
+      if (right <= left || bottom <= top || !rect.width || !rect.height)
+        continue;
+      // device pixels of the canvas per CSS pixel
+      const sx = canvas.width / rect.width;
+      const sy = canvas.height / rect.height;
+      const x = Math.floor((left - rect.left) * sx);
+      const y = Math.floor((top - rect.top) * sy);
+      const width = Math.max(1, Math.ceil((right - left) * sx));
+      const height = Math.max(1, Math.ceil((bottom - top) * sy));
+      const { data } = canvas
+        .getContext("2d")!
+        .getImageData(x, y, width, height);
+      for (let index = 0; index < data.length; index += 4) {
+        total++;
+        if (data[index + 3] < 64) continue;
+        inked++;
+        for (let channel = 0; channel < 3; channel++)
+          sum[channel] += data[index + channel];
+      }
+    }
+    return { total, inked, sum };
+  }, box);
+
+interface ScreenStats extends Ink {
+  // the most common colour in the box, and the mean of all of it
+  background: Rgb;
+  mean: Rgb;
+}
+
+/**
+ * screenStats reads the pixels of a screenshot in `box`: ink is what
+ * differs from the most common colour there
+ */
+const screenStats = async (box: Box): Promise<ScreenStats> => {
+  const png = await browser.takeScreenshot();
+  return browser.executeAsync(
+    (png: string, box: Box, done: (stats: ScreenStats) => void) => {
+      const image = new Image();
+      image.onload = () => {
+        const scale = image.width / window.innerWidth;
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext("2d")!;
+        context.drawImage(image, 0, 0);
+        const x = Math.max(0, Math.floor(box.left * scale));
+        const y = Math.max(0, Math.floor(box.top * scale));
+        const width = Math.max(1, Math.ceil((box.right - box.left) * scale));
+        const height = Math.max(1, Math.ceil((box.bottom - box.top) * scale));
+        const { data } = context.getImageData(x, y, width, height);
+        const counts = new Map<number, number>();
+        const mean = [0, 0, 0];
+        const pixels = data.length / 4;
+        for (let index = 0; index < data.length; index += 4) {
+          const key =
+            (data[index] << 16) | (data[index + 1] << 8) | data[index + 2];
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+          for (let channel = 0; channel < 3; channel++)
+            mean[channel] += data[index + channel] / pixels;
+        }
+        let common = 0;
+        let most = 0;
+        for (const [key, count] of counts)
+          if (count > most) [common, most] = [key, count];
+        const background: Rgb = [
+          (common >> 16) & 255,
+          (common >> 8) & 255,
+          common & 255,
+        ];
+        let inked = 0;
+        const sum = [0, 0, 0];
+        for (let index = 0; index < data.length; index += 4) {
+          const distance =
+            Math.abs(data[index] - background[0]) +
+            Math.abs(data[index + 1] - background[1]) +
+            Math.abs(data[index + 2] - background[2]);
+          if (distance < 40) continue;
+          inked++;
+          for (let channel = 0; channel < 3; channel++)
+            sum[channel] += data[index + channel];
+        }
+        done({
+          share: inked / pixels,
+          ink: inked ? [sum[0] / inked, sum[1] / inked, sum[2] / inked] : null,
+          background,
+          mean: mean as Rgb,
+        });
+      };
+      image.src = `data:image/png;base64,${png}`;
+    },
+    png,
+    box,
+  );
+};
+
+/**
+ * paintedInk returns how much is painted where `target` is (a text on the
+ * pages, or a box in viewport px), and in what colour
+ */
+export const paintedInk = async (
+  target: string | Box,
+  options: InkOptions = {},
+): Promise<Ink> => {
+  const box = await boxOf(target, options);
+  if (options.source === "screen") {
+    const { share, ink } = await screenStats(box);
+    return { share, ink };
+  }
+  const { total, inked, sum } = await canvasInk(box);
+  if (!total) throw new Error(`no page is painted at ${JSON.stringify(box)}`);
+  return {
+    share: inked / total,
+    ink: inked ? [sum[0] / inked, sum[1] / inked, sum[2] / inked] : null,
+  };
+};
+
+/**
+ * waitForInk waits until more than `min` of the pixels where `target` is
+ * show ink: the pages paint in the frames after a change
+ */
+export const waitForInk = async (
+  target: string | Box,
+  options: InkOptions = {},
+  min = 0.02,
+) => {
+  let last: Ink | string | null = null;
+  await browser
+    .waitUntil(async () => {
+      try {
+        last = await paintedInk(target, options);
+      } catch (error) {
+        last = String(error);
+        return false;
+      }
+      return last.share > min;
+    })
+    .catch(() => {
+      throw new Error(
+        `${JSON.stringify(target)} isn't painted: ${JSON.stringify(last)}`,
+      );
+    });
+  return last! as Ink;
+};
+
+/**
+ * screenColor returns the mean colour a screenshot shows in `box`
+ */
+export const screenColor = async (box: Box) => (await screenStats(box)).mean;
+
+/**
+ * luminance returns the relative luminance of a colour of 0–255 channels,
+ * as WCAG defines it
+ */
+export const luminance = ([r, g, b]: Rgb) => {
+  const linear = (value: number) => {
+    const c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+};
+
+/**
+ * contrast returns the WCAG contrast ratio of two colours
+ */
+export const contrast = (a: Rgb, b: Rgb) => {
+  const [dark, light] = [luminance(a), luminance(b)].sort((x, y) => x - y);
+  return (light + 0.05) / (dark + 0.05);
+};
+
+/**
+ * topPage returns the page shown at the top of the page view, counted from
+ * 1: the first whose frame reaches below the bar at the top
+ */
+export const topPage = () =>
+  browser.execute(() => {
+    const view = document.getElementById("page-view")!.getBoundingClientRect();
+    for (const frame of document.querySelectorAll<HTMLElement>(
+      "#page-view .page-frame",
+    )) {
+      if (frame.getBoundingClientRect().bottom > view.top + 60)
+        return Number(frame.dataset.page);
+    }
+    return null;
+  });
 
 /**
  * presses a keyboard shortcut using `Mod`, which translates to Ctrl on Linux
