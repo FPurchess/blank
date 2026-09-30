@@ -23,6 +23,7 @@ import {
 import {
   doc,
   docWithFrontmatter,
+  h,
   keyEvent,
   p,
   table,
@@ -37,6 +38,7 @@ import {
 import { hidePages, showPages } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
 import { forgetImages } from "../../engine/images";
+import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 
@@ -471,5 +473,40 @@ describe("images on the pages", () => {
     expect(shown[3]).toBeCloseTo(225);
     expect(shown[4]).toBeCloseTo(112.5);
     mounted.view.destroy();
+  });
+});
+
+describe("laying out a keystroke", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+  });
+
+  it("lays out once per key in the heading the title comes from", () => {
+    showPages();
+    let state = EditorState.create({
+      schema,
+      doc: doc(h(1, "Title"), p("text")),
+      plugins: [pageSync(), pageView()],
+    });
+    state = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, 6)),
+    );
+    transaction.value = state.tr;
+    // as bootEditor dispatches: the transaction is published first
+    const view: EditorView = new EditorView(document.createElement("div"), {
+      state,
+      dispatchTransaction(tr) {
+        transaction.value = tr;
+        view.updateState(view.state.apply(tr));
+      },
+    });
+    perfSamples(true);
+
+    for (const key of "abcde") view.dispatch(view.state.tr.insertText(key));
+
+    expect(view.state.doc.firstChild!.textContent).toBe("Titleabcde");
+    expect(perfSamples().layout).toHaveLength(5);
+    view.destroy();
   });
 });

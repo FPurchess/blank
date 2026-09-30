@@ -52,6 +52,7 @@ import {
   pageScrollRequest,
   pageSelection,
   path,
+  transaction,
 } from "../../state";
 
 // The page view's side of the editor: keeps the layout engine in step with
@@ -384,6 +385,12 @@ export const pageSync = () => {
               const fresh = new Set(
                 [...loaded].filter((url) => !previousLoaded?.has(url)),
               );
+              // the page setup and the fields follow the transaction being
+              // dispatched, which the view doesn't have yet: its update lays
+              // out once, with them
+              const pending = transaction.value;
+              if (!fresh.size && pending && pending.doc !== view.state.doc)
+                return;
               const blocks = fresh.size
                 ? imageBlocks(view.state.doc, fresh)
                 : [];

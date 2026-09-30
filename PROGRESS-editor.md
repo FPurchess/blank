@@ -19,7 +19,7 @@ deletes this file on merge.
 - [ ] 10. Drag and drop of text
 - [ ] 11. The PDF waits for fallback glyphs
 - [ ] 12. The hidden `TableView` no longer freezes columns
-- [ ] 13. Page setup and field watchers lay out on the new state
+- [x] 13. Page setup and field watchers lay out on the new state
 - [ ] 14. `frozen` is reset with the plugin view
 - [ ] 15. Share the fonts between engines — waiting for S3
 - [ ] 16. Test hooks only in dev and E2E builds
