@@ -352,7 +352,14 @@ describe("tables", () => {
       await drag(line, at(box.left + (box.right - box.left) * 0.25, y), line);
 
       const saved = await save("<colgroup>");
-      expect(saved).toContain('    <col style="width: 25');
+      // the drag lands on whole pixels, so about a quarter, adding up to all
+      const widths = [...saved.matchAll(/<col style="width: ([\d.]+)%"/g)].map(
+        (match) => Number(match[1]),
+      );
+      expect(widths).toHaveLength(2);
+      expect(Math.abs(widths[0] - 25)).toBeLessThanOrEqual(1);
+      expect(Math.abs(widths[1] - 75)).toBeLessThanOrEqual(1);
+      expect(widths[0] + widths[1]).toBeCloseTo(100, 0);
 
       await browser
         .action("pointer")
