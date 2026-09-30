@@ -3,6 +3,14 @@ import { Key } from "webdriverio";
 
 import { application } from "./app.ts";
 
+// the geometry of what the page view paints, see src/engine/geometry.ts
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 /**
  * waits until the app has booted, i.e. the editor and the UI are rendered
  * (see the boot order in src/main.ts)
@@ -48,17 +56,88 @@ export const restartApp = async (args: string[] = []) => {
 };
 
 /**
- * clicks into the editor text at `selector` (the `index`th match) and waits until the editor has
- * taken in where the cursor went: the editor learns that from the
- * "selectionchange" event, which the webview queues after the click, and
- * keys sent before it would still go where the cursor was
+ * clicks where the pages show the end of the text of the editor's element at
+ * `selector` (the `index`th match), as a click right of its last line does,
+ * and waits until the editor has taken in where the cursor went
  */
-export const clickInto = async (selector: string, index = 0) => {
-  await $$(selector)[index].click();
+export const clickInto = async (
+  selector: string,
+  index = 0,
+  button: 0 | 1 | 2 = 0,
+) => {
+  const box = await browser.execute(
+    (selector: string, index: number) => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            endOf: (element: Element) => number;
+            caretBox: (pos: number) => Box | null;
+          };
+        }
+      ).blankGeometry;
+      const element = document.querySelectorAll(selector)[index];
+      if (!element) return null;
+      const pos = geometry.endOf(element);
+      const view = document.getElementById("page-view")!;
+      let caret = geometry.caretBox(pos);
+      if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
+        view.scrollTop += caret.top - view.clientHeight / 2;
+        view.dispatchEvent(new Event("scroll"));
+        caret = geometry.caretBox(pos);
+      }
+      return caret;
+    },
+    selector,
+    index,
+  );
+  if (!box) throw new Error(`${selector} isn't painted on the pages`);
+  await browser
+    .action("pointer")
+    .move({
+      x: Math.round(box.left),
+      y: Math.round((box.top + box.bottom) / 2),
+      origin: "viewport",
+    })
+    .down({ button })
+    .up({ button })
+    .perform();
   await browser.executeAsync((done: () => void) => {
     // two frames: the queued events have run once the second one starts
     requestAnimationFrame(() => requestAnimationFrame(() => done()));
   });
+};
+
+/**
+ * expectEditorText waits until the text of the editor's element at
+ * `selector` (the `index`th match) is `expected`, or matches it; the editor
+ * is hidden behind the pages, where WebDriver's getText reads nothing
+ */
+export const expectEditorText = async (
+  selector: string,
+  expected: string | RegExp,
+  index = 0,
+) => {
+  let last: string | null = null;
+  const matches = (text: string | null) =>
+    text !== null &&
+    (typeof expected === "string"
+      ? text.trim() === expected
+      : expected.test(text));
+  await browser
+    .waitUntil(async () => {
+      last = await browser.execute(
+        (selector: string, index: number) =>
+          document.querySelectorAll(selector)[index]?.textContent ?? null,
+        selector,
+        index,
+      );
+      return matches(last);
+    })
+    .catch(() => {
+      throw new Error(
+        `${selector} has ${JSON.stringify(last)}, not ${String(expected)}`,
+      );
+    });
 };
 
 /**
@@ -69,14 +148,6 @@ export const focusEditor = async () => {
     document.querySelector<HTMLElement>("#editor")!.focus(),
   );
 };
-
-// the geometry of what the page view paints, see src/engine/geometry.ts
-interface Box {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
 
 /**
  * textBox returns where the `index`th occurrence of `text` is painted, as

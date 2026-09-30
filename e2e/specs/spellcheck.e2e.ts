@@ -1,6 +1,16 @@
 import { $, $$, browser, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  clickText,
+  editorText,
+  expectEditorText,
+  focusEditor,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 const errors = () => $$("#editor .spelling-error");
 const menu = () => $("#context-menu");
@@ -9,7 +19,7 @@ const item = (label: string) =>
 const status = () => $("#ui-spellcheck");
 
 const flagged = async () =>
-  (await errors().map((element) => element.getText())).join(" ");
+  (await editorText("#editor .spelling-error")).join(" ");
 
 /**
  * expectFlagged waits until exactly the words in `expected` are flagged
@@ -27,10 +37,11 @@ const expectFlagged = async (expected: string) => {
  * rightClick opens the context menu on the misspelled word `word`
  */
 const rightClick = async (word: string) => {
-  const target = await $(
-    `//*[contains(@class, "spelling-error")][text()="${word}"]`,
+  await browser.waitUntil(
+    async () => (await editorText("#editor .spelling-error")).includes(word),
+    { timeoutMsg: `${word} isn't flagged` },
   );
-  await target.click({ button: "right" });
+  await clickText(word, { offset: 1, button: 2 });
   await expect(menu()).toBeDisplayed();
   // the items move once slow suggestions arrive
   await $(`[data-id="loading"]`).waitForExist({ reverse: true });
@@ -38,39 +49,12 @@ const rightClick = async (word: string) => {
 
 /**
  * contextMenuOn opens the context menu on the first occurrence of `word` in
- * the editor, whether it is flagged or not, or in the first paragraph for ""
+ * the editor, whether it is flagged or not, or at the start of the first
+ * paragraph for ""
  */
 const contextMenuOn = async (word: string) => {
-  await browser.execute((word: string) => {
-    const editor = document.querySelector("#editor")!;
-    const open = (x: number, y: number) => {
-      const init = {
-        bubbles: true,
-        cancelable: true,
-        clientX: x,
-        clientY: y,
-        button: 2,
-      };
-      const target = document.elementFromPoint(x, y)!;
-      target.dispatchEvent(new MouseEvent("mousedown", init));
-      target.dispatchEvent(new MouseEvent("contextmenu", init));
-    };
-    if (!word) {
-      const rect = editor.querySelector("p")!.getBoundingClientRect();
-      return open(rect.left + 2, rect.top + rect.height / 2);
-    }
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const index = node.textContent!.indexOf(word);
-      if (index < 0) continue;
-      const range = document.createRange();
-      range.setStart(node, index);
-      range.setEnd(node, index + word.length);
-      const rect = range.getBoundingClientRect();
-      return open(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    }
-    throw new Error(`${word} isn't in the editor`);
-  }, word);
+  if (word) await clickText(word, { offset: 1, button: 2 });
+  else await clickInto("#editor p", 0, 2);
   await expect(menu()).toBeDisplayed();
   await $(`[data-id="loading"]`).waitForExist({ reverse: true });
 };
@@ -114,10 +98,10 @@ describe("spell check", () => {
     await item("wrong").click();
 
     await expect(menu()).not.toBeExisting();
-    await expect($("#editor p")).toHaveText("Thiss is wrong anothr");
+    await expectEditorText("#editor p", "Thiss is wrong anothr");
 
     await pressMod("z");
-    await expect($("#editor p")).toHaveText("Thiss is wrng anothr");
+    await expectEditorText("#editor p", "Thiss is wrng anothr");
   });
 
   it("adds a word to the dictionary, which lasts", async () => {
@@ -168,7 +152,7 @@ describe("spell check", () => {
     // the editor has the focus again
     await type(Key.ArrowRight);
     await type("x");
-    await expect($("#editor p")).toHaveText(/x/);
+    await expectEditorText("#editor p", /x/);
     await pressMod("z");
   });
 
@@ -214,7 +198,7 @@ describe("spell check", () => {
     await contextMenuOn("");
     await item("Paste").click();
 
-    await expect($("#editor p")).toHaveText("Wrng und unnd");
+    await expectEditorText("#editor p", "Wrng und unnd");
   });
 
   it("turns off from the menu", async () => {

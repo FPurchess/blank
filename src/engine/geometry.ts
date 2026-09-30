@@ -1,4 +1,5 @@
 import type { Node } from "prosemirror-model";
+import type { EditorView } from "prosemirror-view";
 
 import {
   type PageLayoutState,
@@ -229,11 +230,16 @@ export const tablePositions = (doc: Node) => {
 /**
  * exposeGeometry lets E2E tests measure the pages as the page view shows
  * them, through `window.blankGeometry`, since what is painted has no DOM
- * @param doc the editor's document now
+ * @param view the editor
  */
-export const exposeGeometry = (doc: () => Node) => {
+export const exposeGeometry = (view: EditorView) => {
+  const doc = () => view.state.doc;
   Object.assign(window, {
     blankGeometry: {
+      // the end of the content of an element of the hidden editor, e.g.
+      // where a click right of its text puts the caret
+      endOf: (element: Element) =>
+        view.posAtDOM(element, element.childNodes.length),
       caretBox,
       rangeRects,
       blockBoxes,

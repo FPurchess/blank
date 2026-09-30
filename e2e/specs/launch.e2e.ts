@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { $, expect } from "@wdio/globals";
 
-import { restartApp } from "../helpers.ts";
+import { expectEditorText, restartApp } from "../helpers.ts";
 
 describe("launch", () => {
   it("shows the welcome document", async () => {
-    await expect($("#editor h1")).toHaveText("Welcome to Blank");
+    await expectEditorText("#editor h1", "Welcome to Blank");
   });
 
   it("shows an untitled document", async () => {
@@ -45,7 +45,7 @@ describe("launch", () => {
 
       await expect($("#editor")).toBeExisting();
       await expect($(".boot-error")).not.toBeExisting();
-      await expect($("#editor h1")).toHaveText("Welcome to Blank");
+      await expectEditorText("#editor h1", "Welcome to Blank");
     });
   });
 });

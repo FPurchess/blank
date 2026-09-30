@@ -6,7 +6,13 @@ import { fileURLToPath } from "node:url";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  expectEditorText,
+  Key,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 // written by pandoc, see scripts/build-docx-fixtures.sh
 const FIXTURE = path.resolve(
@@ -37,11 +43,12 @@ describe("Word import", () => {
   });
 
   it("imports the Word document as an untitled document", async () => {
-    await expect($("#editor h1")).toHaveText("Fixture");
-    await expect($("#editor h2")).toHaveText("Formatting");
+    await expectEditorText("#editor h1", "Fixture");
+    await expectEditorText("#editor h2", "Formatting");
     // seven list items and the footnote at the end
     await expect($$("#editor li")).toBeElementsArrayOfSize(8);
-    await expect($("#editor pre")).toHaveText(
+    await expectEditorText(
+      "#editor pre",
       'function hello() {\n  return "world";\n}',
     );
     const [chart] = await $$("#editor .image img");
@@ -53,10 +60,10 @@ describe("Word import", () => {
   });
 
   it("never writes to the Word document", async () => {
-    await $("#editor h1").click();
+    await clickInto("#editor h1");
     await type(Key.End);
     await type(" edited");
-    await expect($("#editor h1")).toHaveText("Fixture edited");
+    await expectEditorText("#editor h1", "Fixture edited");
 
     expect(sha256(docxPath)).toBe(original);
   });
@@ -66,7 +73,7 @@ describe("Word import", () => {
     await browser.pause(2000);
     await restartApp();
 
-    await expect($("#editor h1")).toHaveText("Fixture edited");
+    await expectEditorText("#editor h1", "Fixture edited");
     await expect($("#ui-top")).toHaveText("» report.docx (imported)");
   });
 });

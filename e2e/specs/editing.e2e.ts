@@ -1,6 +1,12 @@
 import { $, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, type } from "../helpers.ts";
+import {
+  expectEditorText,
+  focusEditor,
+  Key,
+  pressMod,
+  type,
+} from "../helpers.ts";
 
 describe("editing", () => {
   before(async () => {
@@ -10,7 +16,7 @@ describe("editing", () => {
   it("creates a new file", async () => {
     await pressMod("n");
 
-    await expect($("#editor")).toHaveText("");
+    await expectEditorText("#editor", "");
     await expect($("#ui-top")).toHaveText("» Untitled");
     await expect($("#ui-stats")).toHaveText("0 words 0 chars");
   });
@@ -18,14 +24,14 @@ describe("editing", () => {
   it("counts words and chars while typing", async () => {
     await type("Hello world");
 
-    await expect($("#editor p")).toHaveText("Hello world");
+    await expectEditorText("#editor p", "Hello world");
     await expect($("#ui-stats")).toHaveText("2 words 11 chars");
   });
 
   it("autocompletes arrows", async () => {
     await type(" --> ");
 
-    await expect($("#editor p")).toHaveText("Hello world →");
+    await expectEditorText("#editor p", "Hello world →");
   });
 
   it("autocompletes arrows in the middle of the text", async () => {
@@ -34,7 +40,7 @@ describe("editing", () => {
     for (let i = 0; i < 3; i++) await type(Key.ArrowLeft);
     await type("--> ");
 
-    await expect($("#editor p:last-child")).toHaveText("The → end");
+    await expectEditorText("#editor p:last-child", "The → end");
     await type(Key.End);
   });
 
@@ -42,7 +48,7 @@ describe("editing", () => {
     await type(Key.Enter);
     await type("## Heading");
 
-    await expect($("#editor h2")).toHaveText("Heading");
+    await expectEditorText("#editor h2", "Heading");
   });
 
   it("undoes a block shortcut with a single undo", async () => {
@@ -53,8 +59,8 @@ describe("editing", () => {
     await pressMod("z");
 
     await expect($("#editor ul")).not.toExist();
-    await expect($("#editor p:last-child")).toHaveText("-");
-    await expect($("#editor h2")).toHaveText("Heading");
+    await expectEditorText("#editor p:last-child", "-");
+    await expectEditorText("#editor h2", "Heading");
   });
 
   it("toggles bold via keyboard shortcut", async () => {
@@ -62,7 +68,7 @@ describe("editing", () => {
     await pressMod("b");
     await type("bold");
 
-    await expect($("#editor strong")).toHaveText("bold");
+    await expectEditorText("#editor strong", "bold");
   });
 
   it("chooses the language via keyboard shortcut", async () => {

@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  expectEditorText,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 // a 3x2 PNG
 const PNG = Buffer.from(
@@ -60,7 +67,7 @@ describe("images", () => {
 
   it("inserts, edits and removes an image with the dialog", async () => {
     const images = () => $$("#editor .image img");
-    await $("#editor h1").click();
+    await clickInto("#editor h1");
     await type(Key.End);
 
     await pressMod(Key.Alt, "i");
@@ -94,6 +101,6 @@ describe("images", () => {
 
     await expect($("#image-dialog")).not.toBeExisting();
     await expect(images()).toBeElementsArrayOfSize(3);
-    await expect($("#editor h1")).toHaveText("Images");
+    await expectEditorText("#editor h1", "Images");
   });
 });

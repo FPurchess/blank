@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import { clickInto, Key, pressMod, restartApp, type } from "../helpers.ts";
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
@@ -26,7 +26,7 @@ describe("page setup", () => {
   });
 
   it("opens with Mod+Alt+U on the paper of the region", async () => {
-    await $("#editor p").click();
+    await clickInto("#editor p");
     await pressMod(Key.Alt, "u");
 
     await expect($("#page-setup")).toBeDisplayed();
@@ -126,7 +126,7 @@ describe("page setup", () => {
     fs.writeFileSync(breaksPath, "one\n");
     await restartApp([breaksPath]);
 
-    await $("#editor p").click();
+    await clickInto("#editor p");
     await type(Key.End);
     await pressMod(Key.Enter);
     await type("two");

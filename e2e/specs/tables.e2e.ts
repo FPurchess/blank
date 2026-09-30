@@ -6,6 +6,7 @@ import { browser, $, $$, expect } from "@wdio/globals";
 
 import {
   clickInto,
+  expectEditorText,
   Key,
   paste,
   pressMod,
@@ -109,7 +110,7 @@ describe("tables", () => {
 
     await expect($$("#editor th")).toBeElementsArrayOfSize(2);
     await type("x");
-    await expect($$("#editor td")[0]).toHaveText("x");
+    await expectEditorText("#editor td", "x");
   });
 
   it("saves a line break in a cell as <br>", async () => {

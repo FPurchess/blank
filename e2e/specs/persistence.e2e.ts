@@ -1,6 +1,14 @@
 import { browser, $, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  editorText,
+  expectEditorText,
+  focusEditor,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 describe("persistence", () => {
   it("restores the document, theme and language after a restart", async () => {
@@ -12,14 +20,14 @@ describe("persistence", () => {
     await type("fr");
     await type(Key.Enter);
 
-    await expect($("#editor p")).toHaveText("Remember me 4711");
+    await expectEditorText("#editor p", "Remember me 4711");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
 
     // the document is written to storage at most 1000ms after a change, see src/storage.ts
     await browser.pause(2000);
     await restartApp();
 
-    await expect($("#editor p")).toHaveText("Remember me 4711");
+    await expectEditorText("#editor p", "Remember me 4711");
     await expect($("#ui-top")).toHaveText("» Untitled");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
     await expect($("#ui-language")).toHaveText("FR");
@@ -39,7 +47,7 @@ describe("persistence", () => {
     const restartAt = Date.now();
     await restartApp();
 
-    const restored = (await $("#editor p").getText()).trim().split(/\s+/);
+    const restored = (await editorText("#editor p"))[0].trim().split(/\s+/);
     const expected = typed
       .filter(({ at }) => at < restartAt - 1300)
       .map(({ word }) => word);

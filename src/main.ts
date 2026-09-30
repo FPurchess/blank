@@ -56,7 +56,7 @@ const showBootError = (error: unknown) => {
     const editor = await bootEditor();
     bootMark("editor");
     editorReady = true;
-    exposeGeometry(() => editor.view.state.doc);
+    exposeGeometry(editor.view);
     bootUI(editor);
     bootMark("ui");
     // doesn't wait for the dictionary, which may need a download
