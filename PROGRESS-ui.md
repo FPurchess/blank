@@ -23,7 +23,8 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 16. E2E for engine-editor's fixes: `e2e/specs/navigation.e2e.ts` and `e2e/specs/withoutEngine.e2e.ts`, written against engine-editor's brief. Against this branch alone:
   - passes: ↓↓↑↑ over ragged lines
   - fails until engine/editor is merged: End on a long URL (the caret leaves the line), Shift+↓ and a drag across cells (no cell selection), dragging a selected word (pointer drag), all of `withoutEngine.e2e.ts` (the `blank.engine` switch, `window.blankBreakEngine`, and the PDF message, copied from engine-editor's constant)
-- [ ] 17. Docs and GIFs
+- [x] 17. Docs and GIFs: `page-views.gif` of Mod-Alt-V in "Your pages on the screen" (the screen matches the PDF, not the Word file), page 1's header and the double click in `pages.md`, `writing.md:26` rewritten for the user, the Editing table in `shortcuts.md` aligned, the PDF list in `files.md`, the mouse and the third-party notices in `faq.md` (linked on GitHub; `public/THIRD-PARTY-NOTICES.txt` arrives with engine/release), and `table-mouse.gif` re-recorded (the "+" is clicked as an element now, and the row move and the "+" take). All shots regenerated with `make docs-screenshots`.
+  - `docs/guide/tables.md:140` stays until the integrator says merged cells and lists in cells have landed.
 
 ## Waiting on
 

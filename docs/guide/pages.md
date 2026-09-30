@@ -4,10 +4,12 @@ Your PDF and Word documents come out on the paper of your region, A4 or Letter, 
 
 ## Your pages on the screen {#on-the-screen}
 
-Blank shows your text the way it prints: every line and every page ends on the screen exactly where it ends in the PDF. There are two ways to look at it, and `Mod` `Alt` `V` switches between them:
+Blank shows your text the way it prints: every line and every page ends on the screen exactly where it ends in the PDF. (A Word document is laid out by Word, so its lines can end elsewhere.) There are two ways to look at it, and `Mod` `Alt` `V` switches between them, keeping your place:
 
-- **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where a page ends, a dashed line shows the page's number and footer, and the header of the page that follows.
+- **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where a page ends, a dashed line shows the page's number and footer, and the header of the page that follows. The first page's header sits above your text.
 - **Pages**: the sheets themselves, one below the other, with their margins, headers, footers and page numbers in place.
+
+<img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
 
 Blank remembers your choice. The bar at the bottom tells you which page you're on, like _Page 3 of 12_. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
 

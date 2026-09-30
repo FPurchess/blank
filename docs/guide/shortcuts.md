@@ -21,13 +21,13 @@
 
 ## Editing
 
-| Command           | Shortcut          |
-| ----------------- | ----------------- |
-| Undo              | `Mod` `Z`         |
-| Redo              | `Mod` `Shift` `Z` |
-| Insert line break | `Shift` `Enter`   |
-| A screen up / down | `Page Up` / `Page Down` |
-| Start / end of the line | `Home` / `End` |
+| Command                 | Shortcut                |
+| ----------------------- | ----------------------- |
+| Undo                    | `Mod` `Z`               |
+| Redo                    | `Mod` `Shift` `Z`       |
+| Insert line break       | `Shift` `Enter`         |
+| A screen up / down      | `Page Up` / `Page Down` |
+| Start / end of the line | `Home` / `End`          |
 
 ## Blocks
 
