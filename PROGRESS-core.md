@@ -16,7 +16,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 11. S3: one shared font store
 - [x] 12. S4: failed image decodes and broken fonts in the PDF
 - [x] 13. Tags, `/Lang` and bookmarks in the PDF
-- [ ] 14. Variable-font coordinates
+- [x] 14. Variable-font coordinates
 - [ ] 15. Fallback families as a list, not CSS
 - [ ] 16. Waste in `page_ops` and per keystroke
 - [ ] 17. Dead and test-only code
@@ -224,6 +224,22 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
     - every role is there: H1, H2, P, L, LI, Lbl, LBody, Table, TR, TH, TD, Caption, BlockQuote, Figure (with its `/Alt`) and Link
     - every word is still where it was laid out (`compare`)
 - pdfinfo prints "Syntax Error: Suspects object is wrong type (boolean)" for krilla's `/MarkInfo << /Suspects false >>`, which is valid PDF. That's poppler's message, not a fault in the file (see "Known quirks").
+
+### Task 14: variable fonts
+
+- Verified first (a probe on the variable Noto Emoji): 🦀 in bold comes from Parley as synthesis `wght 700`, normalized coordinate 16384 (1.0), in the same face as the regular one. It was painted and embedded with the default outlines.
+- `Fonts::instances`:
+  - an `Instance` is a face with its variations (for krilla) and normalized coordinates (for skrifa)
+  - numbered from `INSTANCE_BASE` (2^20), so no index ever changes when faces are added
+  - `Fonts::font_of` finds or adds the instance of a run (coordinates all 0 means the face itself)
+  - `Fonts::face` resolves an index
+- `TextBox::run_fonts` holds each run's font index by (line, Parley's run index). The run index counts per line, as I found out when the welcome document's TS exact test caught words in the wrong font. `keeps_each_run_in_its_font_on_every_line` now pins it down.
+- `glyph_path` draws at the instance's coordinates (`LocationRef`). `unitsPerEm` and the underline come from its face.
+- The PDF's fonts (`PdfFonts`) embed each instance with `Font::new_variable` at its variations.
+- Tests:
+  - `text::tests::sets_variable_fonts_at_their_coordinates`: bold is an instance with wght 700 and its own outline; the same instance again; its number and outline stay after `add`, and in `share()`
+  - `pdf::tests::embeds_the_instances_of_variable_fonts`: an instance is a PDF font of its own, found back by `index_of`; the emoji is in the PDF's text
+- Finding for the owner: Parley's other synthesis, `embolden` and `skew` (fake bold and slant for a font without those faces, e.g. a system CJK font), isn't applied either, on screen or in the PDF. Bold Chinese shows regular. Not part of this task.
 
 ### Known quirks (of other tools, not of the PDF)
 

@@ -186,3 +186,17 @@ Commits: 6092203 `fix: write the alt text of images the PDF can't decode, and wa
   - Headers, footers, rules, fills and lines are artifacts.
 - The PDF has bookmarks: one per heading, nested by level, jumping to where it starts.
 - TS side: nothing beyond passing `language` (above). There is no PDF/A: that's the owner's decision.
+
+## Font indices of variable-font instances (task 14)
+
+Commit: `fix: paint and embed glyphs of variable fonts at their coordinates` (its hash is in the handoff message).
+
+No shape changes. What changes is which numbers `font` can be:
+
+- The `font` of a glyph run (in `page`/`pageBody`/`pageBands`), and what `glyphPath(font, id)` and `unitsPerEm(font)` take, is a **font index**.
+  - Below the number of faces (as before), it's a face of a font file, at its default coordinates.
+  - From `INSTANCE_BASE` = 1 048 576 (2^20) on, it's an instance of a variable face at other coordinates, e.g. the bold of Noto Emoji, whose weight varies.
+- `glyphPath` gives an instance's outline at its coordinates, and `unitsPerEm` its face's.
+- An index never changes its meaning, not even when `addFont` adds faces later, so a cache keyed by `font * 0x10000 + id` (as `engine.ts` has it) stays right.
+- `fontFileCount`/`fontFile`/`fontFileFamily` count files, never instances.
+- TS side: nothing to change. Just don't assume that `font` is less than the number of faces.

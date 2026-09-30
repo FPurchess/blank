@@ -15,12 +15,12 @@ use krilla::page::PageSettings;
 use krilla::paint::Fill;
 use krilla::surface::Surface;
 use krilla::tagging::{Artifact, ArtifactType, ContentTag, SpanTag};
-use krilla::text::{Font, GlyphId, KrillaGlyph};
+use krilla::text::{Font, GlyphId, KrillaGlyph, Tag};
 use krilla::Document;
 use parley::Alignment;
 
 use crate::engine::{Engine, Op, Part};
-use crate::fonts::Fonts;
+use crate::fonts::{Fonts, INSTANCE_BASE};
 use crate::items::Role;
 use crate::model::Text;
 use crate::text::{Glyph, TextBox};
@@ -82,6 +82,70 @@ fn unmap_missing_glyph(surface: &mut Surface, font: Font) {
     let glyph = KrillaGlyph::new(GlyphId::new(0), 0.0, 0.0, 0.0, 0.0, 0..0, None);
     surface.draw_glyphs(Point::from_xy(0.0, 0.0), &[glyph], font, "", 1.0, false);
     surface.end_tagged();
+}
+
+/// the fonts of a PDF by their font index: the faces, and the instances of
+/// variable ones at their coordinates, see `Fonts::face`; none for a font
+/// left out
+struct PdfFonts {
+    faces: Vec<Option<Font>>,
+    instances: Vec<Option<Font>>,
+}
+
+impl PdfFonts {
+    fn new(fonts: &Fonts, skipped: &[usize]) -> PdfFonts {
+        let faces = fonts
+            .files
+            .iter()
+            .enumerate()
+            .map(|(index, file)| {
+                if skipped.contains(&index) {
+                    return None;
+                }
+                Font::new(file.data.clone().into(), file.index)
+            })
+            .collect();
+        let instances = fonts
+            .instances
+            .iter()
+            .enumerate()
+            .map(|(index, instance)| {
+                if skipped.contains(&(INSTANCE_BASE + index)) {
+                    return None;
+                }
+                let file = fonts.files.get(instance.file)?;
+                let variations: Vec<(Tag, f32)> = instance
+                    .variations
+                    .iter()
+                    .map(|(tag, value)| (Tag::new(tag), *value))
+                    .collect();
+                Font::new_variable(file.data.clone().into(), file.index, &variations)
+            })
+            .collect();
+        PdfFonts { faces, instances }
+    }
+
+    fn get(&self, font: usize) -> Option<&Font> {
+        match font.checked_sub(INSTANCE_BASE) {
+            Some(index) => self.instances.get(index)?.as_ref(),
+            None => self.faces.get(font)?.as_ref(),
+        }
+    }
+
+    /// the font index of a font krilla names
+    fn index_of(&self, font: &Font) -> Option<usize> {
+        let face = self
+            .faces
+            .iter()
+            .position(|known| known.as_ref() == Some(font));
+        let instance = || {
+            self.instances
+                .iter()
+                .position(|known| known.as_ref() == Some(font))
+                .map(|index| INSTANCE_BASE + index)
+        };
+        face.or_else(instance)
+    }
 }
 
 /// what went wrong in a PDF that was still written
@@ -195,7 +259,7 @@ fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, si
 fn paint_alt(
     surface: &mut Surface,
     engine_fonts: &mut Fonts,
-    fonts: &[Option<Font>],
+    fonts: &PdfFonts,
     alt: &str,
     x: f32,
     y: f32,
@@ -215,7 +279,7 @@ fn paint_alt(
             break;
         }
         for mut run in boxed.glyph_runs(engine_fonts, line) {
-            let Some(Some(font)) = fonts.get(run.font) else {
+            let Some(font) = fonts.get(run.font) else {
                 continue;
             };
             for glyph in &mut run.glyphs {
@@ -237,18 +301,7 @@ fn attempt(
     skipped: &Skipped,
 ) -> Result<(Vec<u8>, Vec<String>), Failed> {
     let mut document = Document::new();
-    let fonts: Vec<Option<Font>> = engine
-        .fonts
-        .files
-        .iter()
-        .enumerate()
-        .map(|(index, file)| {
-            if skipped.fonts.contains(&index) {
-                return None;
-            }
-            Font::new(file.data.clone().into(), file.index)
-        })
-        .collect();
+    let fonts = PdfFonts::new(&engine.fonts, &skipped.fonts);
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let mut undecoded: Vec<String> = vec![];
     let mut ids = tags::Ids::new();
@@ -274,7 +327,7 @@ fn attempt(
         {
             let mut surface = page.surface();
             if page_index == 0 {
-                for font in missing.iter().filter_map(|&font| fonts.get(font)?.clone()) {
+                for font in missing.iter().filter_map(|&font| fonts.get(font).cloned()) {
                     unmap_missing_glyph(&mut surface, font);
                 }
             }
@@ -315,7 +368,7 @@ fn attempt(
                     }
                     Op::Glyphs { run, role, text } => {
                         // a font that can't be embedded is left out
-                        let Some(Some(font)) = fonts.get(run.font) else {
+                        let Some(font) = fonts.get(run.font) else {
                             continue;
                         };
                         surface.set_fill(Some(fill(role)));
@@ -399,14 +452,12 @@ fn attempt(
                 None => Err(Failed::Other("an image can't be written".into())),
             }
         }
-        Err(KrillaError::Font(font, message)) => {
-            match fonts.iter().position(|known| known.as_ref() == Some(&font)) {
-                Some(index) => Err(Failed::Font(index)),
-                None => Err(Failed::Other(format!(
-                    "a font can't be embedded: {message}"
-                ))),
-            }
-        }
+        Err(KrillaError::Font(font, message)) => match fonts.index_of(&font) {
+            Some(index) => Err(Failed::Font(index)),
+            None => Err(Failed::Other(format!(
+                "a font can't be embedded: {message}"
+            ))),
+        },
         Err(error) => Err(Failed::Other(format!("{error:?}"))),
     }
 }
@@ -556,5 +607,37 @@ mod tests {
             .warnings
             .iter()
             .all(|warning| *warning == Warning::Font(index)));
+    }
+
+    #[test]
+    fn embeds_the_instances_of_variable_fonts() {
+        let emoji = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/NotoEmoji-VariableFont_wght.ttf"
+        ))
+        .unwrap();
+        let mut bold = paragraph(1, "a \u{1f980} b");
+        if let Content::Text(text) = &mut bold.content {
+            text.spans = vec![crate::model::Span {
+                from: 2,
+                to: 4,
+                bold: true,
+                ..Default::default()
+            }];
+        }
+        let mut engine = engine(vec![bold]);
+        engine.add_font(emoji, "Noto Emoji");
+        let instance = crate::fonts::INSTANCE_BASE;
+        let fonts = PdfFonts::new(&engine.fonts, &[]);
+        let face = engine.fonts.instances[0].file;
+        // an instance is a font of its own in the PDF, at its coordinates
+        assert!(fonts.get(instance).is_some());
+        assert!(fonts.get(instance) != fonts.get(face));
+        assert_eq!(fonts.index_of(fonts.get(instance).unwrap()), Some(instance));
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "").unwrap();
+        assert!(written.warnings.is_empty());
+        if let Some(text) = text_of(&written.bytes, "variable") {
+            assert!(text.contains('\u{1f980}'), "{text:?}");
+        }
     }
 }

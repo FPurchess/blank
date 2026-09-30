@@ -309,9 +309,8 @@ impl LayoutEngine {
     pub fn units_per_em(&self, font: u32) -> f32 {
         self.engine
             .fonts
-            .files
-            .get(font as usize)
-            .map(|file| file.upem)
+            .face(font as usize)
+            .map(|(file, _)| file.upem)
             .unwrap_or(1000.0)
     }
 
@@ -526,9 +525,8 @@ impl LayoutEngine {
                     "family": self
                         .engine
                         .fonts
-                        .files
-                        .get(*font)
-                        .map(|file| file.family.as_str())
+                        .face(*font)
+                        .map(|(file, _)| file.family.as_str())
                         .unwrap_or(""),
                 }),
             })

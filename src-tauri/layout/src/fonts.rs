@@ -40,8 +40,28 @@ pub struct FontFile {
     pub underline: (f32, f32),
 }
 
+/// where the instances of variable fonts are numbered from, see `Instance`:
+/// far above any number of faces, so a face's number and an instance's
+/// never change, whatever is added later
+pub const INSTANCE_BASE: usize = 1 << 20;
+
+/// a face of a variable font at coordinates other than its default, e.g.
+/// the bold of a font whose weight varies. Its font index is
+/// `INSTANCE_BASE` plus its place in `Fonts::instances`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Instance {
+    /// the face, in `Fonts::files`
+    pub file: usize,
+    /// its coordinates by axis, as Parley set them, e.g. wght 700
+    pub variations: Vec<([u8; 4], f32)>,
+    /// the same, normalized, for the outlines
+    pub coords: Vec<i16>,
+}
+
 pub struct Fonts {
     pub files: Vec<FontFile>,
+    /// the faces of variable fonts at other coordinates than the default
+    pub instances: Vec<Instance>,
     pub fcx: FontContext,
     pub lcx: LayoutContext<Ink>,
     /// the families text is set in, in order, with the fallbacks added for
@@ -123,6 +143,7 @@ impl Fonts {
             .collect();
         Fonts {
             files,
+            instances: vec![],
             fcx,
             lcx: LayoutContext::new(),
             stack: FONT_STACK.into(),
@@ -139,6 +160,45 @@ impl Fonts {
         if !self.stack.split(", ").any(|known| known == family) {
             self.stack = format!("{}, {family}", self.stack);
             self.mono_stack = format!("{}, {family}", self.mono_stack);
+        }
+    }
+
+    /// the font index of a run's font at its coordinates: its face, or an
+    /// instance of it when a variable font is set at other coordinates
+    pub fn font_of(
+        &mut self,
+        font: &FontData,
+        variations: &[([u8; 4], f32)],
+        coords: &[i16],
+    ) -> usize {
+        let file = self.index_of(font);
+        if coords.iter().all(|coord| *coord == 0) {
+            return file;
+        }
+        let known = self
+            .instances
+            .iter()
+            .position(|instance| instance.file == file && instance.coords == coords);
+        let index = known.unwrap_or_else(|| {
+            self.instances.push(Instance {
+                file,
+                variations: variations.to_vec(),
+                coords: coords.to_vec(),
+            });
+            self.instances.len() - 1
+        });
+        INSTANCE_BASE + index
+    }
+
+    /// the face of a font index and its normalized coordinates (none for
+    /// the default)
+    pub fn face(&self, font: usize) -> Option<(&FontFile, &[i16])> {
+        match font.checked_sub(INSTANCE_BASE) {
+            Some(index) => {
+                let instance = self.instances.get(index)?;
+                Some((self.files.get(instance.file)?, &instance.coords))
+            }
+            None => Some((self.files.get(font)?, &[])),
         }
     }
 
@@ -172,6 +232,7 @@ impl Fonts {
         }
         Fonts {
             files: self.files.clone(),
+            instances: self.instances.clone(),
             fcx,
             lcx: LayoutContext::new(),
             stack: self.stack.clone(),
@@ -198,10 +259,17 @@ impl Fonts {
     /// the outline of a glyph as an SVG path, in font units with y up
     pub fn glyph_path(&self, font: usize, glyph: u32) -> String {
         let mut pen = SvgPen(String::new());
-        if let Some(file) = self.files.get(font) {
+        if let Some((file, coords)) = self.face(font) {
             if let Ok(font) = FontRef::from_index(&file.data, file.index) {
                 if let Some(outline) = font.outline_glyphs().get(GlyphId::new(glyph)) {
-                    let settings = DrawSettings::unhinted(Size::unscaled(), LocationRef::default());
+                    // at the instance's coordinates, e.g. the bold of a
+                    // variable font
+                    let coords: Vec<skrifa::instance::NormalizedCoord> = coords
+                        .iter()
+                        .map(|coord| skrifa::raw::types::F2Dot14::from_bits(*coord))
+                        .collect();
+                    let location = LocationRef::new(&coords);
+                    let settings = DrawSettings::unhinted(Size::unscaled(), location);
                     let _ = outline.draw(settings, &mut pen);
                 }
             }
