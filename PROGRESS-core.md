@@ -18,7 +18,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 13. Tags, `/Lang` and bookmarks in the PDF
 - [x] 14. Variable-font coordinates
 - [x] 15. Fallback families as a list, not CSS
-- [ ] 16. Waste in `page_ops` and per keystroke
+- [x] 16. Waste in `page_ops` and per keystroke
 - [ ] 17. Dead and test-only code
 - [ ] 18. The exactness tests prove more
 
@@ -247,6 +247,17 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - What CSS did with odd names (probed with parlance's `parse_css_list`): a name that starts with a quote ends the list with an "unterminated string" error, which drops every family after it. A comma split the name in two. Balanced quotes and other characters were fine.
 - Test `fonts::tests::takes_any_family_name`: a fallback named `"Quoted, and with a comma`, then Noto Emoji. The arrow comes from DejaVu, 🦀 from Noto Emoji, and the name is one entry, added once. With the CSS string, 🦀 was missing.
 
+### Task 16: waste per keystroke
+
+- `TextBox::text` is an `Arc<str>`, shared with every `Op::Glyphs` painted from it, so `page_ops` no longer copies a paragraph's text per glyph run. The PDF path takes it as `&str`.
+- `TextBox` computes its lines once, and `lines()` returns `&[LineInfo]`. `push_text_ops` and the table's slicing called it for every line, which was O(L²).
+- `paginate_from`:
+  - moves the pages and fragments before the restart (`split_off`) instead of copying them
+  - moves the old tail pages over (`drain`, their bands with them) instead of cloning them, and copies the tail's fragments in one go when the item indices don't move
+  - keeps `first_frag` of the items before the restart, finds it for the fragments paginated again, and works it out for the copied tail from the old values
+  - expands band texts only for the pages paginated again, unless the number of pages or the chapters changed (then for every page)
+- The property test (random edits through `update` and `update_many` against a fresh layout, versions both ways) passes, also with 2000 edits in release.
+
 ### Known quirks (of other tools, not of the PDF)
 
 - pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.
@@ -256,11 +267,32 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
-`update_timing` (`--ignored`), the best of 5 runs of 40 updates, and here the best of 3 such runs. The machine was shared with other builds (load average about 35), so differences below about 30% are noise. Task 1's code and task 2's code were run alternately.
+`update_timing` (`--ignored`), the best of 5 runs of 40 updates, and here the best of 3 such runs. The machine was shared with other builds, so differences below about 30% are noise.
 
-| pages | after task 1 | after task 2 | after task 16 |
-|---|---|---|---|
-| 1 | 0.147 | 0.139 | |
-| 39 | 0.165 | 0.166 | |
-| 200 | 0.311 | 0.286 | |
-| 823 | 1.019 | 1.267 | |
+For tasks 1 and 2, task 1's code and task 2's were run alternately (load average about 35). The test then also timed its own bookkeeping: it shifted its copy of every item after the change.
+
+| pages | after task 1 | after task 2 |
+|---|---|---|
+| 1 | 0.147 | 0.139 |
+| 39 | 0.165 | 0.166 |
+| 200 | 0.311 | 0.286 |
+| 823 | 1.019 | 1.267 |
+
+For task 16, the test times only the engine: the typed paragraphs are made before the clock starts. Task 15's code (161c36c) and task 16's were run alternately, at a load average of about 5.
+
+| pages | before task 16 | after task 16 |
+|---|---|---|
+| 1 | 0.089 | 0.115 |
+| 39 | 0.131 | 0.133 |
+| 200 | 0.244 | 0.180 |
+| 823 | 0.689 | 0.415 |
+
+At 823 pages, a keystroke goes (before task 16, from a profile with timers) to:
+- about 180 µs laying out the paragraph, which is inherent
+- about 250 µs moving the positions of the items and text boxes after it
+- about 400 µs paginating
+  - Before task 16 that was: copying the pages and fragments before the change (54 µs), copying the old tail (89 µs), rebuilding `first_frag` and the chapters (92 µs), and the band texts and versions of every page (115 µs).
+  - Task 16 removes most of that; see below.
+- The 1-page difference (tens of µs) is within the noise here.
+- What's left grows with the document: moving the positions of the items after the change, and walking the copied tail's items for `first_frag`. Both are simple loops over integers.
+  - Moving positions touches every text box after the change, which is cache misses more than work. Block-relative positions would avoid it, but at this speed that isn't worth a seam change.

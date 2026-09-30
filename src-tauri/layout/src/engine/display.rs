@@ -17,8 +17,8 @@ pub enum Op {
     Glyphs {
         run: GlyphRun,
         role: Role,
-        /// the text the glyphs' ranges point into
-        text: String,
+        /// the text the glyphs' ranges point into, shared with its text box
+        text: std::sync::Arc<str>,
     },
     Rect {
         x: f32,

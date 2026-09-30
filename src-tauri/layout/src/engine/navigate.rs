@@ -182,10 +182,7 @@ impl Engine {
         let (index, _) = best?;
         let boxed = &texts[index];
         let mut local_y = item_y - boxed.y;
-        if let Some(info) = unit
-            .line
-            .and_then(|line| boxed.lines().into_iter().nth(line))
-        {
+        if let Some(info) = unit.line.and_then(|line| boxed.lines().get(line)) {
             local_y = local_y.clamp(info.top + 0.5, info.bottom - 0.5);
         }
         Some((frag.item, index, item_x - boxed.x, local_y))

@@ -747,7 +747,7 @@ fn splices_runs_of_items() {
 
 /// how long an update takes at the end of a long document: one character
 /// typed into a paragraph in its middle, the best of 5 runs of 40, as the
-/// machine may be busy. Run it in release:
+/// machine may be busy. Only the engine's work is timed. Run it in release:
 /// cargo test --release -p blank-layout --lib update_timing -- --ignored --nocapture
 #[test]
 #[ignore]
@@ -760,17 +760,19 @@ fn update_timing() {
         let middle = paragraphs / 2;
         let mut best = f64::MAX;
         for _ in 0..5 {
-            let started = std::time::Instant::now();
             const TIMES: usize = 40;
-            for _ in 0..TIMES {
-                let mut changed = items[middle].clone();
-                if let Content::Text(text) = &mut changed.content {
-                    text.text.insert(0, 'x');
-                }
-                items[middle] = changed.clone();
-                for item in &mut items[middle + 1..] {
-                    item.shift(1);
-                }
+            // the typed paragraph, made before, so only the engine is timed;
+            // it keeps its position, the ones after it move
+            let typed: Vec<Item> = (0..TIMES)
+                .map(|_| {
+                    if let Content::Text(text) = &mut items[middle].content {
+                        text.text.insert(0, 'x');
+                    }
+                    items[middle].clone()
+                })
+                .collect();
+            let started = std::time::Instant::now();
+            for changed in typed {
                 engine.update(middle, 1, vec![changed], 1);
             }
             best = best.min(started.elapsed().as_secs_f64() * 1000.0 / TIMES as f64);

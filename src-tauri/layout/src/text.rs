@@ -1,6 +1,8 @@
 //! Laying out one textblock with Parley: line breaking, bidi, shaping and
 //! the cursor geometry, in points.
 
+use std::sync::Arc;
+
 use parley::{
     Affinity, Alignment, AlignmentOptions, Cursor, FontStyle, FontWeight, Layout, LineHeight,
     OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
@@ -14,8 +16,8 @@ use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, MEDIUM};
 pub struct TextBox {
     pub layout: Layout<Ink>,
     /// the text as laid out: a space for an empty block, which still takes
-    /// a line
-    pub text: String,
+    /// a line; shared with the glyph runs painted from it
+    pub text: Arc<str>,
     /// the length of the block's text in ProseMirror positions
     pub len: u32,
     /// the ProseMirror position of its first character
@@ -28,6 +30,8 @@ pub struct TextBox {
     pub style: TextStyle,
     /// the characters no font had a glyph for, see Engine::missing
     pub missing: Vec<char>,
+    /// its lines, as Parley broke them
+    lines: Vec<LineInfo>,
     /// the font index of each of its runs, by its line and Parley's index
     /// of the run in it: a face, or an instance of a variable one, see
     /// `Fonts::font_of`
@@ -63,6 +67,7 @@ pub struct GlyphRun {
     pub width: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LineInfo {
     pub top: f32,
     pub bottom: f32,
@@ -131,7 +136,7 @@ impl TextBox {
         };
         let mut boxed = TextBox {
             layout,
-            text: laid_text,
+            text: laid_text.into(),
             len,
             pos: text.pos,
             links,
@@ -140,6 +145,7 @@ impl TextBox {
             width,
             style,
             missing: vec![],
+            lines: vec![],
             run_fonts: vec![],
         };
         boxed.layout.break_all_lines(Some(width));
@@ -149,6 +155,7 @@ impl TextBox {
                 align_when_overflowing: false,
             },
         );
+        boxed.lines = boxed.read_lines();
         boxed.missing = boxed.notdef();
         boxed.run_fonts = boxed.fonts_of_runs(fonts);
         boxed
@@ -222,7 +229,12 @@ impl TextBox {
         self.layout.height()
     }
 
-    pub fn lines(&self) -> Vec<LineInfo> {
+    /// its lines, as Parley broke them
+    pub fn lines(&self) -> &[LineInfo] {
+        &self.lines
+    }
+
+    fn read_lines(&self) -> Vec<LineInfo> {
         self.layout
             .lines()
             .map(|line| {
