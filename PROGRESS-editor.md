@@ -18,7 +18,7 @@ deletes this file on merge.
 - [x] 9. Image cache by resolved URL, retried, and no counter
 - [ ] 10. Drag and drop of text
 - [ ] 11. The PDF waits for fallback glyphs
-- [ ] 12. The hidden `TableView` no longer freezes columns
+- [x] 12. The hidden `TableView` no longer freezes columns
 - [x] 13. Page setup and field watchers lay out on the new state
 - [x] 14. `frozen` is reset with the plugin view
 - [ ] 15. Share the fonts between engines — waiting for S3
@@ -73,6 +73,12 @@ deletes this file on merge.
 bodyVersion)` and `bandDisplay(page, bandVersion)` read `pageBody`/
   `pageBands`, each cached by its own version. `display()` is deprecated
   and still works.
+
+- engine-release (`editor-boundary.md`): `TableView` no longer has
+  `freeze()`/`unfreeze()`; it only renders the caption and the widths set on
+  the table. The engine keeps the columns of the table the cursor is in
+  (`frozenWidths`). In the fallback editor without the engine, the columns
+  now size to their content while typing (accepted by the integrator).
 
 ## Measurements
 
