@@ -24,6 +24,27 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 17. Docs and GIFs: `page-views.gif` of Mod-Alt-V in "Your pages on the screen" (the screen matches the PDF, not the Word file), page 1's header and the double click in `pages.md`, `writing.md:26` rewritten for the user, the Editing table in `shortcuts.md` aligned, the PDF list in `files.md`, the mouse and the third-party notices in `faq.md` (linked on GitHub; `public/THIRD-PARTY-NOTICES.txt` arrives with engine/release), and `table-mouse.gif` re-recorded (the "+" is clicked as an element now, and the row move and the "+" take). All shots regenerated with `make docs-screenshots`.
   - `docs/guide/tables.md:140` stays until the integrator says merged cells and lists in cells have landed.
 
+## Review fixes
+
+From the self-review (the integrator's order; M1 is with engine-editor):
+
+- [x] M4. A removed bands canvas is freed: `Painter.release`, called when a layer's canvas goes and after a leaving page's copy is taken
+- [ ] M3. The bands as strip canvases sized to the margins, not kept as bitmaps; the cache's page count at 2× before and after
+- [ ] M2. E2E ink checks after an edit prove the repaint, not old pixels
+- [ ] M5. The engine-failure spec types and finds a token of its own
+- [ ] M6. The last rendering check waits and compares with the first reading
+- [ ] Selection: the selected text in a contrasting colour, on a layer of its own, at 4.5:1 in every theme
+- [ ] 1. The edge line follows `engineMissing` at runtime
+- [ ] 3. The view keeps its place when the header or properties room changes
+- [ ] 4. A switch renders the target range right away
+- [ ] 6. Queued paints: cancelled on early returns, and a failing job doesn't strand the queue
+- [ ] 7. The bitmap cache is cleared on an engine change and drops a page's superseded key
+- [ ] 8. Less work per key in the first header and the overlay's under layer
+- [ ] 9. "Page N of M": a stable live region, announcing a change of page only
+- [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
+- [ ] 11. The test gaps
+- [ ] 2. Shift + right click: the docs and comments say what each path does
+
 ## Waiting on
 
 - Merged cells and block content in cells: the limit line at `docs/guide/tables.md:140` stays until the integrator says.

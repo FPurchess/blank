@@ -144,6 +144,13 @@ export class Canvas2DPainter implements Painter {
     }
   }
 
+  // a canvas without pixels holds no backing store, which would otherwise
+  // stay until the canvas is collected
+  release(surface: Surface) {
+    surface.canvas.width = 0;
+    surface.canvas.height = 0;
+  }
+
   show(surface: Surface, snapshot: Snapshot) {
     this.clear(surface);
     (surface as Canvas2DSurface).context.drawImage(

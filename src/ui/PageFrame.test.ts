@@ -35,6 +35,7 @@ const recorder = () => {
   const painted: number[] = [];
   const layers: string[] = [];
   const shown: number[] = [];
+  const released: string[] = [];
   const fake: Painter = {
     snapshots: true,
     surface: (canvas) => ({ canvas }),
@@ -49,8 +50,9 @@ const recorder = () => {
       height: surface.canvas.height,
     }),
     show: (surface) => shown.push(pageOf(surface.canvas)),
+    release: (surface) => released.push(layerOf(surface.canvas)),
   };
-  return { fake, painted, layers, shown };
+  return { fake, painted, layers, shown, released };
 };
 
 // what the editor's plugin publishes once the engine laid out `laidOut`
@@ -111,6 +113,9 @@ describe("the pages and the painter", () => {
     pageView.value = "page-ends";
     pageBitmaps.clear();
     document.body.replaceChildren();
+    // what the queue still waits for runs on the fake timers, or it would
+    // stay scheduled for the next test
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
@@ -238,6 +243,42 @@ describe("the pages and the painter", () => {
       // the queue runs what that asked for, before the timers are real again
       await paintQueued();
     }
+  });
+
+  it("frees the canvas of the headers and footers when page ends drops it", async () => {
+    const { fake, layers, released } = recorder();
+    setPainter(fake);
+    pageView.value = "pages";
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const sheets = view().querySelectorAll(".page-frame").length;
+    expect(released).toEqual([]);
+    pageView.value = "page-ends";
+    await paintQueued();
+    // each sheet's bands canvas, and only that
+    expect(released.filter((layer) => layer === "bands")).toHaveLength(sheets);
+    expect(released).not.toContain("body");
+    layers.length = 0;
+    // back on the sheets, the new canvases are painted
+    pageView.value = "pages";
+    await paintQueued();
+    expect(layers.filter((layer) => layer.endsWith(":bands")).length).toBe(
+      view().querySelectorAll(".page-frame").length,
+    );
+  });
+
+  it("frees a page's canvases once it leaves the view", async () => {
+    const { fake, released } = recorder();
+    setPainter(fake);
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await paintQueued();
+    const desk = view().querySelector<HTMLElement>(".page-desk")!;
+    await scrollTo(parseFloat(desk.style.height));
+    await flushPromises();
+    // after the copy of what it showed was taken
+    expect(released).toContain("body");
   });
 
   it("paints again when the pages are shown at another size", async () => {

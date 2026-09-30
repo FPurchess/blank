@@ -43,4 +43,6 @@ export interface Painter {
   snapshot(surface: Surface): Promise<Snapshot | null>;
   // shows a snapshot this painter made
   show(surface: Surface, snapshot: Snapshot): void;
+  // frees what a surface holds, once its canvas is gone from the page
+  release(surface: Surface): void;
 }

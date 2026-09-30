@@ -3,7 +3,6 @@ import {
   computed,
   onBeforeUnmount,
   onMounted,
-  onUnmounted,
   onUpdated,
   useTemplateRef,
   watch,
@@ -104,8 +103,20 @@ const layerOf = (
   // the canvas as the painter paints into it, taken when it's there
   let surface: Surface | null = null;
   const surfaceOf = (canvas: HTMLCanvasElement) => {
-    if (surface?.canvas !== canvas) surface = painter.surface(canvas);
+    if (surface?.canvas !== canvas) {
+      if (surface) painter.release(surface);
+      surface = painter.surface(canvas);
+      shown = "";
+    }
     return surface;
+  };
+  // the layer's canvas is gone, e.g. the bands' in "page ends": nothing of
+  // it is kept or painted any more
+  const release = () => {
+    paintQueue.cancel(job());
+    if (surface) painter.release(surface);
+    surface = null;
+    shown = "";
   };
   // a layer has its own place in the queue, so a newer request replaces one
   // that hasn't run yet
@@ -132,7 +143,8 @@ const layerOf = (
    */
   const paint = () => {
     const canvas = element();
-    if (!canvas || !pageEngine) return;
+    if (!canvas) return release();
+    if (!pageEngine) return;
     const { ratio } = props;
     // a device pixel for each pixel of the canvas, which is shown at
     // exactly its size, so nothing scales it and blurs the text
@@ -198,17 +210,23 @@ const layerOf = (
    * paint
    */
   const keep = () => {
-    if (!element() || !shown || !surface || !painter.snapshots) return;
-    if (pageBitmaps.get(shown)) return;
+    const kept = surface;
+    if (!element() || !shown || !kept) return release();
+    if (!painter.snapshots || pageBitmaps.get(shown)) return release();
     const key = shown;
-    painter.snapshot(surface).then(
-      (snapshot) => snapshot && pageBitmaps.set(key, snapshot),
-      () => {},
+    paintQueue.cancel(job());
+    surface = null;
+    // freed once the copy is taken
+    painter.snapshot(kept).then(
+      (snapshot) => {
+        if (snapshot) pageBitmaps.set(key, snapshot);
+        painter.release(kept);
+      },
+      () => painter.release(kept),
     );
   };
 
-  const cancel = () => paintQueue.cancel(job());
-  return { paint, keep, cancel };
+  return { paint, keep };
 };
 
 const body = layerOf(
@@ -228,8 +246,9 @@ const bands = layerOf(
 const layers = [body, bands];
 
 onMounted(() => layers.forEach((layer) => layer.paint()));
+// what they show is kept for when the page comes back, and their canvases
+// freed
 onBeforeUnmount(() => layers.forEach((layer) => layer.keep()));
-onUnmounted(() => layers.forEach((layer) => layer.cancel()));
 // what changes either layer
 const shownAt = () => [
   props.width,

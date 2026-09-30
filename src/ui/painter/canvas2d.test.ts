@@ -101,4 +101,13 @@ describe("Canvas2DPainter", () => {
     expect(bitmap.close).toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it("frees a canvas' pixels when its surface is released", () => {
+    const { painter } = setUp();
+    const canvas = document.createElement("canvas");
+    canvas.width = 200;
+    canvas.height = 100;
+    painter.release(painter.surface(canvas)!);
+    expect([canvas.width, canvas.height]).toEqual([0, 0]);
+  });
 });
