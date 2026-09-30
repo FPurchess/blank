@@ -8,7 +8,7 @@ deletes this file on merge.
 - [x] 1. An engine error never blocks boot or breaks editing (B2, JS side)
 - [x] B. `blank.engine=off` starts Blank without the engine
 - [x] 2. Without the engine, a fully usable plain editor (B3)
-- [ ] A. `HEADER_ROOM` above the first page's header in "page ends"
+- [x] A. `HEADER_ROOM` above the first page's header in "page ends"
 - [ ] 3. ↑/↓ and End keep the line affinity — waiting for S1
 - [ ] 4. Flatten only the blocks a transaction changed (the shifting part and band versions wait for S6)
 - [ ] 5. One unit for the column goal of ↑/↓ and Page Up/Down
@@ -58,3 +58,6 @@ deletes this file on merge.
   in `src/editor/commands/exportAs.ts`, sent as a notification and through
   `announce()` (so `#ui-announcement`), for "off" and "unavailable". After a
   runtime failure ("failed"), PDF export still works (worker).
+- engine-ui: `PageLayoutState.header` (added here word for word as agreed)
+  is filled from `engine.bands(0)`; `FrameLayout.headerRoom` is
+  `HEADER_ROOM` (20) in "page ends" when it's set, else 0.

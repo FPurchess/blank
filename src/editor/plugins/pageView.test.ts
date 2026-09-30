@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  transaction,
   pageCaret,
   pageComposition,
   pageLayoutState,
@@ -12,7 +13,15 @@ import {
   pageScrollRequest,
   pageSelection,
 } from "../../state";
-import { doc, keyEvent, p, table, td, tr } from "../../test/editor";
+import {
+  doc,
+  docWithFrontmatter,
+  keyEvent,
+  p,
+  table,
+  td,
+  tr,
+} from "../../test/editor";
 import {
   ENGINE_FAILED,
   forgetEngineFailure,
@@ -276,5 +285,34 @@ describe("the page view's plugins without the engine", () => {
     ).toBe(true);
     mounted.view.destroy();
     hidePages();
+  });
+});
+
+describe("the first page's header", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+  });
+
+  const publish = (frontmatter: string) => {
+    const node = docWithFrontmatter(frontmatter, p("text"));
+    // the page setup comes from the document of the last transaction
+    transaction.value = EditorState.create({ schema, doc: node }).tr;
+    showPages();
+    const mounted = mount(node);
+    const header = pageLayoutState.value?.header;
+    mounted.view.destroy();
+    return header;
+  };
+
+  it("is published when the first page has header text", () => {
+    expect(publish("page:\n  header:\n    left: Report")).toBe(true);
+  });
+
+  it("isn't without a header, or with a plain first page", () => {
+    expect(publish("title: x")).toBe(false);
+    expect(
+      publish("page:\n  header:\n    left: Report\n  first-page: plain"),
+    ).toBe(false);
   });
 });

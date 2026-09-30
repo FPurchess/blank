@@ -27,6 +27,9 @@ export interface PageLayoutState {
   // whether the line with the document's properties shows above the first
   // page (see src/ui/PageProperties.vue), which takes room there
   properties?: boolean;
+  // whether the first page has header text, which "page ends" shows in the
+  // room above its first frame
+  header?: boolean;
 }
 
 // null until the engine laid out the document

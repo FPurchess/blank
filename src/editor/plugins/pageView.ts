@@ -99,6 +99,8 @@ const publishLayout = (engine: PageEngine) => {
     versions: engine.versions(),
     bottoms: engine.bottoms(),
     properties: hasProperties.value,
+    // the header's left, center and right slots of the first page
+    header: engine.bands(0).slice(0, 3).some(Boolean),
   };
 };
 
