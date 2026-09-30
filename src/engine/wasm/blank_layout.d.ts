@@ -47,7 +47,15 @@ export class LayoutEngine {
      */
     hit(page: number, x: number, y: number): Float64Array;
     /**
-     * the start or end of the line a position is on, -1 for none
+     * the start or end of the line the caret at `pos` is painted on (as
+     * `after` says): [pos, after], where `after` is 1 if the caret there is
+     * to be painted at the end of its line, e.g. after a word broken where
+     * it is wider than the line; [] for none
+     */
+    lineBoundary(pos: number, after: boolean, end: boolean): Float64Array;
+    /**
+     * the start or end of the line a position is on, -1 for none; see
+     * `lineBoundary`, which also tells how to paint the caret there
      */
     lineEdge(pos: number, end: boolean): number;
     /**
@@ -55,7 +63,8 @@ export class LayoutEngine {
      */
     missing(): string;
     /**
-     * the fonts' files one after the other, with their lengths
+     * the fonts' files one after the other, with their lengths; throws if
+     * the lengths reach past the bytes
      */
     constructor(bytes: Uint8Array, lengths: Uint32Array);
     /**
@@ -120,6 +129,19 @@ export class LayoutEngine {
      * what each page shows changes with its version
      */
     versions(): Uint32Array;
+    /**
+     * the position a line up or down from the caret at `pos`, painted as
+     * `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+     * text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+     * where the caret at the new position is to be painted at the end of
+     * its line, 0 else
+     */
+    verticalAt(pos: number, after: boolean, down: boolean, goal: number): Float64Array;
+    /**
+     * the position a line up or down from `pos`, nearest to `goal`: [0,
+     * pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+     * which also tells how to paint the caret there
+     */
     vertical(pos: number, down: boolean, goal: number): Float64Array;
     word(page: number, x: number, y: number): Uint32Array;
     /**
@@ -144,9 +166,10 @@ export interface InitOutput {
     readonly layoutengine_clearImages: (a: number) => void;
     readonly layoutengine_glyphPath: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineEdge: (a: number, b: number, c: number) => number;
     readonly layoutengine_missing: (a: number) => [number, number];
-    readonly layoutengine_new: (a: number, b: number, c: number, d: number) => number;
+    readonly layoutengine_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly layoutengine_page: (a: number, b: number) => [number, number];
     readonly layoutengine_pageBands: (a: number, b: number) => [number, number];
     readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
@@ -163,6 +186,7 @@ export interface InitOutput {
     readonly layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_versions: (a: number) => [number, number];
     readonly layoutengine_vertical: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly layoutengine_verticalAt: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly layoutengine_word: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_words: (a: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;

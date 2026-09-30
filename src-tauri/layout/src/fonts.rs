@@ -80,6 +80,27 @@ fn face_of(data: Arc<Vec<u8>>, blob: u64, index: u32) -> FontFile {
     }
 }
 
+/// the font files laid one after the other in `bytes`, by their lengths;
+/// an error if the lengths reach past the bytes
+pub fn split_files(bytes: &[u8], lengths: &[u32]) -> Result<Vec<Vec<u8>>, String> {
+    let mut files = vec![];
+    let mut start = 0usize;
+    for length in lengths {
+        let end = start
+            .checked_add(*length as usize)
+            .filter(|end| *end <= bytes.len())
+            .ok_or_else(|| {
+                format!(
+                    "the font lengths add up to more than the {} bytes given",
+                    bytes.len()
+                )
+            })?;
+        files.push(bytes[start..end].to_vec());
+        start = end;
+    }
+    Ok(files)
+}
+
 impl Fonts {
     pub fn new(files: Vec<Vec<u8>>) -> Fonts {
         let mut fcx = FontContext {
@@ -192,3 +213,22 @@ pub const FONT_FILES: [&str; 14] = [
     "IBMPlexMono-Bold.ttf",
     "IBMPlexMono-BoldItalic.ttf",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn splits_font_files_by_their_lengths() {
+        let bytes = [1, 2, 3, 4, 5];
+        assert_eq!(
+            split_files(&bytes, &[2, 3]).unwrap(),
+            vec![vec![1, 2], vec![3, 4, 5]]
+        );
+        assert_eq!(split_files(&bytes, &[]).unwrap(), Vec::<Vec<u8>>::new());
+        // lengths past the end, or adding up past what a usize holds
+        assert!(split_files(&bytes, &[2, 4]).is_err());
+        assert!(split_files(&bytes, &[u32::MAX, u32::MAX]).is_err());
+        assert!(split_files(&[], &[1]).is_err());
+    }
+}

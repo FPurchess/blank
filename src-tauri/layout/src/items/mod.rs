@@ -13,7 +13,7 @@ use crate::style::{MARKER_GAP, RULE};
 use crate::text::TextBox;
 
 use table::table_units;
-pub use table::TableSpec;
+pub use table::{TableSpec, MAX_COLUMNS};
 
 /// what the colours of the screen and the PDF stand for
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -211,11 +211,13 @@ impl Laid {
             let marker_width = boxed.layout.width();
             boxed.x = item.indent - MARKER_GAP - marker_width;
             // on the baseline of the first line
-            let baseline = match (&item.content, first.line) {
-                (Content::Text(_), Some(_)) => laid.texts[0].lines()[0].baseline,
-                _ => boxed.lines()[0].baseline,
+            let first_baseline =
+                |boxed: &TextBox| boxed.lines().first().map_or(0.0, |line| line.baseline);
+            let baseline = match (&item.content, first.line, laid.texts.first()) {
+                (Content::Text(_), Some(_), Some(text)) => first_baseline(text),
+                _ => first_baseline(&boxed),
             };
-            boxed.y = baseline - boxed.lines()[0].baseline;
+            boxed.y = baseline - first_baseline(&boxed);
             laid.marker = Some(boxed);
         }
         laid

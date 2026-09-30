@@ -7,7 +7,7 @@ use std::fmt::Write;
 use wasm_bindgen::prelude::*;
 
 use crate::engine::{Changes, Engine, Hit, Op};
-use crate::fonts::Fonts;
+use crate::fonts::{split_files, Fonts};
 use crate::model::{Item, Settings};
 use crate::pdf::{self, ImageData, Info};
 
@@ -15,6 +15,23 @@ use crate::pdf::{self, ImageData, Info};
 pub struct LayoutEngine {
     engine: Engine,
     images: HashMap<String, ImageData>,
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// writes a panic to the console before the instance traps: with `panic =
+/// "abort"` it would trap without a word, and every later call would throw
+fn report_panics() {
+    static HOOK: std::sync::Once = std::sync::Once::new();
+    HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            console_error(&format!("the layout engine panicked: {info}"));
+        }));
+    });
 }
 
 fn error(message: impl std::fmt::Display) -> JsError {
@@ -114,20 +131,16 @@ fn string(out: &mut String, value: &str) {
 
 #[wasm_bindgen]
 impl LayoutEngine {
-    /// the fonts' files one after the other, with their lengths
+    /// the fonts' files one after the other, with their lengths; throws if
+    /// the lengths reach past the bytes
     #[wasm_bindgen(constructor)]
-    pub fn new(bytes: &[u8], lengths: &[u32]) -> LayoutEngine {
-        let mut files = vec![];
-        let mut start = 0usize;
-        for length in lengths {
-            let end = start + *length as usize;
-            files.push(bytes[start..end].to_vec());
-            start = end;
-        }
-        LayoutEngine {
+    pub fn new(bytes: &[u8], lengths: &[u32]) -> Result<LayoutEngine, JsError> {
+        report_panics();
+        let files = split_files(bytes, lengths).map_err(error)?;
+        Ok(LayoutEngine {
             engine: Engine::new(Fonts::new(files)),
             images: HashMap::new(),
-        }
+        })
     }
 
     /// sets the page; the pages that changed, as `update` gives them
@@ -273,17 +286,53 @@ impl LayoutEngine {
         }
     }
 
+    /// the position a line up or down from `pos`, nearest to `goal`: [0,
+    /// pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+    /// which also tells how to paint the caret there
     pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Vec<f64> {
-        hit(self.engine.vertical(pos, down, goal))
+        hit(self
+            .engine
+            .vertical(pos, false, down, goal)
+            .map(|(hit, _)| hit))
     }
 
-    /// the start or end of the line a position is on, -1 for none
+    /// the position a line up or down from the caret at `pos`, painted as
+    /// `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+    /// text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+    /// where the caret at the new position is to be painted at the end of
+    /// its line, 0 else
+    #[wasm_bindgen(js_name = verticalAt)]
+    pub fn vertical_at(&self, pos: u32, after: bool, down: bool, goal: f32) -> Vec<f64> {
+        match self.engine.vertical(pos, after, down, goal) {
+            Some((found, after)) => {
+                let mut values = hit(Some(found));
+                values.push(if after { 1.0 } else { 0.0 });
+                values
+            }
+            None => vec![],
+        }
+    }
+
+    /// the start or end of the line a position is on, -1 for none; see
+    /// `lineBoundary`, which also tells how to paint the caret there
     #[wasm_bindgen(js_name = lineEdge)]
     pub fn line_edge(&self, pos: u32, end: bool) -> f64 {
         self.engine
-            .line_edge(pos, end)
-            .map(|pos| pos as f64)
+            .line_edge(pos, false, end)
+            .map(|(pos, _)| pos as f64)
             .unwrap_or(-1.0)
+    }
+
+    /// the start or end of the line the caret at `pos` is painted on (as
+    /// `after` says): [pos, after], where `after` is 1 if the caret there is
+    /// to be painted at the end of its line, e.g. after a word broken where
+    /// it is wider than the line; [] for none
+    #[wasm_bindgen(js_name = lineBoundary)]
+    pub fn line_boundary(&self, pos: u32, after: bool, end: bool) -> Vec<f64> {
+        match self.engine.line_edge(pos, after, end) {
+            Some((pos, after)) => vec![pos as f64, if after { 1.0 } else { 0.0 }],
+            None => vec![],
+        }
     }
 
     /// the selection's rectangles: page, x, y, width and height each

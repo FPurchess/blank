@@ -240,7 +240,10 @@ impl Paginator<'_> {
     /// places a unit; false once the pages settled
     fn place(&mut self, item: usize, unit: usize, y: f32, repeat: bool) -> bool {
         let height = self.laid[item].units[unit].height;
-        let page = self.pages.last_mut().unwrap();
+        // run opens the first page before it places anything
+        let Some(page) = self.pages.last_mut() else {
+            return false;
+        };
         if !repeat && page.first.is_none() {
             page.first = Some((item, unit));
             if let Some((tail, old_pages, _)) = self.old {
@@ -261,8 +264,9 @@ impl Paginator<'_> {
                         // chapters and the page count are worked out again
                         // afterwards. So drop this page, and the old
                         // ones follow from here
-                        let page = self.pages.pop().unwrap();
-                        self.frags.truncate(page.start);
+                        if let Some(page) = self.pages.pop() {
+                            self.frags.truncate(page.start);
+                        }
                         if let Some(last) = self.pages.last_mut() {
                             last.end = self.frags.len();
                         }
@@ -280,9 +284,11 @@ impl Paginator<'_> {
         });
         self.y = y + height;
         self.empty = false;
-        let page = self.pages.last_mut().unwrap();
-        page.bottom = page.bottom.max(self.y);
-        page.end = self.frags.len();
+        let end = self.frags.len();
+        if let Some(page) = self.pages.last_mut() {
+            page.bottom = page.bottom.max(self.y);
+            page.end = end;
+        }
         true
     }
 
