@@ -301,6 +301,21 @@ describe("an engine that fails", () => {
     expect(mounted.press("ArrowDown")).toBe(false);
   });
 
+  it("shows no pages when it fails while a long document is laid out", () => {
+    vi.useFakeTimers();
+    const engine = showPages();
+    const mounted = mount(doc(...Array.from({ length: 300 }, () => p(LONG))));
+    destroy = () => mounted.view.destroy();
+    expect(engine.laying).toBe(true);
+    vi.spyOn(engine.raw, "pageCount").mockImplementation(trap);
+
+    vi.runAllTimers();
+
+    expect(pageEngine).toBeNull();
+    expect(pageLayoutState.value).toBeNull();
+    vi.useRealTimers();
+  });
+
   it("mounts the editor when the first layout fails", () => {
     const engine = showPages();
     vi.spyOn(engine.raw, "setItems").mockImplementation(trap);

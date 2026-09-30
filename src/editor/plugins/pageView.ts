@@ -139,7 +139,7 @@ const hasProperties = computed(() => summarize(frontmatter.value) !== null);
 const publishLayout = (engine: PageEngine) => {
   const { layout } = pageLayout.value;
   const { width, height, margins } = pageGeometry(layout);
-  pageLayoutState.value = {
+  const state = {
     width,
     height,
     margins,
@@ -152,6 +152,8 @@ const publishLayout = (engine: PageEngine) => {
     // the header's left, center and right slots of the first page
     header: engine.bands(0).slice(0, 3).some(Boolean),
   };
+  // an engine that failed while it was asked has given up, and shows nothing
+  if (!engine.broken) pageLayoutState.value = state;
 };
 
 /**
@@ -409,7 +411,7 @@ export const pageSync = () => {
         // chunk at a time, which each shows as it comes
         ready.onProgress = () => {
           publishLayout(ready);
-          publishSelection(ready, view.state, false);
+          if (!ready.broken) publishSelection(ready, view.state, false);
         };
         sync(ready, view.state, frozen, { progressive: true });
         // an engine that fails on the document gives up before it watches
