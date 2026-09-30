@@ -7,6 +7,7 @@ import {
 } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { Slice } from "prosemirror-model";
+import { canSplit } from "prosemirror-transform";
 import { sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
   type Command,
@@ -193,6 +194,20 @@ describe("incremental layout", () => {
         select();
         ed.run(setBlockType(schema.nodes.paragraph));
       },
+      // two places apart in one transaction, e.g. a replace of all
+      () => {
+        const [from, to] = span();
+        const tr = ed.state.tr.insertText("b", to);
+        tr.insertText("a", from);
+        ed.apply(tr);
+      },
+      // a new block at one place and text at another, in one transaction
+      () => {
+        const [from, to] = span();
+        const tr = ed.state.tr.insertText("b", to);
+        if (canSplit(tr.doc, from)) tr.split(from);
+        ed.apply(tr);
+      },
       () => ed.run(undo),
       () => ed.run(redo),
       // the frontmatter, which isn't flattened
@@ -265,6 +280,42 @@ describe("incremental layout", () => {
     });
     const keys = (records: FlatRecord[]) => records.map((record) => record.key);
     expect(keys(recordsOf(engine))).toEqual(keys(flatten(state.doc, noSizes)));
+  });
+
+  it("hands changes apart to the engine in one call", () => {
+    const node = doc(
+      ...Array.from({ length: 100 }, (_, index) => p(`Paragraph ${index}`)),
+    );
+    const state = EditorState.create({ schema, doc: node });
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    engine.sync(node, noSizes);
+    const tr = state.tr.insertText("far ", node.content.size - 3);
+    tr.insertText("near ", 3);
+    const tracked = trackChanges(
+      tr,
+      { from: null, ranges: [] },
+      state,
+      engine.syncedDoc,
+    );
+    const next = state.apply(tr).doc;
+    const many = vi.spyOn(engine.raw, "updateMany");
+    const flattened = vi.spyOn(flattening, "flattenBlocks");
+
+    engine.sync(next, noSizes, {
+      changes: { from: tracked.from!, ranges: tracked.ranges },
+    });
+
+    expect(many).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(many.mock.calls[0][0])).toHaveLength(2);
+    expect(flattened).toHaveBeenCalledTimes(2);
+    const fresh = testEngine();
+    fresh.setSettings(testLayout(), documentFields(next));
+    fresh.sync(next, noSizes);
+    expect(pagesOf(engine)).toEqual(pagesOf(fresh));
+    expect(recordsOf(engine).map((record) => record.pos)).toEqual(
+      flatten(next, noSizes).map((record) => record.pos),
+    );
   });
 
   it("flattens it all when the changes count from another document", () => {

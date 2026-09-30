@@ -121,6 +121,8 @@ const publishLayout = (engine: PageEngine) => {
     margins,
     pages: engine.pages(),
     versions: engine.versions(),
+    bodyVersions: engine.bodyVersions(),
+    bandVersions: engine.bandVersions(),
     bottoms: engine.bottoms(),
     properties: hasProperties.value,
     // the header's left, center and right slots of the first page

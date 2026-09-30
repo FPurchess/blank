@@ -18,6 +18,7 @@ import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
 import { packFonts } from "./pdfJob";
+import type { EngineItem } from "./types";
 
 // The layout engine (src-tauri/layout, built for the webview by
 // scripts/build-engine.sh) and what it needs: its fonts, the document as
@@ -189,6 +190,93 @@ const startsOf = (blocks: FlatRecord[][], start: number) => {
   return starts;
 };
 
+// the size of the top-level blocks of `doc` from `from` to before `to`
+const sizeOf = (doc: Node, from: number, to: number) => {
+  let size = 0;
+  for (let index = from; index < to; index++) size += doc.child(index).nodeSize;
+  return size;
+};
+
+// the blocks from `from` to `to` of the new document, which replace those
+// from `oldFrom` to `oldTo` of the old one
+interface Group {
+  from: number;
+  to: number;
+  oldFrom: number;
+  oldTo: number;
+}
+
+/**
+ * matchGroups joins the touched blocks of `doc` that meet into groups, and
+ * finds the blocks of `old` each replaces. The blocks between the groups
+ * must be the same nodes in both, as ProseMirror keeps the nodes a change
+ * left alone.
+ * @returns null when they aren't
+ */
+const matchGroups = (
+  old: Node,
+  doc: Node,
+  touched: [number, number][],
+): Group[] | null => {
+  const count = doc.childCount;
+  const clamp = (index: number) => Math.max(0, Math.min(index, count - 1));
+  const joined: [number, number][] = [];
+  for (const [from, to] of touched
+    .map(([from, to]): [number, number] => [
+      clamp(Math.min(from, to)),
+      clamp(Math.max(from, to)),
+    ])
+    .sort((a, b) => a[0] - b[0])) {
+    const last = joined[joined.length - 1];
+    if (last && from <= last[1] + 1) last[1] = Math.max(last[1], to);
+    else joined.push([from, to]);
+  }
+  // the last block of `old` a group ending at `to` replaces: the one before
+  // the next block, which is the same in both
+  const oldEnd = (oldFrom: number, to: number) => {
+    if (to + 1 >= count) return old.childCount - 1;
+    const next = doc.child(to + 1);
+    for (let index = oldFrom; index < old.childCount; index++)
+      if (old.child(index) === next) return index - 1;
+    return null;
+  };
+  const groups: Group[] = [];
+  let at = 0;
+  let oldAt = 0;
+  for (let index = 0; index < joined.length; index++) {
+    const from = joined[index][0];
+    let to = joined[index][1];
+    for (let block = at; block < from; block++)
+      if (old.maybeChild(oldAt + block - at) !== doc.child(block)) return null;
+    const oldFrom = oldAt + from - at;
+    let oldTo = oldEnd(oldFrom, to);
+    if (oldTo === null) return null;
+    // the space above a heading depends on the block before it
+    for (;;) {
+      const next = doc.maybeChild(to + 1);
+      if (
+        next?.type.name !== "heading" ||
+        (to - from === oldTo - oldFrom &&
+          old.maybeChild(oldTo)?.type === doc.child(to).type)
+      )
+        break;
+      to++;
+      while (index + 1 < joined.length && joined[index + 1][0] <= to + 1)
+        to = Math.max(to, joined[++index][1]);
+      oldTo = oldEnd(oldFrom, to);
+      if (oldTo === null) return null;
+    }
+    if (oldTo < oldFrom - 1) return null;
+    groups.push({ from, to, oldFrom, oldTo });
+    at = to + 1;
+    oldAt = oldTo + 1;
+  }
+  if (count - at !== old.childCount - oldAt) return null;
+  for (let block = at; block < count; block++)
+    if (old.child(oldAt + block - at) !== doc.child(block)) return null;
+  return groups;
+};
+
 // how many items the first layout of a long document lays out before the
 // pages show, a few pages' worth, and then at a time
 const FIRST_ITEMS = 60;
@@ -210,6 +298,12 @@ export class PageEngine {
   private settings = "";
   private frozen = "";
   private displays = new Map<
+    number,
+    { version: number; display: PageDisplay }
+  >();
+  // what each page's body and bands show, by their own versions
+  private bodies = new Map<number, { version: number; display: PageDisplay }>();
+  private bandsShown = new Map<
     number,
     { version: number; display: PageDisplay }
   >();
@@ -300,7 +394,11 @@ export class PageEngine {
       this.raw.addFont(font.bytes, font.family);
       added = true;
     }
-    if (added) this.displays.clear();
+    if (added) {
+      this.displays.clear();
+      this.bodies.clear();
+      this.bandsShown.clear();
+    }
     return added;
   }
 
@@ -405,8 +503,10 @@ export class PageEngine {
   /**
    * syncBlocks flattens only the top-level blocks the changed ranges of
    * `doc` touch, and the `extra` ones, and keeps the records of all others.
-   * The engine moves the items after them itself.
-   * @returns false when that isn't cheaper than flattening it all
+   * Blocks apart are handed over as separate changes in one call; the
+   * engine moves the items after each itself.
+   * @returns false when that isn't cheaper than flattening it all, or the
+   *   blocks between the changes aren't the same
    */
   private syncBlocks(
     doc: Node,
@@ -416,57 +516,67 @@ export class PageEngine {
     frozen: FrozenWidths | null,
   ) {
     const old = this.doc!;
-    const count = doc.childCount;
-    const delta = count - old.childCount;
-    let from = Infinity;
-    let to = -Infinity;
-    for (const [start, end] of ranges) {
-      from = Math.min(from, blockAt(doc, start));
-      to = Math.max(to, blockAt(doc, end));
-    }
-    for (const index of extra) {
-      from = Math.min(from, index);
-      to = Math.max(to, index);
-    }
-    if (from === Infinity) {
+    const touched: [number, number][] = [
+      ...ranges.map(([start, end]): [number, number] => [
+        blockAt(doc, start),
+        blockAt(doc, end),
+      ]),
+      ...extra.map((index): [number, number] => [index, index]),
+    ];
+    if (touched.length === 0) {
       // e.g. only the frontmatter changed, which the settings bring
-      if (delta !== 0) return false;
+      if (doc.childCount !== old.childCount) return false;
       this.doc = doc;
       return true;
     }
-    from = Math.max(0, Math.min(from, count - 1));
-    to = Math.max(from, Math.min(to, count - 1));
-    let oldTo = to - delta;
-    // the space above a heading depends on the block before it
-    const next = to + 1 < count ? doc.child(to + 1) : null;
-    if (
-      next?.type.name === "heading" &&
-      (delta !== 0 || old.maybeChild(oldTo)?.type !== doc.child(to).type)
-    ) {
-      to++;
-      oldTo++;
-    }
-    if (oldTo < from - 1 || oldTo >= old.childCount) return false;
-    if (to - from + 1 > Math.max(MAX_BLOCKS, count / 2)) return false;
+    const groups = matchGroups(old, doc, touched);
+    if (!groups) return false;
+    const flattened = groups.reduce(
+      (sum, group) => sum + group.to - group.from + 1,
+      0,
+    );
+    if (flattened > Math.max(MAX_BLOCKS, doc.childCount / 2)) return false;
 
-    const fresh = flattenBlocks(doc, from, to + 1, sizes, frozen);
-    const records = fresh.flat();
-    const start = this.blockStarts[from];
-    const end = this.blockStarts[oldTo + 1];
-    const shift = doc.content.size - old.content.size;
-    this.send(diff(this.records.slice(start, end), records, shift), start);
-    // the records after them keep what they are, at their new positions;
-    // they are never built again, since the engine has them already
-    for (let index = end; index < this.records.length; index++)
-      this.records[index].pos += shift;
-    this.records.splice(start, end - start, ...records);
-    const moved = records.length - (end - start);
-    this.blockStarts = [
-      ...this.blockStarts.slice(0, from),
-      // the end of the fresh blocks is where the next block starts
-      ...startsOf(fresh, start).slice(0, -1),
-      ...this.blockStarts.slice(oldTo + 1).map((index) => index + moved),
-    ];
+    const entries: [number, number, EngineItem[], number][] = [];
+    // how many blocks the groups before added, to find the next one's
+    let moved = 0;
+    for (const { from, to, oldFrom, oldTo } of groups) {
+      const fresh = flattenBlocks(doc, from, to + 1, sizes, frozen);
+      const records = fresh.flat();
+      const start = this.blockStarts[oldFrom + moved];
+      const end = this.blockStarts[oldTo + 1 + moved];
+      const shift = sizeOf(doc, from, to + 1) - sizeOf(old, oldFrom, oldTo + 1);
+      const change = diff(this.records.slice(start, end), records, shift);
+      if (change.delete > 0 || change.records.length > 0 || shift !== 0) {
+        entries.push([
+          start + change.start,
+          change.delete,
+          change.records.map((record) => record.build()),
+          shift,
+        ]);
+      }
+      // the records after them keep what they are, at their new positions;
+      // they are never built again, since the engine has them already
+      for (let index = end; index < this.records.length; index++)
+        this.records[index].pos += shift;
+      this.records.splice(start, end - start, ...records);
+      const added = records.length - (end - start);
+      this.blockStarts = [
+        ...this.blockStarts.slice(0, oldFrom + moved),
+        // the end of the fresh blocks is where the next block starts
+        ...startsOf(fresh, start).slice(0, -1),
+        ...this.blockStarts
+          .slice(oldTo + 1 + moved)
+          .map((index) => index + added),
+      ];
+      moved += to - from - (oldTo - oldFrom);
+    }
+    if (entries.length === 1) {
+      const [start, count, items, shift] = entries[0];
+      this.raw.update(start, count, JSON.stringify(items), shift);
+    } else if (entries.length > 1) {
+      this.raw.updateMany(JSON.stringify(entries));
+    }
     this.doc = doc;
     return true;
   }
@@ -570,6 +680,7 @@ export class PageEngine {
 
   /**
    * display returns what a page shows, read again only when it changed
+   * @deprecated paint bodyDisplay and bandDisplay, which change apart
    */
   display(page: number, version: number): PageDisplay {
     const cached = this.displays.get(page);
@@ -579,6 +690,50 @@ export class PageEngine {
       this.displays.set(page, { version, display });
       return display;
     });
+  }
+
+  /**
+   * bodyDisplay returns what a page's body shows, without its header and
+   * footer, read again only when its body version changed
+   */
+  bodyDisplay(page: number, version: number): PageDisplay {
+    return this.cachedDisplay(this.bodies, page, version, () =>
+      this.raw.pageBody(page),
+    );
+  }
+
+  /**
+   * bandDisplay returns what a page's header and footer show, read again
+   * only when its band version changed
+   */
+  bandDisplay(page: number, version: number): PageDisplay {
+    return this.cachedDisplay(this.bandsShown, page, version, () =>
+      this.raw.pageBands(page),
+    );
+  }
+
+  private cachedDisplay(
+    cache: Map<number, { version: number; display: PageDisplay }>,
+    page: number,
+    version: number,
+    read: () => string,
+  ): PageDisplay {
+    const cached = cache.get(page);
+    if (cached?.version === version) return cached.display;
+    return this.call(EMPTY_DISPLAY, () => {
+      const display = JSON.parse(read()) as PageDisplay;
+      cache.set(page, { version, display });
+      return display;
+    });
+  }
+
+  // the versions of each page's body, and of its header and footer
+  bodyVersions() {
+    return this.call(new Uint32Array(), () => this.raw.bodyVersions());
+  }
+
+  bandVersions() {
+    return this.call(new Uint32Array(), () => this.raw.bandVersions());
   }
 
   /**

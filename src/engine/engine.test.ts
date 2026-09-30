@@ -177,3 +177,31 @@ describe("bootEngine", () => {
     expect(engineStatus()).toBe("ready");
   });
 });
+
+describe("the body and the bands of a page", () => {
+  it("are read again only when their own versions change", () => {
+    const layout = {
+      ...testLayout(),
+      footer: { left: "", center: "Page {page}", right: "" },
+    };
+    const node = doc(p("Some text"));
+    const engine = testEngine();
+    engine.setSettings(layout, documentFields(node));
+    engine.sync(node, noSizes);
+    const body = engine.bodyDisplay(0, engine.bodyVersions()[0]);
+    const bands = engine.bandDisplay(0, engine.bandVersions()[0]);
+    expect(body.g.length).toBeGreaterThan(0);
+    expect(bands.g.length).toBeGreaterThan(0);
+    // the same page, both layers
+    const glyphs = (display: { g: number[][] }) =>
+      display.g.reduce((sum, run) => sum + (run.length - 3) / 3, 0);
+    expect(glyphs(body) + glyphs(bands)).toBe(
+      glyphs(engine.display(0, engine.versions()[0])),
+    );
+
+    const typed = doc(p("Some more text"));
+    engine.sync(typed, noSizes);
+    expect(engine.bandDisplay(0, engine.bandVersions()[0])).toBe(bands);
+    expect(engine.bodyDisplay(0, engine.bodyVersions()[0])).not.toBe(body);
+  });
+});
