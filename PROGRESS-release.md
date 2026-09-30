@@ -32,3 +32,24 @@
 - [x] `make engine` twice: byte-identical, and identical to the committed wasm at 2c68fa7 (not staged)
 - [x] actionlint on all workflows
 - [x] E2E on port 4531: launch, rendering, pageEngine: 3/3 passed
+
+## Review fixes (after the self-review, from the integrator's list)
+
+Merged spike/page-view-engine at bcf725b (f36f3ba), then one commit each:
+
+- [x] B1: `--strip-producers` in wasm-opt, and `scripts/wasm-producers.ts` fails the build if a producers section is left (57a7412). Both the cargo-installed and the prebuilt wasm-bindgen now give byte-identical files.
+- [x] M1 + M2: a script's fallback family counts only if it has the characters and may be embedded; the rest are found by coverage, the families already found first (9c9780b). The CLAUDE.md gotcha is fixed.
+- [x] M4: Mod+click isn't presented as new (c898438).
+- [x] M5 + M6: the seam on the base's API, the four engine states, and the PDF export loading its own engine (ecdb592). SEAM.md is kept.
+- [x] M7: qpdf in the action, and the docs say every PDF check fails on CI without its tool (c0da825). engine-core gates read_text, pdfinfo and qpdf.
+- [x] CI and build minors: every engine run of a commit must pass, binaryen 132.0.0, the target dir from cargo metadata (6c0eb6c)
+- [x] Fonts minors: an unreadable OS/2 table isn't embeddable; comments on the poison and the held lock (3a1a67d). "Symbols try the families already found" is in 9c9780b. Trimming family names isn't done: the system name is already trimmed ("Mitra"), and the engine reads "Mitra " from the file itself, so the fix belongs in the engine's `Fonts::add` (engine-core), e.g. trimming the names it registers.
+- [x] Docs minors (d78e1ad)
+- [ ] M8, macOS 12: edited but NOT committed. The commit was blocked by the permission check and waits for the user's go-ahead. The uncommitted files are tauri.conf.json (minimumSystemVersion 12.0), CLAUDE.md, layout-engine.md, SPIKE.md (the notes "Blank 3 needs macOS 12 or newer", the decision, and the checklist with Monterey as the oldest Mac) and docs/guide/install.md.
+
+Final checks (on d78e1ad plus the uncommitted M8 files):
+- actionlint clean; fonts tests 17/17; `make notices` gives no diff
+- `make engine` twice: byte-identical, `blank_layout_bg.wasm` f5d055ac5e3d34ff7cc55b8e3acb353782522bb9875c2a0c0377f0759d2169dd (3245432 bytes), `blank_layout.js` 6dfa3b01…, no producers section. Not committed.
+- A flake in engine-editor's `src/main.test.ts`: twice, under the whole suite in the pre-commit hook, "Vitest caught 1 unhandled error … originated in src/main.test.ts". It passes alone and in a full run by hand; the message wasn't captured.
+
+Next: the user decides on the M8 commit, then report to the integrator.
