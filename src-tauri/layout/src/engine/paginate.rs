@@ -293,7 +293,7 @@ impl Paginator<'_> {
     }
 
     /// the height a run of headings from `index` needs with the first unit
-    /// of what follows them
+    /// of what follows them, and the units that stay with that
     fn keep_height(&self, index: usize) -> f32 {
         let mut height = 0.0;
         let mut current = index;
@@ -302,7 +302,14 @@ impl Paginator<'_> {
                 height += self.items[current - 1].after + self.items[current].before;
             }
             if self.items[current].heading_level() == 0 {
-                height += self.laid[current].units[0].height;
+                // its first unit, with the units that stay with it, e.g. a
+                // table's caption, its header rows and its first row
+                let units = &self.laid[current].units;
+                let mut last = 0;
+                while units[last].keep_next && last + 1 < units.len() {
+                    last += 1;
+                }
+                height += units[last].top + units[last].height - units[0].top;
                 return height;
             }
             height += self.laid[current].height();
@@ -628,5 +635,35 @@ mod tests {
         ]);
         assert_eq!(engine.pages.len(), 3);
         assert_eq!(engine.page_of_frag(engine.first_frag[3]), 2);
+    }
+
+    #[test]
+    fn heading_stays_with_captioned_table() {
+        use crate::model::Row;
+        let settings = Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        let heading_height = crate::style::text_style("h3").line;
+        let line = crate::style::text_style("p").line;
+        // under the heading, room for the table's caption, but not for its
+        // header row and first row as well
+        let spare = 30.0;
+        let mut first = paragraph(1, "x");
+        first.after = room - line - 16.0 - heading_height - spare;
+        let rows: Vec<Row> = (0..3)
+            .map(|index| Row {
+                cells: vec![cell(40 + index * 10, "row")],
+                header: index == 0,
+            })
+            .collect();
+        let mut table = table_item(rows, Some("The caption"));
+        if let Content::Table { pos, .. } = &mut table.content {
+            *pos = 30;
+        }
+        let engine = engine(vec![first, heading(4, 3, "Heading"), table]);
+        let caption = engine.laid[2].units[0].height;
+        assert!(caption < spare, "the caption alone fits: {caption}");
+        let heading_page = engine.page_of_frag(engine.first_frag[1]);
+        let table_page = engine.page_of_frag(engine.first_frag[2]);
+        assert_eq!((heading_page, table_page), (1, 1));
     }
 }

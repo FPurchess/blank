@@ -10,7 +10,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 5. Up/Down through the paragraphs of a cell, and past a table's caption
 - [x] 6. A page break near the bottom makes no blank page
 - [x] 7. A row nearly a page tall under repeated header rows
-- [ ] 8. A heading stays with a captioned table
+- [x] 8. A heading stays with a captioned table
 - [ ] 9. S2: lists, quotes and images in table cells
 - [ ] 10. The PDF text layer keeps combining marks and ligature parts
 - [ ] 11. S3: one shared font store
@@ -130,6 +130,12 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - In a table with header rows, a body row stays whole only if it fits under the header rows (`slice_room(false)`). Otherwise it's sliced between its lines like a row taller than the page.
 - The paginator needed no change: after the repeats a page is no longer fresh, so the fit check runs.
 - Test `nearly_page_tall_row_under_repeated_header`: every fragment ends above the content bottom (before: 777.15 against 771.02), and every line of the row is shown once.
+
+### Task 8: headings before captioned tables
+
+- `keep_height` adds the whole `keep_next` chain of the block after the headings: its first unit and the ones that stay with it, e.g. a table's caption, header rows and first row. This is the same loop `run` uses.
+- This lookahead still stays within the item right after the heading run, so `update`'s restart point (task 1) still holds.
+- Test `heading_stays_with_captioned_table` (before: the heading on page 0, the table on page 1).
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
