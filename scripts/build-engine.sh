@@ -71,9 +71,12 @@ cargo build --manifest-path src-tauri/Cargo.toml -p blank-layout --lib \
   --target wasm32-unknown-unknown --profile wasm
 wasm-bindgen --target web --out-dir src/engine/wasm --out-name blank_layout \
   "$target/wasm32-unknown-unknown/wasm/blank_layout.wasm"
-# binaryen's optimizer takes off about a fifth
+# binaryen's optimizer takes off about a fifth. It also drops the producers
+# section, where wasm-bindgen writes its version and, when prebuilt as on CI,
+# its git commit, which would make the file differ by how it was installed
 bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt -O3 --enable-bulk-memory \
   --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals \
-  --enable-reference-types --enable-multivalue src/engine/wasm/blank_layout_bg.wasm \
-  -o src/engine/wasm/blank_layout_bg.wasm
+  --enable-reference-types --enable-multivalue --strip-producers \
+  src/engine/wasm/blank_layout_bg.wasm -o src/engine/wasm/blank_layout_bg.wasm
+bun scripts/wasm-producers.ts src/engine/wasm/blank_layout_bg.wasm
 ls -l src/engine/wasm/blank_layout_bg.wasm
