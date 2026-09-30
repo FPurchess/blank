@@ -21,6 +21,46 @@ integrator deletes it before the release PR.
   `<release>` entry of the metainfo.
 - Delete `SPIKE.md`, `TASK.md` and the `PROGRESS-*.md` files.
 
+## Release notes
+
+For the metainfo's `<release version="3.0.0">` (one paragraph, as for 2.x):
+
+> Blank now shows your text as it prints: every line and page ends on the
+> screen where it ends in the PDF, with "Page N of M" in the bottom bar, as
+> page ends (the new default) or as sheets on a desk (Mod-Alt-V). A new PDF
+> engine sets code in IBM Plex Mono, emoji in monochrome Noto Emoji, and
+> Chinese, Japanese, Korean and other scripts in the fonts on your computer,
+> and splits long table rows across pages. Mod+click opens links. Your
+> markdown files and settings stay as they are; Blank now needs macOS 11 or
+> newer.
+
+For the GitHub release:
+
+> **Your pages, exactly as they print.** Blank lays out every document with
+> its own engine, and the screen shows that layout: each line and each page
+> ends where it ends in the PDF.
+>
+> - **Page ends** is the new default view: one column of text, as wide as on
+>   paper, with a mark where each page ends showing its footer and the next
+>   page's header. `Mod` `Alt` `V` switches to **Pages**, the sheets on a
+>   desk with their headers, footers and numbers. The bottom bar shows
+>   "Page N of M".
+> - **A new PDF engine** replaces pdfmake. Existing documents export with
+>   different line and page breaks than in 2.x, the same ones you now see on
+>   the screen.
+>   - Code is set in IBM Plex Mono, and emoji in the monochrome Noto Emoji.
+>   - Chinese, Japanese, Korean and other scripts Blank's fonts lack, and
+>     symbols like 𝐀, use the fonts on your computer, so the same document
+>     can lay out differently on another machine.
+>   - Table rows longer than a page are split across pages.
+> - `Mod`+click opens a link.
+> - **Known limits:** no hyphenation or justification yet. Images, lists and
+>   quotes inside table cells are laid out as plain text.
+> - **Requirements:** macOS 11 (Big Sur) or newer.
+> - Your markdown files and your settings are unchanged.
+
+Before pasting, check the split table rows and the known limits against engine-core's table tasks: at 8efdc17 rows never split.
+
 ## Decisions for the owner
 
 - **Require `engine` for merging into `main`.** The ruleset "CI must pass on

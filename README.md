@@ -23,7 +23,9 @@ Blank is made for that moment and for everything after it. There are no toolbars
 
 The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. When you are ready to proofread, spell check underlines what it doesn't know and offers what you meant. Close the window mid-thought and Blank keeps your words for the next time you open it.
 
-Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it. And when a piece is finished, Blank sets it as a PDF that looks as considered as the words in it.
+Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it.
+
+What you see is what you print. Blank sets your text in pages as you write, and every line and every page ends on the screen exactly where it ends in the PDF, headers, footers and page numbers included. [See your pages](https://fpurchess.github.io/blank/guide/pages).
 
 ## Download
 

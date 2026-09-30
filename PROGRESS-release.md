@@ -12,7 +12,7 @@
 - [x] 9. CI time and caching
 - [x] 10. CLAUDE.md and the rules
 - [x] 11. `.claude/rules/layout-engine.md`, SPIKE.md reduced to the release
-- [ ] 12. release notes, README
+- [x] 12. release notes, README
 
 ## Notes for the integrator
 
