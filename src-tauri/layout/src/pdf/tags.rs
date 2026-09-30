@@ -20,14 +20,72 @@ use crate::text::TextBox;
 
 /// the marked content drawn for each part of the document, in the order it
 /// was drawn
-pub(super) type Ids = HashMap<Part, Vec<Identifier>>;
+/// with the order each was drawn in
+pub(super) type Ids = HashMap<Part, Vec<(usize, Identifier)>>;
 
 fn leaves(ids: &mut Ids, part: Part) -> Vec<Node> {
-    ids.remove(&part)
+    let mut found = ids.remove(&part).unwrap_or_default();
+    found.sort_by_key(|(order, _)| *order);
+    found.into_iter().map(|(_, id)| Node::Leaf(id)).collect()
+}
+
+/// what was drawn of a text box, in the order it was drawn: its text, and
+/// each link in it as a Link holding the link's text and its annotations
+fn text_nodes(ids: &mut Ids, item: usize, text: usize) -> Vec<Node> {
+    let mut drawn: Vec<(usize, Option<usize>, Identifier)> = ids
+        .remove(&Part::Text { item, text })
         .unwrap_or_default()
         .into_iter()
-        .map(Node::Leaf)
-        .collect()
+        .map(|(order, id)| (order, None, id))
+        .collect();
+    let links: Vec<usize> = ids
+        .keys()
+        .filter_map(|part| match *part {
+            Part::Linked {
+                item: of,
+                text: at,
+                link,
+            } if of == item && at == text => Some(link),
+            _ => None,
+        })
+        .collect();
+    for link in &links {
+        let runs = ids
+            .remove(&Part::Linked {
+                item,
+                text,
+                link: *link,
+            })
+            .unwrap_or_default();
+        drawn.extend(runs.into_iter().map(|(order, id)| (order, Some(*link), id)));
+    }
+    drawn.sort_by_key(|(order, ..)| *order);
+    let mut nodes: Vec<Node> = vec![];
+    let mut open: Option<(usize, Vec<Node>)> = None;
+    let close = |open: &mut Option<(usize, Vec<Node>)>, nodes: &mut Vec<Node>, ids: &mut Ids| {
+        if let Some((link, mut children)) = open.take() {
+            children.extend(leaves(ids, Part::Link { item, text, link }));
+            nodes.push(group(Tag::Link, children));
+        }
+    };
+    for (_, link, id) in drawn {
+        match link {
+            None => {
+                close(&mut open, &mut nodes, ids);
+                nodes.push(Node::Leaf(id));
+            }
+            Some(link) => {
+                if open.as_ref().is_some_and(|(current, _)| *current != link) {
+                    close(&mut open, &mut nodes, ids);
+                }
+                open.get_or_insert_with(|| (link, vec![]))
+                    .1
+                    .push(Node::Leaf(id));
+            }
+        }
+    }
+    close(&mut open, &mut nodes, ids);
+    nodes
 }
 
 fn group(tag: impl Into<TagKind>, children: Vec<Node>) -> Node {
@@ -165,18 +223,9 @@ fn heading_level(level: u8) -> Option<NonZeroU16> {
 /// what an item is in the structure, with what was drawn for it
 fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
     let item = &engine.items[index];
-    let links = leaves(ids, Part::Link { item: index });
-    let link = (!links.is_empty()).then(|| group(Tag::Link, links));
     match &item.content {
         Content::Text(text) => {
-            let mut children = leaves(
-                ids,
-                Part::Text {
-                    item: index,
-                    text: 0,
-                },
-            );
-            children.extend(link);
+            let children = text_nodes(ids, index, 0);
             let node = match heading_level(text.level) {
                 Some(level) => group(Tag::Hn(level, Some(text.text.clone())), children),
                 None if text.style == "code" => group(Tag::P, vec![group(Tag::Code, children)]),
@@ -190,12 +239,12 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             let alt = if alt.is_empty() { src } else { alt };
             Some(group(Tag::Figure(Some(alt.clone())), children))
         }
-        Content::Table { .. } => Some(table_node(engine, index, ids, link)),
+        Content::Table { .. } => Some(table_node(engine, index, ids)),
         Content::Break { .. } | Content::Rule { .. } => None,
     }
 }
 
-fn table_node(engine: &Engine, index: usize, ids: &mut Ids, link: Option<Node>) -> Node {
+fn table_node(engine: &Engine, index: usize, ids: &mut Ids) -> Node {
     let laid = &engine.laid[index];
     let mut children = vec![];
     let caption = leaves(ids, Part::Label { item: index });
@@ -220,12 +269,7 @@ fn table_node(engine: &Engine, index: usize, ids: &mut Ids, link: Option<Node>) 
         }
         children.push(group(Tag::TR, cells));
     }
-    let table = group(Tag::Table, children);
-    match link {
-        // a table's links are in its cells; they go after it
-        Some(link) => group(Tag::Div, vec![table, link]),
-        None => table,
-    }
+    group(Tag::Table, children)
 }
 
 /// what a cell holds, in the order it shows it: its paragraphs, with the
@@ -279,7 +323,7 @@ fn cell_content(laid: &Laid, index: usize, cell: &TableCell, ids: &mut Ids) -> V
         while let Some((_, node)) = blocks.next_if(|(block_y, _)| *block_y < y) {
             builder.place(0, 0.0, None, node);
         }
-        let paragraph = group(Tag::P, leaves(ids, Part::Text { item: index, text }));
+        let paragraph = group(Tag::P, text_nodes(ids, index, text));
         let boxed = &laid.texts[text];
         let marker = markers
             .iter()
@@ -317,11 +361,11 @@ pub(super) fn tag_tree(engine: &Engine, ids: &mut Ids, language: &str) -> TagTre
         tree.push(node);
     }
     // anything drawn that no item holds, so that nothing is lost
-    let mut rest: Vec<(Part, Vec<Identifier>)> = ids.drain().collect();
+    let mut rest: Vec<(Part, Vec<(usize, Identifier)>)> = ids.drain().collect();
     rest.sort_by_key(|(part, _)| format!("{part:?}"));
     let rest: Vec<Node> = rest
         .into_iter()
-        .flat_map(|(_, found)| found.into_iter().map(Node::Leaf))
+        .flat_map(|(_, found)| found.into_iter().map(|(_, id)| Node::Leaf(id)))
         .collect();
     if !rest.is_empty() {
         tree.push(group(Tag::Div, rest));

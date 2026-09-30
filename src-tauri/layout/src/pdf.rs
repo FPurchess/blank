@@ -312,6 +312,8 @@ fn attempt(
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let mut undecoded: Vec<String> = vec![];
     let mut ids = tags::Ids::new();
+    // the order everything is drawn in, for the structure
+    let mut order = 0usize;
     let (width, height) = (engine.settings.width, engine.settings.height);
     // the fonts whose missing glyph the document shows, for what no font has
     let mut missing: Vec<usize> = vec![];
@@ -374,7 +376,8 @@ fn attempt(
                 }
                 let id = surface.start_tagged(tag);
                 if !matches!(part, Part::Decoration | Part::Band { .. } | Part::Repeat) {
-                    ids.entry(part).or_default().push(id);
+                    order += 1;
+                    ids.entry(part).or_default().push((order, id));
                 }
                 match op {
                     Op::Rect { x, y, w, h, role } => {
@@ -448,7 +451,8 @@ fn attempt(
                     page.add_annotation(annotation);
                 } else {
                     let id = page.add_tagged_annotation(annotation);
-                    ids.entry(part).or_default().push(id);
+                    order += 1;
+                    ids.entry(part).or_default().push((order, id));
                 }
             }
         }

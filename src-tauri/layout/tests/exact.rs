@@ -691,3 +691,36 @@ fn pdf_tags_a_cell_in_its_reading_order() {
     assert!(structure.contains("LI"), "{structure}");
     assert!(structure.contains("Lbl"), "{structure}");
 }
+
+#[test]
+fn pdf_tags_links_around_their_text() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(sample());
+    let pdf = pdf_of(&mut engine);
+    let path = std::env::temp_dir().join("blank-layout-links.pdf");
+    std::fs::write(&path, pdf).unwrap();
+    let Some(structure) = run("pdfinfo", &["-struct-text", path.to_str().unwrap()]) else {
+        eprintln!("pdfinfo is missing, skipping the check");
+        return;
+    };
+    // a Link holds the linked text, then its annotation, inside its P
+    let link = structure.find("Link (inline)").expect("a Link");
+    let after: Vec<&str> = structure[link..]
+        .lines()
+        .skip(1)
+        .take(2)
+        .map(str::trim)
+        .collect();
+    assert!(
+        after[0].starts_with('"'),
+        "the link's text first: {after:?}"
+    );
+    assert!(
+        after[1].starts_with('"') || after[1].starts_with("Object"),
+        "{after:?}"
+    );
+    // one Link per link: as many as the sample's paragraphs have links
+    let links = structure.matches("Link (inline)").count();
+    assert_eq!(links, 6 * 8, "{links} Links");
+}
