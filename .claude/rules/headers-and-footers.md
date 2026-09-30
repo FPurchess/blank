@@ -31,7 +31,7 @@ paths:
 - `src/layout/bands.ts` is what both exporters share:
   - the band's size and distance from the edge (`BAND`, `BAND_ROOM`)
   - `bandsOn`: the bands of a page. The first page's own or none; even pages by the number they show, as in Word.
-  - `variantsOf`, `formatNumber` (roman numerals), `documentFields`, `chapterOn`, `fieldValues`
+  - `variantsOf`, `formatNumber` (roman numerals), `documentFields`, `fieldValues`. `{chapter}` is found by the engine itself, per page. `src/layout/bands.parity.test.ts` checks that the engine's bands are `bandsOn` + `fieldValues` + `expand` for the number styles, start numbers, first and even pages, so change both sides together.
 - The pages and the PDF: the layout engine lays out the bands of each page (`src-tauri/layout/src/bands.rs`, a port of `bands.ts` and `tokens.ts`) after it paginated, so `{chapter}` and `{pages}` are known; the screen paints them on the sheets and the PDF holds them.
 - Word (`src/exporters/docx/bands.ts`):
   - One paragraph per band in Word's `Header`/`Footer` style, with center and right tab stops.
