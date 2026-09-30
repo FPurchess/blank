@@ -4,7 +4,7 @@
 - [x] 2. B5: pin the build tools in `scripts/build-engine.sh`
 - [x] 3. B5: the exactness tests fail without poppler on CI
 - [x] 4. macOS minimum version
-- [ ] 5. skip system fonts whose licence forbids embedding
+- [x] 5. skip system fonts whose licence forbids embedding
 - [ ] 6. `fallback_fonts` off the main thread
 - [ ] 7. system fallback for Common-script characters
 - [ ] 8. third-party notices and all font licences ship

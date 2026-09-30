@@ -356,6 +356,7 @@ version = "2.1.0"
 dependencies = [
  "fontique",
  "futures-util",
+ "read-fonts 0.41.0",
  "reqwest 0.13.5",
  "rustls",
  "serde",
