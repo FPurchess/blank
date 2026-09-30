@@ -157,6 +157,31 @@ describe("page view", () => {
     editor.destroy();
   });
 
+  it("keeps the selection when a band in it is pressed", async () => {
+    layOut();
+    pageView.value = "pages";
+    const handle = createTestHandle(createState(node, { cursor: [2, 4000] }));
+    dispose = bootApp(handle);
+    await nextTick();
+    const band = view().querySelector<HTMLElement>(".page-band.footer")!;
+    // the pointer's events, then the mouse's, as the webview sends them
+    for (const type of ["pointerdown", "mousedown", "pointerup", "click"])
+      band.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          detail: 1,
+          // where the pointer hits the selected text
+          clientX: 300,
+          clientY: 300,
+        }),
+      );
+    expect(handle.view.state.selection.from).toBe(2);
+    expect(handle.view.state.selection.to).toBe(4000);
+    bandEditor.value = null;
+  });
+
   it("opens the strip of a band clicked on a sheet or where a page ends", async () => {
     layOut();
     const editor = new EditorView(document.createElement("div"), {

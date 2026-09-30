@@ -45,6 +45,8 @@ describe("moving the selected text on the pages", () => {
       posAt: (event) => event.clientX,
       inView: (event) => event.clientX >= 0 && event.clientX <= 100,
       press,
+      // presses at x 50 are on a header, say
+      ignores: (event) => event.clientX === 50,
     });
 
   beforeEach(() => {
@@ -103,6 +105,18 @@ describe("moving the selected text on the pages", () => {
     move.down(pointer(9));
     expect(move.mouseDown(mouse(3), false)).toBe(false);
     move.up(pointer(9));
+    expect(press).not.toHaveBeenCalled();
+  });
+
+  it("never starts on what isn't the text, e.g. a header", () => {
+    const move = moveOn();
+    // a selection all over, so the header's point hits inside it
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 12)),
+    );
+    move.down(pointer(50));
+    expect(move.mouseDown(mouse(1), false)).toBe(false);
+    move.up(pointer(50));
     expect(press).not.toHaveBeenCalled();
   });
 

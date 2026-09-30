@@ -25,6 +25,8 @@ export interface MoveTarget {
   press(x: number, y: number): void;
   // keeps the pointer's events coming while it's outside the view
   capture?(event: PointerEvent): void;
+  // presses that aren't on the text, e.g. on a header, which never move it
+  ignores?(event: PointerEvent): boolean;
 }
 
 export interface PageMove {
@@ -55,7 +57,8 @@ export const pageMove = (target: MoveTarget): PageMove => {
   return {
     down(event) {
       moving = null;
-      if (event.button !== 0 || event.shiftKey) return;
+      if (event.button !== 0 || event.shiftKey || target.ignores?.(event))
+        return;
       if (!moveCandidate(target.view.state, target.posAt(event))) return;
       moving = { x: event.clientX, y: event.clientY, dragging: false };
       target.capture?.(event);

@@ -301,6 +301,9 @@ const onMouseDown = (event: MouseEvent) => {
   dragAt = { x: event.clientX, y: event.clientY };
 };
 
+// the headers and footers on the pages, which open their strips
+const BANDS = ".page-band, .page-end .band, .page-first-header";
+
 // moving the selected text to another place, see src/editor/pageMove.ts
 const move = pageMove({
   view: editor.view,
@@ -324,6 +327,7 @@ const move = pageMove({
     });
   },
   capture: (event) => scroller.value?.setPointerCapture?.(event.pointerId),
+  ignores: (event) => !!(event.target as Element).closest?.(BANDS),
 });
 const onPointerDown = (event: PointerEvent) => {
   if (pageEngine && layout.value) move.down(event);
