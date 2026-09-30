@@ -122,4 +122,4 @@ From 8efdc17 the review findings are worked on in four worktrees, each with its 
 | engine-ui | `.claude/worktrees/engine-ui` | `engine/ui` | `src/ui/Page*`, the painter, SCSS, `e2e/**`, `docs/guide/**` | 4521 |
 | engine-release | `.claude/worktrees/engine-release` | `engine/release` | `.github/**`, build scripts, `src-tauri/src`, notices, `CLAUDE.md`, rules | 4531 |
 
-No branch commits `src/engine/wasm/`: the integrator rebuilds it once per merge. Merge order: core → editor → ui → release, with core's seam commits merged into editor and ui early.
+No branch commits `src/engine/wasm/`, except the integrator's rebuilds, once per merge. Merge order: core → editor → ui → release, with core's seam commits merged into editor and ui early.
