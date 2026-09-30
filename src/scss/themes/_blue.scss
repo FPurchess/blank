@@ -2,6 +2,10 @@
   --color: #fbc572;
   --background-color: #25324c;
   --spelling-color: #ff8585;
+  // the selection on the pages, under the text (see src/scss/themes.test.ts),
+  // and dimmed while the editor hasn't the focus
+  --selection-color: #647ea9;
+  --selection-inactive-color: #4b6083;
   --color-inverted: #25324c;
   --background-inverted: #fbc572;
   --font-family:

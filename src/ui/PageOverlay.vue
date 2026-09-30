@@ -11,12 +11,14 @@ import {
   type PageRect,
 } from "../state";
 
-// The caret and the selection over the painted pages: the text or cells
+// The caret and the selection on the painted pages: the text or cells
 // selected, the outline of a selected node, and the text an input method is
 // composing. Apart from the pages, so a moving caret renders only this. The
 // caret shows while the editor has the focus, and the selection dims without
 // it, as in the webview's own text.
-const props = defineProps<{ layout: FrameLayout }>();
+// The page view shows it in two layers: the selection under the text (the
+// pages are transparent but for their text), the rest over it.
+const props = defineProps<{ layout: FrameLayout; layer: "under" | "over" }>();
 const editor = useEditor();
 
 const placed = (rects: PageRect[]) =>
@@ -26,11 +28,18 @@ const placed = (rects: PageRect[]) =>
   });
 
 const caret = computed(() =>
-  pageCaret.value ? onDesk(props.layout, pageCaret.value) : null,
+  pageCaret.value && props.layer === "over"
+    ? onDesk(props.layout, pageCaret.value)
+    : null,
 );
-const rects = computed(() => placed(pageSelection.value));
-const nodes = computed(() => placed(pageNodeSelection.value));
-const composing = computed(() => placed(pageComposition.value));
+const under = computed(() => props.layer === "under");
+const rects = computed(() => (under.value ? placed(pageSelection.value) : []));
+const nodes = computed(() =>
+  under.value ? [] : placed(pageNodeSelection.value),
+);
+const composing = computed(() =>
+  under.value ? [] : placed(pageComposition.value),
+);
 
 // a test view has no DOM
 const dom = editor.view.dom as HTMLElement | undefined;

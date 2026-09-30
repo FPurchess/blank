@@ -40,6 +40,8 @@ export const paintCalls = (canvas: HTMLCanvasElement) =>
  * Path2D that keeps its path
  */
 export const installCanvasStub = () => {
+  // tests of their own environment, e.g. node, have no canvas
+  if (typeof HTMLCanvasElement === "undefined") return;
   HTMLCanvasElement.prototype.getContext = function (
     this: HTMLCanvasElement,
     type: string,

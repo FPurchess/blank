@@ -9,7 +9,9 @@ The tasks of `TASK.md`, in the order they are done: 6 first, 5 once S6 is merged
 - [x] 4. The view keeps its place when it switches or resizes (`viewAnchor`/`anchorTop`; requests are cleared once served)
 - [ ] 5. Repaint only the pages that changed, with the bands as their own layer (after S6)
 - [x] 6. A swappable painter (`src/ui/painter/`; jsdom canvases record paints, `src/test/canvas.ts`)
-- [ ] 7. A visible selection in every theme
+- [x] 7. A visible selection in every theme: `--selection-color` at ≥ 3:1 per theme (`src/scss/themes.test.ts`), painted under the text: sheets, selection, the transparent canvases, caret, in DOM order.
+  - WebKitGTK doesn't apply `mix-blend-mode` over the pages, and a z-index on the canvases made WebKit composite them and crash in Skia's GPU shaders under xvfb, so neither is used.
+  - For the owner: a solid colour between text and paper leaves text over the selection at text-to-paper / selection-to-paper, 2.07:1 in green (6.4:1 / 3.1:1), 2.6:1 in blue. The test asks for 2:1.
 - [ ] 8. Contrast of the faint marks
 - [ ] 9. Reduced motion
 - [ ] 10. Shadows and the desk in dark themes

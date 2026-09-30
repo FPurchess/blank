@@ -1279,15 +1279,18 @@ body.without-engine {
   // a page lays out on its own, so one that comes into view or changes
   // lays out none of the others
   contain: layout style;
+}
 
-  // an edge and a solid shadow without blur: a blurred one made the
-  // compositor redraw it on every step of a scroll (see SPIKE.md)
-  &.sheet {
-    background-color: var(--background-color);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color) 10%, transparent),
-      0 2px 0 1px color-mix(in srgb, var(--color) 6%, transparent);
-  }
+// the paper of a sheet in "pages", under the selection and the text, which
+// its frame paints over it. An edge and a solid shadow without blur: a
+// blurred one made the compositor redraw it on every step of a scroll (see
+// SPIKE.md)
+.page-sheet {
+  position: absolute;
+  background-color: var(--background-color);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color) 10%, transparent),
+    0 2px 0 1px color-mix(in srgb, var(--color) 6%, transparent);
 }
 
 .page-canvas {
@@ -1411,16 +1414,17 @@ body.band-editing #page-view {
   transition: opacity 150ms;
 }
 
+// the selected text or cells, in the theme's selection colour under the
+// text, which the pages paint over it (see src/scss/themes.test.ts)
 .page-selection {
   position: absolute;
-  background-color: var(--color);
-  opacity: 0.16;
+  background-color: var(--selection-color);
   pointer-events: none;
 }
 
 // the selection dims while the editor hasn't the focus, e.g. behind a dialog
 .page-selection.inactive {
-  opacity: 0.08;
+  background-color: var(--selection-inactive-color);
 }
 
 // a selected image, rule or page break, as the editor outlined it

@@ -7,11 +7,15 @@ import { browser, $, expect } from "@wdio/globals";
 import {
   boxOf,
   clickText,
+  contrast,
+  doubleClickAt,
   Key,
   luminance,
   paintedInk,
   pressMod,
   restartApp,
+  screenStats,
+  selectionColor,
   textBox,
   type,
   waitForInk,
@@ -147,7 +151,25 @@ describe("rendering", () => {
       async () => luminance((await waitForInk("inkcheck")).ink!) > 0.5,
       { timeoutMsg: "the text isn't painted light in the dark theme" },
     );
-    await themeTo("light");
+
+    // a selected word stands out from the page, in both themes
+    const selected = await boxOf("inkcheck");
+    await doubleClickAt(
+      selected.left + 4,
+      (selected.top + selected.bottom) / 2,
+    );
+    for (const theme of ["dark", "light"]) {
+      await themeTo(theme);
+      const paper = (
+        await screenStats({
+          left: frame + 1,
+          right: frame + 8,
+          top: selected.top,
+          bottom: selected.bottom,
+        })
+      ).background;
+      expect(contrast(await selectionColor(), paper)).toBeGreaterThanOrEqual(3);
+    }
 
     // far down, a page painted when it comes into view
     await waitForInk("farmarker");

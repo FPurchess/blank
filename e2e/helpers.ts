@@ -334,7 +334,7 @@ const canvasInk = (box: Box) =>
     return { total, inked, sum };
   }, box);
 
-interface ScreenStats extends Ink {
+export interface ScreenStats extends Ink {
   // the most common colour in the box, and the mean of all of it
   background: Rgb;
   mean: Rgb;
@@ -344,7 +344,7 @@ interface ScreenStats extends Ink {
  * screenStats reads the pixels of a screenshot in `box`: ink is what
  * differs from the most common colour there
  */
-const screenStats = async (box: Box): Promise<ScreenStats> => {
+export const screenStats = async (box: Box): Promise<ScreenStats> => {
   const png = await browser.takeScreenshot();
   return browser.executeAsync(
     (png: string, box: Box, done: (stats: ScreenStats) => void) => {
@@ -478,6 +478,46 @@ export const luminance = ([r, g, b]: Rgb) => {
 export const contrast = (a: Rgb, b: Rgb) => {
   const [dark, light] = [luminance(a), luminance(b)].sort((x, y) => x - y);
   return (light + 0.05) / (dark + 0.05);
+};
+
+/**
+ * doubleClickAt double-clicks with the pointer at `x`, `y` in the viewport
+ */
+export const doubleClickAt = async (x: number, y: number) => {
+  await browser
+    .action("pointer")
+    .move({ x: Math.round(x), y: Math.round(y), origin: "viewport" })
+    .down()
+    .up()
+    .pause(40)
+    .down()
+    .up()
+    .perform();
+  await browser.executeAsync((done: () => void) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => done()));
+  });
+};
+
+/**
+ * selectionColor returns the colour the pages show the selection in: the
+ * most common one in the first selected box, whatever the text in it
+ */
+export const selectionColor = async () => {
+  const box = await browser.execute(() => {
+    const rect = document
+      .querySelector("#page-view .page-selection")
+      ?.getBoundingClientRect();
+    return rect
+      ? {
+          left: rect.left + 1,
+          right: rect.right - 1,
+          top: rect.top + 1,
+          bottom: rect.bottom - 1,
+        }
+      : null;
+  });
+  if (!box) throw new Error("no selection is shown on the pages");
+  return (await screenStats(box)).background;
 };
 
 /**

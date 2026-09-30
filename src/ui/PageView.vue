@@ -409,6 +409,22 @@ onUnmounted(() => {
       class="page-desk"
       :style="{ height: `${layout.height}px` }"
     >
+      <!-- the sheets, then the selection, then the text painted on them,
+      which is transparent but for the text -->
+      <template v-if="layout.mode === 'pages'">
+        <div
+          v-for="frame in frames"
+          :key="frame.page"
+          class="page-sheet"
+          :style="{
+            top: `${frame.top}px`,
+            left: `${frame.left}px`,
+            width: `${frame.width}px`,
+            height: `${frame.height}px`,
+          }"
+        />
+      </template>
+      <PageOverlay :layout="layout" layer="under" />
       <PageFrame
         v-for="frame in frames"
         :key="frame.page"
@@ -427,7 +443,7 @@ onUnmounted(() => {
         :ratio="ratio"
       />
       <PageMarks :layout="layout" :pages="shownPages" />
-      <PageOverlay :layout="layout" />
+      <PageOverlay :layout="layout" layer="over" />
       <PageFirstHeader :layout="layout" />
       <PageProperties :layout="layout" />
     </div>

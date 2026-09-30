@@ -222,7 +222,7 @@ describe("scrolling", () => {
           await browser.execute(() => {
             const style = document.createElement("style");
             style.id = "no-shadow";
-            style.textContent = ".page-frame.sheet { box-shadow: none; }";
+            style.textContent = ".page-sheet { box-shadow: none; }";
             document.head.append(style);
           });
           await toTop();

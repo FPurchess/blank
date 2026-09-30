@@ -3,6 +3,10 @@
   --color: rgb(27, 40, 50);
   --background-color: #fff;
   --spelling-color: #d7263d;
+  // the selection on the pages, under the text (see src/scss/themes.test.ts),
+  // and dimmed while the editor hasn't the focus
+  --selection-color: #5391f7;
+  --selection-inactive-color: #91b9fa;
   --color-inverted: #fff;
   --background-inverted: #666;
   --font-family:
