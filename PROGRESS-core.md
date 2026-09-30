@@ -6,7 +6,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 1. B1: incremental re-layout equals a full layout
 - [x] 2. S6: changed page ranges, body and band versions, `updateMany`
 - [x] 3. B2 / S5: no panic from JS input
-- [ ] 4. B4 / S1: line affinity for ↑/↓ and End
+- [x] 4. B4 / S1: line affinity for ↑/↓ and End
 - [ ] 5. Up/Down through the paragraphs of a cell, and past a table's caption
 - [ ] 6. A page break near the bottom makes no blank page
 - [ ] 7. A row nearly a page tall under repeated header rows
@@ -96,6 +96,17 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `text_layer::lines` checks `first()` before `last()`
 - Positions near `u32::MAX` add with `saturating_add` (`Item::to`, `TextBox::pos_of`, `selection`).
 - `boundary_tests.rs`: start numbers, huge roman numbers, a page out of range, items with infinite numbers, merged cells at `u32::MAX`, and every query with out-of-range and non-finite arguments on an empty engine and one with a table. `fonts::tests` checks the font lengths, and `bands::tests` the roman limit.
+
+### Task 4: B4 / S1
+
+- `TextBox::hit_line(line, x)`: past a line's end it lands on that end (before the trailing space), with `after` true where the next line starts at the same position.
+- `TextBox::line_end(line)`: the end, with the same `after`.
+- `vertical(pos, after, down, goal)` starts from the line the caret is painted on (`caret(pos, after)`) and returns `(Hit, after)`. `line_edge(pos, after, end)` returns `(pos, after)`.
+- wasm: `vertical` and `lineEdge` keep their shapes. A third element in `vertical`'s result broke the TS `toHit`, which wants exactly two, so the new calls are `verticalAt` and `lineBoundary` (`SEAM.md` S1).
+- Tests:
+  - `moves_up_and_down_along_ragged_lines` (↓↓↑↑ visits lines 1, 2, 1, 0)
+  - `ends_a_line_broken_inside_a_word_on_that_line` (End paints on the same line, a second End stays put, Home, ↓, the last line's End is the text's end)
+  - Both fail without the snapping and the `after`.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 

@@ -147,12 +147,13 @@ fn answers_nothing_for_what_isnt_there() {
             let _ = engine.caret(pos, false);
             let _ = engine.caret(pos, true);
             for down in [false, true] {
-                let _ = engine.vertical(pos, down, 100.0);
-                assert_eq!(engine.vertical(pos, down, f32::NAN), None);
-                assert_eq!(engine.vertical(pos, down, f32::INFINITY), None);
+                for after in [false, true] {
+                    let _ = engine.vertical(pos, after, down, 100.0);
+                    assert_eq!(engine.vertical(pos, after, down, f32::NAN), None);
+                    assert_eq!(engine.vertical(pos, after, down, f32::INFINITY), None);
+                    let _ = engine.line_edge(pos, after, down);
+                }
             }
-            let _ = engine.line_edge(pos, true);
-            let _ = engine.line_edge(pos, false);
             let _ = engine.selection(pos, 0);
             let _ = engine.selection(0, pos);
             let _ = engine.boxes(pos, u32::MAX);

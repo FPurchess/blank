@@ -286,17 +286,53 @@ impl LayoutEngine {
         }
     }
 
+    /// the position a line up or down from `pos`, nearest to `goal`: [0,
+    /// pos] for text, [1, pos] for a node, [] for none; see `verticalAt`,
+    /// which also tells how to paint the caret there
     pub fn vertical(&self, pos: u32, down: bool, goal: f32) -> Vec<f64> {
-        hit(self.engine.vertical(pos, down, goal))
+        hit(self
+            .engine
+            .vertical(pos, false, down, goal)
+            .map(|(hit, _)| hit))
     }
 
-    /// the start or end of the line a position is on, -1 for none
+    /// the position a line up or down from the caret at `pos`, painted as
+    /// `after` says (see `caret`), nearest to `goal`: [0, pos, after] for
+    /// text, [1, pos, 0] for a node, [] for none. The `after` it gives is 1
+    /// where the caret at the new position is to be painted at the end of
+    /// its line, 0 else
+    #[wasm_bindgen(js_name = verticalAt)]
+    pub fn vertical_at(&self, pos: u32, after: bool, down: bool, goal: f32) -> Vec<f64> {
+        match self.engine.vertical(pos, after, down, goal) {
+            Some((found, after)) => {
+                let mut values = hit(Some(found));
+                values.push(if after { 1.0 } else { 0.0 });
+                values
+            }
+            None => vec![],
+        }
+    }
+
+    /// the start or end of the line a position is on, -1 for none; see
+    /// `lineBoundary`, which also tells how to paint the caret there
     #[wasm_bindgen(js_name = lineEdge)]
     pub fn line_edge(&self, pos: u32, end: bool) -> f64 {
         self.engine
-            .line_edge(pos, end)
-            .map(|pos| pos as f64)
+            .line_edge(pos, false, end)
+            .map(|(pos, _)| pos as f64)
             .unwrap_or(-1.0)
+    }
+
+    /// the start or end of the line the caret at `pos` is painted on (as
+    /// `after` says): [pos, after], where `after` is 1 if the caret there is
+    /// to be painted at the end of its line, e.g. after a word broken where
+    /// it is wider than the line; [] for none
+    #[wasm_bindgen(js_name = lineBoundary)]
+    pub fn line_boundary(&self, pos: u32, after: bool, end: bool) -> Vec<f64> {
+        match self.engine.line_edge(pos, after, end) {
+            Some((pos, after)) => vec![pos as f64, if after { 1.0 } else { 0.0 }],
+            None => vec![],
+        }
     }
 
     /// the selection's rectangles: page, x, y, width and height each
