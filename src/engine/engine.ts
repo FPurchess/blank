@@ -14,6 +14,7 @@ import {
 } from "./flatten";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
+import { engineMissing } from "../state/pageView";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
@@ -130,6 +131,7 @@ export const engineless = () => status !== "ready";
  */
 export const useFallbackEditor = (reason: Exclude<EngineStatus, "ready">) => {
   status = reason;
+  engineMissing.value = true;
   document.body.classList.add("without-engine");
 };
 
@@ -151,6 +153,7 @@ export const forgetEngineFailure = () => {
   status = "ready";
   instanceBroken = false;
   notified = false;
+  engineMissing.value = false;
   document.body.classList.remove("without-engine");
 };
 

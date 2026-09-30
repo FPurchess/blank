@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  engineMissing,
   pageFields,
   pageLayout,
   path,
@@ -289,6 +290,7 @@ describe("an engine that fails", () => {
 
     expect(mounted.view.state.doc.firstChild!.textContent).toMatch(/^baLorem/);
     expect(document.body.classList).toContain("without-engine");
+    expect(engineMissing.value).toBe(true);
     expect(pageEngine).toBeNull();
     expect(pageLayoutState.value).toBeNull();
     expect(pageCaret.value).toBeNull();

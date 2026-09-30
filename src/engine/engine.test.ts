@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
 import { doc, h, p, table, td, tr } from "../test/editor";
+import { engineMissing } from "../state";
 import { schema } from "../markdown";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
@@ -161,6 +162,7 @@ describe("bootEngine", () => {
     expect(engineless()).toBe(true);
     expect(engineStatus()).toBe("off");
     expect(document.body.classList).toContain("without-engine");
+    expect(engineMissing.value).toBe(true);
   });
 
   it("loads the engine when the storage can't be read", async () => {

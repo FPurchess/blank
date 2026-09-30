@@ -66,6 +66,9 @@ export const pageComposition = shallowRef<PageRect[]>([]);
 // null while no text is dragged
 export const pageDropCaret = shallowRef<PageRect | null>(null);
 
+// true once the editor shows the text itself, without the layout engine (see useFallbackEditor)
+export const engineMissing = shallowRef(false);
+
 // the page the selection's head is on, counted from 1, and how many there
 // are, for "Page N of M"
 export const pagePosition = computed(() => {
