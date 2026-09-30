@@ -1552,3 +1552,19 @@ body.band-editing #page-view {
     opacity: 0;
   }
 }
+
+// with the system asking for less motion, the caret stays still, and the
+// strips, hints and the faded pages change at once
+@media (prefers-reduced-motion: reduce) {
+  .page-caret,
+  .band-editor,
+  .band-editor.footer {
+    animation: none;
+  }
+
+  .band-line,
+  .band-hint,
+  body.band-editing #page-view {
+    transition: none;
+  }
+}
