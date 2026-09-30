@@ -378,6 +378,26 @@ export const hitAt = (x: number, y: number): Hit | null => {
 };
 
 /**
+ * pageAt returns the page a point of the window is on, or nearest to, and
+ * the positions its blocks start and end at; null while no pages show
+ */
+export const pageAt = (
+  x: number,
+  y: number,
+): { page: number; from: number; to: number } | null => {
+  const shown = ready();
+  if (!shown) return null;
+  const { frames, viewport } = shown;
+  const point = pointOnPage(
+    frames,
+    x - viewport.left,
+    y - viewport.top + viewport.scrollTop,
+  );
+  const span = point && shown.engine.pageSpan(point.page);
+  return point && span ? { page: point.page, ...span } : null;
+};
+
+/**
  * tablePositions returns where the tables of a document are, in order
  */
 export const tablePositions = (doc: Node) => {

@@ -11,7 +11,11 @@ import {
   tableToolbar,
 } from "../../../state";
 import { setGeometryView, tableGeometry } from "../../../engine/geometry";
-import { forgetEngineFailure, useFallbackEditor } from "../../../engine/engine";
+import {
+  forgetEngineFailure,
+  PageEngine,
+  useFallbackEditor,
+} from "../../../engine/engine";
 import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import { hidePages, showPages } from "../../../test/engine";
 import { cellTexts, selectedText } from "../../../test/tables";
@@ -284,5 +288,43 @@ describe("the table handles and toolbar without the engine", () => {
     const first = handles.value;
     window.dispatchEvent(new Event("scroll"));
     expect(handles.value).not.toBe(first);
+  });
+});
+
+describe("measuring the tables under the mouse", () => {
+  const LONG =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+  // five tables, a page or so apart
+  const apart = () =>
+    doc(
+      ...Array.from({ length: 5 }, (_, index) => [
+        table(tr(th(`T${index}`), th("b")), tr(td("c"), td("d"))),
+        ...Array.from({ length: 12 }, () => p(LONG)),
+      ]).flat(),
+    );
+
+  beforeEach(() => {
+    showPages("pages");
+  });
+  afterEach(() => {
+    view.destroy();
+    hidePages();
+  });
+
+  it("measures each table near the mouse once while the layout stays", () => {
+    view = editor(apart());
+    const { box } = tableGeometry(0)!.pieces[0];
+    const measure = vi.spyOn(PageEngine.prototype, "tableGrid");
+
+    for (let move = 0; move < 10; move++)
+      hover((box.left + box.right) / 2, box.top + 2 + move);
+
+    expect(handles.value).not.toBeNull();
+    // the tables on the first page and the next, each once
+    expect(measure.mock.calls.length).toBeGreaterThan(0);
+    expect(measure.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(new Set(measure.mock.calls.map(([pos]) => pos)).size).toBe(
+      measure.mock.calls.length,
+    );
   });
 });

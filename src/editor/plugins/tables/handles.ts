@@ -8,12 +8,16 @@ import { headerRowCount } from "../../../markdown";
 import { watch } from "vue";
 
 import {
+  pageAt,
   tableGeometry,
+  type TableGeometry,
   tablePositions,
   type TablePiece,
 } from "../../../engine/geometry";
-import { engineless } from "../../../engine/engine";
+import { engineless, pageEngine } from "../../../engine/engine";
 import {
+  pageLayoutState,
+  pageView,
   pageViewport,
   type Point,
   tableHandles as handles,
@@ -52,12 +56,78 @@ interface Under {
 }
 
 /**
+ * Measured keeps the tables of a document as the page view shows them, for
+ * the mouse, which moves far more often than the layout changes: each is
+ * measured once, and only those near the page under the mouse
+ */
+class Measured {
+  private tables: { node: Node; pos: number }[] | null = null;
+  private geometries = new Map<number, TableGeometry | null>();
+  private key: readonly unknown[] = [];
+
+  // what the tables' places in the window depend on
+  private keyOf(view: EditorView) {
+    return [
+      view.state.doc,
+      pageLayoutState.value,
+      pageViewport.value,
+      pageView.value,
+    ];
+  }
+
+  private fresh(view: EditorView) {
+    const key = this.keyOf(view);
+    // without the engine, the editor shows the text and scrolls itself
+    if (engineless() || key.some((part, index) => part !== this.key[index])) {
+      this.key = key;
+      this.tables = null;
+      this.geometries.clear();
+    }
+  }
+
+  /**
+   * geometry returns the table at `pos` as the page view shows it
+   */
+  geometry(view: EditorView, pos: number) {
+    this.fresh(view);
+    let geometry = this.geometries.get(pos);
+    if (geometry === undefined) {
+      geometry = tableGeometry(pos);
+      this.geometries.set(pos, geometry);
+    }
+    return geometry;
+  }
+
+  /**
+   * near returns the tables on the page under `point` and the pages next to
+   * it, or all of them without pages
+   */
+  near(view: EditorView, point: Point) {
+    this.fresh(view);
+    this.tables ??= tablePositions(view.state.doc);
+    const page = pageAt(point.x, point.y);
+    if (!page) return this.tables;
+    const before = pageEngine?.pageSpan(page.page - 1);
+    const after = pageEngine?.pageSpan(page.page + 1);
+    const from = before?.from ?? page.from;
+    const to = after?.to ?? page.to;
+    return this.tables.filter(
+      ({ node, pos }) => pos <= to && pos + node.nodeSize >= from,
+    );
+  }
+}
+
+/**
  * tableUnder returns the piece of a table at `point` or just around it, as
  * the page view shows it
  */
-const tableUnder = (view: EditorView, point: Point): Under | undefined => {
-  for (const { node, pos } of tablePositions(view.state.doc)) {
-    const geometry = tableGeometry(pos);
+const tableUnder = (
+  view: EditorView,
+  measured: Measured,
+  point: Point,
+): Under | undefined => {
+  for (const { node, pos } of measured.near(view, point)) {
+    const geometry = measured.geometry(view, pos);
     for (const piece of geometry?.pieces ?? []) {
       const { box } = piece;
       if (
@@ -106,6 +176,8 @@ export const tableHandles = () => {
   let held: { pos: number; page: number } | undefined;
   // the table whose handles show
   let shown: Under | undefined;
+  // the tables as the page view shows them
+  const measured = new Measured();
 
   const clear = () => {
     shown = undefined;
@@ -119,7 +191,8 @@ export const tableHandles = () => {
     if (!held) return undefined;
     const { pos, page } = held;
     const node = view.state.doc.nodeAt(pos);
-    const geometry = node?.type.name === "table" && tableGeometry(pos);
+    const geometry =
+      node?.type.name === "table" && measured.geometry(view, pos);
     const piece =
       geometry &&
       (geometry.pieces.find((piece) => piece.page === page) ??
@@ -136,7 +209,9 @@ export const tableHandles = () => {
   const publish = (view: EditorView) => {
     const table =
       heldTable(view) ??
-      (!held && pointer && !hidden ? tableUnder(view, pointer) : undefined);
+      (!held && pointer && !hidden
+        ? tableUnder(view, measured, pointer)
+        : undefined);
     if (!table) {
       clear();
       return;
@@ -236,7 +311,10 @@ export const tableHandles = () => {
         hidden = false;
         // the handles work out the row and column under the mouse, so the
         // table is measured again only when the mouse gets to another one
-        if (held || (!wasHidden && same(tableUnder(view, pointer), shown)))
+        if (
+          held ||
+          (!wasHidden && same(tableUnder(view, measured, pointer), shown))
+        )
           return;
         publish(view);
       };
