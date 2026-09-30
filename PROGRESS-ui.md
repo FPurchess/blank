@@ -30,7 +30,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 
 - [x] M4. A removed bands canvas is freed: `Painter.release`, called when a layer's canvas goes and after a leaving page's copy is taken
 - [x] M3. The bands as strip canvases sized to the margins, painted with a y origin and not kept as bitmaps. At 2× in "pages", the 192 MB cache kept 7 pages before (14 bitmaps, 199.6 MB) and keeps 14 after (`PageFrame.test.ts`, "keeps a dozen sheets")
-- [ ] M2. E2E ink checks after an edit prove the repaint, not old pixels
+- [x] M2. E2E ink checks after an edit prove the repaint, not old pixels: `waitForRepaint` compares a fingerprint of the line (`inkPrint`) from before the edit; with the body's repaint switched off the check times out
 - [ ] M5. The engine-failure spec types and finds a token of its own
 - [ ] M6. The last rendering check waits and compares with the first reading
 - [ ] Selection: the selected text in a contrasting colour, on a layer of its own, at 4.5:1 in every theme

@@ -5,13 +5,16 @@ import path from "node:path";
 import { browser, $, $$, expect } from "@wdio/globals";
 
 import {
+  inkPrint,
   Key,
+  lineBox,
   luminance,
   pressMod,
   restartApp,
   screenStats,
   type,
   waitForInk,
+  waitForRepaint,
 } from "../helpers.ts";
 
 // The page view the layout engine paints: typing and clicking on the
@@ -142,8 +145,14 @@ describe("page view", () => {
     await browser.saveScreenshot(path.join(SHOTS, "engine-page-ends.png"));
 
     // left of the first paragraph, below the heading: its start
+    const line = await lineBox("Writing is thinking");
+    // painted once already, so only the edit changes it
+    await waitForInk(line);
+    const before = await inkPrint(line);
     await clickOnPage(1, 20, 58);
     await type("xyz ");
+    // the line is painted again, not only laid out
+    await waitForRepaint(line, before);
     await expect(
       browser.execute(
         () => document.querySelector("#editor p")?.textContent ?? "",

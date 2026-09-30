@@ -301,6 +301,8 @@ const canvasInk = (box: Box) =>
   browser.execute((box: Box) => {
     let total = 0;
     let inked = 0;
+    // what the pixels show, as a number that changes when any of them does
+    let print = 0;
     const sum = [0, 0, 0];
     // a frame's canvases lie over each other, its text and the strips of
     // its header and footer, so a pixel counts once, with the ink on top
@@ -355,11 +357,13 @@ const canvasInk = (box: Box) =>
         }
       }
       inked += seen.size;
-      for (const color of seen.values())
+      for (const [at, color] of seen) {
+        print = (Math.imul(print, 31) + at * 7 + color[0] + color[1]) | 0;
         for (let channel = 0; channel < 3; channel++)
           sum[channel] += color[channel];
+      }
     }
-    return { total, inked, sum };
+    return { total, inked, sum, print };
   }, box);
 
 export interface ScreenStats extends Ink {
@@ -453,6 +457,32 @@ export const paintedInk = async (
     share: inked / total,
     ink: inked ? [sum[0] / inked, sum[1] / inked, sum[2] / inked] : null,
   };
+};
+
+/**
+ * inkPrint returns a number for what the pages' canvases show in `box`,
+ * which changes when they are painted again with something else there
+ */
+export const inkPrint = async (box: Box) => (await canvasInk(box)).print;
+
+/**
+ * waitForRepaint waits until the pages show something else in `box` than
+ * `before` (from inkPrint): a change to the text is painted, not merely laid
+ * out, while the canvas still shows what it showed until its repaint
+ */
+export const waitForRepaint = async (box: Box, before: number) => {
+  await browser.waitUntil(async () => (await inkPrint(box)) !== before, {
+    timeoutMsg: `nothing was painted again at ${JSON.stringify(box)}`,
+  });
+};
+
+/**
+ * lineBox returns the box of the whole line `text` is on, as wide as the
+ * view, scrolling it into view first
+ */
+export const lineBox = async (text: string): Promise<Box> => {
+  const box = await boxOf(text);
+  return { left: 0, right: 10_000, top: box.top, bottom: box.bottom };
 };
 
 /**

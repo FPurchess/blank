@@ -9,6 +9,8 @@ import {
   clickText,
   contrast,
   doubleClickAt,
+  inkPrint,
+  lineBox,
   Key,
   luminance,
   paintedInk,
@@ -19,6 +21,7 @@ import {
   textBox,
   type,
   waitForInk,
+  waitForRepaint,
 } from "../helpers.ts";
 
 // How the painted text looks next to the webview's own: a line of the page
@@ -122,9 +125,15 @@ describe("rendering", () => {
     await expect($("#page-view .page-canvas")).toBeExisting();
 
     // the new word has ink, in the theme's text colour
-    // within the sentence, where autocorrect leaves it lowercase
+    // within the sentence, where autocorrect leaves it lowercase; the line
+    // is painted again, and not only laid out
+    const line = await lineBox("is where");
+    // painted once already, so only the edit changes it
+    await waitForInk(line);
+    const before = await inkPrint(line);
     await clickText("is where");
     await type("inkcheck ");
+    await waitForRepaint(line, before);
     const light = await waitForInk("inkcheck");
     expect(luminance(light.ink!)).toBeLessThan(0.2);
     // and the room beside the text, on the same line, has none
@@ -174,8 +183,11 @@ describe("rendering", () => {
     // far down, a page painted when it comes into view
     await waitForInk("farmarker");
     // an edit there paints that page again
+    const far = await lineBox("farmarker");
+    const farBefore = await inkPrint(far);
     await clickText("farmarker", { offset: 9 });
     await type("qz");
+    await waitForRepaint(far, farBefore);
     await waitForInk("farmarkerqz", { offset: 9, length: 2 });
     // and the page before it shows the same as before
     expect((await paintedInk("inkcheck")).share).toBeGreaterThan(0.02);
