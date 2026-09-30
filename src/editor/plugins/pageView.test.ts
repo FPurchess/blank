@@ -1,4 +1,10 @@
-import { joinBackward, lift, splitBlock, wrapIn } from "prosemirror-commands";
+import {
+  joinBackward,
+  lift,
+  splitBlock,
+  toggleMark,
+  wrapIn,
+} from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
@@ -701,6 +707,48 @@ describe("the pages after many real edits", () => {
         () => (select(), run(lift)),
         () => (select(), run(wrapInList(schema.nodes.bullet_list))),
         () => (select(), run(sinkListItem(schema.nodes.list_item))),
+        // bold over a range, which changes marks only
+        () => {
+          select();
+          const { from } = view.state.selection;
+          const to = Math.min(
+            from + 1 + Math.floor(next() * 20),
+            view.state.doc.content.size,
+          );
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.between(
+                view.state.doc.resolve(from),
+                view.state.doc.resolve(to),
+              ),
+            ),
+          );
+          run(toggleMark(schema.marks.strong));
+        },
+        // an attribute of a block: a table's caption, a heading's level
+        () => {
+          const blocks: number[] = [];
+          view.state.doc.forEach((node, offset) => {
+            if (node.type.name === "table" || node.type.name === "heading")
+              blocks.push(offset);
+          });
+          if (!blocks.length) return;
+          const pos = blocks[Math.floor(next() * blocks.length)];
+          const node = view.state.doc.nodeAt(pos)!;
+          view.dispatch(
+            node.type.name === "table"
+              ? view.state.tr.setNodeAttribute(
+                  pos,
+                  "caption",
+                  `Caption ${Math.floor(next() * 9)}`,
+                )
+              : view.state.tr.setNodeAttribute(
+                  pos,
+                  "level",
+                  1 + Math.floor(next() * 3),
+                ),
+          );
+        },
         () => run(undo),
         () => run(redo),
       ];

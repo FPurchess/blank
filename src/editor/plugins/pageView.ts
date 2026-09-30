@@ -8,6 +8,16 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
+import {
+  AddMarkStep,
+  AddNodeMarkStep,
+  AttrStep,
+  DocAttrStep,
+  RemoveMarkStep,
+  RemoveNodeMarkStep,
+  ReplaceAroundStep,
+  ReplaceStep,
+} from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 import { computed, watch } from "vue";
 
@@ -284,12 +294,29 @@ export const trackChanges = (
     tr.mapping.map(from, -1),
     tr.mapping.map(to, 1),
   ]);
-  tr.mapping.maps.forEach((map, index) => {
+  for (const [index, step] of tr.steps.entries()) {
     const rest = tr.mapping.slice(index + 1);
-    map.forEach((_oldStart, _oldEnd, start, end) => {
+    const add = (start: number, end: number) =>
       ranges.push([rest.map(start, -1), rest.map(end, 1)]);
-    });
-  });
+    // steps that change marks or attributes move nothing, so their maps
+    // are empty; what they changed is their own range
+    if (step instanceof AddMarkStep || step instanceof RemoveMarkStep)
+      add(step.from, step.to);
+    else if (
+      step instanceof AttrStep ||
+      step instanceof AddNodeMarkStep ||
+      step instanceof RemoveNodeMarkStep
+    )
+      add(step.pos, step.pos + 1);
+    else if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep)
+      step
+        .getMap()
+        .forEach((_oldStart, _oldEnd, start, end) => add(start, end));
+    // the frontmatter, which the settings bring
+    else if (step instanceof DocAttrStep) continue;
+    // a step it doesn't know: the whole document is flattened again
+    else return { from: null, ranges: [] };
+  }
   return { from: base.from, ranges: merged(ranges) };
 };
 

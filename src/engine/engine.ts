@@ -544,8 +544,11 @@ export class PageEngine {
       ...extra.map((index): [number, number] => [index, index]),
     ];
     if (touched.length === 0) {
-      // e.g. only the frontmatter changed, which the settings bring
+      // e.g. only the frontmatter changed, which the settings bring: the
+      // blocks must all be the ones laid out
       if (doc.childCount !== old.childCount) return false;
+      for (let index = 0; index < doc.childCount; index++)
+        if (old.child(index) !== doc.child(index)) return false;
       this.doc = doc;
       return true;
     }
