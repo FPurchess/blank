@@ -67,7 +67,7 @@ test: ## Run the unit tests
 test-coverage: ## Run the unit tests with coverage (fails below 80%)
 	bun run test:coverage
 
-test-rust: ## Build the frontend and run the Rust tests (the spell check engine)
+test-rust: ## Build the frontend and run the Rust tests of the workspace (spell check, system fonts, layout engine; needs poppler)
 	bun run test:rust
 
 test-e2e: install-e2e ## Build the debug app and run the e2e tests (Linux only)

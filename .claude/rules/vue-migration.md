@@ -14,7 +14,7 @@ Blank's UI outside the editor is moving from hand-built DOM to Vue 3.5, one surf
 - **Composables only for component logic** (`useEditor`, `useRovingFocus`, `usePopupPlacement`, `useFocusTrap`, listeners and timers that clean up). No `use…()` wrapper around shared state.
 - **`observable.ts` goes away** in PR A. Vue skips writing an `Object.is`-equal value, so events that may repeat (`announcement`, `spellcheckMessage`) become `{ text, id }` objects written by `announce()` and `flash()`.
 - **UI → editor goes through `useEditor()`** (from PR B on): `{ view, state, run(cmd), can(cmd), focus() }`, provided to the app. No refs that trigger editor actions, and no `runCommand(id)`.
-- **The editor stays ProseMirror code:** NodeViews (`TableView`, images), decorations, key handling in plugins, and anchor measurement. Vue renders only outside `.ProseMirror`, into `#ui` (see `uiRoot()`), which comes after the editor.
+- **The editor stays ProseMirror code:** NodeViews (`TableView`, images), decorations, key handling in plugins, and the anchors they measure through the engine's geometry (`src/engine/geometry.ts`). Vue renders only outside `.ProseMirror`, into `#ui` (see `uiRoot()`), which comes after the editor.
 - **Architecture docs for agents live in `.claude/rules/*.md`** with `paths:` frontmatter, not in `CLAUDE.md`.
 
 ## Rules that already hold
