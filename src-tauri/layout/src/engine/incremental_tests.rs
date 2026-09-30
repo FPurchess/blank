@@ -5,7 +5,7 @@
 use super::test_support::LONG;
 use super::{Engine, Op, Page};
 use crate::fonts::repository_fonts;
-use crate::model::{Cell, Content, Item, Row, Settings, Text};
+use crate::model::{Cell, CellBlock, CellText, Content, Item, Row, Settings, Text};
 
 /// xorshift64, so the edits are the same on every run
 struct Random(u64);
@@ -50,6 +50,8 @@ enum Spec {
         rows: Vec<Vec<String>>,
         headers: usize,
         caption: Option<String>,
+        /// cells of a list item and an image instead of a paragraph
+        blocks: bool,
     },
 }
 
@@ -137,6 +139,7 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
                 rows,
                 headers,
                 caption,
+                blocks,
             } => {
                 let start = pos;
                 let mut at = start + 1;
@@ -149,17 +152,45 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
                         let cells = cells
                             .iter()
                             .map(|text| {
-                                let cell = Cell {
-                                    paragraphs: vec![Text {
-                                        pos: at + 2,
-                                        text: text.clone(),
-                                        ..Default::default()
-                                    }],
-                                    header: index < *headers,
+                                let paragraph = Text {
+                                    pos: at + 2,
+                                    text: text.clone(),
                                     ..Default::default()
                                 };
-                                at += utf16(text) + 4;
-                                cell
+                                if *blocks {
+                                    // a list of one item, then an image
+                                    let image = at + utf16(text) + 6;
+                                    at += utf16(text) + 9;
+                                    Cell {
+                                        blocks: vec![
+                                            CellBlock::Text(CellText {
+                                                text: Text {
+                                                    pos: paragraph.pos + 2,
+                                                    ..paragraph
+                                                },
+                                                indent: 18.0,
+                                                marker: Some("•".into()),
+                                                bars: vec![],
+                                            }),
+                                            CellBlock::Image {
+                                                pos: image,
+                                                src: "cell.png".into(),
+                                                width: 40.0 + (utf16(text) % 7) as f32 * 30.0,
+                                                height: 30.0,
+                                                alt: String::new(),
+                                            },
+                                        ],
+                                        header: index < *headers,
+                                        ..Default::default()
+                                    }
+                                } else {
+                                    at += utf16(text) + 4;
+                                    Cell {
+                                        paragraphs: vec![paragraph],
+                                        header: index < *headers,
+                                        ..Default::default()
+                                    }
+                                }
                             })
                             .collect();
                         at += 1;
@@ -237,6 +268,7 @@ fn random_spec(random: &mut Random, room: f32) -> Spec {
                 rows,
                 headers: random.below(3).min(count),
                 caption: random.chance(50).then(|| random.words(4)),
+                blocks: random.chance(30),
             }
         }
     }
@@ -277,6 +309,7 @@ fn restyle(random: &mut Random, spec: &mut Spec, room: f32) {
             rows,
             headers,
             caption,
+            blocks,
         } => {
             if random.chance(50) {
                 Spec::Table {
@@ -286,6 +319,7 @@ fn restyle(random: &mut Random, spec: &mut Spec, room: f32) {
                         Some(_) => None,
                         None => Some(random.words(3)),
                     },
+                    blocks,
                 }
             } else {
                 let headers = if headers > 0 { 0 } else { 1.min(rows.len()) };
@@ -293,6 +327,7 @@ fn restyle(random: &mut Random, spec: &mut Spec, room: f32) {
                     rows,
                     headers,
                     caption,
+                    blocks,
                 }
             }
         }
@@ -452,6 +487,10 @@ fn incremental_equals_full() {
                 let a: Vec<u32> = laid.texts.iter().map(|text| text.pos).collect();
                 let b: Vec<u32> = full.texts.iter().map(|text| text.pos).collect();
                 assert_eq!(a, b, "{context}: item {index}");
+                assert_eq!(
+                    laid.cell_images, full.cell_images,
+                    "{context}: item {index}"
+                );
             }
             // only the new items were laid out
             assert_eq!(engine.stats.laid_out, count, "{context}");

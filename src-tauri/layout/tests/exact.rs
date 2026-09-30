@@ -252,3 +252,76 @@ fn the_pdf_holds_the_layout_on_other_paper() {
     engine.set_items(sample());
     compare(&mut engine, "a5");
 }
+
+/// a table whose cells hold a list, a quote and paragraphs, after some text
+fn table_with_blocks() -> Vec<Item> {
+    use blank_layout::model::{Cell, CellBlock, CellText, Row};
+    let text = |pos: u32, text: &str, indent: f32, marker: Option<&str>, bars: Vec<f32>| {
+        CellBlock::Text(CellText {
+            text: Text {
+                pos,
+                text: text.into(),
+                ..Default::default()
+            },
+            indent,
+            marker: marker.map(String::from),
+            bars,
+        })
+    };
+    let cell = |blocks: Vec<CellBlock>| Cell {
+        blocks,
+        ..Default::default()
+    };
+    let rows = vec![
+        Row {
+            cells: vec![
+                cell(vec![text(3, "Ingredients", 0.0, None, vec![])]),
+                cell(vec![text(20, "Steps", 0.0, None, vec![])]),
+            ],
+            header: true,
+        },
+        Row {
+            cells: vec![
+                cell(vec![
+                    text(40, "flour and water", 18.0, Some("•"), vec![]),
+                    text(60, "a pinch of salt", 18.0, Some("•"), vec![]),
+                ]),
+                cell(vec![
+                    text(80, "Knead it well, then let it rest.", 0.0, None, vec![]),
+                    text(
+                        120,
+                        "Patience is the secret ingredient.",
+                        12.0,
+                        None,
+                        vec![0.0],
+                    ),
+                ]),
+            ],
+            header: false,
+        },
+    ];
+    vec![
+        text_item(200, "Bread", "h1", 1, vec![]),
+        Item {
+            content: Content::Table {
+                pos: 210,
+                end: 400,
+                rows,
+                widths: vec![],
+                caption: Some("A simple recipe".into()),
+            },
+            ..text_item(0, "", "p", 0, vec![])
+        },
+    ]
+}
+
+#[test]
+fn the_pdf_holds_tables_with_lists_and_quotes() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(table_with_blocks());
+    if let Some(count) = compare(&mut engine, "cell-blocks") {
+        // the list markers are laid out and in the PDF too
+        assert!(count >= 20, "{count} words");
+    }
+}

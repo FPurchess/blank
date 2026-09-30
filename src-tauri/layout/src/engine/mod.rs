@@ -156,7 +156,14 @@ impl Engine {
     pub fn missing(&self) -> Vec<char> {
         let mut missing: Vec<char> = vec![];
         for laid in &self.laid {
-            for boxed in laid.texts.iter().chain(&laid.label).chain(&laid.marker) {
+            let extras = laid.extras.iter().map(|(boxed, _)| boxed);
+            for boxed in laid
+                .texts
+                .iter()
+                .chain(&laid.label)
+                .chain(&laid.marker)
+                .chain(extras)
+            {
                 for char in &boxed.missing {
                     if !missing.contains(char) {
                         missing.push(*char);
@@ -230,6 +237,9 @@ impl Engine {
                 for laid in &mut self.laid[start + count..] {
                     for text in &mut laid.texts {
                         text.pos = (text.pos as i64 + shift).max(0) as u32;
+                    }
+                    for image in &mut laid.cell_images {
+                        image.pos = (image.pos as i64 + shift).max(0) as u32;
                     }
                 }
             }

@@ -11,7 +11,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - [x] 6. A page break near the bottom makes no blank page
 - [x] 7. A row nearly a page tall under repeated header rows
 - [x] 8. A heading stays with a captioned table
-- [ ] 9. S2: lists, quotes and images in table cells
+- [x] 9. S2: lists, quotes and images in table cells
 - [ ] 10. The PDF text layer keeps combining marks and ligature parts
 - [ ] 11. S3: one shared font store
 - [ ] 12. S4: failed image decodes and broken fonts in the PDF
@@ -136,6 +136,29 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - `keep_height` adds the whole `keep_next` chain of the block after the headings: its first unit and the ones that stay with it, e.g. a table's caption, header rows and first row. This is the same loop `run` uses.
 - This lookahead still stays within the item right after the heading run, so `update`'s restart point (task 1) still holds.
 - Test `heading_stays_with_captioned_table` (before: the heading on page 0, the table on page 1).
+
+### Task 9: S2, block content in cells
+
+- `Cell.blocks: Vec<CellBlock>` (`text` with `indent`/`marker`/`bars`, or `image`), used instead of `paragraphs` when it isn't empty. `Cell::blocks()` turns `paragraphs` into text blocks, so there is one layout path.
+- Layout (`items/table.rs`):
+  - Text blocks are indented. A marker is right-aligned before the indent, on the first baseline, as a `Laid::extras` entry (Role Text).
+  - Quote bars are `Deco::Rect`s, reaching over the gap to the next block of the same quote.
+  - A code block has its fill, as outside a table.
+  - An image is fitted to the cell's width (scaled down only) as a `Deco::Image`. Without a size, its alt text is an extra with Role Hint.
+  - `Unit::extras` names each unit's extras, and `display.rs` paints those lines the unit shows.
+- Rows taller than a page:
+  - Images and alt text lines count as lines no cut goes through.
+  - An image is drawn with the slice it starts in (`clipped`).
+  - An image taller than a page is still cut at the page, like a line would be. It's too rare to lay out apart.
+- `Laid::cell_images` (position, unit, box):
+  - `boxes()` returns them for a node selection of an image in a cell. It now starts at the item that holds `from`.
+  - `update` shifts them.
+- Tests:
+  - `lays_out_a_list_in_a_cell`, `lays_out_a_quote_in_a_cell`, `fits_images_to_their_cells` (fits, scaled down, row height, `Op::Image`, box, shift) and `shows_the_alt_text_of_an_image_in_a_cell_not_loaded` and `sets_a_code_block_in_a_cell_on_its_fill`
+  - `model::reads_the_blocks_of_cells`
+  - `exact.rs`: `the_pdf_holds_tables_with_lists_and_quotes`
+  - The property test's tables now use blocks 30% of the time. It compares `cell_images` with a fresh layout.
+- Found on the way, with the new random sequence: `update_many` whose last entry deleted the last items could settle on a tail that didn't reach the old end, and panic. Fixed in its own commit (e2ac963), with the regression test `update_many_ending_in_a_deletion_at_the_end`.
 
 ### Timings: ms per `update`, one character typed into the middle paragraph, release
 
