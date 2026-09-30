@@ -492,6 +492,18 @@ describe("the PDF's warnings", () => {
       "2 images couldn't be read and show their alt text: cat.png, dog.png",
       "1 font couldn't be embedded, so its text is left out: Noto Sans CJK SC",
     ]);
+    // each named once
+    expect(
+      describeWarnings([
+        { kind: "font", font: 1, family: "" },
+        { kind: "font", font: 2, family: "" },
+        { kind: "image", src: "a.png" },
+        { kind: "image", src: "a.png" },
+      ]),
+    ).toEqual([
+      "1 image couldn't be read and shows its alt text: a.png",
+      "1 font couldn't be embedded, so its text is left out: one of Blank's fonts",
+    ]);
     expect(
       describeWarnings([
         { kind: "font", font: 1, family: "" },

@@ -74,6 +74,10 @@ export const writePdf = (
       warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],
     };
   } finally {
-    engine.free();
+    try {
+      engine.free();
+    } catch {
+      // a trapped engine may not free; the error that trapped it tells more
+    }
   }
 };

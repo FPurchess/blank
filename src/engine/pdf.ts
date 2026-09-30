@@ -191,12 +191,23 @@ export const describeWarnings = (
   warnings: readonly PdfWarning[],
   nameOf: (src: string) => string = (src) => src,
 ) => {
-  const images = warnings.flatMap((warning) =>
-    warning.kind === "image" ? [nameOf(warning.src)] : [],
-  );
-  const fonts = warnings.flatMap((warning) =>
-    warning.kind === "font" ? [warning.family || "one of Blank's fonts"] : [],
-  );
+  // each named once, e.g. the faces of one family
+  const images = [
+    ...new Set(
+      warnings.flatMap((warning) =>
+        warning.kind === "image" ? [nameOf(warning.src)] : [],
+      ),
+    ),
+  ];
+  const fonts = [
+    ...new Set(
+      warnings.flatMap((warning) =>
+        warning.kind === "font"
+          ? [warning.family || "one of Blank's fonts"]
+          : [],
+      ),
+    ),
+  ];
   const described: string[] = [];
   if (images.length === 1)
     described.push(
