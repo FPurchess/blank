@@ -269,6 +269,14 @@ export const caretBox = (pos: number, after = false): Box | null => {
 };
 
 /**
+ * pageBoxInWindow returns where a box of a page, in points, is in the window
+ */
+export const pageBoxInWindow = (rect: PageBox): Box | null => {
+  const shown = ready();
+  return shown ? toWindow(shown.frames, shown.viewport, rect) : null;
+};
+
+/**
  * caretPage returns the page the caret at `pos` is on, counted from 0
  */
 export const caretPage = (pos: number): number | null =>

@@ -16,7 +16,12 @@ import {
   type Hit,
   type PageEngine,
 } from "../../engine/engine";
-import { caretBox, hitAt, viewBox } from "../../engine/geometry";
+import {
+  caretBox,
+  hitAt,
+  pageBoxInWindow,
+  viewBox,
+} from "../../engine/geometry";
 import { imageSizes, imagesLoaded } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
@@ -357,18 +362,27 @@ export const pageView = () => {
    * page moves the head a view's height up or down, and scrolls as far, so
    * it stays where it is in the view
    */
-  const page = (view: EditorView, down: boolean, extend: boolean) => {
+  const page = (
+    view: EditorView,
+    engine: PageEngine,
+    down: boolean,
+    extend: boolean,
+  ) => {
     const { selection, doc } = view.state;
+    const onPage = engine.caret(selection.head);
     const caret = caretBox(selection.head);
     const box = viewBox();
-    if (!caret || !box) return false;
+    if (!onPage || !caret || !box) return false;
+    // the column is kept in points, as ↑ and ↓ keep it
+    const current = goal ?? onPage.x;
+    const column =
+      pageBoxInWindow({ ...onPage, x: current, width: 0 })?.left ?? caret.left;
     const step = Math.max(40, (box.bottom - box.top) * PAGE_STEP);
     const middle = (caret.top + caret.bottom) / 2;
-    const hit = hitAt(goal ?? caret.left, middle + (down ? step : -step));
+    const hit = hitAt(column, middle + (down ? step : -step));
     const edge = down ? Selection.atEnd(doc).to : 0;
     const target =
       hit && hit.pos !== selection.head ? hit : { node: false, pos: edge };
-    const current = goal ?? caret.left;
     move(
       view,
       selectionAt(view.state, target, extend ? selection.anchor : undefined),
@@ -436,7 +450,7 @@ export const pageView = () => {
           return true;
         }
         if (event.key === "PageUp" || event.key === "PageDown") {
-          return page(view, event.key === "PageDown", event.shiftKey);
+          return page(view, engine, event.key === "PageDown", event.shiftKey);
         }
         if (event.key === "Home" || event.key === "End") {
           const edge = engine.lineEdge(selection.head, event.key === "End");

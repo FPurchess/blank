@@ -122,6 +122,25 @@ describe("pageView plugin", () => {
     expect(mounted.view.state.selection.head).toBe(1);
   });
 
+  it("keeps the column of ↑ and ↓ for Page Down", () => {
+    // lines alike, so every line has the same caret positions
+    const mounted = mount(
+      doc(...Array.from({ length: 80 }, () => p("abcdefghij klmnopqrst"))),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    const start = pageCaret.value!;
+    mounted.press("ArrowDown");
+    expect(pageCaret.value!.x).toBeCloseTo(start.x, 3);
+    const before = mounted.view.state.selection.head;
+    expect(mounted.press("PageDown")).toBe(true);
+    expect(mounted.view.state.selection.head).toBeGreaterThan(before + 100);
+    // within a pixel of the page view, in points
+    const scale = 18 / 11;
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
+    mounted.press("PageUp");
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
+  });
+
   it("moves a view's height with Page Up and Down, keeping its place", () => {
     const mounted = mount(doc(...Array.from({ length: 30 }, () => p(LONG))));
     destroy = () => mounted.pluginView.destroy?.();
