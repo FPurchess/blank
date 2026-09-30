@@ -147,7 +147,7 @@ const tableOf = (
       if (!cell || cell.row !== index) return [];
       const paragraphs: EngineText[] = [];
       // the cell's position: the table's content, then its rows and cells
-      const cellPos = pos + 1 + cellOffset(node, cell.node);
+      const cellPos = pos + 1 + cell.offset;
       cell.node.descendants((child, offset) => {
         if (!child.isTextblock) return true;
         paragraphs.push(
@@ -175,17 +175,6 @@ const tableOf = (
     widths: widths?.length === grid.widths.length ? widths : grid.widths,
     ...(caption ? { caption } : {}),
   };
-};
-
-// the offset of a cell in its table
-const cellOffset = (table: Node, cell: Node) => {
-  let found = -1;
-  table.descendants((node, offset) => {
-    if (found >= 0) return false;
-    if (node === cell) found = offset;
-    return node.type.name === "table_row";
-  });
-  return found;
 };
 
 interface Space {

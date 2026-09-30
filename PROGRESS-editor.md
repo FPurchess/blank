@@ -13,7 +13,7 @@ deletes this file on merge.
 - [ ] 4. Flatten only the blocks a transaction changed (the shifting part and band versions wait for S6)
 - [ ] 5. One unit for the column goal of ↑/↓ and Page Up/Down
 - [ ] 6. Keyboard and mouse make cell selections in tables
-- [ ] 7. Cells that share a node object get their own positions
+- [x] 7. Cells that share a node object get their own positions
 - [ ] 8. Images, lists and quotes in table cells — waiting for S2
 - [ ] 9. Image cache by resolved URL, retried, and no counter
 - [ ] 10. Drag and drop of text

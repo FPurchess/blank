@@ -1,4 +1,12 @@
-import type { Node } from "prosemirror-model";
+import { type Node, Slice } from "prosemirror-model";
+import { EditorState } from "prosemirror-state";
+import {
+  CellSelection,
+  handlePaste,
+  TableMap,
+  tableEditing,
+} from "prosemirror-tables";
+import { EditorView } from "prosemirror-view";
 import { describe, expect, it } from "vitest";
 
 import { schema } from "../markdown";
@@ -205,5 +213,70 @@ describe("diff", () => {
       delete: 0,
       records: [],
     });
+  });
+});
+
+describe("the positions of table cells", () => {
+  // the position of each cell's paragraph, as the engine gets it
+  const paragraphs = (node: Node) =>
+    items(node).flatMap((item) =>
+      item.kind === "table"
+        ? item.rows.flatMap((row) =>
+            row.cells.flatMap((cell) =>
+              cell.paragraphs.map((paragraph) => paragraph.pos),
+            ),
+          )
+        : [],
+    );
+
+  // the same, from ProseMirror
+  const expected = (node: Node, tablePos: number) => {
+    const found: number[] = [];
+    const table = node.nodeAt(tablePos)!;
+    const map = TableMap.get(table);
+    new Set(map.map).forEach((offset) =>
+      found.push(tablePos + 1 + offset + 1 + 1),
+    );
+    return found;
+  };
+
+  it("are their own for cells that share a node", () => {
+    const cell = td("x");
+    const node = doc(table(tr(cell, cell)));
+    expect(paragraphs(node)).toEqual([4, 9]);
+    expect(paragraphs(node)).toEqual(expected(node, 0));
+    expect(node.resolve(9).parent.textContent).toBe("x");
+  });
+
+  it("are their own after a cell is pasted into a larger selection", () => {
+    let state = EditorState.create({
+      schema,
+      doc: doc(table(tr(td("a"), td("b")), tr(td("c"), td("d")))),
+      plugins: [tableEditing()],
+    });
+    const map = TableMap.get(state.doc.firstChild!);
+    state = state.apply(
+      state.tr.setSelection(
+        CellSelection.create(state.doc, 1 + map.map[0], 1 + map.map[3]),
+      ),
+    );
+    const view = new EditorView(document.createElement("div"), { state });
+    // one copied cell, which prosemirror-tables repeats over the selection
+    const copied = new Slice(
+      schema.node("table", null, [tr(td("z"))]).content,
+      1,
+      1,
+    );
+    expect(
+      handlePaste(view, new Event("paste") as ClipboardEvent, copied),
+    ).toBe(true);
+
+    const node = view.state.doc;
+    expect(node.textContent).toBe("zzzz");
+    // the node prosemirror-tables pastes in every cell
+    const [first, second] = node.firstChild!.firstChild!.children;
+    expect(first).toBe(second);
+    expect(paragraphs(node)).toEqual(expected(node, 0));
+    view.destroy();
   });
 });
