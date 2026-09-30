@@ -94,6 +94,11 @@ Next, in this order:
    plus `tables.e2e.ts` and `pageMove.e2e.ts`; report the hashes to the
    integrator.
 
+Checks at 28fe97e (E2E build) and 1034ec7 (unit tests): lint, format, 2364
+unit tests with coverage (96.0 % statements, 91.0 % branches), and E2E: the
+nine specs plus `tables.e2e.ts` and `pageMove.e2e.ts`, 10 of 10 files
+passed.
+
 ## Notes for the other streams
 
 - engine-ui: every call into the engine goes through `PageEngine`'s guard.
