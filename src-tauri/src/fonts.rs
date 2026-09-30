@@ -11,7 +11,7 @@ use fontique::{
     Collection, CollectionOptions, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight,
     GenericFamily, Script, SourceKind,
 };
-use read_fonts::{types::Tag, FontRef, TableProvider};
+use read_fonts::{types::Tag, FontRef, ReadError, TableProvider};
 use serde::Serialize;
 use tauri::State;
 use unicode_script::UnicodeScript;
@@ -45,8 +45,9 @@ fn is_common(char: char) -> bool {
     matches!(char.script().short_name(), "Zyyy" | "Zinh" | "Zzzz")
 }
 
-/// the collection, found if it wasn't yet. A lookup that panicked leaves it
-/// as it was, so it stays usable
+/// the collection, found if it wasn't yet. A lookup that panicked doesn't
+/// block the ones after it: this lock is taken back from the poison, and
+/// the collection is used as the panic left it
 fn collection_of(fonts: &Mutex<Option<Collection>>) -> MutexGuard<'_, Option<Collection>> {
     let mut collection = fonts.lock().unwrap_or_else(PoisonError::into_inner);
     collection.get_or_insert_with(|| {
@@ -221,15 +222,20 @@ fn embeddable(data: &[u8], index: u32) -> bool {
     let Ok(font) = FontRef::from_index(data, index) else {
         return false;
     };
-    // fonts without an OS/2 table, like some older Apple ones, are
-    // installable
-    if let Ok(os2) = font.os2() {
-        let fs_type = os2.fs_type();
-        if fs_type & USAGE_PERMISSIONS == RESTRICTED_LICENSE
-            || fs_type & (NO_SUBSETTING | BITMAP_ONLY) != 0
-        {
-            return false;
+    match font.os2() {
+        Ok(os2) => {
+            let fs_type = os2.fs_type();
+            if fs_type & USAGE_PERMISSIONS == RESTRICTED_LICENSE
+                || fs_type & (NO_SUBSETTING | BITMAP_ONLY) != 0
+            {
+                return false;
+            }
         }
+        // fonts without an OS/2 table, like some older Apple ones, are
+        // installable
+        Err(ReadError::TableIsMissing(_)) => {}
+        // one that can't be read might say anything
+        Err(_) => return false,
     }
     let has = |tag: &[u8; 4]| font.table_data(Tag::new(tag)).is_some();
     (has(b"glyf") && has(b"loca")) || has(b"CFF ") || has(b"CFF2")
@@ -359,6 +365,9 @@ fn lookup_in(collection: &mut Collection, text: &str, language: &str) -> Vec<Fal
 /// `language`, and for its characters of no script in particular
 pub fn lookup(fonts: &Mutex<Option<Collection>>, text: &str, language: &str) -> Vec<FallbackFont> {
     let (text, language) = (capped(text), language_tag(language));
+    // held for the whole lookup, a scan of every family included (about a
+    // second on a system with thousands of fonts): lookups are rare, since
+    // fallback.ts asks for each character once, and on a thread of their own
     let mut collection = collection_of(fonts);
     match collection.as_mut() {
         Some(collection) => lookup_in(collection, text, language),
@@ -450,6 +459,9 @@ mod tests {
             0
         ));
         assert!(!embeddable(b"not a font", 0));
+        // an OS/2 table too short to read
+        let broken = sfnt(&[(b"OS/2", vec![0; 4]), (b"CFF ", vec![0; 4])]);
+        assert!(!embeddable(&broken, 0), "an OS/2 table that can't be read");
         assert!(!embeddable(&truetype(0), 1), "no such font in the file");
     }
 
