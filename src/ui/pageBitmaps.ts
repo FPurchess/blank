@@ -4,13 +4,10 @@
 // frame, which paints the pages in view first and those just outside it after
 // them, within a budget per frame.
 
-export interface Bitmap {
-  // what the bitmap holds, e.g. drawn with drawImage
-  image: CanvasImageSource;
-  width: number;
-  height: number;
-  close?: () => void;
-}
+import type { Snapshot } from "./painter";
+
+// a painted page, as the painter keeps it
+export type Bitmap = Snapshot;
 
 /**
  * BitmapCache keeps the painted pages by what they show, the least recently
@@ -147,10 +144,28 @@ export const BITMAP_LIMIT = 192 * 1024 * 1024;
 export const pageBitmaps = new BitmapCache(BITMAP_LIMIT);
 export const paintQueue = new PaintQueue();
 
+// a number for each engine: a page's version counts up within one engine,
+// and a new engine starts again from 1
+const engines = new WeakMap<object, number>();
+let engineCount = 0;
+
+/**
+ * engineId returns the number of an engine, the same for as long as it lives
+ */
+export const engineId = (engine: object) => {
+  let id = engines.get(engine);
+  if (id === undefined) {
+    id = ++engineCount;
+    engines.set(engine, id);
+  }
+  return id;
+};
+
 /**
  * bitmapKey tells apart everything that changes what a painted page shows
  */
 export const bitmapKey = (parts: {
+  engine: number;
   page: number;
   version: number;
   width: number;
@@ -163,6 +178,7 @@ export const bitmapKey = (parts: {
   images: number;
 }) =>
   [
+    parts.engine,
     parts.page,
     parts.version,
     parts.width,

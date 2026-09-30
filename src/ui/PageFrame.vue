@@ -12,11 +12,11 @@ import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
-import { imagesLoaded, loadedImage } from "../engine/images";
+import { imagesLoaded } from "../engine/images";
 import { bootMark, record } from "../engine/perf";
-import { pageLayoutState, path, theme } from "../state";
-import { bitmapKey, pageBitmaps, paintQueue } from "./pageBitmaps";
-import { paintPage } from "./paintPage";
+import { pageLayoutState, theme } from "../state";
+import { bitmapKey, engineId, pageBitmaps, paintQueue } from "./pageBitmaps";
+import { painter, type Surface } from "./painter";
 import { bandTitle, endMark } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
@@ -73,34 +73,28 @@ const colorOf = (element: HTMLElement) => {
 // what the canvas shows now, so the same isn't drawn twice
 let shown = "";
 
+// the canvas as the painter paints into it, taken when it's there
+let surface: Surface | null = null;
+const surfaceOf = (element: HTMLCanvasElement) => {
+  if (surface?.canvas !== element) surface = painter.surface(element);
+  return surface;
+};
+
 /**
- * paintInto paints the page into a context of `width` × `height` device
- * pixels
+ * paintInto paints the page into `target`, whose canvas is `width` ×
+ * `height` device pixels
  */
-const paintInto = (
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  color: string,
-  ratio: number,
-) => {
+const paintInto = (target: Surface, color: string, ratio: number) => {
   const engine = pageEngine;
   if (!engine) return;
   const start = performance.now();
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  paintPage(
-    context as CanvasRenderingContext2D,
-    engine.display(props.page, props.version),
-    {
-      scale: props.scale,
-      ratio,
-      x: props.x,
-      y: props.y,
-      color,
-      glyph: (font, id) => engine.glyph(font, id),
-      unitsPerEm: (font) => engine.unitsPerEm(font),
-      image: (src) => loadedImage(src, path.value)?.image ?? null,
-    },
-  );
+  painter.paint(target, engine.display(props.page, props.version), {
+    scale: props.scale,
+    ratio,
+    x: props.x,
+    y: props.y,
+    color,
+  });
   record("paint", performance.now() - start);
   bootMark("pages");
 };
@@ -129,6 +123,7 @@ const paint = () => {
     shown = "";
   }
   const key = bitmapKey({
+    engine: engineId(pageEngine),
     page: props.page,
     version: props.version,
     width,
@@ -141,18 +136,17 @@ const paint = () => {
     images: imagesLoaded.value,
   });
   if (key === shown) return;
-  const context = element.getContext("2d");
-  if (!context) return;
+  const target = surfaceOf(element);
+  if (!target) return;
   const cached = pageBitmaps.get(key);
   if (cached) {
-    context.clearRect(0, 0, width, height);
-    context.drawImage(cached.image, 0, 0);
+    painter.show(target, cached);
     shown = key;
     return;
   }
-  // without bitmaps, e.g. in tests: right away
-  if (typeof createImageBitmap === "undefined") {
-    paintInto(context, colorOf(element), ratio);
+  // without snapshots, e.g. in tests: right away
+  if (!painter.snapshots) {
+    paintInto(target, colorOf(element), ratio);
     shown = key;
     return;
   }
@@ -164,8 +158,7 @@ const paint = () => {
       // unless the page changed meanwhile, which asks again
       if (!canvas.value || element.width !== width || element.height !== height)
         return;
-      context.clearRect(0, 0, width, height);
-      paintInto(context, colorOf(element), ratio);
+      paintInto(target, colorOf(element), ratio);
       shown = key;
     },
   });
@@ -177,18 +170,11 @@ const paint = () => {
  */
 const keep = () => {
   const element = canvas.value;
-  if (!element || !shown || typeof createImageBitmap === "undefined") return;
+  if (!element || !shown || !surface || !painter.snapshots) return;
   if (pageBitmaps.get(shown)) return;
   const key = shown;
-  const { width, height } = element;
-  createImageBitmap(element).then(
-    (bitmap) =>
-      pageBitmaps.set(key, {
-        image: bitmap,
-        width,
-        height,
-        close: () => bitmap.close(),
-      }),
+  painter.snapshot(surface).then(
+    (snapshot) => snapshot && pageBitmaps.set(key, snapshot),
     () => {},
   );
 };

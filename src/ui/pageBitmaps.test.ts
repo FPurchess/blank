@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BitmapCache,
   bitmapKey,
+  engineId,
   FRAME_BUDGET,
   PaintQueue,
   type Scheduler,
 } from "./pageBitmaps";
 
 const bitmap = (width: number, height: number) => ({
-  image: {} as CanvasImageSource,
   width,
   height,
   close: vi.fn(),
@@ -48,9 +48,19 @@ describe("BitmapCache", () => {
   });
 });
 
+describe("engineId", () => {
+  it("numbers each engine once", () => {
+    const a = {};
+    const b = {};
+    expect(engineId(a)).toBe(engineId(a));
+    expect(engineId(b)).not.toBe(engineId(a));
+  });
+});
+
 describe("bitmapKey", () => {
   it("tells apart what changes a painted page", () => {
     const parts = {
+      engine: 1,
       page: 1,
       version: 3,
       width: 100,
@@ -70,6 +80,7 @@ describe("bitmapKey", () => {
       { theme: "dark" },
       { scale: 1.25 },
       { images: 1 },
+      { engine: 2 },
     ])
       expect(bitmapKey({ ...parts, ...change })).not.toBe(key);
   });
