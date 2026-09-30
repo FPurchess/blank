@@ -297,6 +297,18 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - `exact.rs` has 6 tests: the sample on two papers, cell blocks, marks and ligatures, what no font has, and the tagged PDF.
 - On CI, a missing pdftotext, pdfinfo or qpdf fails the checks that need it, with the package to install. Locally they skip, as engine-release gated `read_words`: `missing_tool` in `exact.rs`, and `text_of` in the PDF's unit tests. Checked by running both ways with the tools off `PATH`.
 
+### Review fixes
+
+The self-review's findings, with the numbers from the report to the coordinator. One commit each, each with the test that failed before.
+
+- B1 (b66a67b): a font left out of the PDF panicked krilla, because a `continue` left its tagged section open. What can't be drawn is now left out before its tag opens. Test: `pdf::tests::leaves_out_a_skipped_font_without_panicking`.
+- B2 + M7 + m11 (2abb33c): `sanitize` caps images at 100 000 pt (top-level and in cells) and quote bars at 64. Table widths fall back to equal shares, links are capped at 65 535 per block, units per em outside 16–16384 count as 1000, and band slots are capped at 1000 characters. The slice loop always moves forward, and JSON numbers are finite. Tests are in `boundary_tests.rs` and `bands::tests`.
+- M1: marks were mirrored in the PDF, because Parley's `dy` points down and krilla's `y_offset` up. `krilla_glyphs` now passes `-dy`. Test: `keeps_marks_on_their_side_of_the_baseline` (kaf with damma), which fails with the old sign. Rendered with `renders_marks_for_a_look` (ignored) and `pdftoppm`/inkscape at the same scale, each cropped and enlarged 2×:
+  - the page view (glyph outlines where it paints them): ![page](progress-core/m1-page.png)
+  - the PDF before: the damma is pushed into the kaf, and the kasra under the beh is squashed: ![before](progress-core/m1-pdf-before.png)
+  - the PDF after, as the page: ![after](progress-core/m1-pdf-after.png)
+  - Plex composes the accented capitals into precomposed glyphs, so they don't differ.
+
 ### Known quirks (of other tools, not of the PDF)
 
 - pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.

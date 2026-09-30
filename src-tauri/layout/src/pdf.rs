@@ -223,25 +223,32 @@ pub fn write_with(
     Err("the PDF can't be written".into())
 }
 
-/// draws glyphs laid out on the page, from where the first one stands
-fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, size: f32) {
-    let Some(first) = glyphs.first() else {
-        return;
-    };
-    let glyphs: Vec<KrillaGlyph> = glyphs
+/// glyphs as krilla takes them, in em. Parley's offsets point down, as the
+/// page does, and krilla's up, as a font's do (it draws at `y - y_offset`),
+/// so a mark placed above its letter stays above it.
+fn krilla_glyphs(glyphs: &[Glyph], size: f32) -> Vec<KrillaGlyph> {
+    glyphs
         .iter()
         .map(|glyph| {
             KrillaGlyph::new(
                 GlyphId::new(glyph.id),
                 glyph.advance / size,
                 glyph.dx / size,
-                glyph.dy / size,
+                -glyph.dy / size,
                 0.0,
                 glyph.start as usize..glyph.end as usize,
                 None,
             )
         })
-        .collect();
+        .collect()
+}
+
+/// draws glyphs laid out on the page, from where the first one stands
+fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, size: f32) {
+    let Some(first) = glyphs.first() else {
+        return;
+    };
+    let glyphs = krilla_glyphs(glyphs, size);
     surface.draw_glyphs(
         Point::from_xy(first.x - first.dx, first.y - first.dy),
         &glyphs,
@@ -669,5 +676,68 @@ mod tests {
         };
         let written = attempt(&mut engine, &HashMap::new(), &info(), "", &skipped);
         assert!(written.is_ok());
+    }
+
+    /// renders a line of marks both ways, for a look: the PDF, and an SVG of
+    /// the glyph outlines where the page view paints them. Run with
+    /// BLANK_RENDER_DIR=dir cargo test -p blank-layout --lib renders_marks -- --ignored
+    #[test]
+    #[ignore]
+    fn renders_marks_for_a_look() {
+        let dir = std::env::var("BLANK_RENDER_DIR").expect("BLANK_RENDER_DIR");
+        let text = "E\u{301}E\u{302}A\u{30A}O\u{308} \u{628}\u{64e}\u{627}\u{628}\u{650} \u{643}\u{64f}\u{62a}\u{64f}\u{628}";
+        let mut item = paragraph(1, text);
+        if let Content::Text(text) = &mut item.content {
+            text.style = "h1".into();
+        }
+        let mut engine = engine(vec![item]);
+        let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
+        std::fs::write(format!("{dir}/marks.pdf"), pdf).unwrap();
+        let (width, height) = (engine.settings.width, engine.settings.height);
+        let mut svg = format!(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' viewBox='0 0 {width} {height}'><rect width='100%' height='100%' fill='white'/>"
+        );
+        for op in engine.page_ops(0, false) {
+            let Op::Glyphs { run, .. } = op else {
+                continue;
+            };
+            let upem = engine
+                .fonts
+                .face(run.font)
+                .map_or(1000.0, |(file, _)| file.upem);
+            let scale = run.size / upem;
+            for glyph in &run.glyphs {
+                let path = engine.fonts.glyph_path(run.font, glyph.id);
+                svg.push_str(&format!(
+                    "<path transform='translate({} {}) scale({scale} {})' d='{path}'/>",
+                    glyph.x, glyph.y, -scale
+                ));
+            }
+        }
+        svg.push_str("</svg>");
+        std::fs::write(format!("{dir}/marks.svg"), svg).unwrap();
+    }
+
+    #[test]
+    fn keeps_marks_on_their_side_of_the_baseline() {
+        use krilla::text::Glyph as _;
+        // kaf with a damma, in DejaVu Sans: the damma is placed with an
+        // offset, which krilla must take the other way round (its y points
+        // up, Parley's down), or the mark crashes into its letter
+        let engine = engine(vec![paragraph(1, "\u{643}\u{64f}\u{62a}\u{64f}\u{628}")]);
+        let mut checked = 0;
+        for op in engine.body_ops(0) {
+            let Op::Glyphs { run, .. } = op else {
+                continue;
+            };
+            let glyphs = krilla_glyphs(&run.glyphs, run.size);
+            for (glyph, krilla) in run.glyphs.iter().zip(&glyphs) {
+                if glyph.dy != 0.0 {
+                    assert!((krilla.y_offset(run.size) + glyph.dy).abs() < 1e-3);
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "no mark with an offset");
     }
 }
