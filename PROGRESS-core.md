@@ -324,7 +324,7 @@ Everything above is committed; nothing is half done in the tree. Next, in this o
 2. **m1**: `text.rs` `end_byte` trims spaces before a hard break. Trim only at soft breaks (`line.break_reason()`); at a "\n", step back over the newline only. Test: "foo␣␣⏎bar" gives `line_end(0)` = 6, not 4.
 3. **m2**: `TextBox::notdef` reports the base letter for a missing combining mark. Use `cluster_ranges`' widened ranges. Test: `a + U+1AB5` reports U+1AB5.
 4. **m3**: a caption can end up alone. `items/table.rs` decides whether a group is sliced by `row_room`; use `slice_room(start == header_rows)`, so the first body row counts the caption. Test: a row in the window room − headers − caption < row ≤ room − headers (41 hard lines on A4): caption and table on one page.
-5. **m4**: `[Break, H1]` with new-page-before gives a blank first page. A Break's fragment must not clear `empty`. Test: 1 page.
+5. ~~**m4**~~, done at 00:15: `[Break, H1]` with new-page-before gave a blank first page. A page that holds only breaks stays `empty` now. Test: `page_break_before_a_chapter_at_the_start`.
 6. **m5**: `keep_height` runs across a new-page-before heading, which leaves H2 alone on a page. Stop the heading run at a heading that starts a new page, and at a Break. Test: `[P, H2, H1, P]` puts H2 with H1 on page 2, or H2 on page 1.
 7. **m7**, only the two agreed parts:
    - a. `paginate_from` copies the tail twice (`split_off`, then `extend`). Paginate into a scratch Vec and `splice` it into `self.frags`/`self.pages` in place, rewriting item indices only when `delta != 0`.

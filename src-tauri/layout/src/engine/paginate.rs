@@ -473,8 +473,14 @@ impl Paginator<'_> {
                     }
                     y = self.y;
                 }
+                let was_empty = self.empty;
                 if !self.place(index, unit_index, y, false) {
                     return;
+                }
+                // a page break takes no room: a page that holds only breaks
+                // is still empty, e.g. for a chapter that starts a new page
+                if is_break {
+                    self.empty = was_empty;
                 }
             }
             self.prev_after = if is_break { 0.0 } else { item.after };
@@ -755,5 +761,19 @@ mod tests {
         let heading_page = engine.page_of_frag(engine.first_frag[1]);
         let table_page = engine.page_of_frag(engine.first_frag[2]);
         assert_eq!((heading_page, table_page), (1, 1));
+    }
+
+    #[test]
+    fn page_break_before_a_chapter_at_the_start() {
+        // a break first, then a chapter that starts a new page: one page
+        let mut engine = Engine::new(repository_fonts());
+        engine.set_settings(Settings {
+            new_page_before: vec![1],
+            ..Default::default()
+        });
+        let mut chapter = heading(2, 1, "One");
+        chapter.before = 0.0;
+        engine.set_items(vec![page_break(0), chapter]);
+        assert_eq!(engine.pages.len(), 1);
     }
 }
