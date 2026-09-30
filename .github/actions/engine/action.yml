@@ -19,12 +19,13 @@ runs:
       with:
         tool: wasm-bindgen-cli@0.2.129
 
-    # pdftotext and pdfinfo, which check the engine's PDF against its layout
-    - name: install poppler
+    # pdftotext and pdfinfo, which check the engine's PDF against its
+    # layout, and qpdf, which checks its structure, tags and bookmarks
+    - name: install poppler and qpdf
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y poppler-utils
+        sudo apt-get install -y poppler-utils qpdf
 
     - name: test the engine
       shell: bash
