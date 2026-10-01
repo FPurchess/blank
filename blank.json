@@ -56,6 +56,9 @@
     "ignoreUppercase": true,
     "ignoreWordsWithNumbers": true
   },
+  "editor": {
+    "indentSize": 4
+  },
   "layout": {
     "page": {
       "size": "auto",

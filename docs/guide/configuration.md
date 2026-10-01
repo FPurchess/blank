@@ -62,6 +62,18 @@ The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `
 
 The words you add to the dictionary are kept next to `blank.json`, in the `dictionaries` folder.
 
+## Code blocks {#code-blocks}
+
+`Tab` and `Shift` `Tab` indent and outdent the lines of a [code block](./writing#code) by 4 spaces. Set another indent size, from 1 to 16 spaces, with `indentSize`; it's also how wide a tab counts there:
+
+```json
+{
+  "editor": {
+    "indentSize": 2
+  }
+}
+```
+
 ## Page setup {#page-setup}
 
 `layout.page` is the [page setup](./pages) of documents that don't have their own. **Make This My Default** in the page setup writes it for you:

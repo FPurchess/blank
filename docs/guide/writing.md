@@ -25,6 +25,10 @@ Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` 
 
 Code is set in IBM Plex Mono. `Mod` + Click on a link opens it in your browser. Emoji appear in black and white, in the colour of your text. Chinese, Japanese, Korean and other scripts use the fonts your computer has for them. Whatever you write, it looks on paper just as it does on the screen, and a word too long for its line, like a long web address, simply carries on to the next one.
 
+## Code blocks {#code}
+
+Type ` ``` ` and Enter at the start of a line to start a code block. In it, `Tab` and `Shift` `Tab` work as in a code editor: select some lines and `Tab` indents all of them by 4 spaces, `Shift` `Tab` outdents them, and the same lines stay selected, so you can press again to go further. Each line moves to the next or the previous step of 4, so a line indented by 6 spaces outdents to 4, not 2, and lines without indentation stay where they are. Without a selection, `Tab` puts in spaces up to the next step, and `Shift` `Tab` outdents the line the cursor is on. Code indented with tabs keeps its tabs. Each press is one step for `Mod` `Z`. Prefer 2 spaces? Set it in [blank.json](./configuration#code-blocks).
+
 ## Tables
 
 Press `Mod` `T`, pick a size with the arrow keys and press Enter. `Tab` takes you from cell to cell and adds a row at the end. [Tables](./tables) has everything about making, filling and saving them.
