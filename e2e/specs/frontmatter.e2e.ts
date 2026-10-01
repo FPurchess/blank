@@ -65,8 +65,30 @@ describe("frontmatter", () => {
   });
 
   it("restores the frontmatter with the document", async () => {
-    // the document is written to storage at most 1000ms after a change, see src/storage.ts
-    await browser.pause(2000);
+    // the document is written to storage at most 1000ms after a change (see
+    // src/storage.ts), later on a busy machine: wait until it's there
+    // (localforage's IndexedDB "Blank", store "keyvaluepairs"), with the
+    // frontmatter and the text typed in the test before
+    await browser.waitUntil(
+      async () => {
+        const stored = await browser.executeAsync(
+          (done: (stored: string) => void) => {
+            const open = indexedDB.open("Blank");
+            open.onerror = () => done("");
+            open.onsuccess = () => {
+              const get = open.result
+                .transaction("keyvaluepairs")
+                .objectStore("keyvaluepairs")
+                .get("doc");
+              get.onerror = () => done("");
+              get.onsuccess = () => done(JSON.stringify(get.result ?? null));
+            };
+          },
+        );
+        return stored.includes("The Lighthouse") && stored.includes("more");
+      },
+      { timeoutMsg: "the edited document wasn't stored" },
+    );
     await restartApp();
 
     await expectEditorText(

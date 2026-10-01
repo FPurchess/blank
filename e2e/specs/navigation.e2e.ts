@@ -12,6 +12,7 @@ import {
   Key,
   pressShift,
   restartApp,
+  screenStats,
   textBox,
 } from "../helpers.ts";
 
@@ -113,18 +114,28 @@ describe("navigation", () => {
       x: Math.round((columns[column] + columns[column + 1]) / 2),
       y: Math.round((rows[row] + rows[row + 1]) / 2),
     });
-    // the pages paint it over both rows of the column
-    const painted = await browser.execute(() => {
-      const rects = [
-        ...document.querySelectorAll("#page-view .page-selection"),
-      ].map((element) => element.getBoundingClientRect());
-      return {
-        top: Math.min(...rects.map((rect) => rect.top)),
-        bottom: Math.max(...rects.map((rect) => rect.bottom)),
-      };
+    // the pages paint it over both rows of the column, under their text: the
+    // colour behind cells c and e is the selection's, not that of d, a body
+    // cell outside it (header cells have a shade of their own)
+    const cell = (column: number, row: number) => ({
+      left: columns[column] + 3,
+      right: columns[column + 1] - 3,
+      top: rows[row] + 3,
+      bottom: rows[row + 1] - 3,
     });
-    expect(painted.top).toBeLessThanOrEqual(rows[1] + 2);
-    expect(painted.bottom).toBeGreaterThanOrEqual(rows[3] - 2);
+    await browser.waitUntil(
+      async () => {
+        const c = await screenStats(cell(0, 1));
+        const e = await screenStats(cell(0, 2));
+        const d = await screenStats(cell(1, 1));
+        const same = (x: number[], y: number[]) =>
+          x.every((value, index) => Math.abs(value - y[index]) <= 6);
+        return (
+          same(c.background, e.background) && !same(c.background, d.background)
+        );
+      },
+      { timeoutMsg: "the cell selection isn't painted over c and e" },
+    );
 
     await clickText("a");
     await browser
