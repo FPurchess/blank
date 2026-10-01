@@ -48,3 +48,5 @@ blank ~/Documents/notes.md
 :::
 
 With a path, `Mod` `S` saves to that file right away.
+
+`blank --version` shows which version you have, and `blank --help` what you can pass, without opening a window.

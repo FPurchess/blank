@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod fonts;
 pub mod primary;
 pub mod spellcheck;
@@ -6,6 +7,15 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // `blank --version` and `blank --help` print and exit, without a window
+    if let Some(text) = cli::answer(
+        std::env::args().skip(1),
+        &context.package_info().version.to_string(),
+    ) {
+        println!("{text}");
+        return;
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -42,6 +52,6 @@ pub fn run() {
             fonts::fallback_fonts,
             primary::read_primary,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
