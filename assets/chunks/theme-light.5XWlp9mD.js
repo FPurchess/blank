@@ -1,1 +1,1 @@
-const s="/blank/screenshots/theme-light.png";export{s as _};
+const s="/screenshots/theme-light.png";export{s as _};
