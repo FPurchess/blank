@@ -377,10 +377,11 @@ pub(super) fn table_units(
         let (y0, y1) = (tops[start], tops[end]);
         // the room the group has: on the pages the table goes on, that is
         // under its header rows, which repeat above it
-        let row_room = if header_rows > 0 && !header {
-            slice_room(false)
-        } else {
+        // and the first body row also under the caption, which stays with it
+        let row_room = if header {
             room
+        } else {
+            slice_room(start == header_rows)
         };
         if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
             for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
@@ -428,24 +429,19 @@ pub(super) fn table_units(
                 )
                 .chain(group_images.iter().map(|&(_, _, _, y, _, h)| (y, y + h)))
                 .collect();
+            let cuts = allowed_cuts(&lines, y1);
+            let mut next_cut = 0;
             let mut from = y0;
             while from < y1 - 0.01 {
                 let limit = from + slice_room(from == y0);
-                let to = {
-                    lines
-                        .iter()
-                        .map(|(_, bottom)| *bottom)
-                        .chain([y1])
-                        .filter(|cut| {
-                            *cut > from + 0.01
-                                && *cut <= limit + 0.01
-                                && lines.iter().all(|(top, bottom)| {
-                                    *cut <= top + 0.01 || *cut >= bottom - 0.01
-                                })
-                        })
-                        .fold(f32::NAN, f32::min)
+                // the first cut after `from`, if the slice has room for it
+                while cuts.get(next_cut).is_some_and(|cut| *cut <= from + 0.01) {
+                    next_cut += 1;
+                }
+                let to = match cuts.get(next_cut) {
+                    Some(&cut) if cut <= limit + 0.01 => cut,
+                    _ => limit,
                 };
-                let to = if to.is_nan() { limit } else { to };
                 // always forward: where a slice can't move on, e.g. past the
                 // precision of f32, the rest of the row is the last slice
                 let to = if to > from { to } else { y1 };
@@ -512,6 +508,37 @@ pub(super) fn table_units(
         cells,
         missing: vec![],
     }
+}
+
+/// where a row taller than a page may be cut, in order: below a line (and
+/// at the row's end, `y1`) where that isn't inside another line or image.
+/// The spans are sorted by their tops, with the lowest bottom reached so
+/// far, so that each cut is checked by a binary search, not against every
+/// line: a cell of thousands of lines is sliced on each keystroke in it.
+fn allowed_cuts(lines: &[(f32, f32)], y1: f32) -> Vec<f32> {
+    let mut spans = lines.to_vec();
+    spans.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut reach = Vec::with_capacity(spans.len());
+    let mut lowest = f32::NEG_INFINITY;
+    for (_, bottom) in &spans {
+        lowest = lowest.max(*bottom);
+        reach.push(lowest);
+    }
+    // inside a span: below its top and above its bottom, by more than the
+    // rounding allowed
+    let inside = |cut: f32| {
+        let before = spans.partition_point(|(top, _)| *top + 0.01 < cut);
+        before > 0 && reach[before - 1] - 0.01 > cut
+    };
+    let mut cuts: Vec<f32> = lines
+        .iter()
+        .map(|(_, bottom)| *bottom)
+        .chain([y1])
+        .filter(|cut| !inside(*cut))
+        .collect();
+    cuts.sort_by(f32::total_cmp);
+    cuts.dedup();
+    cuts
 }
 
 /// the first column a cell covers and how many, within MAX_COLUMNS
@@ -1090,5 +1117,104 @@ mod tests {
         }
         let image = &in_cell.laid[0].cell_images[0];
         assert!((image.w / image.h - 0.05).abs() < 1e-4);
+    }
+
+    /// the cuts as the slicing chose them before, against every line
+    fn cuts_by_hand(lines: &[(f32, f32)], y1: f32) -> Vec<f32> {
+        let mut cuts: Vec<f32> = lines
+            .iter()
+            .map(|(_, bottom)| *bottom)
+            .chain([y1])
+            .filter(|cut| {
+                lines
+                    .iter()
+                    .all(|(top, bottom)| *cut <= top + 0.01 || *cut >= bottom - 0.01)
+            })
+            .collect();
+        cuts.sort_by(f32::total_cmp);
+        cuts.dedup();
+        cuts
+    }
+
+    #[test]
+    fn finds_the_cuts_between_lines() {
+        // the lines of two cells side by side, at other heights, and an
+        // image across several of them
+        let mut lines: Vec<(f32, f32)> = (0..40)
+            .map(|line| (line as f32 * 16.0, line as f32 * 16.0 + 16.0))
+            .collect();
+        lines.extend((0..30).map(|line| (4.0 + line as f32 * 21.0, 25.0 + line as f32 * 21.0)));
+        lines.push((100.0, 180.0));
+        lines.push((500.0, 516.0));
+        assert_eq!(
+            super::allowed_cuts(&lines, 700.0),
+            cuts_by_hand(&lines, 700.0)
+        );
+        assert!(super::allowed_cuts(&[], 50.0) == [50.0]);
+    }
+
+    #[test]
+    fn slices_a_cell_of_thousands_of_lines_in_time() {
+        use crate::model::Row;
+        // the cut search compared every cut with every line: 2000 lines took
+        // 2.6 s in a debug build, on every keystroke in the cell
+        let long = vec!["x"; 3000].join("\n");
+        let rows = vec![Row {
+            cells: vec![cell(3, &long)],
+            header: false,
+        }];
+        let started = std::time::Instant::now();
+        let engine = test_support::engine(vec![table_item(rows, None)]);
+        assert_eq!(engine.laid[0].units.len(), 3001);
+        assert!(
+            started.elapsed().as_secs_f32() < 4.0,
+            "{:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn keeps_the_caption_with_a_first_row_nearly_a_page_tall() {
+        use crate::model::Row;
+        // a first row that fits under the header row, but not under the
+        // caption as well: it was kept whole and moved on, leaving the
+        // caption alone on the page
+        let settings = crate::model::Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        let mut checked = false;
+        for lines in 30..60 {
+            let tall = vec!["x"; lines].join("\n");
+            let rows = vec![
+                Row {
+                    cells: vec![cell(3, "Head")],
+                    header: true,
+                },
+                Row {
+                    cells: vec![cell(12, &tall)],
+                    header: false,
+                },
+            ];
+            let engine = test_support::engine(vec![table_item(rows, Some("Caption"))]);
+            let laid = &engine.laid[0];
+            let caption = laid.units[0].height;
+            let head = laid.units[1].height;
+            let row = laid.texts[1].height() + 2.0 * crate::style::CELL_PADDING_Y;
+            if !(row + head <= room && row + head + caption > room) {
+                continue;
+            }
+            checked = true;
+            let pages: Vec<usize> = (0..engine.frags.len())
+                .map(|frag| engine.pages.partition_point(|page| page.end <= frag))
+                .collect();
+            assert_eq!(
+                pages[0], pages[1],
+                "the caption and the header row: {pages:?}"
+            );
+            assert_eq!(
+                pages[1], pages[2],
+                "the header row and the first of the row: {pages:?}"
+            );
+        }
+        assert!(checked, "no row of the height");
     }
 }

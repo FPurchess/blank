@@ -154,8 +154,9 @@ pub enum Warning {
     /// an image, by its src, that couldn't be decoded: its alt text is in
     /// its place
     Image(String),
-    /// a font, by its index in `Fonts::files`, that couldn't be embedded:
-    /// the text set in it is left out
+    /// a font, by its font index (a face in `Fonts::files`, or an instance
+    /// of a variable one from `INSTANCE_BASE` on), that couldn't be
+    /// embedded: the text set in it is left out
     Font(usize),
 }
 
@@ -201,7 +202,7 @@ pub fn write_with(
     let mut skipped = Skipped::default();
     // krilla tells what it fails on only once it writes the document, so
     // write it again without that, once for each image and font at most
-    for _ in 0..=images.len() + engine.fonts.files.len() {
+    for _ in 0..attempts(images.len(), &engine.fonts) {
         match attempt(engine, images, info, language, &skipped) {
             Ok((bytes, undecoded)) => {
                 let mut warnings: Vec<Warning> = vec![];
@@ -241,6 +242,13 @@ fn krilla_glyphs(glyphs: &[Glyph], size: f32) -> Vec<KrillaGlyph> {
             )
         })
         .collect()
+}
+
+/// how often a PDF is written at most: once, and again for each image and
+/// each font krilla may fail on, the faces and the instances of variable
+/// ones, which are fonts of their own in the PDF
+fn attempts(images: usize, fonts: &Fonts) -> usize {
+    1 + images + fonts.files.len() + fonts.instances.len()
 }
 
 /// draws glyphs laid out on the page, from where the first one stands
@@ -792,5 +800,29 @@ mod tests {
         };
         let structure = String::from_utf8_lossy(&out.stdout);
         assert_eq!(structure.matches("\"Heading\"").count(), 1, "{structure}");
+    }
+
+    #[test]
+    fn may_leave_out_every_instance_too() {
+        // a variable font in bold is an instance, which krilla embeds as a
+        // font of its own and so may fail on: the retries count it
+        let emoji = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fonts/NotoEmoji-VariableFont_wght.ttf"
+        ))
+        .unwrap();
+        let mut bold = paragraph(1, "a \u{1f980}");
+        if let Content::Text(text) = &mut bold.content {
+            text.spans = vec![crate::model::Span {
+                from: 2,
+                to: 4,
+                bold: true,
+                ..Default::default()
+            }];
+        }
+        let mut engine = engine(vec![bold]);
+        engine.add_font(emoji, "Noto Emoji");
+        assert_eq!(engine.fonts.instances.len(), 1);
+        assert_eq!(attempts(0, &engine.fonts), 1 + engine.fonts.files.len() + 1);
     }
 }

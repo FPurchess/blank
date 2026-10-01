@@ -76,6 +76,23 @@ describe("without the layout engine", () => {
     expect(caret.bottom).toBeLessThanOrEqual(caret.height);
   });
 
+  it("opens the menu once from the keyboard, with its first item focused", async () => {
+    await focusEditor();
+    // the shortcut, after which WebKitGTK sends a contextmenu event of its
+    // own, which mustn't open the menu again as a mouse's
+    await browser.keys([Key.Shift, Key.F10]);
+    await expect($("#context-menu")).toBeDisplayed();
+    await browser.pause(300);
+    const focused = await browser.execute(
+      () =>
+        document.activeElement?.closest("#context-menu [role^='menuitem']")
+          ?.textContent ?? null,
+    );
+    expect(focused).not.toBeNull();
+    await browser.keys(Key.Escape);
+    await expect($("#context-menu")).not.toBeExisting();
+  });
+
   it("opens the context menu where it's right clicked", async () => {
     const { x, y } = await lastLine();
     await clickAt(x, y, 2);

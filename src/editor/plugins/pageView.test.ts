@@ -61,6 +61,7 @@ import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 import { applyDocument } from "../document";
+import * as flattening from "../../engine/flatten";
 import { tableGrid } from "../../exporters/table";
 
 const LONG =
@@ -163,6 +164,36 @@ describe("pageView plugin", () => {
     const scale = 18 / 11;
     expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
     mounted.press("PageUp");
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
+  });
+
+  it("keeps the column of ↑ and ↓ for Page Down past a shorter line", () => {
+    // a long line, short ones, then long ones a view's height below
+    const line = "abcdefghij klmnopqrst uvwxyz";
+    const mounted = mount(
+      doc(
+        p(line),
+        ...Array.from({ length: 3 }, () => p("ab")),
+        ...Array.from({ length: 80 }, () => p(line)),
+      ),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    mounted.view.dispatch(
+      mounted.view.state.tr.setSelection(
+        TextSelection.create(mounted.view.state.doc, 21),
+      ),
+    );
+    const start = pageCaret.value!;
+    // onto a short line, whose end is left of the column
+    mounted.press("ArrowDown");
+    expect(pageCaret.value!.x).toBeLessThan(start.x - 20);
+    expect(mounted.press("PageDown")).toBe(true);
+    // back at the column on the long lines below, within a pixel
+    const scale = 18 / 11;
+    expect(
+      mounted.view.state.doc.resolve(mounted.view.state.selection.head).parent
+        .textContent,
+    ).toBe(line);
     expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
   });
 
@@ -314,6 +345,26 @@ describe("an engine that fails", () => {
     expect(pageEngine).toBeNull();
     expect(pageLayoutState.value).toBeNull();
     vi.useRealTimers();
+  });
+
+  it("scrolls the editor, which shows the text itself, to the selection", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((frame) => {
+      frames.push(frame);
+      return frames.length;
+    });
+    const engine = showPages();
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+    const dispatched = vi.spyOn(mounted.view, "dispatch");
+    vi.spyOn(engine.raw, "update").mockImplementation(trap);
+
+    mounted.view.dispatch(mounted.view.state.tr.insertText("a", 1));
+    frames.forEach((frame) => frame(0));
+
+    const last = dispatched.mock.calls[dispatched.mock.calls.length - 1][0];
+    expect(last.scrolledIntoView).toBe(true);
+    expect(last.docChanged).toBe(false);
   });
 
   it("mounts the editor when the first layout fails", () => {
@@ -625,6 +676,31 @@ describe("laying out a keystroke", () => {
     expect(view.state.doc.firstChild!.textContent).toBe("Titleabcde");
     expect(perfSamples().layout).toHaveLength(5);
     view.destroy();
+  });
+});
+
+describe("opening another document", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+    path.value = null;
+  });
+
+  it("lays out only the new document, with its path", () => {
+    showPages();
+    const mounted = mount(doc(p("the old document"), p(LONG)));
+    const flattened = vi.spyOn(flattening, "flattenBlocks");
+    const opened = doc(p("the new document"));
+
+    const next = applyDocument(mounted.view.state, opened, "/docs/new.md");
+    expect(flattened).not.toHaveBeenCalled();
+
+    mounted.view.updateState(next);
+    expect(flattened).toHaveBeenCalled();
+    expect(
+      flattened.mock.calls.every(([laidOut]) => laidOut === next.doc),
+    ).toBe(true);
+    mounted.view.destroy();
   });
 });
 

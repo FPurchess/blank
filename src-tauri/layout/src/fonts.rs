@@ -5,7 +5,7 @@
 use std::fmt::Write;
 use std::sync::Arc;
 
-use parley::fontique::{Blob, Collection, CollectionOptions, SourceCache};
+use parley::fontique::{Blob, Collection, CollectionOptions, FontInfoOverride, SourceCache};
 use parley::{FontContext, FontData, LayoutContext};
 use skrifa::instance::{LocationRef, Size};
 use skrifa::outline::{DrawSettings, OutlinePen};
@@ -74,7 +74,19 @@ pub struct Fonts {
 fn faces_of(fcx: &mut FontContext, bytes: Vec<u8>, family: &str) -> Vec<FontFile> {
     let data = Arc::new(bytes);
     let blob = Blob::new(data.clone());
-    fcx.collection.register_fonts(blob.clone(), None);
+    let families = fcx.collection.register_fonts(blob.clone(), None);
+    // a family named with spaces around it, e.g. "Mitra " in its file, is
+    // also found by the name without them, as fontconfig gives it
+    if let [(id, _)] = families.as_slice() {
+        let name = fcx.collection.family_name(*id).map(str::to_string);
+        if let Some(name) = name.filter(|name| name.trim() != name) {
+            let trimmed = FontInfoOverride {
+                family_name: Some(name.trim()),
+                ..Default::default()
+            };
+            fcx.collection.register_fonts(blob.clone(), Some(trimmed));
+        }
+    }
     let count = match skrifa::raw::FileRef::new(&data) {
         Ok(skrifa::raw::FileRef::Collection(collection)) => collection.len(),
         _ => 1,
@@ -407,5 +419,34 @@ mod tests {
         // and the same name again is added once
         fonts.add(read("dejavu-sans-bold.ttf"), family);
         assert_eq!(fonts.stack.len(), FONT_STACK.len() + 2);
+    }
+
+    #[test]
+    fn finds_a_family_named_with_a_space_after_it() {
+        // Mitra (fonts-beng-extra) names its family "Mitra " in its file,
+        // and fontconfig, which the app asks, gives "Mitra"
+        let Ok(bytes) = std::fs::read("/usr/share/fonts/truetype/fonts-beng-extra/MitraMono.ttf")
+        else {
+            eprintln!("no Mitra, skipping the check");
+            return;
+        };
+        use crate::model::Text;
+        use crate::text::TextBox;
+        let mut fonts = repository_fonts();
+        fonts.add(bytes, "Mitra");
+        let mitra = fonts.files.len() - 1;
+        let text = Text {
+            pos: 1,
+            text: "\u{995}\u{996}".into(),
+            ..Default::default()
+        };
+        let boxed = TextBox::new(&mut fonts, &text, 300.0, parley::Alignment::Start);
+        assert!(boxed.missing.is_empty(), "{:?}", boxed.missing);
+        let used: Vec<usize> = boxed
+            .glyph_runs(&fonts, 0)
+            .iter()
+            .map(|run| run.font)
+            .collect();
+        assert_eq!(used, [mitra]);
     }
 }
