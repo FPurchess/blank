@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use parley::Alignment;
 
-use super::{CellImage, Deco, Laid, Role, TableCell, Unit};
+use super::{CellImage, Deco, Laid, Marked, Role, TableCell, Unit};
 use crate::fonts::Fonts;
 use crate::model::{CellBlock, Text};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
@@ -41,8 +41,46 @@ struct PlacedCell {
     /// its images: their positions, alt texts and places, from the top of
     /// its row
     images: Vec<(u32, String, f32, f32, f32, f32)>,
+    /// its list markers, with the block each marks
+    markers: Vec<(Marked, usize)>,
+    /// the alt texts of its images that aren't loaded, by their positions
+    alts: Vec<(u32, usize)>,
     /// how high its content is, with the padding
     height: f32,
+}
+
+/// a list marker, right-aligned before `x`, its first baseline at `baseline`
+fn marker_box(fonts: &mut Fonts, marker: &str, style: &str, x: f32, baseline: f32) -> TextBox {
+    let text = Text {
+        pos: 0,
+        text: marker.to_string(),
+        style: style.to_string(),
+        ..Default::default()
+    };
+    let mut marked = TextBox::new(fonts, &text, 100.0, Alignment::Start);
+    marked.x = x - MARKER_GAP - marked.layout.width();
+    marked.y = baseline - marked.lines().first().map_or(0.0, |line| line.baseline);
+    marked
+}
+
+/// a block's quote bars, from `y` down `height`, and over the gap to the
+/// next block where it is in the same quote
+fn bar_decos(bars: &[f32], next: Option<&CellBlock>, left: f32, y: f32, height: f32) -> Vec<Deco> {
+    let next_bars = next.map_or(&[][..], CellBlock::bars);
+    bars.iter()
+        .map(|bar| Deco::Rect {
+            x: left + bar,
+            y,
+            w: BAR,
+            h: height
+                + if next_bars.contains(bar) {
+                    CELL_PARAGRAPH_GAP
+                } else {
+                    0.0
+                },
+            role: Role::Text,
+        })
+        .collect()
 }
 
 /// lays out a table: its caption, then its rows with the cells in the grid
@@ -123,6 +161,8 @@ pub(super) fn table_units(
             let left = x + CELL_PADDING_X;
             let mut decos = vec![];
             let mut images = vec![];
+            let mut markers = vec![];
+            let mut alts = vec![];
             let mut y = CELL_PADDING_Y;
             let blocks = cell.blocks();
             for (block_index, block) in blocks.iter().enumerate() {
@@ -141,24 +181,14 @@ pub(super) fn table_units(
                         boxed.x = left + indent;
                         boxed.y = y;
                         if let Some(marker) = &block.marker {
-                            let text = Text {
-                                pos: 0,
-                                text: marker.clone(),
-                                style: paragraph.style.clone(),
-                                ..Default::default()
-                            };
-                            let mut marked = TextBox::new(fonts, &text, 100.0, Alignment::Start);
-                            // right-aligned before the indent, on the
-                            // baseline of the first line
-                            let baseline = |boxed: &TextBox| {
-                                boxed.lines().first().map_or(0.0, |line| line.baseline)
-                            };
-                            marked.x = boxed.x - MARKER_GAP - marked.layout.width();
-                            marked.y = y + baseline(&boxed) - baseline(&marked);
+                            // on the baseline of the first line
+                            let baseline =
+                                y + boxed.lines().first().map_or(0.0, |line| line.baseline);
+                            let marked =
+                                marker_box(fonts, marker, &paragraph.style, boxed.x, baseline);
+                            markers.push((Marked::Text(texts.len()), extras.len()));
                             extras.push((marked, Role::Text));
                         }
-                        // the bars reach down to the next block when it is
-                        // in the same quote
                         let height = boxed.height();
                         // a code block on its fill, as outside a table
                         if paragraph.style == "code" {
@@ -170,24 +200,13 @@ pub(super) fn table_units(
                                 role: Role::CodeFill,
                             });
                         }
-                        let next_bars = match blocks.get(block_index + 1) {
-                            Some(CellBlock::Text(next)) => next.bars.as_slice(),
-                            _ => &[],
-                        };
-                        for bar in &block.bars {
-                            let reach = if next_bars.contains(bar) {
-                                CELL_PARAGRAPH_GAP
-                            } else {
-                                0.0
-                            };
-                            decos.push(Deco::Rect {
-                                x: left + bar,
-                                y,
-                                w: BAR,
-                                h: height + reach,
-                                role: Role::Text,
-                            });
-                        }
+                        decos.extend(bar_decos(
+                            &block.bars,
+                            blocks.get(block_index + 1),
+                            left,
+                            y,
+                            height,
+                        ));
                         y += height;
                         texts.push(boxed);
                     }
@@ -197,23 +216,30 @@ pub(super) fn table_units(
                         width: image_width,
                         height: image_height,
                         alt,
+                        indent,
+                        marker,
+                        bars,
                     } => {
+                        let indent = indent.clamp(0.0, (inner - 10.0).max(0.0));
+                        let x = left + indent;
+                        let room_x = (inner - indent).max(10.0);
+                        let top = y;
                         if *image_width > 0.0 && *image_height > 0.0 {
                             // never wider than the cell, nor taller than a
                             // page, as a row's slices don't cut it
-                            let scale = (inner / image_width)
+                            let scale = (room_x / image_width)
                                 .min((room - 2.0 * CELL_PADDING_Y) / image_height)
                                 .min(1.0);
                             let (w, h) = (image_width * scale, image_height * scale);
                             decos.push(Deco::Image {
                                 src: src.clone(),
                                 alt: alt.clone(),
-                                x: left,
+                                x,
                                 y,
                                 w,
                                 h,
                             });
-                            images.push((*pos, alt.clone(), left, y, w, h));
+                            images.push((*pos, alt.clone(), x, y, w, h));
                             y += h;
                         } else {
                             // until it is loaded: its alt text, or its src
@@ -227,12 +253,27 @@ pub(super) fn table_units(
                                 style: "alt".into(),
                                 ..Default::default()
                             };
-                            let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
-                            label.x = left;
+                            let mut label = TextBox::new(fonts, &text, room_x, Alignment::Start);
+                            label.x = x;
                             label.y = y;
                             y += label.height();
+                            alts.push((*pos, extras.len()));
                             extras.push((label, Role::Hint));
                         }
+                        // a marker at its top, as before a top-level image
+                        if let Some(marker) = marker {
+                            let mut marked = marker_box(fonts, marker, "p", x, top);
+                            marked.y = top;
+                            markers.push((Marked::Image(*pos), extras.len()));
+                            extras.push((marked, Role::Text));
+                        }
+                        decos.extend(bar_decos(
+                            bars,
+                            blocks.get(block_index + 1),
+                            left,
+                            top,
+                            y - top,
+                        ));
                     }
                 }
             }
@@ -246,6 +287,8 @@ pub(super) fn table_units(
                 extras: first_extra..extras.len(),
                 decos,
                 images,
+                markers,
+                alts,
                 height: y + CELL_PADDING_Y,
             });
         }
@@ -495,6 +538,8 @@ pub(super) fn table_units(
                 .iter()
                 .filter_map(|image| cell_images.iter().position(|known| known.pos == image.0))
                 .collect(),
+            markers: cell.markers.clone(),
+            alts: cell.alts.clone(),
         })
         .collect();
     Laid {
@@ -877,6 +922,9 @@ mod tests {
             width,
             height,
             alt: "a cat".into(),
+            indent: 0.0,
+            marker: None,
+            bars: vec![],
         }
     }
 
@@ -1216,5 +1264,61 @@ mod tests {
             );
         }
         assert!(checked, "no row of the height");
+    }
+
+    /// an image block in a list item, `width` × 40, 0 × 0 for not loaded
+    fn listed_image(pos: u32, width: f32) -> crate::model::CellBlock {
+        crate::model::CellBlock::Image {
+            pos,
+            src: "cat.png".into(),
+            width,
+            height: if width > 0.0 { 40.0 } else { 0.0 },
+            alt: "a cat".into(),
+            indent: 18.0,
+            marker: Some("•".into()),
+            bars: vec![0.0],
+        }
+    }
+
+    #[test]
+    fn lays_out_an_image_in_a_list_in_a_cell() {
+        let engine = block_table(vec![vec![listed_image(5, 60.0), listed_image(9, 0.0)]]);
+        let laid = &engine.laid[0];
+        let left = laid.columns[0] + crate::style::CELL_PADDING_X;
+        // indented, with its marker before it, at its top
+        let image = &laid.cell_images[0];
+        assert!((image.x - left - 18.0).abs() < 0.01, "{}", image.x);
+        let cell = &laid.cells[0];
+        assert_eq!(cell.markers.len(), 2);
+        let (marked, extra) = cell.markers[0];
+        assert_eq!(marked, crate::items::Marked::Image(5));
+        let marker = &laid.extras[extra].0;
+        assert!(marker.x + marker.layout.width() <= image.x - crate::style::MARKER_GAP + 0.01);
+        assert!((marker.y - image.y).abs() < 0.01);
+        // the one that isn't loaded shows its alt text there, marked too
+        assert_eq!(cell.markers[1].0, crate::items::Marked::Image(9));
+        let (alt_pos, alt) = cell.alts[0];
+        assert_eq!(alt_pos, 9);
+        assert!((laid.extras[alt].0.x - left - 18.0).abs() < 0.01);
+        // the quote bar down the image and over the gap to the next block
+        let bar = laid.units[0]
+            .decos
+            .iter()
+            .find_map(|deco| match deco {
+                Deco::Rect {
+                    x,
+                    y,
+                    h,
+                    role: Role::Text,
+                    ..
+                } if (*x - left).abs() < 0.01 => Some((*y, *h)),
+                _ => None,
+            })
+            .expect("a bar");
+        assert!((bar.0 - image.y).abs() < 0.01);
+        assert!(
+            (bar.1 - image.h - super::CELL_PARAGRAPH_GAP).abs() < 0.01,
+            "{bar:?}"
+        );
     }
 }

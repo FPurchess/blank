@@ -78,7 +78,25 @@ pub enum CellBlock {
         height: f32,
         #[serde(default)]
         alt: String,
+        /// where it stands in the cell, as for a `text` block: in a list,
+        /// with its marker at its top, or in a quote, with its bars
+        #[serde(default)]
+        indent: f32,
+        #[serde(default)]
+        marker: Option<String>,
+        #[serde(default)]
+        bars: Vec<f32>,
     },
+}
+
+impl CellBlock {
+    /// the quote bars it stands in
+    pub fn bars(&self) -> &[f32] {
+        match self {
+            CellBlock::Text(text) => &text.bars,
+            CellBlock::Image { bars, .. } => bars,
+        }
+    }
 }
 
 /// A cell of a table.
@@ -484,7 +502,20 @@ impl Item {
                                 *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
                             }
                         }
-                        CellBlock::Image { width, height, .. } => image_size(width, height),
+                        CellBlock::Image {
+                            width,
+                            height,
+                            indent,
+                            bars,
+                            ..
+                        } => {
+                            image_size(width, height);
+                            *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
+                            bars.truncate(MAX_BARS);
+                            for bar in bars {
+                                *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
+                            }
+                        }
                     }
                 }
             }

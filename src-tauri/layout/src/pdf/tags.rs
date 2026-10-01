@@ -14,9 +14,8 @@ use krilla::tagging::{
 };
 
 use crate::engine::{Engine, Part};
-use crate::items::{Laid, Role, TableCell};
+use crate::items::{Laid, Marked, TableCell};
 use crate::model::Content;
-use crate::text::TextBox;
 
 /// the marked content drawn for each part of the document, in the order it
 /// was drawn
@@ -276,66 +275,54 @@ fn table_node(engine: &Engine, index: usize, ids: &mut Ids) -> Node {
 /// list markers on their baselines as the labels of list items, its images
 /// and its alt texts, from the top down
 fn cell_content(laid: &Laid, index: usize, cell: &TableCell, ids: &mut Ids) -> Vec<Node> {
-    let baseline =
-        |boxed: &TextBox| boxed.y + boxed.lines().first().map_or(0.0, |line| line.baseline);
     let left = cell
         .texts
         .clone()
         .map(|text| laid.texts[text].x)
+        .chain(cell.images.iter().map(|&image| laid.cell_images[image].x))
         .fold(f32::INFINITY, f32::min);
-    // the markers, by the text box on their baseline
-    let mut markers: Vec<(usize, usize)> = vec![];
-    let mut blocks: Vec<(f32, Node)> = vec![];
-    for extra in cell.extras.clone() {
-        let (boxed, role) = &laid.extras[extra];
-        let owner = cell
-            .texts
-            .clone()
-            .find(|&text| (baseline(&laid.texts[text]) - baseline(boxed)).abs() < 0.5);
-        match (role, owner) {
-            (Role::Text, Some(text)) => markers.push((text, extra)),
-            // an alt text stands for an image that isn't loaded
-            _ => {
-                let content = leaves(ids, Part::Extra { item: index, extra });
-                blocks.push((
-                    boxed.y,
-                    group(Tag::Figure(Some(boxed.text.to_string())), content),
-                ));
-            }
-        }
+    let marker_of = |marked: Marked| {
+        cell.markers
+            .iter()
+            .find(|(block, _)| *block == marked)
+            .map(|&(_, extra)| extra)
+    };
+    // the blocks from the top down: (y, x, the marker, the node)
+    let mut blocks: Vec<(f32, f32, Option<usize>, Node)> = vec![];
+    for text in cell.texts.clone() {
+        let boxed = &laid.texts[text];
+        let paragraph = group(Tag::P, text_nodes(ids, index, text));
+        blocks.push((boxed.y, boxed.x, marker_of(Marked::Text(text)), paragraph));
     }
     for &image in &cell.images {
         let placed = &laid.cell_images[image];
         let alt = (!placed.alt.is_empty()).then(|| placed.alt.clone());
-        let figure = leaves(ids, Part::CellImage { item: index, image });
-        blocks.push((placed.y, group(Tag::Figure(alt), figure)));
+        let figure = group(
+            Tag::Figure(alt),
+            leaves(ids, Part::CellImage { item: index, image }),
+        );
+        blocks.push((
+            placed.y,
+            placed.x,
+            marker_of(Marked::Image(placed.pos)),
+            figure,
+        ));
     }
-    let mut builder = Builder::default();
-    let mut texts: Vec<(f32, usize)> = cell
-        .texts
-        .clone()
-        .map(|text| (laid.texts[text].y, text))
-        .collect();
-    texts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    // an alt text stands for an image that isn't loaded, with its marker
+    for &(pos, extra) in &cell.alts {
+        let (boxed, _) = &laid.extras[extra];
+        let content = leaves(ids, Part::Extra { item: index, extra });
+        let figure = group(Tag::Figure(Some(boxed.text.to_string())), content);
+        blocks.push((boxed.y, boxed.x, marker_of(Marked::Image(pos)), figure));
+    }
     blocks.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let mut blocks = blocks.into_iter().peekable();
-    for (y, text) in texts {
-        while let Some((_, node)) = blocks.next_if(|(block_y, _)| *block_y < y) {
-            builder.place(0, 0.0, None, node);
-        }
-        let paragraph = group(Tag::P, text_nodes(ids, index, text));
-        let boxed = &laid.texts[text];
-        let marker = markers
-            .iter()
-            .find(|(owner, _)| *owner == text)
-            .map(|&(_, extra)| {
-                let numbered = laid.extras[extra].0.text.trim_end().ends_with('.');
-                (leaves(ids, Part::Extra { item: index, extra }), numbered)
-            });
-        builder.place(0, boxed.x - left, marker, paragraph);
-    }
-    for (_, node) in blocks {
-        builder.place(0, 0.0, None, node);
+    let mut builder = Builder::default();
+    for (_, x, marker, node) in blocks {
+        let marker = marker.map(|extra| {
+            let numbered = laid.extras[extra].0.text.trim_end().ends_with('.');
+            (leaves(ids, Part::Extra { item: index, extra }), numbered)
+        });
+        builder.place(0, x - left, marker, node);
     }
     builder.close_all();
     builder.root

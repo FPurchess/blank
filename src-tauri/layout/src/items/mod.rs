@@ -161,6 +161,20 @@ pub struct TableCell {
     pub extras: Range<usize>,
     /// its images, in `Laid::cell_images`
     pub images: Vec<usize>,
+    /// its list markers, in `Laid::extras`, with the block each marks
+    pub markers: Vec<(Marked, usize)>,
+    /// the alt texts of its images that aren't loaded, in `Laid::extras`,
+    /// by the image's position
+    pub alts: Vec<(u32, usize)>,
+}
+
+/// what a list marker in a table's cell marks
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Marked {
+    /// a text box, in `Laid::texts`
+    Text(usize),
+    /// an image, by its position (also when it shows its alt text)
+    Image(u32),
 }
 
 /// an image in a table's cell: its position, the unit it is drawn with,

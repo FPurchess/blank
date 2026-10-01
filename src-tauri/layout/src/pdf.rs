@@ -825,4 +825,53 @@ mod tests {
         assert_eq!(engine.fonts.instances.len(), 1);
         assert_eq!(attempts(0, &engine.fonts), 1 + engine.fonts.files.len() + 1);
     }
+
+    #[test]
+    fn tags_an_image_in_a_list_in_a_cell_as_a_list_item() {
+        use crate::engine::test_support::table_item;
+        use crate::model::{Cell, CellBlock, Row};
+        let image = CellBlock::Image {
+            pos: 5,
+            src: "pixel.png".into(),
+            width: 40.0,
+            height: 40.0,
+            alt: "a red pixel".into(),
+            indent: 18.0,
+            marker: Some("•".into()),
+            bars: vec![],
+        };
+        let cell = Cell {
+            blocks: vec![image],
+            ..Default::default()
+        };
+        let mut engine = engine(vec![table_item(
+            vec![Row {
+                cells: vec![cell],
+                header: false,
+            }],
+            None,
+        )]);
+        let mut images = HashMap::new();
+        images.insert(
+            "pixel.png".to_string(),
+            ImageData {
+                bytes: PNG.to_vec(),
+                jpeg: false,
+            },
+        );
+        let pdf = write(&mut engine, &images, &info()).unwrap();
+        let path = std::env::temp_dir().join("blank-layout-unit-listed-image.pdf");
+        std::fs::write(&path, pdf).unwrap();
+        let Ok(out) = std::process::Command::new("pdfinfo")
+            .arg("-struct-text")
+            .arg(&path)
+            .output()
+        else {
+            return;
+        };
+        let structure = String::from_utf8_lossy(&out.stdout);
+        let body = structure.find("LBody").expect("a list item");
+        assert!(structure[..body].contains("Lbl"), "{structure}");
+        assert!(structure[body..].contains("Figure"), "{structure}");
+    }
 }
