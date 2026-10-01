@@ -97,7 +97,8 @@ export class LayoutEngine {
     pageSpan(page: number): Uint32Array;
     /**
      * what a page shows: rectangles, images, links and glyph runs, of its
-     * body and its header and footer
+     * body and its header and footer. Deprecated: `pageBody` and
+     * `pageBands` give them apart, with their own versions
      */
     page(page: number): string;
     /**
@@ -120,6 +121,9 @@ export class LayoutEngine {
      * replaces all items; the pages that changed, as `update` gives them
      */
     setItems(json: string): Uint32Array;
+    /**
+     * sets the page; the pages that changed, as `update` gives them
+     */
     setSettings(json: string): Uint32Array;
     /**
      * how much the last change laid out: items, the page it paginated
@@ -164,7 +168,6 @@ export class LayoutEngine {
      */
     vertical(pos: number, down: boolean, goal: number): Float64Array;
     /**
-     * sets the page; the pages that changed, as `update` gives them
      * an engine with the fonts of `other`, fallbacks added with `addFont`
      * included, without copying their files, e.g. for an export; it has
      * its own page, items and images
