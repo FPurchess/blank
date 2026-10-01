@@ -7,7 +7,7 @@ import {
 
 // the site is deployed in several channels next to each other (see docs/deploy.sh):
 // "latest" at the root, "dev" at dev/ and each release frozen at v<version>/
-const root = process.env.DOCS_ROOT ?? "/blank/";
+const root = process.env.DOCS_ROOT ?? "/";
 const base = process.env.DOCS_BASE ?? root;
 const channel = (process.env.DOCS_CHANNEL ?? "latest") as Channel;
 // the app version, overridable to preview a frozen release locally
@@ -28,7 +28,7 @@ export interface BlankThemeConfig {
 }
 
 const repo = "https://github.com/FPurchess/blank";
-const origin = "https://fpurchess.github.io";
+const origin = "https://blank-writer.xyz";
 const description =
   "A minimalist, keyboard-only markdown editor made for writing. For Linux, macOS and Windows.";
 

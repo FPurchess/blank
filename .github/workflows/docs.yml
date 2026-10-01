@@ -1,7 +1,7 @@
 name: Docs
 
 # Builds the website (docs/) and deploys it to the gh-pages branch, which GitHub Pages serves
-# at https://fpurchess.github.io/blank/. Pushes to `release` update the latest docs at the root
+# at https://blank-writer.xyz/. Pushes to `release` update the latest docs at the root
 # and freeze a copy at v<version>/, pushes to `main` update dev/. See docs/deploy.sh.
 on:
   push:
