@@ -285,7 +285,7 @@ describe("header and footer", () => {
     const file = path.join(fixtureDir, "unnamed.md");
     fs.writeFileSync(
       file,
-      '---\npage:\n  header: {left: "{author} {chapter}", right: "by {author}"}\n---\n\n',
+      '---\npage:\n  header: {left: "{author} {chapter}"}\n---\n\n',
     );
     await restartApp([file]);
     await expect($("#page-view .page-canvas")).toBeExisting();
@@ -300,25 +300,23 @@ describe("header and footer", () => {
     // above the text, where the header keeps its room
     const header = $(".page-first-header");
     await expect(header).toBeDisplayed();
-    expect(await names(".page-first-header")).toEqual([
-      "Author",
-      "Chapter",
-      "Author",
-    ]);
+    expect(await names(".page-first-header")).toEqual(["Author", "Chapter"]);
     await header.doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("header");
     await tool("Done").click();
     await expect(strip()).not.toExist();
+    // which tells why it shows nothing on the page, and how to set an author
+    await expect($("#ui-announcement")).toHaveText(
+      expect.stringContaining(
+        "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as Text in Page Setup",
+      ),
+    );
     // and on the sheet, in its top margin
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("pages");
     await expect($(".page-band-names")).toBeDisplayed();
-    expect(await names(".page-band-names")).toEqual([
-      "Author",
-      "Chapter",
-      "Author",
-    ]);
+    expect(await names(".page-band-names")).toEqual(["Author", "Chapter"]);
     const margin = await browser.execute(() => {
       const sheet = document
         .querySelector('.page-frame[data-page="1"]')!

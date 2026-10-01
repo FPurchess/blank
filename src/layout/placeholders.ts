@@ -140,3 +140,48 @@ export const hasBand = (
   page: number,
   band: "header" | "footer",
 ) => hasText(bandsOn(layout, page)[band]);
+
+// why a placeholder comes out empty, for the notice when a band shows
+// nothing on a page; {page}, {pages} and {date} always have a value
+const WHY_EMPTY: Partial<Record<Field, (chapters: boolean) => string>> = {
+  title: () => "the document has no title or heading yet",
+  author: () => "no author is set",
+  chapter: (chapters) =>
+    chapters
+      ? "no chapter heading comes before this page"
+      : "the document has no chapter heading yet",
+  file: () => "the document isn't saved to a file yet",
+};
+
+/**
+ * emptyBandNotice returns what to tell when a header or footer comes out
+ * empty on a page although something is written in it, because all its
+ * placeholders have nothing to put in: which, why, and how to set the
+ * author. Null when it shows something there, or has nothing written.
+ * @param slots the band's three slots on the page, see pageBandParts
+ * @param chapters whether the document has a heading 1 at all
+ * @param pageSetup the shortcut of the page setup, e.g. "Ctrl+Alt+U"
+ */
+export const emptyBandNotice = (
+  band: "header" | "footer",
+  slots: BandPart[][],
+  chapters: boolean,
+  pageSetup: string,
+): string | null => {
+  const shows = slots.some((parts) =>
+    parts.some((part) => "text" in part && part.text.trim()),
+  );
+  const fields = emptyFields(slots);
+  if (shows || !fields.length) return null;
+  const reasons = fields.flatMap((field) => {
+    const why = WHY_EMPTY[field];
+    return why ? [why(chapters)] : [];
+  });
+  const list = new Intl.ListFormat("en", { type: "conjunction" }).format(
+    reasons,
+  );
+  const notice = `The ${band} is empty on this page: ${list}.`;
+  return fields.includes("author")
+    ? `${notice} Add an author under Edit as Text in Page Setup (${pageSetup}).`
+    : notice;
+};
