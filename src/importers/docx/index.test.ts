@@ -25,7 +25,10 @@ vi.mock("../../images/codec", () => ({
   rasterize: vi.fn(),
 }));
 vi.mock("../../exporters/docx/font", () => ({
-  loadFont: async () => new TextEncoder().encode("font"),
+  loadFonts: async () => [
+    { name: "IBM Plex Sans", data: new TextEncoder().encode("font") },
+    { name: "IBM Plex Mono", data: new TextEncoder().encode("font") },
+  ],
 }));
 
 // made by scripts/build-docx-fixtures.sh; tests run from the project root

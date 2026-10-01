@@ -12,7 +12,10 @@ import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 // twentieths of a point (twips) and line heights in 240ths of a line.
 
 export const FONT = "IBM Plex Sans";
-const CODE_FONT = "Courier New";
+// code, as on the pages and in the PDF; only its regular face is embedded
+// (see font.ts), so Word slants or emboldens it itself where code is italic
+// or bold
+export const CODE_FONT = "IBM Plex Mono";
 const CODE_BACKGROUND = "F2F2F2";
 
 export const twips = (points: number) => Math.round(points * 20);
