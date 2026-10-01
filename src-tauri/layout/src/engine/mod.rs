@@ -73,6 +73,10 @@ pub struct Stats {
     pub laid_out: usize,
     pub paginated_from: usize,
     pub settled_at: Option<usize>,
+    /// how many pages' band texts were expanded again
+    pub bands_expanded: usize,
+    /// how many fragments after the change had their item index rewritten
+    pub frags_rewritten: usize,
 }
 
 pub struct Engine {
