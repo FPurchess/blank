@@ -28,18 +28,18 @@ export const scrollFor = (
 };
 
 /**
- * endMark returns what the mark at the end of a page shows: its footer,
- * with its number when the footer doesn't show it, and the next page's
- * header
+ * endMark returns what the mark between a page and the next shows: its
+ * footer, with its number when the footer doesn't show it, and the next
+ * page's header
  * @param page the page, counted from 0
- * @param bands the band texts of the page and of the next, see
+ * @param bands the band texts of the page, and `next` those of the next, see
  *   PageEngine.bands
  * @param layout the document's page setup, which numbers the pages
  */
 export const endMark = (
   page: number,
   bands: string[],
-  next: string[] | null,
+  next: string[],
   layout: Layout,
 ) => {
   // the footer's settings say whether it shows the number, whatever its
@@ -55,7 +55,7 @@ export const endMark = (
     number: shown
       ? ""
       : formatNumber(pageNumber(layout, page + 1), layout.numberStyle),
-    header: next ? next.slice(0, 3) : ["", "", ""],
+    header: next.slice(0, 3),
   };
 };
 
@@ -93,6 +93,25 @@ export const firstHeaderPlace = (layout: FrameLayout) => {
     left: first.left + inset,
     top: first.top - room,
     width: first.width - 2 * inset,
+    height: room,
+  };
+};
+
+/**
+ * lastFooterPlace returns where the last page's footer goes in "page ends":
+ * right below its text, as wide as it, where the mark where a page ends
+ * shows a footer. The sheets of "pages" show it themselves.
+ */
+export const lastFooterPlace = (layout: FrameLayout) => {
+  const last = layout.frames[layout.frames.length - 1];
+  // the room the layout keeps for it, none without a footer
+  const room = layout.footerRoom;
+  if (!last || layout.mode === "pages" || !room) return null;
+  const inset = insetOf(layout);
+  return {
+    left: last.left + inset,
+    top: last.top + last.height,
+    width: last.width - 2 * inset,
     height: room,
   };
 };

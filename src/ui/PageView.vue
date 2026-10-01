@@ -39,6 +39,7 @@ import {
   pageViewport,
 } from "../state";
 import PageFirstHeader from "./PageFirstHeader.vue";
+import PageLastFooter from "./PageLastFooter.vue";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
@@ -406,7 +407,8 @@ const pointerAt = (event: MouseEvent): PagePointer => {
 };
 
 // the headers and footers on the pages, which open their strips
-const BANDS = ".page-band, .page-end .band, .page-first-header";
+const BANDS =
+  ".page-band, .page-end .band, .page-first-header, .page-last-footer";
 
 let anchor: number | null = null;
 // the last point of a drag, in the window, for scrolling at the edges
@@ -670,6 +672,7 @@ onUnmounted(() => {
         :focused="focused"
       />
       <PageFirstHeader :layout="layout" />
+      <PageLastFooter :layout="layout" />
       <PageProperties :layout="layout" />
     </div>
   </div>

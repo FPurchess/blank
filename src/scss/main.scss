@@ -1421,15 +1421,13 @@ $page-end-height: 64px + 2 * $band-gap;
   }
 }
 
-// the first page's header in "page ends", above its text, like the bands
-// where a page ends
-.page-first-header {
+// the first page's header in "page ends", above its text, and the last
+// page's footer below it, like the bands where a page ends
+.page-first-header,
+.page-last-footer {
   @extend %page-band-text;
   position: absolute;
   box-sizing: border-box;
-  align-items: end;
-  // placed where the page's text starts (firstHeaderPlace), a gap above it
-  padding: 0 0 $band-gap;
   font-size: 11px;
   letter-spacing: 0.04em;
   opacity: $faint-text-opacity;
@@ -1441,6 +1439,19 @@ $page-end-height: 64px + 2 * $band-gap;
     background-color: color-mix(in srgb, var(--color) 8%, transparent);
     background-clip: content-box;
   }
+}
+
+.page-first-header {
+  align-items: end;
+  // placed where the page's text starts (firstHeaderPlace), a gap above it
+  padding: 0 0 $band-gap;
+}
+
+.page-last-footer {
+  align-items: start;
+  // placed where the page's text ends (lastFooterPlace), a gap below it, as
+  // the footer of the mark where a page ends
+  padding: $band-gap 0 0;
 }
 
 // the header and footer margins of a sheet, and the bands where a page

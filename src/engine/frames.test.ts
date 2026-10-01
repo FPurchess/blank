@@ -5,6 +5,7 @@ import {
   BLEED,
   frameLayout,
   frameNear,
+  FOOTER_ROOM,
   HEADER_ROOM,
   MARK_HEIGHT,
   onDesk,
@@ -12,6 +13,7 @@ import {
   PROPERTIES_ROOM,
   SHEET_GAP,
   TEXT_SCALE,
+  VIEW_BOTTOM,
   VIEW_TOP,
   visibleFrames,
   visibleRange,
@@ -159,5 +161,46 @@ describe("the room for the first page's header", () => {
     const placed = frameLayout({ ...layout, header: true }, "pages", 800);
     expect(placed.headerRoom).toBe(0);
     expect(tops(placed)).toEqual(tops(without));
+  });
+});
+
+describe("the room for the last page's footer", () => {
+  const tops = (placed: ReturnType<typeof frameLayout>) =>
+    placed.frames.map((frame) => frame.top);
+  const bottom = (placed: ReturnType<typeof frameLayout>) => {
+    const last = placed.frames[placed.frames.length - 1];
+    return last.top + last.height;
+  };
+
+  it("is none without a footer: the desk ends a little below the text", () => {
+    const placed = frameLayout(layout, "page-ends", 800);
+    expect(placed.footerRoom).toBe(0);
+    expect(Math.round(placed.height)).toBe(bottom(placed) + VIEW_BOTTOM);
+  });
+
+  it("makes the desk taller below the last page, moving no page", () => {
+    const without = frameLayout(layout, "page-ends", 800);
+    const placed = frameLayout({ ...layout, footer: true }, "page-ends", 800);
+    expect(placed.footerRoom).toBe(FOOTER_ROOM);
+    expect(tops(placed)).toEqual(tops(without));
+    expect(Math.round(placed.height)).toBe(
+      bottom(placed) + FOOTER_ROOM + VIEW_BOTTOM,
+    );
+  });
+
+  it("keeps a one-page document's room as tall as the footer", () => {
+    const one = { ...layout, pages: 1, footer: true };
+    const placed = frameLayout(one, "page-ends", 800);
+    expect(placed.frames).toHaveLength(1);
+    expect(Math.round(placed.height)).toBe(
+      bottom(placed) + FOOTER_ROOM + VIEW_BOTTOM,
+    );
+  });
+
+  it("is none on sheets, which show their footers", () => {
+    const without = frameLayout(layout, "pages", 800);
+    const placed = frameLayout({ ...layout, footer: true }, "pages", 800);
+    expect(placed.footerRoom).toBe(0);
+    expect(placed.height).toBe(without.height);
   });
 });

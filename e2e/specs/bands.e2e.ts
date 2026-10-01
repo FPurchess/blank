@@ -42,6 +42,11 @@ describe("header and footer", () => {
     });
 
   it("adds page numbers from the hint at the bottom edge", async () => {
+    // a page that is the last ends in no mark, and without a footer in
+    // nothing at all
+    await expect($(".page-frame")).toBeExisting();
+    await expect($(".page-end")).not.toExist();
+    await expect($(".page-last-footer")).not.toExist();
     await hoverEdge("bottom");
     await $("#band-footer").$("button=# Page numbers").click();
 
@@ -51,12 +56,27 @@ describe("header and footer", () => {
 
     await expect(strip()).not.toExist();
     await expect(bandText("footer", "center")).resolves.toBe("page");
-    // where the page ends, the footer shows its number
-    await expect($(".page-end .band.footer")).toHaveText("1");
+    // below the text of the last page, its footer shows its number, and no
+    // line where it would end
+    await expect($(".page-last-footer")).toHaveText("1");
+    await expect($(".page-end")).not.toExist();
     await pressMod("s");
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n---\n\n# report\n\ntext.',
     );
+  });
+
+  it("opens a strip from the footer below the last page", async () => {
+    // a single click leaves it closed, as a click beside the text does,
+    // also once a double click would have taken
+    await $(".page-last-footer").click();
+    await browser.pause(600);
+    await expect(strip()).not.toExist();
+    await $(".page-last-footer").doubleClick();
+    await expect(strip()).toBeDisplayed();
+    await expect(strip()).toHaveElementClass("footer");
+    await browser.keys(Key.Escape);
+    await expect(strip()).not.toExist();
   });
 
   it("writes a header with the title and a typed text", async () => {
@@ -93,19 +113,6 @@ describe("header and footer", () => {
     await expect($("#band-header .band-line")).not.toExist();
     await pressMod(Key.Shift, "z");
     await expect($("#band-header .band-line")).toExist();
-  });
-
-  it("opens a strip from where the page ends", async () => {
-    // a single click leaves it closed, as a click beside the text does,
-    // also once a double click would have taken
-    await $(".page-end .band.footer").click();
-    await browser.pause(600);
-    await expect(strip()).not.toExist();
-    await $(".page-end .band.footer").doubleClick();
-    await expect(strip()).toBeDisplayed();
-    await expect(strip()).toHaveElementClass("footer");
-    await browser.keys(Key.Escape);
-    await expect(strip()).not.toExist();
   });
 
   it("opens a strip from the margin of a sheet", async () => {
@@ -253,9 +260,11 @@ describe("header and footer", () => {
           [".page-first-header span:first-child", "left"],
           [".page-end .band.footer span:first-child", "left"],
           [".page-end .band.header span:first-child", "left"],
+          [".page-last-footer span:first-child", "left"],
           [".page-first-header span:last-child", "right"],
           [".page-end .band.footer span:last-child", "right"],
           [".page-end .band.header span:last-child", "right"],
+          [".page-last-footer span:last-child", "right"],
           // the number of a page whose footer doesn't show it
           [".page-end .line .number", "right"],
         ].map(([selector, side]) => ({

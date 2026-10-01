@@ -21,7 +21,8 @@ import { frameRenders, layerDisplay } from "./pageLayers";
 import { bandTitle, endMark, selectedBoxes } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
-// painted into, and in "page ends" the mark where the page ends. Its props
+// painted into, and in "page ends" the mark where the page ends, unless it's
+// the last. Its props
 // are plain values, so it paints again only when one of them changes, and
 // then from the bitmap it was painted into before, if there is one (see
 // pageBitmaps.ts).
@@ -31,7 +32,8 @@ const props = defineProps<{
   // apart (see pageLayers.ts)
   bodyVersion: number;
   bandVersion: number;
-  // the next page's band version, for the mark, -1 for the last page
+  // the next page's band version, for the mark, -1 for the last page, which
+  // has none
   nextBandVersion: number;
   top: number;
   left: number;
@@ -198,16 +200,16 @@ const marked = computed(() =>
 );
 
 // what the mark at the page's end shows, which follows the bands of the
-// page and of the next one, not their text
+// page and of the next one, not their text; none after the last page, whose
+// footer PageLastFooter.vue shows
 const mark = computed(() => {
   const engine = pageEngine;
-  if (props.sheet || !engine) return null;
+  if (props.sheet || !engine || props.nextBandVersion < 0) return null;
   void props.bandVersion;
-  const next = props.nextBandVersion >= 0 ? engine.bands(props.page + 1) : null;
   return endMark(
     props.page,
     engine.bands(props.page),
-    next,
+    engine.bands(props.page + 1),
     pageLayout.value.layout,
   );
 });
@@ -280,7 +282,6 @@ const mark = computed(() => {
         <span v-if="mark.number" class="number">{{ mark.number }}</span>
       </div>
       <div
-        v-if="nextBandVersion >= 0"
         class="band header"
         :title="bandTitle('header')"
         @dblclick="openBand('header')"

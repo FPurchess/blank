@@ -8,7 +8,8 @@ import type {
 // a page that is shown, placed on the desk (the scrolled content), in CSS
 // pixels. The geometry (geometry.ts) and the page view (src/ui/PageView.vue)
 // both place the pages with it. "pages" shows each whole sheet; "page ends" shows the text of each
-// page one after the other, with a mark where a page ends.
+// page one after the other, with a mark between two pages where the first
+// ends.
 
 // room above the first and below the last page, for the bars
 export const VIEW_TOP = 56;
@@ -20,6 +21,9 @@ export const BAND_GAP = 32;
 // room above the first page's text in "page ends" for its header, between
 // the properties' room and the first frame: its line, and the gap below it
 export const HEADER_ROOM = 20 + BAND_GAP;
+// room below the last page's text in "page ends" for its footer, which no
+// mark shows there: the gap above it, and its line
+export const FOOTER_ROOM = BAND_GAP + 20;
 export const VIEW_BOTTOM = 72;
 // between the sheets, and around them
 export const SHEET_GAP = 24;
@@ -77,6 +81,9 @@ export interface FrameLayout {
   // the room above the first frame for the first page's header, in "page
   // ends"; 0 in "pages", whose sheets show their headers
   headerRoom: number;
+  // the room below the last frame for the last page's footer, in "page
+  // ends"; 0 in "pages"
+  footerRoom: number;
 }
 
 /**
@@ -115,7 +122,14 @@ export const frameLayout = (
       layout.pages * (sheetHeight + SHEET_GAP) -
       SHEET_GAP +
       VIEW_BOTTOM;
-    return { mode, scale, frames: frames.map(snapped), height, headerRoom: 0 };
+    return {
+      mode,
+      scale,
+      frames: frames.map(snapped),
+      height,
+      headerRoom: 0,
+      footerRoom: 0,
+    };
   }
   const { margins } = layout;
   const shown = layout.width - margins.left - margins.right + 2 * BLEED;
@@ -125,6 +139,7 @@ export const frameLayout = (
   );
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
   const headerRoom = layout.header ? HEADER_ROOM : 0;
+  const footerRoom = layout.footer ? FOOTER_ROOM : 0;
   let top = viewTop + headerRoom;
   for (let page = 0; page < layout.pages; page++) {
     const bottom = Math.max(layout.bottoms[page] ?? 0, margins.top + MIN_TEXT);
@@ -146,8 +161,10 @@ export const frameLayout = (
     mode,
     scale,
     frames: frames.map(snapped),
-    height: top - MARK_HEIGHT + VIEW_BOTTOM,
+    // no mark after the last page, only its footer if it has one
+    height: top - MARK_HEIGHT + footerRoom + VIEW_BOTTOM,
     headerRoom,
+    footerRoom,
   };
 };
 

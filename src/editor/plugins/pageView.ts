@@ -149,11 +149,12 @@ const hasProperties = computed(() => summarize(frontmatter.value) !== null);
 const publishLayout = (engine: PageEngine) => {
   const { layout } = pageLayout.value;
   const { width, height, margins } = pageGeometry(layout);
+  const pages = engine.pages();
   const state = {
     width,
     height,
     margins,
-    pages: engine.pages(),
+    pages,
     versions: engine.versions(),
     bodyVersions: engine.bodyVersions(),
     bandVersions: engine.bandVersions(),
@@ -161,6 +162,11 @@ const publishLayout = (engine: PageEngine) => {
     properties: hasProperties.value,
     // the header's left, center and right slots of the first page
     header: engine.bands(0).slice(0, 3).some(Boolean),
+    // and the footer's of the last page
+    footer: engine
+      .bands(pages - 1)
+      .slice(3, 6)
+      .some(Boolean),
   };
   // an engine that failed while it was asked has given up, and shows nothing
   if (!engine.broken) pageLayoutState.value = state;

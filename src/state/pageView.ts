@@ -33,6 +33,9 @@ export interface PageLayoutState {
   // whether the first page has header text, which "page ends" shows in the
   // room above its first frame
   header?: boolean;
+  // whether the last page has footer text, which "page ends" shows in the
+  // room below its frame
+  footer?: boolean;
 }
 
 // null until the engine laid out the document

@@ -338,6 +338,117 @@ describe("page view", () => {
     expect(view().querySelector(".page-first-header")).toBeNull();
   });
 
+  // lays out `content` with `settings`, as the editor's plugin publishes it
+  const layOutWith = (
+    content: typeof node,
+    settings: Parameters<typeof testLayout>[0],
+  ) => {
+    const engine = pageEngineFor(content, settings);
+    const pages = engine.pages();
+    pageLayoutState.value = {
+      width: 595.28,
+      height: 841.89,
+      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
+      pages,
+      versions: engine.raw.versions(),
+      bandVersions: engine.raw.bandVersions(),
+      bottoms: engine.raw.bottoms(),
+      header: engine.bands(0).slice(0, 3).some(Boolean),
+      footer: engine
+        .bands(pages - 1)
+        .slice(3, 6)
+        .some(Boolean),
+    };
+    return engine;
+  };
+  const pageEngineFor = (
+    content: typeof node,
+    settings: Parameters<typeof testLayout>[0],
+  ) => {
+    const engine = testEngine();
+    engine.setSettings(testLayout(settings), documentFields(content));
+    engine.sync(content, () => undefined);
+    setPageEngine(engine);
+    return engine;
+  };
+  const lastFooter = () =>
+    view().querySelector<HTMLElement>(".page-last-footer");
+  const slotsOf = (element: HTMLElement | null) =>
+    element ? [...element.children].map((slot) => slot.textContent) : null;
+
+  it("ends the last page without a mark, an empty one with nothing at all", async () => {
+    const empty = doc(p(""));
+    layOutWith(empty, {});
+    dispose = bootApp(createTestHandle(createState(empty, { cursor: 1 })));
+    await nextTick();
+    expect(frames()).toHaveLength(1);
+    expect(view().querySelector(".page-end")).toBeNull();
+    expect(lastFooter()).toBeNull();
+    // the desk ends a little below the text
+    const layout = shown("page-ends");
+    const last = layout.frames[0];
+    expect(layout.height - (last.top + last.height)).toBeLessThan(80);
+  });
+
+  it("shows the last page's footer below its text, where a mark would show it", async () => {
+    const footer = { left: "Foot", center: "", right: "{page}" };
+    const one = doc(p("One page."));
+    layOutWith(one, { footer });
+    const editor = new EditorView(document.createElement("div"), {
+      state: createState(one, { cursor: 1 }),
+    });
+    dispose = bootApp(createEditorHandle(editor).handle);
+    await nextTick();
+    expect(view().querySelector(".page-end")).toBeNull();
+    expect(slotsOf(lastFooter())).toEqual(["Foot", "", "1"]);
+    // right below the text of the page, with room for it on the desk
+    const frame = frames()[0];
+    expect(parseFloat(lastFooter()!.style.top)).toBe(
+      parseFloat(frame.style.top) + parseFloat(frame.style.height),
+    );
+    const layout = shown("page-ends");
+    expect(layout.footerRoom).toBeGreaterThan(0);
+    // a double click opens the footer's strip
+    lastFooter()!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "footer" });
+    bandEditor.value = null;
+    // the sheets show it themselves
+    pageView.value = "pages";
+    await nextTick();
+    expect(lastFooter()).toBeNull();
+    pageView.value = "page-ends";
+    // a plain first page, the only one, has none
+    layOutWith(one, { footer, firstPage: "plain" });
+    await nextTick();
+    expect(lastFooter()).toBeNull();
+    expect(view().querySelector(".page-end")).toBeNull();
+    editor.destroy();
+  });
+
+  it("shows the mark between two pages, and the last one's own footer below", async () => {
+    const footer = { left: "Odd", center: "", right: "" };
+    const evenPages = {
+      header: { left: "", center: "", right: "" },
+      footer: { left: "Even", center: "", right: "" },
+    };
+    // two pages
+    const two = doc(...Array.from({ length: 18 }, () => p(LONG)));
+    layOutWith(two, { footer, evenPages });
+    dispose = bootApp(createTestHandle(createState(two, { cursor: 3 })));
+    await nextTick();
+    // the last page is the second, an even one
+    expect(pageLayoutState.value!.pages).toBe(2);
+    const marks = view().querySelectorAll(".page-end");
+    expect(marks.length).toBe(pageLayoutState.value!.pages - 1);
+    const all = frames();
+    expect(all[0].querySelector(".page-end")).not.toBeNull();
+    expect(all[all.length - 1].querySelector(".page-end")).toBeNull();
+    expect(slotsOf(lastFooter())).toEqual(["Even", "", ""]);
+    expect(
+      slotsOf(all[0].querySelector<HTMLElement>(".page-end .band.footer")),
+    ).toEqual(["Odd", "", ""]);
+  });
+
   // the layout the view shows in `mode`, at jsdom's window width
   const shown = (mode: "page-ends" | "pages") =>
     frameLayout(pageLayoutState.value!, mode, window.innerWidth);

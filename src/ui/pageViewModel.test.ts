@@ -8,6 +8,7 @@ import {
   movesPages,
   endMark,
   firstHeaderPlace,
+  lastFooterPlace,
   pageLabel,
   propertiesPlace,
   scrollFor,
@@ -23,6 +24,7 @@ const pageEnds: FrameLayout = {
   frames: [{ ...frame, ...place }],
   height: 1200,
   headerRoom: 0,
+  footerRoom: 0,
 };
 const pages: FrameLayout = { ...pageEnds, mode: "pages" };
 
@@ -55,7 +57,12 @@ describe("endMark", () => {
       header: ["Next", "", ""],
     });
     expect(
-      endMark(1, ["", "", "", "", "", ""], null, testLayout()),
+      endMark(
+        1,
+        ["", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+        testLayout(),
+      ),
     ).toMatchObject({
       number: "2",
       header: ["", "", ""],
@@ -66,26 +73,26 @@ describe("endMark", () => {
     const empty = ["", "", "", "", "", ""];
     // roman numerals, where the footer has none
     expect(
-      endMark(1, empty, null, testLayout({ numberStyle: "i" })).number,
+      endMark(1, empty, empty, testLayout({ numberStyle: "i" })).number,
     ).toBe("ii");
     // and not twice where it has: "ii" and "2" aren't the same text
     expect(
-      endMark(1, ["", "", "", "", "ii", ""], null, {
+      endMark(1, ["", "", "", "", "ii", ""], empty, {
         ...footer("{page}"),
         numberStyle: "i",
       }).number,
     ).toBe("");
     // from the number the first page starts at
-    expect(endMark(0, empty, null, testLayout({ startNumber: 5 })).number).toBe(
-      "5",
-    );
+    expect(
+      endMark(0, empty, empty, testLayout({ startNumber: 5 })).number,
+    ).toBe("5");
     // a footer that reads a number that isn't the page's
     expect(
-      endMark(1, ["", "", "", "", "Chapter 2", ""], null, footer("Chapter 2"))
+      endMark(1, ["", "", "", "", "Chapter 2", ""], empty, footer("Chapter 2"))
         .number,
     ).toBe("2");
     // nor is a written {page}
-    expect(endMark(1, empty, null, footer("{{page}")).number).toBe("2");
+    expect(endMark(1, empty, empty, footer("{{page}")).number).toBe("2");
   });
 });
 
@@ -105,6 +112,27 @@ describe("firstHeaderPlace", () => {
     expect(firstHeaderPlace({ ...pages, headerRoom: 20 })).toBeNull();
     expect(
       firstHeaderPlace({ ...pageEnds, headerRoom: 20, frames: [] }),
+    ).toBeNull();
+  });
+});
+
+describe("lastFooterPlace", () => {
+  it("puts the last page's footer in the room below its text in page ends", () => {
+    const second = { ...frame, ...place, page: 1, top: 1100, height: 300 };
+    expect(
+      lastFooterPlace({
+        ...pageEnds,
+        frames: [pageEnds.frames[0], second],
+        footerRoom: 52,
+      }),
+    ).toEqual({ left: 76, top: 1400, width: 528, height: 52 });
+  });
+
+  it("shows none without room for it, or on the sheets of pages", () => {
+    expect(lastFooterPlace(pageEnds)).toBeNull();
+    expect(lastFooterPlace({ ...pages, footerRoom: 52 })).toBeNull();
+    expect(
+      lastFooterPlace({ ...pageEnds, footerRoom: 52, frames: [] }),
     ).toBeNull();
   });
 });
@@ -152,6 +180,7 @@ describe("viewAnchor and anchorTop", () => {
     ],
     height: 1200,
     headerRoom: 0,
+    footerRoom: 0,
   };
   const sheets: FrameLayout = {
     mode: "pages",
@@ -182,6 +211,7 @@ describe("viewAnchor and anchorTop", () => {
     ],
     height: 1800,
     headerRoom: 0,
+    footerRoom: 0,
   };
 
   it("finds the spot at the top of the view, and scrolls back to it", () => {
