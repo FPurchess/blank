@@ -96,8 +96,10 @@ describe("header and footer", () => {
   });
 
   it("opens a strip from where the page ends", async () => {
-    // a single click leaves it closed, as a click beside the text does
+    // a single click leaves it closed, as a click beside the text does,
+    // also once a double click would have taken
     await $(".page-end .band.footer").click();
+    await browser.pause(600);
     await expect(strip()).not.toExist();
     await $(".page-end .band.footer").doubleClick();
     await expect(strip()).toBeDisplayed();
@@ -184,18 +186,88 @@ describe("header and footer", () => {
         .getBoundingClientRect()
         .toJSON(),
     );
-    await waitForInk(
-      {
-        left: sheet.left + 8,
-        right: sheet.right - 8,
-        top: sheet.top + 8,
-        // above the text, which starts at the margin of 2.5 cm
-        bottom: sheet.top + 80,
-      },
-      {},
-      0.003,
+    // in the header's own strip, not the text's canvas: two short words over
+    // the width of the sheet and the height of its margin cover about 0.3 %,
+    // and a strip without them nothing
+    const headerStrip = await browser.execute(() =>
+      document
+        .querySelector('.page-frame[data-page="1"] .page-bands.header')!
+        .getBoundingClientRect()
+        .toJSON(),
     );
+    await waitForInk(headerStrip, { layers: ".page-bands.header" }, 0.001);
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("page-ends");
+  });
+
+  it("lines the bands up with the text where pages end", async () => {
+    const file = path.join(fixtureDir, "aligned.md");
+    fs.writeFileSync(
+      file,
+      [
+        "---",
+        "page:",
+        "  header: {left: '{title}', right: 'draft'}",
+        "  footer: {left: 'left foot', right: 'right foot'}",
+        "---",
+        "",
+        "# report",
+        "",
+        ...Array.from(
+          { length: 40 },
+          () =>
+            "Writing is thinking on paper, and every line of it ends where the layout says.\n",
+        ),
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($(".page-end .band.footer")).toBeExisting();
+    const edges = await browser.execute(() => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            find: (text: string) => number;
+            caretBox: (pos: number) => { left: number } | null;
+          };
+        }
+      ).blankGeometry;
+      // where the page's text starts, and its column ends: "page ends"
+      // shows as much room beside it on both sides
+      const left = geometry.caretBox(geometry.find("Writing"))!.left;
+      const frame = document
+        .querySelector('.page-frame[data-page="1"]')!
+        .getBoundingClientRect();
+      const right = frame.right - (left - frame.left);
+      // where each slot's text is drawn
+      const text = (selector: string) => {
+        const slot = document.querySelector(selector)!;
+        const range = document.createRange();
+        range.selectNodeContents(slot);
+        const rect = range.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+      };
+      return {
+        left,
+        right,
+        slots: [
+          [".page-first-header span:first-child", "left"],
+          [".page-end .band.footer span:first-child", "left"],
+          [".page-end .band.header span:first-child", "left"],
+          [".page-first-header span:last-child", "right"],
+          [".page-end .band.footer span:last-child", "right"],
+          [".page-end .band.header span:last-child", "right"],
+          // the number of a page whose footer doesn't show it
+          [".page-end .line .number", "right"],
+        ].map(([selector, side]) => ({
+          selector,
+          side,
+          at: text(selector)[side as "left" | "right"],
+        })),
+      };
+    });
+    for (const { selector, side, at } of edges.slots) {
+      const edge = side === "left" ? edges.left : edges.right;
+      expect([selector, Math.abs(at - edge) <= 1]).toEqual([selector, true]);
+    }
   });
 });

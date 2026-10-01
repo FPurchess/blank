@@ -471,10 +471,24 @@ describe("page view", () => {
           window as unknown as { blankBootTimes: () => Record<string, number> }
         ).blankBootTimes(),
       );
-      // a long document is laid out a chunk at a time: until its last page
+      // a long document is laid out a chunk at a time: until its last page,
+      // which the engine says where it can, or else once the count of the
+      // pages stays the same for a second
       let pages = "";
       await browser.waitUntil(
         async () => {
+          const laying = await browser.execute(() => {
+            const hooks = (
+              window as unknown as {
+                blankGeometry?: { laying?: () => boolean };
+              }
+            ).blankGeometry;
+            return hooks?.laying ? hooks.laying() : null;
+          });
+          if (laying === false) {
+            pages = await $("#ui-page-number").getText();
+            return true;
+          }
           const now = await $("#ui-page-number").getText();
           await browser.pause(1000);
           const settled = now === pages;
@@ -483,6 +497,10 @@ describe("page view", () => {
         },
         { timeout: 120_000, interval: 0 },
       );
+      // about as many pages as the test is named for
+      const count = Number(/of (\d+)/.exec(pages)?.[1]);
+      expect(count).toBeGreaterThanOrEqual(Number(name) * 0.8);
+      expect(count).toBeLessThanOrEqual(Number(name) * 1.25 + 1);
       await clickOnPage(1, 44, 58);
       await browser.execute(() =>
         (
@@ -525,6 +543,8 @@ describe("page view", () => {
       // typing on the first page paints that page, not the others: about a
       // paint a key, and a few more where the text first changes
       expect(perf.paint.length).toBeLessThanOrEqual(TYPED.length + 4);
+      // and the page typed on is painted, about once a key
+      expect(perf.paint.length).toBeGreaterThanOrEqual(TYPED.length / 2);
       fs.appendFileSync(
         path.join(SHOTS, "engine-measurements.jsonl"),
         JSON.stringify({ name, ...result }) + "\n",

@@ -54,7 +54,7 @@ const tableLayout = () =>
  * and one along the bottom of each row (see items.rs), each a thin strip
  * with ink, and more of it than a strip beside the line
  */
-const expectGridPainted = async () => {
+const gridPainted = async () => {
   const { box, rows, columns } = await tableLayout();
   for (const x of columns.slice(1, -1)) {
     const along = await paintedInk({
@@ -83,6 +83,24 @@ const expectGridPainted = async () => {
     });
     expect(along.share).toBeGreaterThan(0.2);
   }
+};
+
+const expectGridPainted = async () => {
+  // the pages paint again in the frames after the change
+  let last = "";
+  await browser
+    .waitUntil(async () => {
+      try {
+        await gridPainted();
+        return true;
+      } catch (error) {
+        last = String(error);
+        return false;
+      }
+    })
+    .catch(() => {
+      throw new Error(`the table's lines aren't painted: ${last}`);
+    });
 };
 
 describe("tables", () => {

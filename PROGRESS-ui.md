@@ -50,8 +50,19 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 7. The bitmap cache is cleared once the engine is missing (`engineMissing`) and keeps one bitmap per page layer and scale, the newest
 - [x] 8. Less work per key: the first header reads the engine only when page 1's band version changes and only in "page ends", and the overlay reads its layer before the refs
 - [x] 9. "Page N of M" shows the physical position (the owner's choice); a stable, visually hidden live region (`#ui-page-spoken`) says only "Page N" when the page changes (`StatusBars.test.ts` lists it in the bar)
-- [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
-- [ ] 11. The test gaps
+- [x] The integrator's band spacing (BAND_GAP 32): looked at in both views and all six themes; the hover over page 1's header and the page-end bands now covers their line of text only, and the page number where a page ends ends where the text does. `bands.e2e.ts` checks that every band's left and right slot, and the number, are within 1 px of the text's edges.
+- [x] Spell check while typing (the owner's top priority): the marks are worked out per page (`PageMarksMemo` in `pageMarks.ts`), again only when the page's body version or the marks on it, relative to its start, change. They are keyed by their place on the page and rendered inside each `PageFrame` from one string, so typing elsewhere renders none of them again. The page view reads the decorations and the doc through computeds, so a selection-only transaction works nothing out. Measured with `e2e/specs/spellcheckTyping.e2e.ts` (`E2E_PERF=1`; 150 paragraphs of English checked as German, a 59-character sentence typed), with two binaries run in turns under the same load:
+
+  | build | off | on: 1st / 2nd / 3rd | frames over 50 ms, on |
+  |---|---|---|---|
+  | before | 2246 ms | 5920 / 6173 / 6337 ms | 59 / 59 / 60 |
+  | after | 2483 ms | 2787 / 2732 / 3206 ms | 2 / 1 / 3 |
+  | before | 2716 ms | 5857 / 5908 / 5879 ms | 59 / 59 / 59 |
+  | after | 2755 ms | 3116 / 2854 / 2876 ms | 3 / 1 / 2 |
+
+- [x] 10. `layerOf` in `src/ui/pageLayer.ts`, `frameRenders` counted only in dev and test builds (`import.meta.env.DEV || __TEST_HOOKS__`), one colour cache for all frames (`themeColors`), the page break of "page ends" at `$faint-text-opacity`; the rule file's wording is the integrator's
+- [x] 11. The test gaps: the paint count has a lower bound and the page counts are asserted; the settle wait uses `blankGeometry.laying()` once engine-editor adds it; `waitForInk` defaults to 5 %, and the header check reads only `.page-bands.header`; the grid check waits; the single click waits past the double-click time; `screenStats` clamps to the screenshot; End must move the caret; `motion.test` checks every animation and transition (a missing one fails); every page's bands and exact render counts in `PageFrame.test`; the recording canvas records colour and alpha and clears on a resize; `parseColor` throws on NaN; only a leading empty composition is dropped
+- [x] 5. The IME aligns at `pageHeadBox`, the head as the plugin paints it, with its line's affinity (on the base since 194178c)
 - [x] 2. Shift + right click: `spelling.md`, `nativeMenu.ts` and `contextMenu.ts` say it opens the system menu in the editor without the pages and Blank's menu on the pages
 
 ## Where it stands (2026-10-01, 00:10), and what's next
@@ -77,7 +88,7 @@ Next, in this order:
    - `PageFrame.test` "bands only" checking every mounted page, and renders `toBe(1)`
    - the recording canvas recording `globalAlpha` and `fillStyle`
    - `parseColor` throwing on NaN
-3. Minor 5, once engine-editor's line has landed: switch `headBox` in `PageView.vue` to `pageHeadBox`, adding this line to `src/state/pageView.ts` right after `pageCaret`, identical:
+3. (done) Minor 5, once engine-editor's line has landed: switch `headBox` in `PageView.vue` to `pageHeadBox`, adding this line to `src/state/pageView.ts` right after `pageCaret`, identical:
    `// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages`
    `export const pageHeadBox = shallowRef<PageRect | null>(null);`
 4. Then the full check: `bun run lint`, `bun run format:check`, `bun run test:coverage`, the full E2E suite (`cd e2e && E2E_PORT=4521 xvfb-run -a bunx wdio run ./wdio.conf.ts`), and `make docs-screenshots` (the selection only shows in the E2E shots, `e2e/screenshots/selection-<theme>.png`, so the docs' stills shouldn't change; check).

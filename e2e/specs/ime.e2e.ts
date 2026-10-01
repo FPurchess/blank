@@ -26,13 +26,15 @@ describe("input methods", () => {
     await type("e9");
     await browser.keys(Key.Space);
 
-    // some input stacks end an empty composition first, e.g. on CI
+    // some input stacks end an empty composition first, e.g. on CI; only
+    // that one is left out
     await expect(
-      browser.execute(() =>
-        (window as unknown as { compositions: string[] }).compositions.filter(
-          (data) => data !== "",
-        ),
-      ),
+      browser.execute(() => {
+        const { compositions } = window as unknown as {
+          compositions: string[];
+        };
+        return compositions[0] === "" ? compositions.slice(1) : compositions;
+      }),
     ).resolves.toEqual(["é"]);
     await expect(editorText("#editor h1")).resolves.toEqual([
       "Welcome to éBlank",

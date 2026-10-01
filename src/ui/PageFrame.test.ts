@@ -183,7 +183,7 @@ describe("the pages and the painter", () => {
     await paintQueued();
     expect(layers).toEqual(["1:body"]);
     // and only its frame rendered again
-    expect(frameRenders.count - renders).toBeLessThanOrEqual(1);
+    expect(frameRenders.count - renders).toBe(1);
   });
 
   it("paints only the headers and footers of the others when a page is added", async () => {
@@ -212,8 +212,16 @@ describe("the pages and the painter", () => {
     publish(engine);
     expect(engine.pages()).toBe(pages + 1);
     await paintQueued();
-    // the pages in view: page 1 and those after it, near the top
-    expect(layers).toContain("1:bands");
+    // every page shown paints its header and footer again, once each, for
+    // {pages}, and none its text
+    const sheets = [...view().querySelectorAll<HTMLElement>(".page-frame")]
+      .map((frame) => frame.dataset.page)
+      .filter((page) => Number(page) <= pages);
+    const bands = layers.filter((layer) => layer.endsWith(":bands"));
+    for (const page of sheets)
+      expect(bands.filter((layer) => layer === `${page}:bands`)).toHaveLength(
+        2,
+      );
     expect(layers.filter((layer) => layer.endsWith(":body"))).toEqual([]);
   });
 

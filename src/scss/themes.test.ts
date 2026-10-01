@@ -79,5 +79,7 @@ describe("parseColor", () => {
       0.5, 0.5, 0.5,
     ]);
     expect(() => parseColor("red")).toThrow();
+    // space separated, which these themes don't write
+    expect(() => parseColor("rgb(27 40 50)")).toThrow();
   });
 });
