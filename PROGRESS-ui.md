@@ -52,6 +52,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 9. "Page N of M" shows the physical position (the owner's choice); a stable, visually hidden live region (`#ui-page-spoken`) says only "Page N" when the page changes (`StatusBars.test.ts` lists it in the bar)
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
 - [ ] 11. The test gaps
+- [x] 5. The IME aligns at `pageHeadBox`, the head as the plugin paints it, with its line's affinity (on the base since 194178c)
 - [x] 2. Shift + right click: `spelling.md`, `nativeMenu.ts` and `contextMenu.ts` say it opens the system menu in the editor without the pages and Blank's menu on the pages
 
 ## Where it stands (2026-10-01, 00:10), and what's next
@@ -77,7 +78,7 @@ Next, in this order:
    - `PageFrame.test` "bands only" checking every mounted page, and renders `toBe(1)`
    - the recording canvas recording `globalAlpha` and `fillStyle`
    - `parseColor` throwing on NaN
-3. Minor 5, once engine-editor's line has landed: switch `headBox` in `PageView.vue` to `pageHeadBox`, adding this line to `src/state/pageView.ts` right after `pageCaret`, identical:
+3. (done) Minor 5, once engine-editor's line has landed: switch `headBox` in `PageView.vue` to `pageHeadBox`, adding this line to `src/state/pageView.ts` right after `pageCaret`, identical:
    `// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages`
    `export const pageHeadBox = shallowRef<PageRect | null>(null);`
 4. Then the full check: `bun run lint`, `bun run format:check`, `bun run test:coverage`, the full E2E suite (`cd e2e && E2E_PORT=4521 xvfb-run -a bunx wdio run ./wdio.conf.ts`), and `make docs-screenshots` (the selection only shows in the E2E shots, `e2e/screenshots/selection-<theme>.png`, so the docs' stills shouldn't change; check).

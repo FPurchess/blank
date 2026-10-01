@@ -28,7 +28,7 @@ import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
   engineMissing,
-  pageCaret,
+  pageHeadBox,
   pageLayoutState,
   pageScrollRequest,
   type PageScrollRequest,
@@ -300,15 +300,13 @@ watch(
   { flush: "post" },
 );
 
-// the head of the selection, where the caret is or a range ends
-const headBox = () =>
-  pageCaret.value ?? pageEngine?.caret(editor.state.value.selection.head);
-
 // the hidden editor's caret follows the painted one, for the IME's window,
 // or the head of a range
 const align = () => {
   const element = scroller.value;
-  const caret = headBox();
+  // the head of the selection, where the caret is or a range ends, on the
+  // line it is painted on
+  const caret = pageHeadBox.value;
   if (!element || !layout.value || !caret) return;
   const rect = onDesk(layout.value, { ...caret, width: 0 });
   if (!rect) return;
@@ -328,7 +326,7 @@ const alignSoon = () => {
   clearTimeout(alignTimer);
   alignTimer = setTimeout(align, ALIGN_DELAY);
 };
-watch([pageCaret, layout], alignSoon, { flush: "post" });
+watch([pageHeadBox, layout], alignSoon, { flush: "post" });
 // the input method places its window at the hidden caret when composing
 // starts, and moves it along as the composed text grows; a test view has
 // no DOM

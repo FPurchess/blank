@@ -8,6 +8,7 @@ import {
   bandEditor,
   contextMenu,
   pageCaret,
+  pageHeadBox,
   pageLayoutState,
   pageScrollRequest,
   pageView,
@@ -67,6 +68,7 @@ describe("page view", () => {
     pageCaret.value = null;
     pageSelection.value = [];
     pageScrollRequest.value = null;
+    pageHeadBox.value = null;
     pageView.value = "page-ends";
     document.body.replaceChildren();
   });
@@ -410,31 +412,31 @@ describe("page view", () => {
     }
   });
 
-  it("aligns the input method at the head of a range", async () => {
+  it("aligns the input method where the selection's head is painted", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
-    const engine = layOut();
-    // a range from the first paragraph into the second
-    const state = createState(node, { cursor: [10, 200] });
-    dispose = bootApp(createTestHandle(state));
+    layOut();
+    // a range whose head is on the second page, at the end of a line the
+    // plugin publishes with its affinity
+    dispose = bootApp(
+      createTestHandle(createState(node, { cursor: [10, 200] })),
+    );
     pageCaret.value = null;
-    pageSelection.value = [{ page: 0, x: 80, y: 90, width: 50, height: 16 }];
+    pageSelection.value = [{ page: 1, x: 80, y: 90, width: 50, height: 16 }];
     await nextTick();
     vi.mocked(alignHiddenEditor).mockClear();
-    // a layout of its own, which the view aligns after
-    pageLayoutState.value = { ...pageLayoutState.value! };
+    const head = { page: 1, x: 200, y: 120, width: 0, height: 16 };
+    pageHeadBox.value = head;
     await nextTick();
     vi.advanceTimersByTime(200);
     expect(alignHiddenEditor).toHaveBeenCalled();
-    const [, , y] =
+    const [, x, y] =
       vi.mocked(alignHiddenEditor).mock.calls[
         vi.mocked(alignHiddenEditor).mock.calls.length - 1
       ];
-    const head = engine.caret(state.selection.head)!;
-    const frame = shown("page-ends").frames[head.page];
-    expect(y).toBeCloseTo(
-      frame.top + (head.y - frame.y) * shown("page-ends").scale,
-      0,
-    );
+    const layout = shown("page-ends");
+    const frame = layout.frames[1];
+    expect(y).toBeCloseTo(frame.top + (head.y - frame.y) * layout.scale, 0);
+    expect(x).toBeCloseTo(frame.left + (head.x - frame.x) * layout.scale, 0);
     vi.useRealTimers();
   });
 
