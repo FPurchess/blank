@@ -432,3 +432,55 @@ At 823 pages, a keystroke goes (before task 16, from a profile with timers) to:
 - The 1-page difference (tens of µs) is within the noise here.
 - What's left grows with the document: moving the positions of the items after the change, and walking the copied tail's items for `first_frag`. Both are simple loops over integers.
   - Moving positions touches every text box after the change, which is cache misses more than work. Block-relative positions would avoid it, but at this speed that isn't worth a seam change.
+
+### Measurements: wasm build variants, start-up and per keystroke (2026-10-01)
+
+Twelve builds of the wasm (at 2243602): cargo opt-level 3 (profile `wasm`, today) or "s" (`wasm-small`), each with `wasm-opt -O3`, `-O2`, `-O1`, `-Os`, `-Oz` or without wasm-opt. They were built in the scratchpad, without changing the build. A bench ran each one in a fresh bun process (JavaScriptCore, the webview's engine family), and a throwaway wdio spec ran each in the app's WebKitGTK. The webview runs measured three times: `WebAssembly.compile`, instantiating, and the app's own `init({ module_or_path: url })` from a loopback server, which streams the fetch and the compile. Every round ran all variants in turn, with `/proc/loadavg` stored per result. A round was dropped if any of its results had a 1-minute load above the cut.
+- bun: 7 of 13 rounds kept, at a load of 1.7–2.6 (cut 3)
+- webview: 4 of 6 rounds under 4.1, at 1.7–4.0. The app, xvfb and WebKit add about 2 to the load by themselves, so only 1 round stayed under 3, and it agrees.
+- `performance.now()` in the webview is only accurate to about 1 ms, so per key is the mean over 40 keys.
+- Per key in ms: the first run of 40 keys / the best of 5 (one number when they're equal), the same edits as `update_timing`.
+
+bun (JavaScriptCore), medians in ms:
+
+| variant | size (B) | compile | instantiate | first layout, 1 p | per key 1 p | 39 p | 200 p | full layout, 200 p |
+|---|---|---|---|---|---|---|---|---|
+| 3, -O3 (today) | 3,312,986 | 25 | 1.9 | 13 | 0.52/0.33 | 0.23 | 0.23/0.22 | 410 |
+| 3, -O2 | 3,343,878 | 25 | 1.8 | 12 | 0.57/0.34 | 0.23 | 0.23 | 437 |
+| 3, -O1 | 3,503,155 | 22 | 2.0 | 13 | 0.52/0.45 | 0.22 | 0.25/0.24 | 406 |
+| 3, -Os | 3,304,724 | 24 | 1.9 | 11 | 0.60/0.32 | 0.25 | 0.32/0.23 | 430 |
+| 3, -Oz | 3,257,577 | 24 | 1.7 | 12 | 0.51/0.30 | 0.23 | 0.25/0.23 | 432 |
+| 3, none | 4,257,287 | 25 | 2.2 | 12 | 0.46/0.33 | 0.22 | 0.26/0.23 | 387 |
+| s, -O3 | 3,178,367 | 22 | 2.2 | 17 | 0.68/0.46 | 0.29 | 0.41/0.31 | 527 |
+| s, -O2 | 3,192,104 | 23 | 2.3 | 19 | 0.64/0.47 | 0.29 | 0.32/0.31 | 567 |
+| s, -O1 | 3,431,506 | 23 | 2.6 | 23 | 0.71/0.42 | 0.30 | 0.40/0.34 | 551 |
+| s, -Os | 3,143,726 | 22 | 2.1 | 18 | 0.70/0.50 | 0.30 | 0.31 | 558 |
+| s, -Oz | 3,099,681 | 21 | 2.2 | 19 | 0.79/0.45 | 0.31 | 0.30 | 539 |
+| s, none | 5,303,137 | 35 | 2.4 | 24 | 0.73/0.41 | 0.28 | 0.42/0.32 | 530 |
+
+The webview (WebKitGTK), medians of 4 rounds in ms:
+
+| variant | compile | instantiate | streaming init | per key 1 p | 39 p | 200 p |
+|---|---|---|---|---|---|---|
+| 3, -O3 (today) | 22 | 7 | 44 | 0.65/0.51 | 0.35 | 0.30 |
+| 3, -O2 | 24 | 5.5 | 42 | 0.75/0.44 | 0.34 | 0.28 |
+| 3, -O1 | 29 | 8.5 | 36 | 0.59/0.42 | 0.35 | 0.29 |
+| 3, -Os | 22 | 8 | 37 | 0.65/0.44 | 0.36 | 0.29 |
+| 3, -Oz | 24 | 7 | 33 | 0.69/0.41 | 0.43/0.40 | 0.30 |
+| 3, none | 24 | 7 | 48 | 0.75/0.59 | 0.32 | 0.32 |
+| s, -O3 | 19 | 7 | 38 | 1.01/0.68 | 0.48 | 0.39 |
+| s, -O2 | 21 | 8.5 | 35 | 1.02/0.73 | 0.44 | 0.43 |
+| s, -O1 | 23 | 9 | 55 | 0.88/0.63 | 0.42 | 0.45 |
+| s, -Os | 25 | 10 | 41 | 1.10/0.70 | 0.47 | 0.46/0.45 |
+| s, -Oz | 21 | 8 | 45 | 1.02/0.72 | 0.47 | 0.41 |
+| s, none | 31 | 8 | 61 | 0.97/0.63 | 0.44 | 0.44 |
+
+What it shows:
+- Compiling costs about 20–25 ms for every variant, in both engines. JavaScriptCore compiles a quick first tier and optimizes later, so the size barely matters. The fastest variants save 3–6 ms, which is inside the noise.
+- The app-style streaming init takes 33–48 ms from a local server. In the app, engine-editor measured about 215 ms for fetching and compiling, so most of that is the fetch of the 3.3 MB file through Tauri's protocol, not the compile. A smaller file shortens it by at most its 2–6 %.
+- Opt-level "s" is slower at everything that happens per key: 30–50 % per keystroke and about 30 % per full layout. It saves at most 6 % of the size.
+- Among the opt-level 3 builds, the wasm-opt level makes no difference above the noise. Without wasm-opt the file is 29 % larger, with no gain. `-Oz` is 55 KB (1.7 %) smaller at the same speed, too little to change a reproducible build that CI checks.
+
+Recommendation, agreed with the coordinator: the build stays at opt-level 3 with `wasm-opt -O3`. A faster start-up has to come from fetching the wasm earlier or faster, not from the build settings.
+
+PDF/A-2u (2243602) adds about 4 KB to every PDF, for the sRGB profile and the XMP: the 7-page tagged sample grows from 86,992 to 91,147 bytes.
