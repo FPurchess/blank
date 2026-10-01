@@ -38,6 +38,11 @@ export type EngineCellBlock =
       width: number;
       height: number;
       alt: string;
+      // where it stands in lists and quotes, as a text block does; the
+      // marker sits at its top
+      indent?: number;
+      marker?: string;
+      bars?: number[];
     };
 
 export interface EngineCell {

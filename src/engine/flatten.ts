@@ -195,9 +195,9 @@ const cellBlocks = (
   ) => {
     const name = node.type.name;
     if (node.isTextblock) {
-      // the marker goes on the first text: an image block has none (S2)
-      let marked = false;
-      pieces(node, at).forEach((piece) => {
+      // a list item's marker goes on its first block, an image's too
+      pieces(node, at).forEach((piece, index) => {
+        const first = index === 0 && marker ? { marker } : {};
         if (piece.image) {
           const src = piece.image.attrs.src as string;
           const size = sizes(src);
@@ -208,6 +208,9 @@ const cellBlocks = (
             width: size?.width ?? 0,
             height: size?.height ?? 0,
             alt: (piece.image.attrs.alt as string | null) ?? "",
+            indent,
+            bars,
+            ...first,
           });
           return;
         }
@@ -215,9 +218,8 @@ const cellBlocks = (
           ...textOf(node, piece.children, piece.pos, false),
           indent,
           bars,
-          ...(!marked && marker ? { marker } : {}),
+          ...first,
         });
-        marked = true;
       });
     } else if (name === "blockquote") {
       node.forEach((child, offset, index) =>

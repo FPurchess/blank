@@ -354,19 +354,40 @@ describe("what a table cell holds", () => {
         width: 120,
         height: 80,
         alt: "a cat",
+        indent: 0,
+        bars: [],
       },
     ]);
     expect(node.nodeAt(10)?.type.name).toBe("image");
   });
 
-  it("keeps a list item's marker when it starts with an image", () => {
+  it("gives images the place of their list and quote, and the marker", () => {
     const { cell } = cellOf([
       ol(li(para(image("cat.png"), schema.text("after")))),
+      blockquote(para(image("dog.png"))),
     ]);
     expect(cell.blocks).toEqual([
-      expect.objectContaining({ kind: "image" }),
-      expect.objectContaining({ kind: "text", text: "after", marker: "1." }),
+      expect.objectContaining({
+        kind: "image",
+        src: "cat.png",
+        indent: LIST_INDENT,
+        marker: "1.",
+        bars: [],
+      }),
+      expect.objectContaining({
+        kind: "text",
+        text: "after",
+        indent: LIST_INDENT,
+      }),
+      expect.objectContaining({
+        kind: "image",
+        src: "dog.png",
+        indent: QUOTE_INDENT,
+        bars: [0],
+      }),
     ]);
+    // the marker once, at the image
+    expect(cell.blocks![1]).not.toHaveProperty("marker");
   });
 
   it("keeps code blocks set as code", () => {
