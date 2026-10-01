@@ -1558,7 +1558,7 @@ body.band-editing #page-view {
 // page's header
 #page-view.page-ends .page-break-mark {
   border-top: none;
-  opacity: 0.6;
+  opacity: $faint-text-opacity;
 
   &::after {
     top: calc(#{$page-end-height} / 2 - 0.65em);
