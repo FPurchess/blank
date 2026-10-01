@@ -24,7 +24,12 @@ import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
 import { flushPromises } from "../test/async";
 import { engineInstanceBroken, forgetEngineFailure } from "./engine";
-import toPDF, { describeWarnings, pdfLanguage, sizesOf } from "./pdf";
+import toPDF, {
+  describeWarnings,
+  pdfLanguage,
+  sizesOf,
+  WORKER_TIMEOUT,
+} from "./pdf";
 import { language } from "../state";
 import { prepareImages } from "../images/prepare";
 import { documentFields } from "../layout/bands";
@@ -36,7 +41,7 @@ import { handleJob, type PdfReply } from "./pdfWorker";
 import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
 import * as pdfJob from "./pdfJob";
-import { baseFonts, setPageEngine } from "./engine";
+import { baseFonts, pageEngine, setPageEngine } from "./engine";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -220,6 +225,49 @@ describe("the PDF export after the engine trapped", () => {
       expect(text).toContain("Findings");
     },
   );
+
+  it("fails on an error of its own that isn't a trap, without a worker", async () => {
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(() => {
+      throw new Error("the image x.png can't be written");
+    });
+    await expect(exportIt()).rejects.toThrow(
+      "the image x.png can't be written",
+    );
+    expect(engineInstanceBroken()).toBe(false);
+    expect(jobs).toEqual([]);
+  });
+
+  it("gives up a worker that doesn't answer", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    // a worker that never answers
+    const hanging = vi
+      .spyOn(InProcessWorker.prototype, "postMessage")
+      .mockImplementation(() => {});
+    const done = exportIt().then(
+      () => "written",
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(WORKER_TIMEOUT + 1);
+    expect(await done).toMatch(/took too long/);
+    hanging.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("gives up the page view's engine after a trap, which shares the instance", async () => {
+    const page = testEngine();
+    setPageEngine(page);
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+
+    const { pages } = await exportIt();
+
+    expect(pages).toBe(1);
+    expect(jobs).toHaveLength(1);
+    expect(page.broken).toBe(true);
+    expect(pageEngine).toBeNull();
+    expect(document.body.classList).toContain("without-engine");
+    setPageEngine(null);
+  });
 
   it("goes straight to the worker once the instance is broken", async () => {
     vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
@@ -465,6 +513,18 @@ describe("the PDF's warnings", () => {
     ).toEqual([
       "2 images couldn't be read and show their alt text: cat.png, dog.png",
       "1 font couldn't be embedded, so its text is left out: Noto Sans CJK SC",
+    ]);
+    // each named once
+    expect(
+      describeWarnings([
+        { kind: "font", font: 1, family: "" },
+        { kind: "font", font: 2, family: "" },
+        { kind: "image", src: "a.png" },
+        { kind: "image", src: "a.png" },
+      ]),
+    ).toEqual([
+      "1 image couldn't be read and shows its alt text: a.png",
+      "1 font couldn't be embedded, so its text is left out: one of Blank's fonts",
     ]);
     expect(
       describeWarnings([

@@ -14,6 +14,7 @@ import {
 } from "./flatten";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
+import { engineMissing } from "../state/pageView";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
@@ -130,6 +131,7 @@ export const engineless = () => status !== "ready";
  */
 export const useFallbackEditor = (reason: Exclude<EngineStatus, "ready">) => {
   status = reason;
+  engineMissing.value = true;
   document.body.classList.add("without-engine");
 };
 
@@ -151,6 +153,7 @@ export const forgetEngineFailure = () => {
   status = "ready";
   instanceBroken = false;
   notified = false;
+  engineMissing.value = false;
   document.body.classList.remove("without-engine");
 };
 
@@ -165,8 +168,6 @@ export interface Changes {
 }
 
 export interface SyncOptions {
-  // flattens the whole document again, even the same one
-  force?: boolean;
   frozen?: FrozenWidths | null;
   // lays out a long document's first pages first, see FIRST_ITEMS
   progressive?: boolean;
@@ -351,16 +352,24 @@ export class PageEngine {
       }
       return run();
     } catch (error) {
+      // a trap leaves the wasm instance unusable, for every engine of it
+      const trap = error instanceof WebAssembly.RuntimeError;
+      if (trap) {
+        instanceBroken = true;
+        if (this !== pageEngine) pageEngine?.fail(error);
+      }
+      // an export's error that isn't a trap is the export's own
+      if (this.strict && !trap) throw error;
       this.fail(error);
       if (this.strict) throw error;
       return fallback;
     }
   }
 
-  // gives the engine up after its first error
+  // gives the engine up after its first error; for the page view's engine,
+  // the editor then shows the text itself
   private fail(error: unknown) {
     this.broken = true;
-    instanceBroken = true;
     clearTimeout(this.timer);
     this.pending = null;
     this.onProgress = null;
@@ -467,7 +476,6 @@ export class PageEngine {
     doc: Node,
     sizes: ImageSizes,
     {
-      force = false,
       frozen = null,
       progressive = false,
       changes = null,
@@ -476,8 +484,7 @@ export class PageEngine {
     }: SyncOptions,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
-    const same =
-      !force && frozenKey === this.frozen && sizesKey === this.sizesKey;
+    const same = frozenKey === this.frozen && sizesKey === this.sizesKey;
     if (doc === this.doc && same && blocks.length === 0) return false;
     this.frozen = frozenKey;
     this.sizesKey = sizesKey;
@@ -544,8 +551,11 @@ export class PageEngine {
       ...extra.map((index): [number, number] => [index, index]),
     ];
     if (touched.length === 0) {
-      // e.g. only the frontmatter changed, which the settings bring
+      // e.g. only the frontmatter changed, which the settings bring: the
+      // blocks must all be the ones laid out
       if (doc.childCount !== old.childCount) return false;
+      for (let index = 0; index < doc.childCount; index++)
+        if (old.child(index) !== doc.child(index)) return false;
       this.doc = doc;
       return true;
     }

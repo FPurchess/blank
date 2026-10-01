@@ -19,21 +19,25 @@ export interface FallbackFont {
 // the fonts added, for new engines, e.g. the PDF export's
 export const fallbackFonts = shallowRef<readonly FallbackFont[]>([]);
 
-// the characters already looked for, found or not; not those whose lookup
-// failed, which are looked for again
-const asked = new Set<string>();
-
 const EMOJI = /\p{Extended_Pictographic}/u;
 
+// the characters already looked for, found or not, with the language they
+// were looked for in, which picks e.g. Chinese or Japanese forms (emoji
+// have none); not those whose lookup failed, which are looked for again
+const asked = new Set<string>();
+
+const askedKey = (char: string, language: string) =>
+  EMOJI.test(char) ? char : `${language}:${char}`;
+
 /**
- * missingOf returns the characters of `missing` not looked for yet, as emoji
- * and the rest
+ * missingOf returns the characters of `missing` not looked for yet in
+ * `language`, as emoji and the rest
  */
-export const missingOf = (missing: string) => {
+export const missingOf = (missing: string, language = "") => {
   const emoji: string[] = [];
   const other: string[] = [];
   for (const char of missing) {
-    if (asked.has(char)) continue;
+    if (asked.has(askedKey(char, language))) continue;
     (EMOJI.test(char) ? emoji : other).push(char);
   }
   return { emoji, other };
@@ -68,12 +72,12 @@ const lookUp = async (
   missing: string,
   language: string,
 ): Promise<FallbackFont[]> => {
-  const { emoji, other } = missingOf(missing);
+  const { emoji, other } = missingOf(missing, language);
   const found: FallbackFont[] = [];
   const known = (family: string) =>
     [...fallbackFonts.value, ...found].some((font) => font.family === family);
   const lookedFor = (chars: string[]) =>
-    chars.forEach((char) => asked.add(char));
+    chars.forEach((char) => asked.add(askedKey(char, language)));
   if (emoji.length && known(EMOJI_FAMILY)) lookedFor(emoji);
   else if (emoji.length) {
     try {

@@ -14,6 +14,7 @@ import { watch } from "vue";
 
 import {
   announce as announceNow,
+  pageLayoutState,
   pageViewport,
   tableToolbar,
   type TableToolbarItem,
@@ -283,8 +284,11 @@ export const tableTools = () => {
       },
     },
     view(view) {
-      // the page view scrolled, resized or switched
-      const stop = watch(pageViewport, () => publish(view), { flush: "sync" });
+      // the page view scrolled, resized or switched, or the pages were laid
+      // out again, e.g. once an image above loaded
+      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
+        flush: "sync",
+      });
       // without the engine, the editor itself scrolls
       const scrolled = () => {
         if (engineless()) publish(view);

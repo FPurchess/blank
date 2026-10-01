@@ -1,10 +1,17 @@
-import { joinBackward, lift, splitBlock, wrapIn } from "prosemirror-commands";
+import {
+  joinBackward,
+  lift,
+  splitBlock,
+  toggleMark,
+  wrapIn,
+} from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { sinkListItem, wrapInList } from "prosemirror-schema-list";
 import {
   type Command,
   EditorState,
   NodeSelection,
+  Plugin as PluginClass,
   type Plugin,
   Selection,
   TextSelection,
@@ -16,7 +23,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../markdown";
 import {
+  engineMissing,
   pageFields,
+  pageHeadBox,
   pageLayout,
   path,
   transaction,
@@ -47,7 +56,7 @@ import {
 } from "../../engine/engine";
 import { hidePages, showPages, testEngine } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
-import { forgetImages } from "../../engine/images";
+import { forgetImages, loadedImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
@@ -282,6 +291,7 @@ describe("an engine that fails", () => {
 
     expect(mounted.view.state.doc.firstChild!.textContent).toMatch(/^baLorem/);
     expect(document.body.classList).toContain("without-engine");
+    expect(engineMissing.value).toBe(true);
     expect(pageEngine).toBeNull();
     expect(pageLayoutState.value).toBeNull();
     expect(pageCaret.value).toBeNull();
@@ -289,6 +299,21 @@ describe("an engine that fails", () => {
     expect(sendNotification).toHaveBeenCalledWith(ENGINE_FAILED);
     // the keys the page view moved by are the editor's own again
     expect(mounted.press("ArrowDown")).toBe(false);
+  });
+
+  it("shows no pages when it fails while a long document is laid out", () => {
+    vi.useFakeTimers();
+    const engine = showPages();
+    const mounted = mount(doc(...Array.from({ length: 300 }, () => p(LONG))));
+    destroy = () => mounted.view.destroy();
+    expect(engine.laying).toBe(true);
+    vi.spyOn(engine.raw, "pageCount").mockImplementation(trap);
+
+    vi.runAllTimers();
+
+    expect(pageEngine).toBeNull();
+    expect(pageLayoutState.value).toBeNull();
+    vi.useRealTimers();
   });
 
   it("mounts the editor when the first layout fails", () => {
@@ -423,6 +448,33 @@ describe("cell selections", () => {
     expect(dispatched!.selection).toBeInstanceOf(CellSelection);
   });
 
+  it("grows a cell selection from the cell it started in", () => {
+    const node = grid();
+    let state = EditorState.create({ schema, doc: node });
+    state = state.apply(
+      state.tr.setSelection(
+        CellSelection.create(node, cellPos(node, 0, 0), cellPos(node, 0, 1)),
+      ),
+    );
+    // Shift + click in (1, 1)
+    const selection = selectionAt(
+      state,
+      { node: false, pos: cellPos(node, 1, 1) + 2 },
+      state.selection.anchor,
+    ) as CellSelection;
+    expect(selection.$anchorCell.pos).toBe(cellPos(node, 0, 0));
+    expect(selection.$headCell.pos).toBe(cellPos(node, 1, 1));
+  });
+
+  it("leaves a cell selection to the editor on other keys", () => {
+    const mounted = mount(grid(), [tableEditing()]);
+    mounted.press("Shift-ArrowDown");
+    expect(mounted.view.state.selection).toBeInstanceOf(CellSelection);
+    for (const key of ["Shift-End", "Shift-Home", "Shift-PageDown"])
+      expect(mounted.press(key)).toBe(false);
+    mounted.view.destroy();
+  });
+
   it("selects text within one cell", () => {
     const state = EditorState.create({ schema, doc: grid() });
     const selection = selectionAt(state, { node: false, pos: 6 }, 4);
@@ -485,6 +537,59 @@ describe("images on the pages", () => {
     expect(shown[3]).toBeCloseTo(225);
     expect(shown[4]).toBeCloseTo(112.5);
     mounted.view.destroy();
+  });
+
+  it("loads the images of another document again", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    path.value = "/docs/report.md";
+    const mounted = mount(
+      doc(p("some text"), schema.node("paragraph", null, image)),
+    );
+    loads[0].load();
+    expect(loadedImages.value.size).toBe(1);
+    // opened: the same src may be another picture, or changed on disk
+    mounted.view.updateState(
+      applyDocument(
+        mounted.view.state,
+        doc(schema.node("paragraph", null, image)),
+      ),
+    );
+    expect(loads).toHaveLength(2);
+    mounted.view.destroy();
+  });
+
+  it("follows a Save As after a transaction another plugin added to", () => {
+    const image = schema.node("image", { src: "img.png", alt: "a cat" });
+    // adds a paragraph after each change, as the table guard may
+    const appending = new PluginClass({
+      appendTransaction: (trs, _old, state) =>
+        trs.some((tr) => tr.docChanged && !tr.getMeta("appended"))
+          ? state.tr
+              .insert(state.doc.content.size, p("kept"))
+              .setMeta("appended", true)
+          : null,
+    });
+    const state = EditorState.create({
+      schema,
+      doc: doc(p("text"), schema.node("paragraph", null, image)),
+      plugins: [pageSync(), pageView(), appending],
+    });
+    // as bootEditor dispatches: the transaction is published first
+    const view: EditorView = new EditorView(document.createElement("div"), {
+      state,
+      dispatchTransaction(tr) {
+        transaction.value = tr;
+        view.updateState(view.state.apply(tr));
+      },
+    });
+    view.dispatch(view.state.tr.insertText("typed ", 1));
+    expect(view.state.doc.lastChild!.textContent).toBe("kept");
+
+    path.value = "/docs/report.md";
+
+    expect(loads).toHaveLength(1);
+    view.destroy();
+    transaction.value = null;
   });
 });
 
@@ -625,6 +730,20 @@ describe("the line a caret is on", () => {
     expect(back).toEqual([lines[1], lines[0]]);
   });
 
+  it("publishes where the head is painted, on its own line", () => {
+    const mounted = mount(doc(p(URL), p("after")));
+    destroy = () => mounted.view.destroy();
+    const start = pageHeadBox.value!;
+    mounted.press("End");
+    // the end of the first line, where the second one starts too
+    expect(pageHeadBox.value!.y).toBe(start.y);
+    expect(pageHeadBox.value).toEqual(pageCaret.value);
+    // a range's head too, where no caret is painted
+    mounted.press("Shift-Home");
+    expect(pageCaret.value).toBeNull();
+    expect(pageHeadBox.value).toMatchObject({ page: 0, y: start.y });
+  });
+
   it("forgets it once the caret moves another way", () => {
     const mounted = mount(doc(p(URL), p("after")));
     destroy = () => mounted.view.destroy();
@@ -701,6 +820,48 @@ describe("the pages after many real edits", () => {
         () => (select(), run(lift)),
         () => (select(), run(wrapInList(schema.nodes.bullet_list))),
         () => (select(), run(sinkListItem(schema.nodes.list_item))),
+        // bold over a range, which changes marks only
+        () => {
+          select();
+          const { from } = view.state.selection;
+          const to = Math.min(
+            from + 1 + Math.floor(next() * 20),
+            view.state.doc.content.size,
+          );
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.between(
+                view.state.doc.resolve(from),
+                view.state.doc.resolve(to),
+              ),
+            ),
+          );
+          run(toggleMark(schema.marks.strong));
+        },
+        // an attribute of a block: a table's caption, a heading's level
+        () => {
+          const blocks: number[] = [];
+          view.state.doc.forEach((node, offset) => {
+            if (node.type.name === "table" || node.type.name === "heading")
+              blocks.push(offset);
+          });
+          if (!blocks.length) return;
+          const pos = blocks[Math.floor(next() * blocks.length)];
+          const node = view.state.doc.nodeAt(pos)!;
+          view.dispatch(
+            node.type.name === "table"
+              ? view.state.tr.setNodeAttribute(
+                  pos,
+                  "caption",
+                  `Caption ${Math.floor(next() * 9)}`,
+                )
+              : view.state.tr.setNodeAttribute(
+                  pos,
+                  "level",
+                  1 + Math.floor(next() * 3),
+                ),
+          );
+        },
         () => run(undo),
         () => run(redo),
       ];

@@ -50,6 +50,9 @@ export interface PageRect {
 // the caret, null while the selection isn't empty or a node is selected
 export const pageCaret = shallowRef<PageRect | null>(null);
 
+// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages
+export const pageHeadBox = shallowRef<PageRect | null>(null);
+
 // the selection's rectangles, empty while it is a caret: the text of a
 // range, or the selected cells
 export const pageSelection = shallowRef<PageRect[]>([]);
@@ -65,6 +68,9 @@ export const pageComposition = shallowRef<PageRect[]>([]);
 // where dragged text would drop, which the page view paints as a caret;
 // null while no text is dragged
 export const pageDropCaret = shallowRef<PageRect | null>(null);
+
+// true once the editor shows the text itself, without the layout engine (see useFallbackEditor)
+export const engineMissing = shallowRef(false);
 
 // the page the selection's head is on, counted from 1, and how many there
 // are, for "Page N of M"

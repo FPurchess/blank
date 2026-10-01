@@ -94,12 +94,18 @@ const ROMAN: [number, string][] = [
   [1, "i"],
 ];
 
+// the largest number written in roman numerals, MMMCMXCIX
+export const LARGEST_ROMAN = 3999;
+
 /**
  * formatNumber writes a page number in a style: 4, iv or IV. Roman
- * numerals start at 1, so 0 stays 0, as in Word.
+ * numerals start at 1, so 0 stays 0, as in Word, and end at LARGEST_ROMAN,
+ * after which the number stays arabic, as the layout engine writes it
+ * (src-tauri/layout/src/bands.rs).
  */
 export const formatNumber = (number: number, style: NumberStyle) => {
-  if (style === "1" || number < 1) return String(number);
+  if (style === "1" || number < 1 || number > LARGEST_ROMAN)
+    return String(number);
   let rest = number;
   let roman = "";
   for (const [value, letters] of ROMAN) {

@@ -83,6 +83,9 @@ const onSharedEngine = async ({
   }
 };
 
+// how long a PDF worker may take, in ms
+export const WORKER_TIMEOUT = 60_000;
+
 /**
  * runPdfWorker writes the PDF of a job in a worker of its own
  */
@@ -91,7 +94,10 @@ export const runPdfWorker = (job: PdfJob) =>
     const worker = new Worker(new URL("./pdfWorker.ts", import.meta.url), {
       type: "module",
     });
+    // a worker that hangs, e.g. whose wasm never loads, is given up
+    const timer = setTimeout(() => fail("it took too long"), WORKER_TIMEOUT);
     const fail = (message: string) => {
+      clearTimeout(timer);
       worker.terminate();
       reject(
         new Error(`the page layout failed while writing the PDF: ${message}`),
@@ -100,6 +106,7 @@ export const runPdfWorker = (job: PdfJob) =>
     worker.onmessage = (event: MessageEvent<PdfReply>) => {
       const reply = event.data;
       if ("error" in reply) return fail(reply.error);
+      clearTimeout(timer);
       worker.terminate();
       resolve(reply.result);
     };
@@ -191,12 +198,23 @@ export const describeWarnings = (
   warnings: readonly PdfWarning[],
   nameOf: (src: string) => string = (src) => src,
 ) => {
-  const images = warnings.flatMap((warning) =>
-    warning.kind === "image" ? [nameOf(warning.src)] : [],
-  );
-  const fonts = warnings.flatMap((warning) =>
-    warning.kind === "font" ? [warning.family || "one of Blank's fonts"] : [],
-  );
+  // each named once, e.g. the faces of one family
+  const images = [
+    ...new Set(
+      warnings.flatMap((warning) =>
+        warning.kind === "image" ? [nameOf(warning.src)] : [],
+      ),
+    ),
+  ];
+  const fonts = [
+    ...new Set(
+      warnings.flatMap((warning) =>
+        warning.kind === "font"
+          ? [warning.family || "one of Blank's fonts"]
+          : [],
+      ),
+    ),
+  ];
   const described: string[] = [];
   if (images.length === 1)
     described.push(

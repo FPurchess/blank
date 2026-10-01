@@ -156,3 +156,12 @@ describe("fieldValues", () => {
     ).toMatchObject({ page: "iv", pages: "10", chapter: "" });
   });
 });
+
+describe("roman page numbers", () => {
+  it("end at 3999, after which they're arabic, as the engine writes them", () => {
+    expect(formatNumber(3999, "I")).toBe("MMMCMXCIX");
+    expect(formatNumber(3999, "i")).toBe("mmmcmxcix");
+    expect(formatNumber(4000, "i")).toBe("4000");
+    expect(formatNumber(4000, "I")).toBe("4000");
+  });
+});

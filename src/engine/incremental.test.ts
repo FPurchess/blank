@@ -3,6 +3,7 @@ import {
   lift,
   setBlockType,
   splitBlock,
+  toggleMark,
   wrapIn,
 } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
@@ -208,6 +209,40 @@ describe("incremental layout", () => {
         if (canSplit(tr.doc, from)) tr.split(from);
         ed.apply(tr);
       },
+      // bold over a range, which changes marks only
+      () => {
+        const [from, to] = span();
+        ed.apply(
+          ed.state.tr.setSelection(
+            TextSelection.create(ed.state.doc, from, to),
+          ),
+        );
+        ed.run(toggleMark(schema.marks.strong));
+      },
+      // an attribute of a block: a table's caption, a heading's level
+      () => {
+        const blocks: number[] = [];
+        ed.state.doc.forEach((node, offset) => {
+          if (node.type.name === "table" || node.type.name === "heading")
+            blocks.push(offset);
+        });
+        if (!blocks.length) return;
+        const pos = blocks[Math.floor(next() * blocks.length)];
+        const node = ed.state.doc.nodeAt(pos)!;
+        ed.apply(
+          node.type.name === "table"
+            ? ed.state.tr.setNodeAttribute(
+                pos,
+                "caption",
+                `Caption ${Math.floor(next() * 9)}`,
+              )
+            : ed.state.tr.setNodeAttribute(
+                pos,
+                "level",
+                1 + Math.floor(next() * 3),
+              ),
+        );
+      },
       () => ed.run(undo),
       () => ed.run(redo),
       // the frontmatter, which isn't flattened
@@ -380,6 +415,23 @@ describe("incremental layout", () => {
       expect(type("y")).toEqual([0]);
       vi.useRealTimers();
     });
+  });
+
+  it("lays out marks and attributes, whose steps move nothing", () => {
+    const ed = editor();
+    ed.apply(ed.state.tr.addMark(10, 15, schema.marks.strong.create()));
+    ed.sync();
+    expectFresh(ed);
+    let pos = 0;
+    ed.state.doc.forEach((node, offset) => {
+      if (node.type.name === "table") pos = offset;
+    });
+    ed.apply(ed.state.tr.setNodeAttribute(pos, "caption", "Totals"));
+    ed.sync();
+    expectFresh(ed);
+    ed.run(undo);
+    ed.sync();
+    expectFresh(ed);
   });
 
   it("flattens it all when the changes count from another document", () => {

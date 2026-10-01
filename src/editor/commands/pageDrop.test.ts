@@ -116,6 +116,24 @@ describe("dragging on the pages", () => {
     view.destroy();
   });
 
+  it("shows text from another app where it drops, whatever is selected", () => {
+    const engine = showPages();
+    // a rule selected, whose drop point would be a block boundary
+    let state = EditorState.create({
+      schema,
+      doc: doc(p("hello world"), schema.node("horizontal_rule")),
+    });
+    state = state.apply(
+      state.tr.setSelection(NodeSelection.create(state.doc, 13)),
+    );
+    const view = new EditorView(document.createElement("div"), { state });
+    engine.setSettings(testLayout(), documentFields(view.state.doc));
+    engine.sync(view.state.doc, () => undefined);
+    showDropAt(view, 4, false);
+    expect(pageDropCaret.value).toEqual(engine.caret(4));
+    view.destroy();
+  });
+
   it("puts text dropped from another app where it's dropped", () => {
     // what ProseMirror's paste makes, which jsdom lacks
     vi.stubGlobal("ClipboardEvent", class extends Event {});

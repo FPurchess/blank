@@ -83,6 +83,17 @@ describe("writePdf", () => {
     expect(result.warnings).toEqual([{ kind: "image", src: "x.png" }]);
   });
 
+  it("tells what trapped, not that the trapped engine couldn't be freed", () => {
+    testEngine();
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(() => {
+      throw new WebAssembly.RuntimeError("unreachable");
+    });
+    vi.spyOn(LayoutEngine.prototype, "free").mockImplementationOnce(() => {
+      throw new Error("recursive use of an object");
+    });
+    expect(() => writePdf(LayoutEngine, jobOf().job)).toThrow("unreachable");
+  });
+
   it("tells which characters no font has", () => {
     testEngine();
     const { job } = jobOf(doc(p("中文")));

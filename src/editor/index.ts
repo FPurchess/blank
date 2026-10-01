@@ -102,6 +102,8 @@ export const bootEditor = async () => {
   transaction.value = view.state.tr;
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
+    // unless the editor is gone by then, e.g. at the end of a test
+    if (typeof document === "undefined" || !view.dom.isConnected) return;
     if (!view.hasFocus()) view.focus();
   }, 100);
   return editor.handle;

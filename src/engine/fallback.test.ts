@@ -89,6 +89,30 @@ describe("fallback fonts", () => {
     expect(invoke).toHaveBeenCalledTimes(1);
   });
 
+  it("looks again for characters in another language", async () => {
+    await findFonts("中", "zh");
+    expect(await findFonts("中", "zh")).toEqual([]);
+    vi.mocked(invoke).mockResolvedValue([
+      { family: "Noto Sans CJK JP", path: "/fonts/cjk-jp.ttc" },
+    ]);
+    const found = await findFonts("中", "ja");
+    expect(found.map((font) => font.family)).toEqual(["Noto Sans CJK JP"]);
+    expect(invoke).toHaveBeenLastCalledWith("fallback_fonts", {
+      text: "中",
+      language: "ja",
+    });
+  });
+
+  it("reads a system font once for lookups that overlap", async () => {
+    // other characters of the same script, looked for at the same time
+    await Promise.all([findFonts("中", "zh"), findFonts("文", "zh")]);
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(fallbackFonts.value.map((font) => font.family)).toEqual([
+      "Noto Sans CJK SC",
+      "Noto Sans CJK SC",
+    ]);
+  });
+
   it("goes on without what it can't find or read", async () => {
     vi.mocked(invoke).mockRejectedValue(new Error("no fonts"));
     vi.mocked(fetch).mockRejectedValue(new Error("offline"));

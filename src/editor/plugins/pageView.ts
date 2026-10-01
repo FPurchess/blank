@@ -8,6 +8,16 @@ import {
   type Transaction,
 } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
+import {
+  AddMarkStep,
+  AddNodeMarkStep,
+  AttrStep,
+  DocAttrStep,
+  RemoveMarkStep,
+  RemoveNodeMarkStep,
+  ReplaceAroundStep,
+  ReplaceStep,
+} from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 import { computed, watch } from "vue";
 
@@ -24,7 +34,12 @@ import {
   pageBoxInWindow,
   viewBox,
 } from "../../engine/geometry";
-import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
+import {
+  forgetFailures,
+  forgetImages,
+  imageSizes,
+  loadedImages,
+} from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
@@ -46,6 +61,7 @@ import {
   language,
   pageCaret,
   pageComposition,
+  pageHeadBox,
   pageFields,
   pageLayout,
   pageLayoutState,
@@ -99,7 +115,12 @@ export const selectionAt = (
   if (anchor !== undefined) {
     // from one cell of a table into another selects whole cells, as a drag
     // or Shift + arrow keys did in the editor before the page view
-    const $anchorCell = cellAround(doc.resolve(anchor));
+    // a cell selection grows from the cell it started in
+    const { selection } = state;
+    const $anchorCell =
+      selection instanceof CellSelection && anchor === selection.anchor
+        ? selection.$anchorCell
+        : cellAround(doc.resolve(anchor));
     const $headCell = cellAround(doc.resolve(pos));
     if (
       $anchorCell &&
@@ -128,7 +149,7 @@ const hasProperties = computed(() => summarize(frontmatter.value) !== null);
 const publishLayout = (engine: PageEngine) => {
   const { layout } = pageLayout.value;
   const { width, height, margins } = pageGeometry(layout);
-  pageLayoutState.value = {
+  const state = {
     width,
     height,
     margins,
@@ -141,6 +162,8 @@ const publishLayout = (engine: PageEngine) => {
     // the header's left, center and right slots of the first page
     header: engine.bands(0).slice(0, 3).some(Boolean),
   };
+  // an engine that failed while it was asked has given up, and shows nothing
+  if (!engine.broken) pageLayoutState.value = state;
 };
 
 /**
@@ -160,6 +183,16 @@ const publishSelection = (
   pageSelection.value = shown.rects;
   pageNodeSelection.value = shown.nodes;
   const head = shown.caret ?? engine.caret(selection.head, after);
+  const now = pageHeadBox.value;
+  if (
+    !head ||
+    !now ||
+    head.page !== now.page ||
+    head.x !== now.x ||
+    head.y !== now.y ||
+    head.height !== now.height
+  )
+    pageHeadBox.value = head;
   if (scroll && head)
     pageScrollRequest.value = at === undefined ? { ...head } : { ...head, at };
 };
@@ -284,12 +317,29 @@ export const trackChanges = (
     tr.mapping.map(from, -1),
     tr.mapping.map(to, 1),
   ]);
-  tr.mapping.maps.forEach((map, index) => {
+  for (const [index, step] of tr.steps.entries()) {
     const rest = tr.mapping.slice(index + 1);
-    map.forEach((_oldStart, _oldEnd, start, end) => {
+    const add = (start: number, end: number) =>
       ranges.push([rest.map(start, -1), rest.map(end, 1)]);
-    });
-  });
+    // steps that change marks or attributes move nothing, so their maps
+    // are empty; what they changed is their own range
+    if (step instanceof AddMarkStep || step instanceof RemoveMarkStep)
+      add(step.from, step.to);
+    else if (
+      step instanceof AttrStep ||
+      step instanceof AddNodeMarkStep ||
+      step instanceof RemoveNodeMarkStep
+    )
+      add(step.pos, step.pos + 1);
+    else if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep)
+      step
+        .getMap()
+        .forEach((_oldStart, _oldEnd, start, end) => add(start, end));
+    // the frontmatter, which the settings bring
+    else if (step instanceof DocAttrStep) continue;
+    // a step it doesn't know: the whole document is flattened again
+    else return { from: null, ranges: [] };
+  }
   return { from: base.from, ranges: merged(ranges) };
 };
 
@@ -344,6 +394,9 @@ export const pageSync = () => {
       },
     },
     view(view) {
+      // a new document, whose images are its own: another folder's img.png
+      // may be another picture, or changed on disk since
+      forgetImages();
       // the widths kept of the table the cursor is in, for this view's
       // document only: a new document gets a new view
       let frozen: FrozenWidths | null = null;
@@ -360,6 +413,7 @@ export const pageSync = () => {
         engine = null;
         pageLayoutState.value = null;
         pageCaret.value = null;
+        pageHeadBox.value = null;
         pageSelection.value = [];
         pageNodeSelection.value = [];
         pageComposition.value = [];
@@ -370,7 +424,7 @@ export const pageSync = () => {
         // chunk at a time, which each shows as it comes
         ready.onProgress = () => {
           publishLayout(ready);
-          publishSelection(ready, view.state, false);
+          if (!ready.broken) publishSelection(ready, view.state, false);
         };
         sync(ready, view.state, frozen, { progressive: true });
         // an engine that fails on the document gives up before it watches
@@ -401,9 +455,14 @@ export const pageSync = () => {
               );
               // the page setup and the fields follow the transaction being
               // dispatched, which the view doesn't have yet: its update lays
-              // out once, with them
+              // out once, with them. Once the view has it, and the
+              // transactions appended to it, a change is laid out here.
               const pending = transaction.value;
-              if (!fresh.size && pending && pending.doc !== view.state.doc)
+              if (
+                !fresh.size &&
+                pending?.docChanged &&
+                pending.before === view.state.doc
+              )
                 return;
               const blocks = fresh.size
                 ? imageBlocks(view.state.doc, fresh)
@@ -550,9 +609,9 @@ export const pageView = () => {
           return false;
         const { selection } = view.state;
         const down = VERTICAL[event.key];
-        // prosemirror-tables' tableEditing grows a cell selection by cells
-        if (down !== undefined && selection instanceof CellSelection)
-          return false;
+        // prosemirror-tables' tableEditing grows a cell selection by
+        // cells; the other keys leave it to the editor
+        if (selection instanceof CellSelection) return false;
         const after = headAfter(view.state);
         if (down !== undefined) {
           const caret = engine.caret(selection.head, after);
