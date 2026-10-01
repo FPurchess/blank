@@ -457,11 +457,15 @@ export const pageSync = () => {
               // dispatched, which the view doesn't have yet: its update lays
               // out once, with them. Once the view has it, and the
               // transactions appended to it, a change is laid out here.
+              // So does a document on its way to the editor (applyDocument),
+              // whose new plugin view lays it out.
               const pending = transaction.value;
               if (
                 !fresh.size &&
-                pending?.docChanged &&
-                pending.before === view.state.doc
+                pending &&
+                (pending.docChanged
+                  ? pending.before === view.state.doc
+                  : pending.doc !== view.state.doc)
               )
                 return;
               const blocks = fresh.size

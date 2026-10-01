@@ -61,6 +61,7 @@ import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 import { applyDocument } from "../document";
+import * as flattening from "../../engine/flatten";
 import { tableGrid } from "../../exporters/table";
 
 const LONG =
@@ -645,6 +646,31 @@ describe("laying out a keystroke", () => {
     expect(view.state.doc.firstChild!.textContent).toBe("Titleabcde");
     expect(perfSamples().layout).toHaveLength(5);
     view.destroy();
+  });
+});
+
+describe("opening another document", () => {
+  afterEach(() => {
+    hidePages();
+    transaction.value = null;
+    path.value = null;
+  });
+
+  it("lays out only the new document, with its path", () => {
+    showPages();
+    const mounted = mount(doc(p("the old document"), p(LONG)));
+    const flattened = vi.spyOn(flattening, "flattenBlocks");
+    const opened = doc(p("the new document"));
+
+    const next = applyDocument(mounted.view.state, opened, "/docs/new.md");
+    expect(flattened).not.toHaveBeenCalled();
+
+    mounted.view.updateState(next);
+    expect(flattened).toHaveBeenCalled();
+    expect(
+      flattened.mock.calls.every(([laidOut]) => laidOut === next.doc),
+    ).toBe(true);
+    mounted.view.destroy();
   });
 });
 
