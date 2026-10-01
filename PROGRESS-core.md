@@ -41,7 +41,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `engine/navigate.rs`: `Hit`, positions, caret, hit, word, vertical, line edges
   - `engine/select.rs`: selection, boxes, page spans, `table_grid`
   - `engine/display.rs`: `Op`, `page_ops`, the bands' boxes
-  - `engine/text_layer.rs`: `Word`, `lines`, `words`
+  - `engine/text_layer.rs`: `Word`, `words` (it also had `lines`, removed in task 17)
   - `engine/test_support.rs`: the builders the tests share
 - Every test now sits next to the code it tests.
 - `items.rs` is split into `items/mod.rs` and `items/table.rs` (the table layout).

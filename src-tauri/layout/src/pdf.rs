@@ -154,8 +154,9 @@ pub enum Warning {
     /// an image, by its src, that couldn't be decoded: its alt text is in
     /// its place
     Image(String),
-    /// a font, by its index in `Fonts::files`, that couldn't be embedded:
-    /// the text set in it is left out
+    /// a font, by its font index (a face in `Fonts::files`, or an instance
+    /// of a variable one from `INSTANCE_BASE` on), that couldn't be
+    /// embedded: the text set in it is left out
     Font(usize),
 }
 
