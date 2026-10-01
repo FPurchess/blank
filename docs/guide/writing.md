@@ -23,7 +23,7 @@ Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
 
 Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` and plain URLs become formatting once you finish the word. See [Autocorrect](./autocorrect) for everything Blank corrects.
 
-Code is set in IBM Plex Mono, on the screen and in the PDF. `Mod` + Click opens a link. Emoji show in black and white, in the colour of your text, and Chinese, Japanese, Korean and other scripts in the fonts your computer has for them, so they look on paper as they do on the screen. A word too long for the line, like a long web address, continues on the next one.
+Code is set in IBM Plex Mono. `Mod` + Click on a link opens it in your browser. Emoji appear in black and white, in the colour of your text. Chinese, Japanese, Korean and other scripts use the fonts your computer has for them. Whatever you write, it looks on paper just as it does on the screen, and a word too long for its line, like a long web address, simply carries on to the next one.
 
 ## Tables
 

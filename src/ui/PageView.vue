@@ -27,19 +27,37 @@ import { pageEngine } from "../engine/engine";
 import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
+  engineMissing,
   pageCaret,
   pageLayoutState,
   pageScrollRequest,
+  type PageScrollRequest,
+  pageSelection,
   pageView,
   pageViewport,
 } from "../state";
+import PageFirstHeader from "./PageFirstHeader.vue";
 import PageFrame from "./PageFrame.vue";
 import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
-import { frameLayout, keptRange, onDesk, visibleRange } from "../engine/frames";
-import { scrollFor } from "./pageViewModel";
+import {
+  type Frame,
+  frameLayout,
+  keptRange,
+  onDesk,
+  visibleRange,
+} from "../engine/frames";
+import { pageBitmaps } from "./pageBitmaps";
+import { layerVersions } from "./pageLayers";
+import {
+  anchorTop,
+  movesPages,
+  scrollFor,
+  selectedOn,
+  viewAnchor,
+} from "./pageViewModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -125,20 +143,74 @@ const inView = computed(() =>
     : "",
 );
 
+// a frame as a page frame shows it, all plain values
+type ShownFrame = Frame & {
+  bodyVersion: number;
+  bandVersion: number;
+  nextBandVersion: number;
+  near: boolean;
+  selected: string;
+};
+// the frames shown before, by page, reused while their values stay the
+// same, so a sync that changed one page makes no new objects for the others
+let shownFrames = new Map<number, ShownFrame>();
+const sameFrame = (a: ShownFrame, b: ShownFrame) =>
+  (Object.keys(a) as (keyof ShownFrame)[]).every((key) => a[key] === b[key]);
+
 const frames = computed(() => {
   const state = pageLayoutState.value;
-  if (!layout.value || !state || !range.value) return [];
+  if (!layout.value || !state || !range.value)
+    return ((shownFrames = new Map()), []);
   const [first, last] = range.value.split("-").map(Number);
   const [shownFirst, shownLast] = inView.value
     ? inView.value.split("-").map(Number)
     : [Infinity, -Infinity];
-  return layout.value.frames.slice(first, last + 1).map((frame) => ({
-    ...frame,
-    version: state.versions[frame.page] ?? 0,
-    near: frame.page < shownFirst || frame.page > shownLast,
-    nextVersion:
-      frame.page + 1 < state.pages ? (state.versions[frame.page + 1] ?? 0) : -1,
-  }));
+  const versions = layerVersions(state);
+  const next = new Map<number, ShownFrame>();
+  const list = layout.value.frames.slice(first, last + 1).map((frame) => {
+    const made: ShownFrame = {
+      ...frame,
+      bodyVersion: versions.body[frame.page] ?? 0,
+      bandVersion: versions.bands[frame.page] ?? 0,
+      nextBandVersion:
+        frame.page + 1 < state.pages
+          ? (versions.bands[frame.page + 1] ?? 0)
+          : -1,
+      near: frame.page < shownFirst || frame.page > shownLast,
+      // painted over the text while the editor has the focus, and dimmed
+      // under it without (PageOverlay.vue)
+      selected: focused.value
+        ? selectedOn(pageSelection.value, frame.page)
+        : "",
+    };
+    const before = shownFrames.get(frame.page);
+    const shown = before && sameFrame(before, made) ? before : made;
+    next.set(frame.page, shown);
+    return shown;
+  });
+  shownFrames = next;
+  return list;
+});
+
+// whether the editor has the focus: the caret shows then, and the selection
+// is painted over the text; without it the selection dims, as the
+// webview's own does. A test view has no DOM.
+const dom = editor.view.dom as HTMLElement | undefined;
+const focused = shallowRef(!dom || document.activeElement === dom);
+const onFocus = () => (focused.value = true);
+const onBlur = () => (focused.value = false);
+onMounted(() => {
+  dom?.addEventListener("focus", onFocus);
+  dom?.addEventListener("blur", onBlur);
+});
+onUnmounted(() => {
+  dom?.removeEventListener("focus", onFocus);
+  dom?.removeEventListener("blur", onBlur);
+});
+
+// without the engine no page is shown again: what was kept of them goes
+watch(engineMissing, (missing) => {
+  if (missing) pageBitmaps.clear();
 });
 
 // the device's pixels per CSS pixel, which the pages are painted at, e.g.
@@ -175,23 +247,40 @@ onUnmounted(() => {
 });
 listenOnWindow("resize", () => measure());
 
-// the view keeps its place on the page when it switches or resizes
-watch(pageView, async () => {
-  await nextTick();
-  scrollToCaret(true);
+// the view keeps the spot of the page at its top when it switches, when a
+// resize shows the pages at another scale, or when the room above the first
+// page changes, e.g. for its header. Before the new layout renders,
+// so the scroll is still the one the old layout was shown at; typing lays
+// out anew on every key, but keeps the view and the scale.
+watch(layout, (next, previous) => {
+  const element = scroller.value;
+  if (!element || !next || !previous) return;
+  if (!movesPages(next, previous)) return;
+  const anchor = viewAnchor(previous, element.scrollTop);
+  const top = anchor && anchorTop(next, anchor);
+  if (top === null) return;
+  // the render that follows already shows the pages there, rather than
+  // those at the old scroll in the new layout
+  scrollTop.value = top;
+  void nextTick(() => {
+    if (!scroller.value) return;
+    scroller.value.scrollTop = top;
+    measure(false);
+  });
 });
 
-const scrollToCaret = (center = false) => {
+/**
+ * serve brings the spot a request asks for into view, as it asks: that far
+ * below the top of the view, or just into it
+ */
+const serve = (request: PageScrollRequest) => {
   const element = scroller.value;
-  const request = pageScrollRequest.value ?? pageCaret.value;
-  if (!element || !layout.value || !request) return;
+  if (!element || !layout.value) return;
   const rect = onDesk(layout.value, { ...request, width: 0 });
   if (!rect) return;
-  const at = pageScrollRequest.value?.at;
-  const target = center
-    ? Math.max(0, rect.top - element.clientHeight / 2)
-    : at !== undefined
-      ? Math.max(0, rect.top - at)
+  const target =
+    request.at !== undefined
+      ? Math.max(0, rect.top - request.at)
       : scrollFor(rect, element.scrollTop, element.clientHeight);
   if (target !== null && target !== element.scrollTop) {
     element.scrollTop = target;
@@ -199,12 +288,27 @@ const scrollToCaret = (center = false) => {
   }
 };
 
-watch(pageScrollRequest, () => scrollToCaret(), { flush: "post" });
+// a request is served once, and then cleared, so an old one never moves the
+// view again, e.g. after a click far from it
+watch(
+  pageScrollRequest,
+  (request) => {
+    if (!request) return;
+    serve(request);
+    pageScrollRequest.value = null;
+  },
+  { flush: "post" },
+);
 
-// the hidden editor's caret follows the painted one, for the IME's window
+// the head of the selection, where the caret is or a range ends
+const headBox = () =>
+  pageCaret.value ?? pageEngine?.caret(editor.state.value.selection.head);
+
+// the hidden editor's caret follows the painted one, for the IME's window,
+// or the head of a range
 const align = () => {
   const element = scroller.value;
-  const caret = pageCaret.value;
+  const caret = headBox();
   if (!element || !layout.value || !caret) return;
   const rect = onDesk(layout.value, { ...caret, width: 0 });
   if (!rect) return;
@@ -276,6 +380,9 @@ const pointerAt = (event: MouseEvent): PagePointer => {
   };
 };
 
+// the headers and footers on the pages, which open their strips
+const BANDS = ".page-band, .page-end .band, .page-first-header";
+
 let anchor: number | null = null;
 // the last point of a drag, in the window, for scrolling at the edges
 let dragAt: { x: number; y: number } | null = null;
@@ -291,6 +398,9 @@ const onMouseDown = (event: MouseEvent) => {
     return;
   }
   if (event.button !== 0) return;
+  // a header or footer opens on a double click, and a press on it leaves
+  // the selection where it is
+  if ((event.target as Element).closest?.(BANDS)) return;
   // a press in the selected text may move it, see onPointerDown
   if (move.mouseDown(event, false)) return;
   const { x, y } = deskPoint(event.clientX, event.clientY);
@@ -300,9 +410,6 @@ const onMouseDown = (event: MouseEvent) => {
   });
   dragAt = { x: event.clientX, y: event.clientY };
 };
-
-// the headers and footers on the pages, which open their strips
-const BANDS = ".page-band, .page-end .band, .page-first-header";
 
 // moving the selected text to another place, see src/editor/pageMove.ts
 const move = pageMove({
@@ -380,9 +487,9 @@ const onModifier = (event: KeyboardEvent) => {
 listenOnWindow("keydown", onModifier);
 listenOnWindow("keyup", onModifier);
 
+// Blank's menu, with Shift too: the webview's own has Back and Reload on the
+// pages, which src/nativeMenu.ts keeps away
 const onContextMenu = (event: MouseEvent) => {
-  // Shift keeps the webview's menu, e.g. for system services
-  if (event.shiftKey) return;
   event.preventDefault();
   sendPagePointer(editor.view, PAGE_MENU, pointerAt(event));
 };
@@ -459,12 +566,35 @@ onUnmounted(() => {
       class="page-desk"
       :style="{ height: `${layout.height}px` }"
     >
+      <!-- the sheets, then the selection, then the text painted on them,
+      which is transparent but for the text -->
+      <template v-if="layout.mode === 'pages'">
+        <div
+          v-for="frame in frames"
+          :key="frame.page"
+          class="page-sheet"
+          :style="{
+            top: `${frame.top}px`,
+            left: `${frame.left}px`,
+            width: `${frame.width}px`,
+            height: `${frame.height}px`,
+          }"
+        />
+      </template>
+      <PageOverlay
+        :layout="layout"
+        layer="under"
+        :ratio="ratio"
+        :focused="focused"
+      />
       <PageFrame
         v-for="frame in frames"
         :key="frame.page"
         :page="frame.page"
-        :version="frame.version"
-        :next-version="frame.nextVersion"
+        :body-version="frame.bodyVersion"
+        :band-version="frame.bandVersion"
+        :next-band-version="frame.nextBandVersion"
+        :selected="frame.selected"
         :top="frame.top"
         :left="frame.left"
         :width="frame.width"
@@ -477,7 +607,13 @@ onUnmounted(() => {
         :ratio="ratio"
       />
       <PageMarks :layout="layout" :pages="shownPages" />
-      <PageOverlay :layout="layout" />
+      <PageOverlay
+        :layout="layout"
+        layer="over"
+        :ratio="ratio"
+        :focused="focused"
+      />
+      <PageFirstHeader :layout="layout" />
       <PageProperties :layout="layout" />
     </div>
   </div>

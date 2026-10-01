@@ -4,11 +4,13 @@ import path from "node:path";
 
 import { $, expect } from "@wdio/globals";
 
-import { expectEditorText, restartApp } from "../helpers.ts";
+import { expectEditorText, restartApp, waitForInk } from "../helpers.ts";
 
 describe("launch", () => {
   it("shows the welcome document", async () => {
     await expectEditorText("#editor h1", "Welcome to Blank");
+    // and painted on the pages
+    await waitForInk("Welcome to Blank");
   });
 
   it("shows an untitled document", async () => {

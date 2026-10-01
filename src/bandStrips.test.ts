@@ -13,6 +13,7 @@ import {
   bandEditor,
   type BandEditorRequest,
   contextMenu,
+  engineMissing,
   type MenuItem,
   transaction,
 } from "./state";
@@ -127,6 +128,38 @@ describe("band strips", () => {
       // only offers to add a footer
       expect(edge("header").hidden).toBe(true);
       expect(edge("footer").hidden).toBe(false);
+    });
+
+    it("shows the header at the edge when there are no pages to show it", () => {
+      // without the layout engine from the start, the editor shows the text
+      // itself
+      dispose();
+      document.body.classList.add("without-engine");
+      try {
+        dispose = bootBandStrips(editor);
+        publish('page:\n  header: { left: "{title}" }');
+        expect(edge("header").hidden).toBe(false);
+        expect(edge("header").querySelector(".band-line")!.textContent).toBe(
+          "Report",
+        );
+        // it hides while its strip is open
+        open();
+        expect(edge("header").hidden).toBe(true);
+      } finally {
+        document.body.classList.remove("without-engine");
+      }
+    });
+
+    it("shows the header at the edge once the engine fails", () => {
+      publish('page:\n  header: { left: "{title}" }');
+      expect(edge("header").hidden).toBe(true);
+      try {
+        engineMissing.value = true;
+        expect(edge("header").hidden).toBe(false);
+      } finally {
+        engineMissing.value = false;
+      }
+      expect(edge("header").hidden).toBe(true);
     });
 
     it("shows a band only the first or even pages have", () => {

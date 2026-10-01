@@ -4,7 +4,18 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  inkPrint,
+  Key,
+  lineBox,
+  luminance,
+  pressMod,
+  restartApp,
+  screenStats,
+  type,
+  waitForInk,
+  waitForRepaint,
+} from "../helpers.ts";
 
 // The page view the layout engine paints: typing and clicking on the
 // painted pages, both views, "Page N of M", and how long it all takes.
@@ -134,17 +145,26 @@ describe("page view", () => {
     await browser.saveScreenshot(path.join(SHOTS, "engine-page-ends.png"));
 
     // left of the first paragraph, below the heading: its start
+    const line = await lineBox("Writing is thinking");
+    // painted once already, so only the edit changes it
+    await waitForInk(line);
+    const before = await inkPrint(line);
     await clickOnPage(1, 20, 58);
     await type("xyz ");
+    // the line is painted again, not only laid out
+    await waitForRepaint(line, before);
     await expect(
       browser.execute(
         () => document.querySelector("#editor p")?.textContent ?? "",
       ),
     ).resolves.toMatch(/^xyz Writing/i);
+    // what was typed is painted (autocorrect made it "Xyz")
+    await waitForInk("yz");
     await browser.saveScreenshot(path.join(SHOTS, "engine-typed.png"));
 
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("pages");
+    await waitForInk("yz");
     await browser.saveScreenshot(path.join(SHOTS, "engine-pages.png"));
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("page-ends");
@@ -302,6 +322,49 @@ describe("page view", () => {
         path.join(SHOTS, `engine-theme-${theme}.png`),
       );
     }
+    // on the sheets, the desk is a shade darker than the paper in every
+    // theme, dark ones too
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    for (let index = 0; index < 6; index++) {
+      await pressMod(Key.Alt, "t");
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      const theme = await browser.execute(() => document.body.dataset.theme);
+      const sheet = await browser.execute(() =>
+        document
+          .querySelector("#page-view .page-sheet")!
+          .getBoundingClientRect()
+          .toJSON(),
+      );
+      // a spot of the sheet in the window, below its top margin's header
+      const middle = Math.round(
+        Math.min(Math.max(sheet.top + 120, 120), sheet.bottom - 80, 480),
+      );
+      const desk = await screenStats({
+        left: 2,
+        right: Math.max(4, sheet.left - 4),
+        top: middle,
+        bottom: middle + 40,
+      });
+      // the margin left of the text
+      const paper = await screenStats({
+        left: sheet.left + 8,
+        right: sheet.left + 40,
+        top: middle,
+        bottom: middle + 40,
+      });
+      if (!(luminance(desk.background) < luminance(paper.background)))
+        throw new Error(
+          `in ${theme} the desk ${desk.background} isn't darker than the paper ${paper.background}`,
+        );
+      await browser.saveScreenshot(
+        path.join(SHOTS, `engine-sheets-${theme}.png`),
+      );
+    }
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
     // the summary opens the page setup
     await $("#page-view .doc-properties").click();
     await expect($("#page-setup")).toBeDisplayed();
@@ -382,13 +445,16 @@ describe("page view", () => {
     await browser.saveScreenshot(path.join(SHOTS, "engine-coverage.png"));
   });
 
-  // two chapters of four paragraphs fill about a page
+  const TYPED = "the quick brown fox jumps over the lazy dog ";
+  // about two chapters of four paragraphs fill a page
   for (const [name, chapters] of [
     ["1", 1],
-    ["20", 40],
-    ["100", 200],
+    ["40", 80],
+    ["200", 400],
   ] as const) {
-    it(`measures typing on about ${name} pages`, async () => {
+    it(`measures typing on about ${name} pages`, async function () {
+      // a long document takes a while to open
+      this.timeout(240_000);
       const file = path.join(dir, `long-${name}.md`);
       fs.writeFileSync(
         file,
@@ -405,7 +471,18 @@ describe("page view", () => {
           window as unknown as { blankBootTimes: () => Record<string, number> }
         ).blankBootTimes(),
       );
-      const pages = await $("#ui-page-number").getText();
+      // a long document is laid out a chunk at a time: until its last page
+      let pages = "";
+      await browser.waitUntil(
+        async () => {
+          const now = await $("#ui-page-number").getText();
+          await browser.pause(1000);
+          const settled = now === pages;
+          pages = now;
+          return settled;
+        },
+        { timeout: 120_000, interval: 0 },
+      );
       await clickOnPage(1, 44, 58);
       await browser.execute(() =>
         (
@@ -415,7 +492,7 @@ describe("page view", () => {
         ).blankPageViewPerf(true),
       );
       await startLatency();
-      await type("the quick brown fox jumps over the lazy dog ");
+      await type(TYPED);
       await browser.executeAsync((done: () => void) => setTimeout(done, 300));
       const perf = (await browser.execute(() =>
         (
@@ -445,6 +522,9 @@ describe("page view", () => {
         paint: summary(perf.paint),
       };
       console.log(`MEASURE ${name}: ${JSON.stringify(result)}`);
+      // typing on the first page paints that page, not the others: about a
+      // paint a key, and a few more where the text first changes
+      expect(perf.paint.length).toBeLessThanOrEqual(TYPED.length + 4);
       fs.appendFileSync(
         path.join(SHOTS, "engine-measurements.jsonl"),
         JSON.stringify({ name, ...result }) + "\n",

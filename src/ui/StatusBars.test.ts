@@ -118,6 +118,8 @@ describe("language chooser", () => {
     expect([...footer.children].map((child) => child.id)).toEqual([
       "ui-stats",
       "ui-announcement",
+      // the page of the caret, read out when it changes, not shown
+      "ui-page-spoken",
       "ui-page",
       "ui-spellcheck",
       "ui-language",

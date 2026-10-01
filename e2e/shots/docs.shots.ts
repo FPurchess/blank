@@ -545,6 +545,20 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "even-pages.gif"), 545);
   });
 
+  it("records switching between page ends and pages", async () => {
+    const film = await filmNew();
+    await film.type("The lighthouse keeper wrote every evening.");
+    await film.enter(0.4);
+    await film.type("The first page ends here.");
+    await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.8);
+    await film.type("And the next one starts.");
+    await film.pause(0.8);
+    await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1.8);
+    await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1.6);
+    await film.pause(1);
+    film.save(path.join(outDir, "page-views.gif"), 545);
+  });
+
   it("captures a page break", async () => {
     await pressMod("n");
     await type("the end of the first chapter.");
@@ -753,10 +767,19 @@ describe("docs screenshots", () => {
     await film.moveTo({ x: table.left, y: middle(table.rows, 3) }, 0.4);
     await film.drag({ x: table.left, y: table.rows[1] + 4 }, 0.9);
 
-    // the + between two rows inserts one, which gets filled
+    // the + between two rows inserts one, which gets filled: it shows
+    // while the pointer is over the table, near the line
     table = await layout();
-    await film.moveTo({ x: table.left + 1, y: Math.round(table.rows[3]) }, 0.7);
-    await film.click(0.6);
+    await film.moveTo(
+      { x: table.left + 40, y: Math.round(table.rows[3]) + 8 },
+      0.5,
+    );
+    await film.moveTo(
+      { x: table.left + 1, y: Math.round(table.rows[3]) + 1 },
+      0.5,
+    );
+    await $("#table-handles .insert").waitForDisplayed();
+    await film.clickOn($("#table-handles .insert"), 0.6);
     await film.hidePointer();
     await film.type("Plums");
     await film.press("Tab", Key.Tab, 0.3);

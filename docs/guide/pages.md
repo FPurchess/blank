@@ -4,10 +4,12 @@ Your PDF and Word documents come out on the paper of your region, A4 or Letter, 
 
 ## Your pages on the screen {#on-the-screen}
 
-Blank shows your text the way it prints: every line and every page ends on the screen exactly where it ends in the PDF. There are two ways to look at it, and `Mod` `Alt` `V` switches between them:
+Blank shows your text the way it prints: every line and every page ends on the screen exactly where it ends in the PDF. (A Word document is laid out by Word, so its lines can end elsewhere.) There are two ways to look at it, and `Mod` `Alt` `V` switches between them, keeping your place:
 
-- **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where a page ends, a dashed line shows the page's number and footer, and the header of the page that follows.
+- **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where a page ends, a dashed line shows the page's number and footer, and the header of the page that follows. The first page's header sits above your text.
 - **Pages**: the sheets themselves, one below the other, with their margins, headers, footers and page numbers in place.
+
+<img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
 
 Blank remembers your choice. The bar at the bottom tells you which page you're on, like _Page 3 of 12_. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
 
@@ -43,7 +45,7 @@ For more, point at the top or bottom edge and click **+ Header** or **+ Footer**
 
 <img class="shot" src="/screenshots/header-footer.gif" alt="A click on Page numbers at the bottom edge numbers the pages; Mod Alt H opens the header, where Chapter goes on the left, Page 3 of 12 on the right, and First Page None leaves the title page plain" />
 
-`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** where each page ends. A click on a header or footer there, or on a sheet's top or bottom margin, opens it again, and `Mod` `Z` in your text undoes the whole change.
+`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page and where each page ends. Double-click a header or footer there, or a sheet's top or bottom margin, to open it again. `Mod` `Z` in your text undoes the whole change.
 
 ### The first page and even pages {#first-and-even-pages}
 

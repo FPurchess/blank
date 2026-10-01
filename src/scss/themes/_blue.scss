@@ -2,6 +2,17 @@
   --color: #fbc572;
   --background-color: #25324c;
   --spelling-color: #ff8585;
+  // the selection on the pages and the selected text over it, and the
+  // selection dimmed under the text while the editor hasn't the focus (see
+  // src/scss/themes.test.ts)
+  --selection-color: #7c9bcc;
+  --selection-text-color: #25324c;
+  --selection-inactive-color: #4b6083;
+  // the desk the sheets of "pages" lie on, a shade darker the paper, and the
+  // sheets' edge and shadow, in black
+  --desk-color: #182031;
+  --sheet-edge: rgba(0, 0, 0, 0.45);
+  --sheet-shadow: rgba(0, 0, 0, 0.3);
   --color-inverted: #25324c;
   --background-inverted: #fbc572;
   --font-family:

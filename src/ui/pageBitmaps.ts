@@ -4,13 +4,10 @@
 // frame, which paints the pages in view first and those just outside it after
 // them, within a budget per frame.
 
-export interface Bitmap {
-  // what the bitmap holds, e.g. drawn with drawImage
-  image: CanvasImageSource;
-  width: number;
-  height: number;
-  close?: () => void;
-}
+import type { Snapshot } from "./painter";
+
+// a painted page, as the painter keeps it
+export type Bitmap = Snapshot;
 
 /**
  * BitmapCache keeps the painted pages by what they show, the least recently
@@ -19,6 +16,9 @@ export interface Bitmap {
 export class BitmapCache {
   private bitmaps = new Map<string, Bitmap>();
   private bytes = 0;
+  // the key each slot holds, e.g. a page's text at a scale, whose older
+  // bitmap no page shows any more once it holds a newer one
+  private slots = new Map<string, string>();
 
   constructor(private limit: number) {}
 
@@ -32,14 +32,21 @@ export class BitmapCache {
     return bitmap;
   }
 
-  set(key: string, bitmap: Bitmap) {
+  /**
+   * set keeps `bitmap` by `key`, in place of what `slot` held before
+   */
+  set(key: string, bitmap: Bitmap, slot?: string) {
+    if (slot !== undefined) {
+      const before = this.slots.get(slot);
+      if (before !== undefined && before !== key) this.delete(before);
+      this.slots.set(slot, key);
+    }
     this.delete(key);
     this.bitmaps.set(key, bitmap);
     this.bytes += bitmap.width * bitmap.height * 4;
-    for (const [oldest, old] of this.bitmaps) {
+    for (const oldest of this.bitmaps.keys()) {
       if (this.bytes <= this.limit || oldest === key) break;
       this.delete(oldest);
-      void old;
     }
   }
 
@@ -53,10 +60,16 @@ export class BitmapCache {
 
   clear() {
     for (const key of [...this.bitmaps.keys()]) this.delete(key);
+    this.slots.clear();
   }
 
   get size() {
     return this.bitmaps.size;
+  }
+
+  // the keys of what it keeps, the least recently used first
+  keys() {
+    return this.bitmaps.keys();
   }
 
   get used() {
@@ -132,7 +145,12 @@ export class PaintQueue {
       const urgent = inFrame && job.priority < this.urgent;
       if (!urgent && this.scheduler.now() - start > FRAME_BUDGET) break;
       this.jobs.delete(job.key);
-      job.run();
+      // one that fails leaves the others to paint
+      try {
+        job.run();
+      } catch (error) {
+        console.error("painting a page failed", error);
+      }
     }
     if (this.jobs.size === 0) return;
     // the rest after the frame, in a task of its own
@@ -147,10 +165,30 @@ export const BITMAP_LIMIT = 192 * 1024 * 1024;
 export const pageBitmaps = new BitmapCache(BITMAP_LIMIT);
 export const paintQueue = new PaintQueue();
 
+// a number for each engine: a page's version counts up within one engine,
+// and a new engine starts again from 1
+const engines = new WeakMap<object, number>();
+let engineCount = 0;
+
+/**
+ * engineId returns the number of an engine, the same for as long as it lives
+ */
+export const engineId = (engine: object) => {
+  let id = engines.get(engine);
+  if (id === undefined) {
+    id = ++engineCount;
+    engines.set(engine, id);
+  }
+  return id;
+};
+
 /**
  * bitmapKey tells apart everything that changes what a painted page shows
  */
 export const bitmapKey = (parts: {
+  engine: number;
+  // the layer of the page, e.g. its text or its header and footer
+  layer: string;
   page: number;
   version: number;
   width: number;
@@ -160,9 +198,12 @@ export const bitmapKey = (parts: {
   x: number;
   y: number;
   theme: string;
-  images: number;
+  // which of its images are loaded
+  images: number | string;
 }) =>
   [
+    parts.engine,
+    parts.layer,
     parts.page,
     parts.version,
     parts.width,

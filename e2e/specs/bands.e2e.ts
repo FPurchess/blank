@@ -12,6 +12,7 @@ import {
   pressMod,
   restartApp,
   type,
+  waitForInk,
 } from "../helpers.ts";
 
 const strip = () => $("#band-editor");
@@ -77,6 +78,8 @@ describe("header and footer", () => {
 
     await expect(strip()).not.toExist();
     await expect(bandText("header", "left")).resolves.toBe("report");
+    // the first page has none, so nothing shows above its text
+    await expect($(".page-first-header")).not.toExist();
     await pressMod("s");
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n---\n\n# report\n\ntext.',
@@ -93,7 +96,10 @@ describe("header and footer", () => {
   });
 
   it("opens a strip from where the page ends", async () => {
+    // a single click leaves it closed, as a click beside the text does
     await $(".page-end .band.footer").click();
+    await expect(strip()).not.toExist();
+    await $(".page-end .band.footer").doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("footer");
     await browser.keys(Key.Escape);
@@ -103,7 +109,7 @@ describe("header and footer", () => {
   it("opens a strip from the margin of a sheet", async () => {
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("pages");
-    await $(".page-band.header").click();
+    await $(".page-band.header").doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("header");
     await browser.saveScreenshot(
@@ -152,5 +158,44 @@ describe("header and footer", () => {
     await saved(
       '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n  even-pages:\n    footer: {center: "{page}"}\n  number-style: i\n---\n\n# report\n\ntext.',
     );
+  });
+
+  it("shows the first page's header above its text", async () => {
+    const file = path.join(fixtureDir, "header.md");
+    fs.writeFileSync(
+      file,
+      '---\npage:\n  header: {left: "{title}", right: "draft"}\n---\n\n# report\n\ntext.\n',
+    );
+    await restartApp([file]);
+    const header = $(".page-first-header");
+    await expect(header).toBeDisplayed();
+    await expect(header).toHaveText(expect.stringContaining("report"));
+    await expect(header).toHaveText(expect.stringContaining("draft"));
+    // above the text of the first page
+    const text = await $('.page-frame[data-page="1"]').getLocation("y");
+    const top = await header.getLocation("y");
+    expect(top).toBeLessThan(text);
+    // on the sheet it is painted in the top margin
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    const sheet = await browser.execute(() =>
+      document
+        .querySelector('.page-frame[data-page="1"]')!
+        .getBoundingClientRect()
+        .toJSON(),
+    );
+    await waitForInk(
+      {
+        left: sheet.left + 8,
+        right: sheet.right - 8,
+        top: sheet.top + 8,
+        // above the text, which starts at the margin of 2.5 cm
+        bottom: sheet.top + 80,
+      },
+      {},
+      0.003,
+    );
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
   });
 });

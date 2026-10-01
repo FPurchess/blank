@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BitmapCache,
   bitmapKey,
+  engineId,
   FRAME_BUDGET,
   PaintQueue,
   type Scheduler,
 } from "./pageBitmaps";
 
 const bitmap = (width: number, height: number) => ({
-  image: {} as CanvasImageSource,
   width,
   height,
   close: vi.fn(),
@@ -38,6 +38,19 @@ describe("BitmapCache", () => {
     expect(cache.used).toBe(0);
   });
 
+  it("keeps one bitmap for each slot, the newest", () => {
+    const cache = new BitmapCache(10_000);
+    const old = bitmap(5, 5);
+    cache.set("page 1 v3", old, "page 1");
+    cache.set("page 2 v1", bitmap(5, 5), "page 2");
+    cache.set("page 1 v4", bitmap(5, 5), "page 1");
+    expect(cache.get("page 1 v3")).toBeUndefined();
+    expect(old.close).toHaveBeenCalled();
+    expect(cache.size).toBe(2);
+    cache.clear();
+    expect(cache.size).toBe(0);
+  });
+
   it("replaces the bitmap of a key", () => {
     const cache = new BitmapCache(10_000);
     const old = bitmap(5, 5);
@@ -48,9 +61,20 @@ describe("BitmapCache", () => {
   });
 });
 
+describe("engineId", () => {
+  it("numbers each engine once", () => {
+    const a = {};
+    const b = {};
+    expect(engineId(a)).toBe(engineId(a));
+    expect(engineId(b)).not.toBe(engineId(a));
+  });
+});
+
 describe("bitmapKey", () => {
   it("tells apart what changes a painted page", () => {
     const parts = {
+      engine: 1,
+      layer: "body",
       page: 1,
       version: 3,
       width: 100,
@@ -70,6 +94,9 @@ describe("bitmapKey", () => {
       { theme: "dark" },
       { scale: 1.25 },
       { images: 1 },
+      { engine: 2 },
+      { layer: "bands" },
+      { images: "10" },
     ])
       expect(bitmapKey({ ...parts, ...change })).not.toBe(key);
   });
@@ -99,6 +126,29 @@ const manual = () => {
 };
 
 describe("PaintQueue", () => {
+  it("paints the others when one fails", () => {
+    const { scheduler, frames, job } = manual();
+    const queue = new PaintQueue(scheduler);
+    const ran: string[] = [];
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    queue.request({
+      key: "broken",
+      priority: 0,
+      run: () => {
+        throw new Error("no context");
+      },
+    });
+    queue.request(job("after", 0, ran));
+    frames.shift()!();
+    expect(ran).toEqual(["after"]);
+    expect(queue.pending).toBe(0);
+    expect(error).toHaveBeenCalled();
+    // and it keeps painting
+    queue.request(job("later", 0, ran));
+    frames.shift()!();
+    expect(ran).toEqual(["after", "later"]);
+  });
+
   it("paints in the next frame, the pages in view first", () => {
     const { scheduler, frames, tasks, job } = manual();
     const queue = new PaintQueue(scheduler);

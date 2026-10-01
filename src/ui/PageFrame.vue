@@ -3,7 +3,7 @@ import {
   computed,
   onBeforeUnmount,
   onMounted,
-  onUnmounted,
+  onUpdated,
   useTemplateRef,
   watch,
 } from "vue";
@@ -14,10 +14,22 @@ import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { bootMark, record } from "../engine/perf";
-import { pageLayoutState, path, theme } from "../state";
-import { bitmapKey, pageBitmaps, paintQueue } from "./pageBitmaps";
-import { paintPage } from "./paintPage";
-import { bandTitle, endMark } from "./pageViewModel";
+import { pageLayout, pageLayoutState, path, theme } from "../state";
+import { bitmapKey, engineId, pageBitmaps, paintQueue } from "./pageBitmaps";
+import { painter, type Surface } from "./painter";
+import {
+  frameRenders,
+  type Layer,
+  layerDisplay,
+  type ThemeColors,
+  themeColors,
+} from "./pageLayers";
+import {
+  bandTitle,
+  endMark,
+  type PageBox,
+  selectedBoxes,
+} from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends. Its props
@@ -26,9 +38,12 @@ import { bandTitle, endMark } from "./pageViewModel";
 // pageBitmaps.ts).
 const props = defineProps<{
   page: number;
-  version: number;
-  // the next page's version, for the mark, -1 for the last page
-  nextVersion: number;
+  // the versions of its text and of its header and footer, which change
+  // apart (see pageLayers.ts)
+  bodyVersion: number;
+  bandVersion: number;
+  // the next page's band version, for the mark, -1 for the last page
+  nextBandVersion: number;
   top: number;
   left: number;
   width: number;
@@ -39,187 +54,343 @@ const props = defineProps<{
   sheet: boolean;
   // just outside the view, which paints after the pages in view
   near: boolean;
+  // the selection's rectangles on the page while the editor has the focus,
+  // see selectedOn; "" for none
+  selected: string;
   // device pixels per CSS pixel
   ratio: number;
 }>();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
+const headerCanvas = useTemplateRef<HTMLCanvasElement>("headerCanvas");
+const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
+const selectedCanvas = useTemplateRef<HTMLCanvasElement>("selectedCanvas");
 const editor = useEditor();
 
-// a click on a header or footer opens its strip, which takes the focus
+// a double click on a header or footer opens its strip, which takes the
+// focus, as in Word; a single one there leaves the text as it is
 const openBand = (band: Band) => editor.run(editBand(band), { focus: false });
 
-// the header and footer margins of a sheet, in pixels
-const margins = computed(() => {
-  const state = pageLayoutState.value;
-  if (!props.sheet || !state) return null;
-  return {
-    top: state.margins.top * props.scale,
-    bottom: state.margins.bottom * props.scale,
-  };
+// the header and footer margins of a sheet, in pixels, 0 where the page
+// ends show no margins; numbers, so a layout with the same margins renders
+// nothing again
+const marginTop = computed(() =>
+  props.sheet ? (pageLayoutState.value?.margins.top ?? 0) * props.scale : 0,
+);
+const marginBottom = computed(() =>
+  props.sheet ? (pageLayoutState.value?.margins.bottom ?? 0) * props.scale : 0,
+);
+
+// which of the images the page's text shows are loaded, e.g. "10", so the
+// page paints again when one of its own loads, not when any image does
+const imagesShown = computed(() => {
+  const engine = pageEngine;
+  void imagesLoaded.value;
+  if (!engine) return "";
+  return layerDisplay(engine, "body", props.page, props.bodyVersion)
+    .i.map(([src]) => (loadedImage(src, path.value) ? "1" : "0"))
+    .join("");
 });
 
-// the theme's text colour, read once for each theme
-const colors = new Map<string, string>();
-const colorOf = (element: HTMLElement) => {
-  let color = colors.get(theme.value);
-  if (!color) {
-    color = getComputedStyle(element).color;
-    colors.set(theme.value, color);
-  }
-  return color;
-};
-
-// what the canvas shows now, so the same isn't drawn twice
-let shown = "";
-
 /**
- * paintInto paints the page into a context of `width` × `height` device
- * pixels
+ * layerOf paints one layer of the page into its canvas: the text, or the
+ * header and footer of a sheet. Each is painted apart, when its own version
+ * changes, and kept as a bitmap of its own.
  */
-const paintInto = (
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  color: string,
-  ratio: number,
-) => {
-  const engine = pageEngine;
-  if (!engine) return;
-  const start = performance.now();
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  paintPage(
-    context as CanvasRenderingContext2D,
-    engine.display(props.page, props.version),
-    {
+// what a layer paints in: the colour of its text, and where it paints only
+// within rectangles over a fill, e.g. the selection
+interface Look {
+  key: string;
+  color: string;
+  within?: PageBox[];
+  fill?: string;
+}
+
+// where a layer's canvas lies on the page, when it isn't all of it: from
+// `top` CSS pixels down, `height` high
+interface Strip {
+  top: number;
+  height: number;
+}
+
+const layerOf = ({
+  name,
+  layer,
+  element,
+  version,
+  images,
+  strip,
+  look,
+}: {
+  // tells its paint jobs and bitmaps apart from the page's other layers
+  name: string;
+  layer: Layer;
+  element: () => HTMLCanvasElement | null;
+  version: () => number;
+  images: () => string;
+  // a strip of the page, or null for all of it
+  strip: () => Strip | null;
+  // how it is painted, e.g. only the selected text in its own colour; also
+  // what tells its bitmaps apart
+  look?: (colors: ThemeColors) => Look;
+}) => {
+  // a strip is a few glyphs, painted again rather than kept as a bitmap, and
+  // so is a look of its own, the selection
+  const keeps = !strip() && !look;
+  const lookOf = (canvas: HTMLCanvasElement) => {
+    const colors = themeColors(theme.value, canvas);
+    return look ? look(colors) : { key: "", color: colors.text };
+  };
+  // what the canvas shows now, so the same isn't drawn twice
+  let shown = "";
+  // the canvas as the painter paints into it, taken when it's there
+  let surface: Surface | null = null;
+  const surfaceOf = (canvas: HTMLCanvasElement) => {
+    if (surface?.canvas !== canvas) {
+      if (surface) painter.release(surface);
+      surface = painter.surface(canvas);
+      shown = "";
+    }
+    return surface;
+  };
+  // the layer's canvas is gone, e.g. the bands' in "page ends": nothing of
+  // it is kept or painted any more
+  const release = () => {
+    paintQueue.cancel(job());
+    if (surface) painter.release(surface);
+    surface = null;
+    shown = "";
+  };
+  // a layer has its own place in the queue, so a newer request replaces one
+  // that hasn't run yet
+  const job = () => `${name}:${props.page}`;
+
+  const paintInto = (
+    target: Surface,
+    shows: Look,
+    ratio: number,
+    top: number,
+  ) => {
+    const engine = pageEngine;
+    if (!engine) return;
+    const start = performance.now();
+    painter.paint(target, layerDisplay(engine, layer, props.page, version()), {
       scale: props.scale,
       ratio,
       x: props.x,
-      y: props.y,
-      color,
-      glyph: (font, id) => engine.glyph(font, id),
-      unitsPerEm: (font) => engine.unitsPerEm(font),
-      image: (src) => loadedImage(src, path.value)?.image ?? null,
-    },
-  );
-  record("paint", performance.now() - start);
-  bootMark("pages");
-};
+      // the page's point at the strip's top
+      y: props.y + top / props.scale,
+      color: shows.color,
+      within: shows.within,
+      fill: shows.fill,
+    });
+    record("paint", performance.now() - start);
+    bootMark("pages");
+  };
 
-// a page has its own place in the queue, so a newer request replaces one
-// that hasn't run yet
-const job = computed(() => `page:${props.page}`);
-
-/**
- * paint shows the page: drawn from its bitmap if it was painted before, or
- * else painted in the next frame, the pages in view first
- */
-const paint = () => {
-  const element = canvas.value;
-  if (!element || !pageEngine) return;
-  const { ratio } = props;
-  // a device pixel for each pixel of the canvas, which is shown at exactly
-  // its size, so nothing scales it and blurs the text
-  const width = Math.round(props.width * ratio);
-  const height = Math.round(props.height * ratio);
-  if (element.width !== width || element.height !== height) {
-    element.width = width;
-    element.height = height;
-    element.style.width = `${width / ratio}px`;
-    element.style.height = `${height / ratio}px`;
-    shown = "";
-  }
-  const key = bitmapKey({
-    page: props.page,
-    version: props.version,
-    width,
-    height,
-    scale: props.scale,
-    ratio,
-    x: props.x,
-    y: props.y,
-    theme: theme.value,
-    images: imagesLoaded.value,
-  });
-  if (key === shown) return;
-  const context = element.getContext("2d");
-  if (!context) return;
-  const cached = pageBitmaps.get(key);
-  if (cached) {
-    context.clearRect(0, 0, width, height);
-    context.drawImage(cached.image, 0, 0);
-    shown = key;
-    return;
-  }
-  // without bitmaps, e.g. in tests: right away
-  if (typeof createImageBitmap === "undefined") {
-    paintInto(context, colorOf(element), ratio);
-    shown = key;
-    return;
-  }
-  // until then the canvas shows what it showed, or the empty sheet
-  paintQueue.request({
-    key: job.value,
-    priority: props.near ? 1 : 0,
-    run: () => {
-      // unless the page changed meanwhile, which asks again
-      if (!canvas.value || element.width !== width || element.height !== height)
-        return;
-      context.clearRect(0, 0, width, height);
-      paintInto(context, colorOf(element), ratio);
+  /**
+   * paint shows the layer: drawn from its bitmap if it was painted before,
+   * or else painted in the next frame, the pages in view first
+   */
+  const paint = () => {
+    const canvas = element();
+    if (!canvas) return release();
+    if (!pageEngine) return;
+    const { ratio } = props;
+    // a device pixel for each pixel of the canvas, which is shown at
+    // exactly its size, so nothing scales it and blurs the text
+    const place = strip();
+    // on a whole device pixel, where the painting starts
+    const top = place ? Math.round(place.top * ratio) / ratio : 0;
+    const width = Math.round(props.width * ratio);
+    const height = Math.round((place ? place.height : props.height) * ratio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${width / ratio}px`;
+      canvas.style.height = `${height / ratio}px`;
+      shown = "";
+    }
+    if (place) canvas.style.top = `${top}px`;
+    const shows = lookOf(canvas);
+    const key = bitmapKey({
+      engine: engineId(pageEngine),
+      layer: name,
+      page: props.page,
+      version: version(),
+      width,
+      height,
+      scale: props.scale,
+      ratio,
+      x: props.x,
+      y: props.y + top / props.scale,
+      theme: theme.value,
+      images: `${images()}${shows.key}`,
+    });
+    // what it shows already, e.g. after a change undone before its paint:
+    // a paint still queued for the change would show the wrong key
+    if (key === shown) return paintQueue.cancel(job());
+    const target = surfaceOf(canvas);
+    if (!target) return;
+    const cached = keeps ? pageBitmaps.get(key) : undefined;
+    if (cached) {
+      paintQueue.cancel(job());
+      painter.show(target, cached);
       shown = key;
-    },
-  });
+      return;
+    }
+    // without snapshots, e.g. in tests: right away
+    if (!painter.snapshots) {
+      paintInto(target, shows, ratio, top);
+      shown = key;
+      return;
+    }
+    // until then the canvas shows what it showed, or the empty sheet
+    paintQueue.request({
+      key: job(),
+      priority: props.near ? 1 : 0,
+      run: () => {
+        // unless the page changed meanwhile, which asks again
+        if (
+          element() !== canvas ||
+          canvas.width !== width ||
+          canvas.height !== height
+        )
+          return;
+        paintInto(target, lookOf(canvas), ratio, top);
+        shown = key;
+      },
+    });
+  };
+
+  /**
+   * keep keeps what the canvas shows for when the page comes into view
+   * again, as it leaves: a copy only of the pages that go, not of every
+   * paint
+   */
+  const keep = () => {
+    const kept = surface;
+    if (!element() || !shown || !kept) return release();
+    if (!keeps || !painter.snapshots || pageBitmaps.get(shown))
+      return release();
+    const key = shown;
+    paintQueue.cancel(job());
+    surface = null;
+    // freed once the copy is taken
+    painter.snapshot(kept).then(
+      (snapshot) => {
+        // in place of what the layer showed before at this scale
+        if (snapshot) pageBitmaps.set(key, snapshot, `${job()}:${props.scale}`);
+        painter.release(kept);
+      },
+      () => painter.release(kept),
+    );
+  };
+
+  return { paint, keep };
 };
 
-/**
- * keep keeps what the canvas shows for when the page comes into view again,
- * as it leaves: a copy only of the pages that go, not of every paint
- */
-const keep = () => {
-  const element = canvas.value;
-  if (!element || !shown || typeof createImageBitmap === "undefined") return;
-  if (pageBitmaps.get(shown)) return;
-  const key = shown;
-  const { width, height } = element;
-  createImageBitmap(element).then(
-    (bitmap) =>
-      pageBitmaps.set(key, {
-        image: bitmap,
-        width,
-        height,
-        close: () => bitmap.close(),
-      }),
-    () => {},
-  );
-};
+const body = layerOf({
+  name: "body",
+  layer: "body",
+  element: () => canvas.value,
+  version: () => props.bodyVersion,
+  images: () => imagesShown.value,
+  strip: () => null,
+});
+// the header and footer on a sheet, in strips as high as the margins they
+// sit in; "page ends" shows them where each page ends, as text
+const header = layerOf({
+  name: "header",
+  layer: "bands",
+  element: () => headerCanvas.value,
+  version: () => props.bandVersion,
+  images: () => "",
+  strip: () => ({ top: 0, height: marginTop.value }),
+});
+const footer = layerOf({
+  name: "footer",
+  layer: "bands",
+  element: () => footerCanvas.value,
+  version: () => props.bandVersion,
+  images: () => "",
+  strip: () => ({
+    top: props.height - marginBottom.value,
+    height: marginBottom.value,
+  }),
+});
+const bands = [header, footer];
+// the selected text over the selection, in colours of its own, which only
+// a page with a selection has, painted again when it changes (see
+// src/scss/themes.test.ts for the contrast)
+const selectedText = layerOf({
+  name: "selected",
+  layer: "body",
+  element: () => selectedCanvas.value,
+  version: () => props.bodyVersion,
+  images: () => imagesShown.value,
+  strip: () => null,
+  look: (colors) => ({
+    key: props.selected,
+    color: colors.selectedText,
+    within: selectedBoxes(props.selected),
+    fill: colors.selection,
+  }),
+});
+const layers = [body, ...bands, selectedText];
 
-onMounted(paint);
-onBeforeUnmount(keep);
-onUnmounted(() => paintQueue.cancel(job.value));
+onMounted(() => layers.forEach((layer) => layer.paint()));
+// what they show is kept for when the page comes back, and their canvases
+// freed
+onBeforeUnmount(() => layers.forEach((layer) => layer.keep()));
+// what changes either layer
+const shownAt = () => [
+  props.width,
+  props.height,
+  props.scale,
+  props.x,
+  props.y,
+  props.near,
+  props.ratio,
+  theme.value,
+];
+watch(() => [props.bodyVersion, imagesShown.value, ...shownAt()], body.paint, {
+  flush: "post",
+});
+watch(
+  () => [props.selected, props.bodyVersion, imagesShown.value, ...shownAt()],
+  selectedText.paint,
+  { flush: "post" },
+);
 watch(
   () => [
-    props.version,
-    props.width,
-    props.height,
-    props.scale,
-    props.x,
-    props.y,
-    props.near,
-    props.ratio,
-    theme.value,
-    imagesLoaded.value,
+    props.bandVersion,
+    props.sheet,
+    marginTop.value,
+    marginBottom.value,
+    ...shownAt(),
   ],
-  paint,
+  () => bands.forEach((band) => band.paint()),
   { flush: "post" },
 );
 
-// what the mark at the page's end shows
+// how often the frames render, for the tests that keep one from rendering
+// when nothing it shows changed
+onUpdated(() => frameRenders.count++);
+
+// what the mark at the page's end shows, which follows the bands of the
+// page and of the next one, not their text
 const mark = computed(() => {
   const engine = pageEngine;
   if (props.sheet || !engine) return null;
-  void props.version;
-  const next = props.nextVersion >= 0 ? engine.bands(props.page + 1) : null;
-  return endMark(props.page, engine.bands(props.page), next);
+  void props.bandVersion;
+  const next = props.nextBandVersion >= 0 ? engine.bands(props.page + 1) : null;
+  return endMark(
+    props.page,
+    engine.bands(props.page),
+    next,
+    pageLayout.value.layout,
+  );
 });
 </script>
 
@@ -237,30 +408,45 @@ const mark = computed(() => {
   >
     <!-- its size is set when it's painted, in device pixels -->
     <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
-    <template v-if="margins">
+    <canvas
+      v-if="selected"
+      ref="selectedCanvas"
+      class="page-canvas page-selected"
+      aria-hidden="true"
+    />
+    <template v-if="sheet">
+      <canvas
+        ref="headerCanvas"
+        class="page-canvas page-bands header"
+        aria-hidden="true"
+      />
+      <canvas
+        ref="footerCanvas"
+        class="page-canvas page-bands footer"
+        aria-hidden="true"
+      />
+    </template>
+    <template v-if="sheet">
       <div
         class="page-band header"
         :title="bandTitle('header')"
         aria-hidden="true"
-        :style="{ height: `${margins.top}px` }"
-        @mousedown.prevent.stop
-        @click="openBand('header')"
+        :style="{ height: `${marginTop}px` }"
+        @dblclick="openBand('header')"
       />
       <div
         class="page-band footer"
         :title="bandTitle('footer')"
         aria-hidden="true"
-        :style="{ height: `${margins.bottom}px` }"
-        @mousedown.prevent.stop
-        @click="openBand('footer')"
+        :style="{ height: `${marginBottom}px` }"
+        @dblclick="openBand('footer')"
       />
     </template>
     <div v-if="mark" class="page-end" aria-hidden="true">
       <div
         class="band footer"
         :title="bandTitle('footer')"
-        @mousedown.prevent.stop
-        @click="openBand('footer')"
+        @dblclick="openBand('footer')"
       >
         <span v-for="(slot, index) in mark.footer" :key="index">{{
           slot
@@ -270,11 +456,10 @@ const mark = computed(() => {
         <span v-if="mark.number" class="number">{{ mark.number }}</span>
       </div>
       <div
-        v-if="nextVersion >= 0"
+        v-if="nextBandVersion >= 0"
         class="band header"
         :title="bandTitle('header')"
-        @mousedown.prevent.stop
-        @click="openBand('header')"
+        @dblclick="openBand('header')"
       >
         <span v-for="(slot, index) in mark.header" :key="index">{{
           slot

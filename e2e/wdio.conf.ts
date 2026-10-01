@@ -69,7 +69,10 @@ export const config: WebdriverIO.Config = {
         { cwd: repoRoot, stdio: "inherit" },
       );
       if (build.status !== 0) {
-        throw new Error(`building the app failed with status ${build.status}`);
+        // wdio goes on after a failed onPrepare, which would test the build
+        // before this one
+        console.error(`building the app failed with status ${build.status}`);
+        process.exit(1);
       }
     }
 
