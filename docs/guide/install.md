@@ -4,6 +4,8 @@
 
 ## macOS
 
+Blank 3 needs macOS 12 (Monterey) or newer.
+
 Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
 
 - **macOS 15 (Sequoia) or newer:** try to open Blank once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.

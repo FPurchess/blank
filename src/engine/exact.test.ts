@@ -32,6 +32,10 @@ const hasPdftotext = (() => {
     execFileSync("pdftotext", ["-v"], { stdio: "ignore" });
     return true;
   } catch {
+    if (process.env.CI)
+      throw new Error(
+        "pdftotext is missing: install poppler, CI doesn't skip this test",
+      );
     return false;
   }
 })();

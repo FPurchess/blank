@@ -30,7 +30,7 @@ The UI around the editor is moving to Vue 3.5 (see `vue-migration.md` for what's
 - **Focus after rendering.** A component that moves the focus does it once its DOM exists, in `onMounted` or in `nextTick` after changing its state (`ContextMenu.vue`'s `focusCurrent`). Listeners that only matter while it's open go through `listenOnWindow` in its setup, which removes them when it unmounts.
 - **What the keys move between** is found with `shownIn(root, selectors)` (`src/dom.ts`), which leaves out what's inside `[hidden]`: the dialog's Tab trap, the page setup's ↑↓ and the strips' Tab use it.
 - **Keep every id, class, role, `data-*` and aria attribute** that E2E, the docs shots and the tests use.
-- **Stacking:** `#ui` comes after `.ProseMirror`. The z-index layers are set in `src/scss/main.scss` (e.g. table handles 4, toolbar 5, dialog backdrop 10, picker and menus 20); keep a new part in line with them, below the backdrop unless it is a modal or a menu.
+- **Stacking:** `#ui` comes after `.ProseMirror`. The z-index layers are set in `src/scss/main.scss` (e.g. the page view 1, the bottom bar 2, table handles 4, toolbar 5, band editor 8, dialog backdrop 10, picker and menus 20); keep a new part in line with them, below the backdrop unless it is a modal or a menu. `#page-view` (`PageView.vue`) is fixed over the whole window at 1, above the hidden editor and below everything else; its page canvases (`PageFrame.vue`), marks and overlay (`PageOverlay.vue`: caret, selection, composition) are positioned inside it and have no z-index of their own.
 
 ## Components so far
 

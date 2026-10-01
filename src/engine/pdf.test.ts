@@ -51,6 +51,10 @@ const has = (tool: string) => {
     execFileSync(tool, ["-v"], { stdio: "ignore" });
     return true;
   } catch {
+    if (process.env.CI)
+      throw new Error(
+        `${tool} is missing: install poppler, CI doesn't skip this test`,
+      );
     return false;
   }
 };

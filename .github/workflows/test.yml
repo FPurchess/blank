@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
 
       - name: setup node
@@ -44,31 +44,13 @@ jobs:
           desktop-file-validate "$RUNNER_TEMP/blank.desktop"
 
   # the layout engine: its tests, and whether the committed wasm is what its
-  # sources build (scripts/build-engine.sh builds it reproducibly)
+  # sources build (scripts/build-engine.sh builds it reproducibly). The
+  # publish workflow runs the same check before it builds a release, and
+  # make release requires it on origin/main
   engine:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          # RUST_VERSION in scripts/build-engine.sh
-          toolchain: 1.98.1
-          targets: wasm32-unknown-unknown
-
-      - name: install poppler and wasm-bindgen
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y poppler-utils
-          # the version of the wasm-bindgen crate in src-tauri/Cargo.lock
-          cargo install wasm-bindgen-cli --version 0.2.129 --locked
-
-      - name: test the engine
-        run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout
-
-      - name: check the committed wasm
-        run: |
-          bash scripts/build-engine.sh
-          git diff --exit-code --stat src/engine/wasm ||
-            { echo "::error::src/engine/wasm isn't what the engine's sources build: run make engine"; exit 1; }
+      - uses: ./.github/actions/engine

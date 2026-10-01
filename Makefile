@@ -40,6 +40,9 @@ dictionaries: ## Update the spell check dictionaries and their catalog
 engine: ## Build the layout engine for the webview into src/engine/wasm
 	bun run engine:build
 
+notices: ## Regenerate public/THIRD-PARTY-NOTICES.txt after changing dependencies (needs cargo-about)
+	bun run notices
+
 clean: ## Remove build output and coverage, incl. the Rust target dir (full rebuild)
 	rm -rf dist coverage e2e/screenshots
 	cargo clean --manifest-path src-tauri/Cargo.toml
@@ -64,7 +67,7 @@ test: ## Run the unit tests
 test-coverage: ## Run the unit tests with coverage (fails below 80%)
 	bun run test:coverage
 
-test-rust: ## Build the frontend and run the Rust tests (the spell check engine)
+test-rust: ## Build the frontend and run the Rust tests of the workspace (spell check, system fonts, layout engine; needs poppler)
 	bun run test:rust
 
 test-e2e: install-e2e ## Build the debug app and run the e2e tests (Linux only)
@@ -145,6 +148,8 @@ release: ## Publish origin/main by pushing it to the release branch (DRY_RUN=1 o
 		fail "nothing to release, release is already at origin/main"; \
 	git merge-base --is-ancestor origin/release origin/main || \
 		fail "origin/release is not an ancestor of origin/main"; \
+	bash scripts/check-engine-ci.sh "$$(git rev-parse origin/main)" || \
+		fail "release only what the engine check passed on"; \
 	echo "Releasing v$$v at $$(git log -1 --format='%h %s' origin/main)"; \
 	echo "Changes since the last release:"; \
 	git log --oneline origin/release..origin/main; \

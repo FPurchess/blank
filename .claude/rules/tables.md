@@ -29,7 +29,7 @@ paths:
 - The editing lives in `src/editor/plugins/tables/`:
   - `keys.ts`: Tab, Enter as a line break in plain cell text, leaving at the edges, Backspace only clears cells;
   - `guard.ts`: no table, heading or rule in a cell, and a paragraph next to tables at the edges of the document;
-  - `view.ts`: the NodeView, which freezes the column widths while the cursor is in the table;
+  - `view.ts`: the NodeView of the hidden editor, which renders the caption and the column widths set on the table;
   - `picker.ts`, `tools.ts` (the table toolbar and table mode) and `handles.ts` (the mouse handles, below).
 - The commands are in `src/editor/commands/table/`. `actions.ts` there lists every action on a table once, with its label, icon, table-mode key and announcement. The toolbar (`src/ui/TableToolbar.vue`), table mode (`Mod+T` in a table) and the context menu's Table submenu all use that list, so a new action goes there.
 - Actions announce what they did through `announcement`, which the status bar shows and screen readers read. `reporting()` in `tools.ts` joins that with what it led to, e.g. a table that's now saved as HTML.
@@ -44,8 +44,8 @@ paths:
 
 - Widths set with the mouse are percentages in the cells' `colwidth`, one per column a cell spans (`columnPercents`, `cellWidths`, `withColumnPercents` in `src/markdown/tables.ts`). prosemirror-tables keeps them through inserts, deletes, merges and splits, and its `fixTables` gives new rows their columns' widths; a new column has none and gets the average.
 - They make a table an HTML table (the `widths` reason of `gfmBlocker`), saved as a `<colgroup>` of percentages. `parseHtmlTable` reads them back only from Blank's own files; `normalizeTableHtml` drops `<colgroup>`, so pasted and imported tables size to their content.
-- The NodeView renders them and doesn't freeze such tables.
-- The page view lays tables out in the engine (`src-tauri/layout/src/items.rs`, `table_units`) with the widths of `tableGrid`, which `flatten.ts` sends. While the cursor is in a table without set widths, `frozenWidths` (`plugins/pageView.ts`) keeps the widths it had when the cursor went in, so the painted columns don't move while typing; they follow the text again once the cursor leaves. The NodeView's own freezing only concerns the hidden DOM.
+- The NodeView renders them.
+- The page view lays tables out in the engine (`src-tauri/layout/src/items/table.rs`, `table_units`) with the widths of `tableGrid`, which `flatten.ts` sends. While the cursor is in a table without set widths, `frozenWidths` (`plugins/pageView.ts`) keeps the widths it had when the cursor went in, so the painted columns don't move while typing; they follow the text again once the cursor leaves. Without the engine, the visible editor's columns size to their content while typing.
 - The engine keeps rows that merged cells join together, slices a row taller than a page between its lines (each slice is a unit, see `Unit::clip`), repeats the header rows on every page, keeps the header rows with the first row and the caption with the table.
 
 ## Clipboard

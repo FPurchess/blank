@@ -21,7 +21,7 @@ cd "$(dirname "$0")/.."
 fail() { echo "error: $*" >&2; exit 1; }
 
 RUST_VERSION=1.98.1
-BINARYEN_VERSION=132
+BINARYEN_VERSION=132.0.0
 
 is_pinned() { rustc --version 2>/dev/null | grep -q "^rustc $RUST_VERSION "; }
 if [ -z "${ALLOW_OTHER_TOOLCHAIN:-}" ]; then
@@ -47,8 +47,11 @@ command -v wasm-bindgen >/dev/null ||
 command -v bun >/dev/null || fail "bun is missing, it runs binaryen's wasm-opt"
 
 root=$(pwd)
-target="${CARGO_TARGET_DIR:-src-tauri/target}"
-[[ "$target" = /* ]] || target="$root/$target"
+# where cargo builds, as it resolves CARGO_TARGET_DIR and a target-dir in
+# a cargo config
+target=$(cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 --no-deps |
+  bun -e 'console.log(JSON.parse(await Bun.stdin.text()).target_directory)')
+[ -n "$target" ] || fail "cargo metadata gave no target directory"
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 sysroot="$(rustc --print sysroot)"
 commit="$(rustc -vV | sed -n 's/^commit-hash: //p')"
@@ -71,9 +74,12 @@ cargo build --manifest-path src-tauri/Cargo.toml -p blank-layout --lib \
   --target wasm32-unknown-unknown --profile wasm
 wasm-bindgen --target web --out-dir src/engine/wasm --out-name blank_layout \
   "$target/wasm32-unknown-unknown/wasm/blank_layout.wasm"
-# binaryen's optimizer takes off about a fifth
+# binaryen's optimizer takes off about a fifth. It also drops the producers
+# section, where wasm-bindgen writes its version and, when prebuilt as on CI,
+# its git commit, which would make the file differ by how it was installed
 bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt -O3 --enable-bulk-memory \
   --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals \
-  --enable-reference-types --enable-multivalue src/engine/wasm/blank_layout_bg.wasm \
-  -o src/engine/wasm/blank_layout_bg.wasm
+  --enable-reference-types --enable-multivalue --strip-producers \
+  src/engine/wasm/blank_layout_bg.wasm -o src/engine/wasm/blank_layout_bg.wasm
+bun scripts/wasm-producers.ts src/engine/wasm/blank_layout_bg.wasm
 ls -l src/engine/wasm/blank_layout_bg.wasm
