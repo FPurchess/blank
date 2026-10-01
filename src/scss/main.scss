@@ -1246,6 +1246,15 @@ $strip-height: 90px;
   caret-color: transparent;
 }
 
+// with the pages shown, the hidden editor is set in the system's font: its
+// first layout then waits for no web font (500 ms of the start with Plex),
+// and its lines break apart from the pages' anyway; hidden.ts measures where
+// its caret is to move it under the painted one, so the input method's
+// window still opens there. Without the engine it shows the text in Plex.
+body:not(.without-engine) #editor {
+  font-family: system-ui, sans-serif;
+}
+
 // if the layout engine can't load, the editor shows the text itself, as
 // before the page view
 body.without-engine {

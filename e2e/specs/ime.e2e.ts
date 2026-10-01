@@ -9,6 +9,31 @@ import { clickText, editorText, Key, type } from "../helpers.ts";
 // composing (the underline, the candidate window) can't be checked here.
 
 describe("input methods", () => {
+  it("has the hidden editor in the system's font while the pages show", async () => {
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    const font = await browser.execute(
+      () => getComputedStyle(document.querySelector("#editor")!).fontFamily,
+    );
+    expect(font).toMatch(/^system-ui/);
+    // its caret still under the painted one, where the input method opens
+    // its window: moved there once the caret rests (ALIGN_DELAY)
+    await clickText("Blank");
+    await browser.pause(300);
+    const carets = await browser.execute(() => {
+      const range = getSelection()!.getRangeAt(0);
+      const hidden = range.getClientRects()[0] ?? range.getBoundingClientRect();
+      const painted = document
+        .querySelector("#page-view .page-caret")!
+        .getBoundingClientRect();
+      return {
+        hidden: { left: hidden.left, top: hidden.top },
+        painted: { left: painted.left, top: painted.top },
+      };
+    });
+    expect(Math.abs(carets.hidden.left - carets.painted.left)).toBeLessThan(3);
+    expect(Math.abs(carets.hidden.top - carets.painted.top)).toBeLessThan(8);
+  });
+
   it("composes a character where the pages were clicked", async () => {
     await expect($("#page-view .page-canvas")).toBeExisting();
     await browser.execute(() => {
