@@ -286,10 +286,22 @@ describe("the table handles and toolbar without the engine", () => {
   });
 
   it("places them again when the editor scrolls", () => {
+    // the cursor in the table, for the toolbar
+    view.dispatch(
+      view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, TABLE + 4),
+      ),
+    );
     hover(50, 40);
-    const first = handles.value;
+    expect(state().box.top).toBe(20);
+    expect(tableToolbar.value?.anchor.top).toBe(20);
+    // scrolled by 10 px: every box is 10 px higher
+    vi.mocked(Element.prototype.getBoundingClientRect).mockReturnValue(
+      new DOMRect(10, 10, 100, 40),
+    );
     window.dispatchEvent(new Event("scroll"));
-    expect(handles.value).not.toBe(first);
+    expect(state().box).toMatchObject({ top: 10, bottom: 50 });
+    expect(tableToolbar.value?.anchor.top).toBe(10);
   });
 });
 

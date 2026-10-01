@@ -429,6 +429,8 @@ export const exposeGeometry = (view: EditorView) => {
       hitAt,
       tables: () => tablePositions(doc()).map(({ pos }) => tableGeometry(pos)),
       find: (text: string, index = 0) => findText(doc(), text, index),
+      // whether the engine is still laying out the rest of a long document
+      laying: () => pageEngine?.laying ?? false,
     },
   });
 };

@@ -89,6 +89,18 @@ describe("moving the selected text on the pages", () => {
     expect(press).not.toHaveBeenCalled();
   });
 
+  it("tells while the text is dragged, past a press in it", () => {
+    const move = moveOn();
+    move.down(pointer(9));
+    expect(move.dragging).toBe(false);
+    move.move(pointer(10));
+    expect(move.dragging).toBe(false);
+    move.move(pointer(4));
+    expect(move.dragging).toBe(true);
+    move.up(pointer(4));
+    expect(move.dragging).toBe(false);
+  });
+
   it("places the caret where a press without a move was", () => {
     const move = moveOn();
     move.down(pointer(9));

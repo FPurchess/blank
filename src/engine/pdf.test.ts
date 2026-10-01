@@ -189,13 +189,18 @@ describe("the PDF export after the engine trapped", () => {
     onerror: ((event: { message: string }) => void) | null = null;
     onmessageerror: (() => void) | null = null;
     terminate = vi.fn();
-    postMessage(job: PdfJob) {
+    // as a worker gets it: a copy, with the buffers it's handed detached
+    // on this side
+    postMessage(message: PdfJob, transfer: Transferable[] = []) {
+      const job = structuredClone(message, { transfer });
       jobs.push(job);
       if (workerFails) {
         queueMicrotask(() => this.onerror?.({ message: "no worker" }));
         return;
       }
-      void handleJob(job, (reply) => this.onmessage?.({ data: reply }));
+      void handleJob(job, (reply, back) =>
+        this.onmessage?.({ data: structuredClone(reply, { transfer: back }) }),
+      );
     }
   }
 
@@ -271,6 +276,16 @@ describe("the PDF export after the engine trapped", () => {
     expect(pageEngine).toBeNull();
     expect(document.body.classList).toContain("without-engine");
     setPageEngine(null);
+  });
+
+  it("hands the worker copies, so the page view keeps its fonts", async () => {
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    const fonts = await baseFonts();
+    const sizes = fonts.map((font) => font.byteLength);
+    await exportIt();
+    expect(jobs).toHaveLength(1);
+    expect((await baseFonts()).map((font) => font.byteLength)).toEqual(sizes);
+    expect(sizes.every((size) => size > 0)).toBe(true);
   });
 
   it("goes straight to the worker once the instance is broken", async () => {

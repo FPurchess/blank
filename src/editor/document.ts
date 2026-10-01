@@ -42,9 +42,11 @@ export function applyDocument(
   // guard keeps next to tables, do it right away, not with the first click,
   // which would then land where the content has moved to
   const next = created.apply(created.tr);
-  if (path) _path.value = path;
-  // storage persists the transaction's doc and the UI renders it
+  // storage persists the transaction's doc and the UI renders it; the page
+  // view lays the document out once the editor has it, not the old one with
+  // the new path (see pageSync)
   transaction.value = next.tr;
+  if (path) _path.value = path;
   return next;
 }
 
