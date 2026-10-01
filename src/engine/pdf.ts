@@ -112,15 +112,16 @@ export const runPdfWorker = (job: PdfJob) =>
     };
     worker.onerror = (event) => fail(event.message || "the worker failed");
     worker.onmessageerror = () => fail("the worker's reply can't be read");
-    // copies, so the page view keeps its own
-    const fonts = job.fonts.map((font) => font.slice());
+    // copies, so the page view keeps its own: new Uint8Array copies any
+    // view, where slice() of a Node Buffer, say, is a view of the same bytes
+    const fonts = job.fonts.map((font) => new Uint8Array(font));
     const fallbacks = job.fallbacks.map(({ family, bytes }) => ({
       family,
-      bytes: bytes.slice(),
+      bytes: new Uint8Array(bytes),
     }));
     const images = job.images.map((image) => ({
       ...image,
-      bytes: image.bytes.slice(),
+      bytes: new Uint8Array(image.bytes),
     }));
     worker.postMessage({ ...job, fonts, fallbacks, images }, [
       ...fonts.map((font) => font.buffer),
