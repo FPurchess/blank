@@ -305,7 +305,8 @@ export class LayoutEngine {
     }
     /**
      * what a page shows: rectangles, images, links and glyph runs, of its
-     * body and its header and footer
+     * body and its header and footer. Deprecated: `pageBody` and
+     * `pageBands` give them apart, with their own versions
      * @param {number} page
      * @returns {string}
      */
@@ -392,6 +393,7 @@ export class LayoutEngine {
         return v2;
     }
     /**
+     * sets the page; the pages that changed, as `update` gives them
      * @param {string} json
      * @returns {Uint32Array}
      */
@@ -521,7 +523,6 @@ export class LayoutEngine {
         return v1;
     }
     /**
-     * sets the page; the pages that changed, as `update` gives them
      * an engine with the fonts of `other`, fallbacks added with `addFont`
      * included, without copying their files, e.g. for an export; it has
      * its own page, items and images
