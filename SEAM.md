@@ -135,6 +135,12 @@ A cell gets `blocks`, used instead of `paragraphs` when it isn't empty. `paragra
 - A `text` block with `"style": "code"` is set in IBM Plex Mono on its grey fill, as outside a table. Headings keep their style name too.
 - Markers and alt texts are painted but aren't text of the document: the caret and hits only land in the text blocks.
 - Every position in `blocks` moves with `update`'s `shift`, like the rest.
+- **Addition (list context on image blocks):** an `image` block takes the same `indent`, `marker` and `bars` as a `text` block. All three are optional (defaults 0, none, []), so old JSON lays out as before.
+  - The image is placed at the cell's left + `indent` and fitted to the width left. Its marker is right-aligned before the indent, at the image's top (as a top-level image's marker is).
+  - Its bars span it, and reach over the gap to the next block when it has the same bar. An image that isn't loaded shows its alt text at that place.
+  - In the PDF, a marked image is an LI whose LBody holds its Figure.
+  - Shape: `{"kind":"image","pos":12,"src":"cat.png","width":120,"height":80,"alt":"a cat","indent":18,"marker":"•","bars":[0]}`.
+  - TS side (engine-editor): `flatten.ts` puts the list's `indent`/`marker` and the quote's `bars` on image blocks, as it does on text blocks.
 - TS side (engine-editor): have `flatten.ts` send `blocks` for cells with lists, quotes or images, instead of "￼" and flattened paragraphs. Cells of plain paragraphs may keep `paragraphs`.
 
 ## S3: one shared font store (task 11)

@@ -198,6 +198,9 @@ fn keeps_images_to_a_size_that_can_be_laid_out() {
             width: 1.0,
             height,
             alt: String::new(),
+            indent: 0.0,
+            marker: None,
+            bars: vec![],
         };
         let cell = Cell {
             blocks: vec![image],
