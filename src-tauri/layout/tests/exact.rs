@@ -570,6 +570,18 @@ fn run(program: &str, args: &[&str]) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr))
 }
 
+/// whether the uncompressed PDF has a structure element of `role`, as a
+/// whole word: `/S /L` is not found in `/S /LI`
+fn has_role(text: &str, role: &str) -> bool {
+    let needle = format!("/S {role}");
+    text.match_indices(&needle).any(|(at, _)| {
+        text[at + needle.len()..]
+            .chars()
+            .next()
+            .is_none_or(|next| !next.is_alphanumeric())
+    })
+}
+
 #[test]
 fn pdf_is_tagged() {
     use blank_layout::pdf::write_with;
@@ -656,11 +668,10 @@ fn pdf_is_tagged() {
             "/Figure",
             "/Link",
         ] {
-            assert!(
-                text.contains(&format!("/S {role}")),
-                "no {role} in the structure"
-            );
+            assert!(has_role(&text, role), "no {role} in the structure");
         }
+        // a role is matched whole: a prefix of one isn't found
+        assert!(!has_role(&text, "/Lb"), "/Lb found in /Lbl");
     }
     // and its text is where it was laid out, as without tags
     compare(&mut engine, "tagged");
