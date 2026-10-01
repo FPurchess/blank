@@ -31,8 +31,10 @@ For the metainfo's `<release version="3.0.0">` (one paragraph, as for 2.x):
 > engine sets code in IBM Plex Mono, emoji in monochrome Noto Emoji, and
 > Chinese, Japanese, Korean and other scripts in the fonts on your computer.
 > Table cells hold lists, quotes, code and images, and a row too tall for a
-> page goes on over the next ones, under the repeated header rows. Your
-> markdown files and settings stay as they are. Blank 3 needs macOS 12 or
+> page goes on over the next ones, under the repeated header rows. Every PDF
+> is a PDF/A, for archiving. Code in Word documents is set in IBM Plex Mono,
+> and on Linux a middle click pastes the text selected last. Your markdown
+> files and settings stay as they are. Blank 3 needs macOS 12 or
 > newer.
 
 For the GitHub release:
@@ -61,6 +63,13 @@ For the GitHub release:
 >     (nested too), quotes, code blocks and images. Images fit the cell's
 >     width, and one that can't be loaded shows its alt text, on screen and
 >     in the PDF alike.
+>   - Every PDF is a PDF/A-2u, the archival kind of PDF, tagged, with
+>     bookmarks and its language. When a document can't be one (a
+>     character no font has, or a font that mustn't be embedded), Blank
+>     writes a normal PDF and tells you why.
+> - **Word export:** code is set in IBM Plex Mono, embedded in the document.
+> - **Linux:** a middle click on the pages pastes the text selected last, as
+>   in other apps.
 > - `Mod`+click still opens links, now on the pages too.
 > - **Known limits:** no hyphenation or justification yet.
 > - **Requirements:** Blank 3 needs macOS 12 (Monterey) or newer.

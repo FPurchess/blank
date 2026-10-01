@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScript + ProseMirror frontend in `src/`, whose UI around the editor is moving to Vue 3 (all of it but the table handles and the header and footer strips so far, see `.claude/rules/vue-migration.md`). The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries, and the lookup of the system's fonts for scripts Blank's fonts lack (`src-tauri/src/fonts.rs`). Blank's layout engine is the workspace member `src-tauri/layout` (crate `blank-layout`), which runs in the webview as wasm (see `.claude/rules/layout-engine.md`).
+Blank is a keyboard-only markdown editor: a Tauri 2 desktop app with a TypeScript + ProseMirror frontend in `src/`, whose UI around the editor is moving to Vue 3 (all of it but the table handles and the header and footer strips so far, see `.claude/rules/vue-migration.md`). The app logic lives in the frontend. `src-tauri/` registers the Tauri plugins and holds the spell check engine (`src-tauri/src/spellcheck/`), which loads, checks and downloads the dictionaries, the lookup of the system's fonts for scripts Blank's fonts lack (`src-tauri/src/fonts.rs`), and, on Linux, the primary selection a middle click pastes (`src-tauri/src/primary.rs`, `read_primary`). Blank's layout engine is the workspace member `src-tauri/layout` (crate `blank-layout`), which runs in the webview as wasm (see `.claude/rules/layout-engine.md`).
 
 ## Commands
 
