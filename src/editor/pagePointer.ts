@@ -2,6 +2,8 @@ import { type EditorState, Plugin, TextSelection } from "prosemirror-state";
 import { dropPoint } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 
+import { invoke } from "@tauri-apps/api/core";
+
 import { engineless, pageEngine } from "../engine/engine";
 import { pageDropCaret } from "../state";
 import { pageDrop } from "./commands/pageDrop";
@@ -185,5 +187,42 @@ export const dropExternal = (
   view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)));
   if (html) view.pasteHTML(html);
   else pasteText(view, text, false);
+  return true;
+};
+
+/**
+ * hasPrimarySelection tells whether the system has a primary selection,
+ * which a middle click pastes: Linux, on X11 and Wayland, but not macOS or
+ * Windows
+ */
+export const hasPrimarySelection = () =>
+  typeof navigator !== "undefined" &&
+  /Linux/.test(navigator.platform) &&
+  !/Android/.test(navigator.userAgent);
+
+/**
+ * pastePrimary pastes the primary selection, the text selected last in any
+ * app, at `pos`, as a middle click does in other apps: the caret goes there
+ * as with a click, and the text comes as plain text
+ * @returns whether it took the middle click
+ */
+export const pastePrimary = async (view: EditorView, pos: number | null) => {
+  if (!hasPrimarySelection() || pos === null) return false;
+  const { doc } = view.state;
+  view.dispatch(
+    view.state.tr.setSelection(
+      TextSelection.near(
+        doc.resolve(Math.max(0, Math.min(pos, doc.content.size))),
+      ),
+    ),
+  );
+  let text: string | null = null;
+  try {
+    text = await invoke<string | null>("read_primary");
+  } catch (error) {
+    console.error("failed to read the primary selection", error);
+  }
+  // the editor may be gone by then, e.g. with another document
+  if (text && !view.isDestroyed) pasteText(view, text, true);
   return true;
 };

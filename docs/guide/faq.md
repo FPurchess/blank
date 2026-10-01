@@ -28,6 +28,8 @@ No. The only thing Blank ever downloads is a [spell check dictionary](./spelling
 
 You can click to place the cursor, select text and drag it somewhere else, double-click a header or footer to change it, and `Mod` + Click a link to open it. [Tables](./tables) have handles for the mouse too. Everything else is done with the keyboard, on purpose.
 
+On Linux, middle-click pastes as in your other apps: the text you select in Blank is the one a middle click pastes elsewhere, and a middle click in Blank pastes the text you selected last, in Blank or in any other app, right where you click. It comes in as plain text.
+
 ## Can I edit a Word document with Blank?
 
 You can open it with `Mod` `O`: Blank turns it into a markdown document and leaves the Word file as it is. When you're done, save it as markdown with `Mod` `S`, or send it back as a Word document with `Mod` `Alt` `W`. Blank never writes markdown into a .docx, so the original can't get lost by accident. See [Back and forth with Word users](./files#back-and-forth) for how it works and what comes along.
