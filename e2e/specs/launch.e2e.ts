@@ -13,6 +13,41 @@ describe("launch", () => {
     await waitForInk("Welcome to Blank");
   });
 
+  it("loads DejaVu Sans only for a character IBM Plex Sans lacks", async () => {
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    const loaded = () =>
+      browser.execute(() =>
+        [...document.fonts]
+          .filter((face) => face.status === "loaded")
+          .map((face) => face.family.replace(/"/g, "")),
+      );
+    // nothing at the start needs it
+    expect(await loaded()).not.toContain("DejaVu Sans");
+    // an arrow Plex lacks, in the UI's fonts, as the bars and dialogs set it,
+    // kept until its face is loaded
+    await browser.execute(() => {
+      const probe = document.createElement("span");
+      probe.id = "fallback-probe";
+      probe.style.font = "32px var(--font-family)";
+      probe.textContent = "⇒";
+      document.body.append(probe);
+    });
+    await browser.waitUntil(
+      async () => (await loaded()).includes("DejaVu Sans"),
+      {
+        timeoutMsg: "DejaVu Sans wasn't loaded for ⇒",
+      },
+    );
+    const width = await browser.execute(() => {
+      const probe = document.getElementById("fallback-probe")!;
+      const width = probe.getBoundingClientRect().width;
+      probe.remove();
+      return width;
+    });
+    // drawn, not left out
+    expect(width).toBeGreaterThan(10);
+  });
+
   it("shows an untitled document", async () => {
     await expect($("#ui-top")).toHaveText("» Untitled");
   });

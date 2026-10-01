@@ -55,6 +55,13 @@ describe("without the layout engine", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it("shows the text in IBM Plex Sans", async () => {
+    const font = await browser.execute(
+      () => getComputedStyle(document.querySelector("#editor")!).fontFamily,
+    );
+    expect(font).toMatch(/IBM Plex Sans/);
+  });
+
   it("shows the header at the top edge", async () => {
     await expect($("#band-header")).toBeDisplayed();
     await expect($("#band-header .band-line")).toHaveText(
