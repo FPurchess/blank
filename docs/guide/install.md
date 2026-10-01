@@ -4,7 +4,7 @@
 
 ## macOS
 
-Blank needs macOS 11 (Big Sur) or newer.
+Blank 3 needs macOS 12 (Monterey) or newer.
 
 Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
 

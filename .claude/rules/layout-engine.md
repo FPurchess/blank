@@ -75,7 +75,7 @@ The wasm API between Rust (`model.rs`, `wasm.rs`) and TypeScript (`flatten.ts`, 
 - The text is painted from unhinted outlines with grayscale anti-aliasing on whole-pixel baselines: a shade lighter than the webview's text at 1×, no subpixel anti-aliasing.
 - The IME and screen readers rely on the hidden, moved contenteditable. A real composing input method, and macOS and Windows input methods and screen readers, haven't been tested. Orca reads the lines as the hidden editor breaks them.
 - The Word export keeps its own layout and fonts (code in Courier New), so Word and the PDF can differ.
-- It needs WebKit with Safari 15's wasm features, hence macOS 11 or newer.
+- It needs the wasm features of Safari 15's WebKit, which macOS 12 (Monterey) ships with, hence macOS 12 or newer.
 - A new feature that measures the DOM measures the wrong place. Measure through `src/engine/geometry.ts`.
 
 ## Measurements worth keeping

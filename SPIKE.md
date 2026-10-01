@@ -32,7 +32,7 @@ For the metainfo's `<release version="3.0.0">` (one paragraph, as for 2.x):
 > Chinese, Japanese, Korean and other scripts in the fonts on your computer.
 > Table cells hold lists, quotes, code and images, and a row too tall for a
 > page goes on over the next ones, under the repeated header rows. Your
-> markdown files and settings stay as they are; Blank now needs macOS 11 or
+> markdown files and settings stay as they are. Blank 3 needs macOS 12 or
 > newer.
 
 For the GitHub release:
@@ -63,7 +63,7 @@ For the GitHub release:
 >     in the PDF alike.
 > - `Mod`+click still opens links, now on the pages too.
 > - **Known limits:** no hyphenation or justification yet.
-> - **Requirements:** macOS 11 (Big Sur) or newer.
+> - **Requirements:** Blank 3 needs macOS 12 (Monterey) or newer.
 > - Your markdown files and your settings are unchanged.
 
 ## Decisions for the owner
@@ -73,9 +73,9 @@ For the GitHub release:
   (the wasm freshness check, the engine's tests and the notices) runs on every
   push and pull request, and `publish.yml` and `make release` require it, but
   a pull request can merge without it.
-- **The macOS minimum:** 11.0 (Big Sur), whose Safari 15 WebKit compiles the
-  engine's wasm (bulk memory, reference types, …). Older Macs would start
-  without the engine and without PDF export.
+- **The macOS minimum (decided):** 12.0 (Monterey), which ships with Safari
+  15, whose WebKit compiles the engine's wasm (bulk memory, reference types,
+  …). macOS 11 shipped with Safari 14, so Big Sur is no longer supported.
 - **System fonts:** fonts whose licence forbids embedding a subset, or that
   have no outlines, are skipped for the next fallback family. The alternative,
   bundling Noto Sans CJK, costs about 16 MB per weight.
@@ -85,8 +85,9 @@ For the GitHub release:
 
 ## Manual test checklist
 
-On a release build of each platform (Linux, Windows, macOS 11 and the newest
-macOS, Apple Silicon and Intel):
+On a release build of each platform (Linux, Windows, and macOS 12 Monterey as
+the oldest Mac plus the newest macOS, Apple Silicon and Intel). Big Sur is no
+longer supported:
 
 - [ ] The app starts on the pages, in "page ends"; Mod-Alt-V switches to the
       sheets and back, and the view is remembered after a restart.
