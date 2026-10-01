@@ -127,8 +127,9 @@ describe("rendering", () => {
     // within the sentence, where autocorrect leaves it lowercase; the line
     // is painted again, and not only laid out
     const line = await lineBox("is where");
-    // painted once already, so only the edit changes it
-    await waitForInk(line);
+    // painted once already, so only the edit changes it; a short line takes
+    // a little of the page's width
+    await waitForInk(line, {}, 0.02);
     const before = await inkPrint(line);
     await clickText("is where");
     await type("inkcheck ");

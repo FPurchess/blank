@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { recordingContext } from "../../test/canvas";
-import { Canvas2DPainter } from "./canvas2d";
+import { paintCalls, recordingContext } from "../../test/canvas";
+import { Canvas2DPainter, ROLE_OPACITY } from "./canvas2d";
 
 const DISPLAY = {
   r: [[10, 20, 30, 0.1, 0]],
@@ -48,6 +48,11 @@ describe("Canvas2DPainter", () => {
     expect(calls).toContainEqual(["transform", 0.02, 0, 0, -0.02, 4, 40]);
     expect(calls).toContainEqual(["transform", 0.02, 0, 0, -0.02, 16, 40]);
     expect(glyph).toHaveBeenCalledWith(0, 43);
+    // in the theme's colour, the rectangle and the glyphs as their roles are
+    // (text at full opacity)
+    const styles = calls.filter((call) => call[0] === "style");
+    expect(styles).toContainEqual(["style", "black", ROLE_OPACITY[0]]);
+    expect(styles.every((call) => call[1] === "black")).toBe(true);
   });
 
   it("paints nothing without an engine", () => {
@@ -93,13 +98,16 @@ describe("Canvas2DPainter", () => {
       "createImageBitmap",
       vi.fn(async () => bitmap),
     );
-    const { painter, surface } = setUp();
-    expect(painter.snapshots).toBe(true);
-    const snapshot = (await painter.snapshot(surface))!;
-    expect(snapshot).toMatchObject({ width: 200, height: 100 });
-    snapshot.close?.();
-    expect(bitmap.close).toHaveBeenCalled();
-    vi.unstubAllGlobals();
+    try {
+      const { painter, surface } = setUp();
+      expect(painter.snapshots).toBe(true);
+      const snapshot = (await painter.snapshot(surface))!;
+      expect(snapshot).toMatchObject({ width: 200, height: 100 });
+      snapshot.close?.();
+      expect(bitmap.close).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("frees a canvas' pixels when its surface is released", () => {
@@ -128,5 +136,13 @@ describe("Canvas2DPainter", () => {
     expect(calls).toContainEqual(["clipRect", 4, 16, 20, 10]);
     expect(order.indexOf("clip")).toBeLessThan(order.indexOf("fill"));
     expect(order[order.length - 1]).toBe("restore");
+  });
+
+  it("records only what a canvas shows since its size was set", () => {
+    const canvas = document.createElement("canvas");
+    canvas.getContext("2d")!.fillRect(0, 0, 1, 1);
+    expect(paintCalls(canvas)).not.toEqual([]);
+    canvas.width = 10;
+    expect(paintCalls(canvas)).toEqual([]);
   });
 });

@@ -27,6 +27,8 @@ export const parseColor = (value: string, background?: Rgb): Rgb => {
   const rgb = /^rgba?\(([^)]*)\)$/i.exec(text);
   if (rgb) {
     const [r, g, b, a = 1] = rgb[1].split(",").map(Number);
+    if ([r, g, b, a].some(Number.isNaN))
+      throw new Error(`not a colour: ${value}`);
     const color: Rgb = [r / 255, g / 255, b / 255];
     return a === 1 ? color : mix(color, background ?? [0, 0, 0], a);
   }

@@ -21,10 +21,17 @@ export const recordingContext = (
     imageSmoothingQuality: "low",
     setTransform: (...args: number[]) => calls.push(["transform", ...args]),
     clearRect: (...args: number[]) => calls.push(["clear", ...args]),
-    fillRect: (...args: number[]) => calls.push(["rect", ...args]),
+    fillRect: (...args: number[]) => {
+      calls.push(["rect", ...args]);
+      // in what it was painted, for the tests of colours and roles
+      calls.push(["style", context.fillStyle, context.globalAlpha]);
+    },
     drawImage: (image: unknown, ...args: number[]) =>
       calls.push(["image", image, ...args]),
-    fill: (path: unknown) => calls.push(["fill", path]),
+    fill: (path: unknown) => {
+      calls.push(["fill", path]);
+      calls.push(["style", context.fillStyle, context.globalAlpha]);
+    },
     save: () => calls.push(["save"]),
     restore: () => calls.push(["restore"]),
     beginPath: () => calls.push(["beginPath"]),
@@ -61,6 +68,24 @@ export const installCanvasStub = () => {
     }
     return context;
   } as typeof HTMLCanvasElement.prototype.getContext;
+  // setting a canvas' size clears it, and what was painted into it
+  for (const size of ["width", "height"] as const) {
+    const own = Object.getOwnPropertyDescriptor(
+      HTMLCanvasElement.prototype,
+      size,
+    );
+    if (!own?.set || !own.get) continue;
+    Object.defineProperty(HTMLCanvasElement.prototype, size, {
+      configurable: true,
+      get(this: HTMLCanvasElement) {
+        return own.get!.call(this);
+      },
+      set(this: HTMLCanvasElement, value: number) {
+        own.set!.call(this, value);
+        records.get(this)?.splice(0);
+      },
+    });
+  }
   globalThis.Path2D ??= class {
     constructor(readonly d?: string) {}
   } as unknown as typeof Path2D;

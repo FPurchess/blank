@@ -32,6 +32,14 @@ const caretTop = async () => {
   );
 };
 
+// and how far to the right
+const caretLeft = () =>
+  browser.execute(
+    () =>
+      document.querySelector("#page-view .page-caret")?.getBoundingClientRect()
+        .left ?? null,
+  );
+
 const URL = `https://example.com/${"a-rather-long-path-segment/".repeat(8)}end`;
 
 describe("navigation", () => {
@@ -86,8 +94,11 @@ describe("navigation", () => {
     await open(`see ${URL} for more.\n`);
     await clickText("see");
     const before = await caretTop();
+    const start = await caretLeft();
     await browser.keys(Key.End);
+    // at the end of the same line, not where it was
     expect(await caretTop()).toBe(before);
+    expect((await caretLeft())! - start!).toBeGreaterThan(100);
   });
 
   it("selects cells with Shift and down, and with a drag", async () => {
@@ -114,9 +125,9 @@ describe("navigation", () => {
       x: Math.round((columns[column] + columns[column + 1]) / 2),
       y: Math.round((rows[row] + rows[row + 1]) / 2),
     });
-    // the pages paint it over both rows of the column, under their text: the
-    // colour behind cells c and e is the selection's, not that of d, a body
-    // cell outside it (header cells have a shade of their own)
+    // the pages paint it over both rows of the column, the selected text
+    // over it: the colour behind cells c and e is the selection's, not that
+    // of d, a body cell outside it (header cells have a shade of their own)
     const cell = (column: number, row: number) => ({
       left: columns[column] + 3,
       right: columns[column + 1] - 3,

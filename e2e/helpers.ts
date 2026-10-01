@@ -247,6 +247,8 @@ export interface InkOptions {
   // "canvas" reads the pages' canvases, "screen" a screenshot, which also
   // has what is shown over them, like the selection and the marks
   source?: "canvas" | "screen";
+  // which of a page's canvases, e.g. ".page-bands.header" for its header
+  layers?: string;
 }
 
 /**
@@ -297,74 +299,80 @@ export const boxOf = async (
  * (the sheet's colour is under it). It reads what the canvases show,
  * painted or drawn from a kept bitmap.
  */
-const canvasInk = (box: Box) =>
-  browser.execute((box: Box) => {
-    let total = 0;
-    let inked = 0;
-    // what the pixels show, as a number that changes when any of them does
-    let print = 0;
-    const sum = [0, 0, 0];
-    // a frame's canvases lie over each other, its text and the strips of
-    // its header and footer, so a pixel counts once, with the ink on top
-    for (const frame of document.querySelectorAll<HTMLElement>(
-      "#page-view .page-frame",
-    )) {
-      const canvases = [
-        ...frame.querySelectorAll<HTMLCanvasElement>(".page-canvas"),
-      ];
-      const base = canvases[0]?.getBoundingClientRect();
-      if (!base?.width || !base.height) continue;
-      const left = Math.max(box.left, base.left);
-      const top = Math.max(box.top, base.top);
-      const right = Math.min(box.right, base.right);
-      const bottom = Math.min(box.bottom, base.bottom);
-      if (right <= left || bottom <= top) continue;
-      // device pixels per CSS pixel, the same for all of the frame's
-      const ratio = canvases[0].width / base.width;
-      const columns = Math.max(1, Math.ceil((right - left) * ratio));
-      const rows = Math.max(1, Math.ceil((bottom - top) * ratio));
-      total += columns * rows;
-      // the colour seen at each device pixel of the box, by row and column
-      const seen = new Map<number, number[]>();
-      for (const canvas of canvases) {
-        const rect = canvas.getBoundingClientRect();
-        const x0 = Math.max(left, rect.left);
-        const y0 = Math.max(top, rect.top);
-        const x1 = Math.min(right, rect.right);
-        const y1 = Math.min(bottom, rect.bottom);
-        if (x1 <= x0 || y1 <= y0) continue;
-        const x = Math.floor((x0 - rect.left) * ratio);
-        const y = Math.floor((y0 - rect.top) * ratio);
-        const width = Math.max(1, Math.ceil((x1 - x0) * ratio));
-        const height = Math.max(1, Math.ceil((y1 - y0) * ratio));
-        const { data } = canvas
-          .getContext("2d")!
-          .getImageData(x, y, width, height);
-        // where this part lies in the box
-        const column0 = Math.round((x0 - left) * ratio);
-        const row0 = Math.round((y0 - top) * ratio);
-        for (let row = 0; row < height; row++) {
-          for (let column = 0; column < width; column++) {
-            const index = (row * width + column) * 4;
-            // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
-            if (data[index + 3] < 24) continue;
-            seen.set((row0 + row) * columns + column0 + column, [
-              data[index],
-              data[index + 1],
-              data[index + 2],
-            ]);
+const canvasInk = (box: Box, layers = ".page-canvas") =>
+  browser.execute(
+    (box: Box, layers: string) => {
+      let total = 0;
+      let inked = 0;
+      // what the pixels show, as a number that changes when any of them does
+      let print = 0;
+      const sum = [0, 0, 0];
+      // a frame's canvases lie over each other, its text and the strips of
+      // its header and footer, so a pixel counts once, with the ink on top
+      for (const frame of document.querySelectorAll<HTMLElement>(
+        "#page-view .page-frame",
+      )) {
+        const canvases = [...frame.querySelectorAll<HTMLCanvasElement>(layers)];
+        const base = frame
+          .querySelector<HTMLCanvasElement>(".page-canvas")
+          ?.getBoundingClientRect();
+        if (!base?.width || !base.height) continue;
+        const left = Math.max(box.left, base.left);
+        const top = Math.max(box.top, base.top);
+        const right = Math.min(box.right, base.right);
+        const bottom = Math.min(box.bottom, base.bottom);
+        if (right <= left || bottom <= top) continue;
+        if (!canvases.length) continue;
+        // device pixels per CSS pixel, the same for all of the frame's
+        const ratio =
+          canvases[0].width / canvases[0].getBoundingClientRect().width;
+        const columns = Math.max(1, Math.ceil((right - left) * ratio));
+        const rows = Math.max(1, Math.ceil((bottom - top) * ratio));
+        total += columns * rows;
+        // the colour seen at each device pixel of the box, by row and column
+        const seen = new Map<number, number[]>();
+        for (const canvas of canvases) {
+          const rect = canvas.getBoundingClientRect();
+          const x0 = Math.max(left, rect.left);
+          const y0 = Math.max(top, rect.top);
+          const x1 = Math.min(right, rect.right);
+          const y1 = Math.min(bottom, rect.bottom);
+          if (x1 <= x0 || y1 <= y0) continue;
+          const x = Math.floor((x0 - rect.left) * ratio);
+          const y = Math.floor((y0 - rect.top) * ratio);
+          const width = Math.max(1, Math.ceil((x1 - x0) * ratio));
+          const height = Math.max(1, Math.ceil((y1 - y0) * ratio));
+          const { data } = canvas
+            .getContext("2d")!
+            .getImageData(x, y, width, height);
+          // where this part lies in the box
+          const column0 = Math.round((x0 - left) * ratio);
+          const row0 = Math.round((y0 - top) * ratio);
+          for (let row = 0; row < height; row++) {
+            for (let column = 0; column < width; column++) {
+              const index = (row * width + column) * 4;
+              // faint marks too: table lines paint at 0.2 (ROLE_OPACITY)
+              if (data[index + 3] < 24) continue;
+              seen.set((row0 + row) * columns + column0 + column, [
+                data[index],
+                data[index + 1],
+                data[index + 2],
+              ]);
+            }
           }
         }
+        inked += seen.size;
+        for (const [at, color] of seen) {
+          print = (Math.imul(print, 31) + at * 7 + color[0] + color[1]) | 0;
+          for (let channel = 0; channel < 3; channel++)
+            sum[channel] += color[channel];
+        }
       }
-      inked += seen.size;
-      for (const [at, color] of seen) {
-        print = (Math.imul(print, 31) + at * 7 + color[0] + color[1]) | 0;
-        for (let channel = 0; channel < 3; channel++)
-          sum[channel] += color[channel];
-      }
-    }
-    return { total, inked, sum, print };
-  }, box);
+      return { total, inked, sum, print };
+    },
+    box,
+    layers,
+  );
 
 export interface ScreenStats extends Ink {
   // the most common colour in the box, and the mean of all of it
@@ -391,10 +399,13 @@ export const screenStats = async (box: Box): Promise<ScreenStats> => {
         canvas.height = image.height;
         const context = canvas.getContext("2d")!;
         context.drawImage(image, 0, 0);
+        // within the screenshot: what lies outside it would read as black
         const x = Math.max(0, Math.floor(box.left * scale));
         const y = Math.max(0, Math.floor(box.top * scale));
-        const width = Math.max(1, Math.ceil((box.right - box.left) * scale));
-        const height = Math.max(1, Math.ceil((box.bottom - box.top) * scale));
+        const right = Math.min(image.width, Math.ceil(box.right * scale));
+        const bottom = Math.min(image.height, Math.ceil(box.bottom * scale));
+        const width = Math.max(1, right - x);
+        const height = Math.max(1, bottom - y);
         const { data } = context.getImageData(x, y, width, height);
         const counts = new Map<number, number>();
         const mean = [0, 0, 0];
@@ -461,7 +472,7 @@ export const paintedInk = async (
     const { share, ink } = await screenStats(box);
     return { share, ink };
   }
-  const { total, inked, sum } = await canvasInk(box);
+  const { total, inked, sum } = await canvasInk(box, options.layers);
   if (!total) throw new Error(`no page is painted at ${JSON.stringify(box)}`);
   return {
     share: inked / total,
@@ -502,7 +513,8 @@ export const lineBox = async (text: string): Promise<Box> => {
 export const waitForInk = async (
   target: string | Box,
   options: InkOptions = {},
-  min = 0.02,
+  // a word covers 15–30 % of its box, a line a bit less
+  min = 0.05,
 ) => {
   let last: Ink | string | null = null;
   await browser
