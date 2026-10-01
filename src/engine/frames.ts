@@ -16,7 +16,7 @@ export const VIEW_TOP = 56;
 // properties
 export const PROPERTIES_ROOM = 28;
 // the room between a header or footer and the page's text in "page ends"
-export const BAND_GAP = 16;
+export const BAND_GAP = 32;
 // room above the first page's text in "page ends" for its header, between
 // the properties' room and the first frame: its line, and the gap below it
 export const HEADER_ROOM = 20 + BAND_GAP;
