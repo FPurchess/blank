@@ -79,10 +79,14 @@ Next, in this order:
 5. m4: edge scrolling while moving text (reuse `edgeStep`/`scrollAtEdges`
    in `PageView.vue` for `pageMove`), and a stale drop caret after a wheel
    scroll mid-move.
-6. M6: an E2E that presses the ContextMenu key in the plain editor
-   (`blank.engine=off`, `restartApp`) to see whether WebKitGTK's key event
-   reaches `nativePointer` as a right click; fix only if it reproduces,
-   else record it here.
+6. M6, checked: `withoutEngine.e2e.ts` now opens the menu with Shift+F10
+   in the plain editor and checks that it opens once, as a keyboard menu
+   with its first item focused: it does. WebDriver has no ContextMenu key,
+   and its Shift+F10 makes WebKitGTK send no `contextmenu` event of its own
+   (a listener recorded none), so the double open the review feared can't be
+   driven in E2E, and it didn't reproduce. Left as it is. If a real
+   ContextMenu key ever opens the menu twice, the fix is to check
+   `openedByKeyboardAt` (contextMenu.ts) in `nativePointer`'s `contextmenu`.
 7. Test gaps: the Page Down goal test should start mid-line (goal ≠ x); the
    handles scroll test should check the new box; cover `breakForTest` and
    the strict rethrow; make `InProcessWorker` in `pdf.test.ts` respect
