@@ -47,6 +47,11 @@ read-fonts = "0.41"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"
 
+# the primary selection, which a middle click pastes (src/primary.rs); the
+# version tauri's webview already uses
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
 
 [dev-dependencies]
 tempfile = "3"

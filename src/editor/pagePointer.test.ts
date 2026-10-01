@@ -5,12 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forgetEngineFailure, useFallbackEditor } from "../engine/engine";
 import { schema } from "../markdown";
 import { doc, p } from "../test/editor";
+import { invoke } from "@tauri-apps/api/core";
+
 import {
+  hasPrimarySelection,
   nativePointer,
+  pastePrimary,
   PAGE_MENU,
   PAGE_PRESS,
   type PagePointerEvent,
 } from "./pagePointer";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 describe("nativePointer", () => {
   let view: EditorView;
@@ -92,5 +98,57 @@ describe("nativePointer", () => {
     presses.length = 0;
     fire("contextmenu", { button: 0, clientX: 0, clientY: 0 });
     expect(presses).toEqual([]);
+  });
+});
+
+describe("pastePrimary", () => {
+  let view: EditorView;
+  const platform = (name: string) =>
+    vi.spyOn(navigator, "platform", "get").mockReturnValue(name);
+
+  beforeEach(() => {
+    // what ProseMirror's paste makes, which jsdom lacks
+    vi.stubGlobal("ClipboardEvent", class extends Event {});
+    view = new EditorView(document.createElement("div"), {
+      state: EditorState.create({ schema, doc: doc(p("hello world")) }),
+    });
+  });
+  afterEach(() => view.destroy());
+
+  it("pastes the primary selection where the middle click was, as plain text", async () => {
+    platform("Linux x86_64");
+    vi.mocked(invoke).mockResolvedValue("**bold** ");
+
+    expect(await pastePrimary(view, 7)).toBe(true);
+
+    expect(invoke).toHaveBeenCalledWith("read_primary");
+    // as typed, not as markdown
+    expect(view.state.doc.textContent).toBe("hello **bold** world");
+  });
+
+  it("moves the caret there without a primary selection", async () => {
+    platform("Linux x86_64");
+    vi.mocked(invoke).mockResolvedValue(null);
+    await pastePrimary(view, 4);
+    expect(view.state.selection.head).toBe(4);
+    expect(view.state.doc.textContent).toBe("hello world");
+  });
+
+  it("goes on when the primary selection can't be read", async () => {
+    platform("Linux x86_64");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(invoke).mockRejectedValue(new Error("no display"));
+    expect(await pastePrimary(view, 4)).toBe(true);
+    expect(view.state.doc.textContent).toBe("hello world");
+  });
+
+  it("does nothing where there's no primary selection, on macOS and Windows", async () => {
+    for (const name of ["MacIntel", "Win32"]) {
+      platform(name);
+      expect(hasPrimarySelection()).toBe(false);
+      expect(await pastePrimary(view, 4)).toBe(false);
+    }
+    expect(invoke).not.toHaveBeenCalled();
+    expect(view.state.selection.head).not.toBe(4);
   });
 });

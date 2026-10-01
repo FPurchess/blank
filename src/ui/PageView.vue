@@ -15,6 +15,8 @@ import { alignHiddenEditor } from "../editor/hidden";
 import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
 import {
   dropExternal,
+  hasPrimarySelection,
+  pastePrimary,
   PAGE_MENU,
   PAGE_PRESS,
   type PagePointer,
@@ -420,6 +422,11 @@ const onMouseDown = (event: MouseEvent) => {
     move.mouseDown(event, true);
     return;
   }
+  // a middle click pastes the primary selection there, on Linux
+  if (event.button === 1) {
+    void pastePrimary(editor.view, pointerAt(event).pos);
+    return;
+  }
   if (event.button !== 0) return;
   // a header or footer opens on a double click, and a press on it leaves
   // the selection where it is
@@ -432,6 +439,12 @@ const onMouseDown = (event: MouseEvent) => {
     shift: event.shiftKey,
   });
   dragAt = { x: event.clientX, y: event.clientY };
+};
+
+// the webview pastes the primary selection itself when the middle button
+// is let go, with its markup and where the caret was: pastePrimary did
+const onMouseUp = (event: MouseEvent) => {
+  if (event.button === 1 && hasPrimarySelection()) event.preventDefault();
 };
 
 // moving the selected text to another place, see src/editor/pageMove.ts
@@ -591,6 +604,7 @@ onUnmounted(() => {
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
+    @mouseup="onMouseUp"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"

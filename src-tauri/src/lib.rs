@@ -1,4 +1,5 @@
 pub mod fonts;
+pub mod primary;
 pub mod spellcheck;
 
 use tauri::Manager;
@@ -39,6 +40,7 @@ pub fn run() {
             spellcheck::spellcheck_add,
             spellcheck::spellcheck_remove,
             fonts::fallback_fonts,
+            primary::read_primary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
