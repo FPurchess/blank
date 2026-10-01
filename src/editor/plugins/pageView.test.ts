@@ -167,6 +167,36 @@ describe("pageView plugin", () => {
     expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
   });
 
+  it("keeps the column of ↑ and ↓ for Page Down past a shorter line", () => {
+    // a long line, short ones, then long ones a view's height below
+    const line = "abcdefghij klmnopqrst uvwxyz";
+    const mounted = mount(
+      doc(
+        p(line),
+        ...Array.from({ length: 3 }, () => p("ab")),
+        ...Array.from({ length: 80 }, () => p(line)),
+      ),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    mounted.view.dispatch(
+      mounted.view.state.tr.setSelection(
+        TextSelection.create(mounted.view.state.doc, 21),
+      ),
+    );
+    const start = pageCaret.value!;
+    // onto a short line, whose end is left of the column
+    mounted.press("ArrowDown");
+    expect(pageCaret.value!.x).toBeLessThan(start.x - 20);
+    expect(mounted.press("PageDown")).toBe(true);
+    // back at the column on the long lines below, within a pixel
+    const scale = 18 / 11;
+    expect(
+      mounted.view.state.doc.resolve(mounted.view.state.selection.head).parent
+        .textContent,
+    ).toBe(line);
+    expect(Math.abs(pageCaret.value!.x - start.x) * scale).toBeLessThan(1);
+  });
+
   it("moves a view's height with Page Up and Down, keeping its place", () => {
     const mounted = mount(doc(...Array.from({ length: 30 }, () => p(LONG))));
     destroy = () => mounted.pluginView.destroy?.();

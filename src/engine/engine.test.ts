@@ -8,6 +8,7 @@ import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import {
   bootEngine,
+  engineInstanceBroken,
   engineless,
   engineStatus,
   forgetEngineFailure,
@@ -250,5 +251,40 @@ describe("an image in a table cell", () => {
     const [box] = engine.boxes(4, 5);
     expect(box).toMatchObject({ page: 0 });
     expect(box.width).toBeCloseTo(shown[3]);
+  });
+});
+
+describe("an engine's failures", () => {
+  afterEach(() => forgetEngineFailure());
+
+  it("fail the next call after breakForTest, as a trap does", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const engine = testEngine();
+    engine.sync(doc(p("text")), noSizes);
+    engine.breakForTest();
+    expect(engine.pages()).toBe(0);
+    expect(engine.broken).toBe(true);
+    expect(engineInstanceBroken()).toBe(true);
+    // given up: the calls after it don't reach the engine
+    const counted = vi.spyOn(engine.raw, "pageCount");
+    expect(engine.pages()).toBe(0);
+    expect(counted).not.toHaveBeenCalled();
+  });
+
+  it("are thrown by a strict engine, a trap and any other error", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const strict = testEngine().sharing(true);
+    vi.spyOn(strict.raw, "pdf").mockImplementationOnce(() => {
+      throw new Error("the image x can't be written");
+    });
+    expect(() => strict.pdf("", "")).toThrow("the image x can't be written");
+    // an error of its own: the instance is fine
+    expect(engineInstanceBroken()).toBe(false);
+    expect(strict.broken).toBe(false);
+
+    strict.breakForTest();
+    expect(() => strict.pages()).toThrow(WebAssembly.RuntimeError);
+    expect(engineInstanceBroken()).toBe(true);
+    expect(() => strict.pages()).toThrow("the page layout failed before");
   });
 });
