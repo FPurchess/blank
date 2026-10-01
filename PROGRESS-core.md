@@ -329,7 +329,25 @@ The self-review's findings, with the numbers from the report to the coordinator.
     - the property test, also with 2000 edits in release
   - Timings at a load average of 20–24, the best of 3 alternate runs, before → after: 0.325 → 0.315, 0.342 → 0.370, 0.539 → 0.449 and 1.597 → 1.536 ms at 1, 39, 200 and 823 pages. Within the noise; the counters show the work saved.
 
-### Where the review fixes stand (stopped at 00:17 on 2026-10-01 for the night)
+- m10 (618077f): `pdf_is_tagged` matches roles as whole words (`has_role`), so `/S /L` is no longer found in `/S /LI`. The test also checks that `/Lb` isn't found, which the old substring match did find.
+- m9 (a924976): the doc comments of `setSettings`/`withFontsOf` are where they belong, `page()` is marked deprecated, and `Warning::Font` names instance indices.
+- Trailing-space family names (d68ee67): a font registering one family whose name has spaces around it ("Mitra " in MitraMono) is registered again under the trimmed name, which fontconfig and JS use. Test: `finds_a_family_named_with_a_space_after_it`, with the system's MitraMono (it skips where the font isn't installed); Bengali was missing before.
+- m8, the retry bound only (d904366): `attempts` counts the instances of variable fonts too. Test: `may_leave_out_every_instance_too`.
+- List context on image blocks in cells (4bf2363, an S2 addition the coordinator approved; see SEAM.md):
+  - `indent`, `marker` (at the image's top) and `bars` on `image` blocks
+  - `TableCell::markers` records each marker with the block it marks, and `TableCell::alts` the alt texts of images not loaded; `tags::cell_content` uses them, where it used to match baselines
+  - Tests: `lays_out_an_image_in_a_list_in_a_cell` and `pdf::tests::tags_an_image_in_a_list_in_a_cell_as_a_list_item`
+
+### What's left, for later
+
+- m8, the rest:
+  - `index_of` when a font file is there twice
+  - TH scope Row for header cells in body rows
+  - no empty P for empty cells
+  - one tagged section per line and part, for fewer MCIDs
+- The other perf leftovers of m7: `glyph_runs`' O(C²) cluster lookup, and the PDF's double pass over the pages.
+
+### Where the review fixes stand (on 2026-10-01 at 00:17; all of it was done in the morning, see above)
 
 Everything above is committed; nothing is half done in the tree. Next, in this order (the coordinator's list):
 
