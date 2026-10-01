@@ -389,6 +389,15 @@ impl Paginator<'_> {
         let mut current = index;
         loop {
             if current > index {
+                // what starts a page of its own isn't kept with: a page
+                // break, or a heading that starts a new page
+                let item = &self.items[current];
+                let level = item.heading_level();
+                let top = matches!(&item.content, Content::Text(text) if text.top);
+                let new_page = top && level > 0 && self.settings.new_page_before.contains(&level);
+                if new_page || matches!(item.content, Content::Break { .. }) {
+                    return height;
+                }
                 height += self.items[current - 1].after + self.items[current].before;
             }
             if self.items[current].heading_level() == 0 {
@@ -775,5 +784,32 @@ mod tests {
         chapter.before = 0.0;
         engine.set_items(vec![page_break(0), chapter]);
         assert_eq!(engine.pages.len(), 1);
+    }
+
+    #[test]
+    fn keeps_a_heading_with_what_follows_only_up_to_a_new_page() {
+        // a heading, then a chapter that starts a new page: the heading
+        // isn't kept with the chapter, which would leave it alone on a page
+        // between the two
+        let settings = Settings {
+            new_page_before: vec![1],
+            ..Default::default()
+        };
+        let room = settings.content_bottom() - settings.content_top();
+        let mut first = paragraph(1, "x");
+        first.after = room - 16.0 - 60.0;
+        let mut engine = Engine::new(repository_fonts());
+        engine.set_settings(settings);
+        engine.set_items(vec![
+            first,
+            heading(4, 2, "Two"),
+            heading(10, 1, "One"),
+            paragraph(16, "text"),
+        ]);
+        let pages: Vec<usize> = (0..4)
+            .map(|item| engine.page_of_frag(engine.first_frag[item]))
+            .collect();
+        assert_eq!(pages, [0, 0, 1, 1]);
+        assert_eq!(engine.pages.len(), 2);
     }
 }
