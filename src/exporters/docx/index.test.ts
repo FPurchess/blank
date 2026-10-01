@@ -610,6 +610,11 @@ describe("exporter.docx", () => {
       expect(attr(child(style, "rFonts"), "ascii")).toBe("IBM Plex Mono");
     }
     expect(await exported.text("word/styles.xml")).not.toMatch(/Courier/);
+    // monospaced where a reader lacks it, so code keeps its columns
+    const font = all(await exported.xml("word/fontTable.xml"), "font").find(
+      (element) => attr(element, "name") === "IBM Plex Mono",
+    )!;
+    expect(attr(child(font, "pitch"), "val")).toBe("fixed");
   });
 
   it("titles the document by its first heading", async () => {

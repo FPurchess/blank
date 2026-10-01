@@ -63,6 +63,22 @@ describe("exporter.docx.fixPackage", () => {
     );
   });
 
+  it("gives the font of code a fixed pitch, and only that one", async () => {
+    const font = (name: string) =>
+      `<w:font w:name="${name}"><w:family w:val="auto"/><w:pitch w:val="variable"/></w:font>`;
+    const file = await unpack(
+      await fixPackage(
+        await pack({
+          "word/fontTable.xml": `<w:fonts>${font("IBM Plex Sans")}${font("IBM Plex Mono")}</w:fonts>`,
+        }),
+      ),
+    );
+
+    expect(await file("word/fontTable.xml")).toBe(
+      `<w:fonts>${font("IBM Plex Sans")}<w:font w:name="IBM Plex Mono"><w:family w:val="modern"/><w:pitch w:val="fixed"/></w:font></w:fonts>`,
+    );
+  });
+
   it("leaves documents without these parts alone", async () => {
     const file = await unpack(
       await fixPackage(await pack({ "word/document.xml": "<w:document/>" })),
