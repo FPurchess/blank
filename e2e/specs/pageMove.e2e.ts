@@ -3,6 +3,7 @@ import { browser, expect } from "@wdio/globals";
 import {
   editorText,
   focusEditor,
+  paste,
   pressMod,
   textBox,
   type,
@@ -118,5 +119,42 @@ describe("moving text on the pages", () => {
       .perform();
     await frames();
     expect((await editorText())[0]).toBe(SHOWN);
+  });
+
+  it("scrolls at the bottom edge while a word is dragged there", async () => {
+    // lines enough for a few pages after the first
+    await pressMod("End");
+    await paste({
+      "text/plain": Array.from({ length: 120 }, (_, n) => `line ${n}`).join(
+        "\n\n",
+      ),
+    });
+    await frames();
+    await pressMod("Home");
+    await frames();
+    await selectWord("beta");
+    const from = await pointAt("beta", 2);
+    const height = await browser.execute(() => window.innerHeight);
+    await browser
+      .action("pointer")
+      .move(from)
+      .down()
+      .move({ ...from, y: from.y + 10, duration: 50 })
+      // at the bottom edge, where the view scrolls
+      .move({ ...from, y: height - 4, duration: 100 })
+      .pause(800)
+      // back up onto the pages, and let go there
+      .move({ ...from, y: Math.round(height / 2), duration: 100 })
+      .up()
+      .perform();
+    await frames();
+    const scrolled = await browser.execute(
+      () => document.getElementById("page-view")!.scrollTop,
+    );
+    expect(scrolled).toBeGreaterThan(200);
+    const [first, ...rest] = await editorText("#editor p");
+    // gone from the first line, and dropped further down
+    expect(first).not.toContain("beta");
+    expect(rest.join("\n")).toContain("beta");
   });
 });

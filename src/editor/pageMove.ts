@@ -39,6 +39,8 @@ export interface PageMove {
    */
   mouseDown(event: MouseEvent, taken: boolean): boolean;
   move(event: PointerEvent): void;
+  // whether the selected text is being dragged, past a press in it
+  readonly dragging: boolean;
   up(event: PointerEvent): void;
   cancel(): void;
 }
@@ -101,5 +103,8 @@ export const pageMove = (target: MoveTarget): PageMove => {
       target.press(was.x, was.y);
     },
     cancel,
+    get dragging() {
+      return moving?.dragging ?? false;
+    },
   };
 };

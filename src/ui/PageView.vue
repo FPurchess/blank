@@ -346,7 +346,11 @@ onUnmounted(() => {
 // scrolling moves nothing but the pages: the hidden editor follows the
 // caret when it moves or composing starts, not the scrolling, since moving
 // it makes the webview lay out all of it again
-const onScroll = () => measureSoon();
+const onScroll = () => {
+  measureSoon();
+  // e.g. the wheel while text is dragged
+  requestAnimationFrame(moveAgain);
+};
 
 // how long the view takes to render, for the measurements
 let renderStart = 0;
@@ -448,8 +452,26 @@ const move = pageMove({
 const onPointerDown = (event: PointerEvent) => {
   if (pageEngine && layout.value) move.down(event);
 };
-const onPointerMove = (event: PointerEvent) => move.move(event);
-const onPointerUp = (event: PointerEvent) => move.up(event);
+const onPointerMove = (event: PointerEvent) => {
+  move.move(event);
+  if (!move.dragging) return;
+  // near the top or bottom edge, the view scrolls, as for a selection
+  dragAt = { x: event.clientX, y: event.clientY };
+  edgeScroll ??= requestAnimationFrame(scrollAtEdges);
+};
+// where the dragged text would drop, once the pages moved under the pointer
+const moveAgain = () => {
+  if (move.dragging && dragAt)
+    move.move({
+      clientX: dragAt.x,
+      clientY: dragAt.y,
+      buttons: 1,
+    } as PointerEvent);
+};
+const onPointerUp = (event: PointerEvent) => {
+  move.up(event);
+  if (anchor === null) dragAt = null;
+};
 const cancelMove = () => move.cancel();
 listenOnWindow("keydown", (event) => {
   if (event.key === "Escape") move.cancel();
@@ -510,13 +532,14 @@ const dragTo = (x: number, y: number) => {
 const scrollAtEdges = () => {
   edgeScroll = undefined;
   const element = scroller.value;
-  if (anchor === null || !dragAt || !element) return;
+  if ((anchor === null && !move.dragging) || !dragAt || !element) return;
   const box = element.getBoundingClientRect();
   const step = edgeStep(dragAt.y, box.top, box.bottom);
   if (step === 0) return;
   element.scrollTop += step;
   measure(false);
-  dragTo(dragAt.x, dragAt.y);
+  if (anchor !== null) dragTo(dragAt.x, dragAt.y);
+  else moveAgain();
   edgeScroll = requestAnimationFrame(scrollAtEdges);
 };
 
