@@ -162,7 +162,11 @@ const compare = (
     }
     unmatched.splice(index, 1);
   }
-  return { words: laid.length, pages: engine.pages() };
+  return {
+    words: laid.length,
+    pages: engine.pages(),
+    texts: found.map((word) => word.text),
+  };
 };
 
 const welcome = readFileSync(
@@ -278,5 +282,28 @@ describe.runIf(hasPdftotext)("the PDF holds the layout", () => {
     ].join("\n");
     const { pages } = compare(markdown, "report");
     expect(pages).toBeGreaterThan(5);
+  });
+
+  it("with placeholders that come out empty as nothing, which the screen names", () => {
+    const markdown = [
+      "---",
+      "page:",
+      "  header: { left: '{author} {chapter}', right: 'by {author}' }",
+      "  footer: { center: '{page}' }",
+      "---",
+      "",
+      "Some text, and no heading.",
+    ].join("\n");
+    const { texts } = compare(markdown, "empty-fields");
+    expect(texts).toEqual([
+      "by",
+      "Some",
+      "text,",
+      "and",
+      "no",
+      "heading.",
+      "1",
+    ]);
+    expect(texts.join(" ")).not.toMatch(/Author|Chapter/);
   });
 });

@@ -1,10 +1,18 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { formatShortcut } from "../editor/keyBindings";
 import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
-import { type Band, bandsOn, formatNumber, pageNumber } from "../layout/bands";
+import {
+  BAND,
+  type Band,
+  bandsOn,
+  formatNumber,
+  pageNumber,
+} from "../layout/bands";
+import type { BandPart } from "../layout/placeholders";
 import type { Layout } from "../layout/resolve";
 import { SLOTS } from "../layout/settings";
 import { segments } from "../layout/tokens";
+import type { PageLayoutState } from "../state/pageView";
 
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
@@ -32,14 +40,15 @@ export const scrollFor = (
  * footer, with its number when the footer doesn't show it, and the next
  * page's header
  * @param page the page, counted from 0
- * @param bands the band texts of the page, and `next` those of the next, see
- *   PageEngine.bands
+ * @param bands the six slots of the page's header and footer, as texts
+ *   (PageEngine.bands) or as what the screen shows of them (pageBandParts),
+ *   and `next` those of the next page
  * @param layout the document's page setup, which numbers the pages
  */
-export const endMark = (
+export const endMark = <Slot>(
   page: number,
-  bands: string[],
-  next: string[],
+  bands: Slot[],
+  next: Slot[],
   layout: Layout,
 ) => {
   // the footer's settings say whether it shows the number, whatever its
@@ -114,6 +123,70 @@ export const lastFooterPlace = (layout: FrameLayout) => {
     width: last.width - 2 * inset,
     height: room,
   };
+};
+
+// a band's line on a sheet, at the natural 1.3 em of IBM Plex Sans, as the
+// layout engine sets it (BAND_LINE in src-tauri/layout/src/bands.rs)
+const BAND_LINE = BAND.size * 1.3;
+
+/**
+ * sheetSlots returns the slots of a sheet's header and footer that name a
+ * placeholder that comes out empty, with where the engine sets them on the
+ * sheet, in pixels: a third of the text's width each, the header `BAND
+ * .distance` below the top edge and the footer as far above the bottom one
+ * (band_boxes in src-tauri/layout/src/engine/display.rs). The engine paints
+ * their text; the page view names the placeholders over it.
+ * @param slots the six slots of the page, see pageBandParts
+ * @param page the size and margins of the page, in points
+ * @param scale CSS pixels per point
+ */
+export const sheetSlots = (
+  slots: BandPart[][],
+  page: Pick<PageLayoutState, "width" | "height" | "margins">,
+  scale: number,
+) => {
+  const { margins } = page;
+  const width = (page.width - margins.left - margins.right) / 3;
+  const tops = [
+    BAND.distance,
+    page.height -
+      margins.bottom +
+      Math.max(0, margins.bottom - BAND.distance - BAND_LINE),
+  ];
+  return slots.flatMap((parts, index) => {
+    if (!parts.some((part) => "field" in part)) return [];
+    const slot = SLOTS[index % 3];
+    return [
+      {
+        key: index,
+        slot,
+        // a space before a name at the end of the painted text, which ends
+        // where its last letter does: the name would otherwise take its
+        // space
+        parts: parts.map((part, at) => {
+          if (!("field" in part)) return part;
+          const before = parts[at - 1];
+          const last = parts
+            .slice(at + 1)
+            .every((after) => "field" in after || !after.text.trim());
+          return {
+            ...part,
+            spaced:
+              last && !!before && "text" in before && /\s$/.test(before.text),
+          };
+        }),
+        // the text of a slot that is only placeholders and spaces isn't
+        // painted, so their names take its place as the text would; beside
+        // painted text, they go where their placeholders are in it
+        named: parts.every((part) => "field" in part || !part.text.trim()),
+        left: (margins.left + width * (index % 3)) * scale,
+        top: tops[Math.floor(index / 3)] * scale,
+        width: width * scale,
+        height: BAND_LINE * scale,
+        size: BAND.size * scale,
+      },
+    ];
+  });
 };
 
 /**

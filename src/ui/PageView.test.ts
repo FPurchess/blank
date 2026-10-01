@@ -14,15 +14,24 @@ import {
   pageView,
   pageSelection,
   pageViewport,
+  transaction,
 } from "../state";
 import { EditorView } from "prosemirror-view";
 
 import { createEditorHandle } from "../editor/handle";
 import { PAGE_PRESS } from "../editor/pagePointer";
 import { contextMenuPlugin } from "../editor/plugins/contextMenu";
-import { createState, createTestHandle, doc, h, p } from "../test/editor";
+import {
+  createState,
+  createTestHandle,
+  doc,
+  docWithFrontmatter,
+  h,
+  p,
+} from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
+import { hasBand } from "../layout/placeholders";
 import { bootApp } from "./mount";
 import { viewAnchor } from "./pageViewModel";
 import { alignHiddenEditor } from "../editor/hidden";
@@ -69,6 +78,7 @@ describe("page view", () => {
     pageSelection.value = [];
     pageScrollRequest.value = null;
     pageHeadBox.value = null;
+    transaction.value = null;
     pageView.value = "page-ends";
     document.body.replaceChildren();
   });
@@ -353,11 +363,9 @@ describe("page view", () => {
       versions: engine.raw.versions(),
       bandVersions: engine.raw.bandVersions(),
       bottoms: engine.raw.bottoms(),
-      header: engine.bands(0).slice(0, 3).some(Boolean),
-      footer: engine
-        .bands(pages - 1)
-        .slice(3, 6)
-        .some(Boolean),
+      // as the editor's plugin sets them, from what is written
+      header: hasBand(testLayout(settings), 1, "header"),
+      footer: hasBand(testLayout(settings), pages, "footer"),
     };
     return engine;
   };
@@ -447,6 +455,49 @@ describe("page view", () => {
     expect(
       slotsOf(all[0].querySelector<HTMLElement>(".page-end .band.footer")),
     ).toEqual(["Odd", "", ""]);
+  });
+
+  it("names the placeholders that come out empty, and keeps the band to open", async () => {
+    // no author, and no heading for a chapter
+    const header = { left: "{author}", center: "", right: "by {author}" };
+    // the page setup the view reads is the document's
+    const empty = docWithFrontmatter(
+      'page:\n  header: {left: "{author}", right: "by {author}"}',
+      p(""),
+    );
+    transaction.value = createState(empty).tr;
+    layOutWith(empty, { header });
+    const editor = new EditorView(document.createElement("div"), {
+      state: createState(empty, { cursor: 1 }),
+    });
+    dispose = bootApp(createEditorHandle(editor).handle);
+    await nextTick();
+    // above the text, with its room
+    expect(shown("page-ends").headerRoom).toBeGreaterThan(0);
+    const first = view().querySelector<HTMLElement>(".page-first-header")!;
+    expect(slotsOf(first)).toEqual(["Author", "", "by Author"]);
+    expect(
+      [...first.querySelectorAll(".band-placeholder")].map(
+        (name) => (name as HTMLElement).dataset.field,
+      ),
+    ).toEqual(["author", "author"]);
+    first.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "header" });
+    bandEditor.value = null;
+    // on the sheet, over the slots the engine painted
+    pageView.value = "pages";
+    await nextTick();
+    const names = [
+      ...frames()[0].querySelectorAll<HTMLElement>(".page-band-names"),
+    ];
+    expect(names.map((slot) => slot.className)).toEqual([
+      "page-band-names left named",
+      "page-band-names right",
+    ]);
+    // the painted text keeps its place, and the name goes after it
+    expect(names[1].querySelector(".painted")!.textContent).toBe("by ");
+    expect(names[1].textContent).toBe("by Author");
+    editor.destroy();
   });
 
   // the layout the view shows in `mode`, at jsdom's window width

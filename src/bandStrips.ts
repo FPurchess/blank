@@ -27,6 +27,7 @@ import {
   NO_FIELDS,
   variantsOf,
 } from "./layout/bands";
+import { FIELD_NAMES } from "./layout/placeholders";
 import { type PageSettings, SLOTS, type Slots } from "./layout/settings";
 import { createSlotEditor, renderSlot, type SlotEditor } from "./slotEditor";
 import { bootScope, listenOnWindow } from "./scope";
@@ -54,14 +55,11 @@ const EDITOR_ID = "band-editor";
 // the context menu with its submenus, see src/ui/ContextMenu.vue
 const MENUS = ".context-menus";
 
-// the placeholders the strips insert, see tokens.ts
-const INSERTS = [
-  ["Title", "{title}"],
-  ["Author", "{author}"],
-  ["Chapter", "{chapter}"],
-  ["Date", "{date}"],
-  ["File", "{file}"],
-] as const;
+// the placeholders the strips insert, see tokens.ts, by the names the pages
+// show where one comes out empty
+const INSERTS = (["title", "author", "chapter", "date", "file"] as const).map(
+  (field) => [FIELD_NAMES[field], `{${field}}`] as const,
+);
 
 // the classes the strips give the body
 const BODY_CLASSES = [

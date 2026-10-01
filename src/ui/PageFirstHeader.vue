@@ -5,13 +5,16 @@ import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { FrameLayout } from "../engine/frames";
-import { pageLayoutState } from "../state";
+import { pageBandParts } from "../layout/placeholders";
+import { pageFields, pageLayout, pageLayoutState } from "../state";
+import BandSlots from "./BandSlots.vue";
 import { bandTitle, firstHeaderPlace } from "./pageViewModel";
 
 // The first page's header in "page ends", right above its text: the marks
 // where the pages end show the header of each page after it, and the sheets
 // of "pages" show every header themselves. It isn't there when the first
-// page has no header.
+// page has no header written; a placeholder that comes out empty shows its
+// name.
 const props = defineProps<{ layout: FrameLayout }>();
 const editor = useEditor();
 
@@ -26,16 +29,23 @@ const version = computed(
     pageLayoutState.value?.versions[0] ??
     0,
 );
-// the header's slots as one string, read from the engine only where the
-// header shows, and again only when its version changes
+const pages = computed(() => pageLayoutState.value?.pages ?? 1);
+// the header's slots, read from the engine only where the header shows, and
+// again only when its version, the page setup or the placeholders' values
+// change
 const slots = computed(() => {
   const engine = pageEngine;
   void version.value;
-  if (!engine || !here.value) return "";
-  return engine.bands(0).slice(0, 3).join("\u0000");
+  if (!engine || !here.value) return [];
+  return pageBandParts(
+    pageLayout.value.layout,
+    0,
+    pages.value,
+    pageFields.value,
+    engine.bands(0),
+  ).slice(0, 3);
 });
-const parts = computed(() => slots.value.split("\u0000"));
-const shown = computed(() => parts.value.some(Boolean));
+const shown = computed(() => slots.value.some((parts) => parts.length));
 
 // a double click opens its strip, which takes the focus
 const open = () => editor.run(editBand("header"), { focus: false });
@@ -55,6 +65,6 @@ const open = () => editor.run(editBand("header"), { focus: false });
     }"
     @dblclick="open"
   >
-    <span v-for="(slot, index) in parts" :key="index">{{ slot }}</span>
+    <BandSlots :slots="slots" />
   </div>
 </template>

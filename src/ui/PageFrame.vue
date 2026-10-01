@@ -14,11 +14,13 @@ import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
-import { pageLayout, pageLayoutState, path, theme } from "../state";
+import { FIELD_NAMES, pageBandParts } from "../layout/placeholders";
+import { pageFields, pageLayout, pageLayoutState, path, theme } from "../state";
+import BandSlots from "./BandSlots.vue";
 import { layerOf } from "./pageLayer";
 import { shownMarks } from "./pageMarks";
 import { frameRenders, layerDisplay } from "./pageLayers";
-import { bandTitle, endMark, selectedBoxes } from "./pageViewModel";
+import { bandTitle, endMark, selectedBoxes, sheetSlots } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends, unless it's
@@ -202,15 +204,49 @@ const marked = computed(() =>
 // what the mark at the page's end shows, which follows the bands of the
 // page and of the next one, not their text; none after the last page, whose
 // footer PageLastFooter.vue shows
+const pages = computed(() => pageLayoutState.value?.pages ?? 1);
+// what the six slots of a page's header and footer show, with the
+// placeholders that come out empty named (see src/layout/placeholders.ts)
+const bandsOf = (page: number) =>
+  pageBandParts(
+    pageLayout.value.layout,
+    page,
+    pages.value,
+    pageFields.value,
+    pageEngine!.bands(page),
+  );
 const mark = computed(() => {
   const engine = pageEngine;
   if (props.sheet || !engine || props.nextBandVersion < 0) return null;
   void props.bandVersion;
+  void props.nextBandVersion;
   return endMark(
     props.page,
-    engine.bands(props.page),
-    engine.bands(props.page + 1),
+    bandsOf(props.page),
+    bandsOf(props.page + 1),
     pageLayout.value.layout,
+  );
+});
+// the slots of a sheet's header and footer whose placeholders come out
+// empty, named over the bands the engine painted
+// the page's size and margins, as text, which stays the same while typing
+// publishes a new layout
+const pageBox = computed(() => {
+  const state = pageLayoutState.value;
+  if (!state) return "";
+  const { top, right, bottom, left } = state.margins;
+  return [state.width, state.height, top, right, bottom, left].join(",");
+});
+const named = computed(() => {
+  if (!props.sheet || !pageEngine || !pageBox.value) return [];
+  void props.bandVersion;
+  const [width, height, top, right, bottom, left] = pageBox.value
+    .split(",")
+    .map(Number);
+  return sheetSlots(
+    bandsOf(props.page),
+    { width, height, margins: { top, right, bottom, left } },
+    props.scale,
   );
 });
 </script>
@@ -274,9 +310,7 @@ const mark = computed(() => {
         :title="bandTitle('footer')"
         @dblclick="openBand('footer')"
       >
-        <span v-for="(slot, index) in mark.footer" :key="index">{{
-          slot
-        }}</span>
+        <BandSlots :slots="mark.footer" />
       </div>
       <div class="line">
         <span v-if="mark.number" class="number">{{ mark.number }}</span>
@@ -286,10 +320,34 @@ const mark = computed(() => {
         :title="bandTitle('header')"
         @dblclick="openBand('header')"
       >
-        <span v-for="(slot, index) in mark.header" :key="index">{{
-          slot
-        }}</span>
+        <BandSlots :slots="mark.header" />
       </div>
+    </div>
+    <div
+      v-for="band in named"
+      :key="`band-${band.key}`"
+      class="page-band-names"
+      :class="[band.slot, { named: band.named }]"
+      aria-hidden="true"
+      :style="{
+        left: `${band.left}px`,
+        top: `${band.top}px`,
+        width: `${band.width}px`,
+        height: `${band.height}px`,
+        fontSize: `${band.size}px`,
+      }"
+    >
+      <template v-for="(part, at) in band.parts" :key="at"
+        ><span v-if="'text' in part" class="painted">{{ part.text }}</span
+        ><span v-else class="at"
+          ><em
+            class="band-placeholder"
+            :class="{ spaced: part.spaced }"
+            :data-field="part.field"
+            >{{ FIELD_NAMES[part.field] }}</em
+          ></span
+        ></template
+      >
     </div>
     <div
       v-for="over in marked"

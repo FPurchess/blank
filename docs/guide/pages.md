@@ -47,6 +47,8 @@ For more, point at the top or bottom edge and click **+ Header** or **+ Footer**
 
 `Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Double-click a header or footer there, or a sheet's top or bottom margin, to open it again. `Mod` `Z` in your text undoes the whole change.
 
+When a placeholder has nothing to put in yet, say **Author** while the document has no author, or **Chapter** before the first heading 1, your pages show its name there in faint italics, so you can still see the header or footer and double-click it. Only the screen shows these names: your PDF and Word document leave the place empty until there is something to put in.
+
 ### The first page and even pages {#first-and-even-pages}
 
 Above the places, **First Page ▾** chooses what the first page has: the same as the other pages, **None**, e.g. for a title page, or **Its Own**, e.g. a letterhead with your address on the first page and just the page number after it.

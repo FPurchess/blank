@@ -55,6 +55,7 @@ import {
   inSameTable,
   TableMap,
 } from "prosemirror-tables";
+import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
 import {
   frontmatter,
@@ -160,13 +161,10 @@ const publishLayout = (engine: PageEngine) => {
     bandVersions: engine.bandVersions(),
     bottoms: engine.bottoms(),
     properties: hasProperties.value,
-    // the header's left, center and right slots of the first page
-    header: engine.bands(0).slice(0, 3).some(Boolean),
-    // and the footer's of the last page
-    footer: engine
-      .bands(pages - 1)
-      .slice(3, 6)
-      .some(Boolean),
+    // whether the first page has a header written and the last a footer,
+    // whatever their placeholders come out as, which the page view names
+    header: hasBand(layout, 1, "header"),
+    footer: hasBand(layout, pages, "footer"),
   };
   // an engine that failed while it was asked has given up, and shows nothing
   if (!engine.broken) pageLayoutState.value = state;
