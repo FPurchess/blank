@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish, e.g. v2.0.0"
+        description: "Release tag to publish, e.g. v2.1.0"
         required: true
   pull_request:
     paths:

@@ -24,7 +24,7 @@ description: |
   `sudo snap connect blank:removable-media` once.
 license: AGPL-3.0-only
 icon: src-tauri/icons/128x128@2x.png
-website: https://fpurchess.github.io/blank/
+website: https://blank-writer.xyz/
 source-code: https://github.com/FPurchess/blank
 issues: https://github.com/FPurchess/blank/issues
 contact: https://github.com/FPurchess/blank/issues
