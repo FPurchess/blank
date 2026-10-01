@@ -1,6 +1,6 @@
 import { EditorState } from "prosemirror-state";
-import { Decoration } from "prosemirror-view";
-import { describe, expect, it } from "vitest";
+import { Decoration, DecorationSet } from "prosemirror-view";
+import { describe, expect, it, vi } from "vitest";
 
 import { spellcheck, spellcheckKey } from "../editor/plugins/spellcheck";
 import { documentFields } from "../layout/bands";
@@ -8,7 +8,8 @@ import { schema } from "../markdown";
 import { doc, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
-import { marksOn } from "./pageMarks";
+import type { PageEngine } from "../engine/engine";
+import { marksOn, PageMarksMemo, shownMarks } from "./pageMarks";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
@@ -56,5 +57,111 @@ describe("marksOn", () => {
     expect(breaks[0].page).toBe(0);
     // only on the pages asked for
     expect(marksOn(engine, state, [1])).toEqual([]);
+  });
+});
+
+describe("PageMarksMemo", () => {
+  // a misspelled word on the second page, after a page break
+  const twoPages = doc(
+    p("first page text"),
+    schema.nodes.page_break.create(),
+    p("short"),
+    p("then wrng on the second page"),
+  );
+  const at = (node: typeof twoPages, word: string) => {
+    let found = -1;
+    node.descendants((child, pos) => {
+      if (found < 0 && child.isText && child.text!.includes(word))
+        found = pos + child.text!.indexOf(word);
+    });
+    return found;
+  };
+  const setUp = () => {
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(twoPages));
+    engine.sync(twoPages, () => undefined);
+    const from = at(twoPages, "wrng");
+    const decorations = DecorationSet.create(twoPages, [
+      Decoration.inline(from, from + 4, {}, { word: "wrng" }),
+    ]);
+    return { engine, decorations };
+  };
+  const versionOf = (engine: PageEngine, page: number) =>
+    engine.raw.bodyVersions()[page];
+
+  it("measures a page's marks again only when they change", () => {
+    const { engine, decorations } = setUp();
+    const memo = new PageMarksMemo();
+    const measure = vi.spyOn(engine, "selection");
+    const first = memo.marksOn(
+      engine,
+      twoPages,
+      decorations,
+      1,
+      versionOf(engine, 1),
+    );
+    expect(shownMarks(first).map((mark) => mark.kind)).toEqual(["spelling"]);
+    const measured = measure.mock.calls.length;
+    // asked again, nothing is measured, and the very same string comes back
+    expect(
+      memo.marksOn(engine, twoPages, decorations, 1, versionOf(engine, 1)),
+    ).toBe(first);
+    expect(measure.mock.calls.length).toBe(measured);
+    // the first page has the break's label
+    expect(
+      shownMarks(
+        memo.marksOn(engine, twoPages, decorations, 0, versionOf(engine, 0)),
+      ).map((mark) => mark.kind),
+    ).toEqual(["break"]);
+  });
+
+  it("keeps a page's marks while text is typed on another page", () => {
+    const { engine, decorations } = setUp();
+    const memo = new PageMarksMemo();
+    const before = memo.marksOn(
+      engine,
+      twoPages,
+      decorations,
+      1,
+      versionOf(engine, 1),
+    );
+    // a word typed on the first page moves everything after it
+    const state = EditorState.create({ schema, doc: twoPages });
+    const tr = state.tr.insertText("more ", 1);
+    engine.sync(tr.doc, () => undefined);
+    const measure = vi.spyOn(engine, "selection");
+    const after = memo.marksOn(
+      engine,
+      tr.doc,
+      decorations.map(tr.mapping, tr.doc),
+      1,
+      versionOf(engine, 1),
+    );
+    expect(after).toBe(before);
+    expect(measure).not.toHaveBeenCalled();
+  });
+
+  it("keys a mark by its place on the page, which an edit above it keeps", () => {
+    const { engine, decorations } = setUp();
+    const memo = new PageMarksMemo();
+    const before = shownMarks(
+      memo.marksOn(engine, twoPages, decorations, 1, versionOf(engine, 1)),
+    );
+    // on the same page, in the line above the word's
+    const state = EditorState.create({ schema, doc: twoPages });
+    const tr = state.tr.insertText("er", at(twoPages, "short") + 5);
+    engine.sync(tr.doc, () => undefined);
+    const after = shownMarks(
+      memo.marksOn(
+        engine,
+        tr.doc,
+        decorations.map(tr.mapping, tr.doc),
+        1,
+        versionOf(engine, 1),
+      ),
+    );
+    expect(after.map((mark) => mark.key)).toEqual(
+      before.map((mark) => mark.key),
+    );
   });
 });

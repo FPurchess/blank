@@ -16,6 +16,7 @@ import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { pageLayout, pageLayoutState, path, theme } from "../state";
 import { layerOf } from "./pageLayer";
+import { shownMarks } from "./pageMarks";
 import { frameRenders, layerDisplay } from "./pageLayers";
 import { bandTitle, endMark, selectedBoxes } from "./pageViewModel";
 
@@ -45,6 +46,9 @@ const props = defineProps<{
   // the selection's rectangles on the page while the editor has the focus,
   // see selectedOn; "" for none
   selected: string;
+  // the underlines of misspelled words and the labels of page breaks on the
+  // page, see PageMarksMemo; "" for none
+  marks: string;
   // device pixels per CSS pixel
   ratio: number;
 }>();
@@ -181,6 +185,18 @@ watch(
 if (import.meta.env.DEV || __TEST_HOOKS__)
   onUpdated(() => frameRenders.count++);
 
+// the marks over the text, placed on the frame, keyed by where they are on
+// the page, so a mark that stays keeps its element
+const marked = computed(() =>
+  shownMarks(props.marks).map((mark) => ({
+    ...mark,
+    left: (mark.x - props.x) * props.scale,
+    top: (mark.y - props.y) * props.scale,
+    width: mark.width * props.scale,
+    height: mark.height * props.scale,
+  })),
+);
+
 // what the mark at the page's end shows, which follows the bands of the
 // page and of the next one, not their text
 const mark = computed(() => {
@@ -274,5 +290,17 @@ const mark = computed(() => {
         }}</span>
       </div>
     </div>
+    <div
+      v-for="over in marked"
+      :key="over.key"
+      :class="over.kind === 'spelling' ? 'page-misspelling' : 'page-break-mark'"
+      aria-hidden="true"
+      :style="{
+        left: `${over.left}px`,
+        top: `${over.top}px`,
+        width: `${over.width}px`,
+        height: `${over.height}px`,
+      }"
+    />
   </div>
 </template>

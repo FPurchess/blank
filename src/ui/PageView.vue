@@ -38,7 +38,6 @@ import {
 } from "../state";
 import PageFirstHeader from "./PageFirstHeader.vue";
 import PageFrame from "./PageFrame.vue";
-import PageMarks from "./PageMarks.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
@@ -50,7 +49,9 @@ import {
   visibleRange,
 } from "../engine/frames";
 import { pageBitmaps } from "./pageBitmaps";
+import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
+import { PageMarksMemo } from "./pageMarks";
 import {
   anchorTop,
   movesPages,
@@ -143,6 +144,15 @@ const inView = computed(() =>
     : "",
 );
 
+// what the marks on the pages follow: the document and the spell check's
+// findings, which a transaction that only moves the selection keeps, so it
+// makes the page view work out no marks
+const doc = computed(() => editor.state.value.doc);
+const decorations = computed(
+  () => spellcheckKey.getState(editor.state.value)?.decorations,
+);
+const marks = new PageMarksMemo();
+
 // a frame as a page frame shows it, all plain values
 type ShownFrame = Frame & {
   bodyVersion: number;
@@ -150,6 +160,7 @@ type ShownFrame = Frame & {
   nextBandVersion: number;
   near: boolean;
   selected: string;
+  marks: string;
 };
 // the frames shown before, by page, reused while their values stay the
 // same, so a sync that changed one page makes no new objects for the others
@@ -181,6 +192,17 @@ const frames = computed(() => {
       // under it without (PageOverlay.vue)
       selected: focused.value
         ? selectedOn(pageSelection.value, frame.page)
+        : "",
+      // the underlines of misspelled words and the labels of page breaks,
+      // the same string while neither the page nor its marks change
+      marks: pageEngine
+        ? marks.marksOn(
+            pageEngine,
+            doc.value,
+            decorations.value,
+            frame.page,
+            versions.body[frame.page] ?? 0,
+          )
         : "",
     };
     const before = shownFrames.get(frame.page);
@@ -230,7 +252,6 @@ onMounted(watchRatio);
 onUnmounted(() => resolution?.removeEventListener("change", onRatio));
 
 // the pages in view, whose marks show
-const shownPages = computed(() => frames.value.map((frame) => frame.page));
 
 onMounted(() => measure());
 // e.g. when an open strip of a header or footer takes room of the window
@@ -616,6 +637,7 @@ onUnmounted(() => {
         :band-version="frame.bandVersion"
         :next-band-version="frame.nextBandVersion"
         :selected="frame.selected"
+        :marks="frame.marks"
         :top="frame.top"
         :left="frame.left"
         :width="frame.width"
@@ -627,7 +649,6 @@ onUnmounted(() => {
         :near="frame.near"
         :ratio="ratio"
       />
-      <PageMarks :layout="layout" :pages="shownPages" />
       <PageOverlay
         :layout="layout"
         layer="over"
