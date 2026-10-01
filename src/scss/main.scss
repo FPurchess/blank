@@ -1331,7 +1331,7 @@ body.without-engine {
 // (MARK_HEIGHT in src/engine/frames.ts)
 // the room between a header or footer and the page's text in "page ends",
 // BAND_GAP in src/engine/frames.ts
-$band-gap: 16px;
+$band-gap: 32px;
 // MARK_HEIGHT in src/engine/frames.ts
 $page-end-height: 64px + 2 * $band-gap;
 
