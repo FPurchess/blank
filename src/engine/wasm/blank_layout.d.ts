@@ -103,16 +103,19 @@ export class LayoutEngine {
     page(page: number): string;
     /**
      * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
-     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+     * …}, {"kind": "font", "font": index, "family": …}, {"kind": "pdfa",
+     * "reason": …}]`, empty for nothing
      */
     pdfWarnings(): string;
     /**
-     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
-     * none if left out or empty). An image that can't be decoded shows its
-     * alt text, and a font that can't be embedded is left out: see
-     * `pdfWarnings`
+     * the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
+     * "de-CH", none if left out or empty), made at `date` (ISO 8601 with
+     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
+     * image that can't be decoded shows its alt text, a font that can't be
+     * embedded is left out, and a document that can't be PDF/A-2u is a
+     * normal PDF: see `pdfWarnings`
      */
-    pdf(title: string, author: string, language?: string | null): Uint8Array;
+    pdf(title: string, author: string, language?: string | null, date?: string | null): Uint8Array;
     /**
      * the selection's rectangles: page, x, y, width and height each
      */
@@ -209,7 +212,7 @@ export interface InitOutput {
     readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
-    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
+    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
     readonly layoutengine_pdfWarnings: (a: number) => [number, number];
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];

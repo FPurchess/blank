@@ -34,6 +34,7 @@ const jobOf = (node = doc(h(1, "Title"), ...Array(40).fill(p(LONG)))) => {
     ),
     title: "Title",
     author: "",
+    date: "2026-10-01T09:30:00+02:00",
   };
   return { job, node, layout, fields };
 };
@@ -81,6 +82,24 @@ describe("writePdf", () => {
       /\/Lang\s*\(de-CH\)/,
     );
     expect(result.warnings).toEqual([{ kind: "image", src: "x.png" }]);
+  });
+
+  it("writes a PDF/A, and a normal PDF without a date", () => {
+    testEngine();
+    const { job } = jobOf(doc(p("Text")));
+    const archived = writePdf(LayoutEngine, job);
+    expect(new TextDecoder("latin1").decode(archived.pdf)).toContain(
+      "pdfaid:part",
+    );
+    expect(archived.warnings).toEqual([]);
+
+    const undated = writePdf(LayoutEngine, { ...job, date: "" });
+    expect(new TextDecoder("latin1").decode(undated.pdf)).not.toContain(
+      "pdfaid:part",
+    );
+    expect(undated.warnings).toEqual([
+      { kind: "pdfa", reason: expect.stringContaining("date") },
+    ]);
   });
 
   it("tells what trapped, not that the trapped engine couldn't be freed", () => {

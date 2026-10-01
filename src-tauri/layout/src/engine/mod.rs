@@ -436,6 +436,7 @@ mod tests {
             &crate::pdf::Info {
                 title: String::new(),
                 author: String::new(),
+                date: "2026-10-01T09:30:00+02:00".into(),
             },
         )
         .unwrap();
@@ -482,6 +483,7 @@ mod tests {
         let info = crate::pdf::Info {
             title: "Shared".into(),
             author: String::new(),
+            date: "2026-10-01T09:30:00+02:00".into(),
         };
         let shared = crate::pdf::write(&mut export, &Default::default(), &info).unwrap();
         let own = crate::pdf::write(&mut fresh, &Default::default(), &info).unwrap();

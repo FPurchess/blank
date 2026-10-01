@@ -324,7 +324,8 @@ export class LayoutEngine {
     }
     /**
      * what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
-     * …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+     * …}, {"kind": "font", "font": index, "family": …}, {"kind": "pdfa",
+     * "reason": …}]`, empty for nothing
      * @returns {string}
      */
     pdfWarnings() {
@@ -340,29 +341,34 @@ export class LayoutEngine {
         }
     }
     /**
-     * the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
-     * none if left out or empty). An image that can't be decoded shows its
-     * alt text, and a font that can't be embedded is left out: see
-     * `pdfWarnings`
+     * the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
+     * "de-CH", none if left out or empty), made at `date` (ISO 8601 with
+     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
+     * image that can't be decoded shows its alt text, a font that can't be
+     * embedded is left out, and a document that can't be PDF/A-2u is a
+     * normal PDF: see `pdfWarnings`
      * @param {string} title
      * @param {string} author
      * @param {string | null} [language]
+     * @param {string | null} [date]
      * @returns {Uint8Array}
      */
-    pdf(title, author, language) {
+    pdf(title, author, language, date) {
         const ptr0 = passStringToWasm0(title, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(author, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
         var ptr2 = isLikeNone(language) ? 0 : passStringToWasm0(language, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len2 = WASM_VECTOR_LEN;
-        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
+        var ptr3 = isLikeNone(date) ? 0 : passStringToWasm0(date, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len3 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }
-        var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v4;
+        return v5;
     }
     /**
      * the selection's rectangles: page, x, y, width and height each

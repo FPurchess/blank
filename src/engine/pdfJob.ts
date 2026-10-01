@@ -18,13 +18,17 @@ export interface PdfJob {
   author: string;
   // a BCP 47 tag, see PageEngine.pdf
   language?: string;
+  // when the PDF was made, see pdfDate
+  date: string;
 }
 
 // what a PDF left out: an image it couldn't decode, which shows its alt
-// text instead, or a font it couldn't embed ("" for one of Blank's own)
+// text instead, or a font it couldn't embed ("" for one of Blank's own);
+// or why it isn't a PDF/A, in plain English
 export type PdfWarning =
   | { kind: "image"; src: string }
-  | { kind: "font"; font: number; family: string };
+  | { kind: "font"; font: number; family: string }
+  | { kind: "pdfa"; reason: string };
 
 export interface PdfResult {
   pdf: Uint8Array;
@@ -68,7 +72,7 @@ export const writePdf = (
     engine.setSettings(job.settings);
     engine.setItems(job.items);
     return {
-      pdf: engine.pdf(job.title, job.author, job.language ?? null),
+      pdf: engine.pdf(job.title, job.author, job.language ?? null, job.date),
       pages: engine.pageCount(),
       missing: engine.missing(),
       warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],

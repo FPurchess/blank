@@ -258,6 +258,7 @@ pub fn compare(engine: &mut Engine, name: &str) -> Option<usize> {
         &Info {
             title: "Sample".into(),
             author: "".into(),
+            date: "2026-10-01T09:30:00+02:00".into(),
         },
     )
     .unwrap();
@@ -466,6 +467,7 @@ fn pdf_of(engine: &mut Engine) -> Vec<u8> {
         &Info {
             title: String::new(),
             author: String::new(),
+            date: "2026-10-01T09:30:00+02:00".into(),
         },
     )
     .unwrap()
@@ -582,6 +584,22 @@ fn has_role(text: &str, role: &str) -> bool {
     })
 }
 
+/// checks a PDF/A-2u with veraPDF, where it is installed: on the PATH as
+/// `verapdf`, or where `VERAPDF` points. It isn't on CI, so this never fails
+/// for want of it.
+fn verapdf(path: &str) {
+    let program = std::env::var("VERAPDF").unwrap_or_else(|_| "verapdf".into());
+    let Ok(out) = Command::new(&program)
+        .args(["--flavour", "2u", "--format", "text", path])
+        .output()
+    else {
+        eprintln!("veraPDF is missing, skipping its check");
+        return;
+    };
+    let report = String::from_utf8_lossy(&out.stdout);
+    assert!(report.starts_with("PASS"), "veraPDF: {report}");
+}
+
 #[test]
 fn pdf_is_tagged() {
     use blank_layout::pdf::write_with;
@@ -616,14 +634,21 @@ fn pdf_is_tagged() {
         &Info {
             title: "Sample".into(),
             author: "".into(),
+            date: "2026-10-01T09:30:00+02:00".into(),
         },
         "en-GB",
     )
     .unwrap();
-    assert!(written.warnings.is_empty());
+    // no warnings: krilla found it meets the rules of PDF/A-2u, which it
+    // says in its metadata
+    assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+    let xmp = String::from_utf8_lossy(&written.bytes);
+    assert!(xmp.contains("<pdfaid:part>2</pdfaid:part><pdfaid:conformance>U</pdfaid:conformance>"));
+    assert!(xmp.contains("<rdf:li>en-GB</rdf:li>"), "no dc:language");
     let path = std::env::temp_dir().join("blank-layout-tagged.pdf");
     std::fs::write(&path, &written.bytes).unwrap();
     let path = path.to_str().unwrap();
+    verapdf(path);
     let Some(info) = run("pdfinfo", &[path]) else {
         eprintln!("pdfinfo is missing, skipping the check");
         return;
@@ -674,7 +699,7 @@ fn pdf_is_tagged() {
         assert!(!has_role(&text, "/Lb"), "/Lb found in /Lbl");
     }
     // and its text is where it was laid out, as without tags
-    compare(&mut engine, "tagged");
+    compare(&mut engine, "tagged-layout");
 }
 
 #[test]

@@ -696,10 +696,12 @@ export class PageEngine {
    * pdf writes the PDF of the layout
    * @param language the document's language as a BCP 47 tag, e.g. "de-CH",
    *   which screen readers read it in; none when it isn't known
+   * @param date when the PDF was made, in ISO 8601 with its offset (see
+   *   pdfDate), which a PDF/A needs: the wasm has no clock
    */
-  pdf(title: string, author: string, language?: string) {
+  pdf(title: string, author: string, language?: string, date?: string) {
     return this.call(new Uint8Array(), () =>
-      this.raw.pdf(title, author, language ?? null),
+      this.raw.pdf(title, author, language ?? null, date ?? null),
     );
   }
 

@@ -6,17 +6,18 @@ use std::collections::HashMap;
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
+use krilla::configure::{Archival, ConfigurationBuilder, ValidationError, Validators};
 use krilla::error::KrillaError;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
-use krilla::metadata::Metadata;
+use krilla::metadata::{DateTime, Metadata};
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::Fill;
 use krilla::surface::Surface;
 use krilla::tagging::{Artifact, ArtifactType, ContentTag, SpanTag};
 use krilla::text::{Font, GlyphId, KrillaGlyph, Tag};
-use krilla::Document;
+use krilla::{Document, SerializeSettings};
 use parley::Alignment;
 
 use crate::engine::{Engine, Op, Part};
@@ -35,9 +36,85 @@ pub struct ImageData {
     pub jpeg: bool,
 }
 
+#[derive(Clone, Default)]
 pub struct Info {
     pub title: String,
     pub author: String,
+    /// when the PDF was made, in ISO 8601 (`2026-10-01T09:30:00+02:00`):
+    /// PDF/A needs it, and the wasm has no clock of its own
+    pub date: String,
+}
+
+/// reads an ISO 8601 date and time (`YYYY-MM-DDTHH:MM:SS`, optionally with
+/// fractions of a second, and `Z` or an offset `±HH:MM`)
+fn parse_date(text: &str) -> Option<DateTime> {
+    let number = |range: std::ops::Range<usize>| -> Option<u16> {
+        let digits = text.get(range)?;
+        if !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        digits.parse().ok()
+    };
+    let bytes = text.as_bytes();
+    let separators = [(4, b'-'), (7, b'-'), (10, b'T'), (13, b':'), (16, b':')];
+    if separators.iter().any(|&(at, byte)| {
+        !bytes
+            .get(at)
+            .is_some_and(|found| found.eq_ignore_ascii_case(&byte))
+    }) {
+        return None;
+    }
+    let (year, month, day) = (number(0..4)?, number(5..7)?, number(8..10)?);
+    let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
+        return None;
+    }
+    let mut rest = &text[19..];
+    if let Some(fraction) = rest.strip_prefix('.') {
+        let digits = fraction.bytes().take_while(u8::is_ascii_digit).count();
+        if digits == 0 {
+            return None;
+        }
+        rest = &fraction[digits..];
+    }
+    let date = DateTime::new(year)
+        .month(month as u8)
+        .day(day as u8)
+        .hour(hour as u8)
+        .minute(minute as u8)
+        .second(second.min(59) as u8);
+    if rest.eq_ignore_ascii_case("z") {
+        return Some(date.utc_offset_hour(0).utc_offset_minute(0));
+    }
+    let sign: i8 = match rest.as_bytes().first()? {
+        b'+' => 1,
+        b'-' => -1,
+        _ => return None,
+    };
+    let offset = &rest[1..];
+    if offset.len() != 5 || offset.as_bytes()[2] != b':' {
+        return None;
+    }
+    let digits = |range: std::ops::Range<usize>| -> Option<u8> {
+        let part = offset.get(range)?;
+        if !part.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        part.parse().ok()
+    };
+    let (hours, minutes) = (digits(0..2)?, digits(3..5)?);
+    if hours > 23 || minutes > 59 {
+        return None;
+    }
+    Some(
+        date.utc_offset_hour(sign * hours as i8)
+            .utc_offset_minute(minutes),
+    )
 }
 
 /// the colour of each role on paper
@@ -158,6 +235,9 @@ pub enum Warning {
     /// of a variable one from `INSTANCE_BASE` on), that couldn't be
     /// embedded: the text set in it is left out
     Font(usize),
+    /// why the PDF isn't PDF/A-2u, in plain words: it was written as a
+    /// normal PDF instead
+    Pdfa(String),
 }
 
 /// a PDF, and what went wrong in it
@@ -186,13 +266,97 @@ struct Skipped {
 enum Failed {
     Image(String),
     Font(usize),
+    /// why it can't be PDF/A, in plain words
+    Archival(String),
     Other(String),
 }
 
-/// writes the document's pages as a PDF in `language` (a BCP 47 tag, or
-/// empty for none), with what went wrong: an image that can't be decoded
+/// what PDF/A-2u forbids in a document, in plain words, each reason once
+fn archival_reason(
+    errors: &[(ValidationError, Validators)],
+    fonts: &PdfFonts,
+    engine: &Engine,
+) -> String {
+    let family = |font: &Font| {
+        fonts
+            .index_of(font)
+            .and_then(|index| engine.fonts.face(index))
+            .map(|(file, _)| file.family.clone())
+            .unwrap_or_default()
+    };
+    // the characters no font has, in the order they came
+    let mut missing: Vec<char> = vec![];
+    let mut reasons: Vec<String> = vec![];
+    for (error, _) in errors {
+        let reason = match error {
+            ValidationError::ContainsNotDefGlyph(_, _, text) => {
+                for character in text.chars() {
+                    if !missing.contains(&character) {
+                        missing.push(character);
+                    }
+                }
+                continue;
+            }
+            ValidationError::RestrictedLicense(font) => {
+                format!(
+                    "the license of the font {} doesn't allow embedding it",
+                    family(font)
+                )
+            }
+            ValidationError::NoCodepointMapping(font, ..) => {
+                format!(
+                    "the font {} shows a glyph that stands for no text",
+                    family(font)
+                )
+            }
+            ValidationError::InvalidCodepointMapping(_, _, character, _)
+            | ValidationError::UnicodePrivateArea(_, _, character, _) => {
+                format!(
+                    "it holds the character U+{:04X}, which PDF/A forbids",
+                    *character as u32
+                )
+            }
+            ValidationError::MissingDocumentDate => "it has no date".into(),
+            ValidationError::TooLongString => {
+                "a text in it, such as the title or the author, is too long".into()
+            }
+            ValidationError::TooLongName => "the name of a font in it is too long".into(),
+            ValidationError::TooManyIndirectObjects => "it is too large".into(),
+            ValidationError::TooHighQNestingLevel => "its drawing nests too deep".into(),
+            ValidationError::ImageInterpolation(_) => "an image in it is smoothed".into(),
+            other => format!("{other:?}"),
+        };
+        if !reasons.contains(&reason) {
+            reasons.push(reason);
+        }
+    }
+    let shown: String = missing
+        .iter()
+        .filter(|character| !character.is_control())
+        .collect();
+    if !missing.is_empty() {
+        let characters = if shown.is_empty() {
+            "a character".to_string()
+        } else if shown.chars().count() == 1 {
+            format!("the character {shown}")
+        } else {
+            format!("the characters {shown}")
+        };
+        reasons.insert(0, format!("no font has {characters}"));
+    }
+    if reasons.is_empty() {
+        "it doesn't meet the rules".into()
+    } else {
+        reasons.join("; ")
+    }
+}
+
+/// writes the document's pages as a PDF/A-2u in `language` (a BCP 47 tag,
+/// or empty for none), with what went wrong: an image that can't be decoded
 /// shows its alt text, and a font that can't be embedded is left out, so
-/// neither fails the whole PDF
+/// neither fails the whole PDF. A document that can't be PDF/A-2u (no font
+/// has one of its characters, a font's license forbids it, or it has no
+/// date) is written as a normal PDF, with the reason.
 pub fn write_with(
     engine: &mut Engine,
     images: &HashMap<String, ImageData>,
@@ -200,10 +364,19 @@ pub fn write_with(
     language: &str,
 ) -> Result<Written, String> {
     let mut skipped = Skipped::default();
+    let date = parse_date(&info.date);
+    // why it isn't PDF/A, once it isn't
+    let mut not_archival = match date {
+        Some(_) => None,
+        None if info.date.is_empty() => Some("it has no date".to_string()),
+        None => Some(format!("its date {} can't be read", info.date)),
+    };
     // krilla tells what it fails on only once it writes the document, so
-    // write it again without that, once for each image and font at most
-    for _ in 0..attempts(images.len(), &engine.fonts) {
-        match attempt(engine, images, info, language, &skipped) {
+    // write it again without that, once for each image and font at most,
+    // and once more as a normal PDF
+    for _ in 0..attempts(images.len(), &engine.fonts) + 1 {
+        let archival = not_archival.is_none();
+        match attempt(engine, images, info, date, language, archival, &skipped) {
             Ok((bytes, undecoded)) => {
                 let mut warnings: Vec<Warning> = vec![];
                 for src in undecoded.into_iter().chain(skipped.images.iter().cloned()) {
@@ -212,12 +385,15 @@ pub fn write_with(
                     }
                 }
                 warnings.extend(skipped.fonts.iter().map(|&font| Warning::Font(font)));
+                warnings.extend(not_archival.map(Warning::Pdfa));
                 return Ok(Written { bytes, warnings });
             }
             Err(Failed::Image(src)) if !skipped.images.contains(&src) => skipped.images.push(src),
             Err(Failed::Font(font)) if !skipped.fonts.contains(&font) => skipped.fonts.push(font),
+            Err(Failed::Archival(reason)) if archival => not_archival = Some(reason),
             Err(Failed::Image(src)) => return Err(format!("the image {src} can't be written")),
             Err(Failed::Font(font)) => return Err(format!("the font {font} can't be written")),
+            Err(Failed::Archival(reason)) => return Err(reason),
             Err(Failed::Other(message)) => return Err(message),
         }
     }
@@ -306,16 +482,39 @@ fn paint_alt(
     }
 }
 
-/// writes the PDF once, leaving out what is skipped: its bytes and the
-/// images it couldn't decode, or what it failed on
+/// the settings of a PDF/A-2u: krilla then checks the rules, and writes
+/// the XMP metadata and the sRGB output intent they ask for
+fn archival_settings() -> Option<SerializeSettings> {
+    let configuration = ConfigurationBuilder::new()
+        .with_archival_validator(Archival::A2_U)
+        .finish()
+        .ok()?;
+    Some(SerializeSettings {
+        configuration,
+        ..SerializeSettings::default()
+    })
+}
+
+/// writes the PDF once, as a PDF/A-2u when `archival`, leaving out what is
+/// skipped: its bytes and the images it couldn't decode, or what it failed
+/// on
+#[allow(clippy::too_many_arguments)]
 fn attempt(
     engine: &mut Engine,
     images: &HashMap<String, ImageData>,
     info: &Info,
+    date: Option<DateTime>,
     language: &str,
+    archival: bool,
     skipped: &Skipped,
 ) -> Result<(Vec<u8>, Vec<String>), Failed> {
-    let mut document = Document::new();
+    let mut document = if archival {
+        let settings = archival_settings()
+            .ok_or_else(|| Failed::Archival("krilla can't write PDF/A-2u".into()))?;
+        Document::new_with(settings)
+    } else {
+        Document::new()
+    };
     let fonts = PdfFonts::new(&engine.fonts, &skipped.fonts);
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let mut undecoded: Vec<String> = vec![];
@@ -420,10 +619,12 @@ fn attempt(
                             }
                             let data = images.get(&src)?;
                             let bytes = data.bytes.clone().into();
+                            // PDF/A forbids smoothing images, and a normal
+                            // PDF looks the same
                             let image = if data.jpeg {
-                                Image::from_jpeg(bytes, true)
+                                Image::from_jpeg(bytes, false)
                             } else {
-                                Image::from_png(bytes, true)
+                                Image::from_png(bytes, false)
                             };
                             if image.is_err() {
                                 undecoded.push(src.clone());
@@ -478,6 +679,9 @@ fn attempt(
     if !language.is_empty() {
         metadata = metadata.language(language.to_string());
     }
+    if let Some(date) = date {
+        metadata = metadata.creation_date(date);
+    }
     document.set_metadata(metadata);
     match document.finish() {
         Ok(bytes) => Ok((bytes, undecoded)),
@@ -497,6 +701,9 @@ fn attempt(
                 "a font can't be embedded: {message}"
             ))),
         },
+        Err(KrillaError::Validation(errors)) => {
+            Err(Failed::Archival(archival_reason(&errors, &fonts, engine)))
+        }
         Err(error) => Err(Failed::Other(format!("{error:?}"))),
     }
 }
@@ -537,6 +744,7 @@ mod tests {
         Info {
             title: String::new(),
             author: String::new(),
+            date: "2026-10-01T09:30:00+02:00".into(),
         }
     }
 
@@ -695,7 +903,16 @@ mod tests {
             images: vec![],
             fonts: vec![0],
         };
-        let written = attempt(&mut engine, &HashMap::new(), &info(), "", &skipped);
+        let date = parse_date(&info().date);
+        let written = attempt(
+            &mut engine,
+            &HashMap::new(),
+            &info(),
+            date,
+            "",
+            true,
+            &skipped,
+        );
         assert!(written.is_ok());
     }
 
@@ -873,5 +1090,112 @@ mod tests {
         let body = structure.find("LBody").expect("a list item");
         assert!(structure[..body].contains("Lbl"), "{structure}");
         assert!(structure[body..].contains("Figure"), "{structure}");
+    }
+
+    /// whether a PDF says it is a PDF/A-2u, in its XMP metadata
+    fn says_pdfa(pdf: &[u8]) -> bool {
+        let text = String::from_utf8_lossy(pdf);
+        text.contains("<pdfaid:part>2</pdfaid:part><pdfaid:conformance>U</pdfaid:conformance>")
+    }
+
+    #[test]
+    fn a_normal_document_is_pdfa() {
+        let mut engine = engine(vec![paragraph(1, "hello"), paragraph(8, "world")]);
+        let mut images = HashMap::new();
+        images.insert(
+            "red.png".to_string(),
+            ImageData {
+                bytes: PNG.to_vec(),
+                jpeg: false,
+            },
+        );
+        engine.set_items(vec![paragraph(1, "hello"), image(8, "red.png")]);
+        let written = write_with(&mut engine, &images, &info(), "de-CH").unwrap();
+        // krilla checked the rules of PDF/A-2u, and found nothing
+        assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+        assert!(says_pdfa(&written.bytes));
+        let text = String::from_utf8_lossy(&written.bytes);
+        assert!(text.contains("/OutputIntents"), "no output intent");
+        assert!(text.contains("/S/GTS_PDFA1"), "no PDF/A output intent");
+        assert!(text.contains("<rdf:li>de-CH</rdf:li>"), "no dc:language");
+        assert!(text.contains("/Lang(de-CH)"), "no /Lang");
+        // PDF/A forbids smoothing images
+        assert!(!text.contains("/Interpolate true"));
+    }
+
+    #[test]
+    fn a_character_no_font_has_falls_back_to_a_normal_pdf() {
+        // no font of the repository has Egyptian hieroglyphs
+        let mut engine = engine(vec![paragraph(1, "a \u{13000} b \u{13000}\u{13001}")]);
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "en").unwrap();
+        assert_eq!(
+            written.warnings,
+            vec![Warning::Pdfa(
+                "no font has the characters \u{13000}\u{13001}".into()
+            )]
+        );
+        assert!(!says_pdfa(&written.bytes));
+        // and the normal PDF keeps the text, as before
+        if let Some(text) = text_of(&written.bytes, "no-font") {
+            assert!(text.contains('a') && text.contains('b'), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_pdf_without_a_date_is_a_normal_pdf() {
+        let mut engine = engine(vec![paragraph(1, "hello")]);
+        let none = Info::default();
+        let written = write_with(&mut engine, &HashMap::new(), &none, "").unwrap();
+        assert_eq!(
+            written.warnings,
+            vec![Warning::Pdfa("it has no date".into())]
+        );
+        assert!(!says_pdfa(&written.bytes));
+        let wrong = Info {
+            date: "yesterday".into(),
+            ..Info::default()
+        };
+        let written = write_with(&mut engine, &HashMap::new(), &wrong, "").unwrap();
+        assert_eq!(
+            written.warnings,
+            vec![Warning::Pdfa("its date yesterday can't be read".into())]
+        );
+    }
+
+    #[test]
+    fn reads_iso_dates() {
+        let date = |year: u16| {
+            DateTime::new(year)
+                .month(10)
+                .day(1)
+                .hour(9)
+                .minute(30)
+                .second(5)
+        };
+        assert_eq!(
+            parse_date("2026-10-01T09:30:05Z"),
+            Some(date(2026).utc_offset_hour(0).utc_offset_minute(0))
+        );
+        assert_eq!(
+            parse_date("2026-10-01T09:30:05.123+05:45"),
+            Some(date(2026).utc_offset_hour(5).utc_offset_minute(45))
+        );
+        assert_eq!(
+            parse_date("2026-10-01t09:30:05-03:30"),
+            Some(date(2026).utc_offset_hour(-3).utc_offset_minute(30))
+        );
+        for wrong in [
+            "",
+            "2026-10-01",
+            "2026-10-01T09:30:05",
+            "2026-13-01T09:30:05Z",
+            "2026-10-01T24:30:05Z",
+            "2026-10-01T09:30:05.Z",
+            "2026-10-01T09:30:05+5:45",
+            "2026-1०-01T09:30:05Z",
+            "+026-10-01T09:30:05Z",
+        ] {
+            assert_eq!(parse_date(wrong), None, "{wrong}");
+        }
     }
 }

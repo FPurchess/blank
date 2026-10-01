@@ -491,19 +491,23 @@ impl LayoutEngine {
         self.images.clear();
     }
 
-    /// the document as a PDF, in `language` (a BCP 47 tag such as "de-CH",
-    /// none if left out or empty). An image that can't be decoded shows its
-    /// alt text, and a font that can't be embedded is left out: see
-    /// `pdfWarnings`
+    /// the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
+    /// "de-CH", none if left out or empty), made at `date` (ISO 8601 with
+    /// its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
+    /// image that can't be decoded shows its alt text, a font that can't be
+    /// embedded is left out, and a document that can't be PDF/A-2u is a
+    /// normal PDF: see `pdfWarnings`
     pub fn pdf(
         &mut self,
         title: &str,
         author: &str,
         language: Option<String>,
+        date: Option<String>,
     ) -> Result<Vec<u8>, JsError> {
         let info = Info {
             title: title.to_string(),
             author: author.to_string(),
+            date: date.unwrap_or_default(),
         };
         let language = language.unwrap_or_default();
         self.warnings.clear();
@@ -514,7 +518,8 @@ impl LayoutEngine {
     }
 
     /// what went wrong in the last PDF, as JSON: `[{"kind": "image", "src":
-    /// …}, {"kind": "font", "font": index, "family": …}]`, empty for nothing
+    /// …}, {"kind": "font", "font": index, "family": …}, {"kind": "pdfa",
+    /// "reason": …}]`, empty for nothing
     #[wasm_bindgen(js_name = pdfWarnings)]
     pub fn pdf_warnings(&self) -> String {
         let warnings: Vec<serde_json::Value> = self
@@ -532,6 +537,7 @@ impl LayoutEngine {
                         .map(|(file, _)| file.family.as_str())
                         .unwrap_or(""),
                 }),
+                Warning::Pdfa(reason) => serde_json::json!({ "kind": "pdfa", "reason": reason }),
             })
             .collect();
         serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into())

@@ -26,6 +26,7 @@ import { flushPromises } from "../test/async";
 import { engineInstanceBroken, forgetEngineFailure } from "./engine";
 import toPDF, {
   describeWarnings,
+  pdfDate,
   pdfLanguage,
   sizesOf,
   WORKER_TIMEOUT,
@@ -555,6 +556,16 @@ describe("the PDF's warnings", () => {
     ]);
   });
 
+  it("tell why the PDF isn't a PDF/A", () => {
+    expect(
+      describeWarnings([
+        { kind: "pdfa", reason: "no font has the characters 𓀀𓀁" },
+      ]),
+    ).toEqual([
+      "It's a normal PDF, not a PDF/A for archiving, because no font has the characters 𓀀𓀁",
+    ]);
+  });
+
   it("come with the export of an image the engine can't decode", async () => {
     testEngine();
     // a PNG whose header is fine, but whose pixels are broken
@@ -573,5 +584,17 @@ describe("the PDF's warnings", () => {
     expect(warnings).toEqual([
       "1 image couldn't be read and shows its alt text: a broken dot",
     ]);
+  });
+});
+
+describe("pdfDate", () => {
+  it("writes local time in ISO 8601 with its offset", () => {
+    const date = pdfDate(new Date(2026, 9, 1, 9, 5, 7));
+    expect(date).toMatch(/^2026-10-01T09:05:07[+-]\d{2}:\d{2}$/);
+    const offset = -new Date(2026, 9, 1, 9, 5, 7).getTimezoneOffset();
+    const sign = offset < 0 ? "-" : "+";
+    const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+    const minutes = String(Math.abs(offset) % 60).padStart(2, "0");
+    expect(date.endsWith(`${sign}${hours}:${minutes}`)).toBe(true);
   });
 });

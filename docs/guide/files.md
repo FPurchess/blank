@@ -61,6 +61,8 @@ The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 - emoji are black and white, in the colour of your text,
 - Chinese, Japanese, Korean and other scripts come from the fonts your computer has for them, so a PDF of such text can look a little different when it's made on another computer.
 
+Every PDF is a PDF/A, the standard for archiving: it holds its fonts, colours and metadata, so it opens the same in years to come, and theses, offices and courts that ask for PDF/A accept it. It's also tagged, so screen readers read it in order, in your document's language, and its headings are bookmarks. If a document can't be a PDF/A, for example because it uses a character no font has, Blank makes a normal PDF and tells you why.
+
 If you made PDFs with Blank 2.1 or earlier, lines may now break in other places: the PDF is typeset by Blank itself now, the same way as your screen.
 
 Images come along at the size they have in Blank, up to the width of the page. Images from the web are downloaded for the PDF, so that needs an internet connection. If an image can't be loaded, the PDF shows its description in its place, and Blank tells you which one it was.

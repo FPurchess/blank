@@ -73,7 +73,7 @@ const onSharedEngine = async ({
       engine.addFonts(fallbackFonts.value);
     }
     return {
-      pdf: engine.pdf(fields.title, fields.author, pdfLanguage()),
+      pdf: engine.pdf(fields.title, fields.author, pdfLanguage(), pdfDate()),
       pages: engine.pages(),
       missing: engine.missing(),
       warnings: engine.pdfWarnings(),
@@ -162,7 +162,24 @@ const jobOf = (
   title: fields.title,
   author: fields.author,
   language: pdfLanguage(),
+  date: pdfDate(),
 });
+
+/**
+ * pdfDate returns `now` as the PDF's date: local time in ISO 8601 with its
+ * offset, e.g. "2026-10-01T09:30:00+02:00"
+ */
+export const pdfDate = (now = new Date()) => {
+  const pad = (value: number) => String(Math.floor(value)).padStart(2, "0");
+  const offset = -now.getTimezoneOffset();
+  const sign = offset < 0 ? "-" : "+";
+  const minutes = Math.abs(offset);
+  return (
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+    `T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}` +
+    `${sign}${pad(minutes / 60)}:${pad(minutes % 60)}`
+  );
+};
 
 /**
  * pdfLanguage returns the document's language as a BCP 47 tag: the
@@ -232,6 +249,13 @@ export const describeWarnings = (
   else if (fonts.length > 1)
     described.push(
       `${fonts.length} fonts couldn't be embedded, so their text is left out: ${fonts.join(", ")}`,
+    );
+  const pdfa = warnings.flatMap((warning) =>
+    warning.kind === "pdfa" ? [warning.reason] : [],
+  );
+  if (pdfa.length)
+    described.push(
+      `It's a normal PDF, not a PDF/A for archiving, because ${pdfa.join("; ")}`,
     );
   return described;
 };
