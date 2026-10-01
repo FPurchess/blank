@@ -74,7 +74,7 @@ The wasm API between Rust (`model.rs`, `wasm.rs`) and TypeScript (`flatten.ts`, 
 - Chinese, Japanese, Korean and symbols Blank's fonts lack come from the system's fonts, so another machine can lay the same document out differently, and a machine without such a font shows boxes on screen and in the PDF. Fonts whose licence forbids embedding a subset are skipped (see CLAUDE.md, Gotchas).
 - The text is painted from unhinted outlines with grayscale anti-aliasing on whole-pixel baselines: a shade lighter than the webview's text at 1×, no subpixel anti-aliasing.
 - The IME and screen readers rely on the hidden, moved contenteditable. A real composing input method, and macOS and Windows input methods and screen readers, haven't been tested. Orca reads the lines as the hidden editor breaks them.
-- The Word export keeps its own layout and fonts (code in Courier New), so Word and the PDF can differ.
+- The Word export keeps its own layout and fonts (code in IBM Plex Mono, embedded in its regular face), so Word and the PDF can differ.
 - It needs the wasm features of Safari 15's WebKit, which macOS 12 (Monterey) ships with, hence macOS 12 or newer.
 - A new feature that measures the DOM measures the wrong place. Measure through `src/engine/geometry.ts`.
 
