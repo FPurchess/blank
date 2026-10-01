@@ -25,7 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # `webkit2gtk-driver` provides WebKitWebDriver, `xvfb` a virtual display
+      # `webkit2gtk-driver` provides WebKitWebDriver, `xvfb` a virtual display, and `xclip`
+      # the X selection the middle-click paste spec sets
       - name: install system dependencies
         run: |
           sudo apt-get update
@@ -40,6 +41,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             webkit2gtk-driver \
+            xclip \
             xvfb
           # the desktop portal is registered with D-Bus but never comes up on the runner, so WebKitGTK
           # and tao wait for its timeouts (~30s) on every app start. Without the service file, the

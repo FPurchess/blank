@@ -53,3 +53,15 @@ Final checks (on d78e1ad plus the uncommitted M8 files):
 - A flake in engine-editor's `src/main.test.ts`: twice, under the whole suite in the pre-commit hook, "Vitest caught 1 unhandled error … originated in src/main.test.ts". It passes alone and in a full run by hand; the message wasn't captured.
 
 Next: the user decides on the M8 commit, then report to the integrator.
+
+## Later: bundling Chinese, Japanese and Korean fonts (researched 2026-10-01, not done)
+
+The owner decided against it for now; the system-font fallback stays. If it comes back:
+
+- Files: the static OTCs of Noto Sans CJK, release Sans2.004 of notofonts/noto-cjk (`03_NotoSansCJK-OTC.zip`): `NotoSansCJK-Regular.ttc` (18.6 MB), `-Medium.ttc` (17.5 MB, h1-h3 use Medium 500 like Plex), `-Bold.ttc` (19.1 MB, bold, h4-h6, th). 55.2 MB together; brotli-9, which is how Tauri embeds dist/: 37.3 MB, so each installer grows by about that (deb 13.4 → ~51 MB, AppImage 87 → ~125 MB, dmg/msi ~11 → ~49 MB). SIL OFL 1.1, shipped unmodified, with its LICENSE.
+- Each OTC holds all five regions as faces ("Noto Sans CJK JP/KR/SC/TC/HK", plus Mono), so the region is only the family name, and every face covers Han, kana, Hangul, Bopomofo and CJK punctuation.
+- The engine handles them as they are: `Fonts::add` registers every face of a .ttc, krilla embeds them as CFF ("CID Type 0C"), and the PDF is word-exact (measured: layout 253 ms, PDF 114 ms for a short sample).
+- Not the variable OTC (`NotoSansCJK-VF.otf.ttc`, 31.2 MB, brotli 14.5 MB): it works and is word-exact, but krilla writes its CFF2 instances as TrueType (cubic outlines approximated by quadratic ones, so the PDF's shapes differ slightly from the screen), names every instance "-Thin", and laid out and wrote 2× slower (577/261 ms).
+- Region of Han characters, from the document `language`: `ja` → JP, `ko` → KR, `zh-TW`/`zh-Hant*` → TC, `zh-HK`/`zh-MO` → HK, `zh`/`zh-CN`/`zh-SG`/`zh-Hans*` → SC; any other language → the same on `navigator.language`, then SC (or JP; open). A later switch to another region needs the family added to the engine's stack without the 55 MB again: an engine call that adds a family name for files it has.
+- Loading: lazily in `src/engine/fallback.ts`, as Noto Emoji, all three weights once a document has CJK (`missing()` doesn't say the weight); those scripts then never ask `fallback_fonts`. The PDF engine shares them (`withFontsOf`).
+- Open: commit the fonts (~45 MB of git history) or download them pinned by SHA-256 like the dictionaries.
