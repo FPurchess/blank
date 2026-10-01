@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://fpurchess.github.io/blank/">
+  <a href="https://blank-writer.xyz/">
     <img src="docs/public/logo.svg" alt="Blank" width="299">
   </a>
 </p>
@@ -31,7 +31,7 @@ Underneath, it's plain markdown, so your writing stays yours, readable by any ed
 - **Windows:** [Installer (.msi)](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_x64_en-US.msi) · [Setup (.exe)](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_x64-setup.exe)
 - **Linux:** [.deb](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_amd64.deb) · [.rpm](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank-2.1.0-1.x86_64.rpm) · [AppImage](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_amd64.AppImage)
 
-**macOS** blocks Blank on first open because it isn't notarized by Apple. **Linux** needs glibc 2.35+ and WebKitGTK 4.1 (Ubuntu 22.04+, Debian 12+). See the [install guide](https://fpurchess.github.io/blank/guide/install) for both.
+**macOS** blocks Blank on first open because it isn't notarized by Apple. **Linux** needs glibc 2.35+ and WebKitGTK 4.1 (Ubuntu 22.04+, Debian 12+). See the [install guide](https://blank-writer.xyz/guide/install) for both.
 
 ## Keyboard shortcuts
 
@@ -47,11 +47,11 @@ A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ct
 | Insert table                | `Mod T`                     |
 | Export as PDF / Word        | `Mod Alt P` / `Mod Alt W`   |
 
-All shortcuts, and how to change them, are in the [documentation](https://fpurchess.github.io/blank/guide/shortcuts).
+All shortcuts, and how to change them, are in the [documentation](https://blank-writer.xyz/guide/shortcuts).
 
 ## Documentation
 
-Everything else lives on **[fpurchess.github.io/blank](https://fpurchess.github.io/blank/)**: [writing in Blank](https://fpurchess.github.io/blank/guide/writing), [tables](https://fpurchess.github.io/blank/guide/tables), [files and formats: PDF and Word](https://fpurchess.github.io/blank/guide/files), [autocorrect in 14 languages](https://fpurchess.github.io/blank/guide/autocorrect), [spell check](https://fpurchess.github.io/blank/guide/spelling), the [six themes](https://fpurchess.github.io/blank/guide/themes), [your own shortcuts and settings](https://fpurchess.github.io/blank/guide/configuration) and the [FAQ](https://fpurchess.github.io/blank/guide/faq).
+Everything else lives on **[blank-writer.xyz](https://blank-writer.xyz/)**: [writing in Blank](https://blank-writer.xyz/guide/writing), [tables](https://blank-writer.xyz/guide/tables), [files and formats: PDF and Word](https://blank-writer.xyz/guide/files), [autocorrect in 14 languages](https://blank-writer.xyz/guide/autocorrect), [spell check](https://blank-writer.xyz/guide/spelling), the [six themes](https://blank-writer.xyz/guide/themes), [your own shortcuts and settings](https://blank-writer.xyz/guide/configuration) and the [FAQ](https://blank-writer.xyz/guide/faq).
 
 ## Contributing
 

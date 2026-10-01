@@ -9,7 +9,7 @@ set -euo pipefail
 channel=${1:?usage: docs/deploy.sh <latest|dev> <site dir>}
 mkdir -p "${2:?usage: docs/deploy.sh <latest|dev> <site dir>}"
 site=$(cd "$2" && pwd)
-root=${DOCS_ROOT:-/blank/}
+root=${DOCS_ROOT:-/}
 docs=$(cd "$(dirname "$0")" && pwd)
 version=$(cd "$docs/.." && bun pm pkg get version | tr -d '"')
 
@@ -26,7 +26,7 @@ case "$channel" in
     # the root holds the latest release, but must keep the other channels in place
     build latest "$root" "$tmp/latest"
     rsync -a --delete --exclude /.git --exclude /dev/ --exclude '/v[0-9]*/' \
-      --exclude /versions.json --exclude /.nojekyll "$tmp/latest/" "$site/"
+      --exclude /versions.json --exclude /.nojekyll --exclude /CNAME "$tmp/latest/" "$site/"
     build archive "${root}v$version/" "$tmp/archive"
     rsync -a --delete "$tmp/archive/" "$site/v$version/"
 
@@ -49,3 +49,5 @@ esac
 
 # GitHub Pages must not run Jekyll over the build, it would drop files starting with "_"
 touch "$site/.nojekyll"
+# the custom domain, which GitHub Pages drops when the file goes missing
+echo blank-writer.xyz >"$site/CNAME"
