@@ -9,6 +9,7 @@ import {
 } from "vue";
 
 import { editBand } from "../editor/commands/editBand";
+import { BLEED } from "../engine/frames";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
@@ -80,6 +81,9 @@ const marginTop = computed(() =>
 const marginBottom = computed(() =>
   props.sheet ? (pageLayoutState.value?.margins.bottom ?? 0) * props.scale : 0,
 );
+// where the text starts in a frame of "page ends", which the header and
+// footer of a page-end mark line up with
+const bandInset = computed(() => `${BLEED * props.scale}px`);
 
 // which of the images the page's text shows are loaded, e.g. "10", so the
 // page paints again when one of its own loads, not when any image does
@@ -442,7 +446,12 @@ const mark = computed(() => {
         @dblclick="openBand('footer')"
       />
     </template>
-    <div v-if="mark" class="page-end" aria-hidden="true">
+    <div
+      v-if="mark"
+      class="page-end"
+      aria-hidden="true"
+      :style="{ '--band-inset': bandInset }"
+    >
       <div
         class="band footer"
         :title="bandTitle('footer')"

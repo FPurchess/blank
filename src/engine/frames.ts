@@ -15,15 +15,18 @@ export const VIEW_TOP = 56;
 // more room above the first page for the line with the document's
 // properties
 export const PROPERTIES_ROOM = 28;
+// the room between a header or footer and the page's text in "page ends"
+export const BAND_GAP = 16;
 // room above the first page's text in "page ends" for its header, between
-// the properties' room and the first frame
-export const HEADER_ROOM = 20;
+// the properties' room and the first frame: its line, and the gap below it
+export const HEADER_ROOM = 20 + BAND_GAP;
 export const VIEW_BOTTOM = 72;
 // between the sheets, and around them
 export const SHEET_GAP = 24;
 export const DESK_SIDE = 24;
-// the mark between the pages of "page ends"
-export const MARK_HEIGHT = 64;
+// the mark between the pages of "page ends": a footer, the line where the
+// page ends and a header, with a gap to the text above and below
+export const MARK_HEIGHT = 64 + 2 * BAND_GAP;
 // what "page ends" shows beside the text, for list markers and quote bars,
 // in points
 export const BLEED = 24;
