@@ -426,6 +426,11 @@ impl TextBox {
             return self.text.len();
         };
         let mut end = info.end;
+        // at a hard break, before the break only: the spaces before it are
+        // text, as the editor keeps them
+        if line + 1 < lines.len() && self.text[..end].ends_with('\n') {
+            return end - 1;
+        }
         if line + 1 < lines.len() {
             while end > info.start && self.text[..end].ends_with(|c: char| c.is_whitespace()) {
                 end = self.text[..end]
@@ -568,7 +573,12 @@ fn push_span(
         builder.push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
     }
     let mut ink: Ink = 0;
-    if let Some(href) = &span.link {
+    // a link's number shares the ink's bits with code, so no more than fit
+    if let Some(href) = span
+        .link
+        .as_ref()
+        .filter(|_| links.len() < INK_CODE as usize - 1)
+    {
         links.push(href.clone());
         ink |= links.len() as Ink;
         builder.push(StyleProperty::Underline(true), range.clone());
@@ -870,5 +880,23 @@ mod tests {
                 assert_eq!(run.font, if code { 10 } else { 0 }, "line {line}");
             }
         }
+    }
+
+    #[test]
+    fn ends_a_line_at_a_hard_break_after_its_spaces() {
+        let mut fonts = repository_fonts();
+        let boxed = TextBox::new(&mut fonts, &text("foo  \nbar"), 300.0, Alignment::Start);
+        assert_eq!(boxed.line_count(), 2);
+        // after "foo" and its two spaces, before the break
+        assert_eq!(boxed.line_end(0), (6, false));
+        // a soft break still ends before the space it breaks at
+        let wrapped = TextBox::new(
+            &mut fonts,
+            &text("aaaa bbbb cccc dddd"),
+            40.0,
+            Alignment::Start,
+        );
+        let (end, _) = wrapped.line_end(0);
+        assert_eq!(&wrapped.text[..(end - 1) as usize], "aaaa");
     }
 }

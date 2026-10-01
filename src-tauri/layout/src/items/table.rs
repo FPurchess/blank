@@ -68,8 +68,8 @@ pub(super) fn table_units(
         .max()
         .unwrap_or(1)
         .max(1) as usize;
-    let shares: Vec<f32> = if table.widths.len() == columns {
-        let total: f32 = table.widths.iter().sum::<f32>().max(f32::EPSILON);
+    let total: f32 = table.widths.iter().sum();
+    let shares: Vec<f32> = if table.widths.len() == columns && total.is_finite() && total > 0.0 {
         table.widths.iter().map(|share| share / total).collect()
     } else {
         vec![1.0 / columns as f32; columns]
@@ -199,8 +199,11 @@ pub(super) fn table_units(
                         alt,
                     } => {
                         if *image_width > 0.0 && *image_height > 0.0 {
-                            // never wider than the cell
-                            let scale = (inner / image_width).min(1.0);
+                            // never wider than the cell, nor taller than a
+                            // page, as a row's slices don't cut it
+                            let scale = (inner / image_width)
+                                .min((room - 2.0 * CELL_PADDING_Y) / image_height)
+                                .min(1.0);
                             let (w, h) = (image_width * scale, image_height * scale);
                             decos.push(Deco::Image {
                                 src: src.clone(),
@@ -443,6 +446,9 @@ pub(super) fn table_units(
                         .fold(f32::NAN, f32::min)
                 };
                 let to = if to.is_nan() { limit } else { to };
+                // always forward: where a slice can't move on, e.g. past the
+                // precision of f32, the rest of the row is the last slice
+                let to = if to > from { to } else { y1 };
                 for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
                     if y >= from - 0.01 && y < to - 0.01 {
                         cell_images.push(CellImage {
@@ -504,6 +510,7 @@ pub(super) fn table_units(
         extras,
         cell_images,
         cells,
+        missing: vec![],
     }
 }
 
@@ -1054,5 +1061,34 @@ mod tests {
             .collect();
         // IBM Plex Mono
         assert_eq!(fonts, [10]);
+    }
+
+    #[test]
+    fn keeps_images_within_the_page() {
+        // taller than a page, at the top and in a cell: scaled down to the
+        // room, keeping their shape
+        let tall = Item {
+            content: Content::Image {
+                pos: 0,
+                src: "tall.png".into(),
+                width: 100.0,
+                height: 2000.0,
+                alt: String::new(),
+            },
+            ..crate::engine::test_support::paragraph(0, "")
+        };
+        let engine = test_support::engine(vec![tall]);
+        let bottom = engine.settings.content_bottom();
+        assert!(
+            engine.pages[0].bottom <= bottom + 0.01,
+            "{}",
+            engine.pages[0].bottom
+        );
+        let in_cell = block_table(vec![vec![image_block(5, 100.0, 2000.0)]]);
+        for page in &in_cell.pages {
+            assert!(page.bottom <= bottom + 0.01, "{}", page.bottom);
+        }
+        let image = &in_cell.laid[0].cell_images[0];
+        assert!((image.w / image.h - 0.05).abs() < 1e-4);
     }
 }

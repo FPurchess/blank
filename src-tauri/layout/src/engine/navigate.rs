@@ -301,6 +301,12 @@ impl Engine {
                 .filter(|(_, info)| unit.shows(boxed.y + info.top, boxed.y + info.bottom))
                 .map(|(line, _)| line)
                 .collect();
+            // a slice of a row taller than a page that shows none of the box
+            // under the goal, e.g. of the other, longer cell: past it, to
+            // where the column goes on
+            if unit.line.is_none() && unit.clip.is_some() && shown.is_empty() {
+                continue;
+            }
             let line = match unit.line {
                 Some(line) => line,
                 None if down => shown.first().copied().unwrap_or(0),
@@ -576,5 +582,29 @@ mod tests {
         // and back up over the caption, into the paragraph
         let up = text_hit(engine.vertical(down, false, false, goal));
         assert!((1..=6).contains(&up), "{up}");
+    }
+
+    #[test]
+    fn leaves_a_row_taller_than_a_page_by_its_short_cell() {
+        use crate::model::{Content, Row};
+        // a short cell beside one taller than a page, then a paragraph
+        let long = vec!["x"; 90].join("\n");
+        let rows = vec![Row {
+            cells: vec![cell(3, "short"), cell(20, &long)],
+            header: false,
+        }];
+        let mut table = table_item(rows, None);
+        if let Content::Table { end, .. } = &mut table.content {
+            *end = 300;
+        }
+        let engine = engine(vec![table, paragraph(301, "after")]);
+        assert!(engine.pages.len() > 1);
+        let (_, x, ..) = engine.caret(5, false).unwrap();
+        // down from the short cell goes past the long one's slices
+        let down = text_hit(engine.vertical(5, false, true, x));
+        assert!((301..=306).contains(&down), "{down}");
+        // and up from below comes back into the short cell's column
+        let up = text_hit(engine.vertical(down, false, false, x));
+        assert!((3..=8).contains(&up), "{up}");
     }
 }

@@ -125,8 +125,7 @@ fn display(ops: Vec<Op>) -> String {
 
 /// a number with at most three decimals, which is finer than any screen
 fn number(out: &mut String, value: f32) {
-    let rounded = (value * 1000.0).round() / 1000.0;
-    let _ = write!(out, "{rounded}");
+    out.push_str(&crate::model::json_number(value));
 }
 
 fn string(out: &mut String, value: &str) {

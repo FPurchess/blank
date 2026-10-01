@@ -143,6 +143,8 @@ pub struct Laid {
     pub cell_images: Vec<CellImage>,
     /// for a table: its cells, in the order of its rows
     pub cells: Vec<TableCell>,
+    /// the characters no font has a glyph for in it, see Engine::missing
+    pub missing: Vec<char>,
 }
 
 /// a cell of a table as laid out: where it is in the grid, and what of the
@@ -201,8 +203,9 @@ impl Laid {
                 ..
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
-                    // an image never is wider than the room it has
-                    let scale = (inner / image_width).min(1.0);
+                    // an image never is wider than the room it has, nor
+                    // taller than a page's
+                    let scale = (inner / image_width).min(room / height).min(1.0);
                     let (w, h) = (image_width * scale, height * scale);
                     Laid::single(
                         h,
@@ -288,6 +291,7 @@ impl Laid {
             extras: vec![],
             cell_images: vec![],
             cells: vec![],
+            missing: vec![],
         }
     }
 
@@ -335,5 +339,6 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
         extras: vec![],
         cell_images: vec![],
         cells: vec![],
+        missing: vec![],
     }
 }

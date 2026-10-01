@@ -87,6 +87,9 @@ pub struct Engine {
     pub chapters: Vec<Chapter>,
     pub stats: Stats,
     next_version: u32,
+    /// how many items miss each character, in the order the characters
+    /// came, see `missing`
+    missing_chars: Vec<(char, usize)>,
 }
 
 impl Engine {
@@ -102,6 +105,7 @@ impl Engine {
             chapters: vec![],
             stats: Stats::default(),
             next_version: 1,
+            missing_chars: Default::default(),
         };
         engine.paginate_from(0, None);
         engine
@@ -114,6 +118,22 @@ impl Engine {
         if laid.units.is_empty() {
             laid.units.push(crate::items::Unit::default());
         }
+        let extras = laid.extras.iter().map(|(boxed, _)| boxed);
+        let mut missing: Vec<char> = vec![];
+        for boxed in laid
+            .texts
+            .iter()
+            .chain(&laid.label)
+            .chain(&laid.marker)
+            .chain(extras)
+        {
+            for char in &boxed.missing {
+                if !missing.contains(char) {
+                    missing.push(*char);
+                }
+            }
+        }
+        laid.missing = missing;
         laid
     }
 
@@ -133,6 +153,7 @@ impl Engine {
             let items = std::mem::take(&mut self.items);
             self.laid = items.iter().map(|item| self.lay_out(item)).collect();
             self.items = items;
+            self.recount_missing();
             return self.paginate_from(0, None);
         }
         // the same items, only paginated again, e.g. for new bands: pages
@@ -151,29 +172,28 @@ impl Engine {
         let items = std::mem::take(&mut self.items);
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
+        self.recount_missing();
         self.paginate_from(0, None)
     }
 
-    /// the characters of the document no font has a glyph for
+    /// the characters of the document no font has a glyph for; kept up to
+    /// date as items are laid out, so asking is cheap
     pub fn missing(&self) -> Vec<char> {
-        let mut missing: Vec<char> = vec![];
+        self.missing_chars.iter().map(|(char, _)| *char).collect()
+    }
+
+    /// counts the characters every item misses, after all were laid out
+    fn recount_missing(&mut self) {
+        let mut counts: Vec<(char, usize)> = vec![];
         for laid in &self.laid {
-            let extras = laid.extras.iter().map(|(boxed, _)| boxed);
-            for boxed in laid
-                .texts
-                .iter()
-                .chain(&laid.label)
-                .chain(&laid.marker)
-                .chain(extras)
-            {
-                for char in &boxed.missing {
-                    if !missing.contains(char) {
-                        missing.push(*char);
-                    }
+            for char in &laid.missing {
+                match counts.iter_mut().find(|(known, _)| known == char) {
+                    Some((_, count)) => *count += 1,
+                    None => counts.push((*char, 1)),
                 }
             }
         }
-        missing
+        self.missing_chars = counts;
     }
 
     /// replaces all items
@@ -181,6 +201,7 @@ impl Engine {
         items.iter_mut().for_each(Item::sanitize);
         self.laid = items.iter().map(|item| self.lay_out(item)).collect();
         self.items = items;
+        self.recount_missing();
         self.stats = Stats {
             laid_out: self.items.len(),
             ..Default::default()
@@ -230,6 +251,34 @@ impl Engine {
             }
             previous_end = start + count;
             let laid: Vec<Laid> = inserted.iter().map(|item| self.lay_out(item)).collect();
+            let removed: Vec<Vec<char>> = self.laid[start..start + delete]
+                .iter()
+                .map(|laid| laid.missing.clone())
+                .collect();
+            for missing in removed {
+                for char in missing {
+                    if let Some((_, count)) = self
+                        .missing_chars
+                        .iter_mut()
+                        .find(|(known, _)| *known == char)
+                    {
+                        *count = count.saturating_sub(1);
+                    }
+                }
+            }
+            self.missing_chars.retain(|(_, count)| *count > 0);
+            for new in &laid {
+                for char in &new.missing {
+                    match self
+                        .missing_chars
+                        .iter_mut()
+                        .find(|(known, _)| known == char)
+                    {
+                        Some((_, count)) => *count += 1,
+                        None => self.missing_chars.push((*char, 1)),
+                    }
+                }
+            }
             self.items.splice(start..start + delete, inserted);
             self.laid.splice(start..start + delete, laid);
             if shift != 0 {
@@ -434,5 +483,36 @@ mod tests {
         let own = crate::pdf::write(&mut fresh, &Default::default(), &info).unwrap();
         assert!(shared == own, "the PDFs differ");
         assert_eq!(export.frags, page.frags);
+    }
+
+    #[test]
+    fn counts_what_no_font_has_as_items_come_and_go() {
+        let mut engine = engine(document(&["plain", "\u{4e2d}\u{6587}", "more \u{4e2d}"]));
+        assert_eq!(engine.missing(), vec!['\u{4e2d}', '\u{6587}']);
+        // without the second paragraph, only the third one's character
+        let third = engine.items[2].clone();
+        engine.update(1, 1, vec![], -4);
+        assert_eq!(engine.missing(), vec!['\u{4e2d}']);
+        // without the third too, nothing
+        engine.update(1, 1, vec![], -(third.to() as i64 - third.from() as i64 + 2));
+        assert!(engine.missing().is_empty());
+        // and back
+        engine.update(1, 0, vec![paragraph(8, "\u{6587}")], 3);
+        assert_eq!(engine.missing(), vec!['\u{6587}']);
+    }
+
+    #[test]
+    #[ignore]
+    fn missing_timing() {
+        let engine = engine(document(&vec![LONG; 10150]));
+        let started = std::time::Instant::now();
+        for _ in 0..100 {
+            std::hint::black_box(engine.missing());
+        }
+        println!(
+            "missing() at {} pages: {:?}",
+            engine.pages.len(),
+            started.elapsed() / 100
+        );
     }
 }

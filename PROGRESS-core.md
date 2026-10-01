@@ -297,6 +297,72 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
 - `exact.rs` has 6 tests: the sample on two papers, cell blocks, marks and ligatures, what no font has, and the tagged PDF.
 - On CI, a missing pdftotext, pdfinfo or qpdf fails the checks that need it, with the package to install. Locally they skip, as engine-release gated `read_words`: `missing_tool` in `exact.rs`, and `text_of` in the PDF's unit tests. Checked by running both ways with the tools off `PATH`.
 
+### Review fixes
+
+The self-review's findings, with the numbers from the report to the coordinator. One commit each, each with the test that failed before.
+
+- B1 (b66a67b): a font left out of the PDF panicked krilla, because a `continue` left its tagged section open. What can't be drawn is now left out before its tag opens. Test: `pdf::tests::leaves_out_a_skipped_font_without_panicking`.
+- B2 + M7 + m11 (2abb33c): `sanitize` caps images at 100 000 pt (top-level and in cells) and quote bars at 64. Table widths fall back to equal shares, links are capped at 65 535 per block, units per em outside 16–16384 count as 1000, and band slots are capped at 1000 characters. The slice loop always moves forward, and JSON numbers are finite. Tests are in `boundary_tests.rs` and `bands::tests`.
+- M1: marks were mirrored in the PDF, because Parley's `dy` points down and krilla's `y_offset` up. `krilla_glyphs` now passes `-dy`. Test: `keeps_marks_on_their_side_of_the_baseline` (kaf with damma), which fails with the old sign. Rendered with `renders_marks_for_a_look` (ignored) and `pdftoppm`/inkscape at the same scale, each cropped and enlarged 2×:
+  - the page view (glyph outlines where it paints them): ![page](progress-core/m1-page.png)
+  - the PDF before: the damma is pushed into the kaf, and the kasra under the beh is squashed: ![before](progress-core/m1-pdf-before.png)
+  - the PDF after, as the page: ![after](progress-core/m1-pdf-after.png)
+  - Plex composes the accented capitals into precomposed glyphs, so they don't differ.
+  - Commit: 346b49c.
+- M2 (32b1099): ↓ inside a row taller than a page got stuck. Slices that show no line of the box under the goal are skipped, both ways. Test: `leaves_a_row_taller_than_a_page_by_its_short_cell`.
+- M6 (61e33a3): images taller than a page are scaled down to its room, at the top and in cells, keeping their shape. Test: `keeps_images_within_the_page`.
+- M8 (a67e5e8): `missing()` walked every text box on each sync, 0.86 ms at 823 pages. Each `Laid` now keeps its missing characters, and the engine counts them as items come and go, in the order they came, so `missing()` takes 30 ns. Tests: `counts_what_no_font_has_as_items_come_and_go`, plus the property test, which compares with a fresh layout as sets. After edits the order is the order they came, not the document's.
+- M3 (609b867): repeated header rows are `Part::Repeat`, drawn as `PaginationOther` artifacts with untagged link annotations. Test: `puts_repeated_header_rows_in_the_structure_once` (pdfinfo finds "Heading" once).
+- M4 (f5a30e2): a cell's content is tagged in its reading order (`tags::cell_content`): markers go by their baseline to their text box, lists in cells become L > LI > Lbl + LBody through `Builder`, and images and alt texts are Figures. Test: `exact.rs` `pdf_tags_a_cell_in_its_reading_order`.
+- M5 (1666b4f): a link is tagged around its own text. `Part::Linked {item, text, link}` covers its runs and `Part::Link {…, link}` its annotations, `Ids` keeps the order things were drawn in, and `tags::text_nodes` builds a text box's leaves with one Link per link, inline. Test: `exact.rs` `pdf_tags_links_around_their_text` (48 Links, each with its text before its annotation).
+
+### Where the review fixes stand (stopped at 00:17 on 2026-10-01 for the night)
+
+Everything above is committed; nothing is half done in the tree. Next, in this order (the coordinator's list):
+
+1. **M9**: `items/table.rs` slicing, cut search about cubic (2000 lines in one cell take 2.6 s in debug). Merge the lines' intervals once (sorted), take the gaps as the allowed cuts, and walk them with one pointer per slice. The test: a cell of 2000 hard lines laid out within a time bound, with slice for slice the same result as before.
+2. ~~**m1**~~, done at 00:17: at a hard break, `end_byte` steps back over the "\n" only, keeping the spaces before it. Soft breaks still trim. Test: `ends_a_line_at_a_hard_break_after_its_spaces`.
+3. **m2**: `TextBox::notdef` reports the base letter for a missing combining mark. Use `cluster_ranges`' widened ranges. Test: `a + U+1AB5` reports U+1AB5.
+4. **m3**: a caption can end up alone. `items/table.rs` decides whether a group is sliced by `row_room`; use `slice_room(start == header_rows)`, so the first body row counts the caption. Test: a row in the window room − headers − caption < row ≤ room − headers (41 hard lines on A4): caption and table on one page.
+5. ~~**m4**~~, done at 00:15: `[Break, H1]` with new-page-before gave a blank first page. A page that holds only breaks stays `empty` now. Test: `page_break_before_a_chapter_at_the_start`.
+6. **m5**: `keep_height` runs across a new-page-before heading, which leaves H2 alone on a page. Stop the heading run at a heading that starts a new page, and at a Break. Test: `[P, H2, H1, P]` puts H2 with H1 on page 2, or H2 on page 1.
+7. **m7**, only the two agreed parts:
+   - a. `paginate_from` copies the tail twice (`split_off`, then `extend`). Paginate into a scratch Vec and `splice` it into `self.frags`/`self.pages` in place, rewriting item indices only when `delta != 0`.
+   - b. Re-expand the bands of every page only if a slot uses `{chapter}` (for a chapter change) or `{pages}` (for a page-count change).
+   - Leave `glyph_runs`' O(C²) and the PDF's double pass unless they're small.
+8. **m8**, the PDF details:
+   - the retry bound counts `fonts.instances`
+   - `index_of` works when a file is there twice
+   - TH scope: Column in header rows, Row for header cells in body rows
+   - no empty P for empty cells
+   - cell figures fall back to src for their alt
+   - merge one line's runs of one part into one tagged section, which gives fewer MCIDs
+   - M5 already removed the latent link cases
+9. **m9**, seam and docs:
+   - `addFont` returns the four ranges
+   - move `setSettings`' doc comment from `withFontsOf` back to it
+   - mark `page()` deprecated
+   - `Warning::Font`'s doc mentions instance indices
+   - remove `lines` from the task 0 notes
+   - update SEAM.md
+10. **m10**, tests:
+   - `pdf_is_tagged` matches `/S /L\n`, not the prefix
+   - loosen the wall-clock asserts in the debug tests (`boundary_tests.rs`)
+   - make the property test generate `bars_continue` and nested quotes and lists
+   - `answers_nothing_for_what_isnt_there` asserts what out-of-range positions give
+11. From engine-release (low priority): trim family names in `Fonts::add` and wherever fontique's names are compared ("Mitra " against "Mitra"), with a test.
+- m6 (Roman numerals ≥ 4000 in TS `src/layout/bands.ts`) is engine-editor's; the coordinator passes it on.
+- m12 are notes, below.
+- Seen while committing M5: the TS test `importers/docx` "keeps a pipe table" timed out in the pre-commit hook at a load average of 41. It passes alone; not related to the engine.
+
+### Notes from the review (m12, not bugs of this work)
+
+- `words()` (test-hooks only) gets right-to-left words wrong: glyphs come in visual order. Fix it if RTL text ever goes into `exact.rs`'s word comparison.
+- Parley 0.11 doesn't apply letter spacing to ligature parts, so the caret can drift in h1/h2 with NFD accents or emoji ZWJ sequences.
+- Parley's synthetic bold and slant (`embolden`/`skew`) aren't applied, e.g. for bold or italic in a system CJK font.
+- An engine rebuilt from `fontFile*` numbers its variable-font instances in the order it lays them out, so a cache of glyph paths by font index must be cleared when switching to it.
+- Not reproduced, so dropped: a right-to-left line break inside a cluster (Parley `data.rs`), tried at 3 widths.
+
 ### Known quirks (of other tools, not of the PDF)
 
 - pdftotext (poppler) turns the characters of one right-to-left glyph around: lam-alef comes out as alef-lam, and a fatha before its beh.

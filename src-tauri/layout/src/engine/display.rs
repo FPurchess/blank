@@ -65,10 +65,23 @@ pub enum Part {
     Extra { item: usize, extra: usize },
     /// an image in a table's cell, see `Laid::cell_images`
     CellImage { item: usize, image: usize },
-    /// a link in the text of an item
-    Link { item: usize },
+    /// a link of a text box: its annotation, by the link's number in the box
+    Link {
+        item: usize,
+        text: usize,
+        link: usize,
+    },
+    /// the text of a link, drawn in its glyph runs
+    Linked {
+        item: usize,
+        text: usize,
+        link: usize,
+    },
     /// the header or the footer of the page
     Band { footer: bool },
+    /// a table's header rows, repeated on a page the table goes on: they
+    /// are in the structure once, where they first are
+    Repeat,
 }
 
 impl Engine {
@@ -128,6 +141,11 @@ impl Engine {
                     },
                     Deco::Rect { .. } => Part::Decoration,
                 };
+                let part = if frag.repeat && part != Part::Decoration {
+                    Part::Repeat
+                } else {
+                    part
+                };
                 ops.push((deco_op(deco.moved(dx, dy)), part));
             }
             // quote bars, down to the next item in the quote on this page
@@ -176,9 +194,13 @@ impl Engine {
                     None => 0..boxed.line_count(),
                 };
                 let infos = boxed.lines();
-                let part = Part::Text {
-                    item: frag.item,
-                    text,
+                let part = if frag.repeat {
+                    Part::Repeat
+                } else {
+                    Part::Text {
+                        item: frag.item,
+                        text,
+                    }
                 };
                 for line in lines {
                     let info = &infos[line];
@@ -190,9 +212,13 @@ impl Engine {
             // the list markers and alt texts in a table's cells
             for extra in unit.extras.clone() {
                 let (boxed, role) = &laid.extras[extra];
-                let part = Part::Extra {
-                    item: frag.item,
-                    extra,
+                let part = if frag.repeat {
+                    Part::Repeat
+                } else {
+                    Part::Extra {
+                        item: frag.item,
+                        extra,
+                    }
                 };
                 for (line, info) in boxed.lines().iter().enumerate() {
                     if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
@@ -304,15 +330,13 @@ fn push_text_ops(
     let Some(info) = lines.get(line) else {
         return;
     };
-    let link_part = match part {
-        Part::Text { item, .. }
-        | Part::Marker { item }
-        | Part::Label { item }
-        | Part::Image { item }
-        | Part::Extra { item, .. }
-        | Part::CellImage { item, .. }
-        | Part::Link { item } => Part::Link { item },
-        other => other,
+    // a link's text and its annotation are the link's parts
+    let link_parts = |run_ink| match (part, crate::fonts::ink_link(run_ink)) {
+        (Part::Text { item, text }, Some(link)) => (
+            Part::Linked { item, text, link },
+            Part::Link { item, text, link },
+        ),
+        _ => (part, part),
     };
     let decoration = match part {
         Part::Band { .. } => part,
@@ -357,17 +381,18 @@ fn push_text_ops(
                 w: run.width,
                 h: info.bottom - info.top,
             };
-            ops.push((op, link_part));
+            ops.push((op, link_parts(run.ink).1));
         }
         if run.glyphs.is_empty() {
             continue;
         }
+        let glyphs = link_parts(run.ink).0;
         let op = Op::Glyphs {
             run,
             role,
             text: boxed.text.clone(),
         };
-        ops.push((op, part));
+        ops.push((op, glyphs));
     }
 }
 

@@ -186,3 +186,85 @@ fn answers_nothing_for_what_isnt_there() {
         assert_eq!(engine.pages.len(), 1);
     }
 }
+
+#[test]
+fn keeps_images_to_a_size_that_can_be_laid_out() {
+    use crate::model::{CellBlock, MAX_IMAGE};
+    // a cell image so tall the slices of its row couldn't move on in f32
+    for height in [1e7f32, 1e20, f32::MAX] {
+        let image = CellBlock::Image {
+            pos: 5,
+            src: "a.png".into(),
+            width: 1.0,
+            height,
+            alt: String::new(),
+        };
+        let cell = Cell {
+            blocks: vec![image],
+            ..Default::default()
+        };
+        let started = std::time::Instant::now();
+        let engine = engine(vec![table_item(
+            vec![Row {
+                cells: vec![cell],
+                header: false,
+            }],
+            None,
+        )]);
+        assert!(started.elapsed().as_secs_f32() < 5.0, "{height}");
+        let room = engine.settings.content_bottom() - engine.settings.content_top();
+        assert!(
+            engine.pages.len() <= (MAX_IMAGE / room) as usize + 2,
+            "{height}: {}",
+            engine.pages.len()
+        );
+    }
+    // and a top-level one keeps its shape within the limit
+    let json = r#"[{"kind":"image","pos":0,"src":"a","width":10,"height":1e36}]"#;
+    let items: Vec<Item> = serde_json::from_str(json).unwrap();
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_items(items);
+    let Content::Image { width, height, .. } = engine.items[0].content else {
+        panic!("an image");
+    };
+    assert!((height - MAX_IMAGE).abs() < 0.1, "{height}");
+    assert!(width > 0.0 && width < 1e-20);
+}
+
+#[test]
+fn writes_only_numbers_json_holds() {
+    use crate::model::json_number;
+    assert_eq!(json_number(1.23456), "1.235");
+    assert_eq!(json_number(-0.5), "-0.5");
+    assert_eq!(json_number(f32::INFINITY), "0");
+    assert_eq!(json_number(f32::NAN), "0");
+    // huge ones stay numbers: in f32, 1e36 × 1000 was inf, written "inf"
+    for value in [1e36f32, f32::MAX, -f32::MAX] {
+        let written = json_number(value);
+        assert!(serde_json::from_str::<f64>(&written).is_ok(), "{written}");
+    }
+}
+
+#[test]
+fn caps_quote_bars_and_table_widths() {
+    let mut quote = paragraph(1, "deep");
+    quote.bars = vec![0.0; 50_000];
+    let widths = Item {
+        content: Content::Table {
+            pos: 10,
+            end: 40,
+            rows: vec![Row {
+                cells: vec![cell(12, "a"), cell(20, "b")],
+                header: false,
+            }],
+            widths: vec![f32::MAX, f32::MAX],
+            caption: None,
+        },
+        ..paragraph(0, "")
+    };
+    let engine = engine(vec![quote, widths]);
+    assert_eq!(engine.items[0].bars.len(), crate::model::MAX_BARS);
+    // the columns still split the width
+    let columns = &engine.laid[1].columns;
+    assert!(columns[1] - columns[0] > 100.0, "{columns:?}");
+}

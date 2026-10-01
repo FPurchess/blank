@@ -223,25 +223,32 @@ pub fn write_with(
     Err("the PDF can't be written".into())
 }
 
-/// draws glyphs laid out on the page, from where the first one stands
-fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, size: f32) {
-    let Some(first) = glyphs.first() else {
-        return;
-    };
-    let glyphs: Vec<KrillaGlyph> = glyphs
+/// glyphs as krilla takes them, in em. Parley's offsets point down, as the
+/// page does, and krilla's up, as a font's do (it draws at `y - y_offset`),
+/// so a mark placed above its letter stays above it.
+fn krilla_glyphs(glyphs: &[Glyph], size: f32) -> Vec<KrillaGlyph> {
+    glyphs
         .iter()
         .map(|glyph| {
             KrillaGlyph::new(
                 GlyphId::new(glyph.id),
                 glyph.advance / size,
                 glyph.dx / size,
-                glyph.dy / size,
+                -glyph.dy / size,
                 0.0,
                 glyph.start as usize..glyph.end as usize,
                 None,
             )
         })
-        .collect();
+        .collect()
+}
+
+/// draws glyphs laid out on the page, from where the first one stands
+fn draw_run(surface: &mut Surface, glyphs: &[Glyph], font: &Font, text: &str, size: f32) {
+    let Some(first) = glyphs.first() else {
+        return;
+    };
+    let glyphs = krilla_glyphs(glyphs, size);
     surface.draw_glyphs(
         Point::from_xy(first.x - first.dx, first.y - first.dy),
         &glyphs,
@@ -305,6 +312,8 @@ fn attempt(
     let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
     let mut undecoded: Vec<String> = vec![];
     let mut ids = tags::Ids::new();
+    // the order everything is drawn in, for the structure
+    let mut order = 0usize;
     let (width, height) = (engine.settings.width, engine.settings.height);
     // the fonts whose missing glyph the document shows, for what no font has
     let mut missing: Vec<usize> = vec![];
@@ -348,31 +357,46 @@ fn attempt(
                     Part::Band { footer: true } => {
                         ContentTag::Artifact(Artifact::new(ArtifactType::Footer, None))
                     }
+                    Part::Repeat => {
+                        ContentTag::Artifact(Artifact::new(ArtifactType::PaginationOther, None))
+                    }
                     _ => ContentTag::Span(SpanTag::empty()),
                 };
+                // what can't be drawn is left out before its tag opens: a
+                // tagged section must be closed on every path
+                let drawable = match &op {
+                    Op::Rect { x, y, w, h, .. } => {
+                        Rect::from_xywh(*x, *y, w.max(0.01), h.max(0.01)).is_some()
+                    }
+                    Op::Glyphs { run, .. } => fonts.get(run.font).is_some(),
+                    _ => true,
+                };
+                if !drawable {
+                    continue;
+                }
                 let id = surface.start_tagged(tag);
-                if !matches!(part, Part::Decoration | Part::Band { .. }) {
-                    ids.entry(part).or_default().push(id);
+                if !matches!(part, Part::Decoration | Part::Band { .. } | Part::Repeat) {
+                    order += 1;
+                    ids.entry(part).or_default().push((order, id));
                 }
                 match op {
                     Op::Rect { x, y, w, h, role } => {
-                        let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) else {
-                            continue;
-                        };
+                        let rect = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01));
                         let mut builder = PathBuilder::new();
-                        builder.push_rect(rect);
+                        if let Some(rect) = rect {
+                            builder.push_rect(rect);
+                        }
                         if let Some(path) = builder.finish() {
                             surface.set_fill(Some(fill(role)));
                             surface.draw_path(&path);
                         }
                     }
                     Op::Glyphs { run, role, text } => {
-                        // a font that can't be embedded is left out
-                        let Some(font) = fonts.get(run.font) else {
-                            continue;
-                        };
-                        surface.set_fill(Some(fill(role)));
-                        draw_run(&mut surface, &run.glyphs, font, &text, run.size);
+                        // a font that can't be embedded is left out (above)
+                        if let Some(font) = fonts.get(run.font) {
+                            surface.set_fill(Some(fill(role)));
+                            draw_run(&mut surface, &run.glyphs, font, &text, run.size);
+                        }
                     }
                     Op::Image {
                         src,
@@ -421,8 +445,15 @@ fn attempt(
                 let target = Target::Action(Action::Link(LinkAction::new(href.clone())));
                 let annotation =
                     Annotation::new_link(LinkAnnotation::new(rect, target), Some(href));
-                let id = page.add_tagged_annotation(annotation);
-                ids.entry(part).or_default().push(id);
+                // a repeated row's links are artifacts' too: only the
+                // first ones are in the structure
+                if part == Part::Repeat {
+                    page.add_annotation(annotation);
+                } else {
+                    let id = page.add_tagged_annotation(annotation);
+                    order += 1;
+                    ids.entry(part).or_default().push((order, id));
+                }
             }
         }
         page.finish();
@@ -645,5 +676,121 @@ mod tests {
         if let Some(text) = text_of(&written.bytes, "variable") {
             assert!(text.contains('\u{1f980}'), "{text:?}");
         }
+    }
+
+    #[test]
+    fn leaves_out_a_skipped_font_without_panicking() {
+        // what write_with does once krilla failed on a font: write again
+        // without it. Its runs are left out, and their tags with them.
+        let mut engine = engine(vec![paragraph(1, "hello"), paragraph(8, "world")]);
+        let skipped = Skipped {
+            images: vec![],
+            fonts: vec![0],
+        };
+        let written = attempt(&mut engine, &HashMap::new(), &info(), "", &skipped);
+        assert!(written.is_ok());
+    }
+
+    /// renders a line of marks both ways, for a look: the PDF, and an SVG of
+    /// the glyph outlines where the page view paints them. Run with
+    /// BLANK_RENDER_DIR=dir cargo test -p blank-layout --lib renders_marks -- --ignored
+    #[test]
+    #[ignore]
+    fn renders_marks_for_a_look() {
+        let dir = std::env::var("BLANK_RENDER_DIR").expect("BLANK_RENDER_DIR");
+        let text = "E\u{301}E\u{302}A\u{30A}O\u{308} \u{628}\u{64e}\u{627}\u{628}\u{650} \u{643}\u{64f}\u{62a}\u{64f}\u{628}";
+        let mut item = paragraph(1, text);
+        if let Content::Text(text) = &mut item.content {
+            text.style = "h1".into();
+        }
+        let mut engine = engine(vec![item]);
+        let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
+        std::fs::write(format!("{dir}/marks.pdf"), pdf).unwrap();
+        let (width, height) = (engine.settings.width, engine.settings.height);
+        let mut svg = format!(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' viewBox='0 0 {width} {height}'><rect width='100%' height='100%' fill='white'/>"
+        );
+        for op in engine.page_ops(0, false) {
+            let Op::Glyphs { run, .. } = op else {
+                continue;
+            };
+            let upem = engine
+                .fonts
+                .face(run.font)
+                .map_or(1000.0, |(file, _)| file.upem);
+            let scale = run.size / upem;
+            for glyph in &run.glyphs {
+                let path = engine.fonts.glyph_path(run.font, glyph.id);
+                svg.push_str(&format!(
+                    "<path transform='translate({} {}) scale({scale} {})' d='{path}'/>",
+                    glyph.x, glyph.y, -scale
+                ));
+            }
+        }
+        svg.push_str("</svg>");
+        std::fs::write(format!("{dir}/marks.svg"), svg).unwrap();
+    }
+
+    #[test]
+    fn keeps_marks_on_their_side_of_the_baseline() {
+        use krilla::text::Glyph as _;
+        // kaf with a damma, in DejaVu Sans: the damma is placed with an
+        // offset, which krilla must take the other way round (its y points
+        // up, Parley's down), or the mark crashes into its letter
+        let engine = engine(vec![paragraph(1, "\u{643}\u{64f}\u{62a}\u{64f}\u{628}")]);
+        let mut checked = 0;
+        for op in engine.body_ops(0) {
+            let Op::Glyphs { run, .. } = op else {
+                continue;
+            };
+            let glyphs = krilla_glyphs(&run.glyphs, run.size);
+            for (glyph, krilla) in run.glyphs.iter().zip(&glyphs) {
+                if glyph.dy != 0.0 {
+                    assert!((krilla.y_offset(run.size) + glyph.dy).abs() < 1e-3);
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "no mark with an offset");
+    }
+
+    #[test]
+    fn puts_repeated_header_rows_in_the_structure_once() {
+        use crate::engine::test_support::{cell, table_item};
+        use crate::model::Row;
+        let mut rows = vec![Row {
+            cells: vec![cell(3, "Heading")],
+            header: true,
+        }];
+        for index in 0..120u32 {
+            rows.push(Row {
+                cells: vec![cell(20 + index * 10, "row")],
+                header: false,
+            });
+        }
+        let mut engine = engine(vec![table_item(rows, None)]);
+        assert!(engine.pages.len() > 2);
+        // on the pages after the first, the header row is a repeat
+        let header = Part::Text { item: 0, text: 0 };
+        for page in 1..engine.pages.len() {
+            let parts = engine.body_parts(page);
+            assert!(parts.iter().all(|(_, part)| *part != header), "page {page}");
+            assert!(
+                parts.iter().any(|(_, part)| *part == Part::Repeat),
+                "page {page}"
+            );
+        }
+        let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
+        let path = std::env::temp_dir().join("blank-layout-unit-repeats.pdf");
+        std::fs::write(&path, pdf).unwrap();
+        let Ok(out) = std::process::Command::new("pdfinfo")
+            .arg("-struct-text")
+            .arg(&path)
+            .output()
+        else {
+            return;
+        };
+        let structure = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(structure.matches("\"Heading\"").count(), 1, "{structure}");
     }
 }

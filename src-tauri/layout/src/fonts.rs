@@ -87,7 +87,13 @@ fn faces_of(fcx: &mut FontContext, bytes: Vec<u8>, family: &str) -> Vec<FontFile
 fn face_of(data: Arc<Vec<u8>>, blob: Blob<u8>, family: &str, index: u32) -> FontFile {
     let (upem, underline) = match FontRef::from_index(&data, index) {
         Ok(font) => {
-            let upem = font.head().map(|head| head.units_per_em()).unwrap_or(1000) as f32;
+            // what the spec allows, else what most fonts have
+            let upem = font
+                .head()
+                .map(|head| head.units_per_em())
+                .ok()
+                .filter(|upem| (16..=16384).contains(upem))
+                .unwrap_or(1000) as f32;
             let metrics = font.metrics(Size::unscaled(), LocationRef::default());
             let underline = metrics
                 .underline

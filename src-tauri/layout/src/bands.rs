@@ -129,10 +129,16 @@ impl Values<'_> {
 
 /// writes the values into the fields of a slot; `{{` writes a `{`, and
 /// anything else in braces stays as it is
+/// the most characters a slot shows, far more than fit a page's width
+pub const MAX_SLOT: usize = 1000;
+
 pub fn expand(text: &str, values: &Values) -> String {
     let mut result = String::new();
     let mut rest = text;
     while let Some(start) = rest.find('{') {
+        if result.len() > MAX_SLOT * 4 {
+            break;
+        }
         result.push_str(&rest[..start]);
         let after = &rest[start + 1..];
         if let Some(stripped) = after.strip_prefix('{') {
@@ -151,6 +157,9 @@ pub fn expand(text: &str, values: &Values) -> String {
         rest = after;
     }
     result.push_str(rest);
+    if result.chars().count() > MAX_SLOT {
+        result = result.chars().take(MAX_SLOT).collect();
+    }
     result
 }
 
@@ -214,6 +223,25 @@ mod tests {
         assert_eq!(expand("Page {page} of {pages}", &values), "Page 2 of 5");
         assert_eq!(expand("{title}: {chapter}", &values), "Essay: One");
         assert_eq!(expand("{{page} {nope} {", &values), "{page} {nope} {");
+    }
+
+    #[test]
+    fn caps_what_a_slot_shows() {
+        let settings = Settings {
+            fields: Fields {
+                title: "t".repeat(5000),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let values = Values {
+            settings: &settings,
+            page: 1,
+            pages: 1,
+            chapter: String::new(),
+        };
+        let slot = "{title}".repeat(1000);
+        assert_eq!(expand(&slot, &values).chars().count(), MAX_SLOT);
     }
 
     #[test]
