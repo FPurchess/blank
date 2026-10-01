@@ -316,6 +316,26 @@ describe("an engine that fails", () => {
     vi.useRealTimers();
   });
 
+  it("scrolls the editor, which shows the text itself, to the selection", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((frame) => {
+      frames.push(frame);
+      return frames.length;
+    });
+    const engine = showPages();
+    const mounted = mount();
+    destroy = () => mounted.view.destroy();
+    const dispatched = vi.spyOn(mounted.view, "dispatch");
+    vi.spyOn(engine.raw, "update").mockImplementation(trap);
+
+    mounted.view.dispatch(mounted.view.state.tr.insertText("a", 1));
+    frames.forEach((frame) => frame(0));
+
+    const last = dispatched.mock.calls[dispatched.mock.calls.length - 1][0];
+    expect(last.scrolledIntoView).toBe(true);
+    expect(last.docChanged).toBe(false);
+  });
+
   it("mounts the editor when the first layout fails", () => {
     const engine = showPages();
     vi.spyOn(engine.raw, "setItems").mockImplementation(trap);

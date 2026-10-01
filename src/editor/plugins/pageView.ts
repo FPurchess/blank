@@ -480,8 +480,19 @@ export const pageSync = () => {
       const watching = watch(
         pageEngineReady,
         (ready) => {
-          if (!ready) teardown();
-          else if (!engine) start(ready);
+          if (ready) {
+            if (!engine) start(ready);
+            return;
+          }
+          const failed = engine !== null;
+          teardown();
+          // the editor shows the text itself now, from its top: it scrolls
+          // to the selection, once it's laid out, outside this update
+          if (failed)
+            requestAnimationFrame(() => {
+              if (!view.isDestroyed)
+                view.dispatch(view.state.tr.scrollIntoView());
+            });
         },
         { flush: "sync" },
       );
