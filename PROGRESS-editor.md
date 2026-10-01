@@ -234,3 +234,15 @@ the "before" run booted about three times slower than the "after" one.
 The JS side now flattens only the block typed in (see the spy test in
 `src/engine/incremental.test.ts`); what's left per key is the engine's own
 layout and the painting.
+
+Start-up, ms from the window opening to the pages painted (`window.blankBootTimes`), debug build under xvfb, welcome document, 1 cold and 5 warm starts per build, builds measured in turns, only at a 1-minute load of about 1 on 12 cores:
+
+- This morning: ~1390. Most of it was the webview's first style and layout with the woff2 faces: the hidden editor ~500 and the UI ~300. The engine's part was ~250 (fetching and compiling the wasm in parallel with config and storage, ~60 for the first layout, ~50 for the first paint).
+- With engine-ui's font changes (the hidden editor on a system font, a preloaded Plex Regular, DejaVu by `unicode-range`): ~630.
+- With the editor and the UI mounting while the engine loads (e091fb9): ~575 (before 594–669, after 547–599). The hidden editor never shows meanwhile.
+- In the app, fetching the 3.3 MB wasm through Tauri's protocol takes ~120 ms and compiling it ~15 ms.
+- Preloading the wasm and the engine's TTFs from `index.html` (`as="fetch"`, as the engine reads them with `fetch()`) was measured and not kept:
+  - no preload: 549 (cold 605)
+  - the wasm and the TTFs: 665 (cold 694), since the 14 TTF preloads compete with the JS bundle, which starts running 25–60 ms later
+  - the wasm alone: 589 (cold 612)
+  - In every variant, the engine's own request for the wasm answers at ~500 ms: the response is there sooner, but its promise runs only once the main thread has mounted the editor and the UI. So the engine is bound by the main thread's mount work, not by the fetch. What's left to gain is main-thread work: compiling and instantiating the wasm off it, or before the mount.
