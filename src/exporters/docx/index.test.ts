@@ -12,7 +12,10 @@ import { NO_SLOTS } from "../../layout/settings";
 import { datePicture } from "./bands";
 
 vi.mock("./font", () => ({
-  loadFont: async () => new TextEncoder().encode("not really a font"),
+  loadFonts: async () => [
+    { name: "IBM Plex Sans", data: new TextEncoder().encode("not a font") },
+    { name: "IBM Plex Mono", data: new TextEncoder().encode("nor this") },
+  ],
 }));
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -580,14 +583,33 @@ describe("exporter.docx", () => {
     });
   });
 
-  it("embeds the regular face of IBM Plex Sans", async () => {
+  it("embeds the regular faces of IBM Plex Sans and IBM Plex Mono", async () => {
     const exported = await exportMarkdown("text");
 
     const fonts = files(exported, "word/fonts/");
-    expect(fonts).toHaveLength(1);
+    expect(fonts).toHaveLength(2);
     const table = await exported.text("word/fontTable.xml");
-    expect(table).toMatch(/w:name="IBM Plex Sans"/);
-    expect(table).toMatch(/<w:embedRegular\b/);
+    for (const name of ["IBM Plex Sans", "IBM Plex Mono"]) {
+      const entry = new RegExp(
+        `<w:font w:name="${name}">.*?<w:embedRegular\\b.*?</w:font>`,
+        "s",
+      );
+      expect(table).toMatch(entry);
+    }
+  });
+
+  it("sets code in IBM Plex Mono, in the styles the import maps back", async () => {
+    const exported = await exportMarkdown(
+      "text `inline` code\n\n```\nlet x = 1;\n```",
+    );
+    const styles = await exported.xml("word/styles.xml");
+    for (const id of ["CodeBlock", "InlineCode"]) {
+      const style = all(styles, "style").find(
+        (element) => attr(element, "styleId") === id,
+      )!;
+      expect(attr(child(style, "rFonts"), "ascii")).toBe("IBM Plex Mono");
+    }
+    expect(await exported.text("word/styles.xml")).not.toMatch(/Courier/);
   });
 
   it("titles the document by its first heading", async () => {
