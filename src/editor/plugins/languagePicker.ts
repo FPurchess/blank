@@ -10,6 +10,7 @@ import {
   typeChar,
 } from "../../languagePicker";
 import { languagePicker as pickerState } from "../../state";
+import { PAGE_PRESS } from "../pagePointer";
 
 /**
  * languagePicker handles the keyboard while the language picker is open, so
@@ -42,7 +43,8 @@ export const languagePicker = () => {
       },
       handleTextInput: () => pickerState.value.open,
       handleDOMEvents: {
-        mousedown: () => {
+        // a press on the pages closes it
+        [PAGE_PRESS]: () => {
           if (pickerState.value.open) closePicker();
           return false;
         },

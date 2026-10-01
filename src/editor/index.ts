@@ -12,6 +12,8 @@ import {
   keymap,
   languagePicker,
   openLink,
+  pageSync,
+  pageView,
   properties,
   spellcheck,
   tableGuard,
@@ -23,7 +25,10 @@ import {
   tableView,
 } from "./plugins";
 import { applyInitialDocument } from "./document";
+import { nativePointer } from "./pagePointer";
+import { setGeometryView } from "../engine/geometry";
 import { createEditorHandle, syncPlugin } from "./handle";
+import { timed } from "../engine/perf";
 
 /**
  * bootEditor mounts the editor with the first document
@@ -36,6 +41,10 @@ export const bootEditor = async () => {
       // the pickers and autocorrect see Enter and Tab before the table keys
       // and the keymap do; prosemirror-tables asks for tableEditing last
       plugins: [
+        // lays out first, so the other plugins' views measure the new layout
+        pageSync(),
+        // without the engine, the clicks on the editor's own text
+        nativePointer(),
         history(),
         languagePicker(),
         tablePickerKeys(),
@@ -44,6 +53,8 @@ export const bootEditor = async () => {
         spellcheck(),
         autocomplete(),
         tableKeys(),
+        // moves by the lines the page view shows, before the keymap
+        pageView(),
         keymap(),
         openLink(),
         images(),
@@ -78,15 +89,21 @@ export const bootEditor = async () => {
       },
     },
     dispatchTransaction(tx) {
-      transaction.value = tx;
-      view.updateState(view.state.apply(tx));
+      // the editor's whole update, for the page view's measurements
+      timed("dispatch", () => {
+        transaction.value = tx;
+        view.updateState(view.state.apply(tx));
+      });
     },
   });
+  setGeometryView(view);
   const editor = createEditorHandle(view);
   sync = editor.sync;
   transaction.value = view.state.tr;
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
+    // unless the editor is gone by then, e.g. at the end of a test
+    if (typeof document === "undefined" || !view.dom.isConnected) return;
     if (!view.hasFocus()) view.focus();
   }, 100);
   return editor.handle;

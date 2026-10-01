@@ -54,6 +54,7 @@ export enum CommandIdentifier {
   PAGE_SETUP = "page.setup",
   EDIT_HEADER = "edit.header",
   EDIT_FOOTER = "edit.footer",
+  VIEW_PAGES = "view.pages",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -79,6 +80,16 @@ export interface SpellcheckConfig {
   ignoreWordsWithNumbers: boolean;
 }
 
+export interface EditorConfig {
+  // the spaces Tab and Shift-Tab indent and outdent the lines of a code block
+  // by, and how wide a tab is there
+  indentSize: number;
+}
+
+// the indent sizes blank.json may set
+export const MIN_INDENT = 1;
+export const MAX_INDENT = 16;
+
 export interface LayoutConfig {
   // the page setup of documents that don't have their own
   page: PageSettings;
@@ -88,6 +99,7 @@ export interface Config {
   keymap: { [key in CommandIdentifier]: string };
   autocorrect: AutocorrectConfig;
   spellcheck: SpellcheckConfig;
+  editor: EditorConfig;
   layout: LayoutConfig;
 }
 
@@ -130,6 +142,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.PAGE_SETUP]: "Mod-Alt-u",
     [CommandIdentifier.EDIT_HEADER]: "Mod-Alt-h",
     [CommandIdentifier.EDIT_FOOTER]: "Mod-Alt-f",
+    [CommandIdentifier.VIEW_PAGES]: "Mod-Alt-v",
   },
   autocorrect: {
     arrows: true,
@@ -145,6 +158,9 @@ const defaultConfig: Config = {
   spellcheck: {
     ignoreUppercase: true,
     ignoreWordsWithNumbers: true,
+  },
+  editor: {
+    indentSize: 4,
   },
   layout: {
     page: DEFAULT_PAGE,
@@ -314,6 +330,31 @@ const mergeSpellcheck = (
 };
 
 /**
+ * mergeEditor takes the user's editor settings that are valid and keeps the
+ * defaults for the rest: the indent size is a whole number of spaces from
+ * MIN_INDENT to MAX_INDENT
+ */
+const mergeEditor = (user: unknown, problems: string[]): EditorConfig => {
+  const editor = { ...defaultConfig.editor };
+  if (user === undefined) return editor;
+  if (!isRecord(user)) {
+    problems.push("editor");
+    return editor;
+  }
+  const size = user.indentSize;
+  if (size === undefined) return editor;
+  if (
+    typeof size !== "number" ||
+    !Number.isInteger(size) ||
+    size < MIN_INDENT ||
+    size > MAX_INDENT
+  )
+    problems.push("editor.indentSize");
+  else editor.indentSize = size;
+  return editor;
+};
+
+/**
  * mergeLayout reads the user's page setup over Blank's, like the frontmatter
  * of a document over the user's, see src/layout/resolve.ts
  */
@@ -349,6 +390,7 @@ export const bootConfig = async () => {
     autocorrect: mergeAutocorrect(userConfig.autocorrect, problems),
     // merge spell check settings the same way
     spellcheck: mergeSpellcheck(userConfig.spellcheck, problems),
+    editor: mergeEditor(userConfig.editor, problems),
     layout: mergeLayout(userConfig.layout, problems),
   };
   if (problems.length > 0) {

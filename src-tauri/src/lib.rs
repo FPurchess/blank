@@ -1,7 +1,21 @@
+pub mod cli;
+pub mod fonts;
+pub mod primary;
 pub mod spellcheck;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // `blank --version` and `blank --help` print and exit, without a window
+    if let Some(text) = cli::answer(
+        std::env::args().skip(1),
+        &context.package_info().version.to_string(),
+    ) {
+        println!("{text}");
+        return;
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -18,6 +32,14 @@ pub fn run() {
                 .build(),
         )
         .manage(spellcheck::SpellState::default())
+        .manage(fonts::FontState::default())
+        // finds the system's fonts while the app starts, so the first
+        // document with e.g. Chinese doesn't wait for it
+        .setup(|app| {
+            let fonts = app.state::<fonts::FontState>().collection.clone();
+            std::thread::spawn(move || fonts::warm(&fonts));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             spellcheck::spellcheck_status,
             spellcheck::spellcheck_install,
@@ -27,7 +49,9 @@ pub fn run() {
             spellcheck::spellcheck_suggest,
             spellcheck::spellcheck_add,
             spellcheck::spellcheck_remove,
+            fonts::fallback_fonts,
+            primary::read_primary,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }

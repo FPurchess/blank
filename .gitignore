@@ -39,3 +39,4 @@ scripts/.cache
 
 # dictionaries served to the app by the e2e tests
 e2e/.cache
+

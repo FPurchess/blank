@@ -260,10 +260,7 @@ describe("plugin.keymap", () => {
 
   it("Mod-t opens the table picker", () => {
     const { view, press } = setup(doc(p()), { cursor: 1 });
-    Object.assign(view, {
-      coordsAtPos: () => ({ left: 0, top: 0, bottom: 0 }),
-      focus: () => {},
-    });
+    Object.assign(view, { focus: () => {} });
 
     expect(press("Mod-t")).toBe(true);
     expect(tablePicker.value).toMatchObject({ cols: 3, rows: 3 });

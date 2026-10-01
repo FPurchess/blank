@@ -30,7 +30,6 @@ import { FRONTMATTER_PROPERTY } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
-  FONT,
   HEADING_AFTER_HEADING_SPACING,
   LIST_HANGING,
   LIST_INDENT,
@@ -47,6 +46,7 @@ import {
   stylesFor,
   twips,
 } from "./template";
+import { loadFonts } from "./font";
 
 type Docx = typeof import("docx");
 
@@ -484,21 +484,10 @@ const spaceTopLevel = (blocks: Block[], serializer: Serializer) =>
       : { ...block, spacing: { ...block.spacing, before } };
   });
 
-let font: Promise<Uint8Array> | undefined;
-
-// the regular face of IBM Plex Sans, shared with the PDF export, whose font
-// files are several megabytes and only loaded on the first export
-const loadFont = () =>
-  (font ??= import("../pdf/pdfmake-vfs").then(({ default: vfs }) =>
-    Uint8Array.from(atob(vfs["IBMPlexSans-Regular.ttf"]), (char) =>
-      char.charCodeAt(0),
-    ),
-  ));
-
 const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const docx = await import("docx");
-  const [fontData, { images, failures }] = await Promise.all([
-    loadFont(),
+  const [fonts, { images, failures }] = await Promise.all([
+    loadFonts(),
     prepareImages(state.doc, docPath, [...EMBEDDABLE]),
   ]);
 
@@ -532,9 +521,13 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
             { name: FRONTMATTER_PROPERTY, value: frontmatter },
           ],
         }),
-    // IBM's unmodified font file; Word obfuscates embedded fonts as the
-    // format requires. The type asks for a Buffer, but any bytes do.
-    fonts: [{ name: FONT, data: fontData as unknown as Buffer }],
+    // IBM's unmodified font files, for the text and for code; Word
+    // obfuscates embedded fonts as the format requires. The type asks for a
+    // Buffer, but any bytes do.
+    fonts: fonts.map(({ name, data }) => ({
+      name,
+      data: data as unknown as Buffer,
+    })),
     styles: stylesFor(layout.newPageBefore),
     numbering: serializer.numbering(),
     sections: [

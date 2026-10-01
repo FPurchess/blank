@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  Key,
+  pressMod,
+  restartApp,
+  topPage,
+  type,
+} from "../helpers.ts";
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
@@ -26,7 +33,7 @@ describe("page setup", () => {
   });
 
   it("opens with Mod+Alt+U on the paper of the region", async () => {
-    await $("#editor p").click();
+    await clickInto("#editor p");
     await pressMod(Key.Alt, "u");
 
     await expect($("#page-setup")).toBeDisplayed();
@@ -125,8 +132,9 @@ describe("page setup", () => {
     const breaksPath = path.join(fixtureDir, "breaks.md");
     fs.writeFileSync(breaksPath, "one\n");
     await restartApp([breaksPath]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
 
-    await $("#editor p").click();
+    await clickInto("#editor p");
     await type(Key.End);
     await pressMod(Key.Enter);
     await type("two");
@@ -162,5 +170,65 @@ describe("page setup", () => {
     await browser.keys(Key.Escape);
 
     await expect($("#page-setup")).not.toExist();
+  });
+
+  it("keeps the page at the top of the view when the view switches", async () => {
+    const file = path.join(fixtureDir, "long.md");
+    fs.writeFileSync(
+      file,
+      Array.from(
+        { length: 300 },
+        (_, index) =>
+          `Paragraph ${index + 1}: writing is thinking on paper, and every line ends where the layout says it ends.\n`,
+      ).join("\n"),
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    // well into the document, where only the pages near the view are shown
+    await browser.executeAsync((done: () => void) => {
+      const view = document.getElementById("page-view")!;
+      view.scrollTop = view.scrollHeight * 0.45;
+      requestAnimationFrame(() => requestAnimationFrame(() => done()));
+    });
+    const before = await topPage();
+    expect(before).toBeGreaterThan(5);
+    for (const mode of ["pages", "page-ends"]) {
+      await pressMod(Key.Alt, "v");
+      await expect($("#page-view")).toHaveElementClass(mode);
+      await browser.executeAsync((done: () => void) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => done())),
+      );
+      expect(await topPage()).toBe(before);
+    }
+  });
+
+  it("shows an empty document as nothing but the caret, and a mark only between pages", async () => {
+    const file = path.join(fixtureDir, "empty.md");
+    fs.writeFileSync(file, "");
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    await expect($$(".page-frame")).toBeElementsArrayOfSize(1);
+    // no mark after the last page, and no footer to show there
+    await expect($(".page-end")).not.toExist();
+    await expect($(".page-last-footer")).not.toExist();
+    await expect($(".page-caret")).toBeDisplayed();
+    const top = () =>
+      browser.execute(
+        () =>
+          document
+            .querySelector('.page-frame[data-page="1"]')!
+            .getBoundingClientRect().top,
+      );
+    const before = await top();
+    // a second page brings the mark between the two, and the first page
+    // stays where it is
+    await clickInto("#editor p");
+    await type("first");
+    await pressMod(Key.Enter);
+    await type("second");
+    await expect($$(".page-frame")).toBeElementsArrayOfSize(2);
+    await expect($$(".page-end")).toBeElementsArrayOfSize(1);
+    await expect($('.page-frame[data-page="1"] .page-end')).toBeExisting();
+    expect(await top()).toBe(before);
   });
 });

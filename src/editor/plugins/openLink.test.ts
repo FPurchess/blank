@@ -6,6 +6,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { flushPromises } from "../../test/async";
+import { createState, createTestView, doc, p } from "../../test/editor";
+import { pagePointer } from "../../test/pagePointer";
+import { PAGE_PRESS } from "../pagePointer";
 import openLink, { _openLink } from "./openLink";
 
 const setPlatform = (platform: string) =>
@@ -49,6 +52,27 @@ describe("plugin.openLink", () => {
   beforeEach(() => {
     setPlatform("Linux x86_64");
     vi.mocked(openUrl).mockResolvedValue();
+  });
+
+  it("opens a link pressed on the pages with Ctrl", () => {
+    const plugin = openLink();
+    const view = createTestView(createState(doc(p("a link"))));
+    const press = (change: Parameters<typeof pagePointer>[1]) =>
+      plugin.props.handleDOMEvents![PAGE_PRESS]!.call(
+        plugin,
+        view,
+        new CustomEvent(PAGE_PRESS, {
+          detail: pagePointer(2, { link: "https://blank.app", ...change }),
+          cancelable: true,
+        }),
+      );
+
+    expect(press({})).toBe(false);
+    expect(press({ ctrlKey: true, button: 2 })).toBe(false);
+    expect(press({ ctrlKey: true, link: null })).toBe(false);
+    expect(openUrl).not.toHaveBeenCalled();
+    expect(press({ ctrlKey: true })).toBe(true);
+    expect(openUrl).toHaveBeenCalledWith("https://blank.app");
   });
 
   describe("on Windows and Linux", () => {

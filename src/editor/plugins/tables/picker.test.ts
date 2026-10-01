@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PAGE_PRESS } from "../../pagePointer";
+import { pagePointer } from "../../../test/pagePointer";
 import { tablePicker, type TablePickerState } from "../../../state";
 import {
   createState,
@@ -90,10 +92,10 @@ describe("tablePickerKeys", () => {
         () => view.state.tr,
       ),
     ).toBe(true);
-    plugin.props.handleDOMEvents?.mousedown?.call(
+    plugin.props.handleDOMEvents?.[PAGE_PRESS]?.call(
       plugin,
       view,
-      new MouseEvent("mousedown"),
+      new CustomEvent(PAGE_PRESS, { detail: pagePointer(1) }),
     );
     expect(picker.cancel).toHaveBeenCalled();
   });

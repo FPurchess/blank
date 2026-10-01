@@ -36,7 +36,8 @@
     "menu.context": "Shift-F10",
     "page.setup": "Mod-Alt-u",
     "edit.header": "Mod-Alt-h",
-    "edit.footer": "Mod-Alt-f"
+    "edit.footer": "Mod-Alt-f",
+    "view.pages": "Mod-Alt-v"
   },
   "autocorrect": {
     "arrows": true,
@@ -54,6 +55,9 @@
   "spellcheck": {
     "ignoreUppercase": true,
     "ignoreWordsWithNumbers": true
+  },
+  "editor": {
+    "indentSize": 4
   },
   "layout": {
     "page": {

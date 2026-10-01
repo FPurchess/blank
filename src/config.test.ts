@@ -296,6 +296,50 @@ describe("config", () => {
     expect(getKeyBinding(CommandIdentifier.EXPORT_DOCX)).toBe("Mod-Alt-w");
   });
 
+  describe("editor", () => {
+    it("indents code blocks by 4 spaces by default", async () => {
+      vi.mocked(exists).mockResolvedValue(false);
+      await bootConfig();
+      expect(config.value.editor).toEqual({ indentSize: 4 });
+    });
+
+    it("takes the user's indent size", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ editor: { indentSize: 2 } }),
+      );
+      await bootConfig();
+      expect(config.value.editor.indentSize).toBe(2);
+    });
+
+    it.each([0, 17, 2.5, "2", null])(
+      "keeps the default for the indent size %j",
+      async (size) => {
+        vi.mocked(exists).mockResolvedValue(true);
+        vi.mocked(readTextFile).mockResolvedValue(
+          JSON.stringify({ editor: { indentSize: size } }),
+        );
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        await bootConfig();
+        expect(config.value.editor.indentSize).toBe(4);
+        expect(sendNotification).toHaveBeenCalledWith(
+          "Ignored invalid settings in blank.json: editor.indentSize",
+        );
+      },
+    );
+
+    it("ignores editor settings that aren't an object", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(JSON.stringify({ editor: 4 }));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      await bootConfig();
+      expect(config.value.editor.indentSize).toBe(4);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: editor",
+      );
+    });
+  });
+
   describe("spellcheck", () => {
     it("leaves words in capitals and with digits alone by default", async () => {
       vi.mocked(exists).mockResolvedValue(false);

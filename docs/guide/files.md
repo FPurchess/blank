@@ -49,14 +49,21 @@ Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your docum
 
 The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 
-- set in IBM Plex Sans on the paper of your region, or the [page setup](./pages) you chose,
+- set in IBM Plex Sans on the paper of your region, or the [page setup](./pages) you chose, and code in IBM Plex Mono,
+- every line and every page ends exactly where it ends on your screen,
 - a heading never ends a page on its own; it moves to the next page with its text,
 - [page breaks](./pages#page-breaks) start a new page, and horizontal lines are drawn across the text,
 - your [page numbers, header and footer](./pages#headers-and-footers) are on every page,
 - quotes keep their bar on the left and everything inside them,
 - line breaks you made with `Shift` `Enter` stay, and a numbered list that starts at 3 starts at 3,
-- [tables](./tables#export) look like in the editor, repeat their header row on every page, and keep their rows whole,
-- links stay clickable.
+- [tables](./tables#export) look like in the editor, repeat their header row on every page, and keep their rows whole; a row too tall for a page goes on over the next,
+- links stay clickable,
+- emoji are black and white, in the colour of your text,
+- Chinese, Japanese, Korean and other scripts come from the fonts your computer has for them, so a PDF of such text can look a little different when it's made on another computer.
+
+Every PDF is a PDF/A, the standard for archiving: it holds its fonts, colours and metadata, so it opens the same in years to come, and theses, offices and courts that ask for PDF/A accept it. It's also tagged, so screen readers read it in order, in your document's language, and its headings are bookmarks. If a document can't be a PDF/A, for example because it uses a character no font has, Blank makes a normal PDF and tells you why.
+
+If you made PDFs with Blank 2.1 or earlier, lines may now break in other places: the PDF is typeset by Blank itself now, the same way as your screen.
 
 Images come along at the size they have in Blank, up to the width of the page. Images from the web are downloaded for the PDF, so that needs an internet connection. If an image can't be loaded, the PDF shows its description in its place, and Blank tells you which one it was.
 
@@ -66,7 +73,7 @@ Images come along at the size they have in Blank, up to the width of the page. I
 
 When someone needs your text in Word, press `Mod` `Alt` `W`. Blank suggests your document's name with `.docx`.
 
-The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, links and images come along, and headers, footers and page numbers are Word's own, so they stay right however the document grows. Tables become real Word tables, with their header row repeated on every page, merged cells and their caption in Word's caption style. Blank's font is embedded, so Word shows it even on computers that don't have it installed. LibreOffice and Google Docs use a similar font instead.
+The Word document looks like your PDF, and stays easy to edit: headings, quotes and code use real Word styles, so they show up in Word's style gallery, navigation pane and table of contents. Lists keep their numbers, links and images come along, and headers, footers and page numbers are Word's own, so they stay right however the document grows. Tables become real Word tables, with their header row repeated on every page, merged cells and their caption in Word's caption style. Blank's fonts are embedded, IBM Plex Sans for the text and IBM Plex Mono for code, so Word shows them even on computers that don't have them installed. LibreOffice and Google Docs use similar fonts instead.
 
 Your markdown file stays exactly as it is. The document's title and author come along, and so do the [properties](#frontmatter) at the top of your file: open the Word document in Blank again and they're back, including the ones Word has no place for. If someone changed the title or author in Word, you get their version.
 

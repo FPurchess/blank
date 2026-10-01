@@ -13,6 +13,7 @@ import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
+import PageView from "./PageView.vue";
 import TablePicker from "./TablePicker.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TopBar from "./TopBar.vue";
@@ -23,6 +24,7 @@ import TopBar from "./TopBar.vue";
 </script>
 
 <template>
+  <PageView />
   <TopBar />
   <BottomBar />
   <TableToolbar v-if="tableToolbar" :state="tableToolbar" />

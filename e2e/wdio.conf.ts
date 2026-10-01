@@ -59,6 +59,8 @@ export const config: WebdriverIO.Config = {
   // ensure the app is built, since the webdriver sessions expect the binary to exist
   onPrepare: async () => {
     await cacheMirroredDictionary();
+    // where the specs keep their screenshots and measurements, not in git
+    fs.mkdirSync(path.join(dirname, "screenshots"), { recursive: true });
 
     if (!process.env.E2E_SKIP_BUILD) {
       const build = spawnSync(
@@ -67,7 +69,10 @@ export const config: WebdriverIO.Config = {
         { cwd: repoRoot, stdio: "inherit" },
       );
       if (build.status !== 0) {
-        throw new Error(`building the app failed with status ${build.status}`);
+        // wdio goes on after a failed onPrepare, which would test the build
+        // before this one
+        console.error(`building the app failed with status ${build.status}`);
+        process.exit(1);
       }
     }
 

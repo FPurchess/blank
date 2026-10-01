@@ -4,7 +4,7 @@ import { EditorView } from "prosemirror-view";
 import { history, undo } from "prosemirror-history";
 
 import { NO_SLOTS } from "../../layout/settings";
-import { bandEditor } from "../../state";
+import { announcement, bandEditor } from "../../state";
 import { doc, docWithFrontmatter, h, p } from "../../test/editor";
 import { editBand, openBand } from "./editBand";
 
@@ -30,6 +30,7 @@ describe("command.editBand", () => {
   afterEach(() => {
     view?.destroy();
     bandEditor.value = null;
+    announcement.value = null;
   });
 
   it("opens the strip with the band as the document has it", () => {
@@ -105,5 +106,37 @@ describe("command.editBand", () => {
     strip.apply(strip.bands);
 
     expect(view.state).toBe(before);
+  });
+
+  it("tells when the band comes out empty on the page, and why", () => {
+    mount(docWithFrontmatter("title: Hi", p("text")));
+    openBand(view, "header");
+    const strip = request();
+    strip.apply({
+      ...strip.bands,
+      header: { ...NO_SLOTS, left: "{author}", right: "{chapter}" },
+    });
+    expect(announcement.value?.text).toMatch(
+      /^The header is empty on this page: no author is set and the document has no chapter heading yet\. Add an author under Edit as Text in Page Setup \(.+\)\.$/,
+    );
+  });
+
+  it("tells nothing when the band shows something", () => {
+    mount(docWithFrontmatter("author: Ada", h(1, "One"), p("text")));
+    openBand(view, "footer");
+    const strip = request();
+    strip.apply({
+      ...strip.bands,
+      footer: { ...NO_SLOTS, left: "{author}", right: "{chapter}" },
+    });
+    expect(announcement.value).toBeNull();
+    // nor when a placeholder is empty beside text
+    openBand(view, "header");
+    const header = request();
+    header.apply({
+      ...header.bands,
+      header: { ...NO_SLOTS, left: "by {file}" },
+    });
+    expect(announcement.value).toBeNull();
   });
 });

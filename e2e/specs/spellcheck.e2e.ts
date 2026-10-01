@@ -1,6 +1,18 @@
 import { $, $$, browser, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  clickText,
+  editorText,
+  expectEditorText,
+  focusEditor,
+  boxOf,
+  Key,
+  paintedInk,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 const errors = () => $$("#editor .spelling-error");
 const menu = () => $("#context-menu");
@@ -9,10 +21,14 @@ const item = (label: string) =>
 const status = () => $("#ui-spellcheck");
 
 const flagged = async () =>
-  (await errors().map((element) => element.getText())).join(" ");
+  (await editorText("#editor .spelling-error")).join(" ");
+
+// the underlines the pages show under misspelled words
+const marks = () => $$("#page-view .page-misspelling");
 
 /**
- * expectFlagged waits until exactly the words in `expected` are flagged
+ * expectFlagged waits until exactly the words in `expected` are flagged,
+ * and the pages underline as many
  */
 const expectFlagged = async (expected: string) => {
   let last = "";
@@ -21,16 +37,55 @@ const expectFlagged = async (expected: string) => {
     .catch(() => {
       throw new Error(`flagged "${last}" instead of "${expected}"`);
     });
+  const words = expected ? expected.split(" ").length : 0;
+  await browser.waitUntil(async () => (await marks().length) === words, {
+    timeoutMsg: `the pages don't underline ${words} words`,
+  });
+};
+
+/**
+ * expectUnderlined checks that the pages show the wavy line under `word`:
+ * a mark under its painted box, whose bottom has ink in the spelling colour
+ */
+const expectUnderlined = async (word: string) => {
+  const box = await boxOf(word);
+  const underline = await browser.execute((box) => {
+    for (const mark of document.querySelectorAll(
+      "#page-view .page-misspelling",
+    )) {
+      const rect = mark.getBoundingClientRect();
+      if (
+        rect.right > box.left &&
+        rect.left < box.right &&
+        rect.bottom > box.top &&
+        rect.top < box.bottom
+      )
+        return {
+          left: rect.left,
+          right: rect.right,
+          top: rect.bottom - 4,
+          bottom: rect.bottom,
+        };
+    }
+    return null;
+  }, box);
+  expect(underline).not.toBeNull();
+  const { share, ink } = await paintedInk(underline!, { source: "screen" });
+  expect(share).toBeGreaterThan(0.1);
+  // red rather than the text's colour
+  expect(ink![0]).toBeGreaterThan(ink![2] + 40);
 };
 
 /**
  * rightClick opens the context menu on the misspelled word `word`
  */
 const rightClick = async (word: string) => {
-  const target = await $(
-    `//*[contains(@class, "spelling-error")][text()="${word}"]`,
+  await browser.waitUntil(
+    async () => (await editorText("#editor .spelling-error")).includes(word),
+    { timeoutMsg: `${word} isn't flagged` },
   );
-  await target.click({ button: "right" });
+  await expectUnderlined(word);
+  await clickText(word, { offset: 1, button: 2 });
   await expect(menu()).toBeDisplayed();
   // the items move once slow suggestions arrive
   await $(`[data-id="loading"]`).waitForExist({ reverse: true });
@@ -38,39 +93,12 @@ const rightClick = async (word: string) => {
 
 /**
  * contextMenuOn opens the context menu on the first occurrence of `word` in
- * the editor, whether it is flagged or not, or in the first paragraph for ""
+ * the editor, whether it is flagged or not, or at the start of the first
+ * paragraph for ""
  */
 const contextMenuOn = async (word: string) => {
-  await browser.execute((word: string) => {
-    const editor = document.querySelector("#editor")!;
-    const open = (x: number, y: number) => {
-      const init = {
-        bubbles: true,
-        cancelable: true,
-        clientX: x,
-        clientY: y,
-        button: 2,
-      };
-      const target = document.elementFromPoint(x, y)!;
-      target.dispatchEvent(new MouseEvent("mousedown", init));
-      target.dispatchEvent(new MouseEvent("contextmenu", init));
-    };
-    if (!word) {
-      const rect = editor.querySelector("p")!.getBoundingClientRect();
-      return open(rect.left + 2, rect.top + rect.height / 2);
-    }
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const index = node.textContent!.indexOf(word);
-      if (index < 0) continue;
-      const range = document.createRange();
-      range.setStart(node, index);
-      range.setEnd(node, index + word.length);
-      const rect = range.getBoundingClientRect();
-      return open(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    }
-    throw new Error(`${word} isn't in the editor`);
-  }, word);
+  if (word) await clickText(word, { offset: 1, button: 2 });
+  else await clickInto("#editor p", 0, 2);
   await expect(menu()).toBeDisplayed();
   await $(`[data-id="loading"]`).waitForExist({ reverse: true });
 };
@@ -114,10 +142,10 @@ describe("spell check", () => {
     await item("wrong").click();
 
     await expect(menu()).not.toBeExisting();
-    await expect($("#editor p")).toHaveText("Thiss is wrong anothr");
+    await expectEditorText("#editor p", "Thiss is wrong anothr");
 
     await pressMod("z");
-    await expect($("#editor p")).toHaveText("Thiss is wrng anothr");
+    await expectEditorText("#editor p", "Thiss is wrng anothr");
   });
 
   it("adds a word to the dictionary, which lasts", async () => {
@@ -168,7 +196,7 @@ describe("spell check", () => {
     // the editor has the focus again
     await type(Key.ArrowRight);
     await type("x");
-    await expect($("#editor p")).toHaveText(/x/);
+    await expectEditorText("#editor p", /x/);
     await pressMod("z");
   });
 
@@ -214,7 +242,7 @@ describe("spell check", () => {
     await contextMenuOn("");
     await item("Paste").click();
 
-    await expect($("#editor p")).toHaveText("Wrng und unnd");
+    await expectEditorText("#editor p", "Wrng und unnd");
   });
 
   it("turns off from the menu", async () => {

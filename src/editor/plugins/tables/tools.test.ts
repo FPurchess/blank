@@ -2,11 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
-import { announcement, tableToolbar } from "../../../state";
+import { announcement, pageViewport, tableToolbar } from "../../../state";
+import { PAGE_PRESS, sendPagePointer } from "../../pagePointer";
 import { doc, p, table, td, th, tr } from "../../../test/editor";
 import { at, cellTexts, cursorAt, selectCells } from "../../../test/tables";
+import { blockBoxes, caretPage } from "../../../engine/geometry";
 import { tableKey } from "../../commands/table/tableKey";
 import { formatMessage, tableTools, toolsKey } from "./tools";
+
+// the page view shows every table at the same box
+vi.mock("../../../engine/geometry", () => ({
+  blockBoxes: vi.fn(),
+  caretPage: vi.fn(),
+}));
 
 const grid = () =>
   doc(
@@ -22,6 +30,10 @@ const grid = () =>
 let view: EditorView;
 
 const setup = (text = "10", node = grid()) => {
+  vi.mocked(blockBoxes).mockReturnValue([
+    { page: 0, left: 10, top: 20, right: 110, bottom: 60 },
+  ]);
+  vi.mocked(caretPage).mockReturnValue(0);
   const state = cursorAt(node, text);
   view = new EditorView(document.createElement("div"), {
     state: state.reconfigure({ plugins: [tableTools()] }),
@@ -57,6 +69,7 @@ describe("tableTools", () => {
 
   afterEach(() => {
     view.destroy();
+    pageViewport.value = null;
   });
 
   describe("toolbar", () => {
@@ -93,7 +106,14 @@ describe("tableTools", () => {
     it("keeps its items while scrolling, and makes new ones on a change", () => {
       setup();
       const before = toolbar();
-      window.dispatchEvent(new Event("scroll"));
+      // the page view scrolls
+      pageViewport.value = {
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        scrollTop: 40,
+      };
 
       expect(toolbar()).not.toBe(before);
       expect(toolbar().items).toBe(before.items);
@@ -176,9 +196,17 @@ describe("tableTools", () => {
       );
       expect(typed).toBe(true);
 
-      view
-        .someProp("handleDOMEvents")
-        ?.mousedown?.(view, new MouseEvent("mousedown"));
+      sendPagePointer(view, PAGE_PRESS, {
+        pos: 3,
+        link: null,
+        x: 0,
+        y: 0,
+        button: 0,
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+      });
       expect(keys()).toBe(false);
     });
 

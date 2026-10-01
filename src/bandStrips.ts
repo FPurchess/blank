@@ -27,6 +27,7 @@ import {
   NO_FIELDS,
   variantsOf,
 } from "./layout/bands";
+import { FIELD_NAMES } from "./layout/placeholders";
 import { type PageSettings, SLOTS, type Slots } from "./layout/settings";
 import { createSlotEditor, renderSlot, type SlotEditor } from "./slotEditor";
 import { bootScope, listenOnWindow } from "./scope";
@@ -35,6 +36,7 @@ import {
   type BandEditorRequest,
   bandEditor,
   contextMenu,
+  engineMissing,
   type MenuItem,
   pageFields,
   pageLayout,
@@ -53,14 +55,11 @@ const EDITOR_ID = "band-editor";
 // the context menu with its submenus, see src/ui/ContextMenu.vue
 const MENUS = ".context-menus";
 
-// the placeholders the strips insert, see tokens.ts
-const INSERTS = [
-  ["Title", "{title}"],
-  ["Author", "{author}"],
-  ["Chapter", "{chapter}"],
-  ["Date", "{date}"],
-  ["File", "{file}"],
-] as const;
+// the placeholders the strips insert, see tokens.ts, by the names the pages
+// show where one comes out empty
+const INSERTS = (["title", "author", "chapter", "date", "file"] as const).map(
+  (field) => [FIELD_NAMES[field], `{${field}}`] as const,
+);
 
 // the classes the strips give the body
 const BODY_CLASSES = [
@@ -450,8 +449,24 @@ export const bootBandStrips = (editor: EditorHandle) => {
           scope.run(() => renderEditor(request));
           closeEditor = () => scope.stop();
         }
+      },
+      { flush: "sync", immediate: true },
+    );
+    // the pages show the bands themselves, on the sheets, where each page
+    // ends and above the first page (src/ui/PageFrame.vue,
+    // PageFirstHeader.vue), and open their strips on a double click; the
+    // edges only offer to add one, near the bars. Without the layout engine,
+    // from the start or once it failed, there are no pages, and the edges
+    // show the bands.
+    const withoutPages = () =>
+      engineMissing.value || document.body.classList.contains("without-engine");
+    watch(
+      [bandEditor, atRest, engineMissing],
+      ([request, bands]) => {
         for (const band of BANDS) {
-          edges[band].element.hidden = request?.band === band;
+          edges[band].element.hidden =
+            request?.band === band ||
+            (bands[band] !== undefined && !withoutPages());
         }
       },
       { flush: "sync", immediate: true },

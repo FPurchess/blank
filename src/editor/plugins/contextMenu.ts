@@ -9,6 +9,9 @@ import {
   type ContextMenuRequest,
 } from "../../state";
 import { words } from "../../spellcheck/tokenize";
+import { caretBox } from "../../engine/geometry";
+import { headAfter } from "./pageView";
+import { PAGE_MENU, PAGE_PRESS, type PagePointerEvent } from "../pagePointer";
 import { buildMenu, type MenuTarget, tableMenu } from "../contextMenu/model";
 import { type Misspelling, misspellingAt } from "./spellcheck";
 
@@ -94,12 +97,13 @@ export const openContextMenu = (
   const at = target.misspelling?.from ?? pos;
   let where = anchor;
   if (!where) {
-    try {
-      const coords = view.coordsAtPos(at);
-      where = { left: coords.left, top: coords.top, bottom: coords.bottom };
-    } catch {
-      where = { left: 0, top: 0, bottom: 0 };
-    }
+    const caret = caretBox(
+      at,
+      at === view.state.selection.head && headAfter(view.state),
+    );
+    where = caret
+      ? { left: caret.left, top: caret.top, bottom: caret.bottom }
+      : { left: 0, top: 0, bottom: 0 };
   }
 
   const close = closer(view);
@@ -150,65 +154,53 @@ export const openTableMenu = (view: EditorView, anchor: Anchor) => {
 };
 
 /**
- * contextMenuPlugin shows Blank's context menu instead of the webview's. Shift
- * + right click still shows the webview's menu, e.g. for system services.
+ * contextMenuPlugin shows Blank's context menu instead of the webview's: on
+ * a right click on the pages (see src/editor/pagePointer.ts), the ContextMenu
+ * key and the shortcut. Shift + right click shows the webview's menu in the
+ * editor without the pages, e.g. for the input methods and the emoji picker;
+ * on the pages it opens Blank's menu, since the webview's has nothing to
+ * offer there.
  */
 export const contextMenuPlugin = () =>
   new Plugin({
     props: {
       handleDOMEvents: {
-        mousedown: (view, event) => {
-          if (event.button !== 2) return false;
-          const found = view.posAtCoords({
-            left: event.clientX,
-            top: event.clientY,
-          });
-          if (found) prefetch(view.state, found.pos);
+        // a right press on the pages starts looking up the suggestions
+        [PAGE_PRESS]: (view, event: PagePointerEvent) => {
+          const { button, pos } = event.detail;
+          if (button === 2 && pos !== null) prefetch(view.state, pos);
           return false;
         },
+        // a right click on the pages, which the page view hit
+        [PAGE_MENU]: (view, event: PagePointerEvent) => {
+          const { pos, x, y } = event.detail;
+          event.preventDefault();
+          if (pos === null) return true;
+          const { from, to } = view.state.selection;
+          // keep a selection clicked into, as the menu may cut or copy it
+          if (from === to || pos < from || pos > to) {
+            view.dispatch(
+              view.state.tr.setSelection(
+                TextSelection.create(view.state.doc, pos),
+              ),
+            );
+          }
+          openContextMenu(view, pos, {
+            anchor: { left: x, top: y, bottom: y },
+            keyboard: false,
+          });
+          return true;
+        },
+        // the ContextMenu key, which the webview sends to the focused editor
         contextmenu: (view, event) => {
           if (event.shiftKey) return false;
           event.preventDefault();
           // the keyboard shortcut already opened the menu
           const since =
             Date.now() - (openedByKeyboardAt.get(view) ?? -Infinity);
-          if (since < KEYBOARD_EVENT_WINDOW) {
-            return true;
-          }
-
-          // the ContextMenu key: at the cursor, like the keyboard shortcut
-          if (
-            event.button !== 2 &&
-            event.clientX === 0 &&
-            event.clientY === 0
-          ) {
-            openContextMenu(view, view.state.selection.head, {
-              keyboard: true,
-            });
-            return true;
-          }
-
-          const found = view.posAtCoords({
-            left: event.clientX,
-            top: event.clientY,
-          });
-          if (!found) return true;
-          const { from, to } = view.state.selection;
-          // keep a selection clicked into, as the menu may cut or copy it
-          if (from === to || found.pos < from || found.pos > to) {
-            view.dispatch(
-              view.state.tr.setSelection(
-                TextSelection.create(view.state.doc, found.pos),
-              ),
-            );
-          }
-          openContextMenu(view, found.pos, {
-            anchor: {
-              left: event.clientX,
-              top: event.clientY,
-              bottom: event.clientY,
-            },
-            keyboard: false,
+          if (since < KEYBOARD_EVENT_WINDOW) return true;
+          openContextMenu(view, view.state.selection.head, {
+            keyboard: true,
           });
           return true;
         },

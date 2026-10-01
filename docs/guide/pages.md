@@ -2,6 +2,17 @@
 
 Your PDF and Word documents come out on the paper of your region, A4 or Letter, with generous margins of 2.5 cm. Most documents never need more than that. When one does, a single shortcut gets you there.
 
+## Your pages on the screen {#on-the-screen}
+
+Blank shows your text the way it prints: every line and every page ends on the screen exactly where it ends in the PDF. (A Word document is laid out by Word, so its lines can end elsewhere.) There are two ways to look at it, and `Mod` `Alt` `V` switches between them, keeping your place:
+
+- **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where one page ends and the next begins, a dashed line shows the page's number and footer, and the header of the page that follows. The first page's header sits above your text, and the last page's footer below it. A new document is just that: an empty page and your caret.
+- **Pages**: the sheets themselves, one below the other, with their margins, headers, footers and page numbers in place.
+
+<img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
+
+Blank remembers your choice. The bar at the bottom tells you which page you're on, like _Page 3 of 12_. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
+
 ## Page setup {#page-setup}
 
 Press `Mod` `Alt` `U`, click the paper in the bar at the bottom (e.g. _A4 (portrait)_), or choose **Page Setup…** from the menu (right-click or `Shift` `F10`).
@@ -34,7 +45,9 @@ For more, point at the top or bottom edge and click **+ Header** or **+ Footer**
 
 <img class="shot" src="/screenshots/header-footer.gif" alt="A click on Page numbers at the bottom edge numbers the pages; Mod Alt H opens the header, where Chapter goes on the left, Page 3 of 12 on the right, and First Page None leaves the title page plain" />
 
-`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. While you write, the header and footer stay quietly at the edges of the window, so you always see what your pages carry. A click on one opens it again, and `Mod` `Z` in your text undoes the whole change.
+`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Double-click a header or footer there, or a sheet's top or bottom margin, to open it again. `Mod` `Z` in your text undoes the whole change.
+
+When a placeholder has nothing to put in yet, say **Author** while the document has no author, or **Chapter** before the first heading 1, your pages show its name there in faint italics, so you can still see the header or footer and double-click it. Only the screen shows these names: your PDF and Word document leave the place empty until there is something to put in. And if the header or footer you're done with shows nothing at all on your page yet, the bottom bar tells you why, say that no author is set, and how to set one.
 
 ### The first page and even pages {#first-and-even-pages}
 
@@ -50,7 +63,7 @@ When the first or even pages have their own, tabs above the places switch betwee
 
 ![A page break between two paragraphs, shown as a dashed line labelled Page break](/screenshots/page-break.png)
 
-Press `Mod` `Enter` to continue on a new page, as in Word and Google Docs. You can also type `+++` on an empty line and press `Enter`. Blank shows the break as a dashed line labelled _Page break_. To remove it, press `Backspace` at the start of the line below it.
+Press `Mod` `Enter` to continue on a new page, as in Word and Google Docs. You can also type `+++` on an empty line and press `Enter`. The page ends right there, and Blank labels it _Page break_ (only on the screen, not on paper). To remove it, press `Backspace` at the start of the line below it.
 
 In the file, a page break is the line `<!-- pagebreak -->`, which other markdown apps don't show. Blank also reads pandoc's `\newpage`.
 

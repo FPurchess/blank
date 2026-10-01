@@ -1,10 +1,24 @@
+import type { Node } from "prosemirror-model";
 import { Plugin, type Command } from "prosemirror-state";
 import { isInTable, selectedRect } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import { columnPercents, roundPercent } from "../../../markdown/tables";
 import { headerRowCount } from "../../../markdown";
+import { watch } from "vue";
+
 import {
+  pageAt,
+  tableGeometry,
+  type TableGeometry,
+  tablePositions,
+  type TablePiece,
+} from "../../../engine/geometry";
+import { engineless, pageEngine } from "../../../engine/engine";
+import {
+  pageLayoutState,
+  pageView,
+  pageViewport,
   type Point,
   tableHandles as handles,
   type TableHandlesState,
@@ -28,31 +42,110 @@ import {
 import { setColumnWidths } from "../../commands/table/widths";
 import { openTableMenu } from "../contextMenu";
 import { reporting } from "./tools";
-import { columnWidths, tableViewOf, type TableView } from "./view";
 
 // how far around a table the mouse still shows its handles, which sit on and
 // just outside its edges, in px
 const MARGIN = { left: 28, top: 20, right: 24, bottom: 24 };
 
+// the part of a table under the mouse: the table, and its piece on a page
+interface Under {
+  node: Node;
+  pos: number;
+  piece: TablePiece;
+  rowCount: number;
+}
+
 /**
- * tableUnder returns the view of the table at `point` or just around it
+ * Measured keeps the tables of a document as the page view shows them, for
+ * the mouse, which moves far more often than the layout changes: each is
+ * measured once, and only those near the page under the mouse
  */
-const tableUnder = (view: EditorView, point: Point): TableView | undefined => {
-  for (const block of view.dom.querySelectorAll(".table-block")) {
-    const table = tableViewOf(block);
-    if (!table) continue;
-    const box = table.element.getBoundingClientRect();
-    if (
-      point.x >= box.left - MARGIN.left &&
-      point.x <= box.right + MARGIN.right &&
-      point.y >= box.top - MARGIN.top &&
-      point.y <= box.bottom + MARGIN.bottom
-    ) {
-      return table;
+class Measured {
+  private tables: { node: Node; pos: number }[] | null = null;
+  private geometries = new Map<number, TableGeometry | null>();
+  private key: readonly unknown[] = [];
+
+  // what the tables' places in the window depend on
+  private keyOf(view: EditorView) {
+    return [
+      view.state.doc,
+      pageLayoutState.value,
+      pageViewport.value,
+      pageView.value,
+    ];
+  }
+
+  private fresh(view: EditorView) {
+    const key = this.keyOf(view);
+    // without the engine, the editor shows the text and scrolls itself
+    if (engineless() || key.some((part, index) => part !== this.key[index])) {
+      this.key = key;
+      this.tables = null;
+      this.geometries.clear();
+    }
+  }
+
+  /**
+   * geometry returns the table at `pos` as the page view shows it
+   */
+  geometry(view: EditorView, pos: number) {
+    this.fresh(view);
+    let geometry = this.geometries.get(pos);
+    if (geometry === undefined) {
+      geometry = tableGeometry(pos);
+      this.geometries.set(pos, geometry);
+    }
+    return geometry;
+  }
+
+  /**
+   * near returns the tables on the page under `point` and the pages next to
+   * it, or all of them without pages
+   */
+  near(view: EditorView, point: Point) {
+    this.fresh(view);
+    this.tables ??= tablePositions(view.state.doc);
+    const page = pageAt(point.x, point.y);
+    if (!page) return this.tables;
+    const before = pageEngine?.pageSpan(page.page - 1);
+    const after = pageEngine?.pageSpan(page.page + 1);
+    const from = before?.from ?? page.from;
+    const to = after?.to ?? page.to;
+    return this.tables.filter(
+      ({ node, pos }) => pos <= to && pos + node.nodeSize >= from,
+    );
+  }
+}
+
+/**
+ * tableUnder returns the piece of a table at `point` or just around it, as
+ * the page view shows it
+ */
+const tableUnder = (
+  view: EditorView,
+  measured: Measured,
+  point: Point,
+): Under | undefined => {
+  for (const { node, pos } of measured.near(view, point)) {
+    const geometry = measured.geometry(view, pos);
+    for (const piece of geometry?.pieces ?? []) {
+      const { box } = piece;
+      if (
+        point.x >= box.left - MARGIN.left &&
+        point.x <= box.right + MARGIN.right &&
+        point.y >= box.top - MARGIN.top &&
+        point.y <= box.bottom + MARGIN.bottom
+      ) {
+        return { node, pos, piece, rowCount: geometry!.rowCount };
+      }
     }
   }
   return undefined;
 };
+
+// the same piece of the same table
+const same = (a: Under | undefined, b: Under | undefined) =>
+  a?.pos === b?.pos && a?.piece.page === b?.piece.page;
 
 /**
  * selectedSpans returns the rows and columns selected in the table at
@@ -79,9 +172,12 @@ const selectedSpans = (view: EditorView, tableStart: number) => {
 export const tableHandles = () => {
   let pointer: Point | null = null;
   let hidden = false;
-  let held: TableView | undefined;
+  // the table a drag holds, by its position and page
+  let held: { pos: number; page: number } | undefined;
   // the table whose handles show
-  let shown: TableView | undefined;
+  let shown: Under | undefined;
+  // the tables as the page view shows them
+  const measured = new Measured();
 
   const clear = () => {
     shown = undefined;
@@ -89,30 +185,42 @@ export const tableHandles = () => {
   };
 
   /**
-   * publish shows the handles of the table under the mouse, measured as it
-   * is rendered now
+   * heldTable returns the table a drag holds, as it is laid out now
+   */
+  const heldTable = (view: EditorView): Under | undefined => {
+    if (!held) return undefined;
+    const { pos, page } = held;
+    const node = view.state.doc.nodeAt(pos);
+    const geometry =
+      node?.type.name === "table" && measured.geometry(view, pos);
+    const piece =
+      geometry &&
+      (geometry.pieces.find((piece) => piece.page === page) ??
+        geometry.pieces[0]);
+    return node && geometry && piece
+      ? { node, pos, piece, rowCount: geometry.rowCount }
+      : undefined;
+  };
+
+  /**
+   * publish shows the handles of the table under the mouse, as the page view
+   * shows it now
    */
   const publish = (view: EditorView) => {
-    const table = held ?? (pointer && !hidden && tableUnder(view, pointer));
-    const located = table ? table.located : null;
-    if (!table || !located) {
+    const table =
+      heldTable(view) ??
+      (!held && pointer && !hidden
+        ? tableUnder(view, measured, pointer)
+        : undefined);
+    if (!table) {
       clear();
       return;
     }
     shown = table;
-    const { node, start } = located;
-    const { element } = table;
-    // the rows, without the caption above them
-    const body = element.tBodies[0];
-    const box = body.getBoundingClientRect();
-    const scroll = element.parentElement!.getBoundingClientRect();
-    const rowElements = [...body.rows];
-    const rows = rowElements.map((row) => row.getBoundingClientRect().top);
-    rows.push(box.bottom);
-    const widths = columnWidths(node, rowElements);
-    const columns = [box.left];
-    for (const width of widths)
-      columns.push(columns[columns.length - 1] + width);
+    const { node, pos, piece, rowCount } = table;
+    const start = pos + 1;
+    const { box, rows, columns } = piece;
+    const widths = columns.slice(1).map((x, index) => x - columns[index]);
     const total = widths.reduce((sum, width) => sum + width, 0) || 1;
 
     const run = (command: Command, message: string) => {
@@ -122,18 +230,13 @@ export const tableHandles = () => {
       view.focus();
     };
     handles.value = {
-      box: {
-        left: box.left,
-        top: box.top,
-        right: box.right,
-        bottom: box.bottom,
-      },
-      visible: {
-        left: Math.max(box.left, scroll.left),
-        right: Math.min(box.right, scroll.right),
-      },
+      box: { ...box },
+      // the pages never scroll sideways
+      visible: { left: box.left, right: box.right },
       rows,
       columns,
+      firstRow: piece.firstRow,
+      rowCount,
       headerRows: headerRowCount(node),
       headerColumn: hasHeaderColumn(tableRect(view.state, start)),
       smallest: smallestSize(node),
@@ -181,7 +284,7 @@ export const tableHandles = () => {
         );
       },
       hold: (hold) => {
-        held = hold ? table : undefined;
+        held = hold ? { pos, page: piece.page } : undefined;
         if (!hold) publish(view);
       },
     } satisfies TableHandlesState;
@@ -208,18 +311,29 @@ export const tableHandles = () => {
         hidden = false;
         // the handles work out the row and column under the mouse, so the
         // table is measured again only when the mouse gets to another one
-        if (held || (!wasHidden && tableUnder(view, pointer) === shown)) return;
+        if (
+          held ||
+          (!wasHidden && same(tableUnder(view, measured, pointer), shown))
+        )
+          return;
         publish(view);
       };
       const leave = () => {
         pointer = null;
         if (!held) clear();
       };
-      const reposition = () => publish(view);
       window.addEventListener("mousemove", move);
       document.documentElement.addEventListener("mouseleave", leave);
-      window.addEventListener("scroll", reposition, true);
-      window.addEventListener("resize", reposition);
+      // the page view scrolled, resized or switched, or the pages were laid
+      // out again, e.g. once an image above loaded
+      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
+        flush: "sync",
+      });
+      // without the engine, the editor itself scrolls
+      const scrolled = () => {
+        if (engineless()) publish(view);
+      };
+      window.addEventListener("scroll", scrolled, true);
       return {
         update: (view, previous) => {
           // a change to the table or what's selected in it
@@ -231,8 +345,8 @@ export const tableHandles = () => {
         destroy: () => {
           window.removeEventListener("mousemove", move);
           document.documentElement.removeEventListener("mouseleave", leave);
-          window.removeEventListener("scroll", reposition, true);
-          window.removeEventListener("resize", reposition);
+          stop();
+          window.removeEventListener("scroll", scrolled, true);
           clear();
         },
       };

@@ -4,7 +4,6 @@ import { doc, docWithFrontmatter, h, p } from "../test/editor";
 import { testLayout } from "../test/layout";
 import {
   bandsOn,
-  chapterOn,
   documentFields,
   fieldValues,
   fileName,
@@ -134,26 +133,6 @@ describe("documentFields", () => {
   });
 });
 
-describe("chapterOn", () => {
-  const chapters = [
-    { page: 1, text: "One" },
-    { page: 3, text: "Two" },
-    { page: 3, text: "Three" },
-  ];
-
-  it("takes the first heading 1 on the page, or the last one before it", () => {
-    expect(chapterOn(chapters, 1)).toBe("One");
-    expect(chapterOn(chapters, 2)).toBe("One");
-    expect(chapterOn(chapters, 3)).toBe("Two");
-    expect(chapterOn(chapters, 4)).toBe("Three");
-  });
-
-  it("is empty before the first chapter", () => {
-    expect(chapterOn([{ page: 2, text: "One" }], 1)).toBe("");
-    expect(chapterOn([], 1)).toBe("");
-  });
-});
-
 describe("fieldValues", () => {
   const fields = { title: "T", author: "A", date: "D", file: "F" };
 
@@ -175,5 +154,14 @@ describe("fieldValues", () => {
     expect(
       fieldValues(testLayout({ numberStyle: "i" }), 4, 10, fields),
     ).toMatchObject({ page: "iv", pages: "10", chapter: "" });
+  });
+});
+
+describe("roman page numbers", () => {
+  it("end at 3999, after which they're arabic, as the engine writes them", () => {
+    expect(formatNumber(3999, "I")).toBe("MMMCMXCIX");
+    expect(formatNumber(3999, "i")).toBe("mmmcmxcix");
+    expect(formatNumber(4000, "i")).toBe("4000");
+    expect(formatNumber(4000, "I")).toBe("4000");
   });
 });

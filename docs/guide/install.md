@@ -4,6 +4,8 @@
 
 ## macOS
 
+Blank 3 needs macOS 12 (Monterey) or newer.
+
 Blank is not notarized by Apple, so macOS blocks it the first time you open it. To allow it:
 
 - **macOS 15 (Sequoia) or newer:** try to open Blank once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
@@ -46,3 +48,5 @@ blank ~/Documents/notes.md
 :::
 
 With a path, `Mod` `S` saves to that file right away.
+
+`blank --version` shows which version you have, and `blank --help` what you can pass, without opening a window.

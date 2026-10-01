@@ -1,0 +1,53 @@
+name: "check the layout engine"
+description: "Tests the layout engine, and fails when the committed wasm or the third-party notices aren't what the sources give"
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        # RUST_VERSION in scripts/build-engine.sh
+        toolchain: 1.98.1
+        targets: wasm32-unknown-unknown
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src-tauri -> target
+
+    # the version of the wasm-bindgen crate in src-tauri/Cargo.lock
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen-cli@0.2.129
+
+    # pdftotext and pdfinfo, which check the engine's PDF against its
+    # layout, and qpdf, which checks its structure, tags and bookmarks
+    - name: install poppler and qpdf
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y poppler-utils qpdf
+
+    - name: test the engine
+      shell: bash
+      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout
+
+    - name: check the committed wasm
+      shell: bash
+      run: |
+        bash scripts/build-engine.sh
+        git diff --exit-code --stat src/engine/wasm ||
+          { echo "::error::src/engine/wasm isn't what the engine's sources build: run make engine"; exit 1; }
+
+    # public/THIRD-PARTY-NOTICES.txt lists the licences of every crate and
+    # npm package Blank ships, see scripts/build-notices.ts
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-about@0.9.2
+
+    - name: check the third-party notices
+      shell: bash
+      run: |
+        bun install --frozen-lockfile
+        bun run notices
+        git diff --exit-code --stat public/THIRD-PARTY-NOTICES.txt ||
+          { echo "::error::public/THIRD-PARTY-NOTICES.txt is out of date: run make notices"; exit 1; }

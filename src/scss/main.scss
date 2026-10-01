@@ -17,6 +17,8 @@ body {
 #ui-bottom {
   opacity: 0.3;
   position: fixed;
+  // above the page view
+  z-index: 2;
   padding: 12px 24px;
   font-size: 0.9rem;
   user-select: none;
@@ -40,7 +42,36 @@ body {
   pointer-events: none;
 }
 
-// the right of the bar: the page, spell check and language
+// the right of the bar: the page number, the paper, spell check and
+// language
+#ui-page-number {
+  order: 1;
+  margin-left: auto;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+// read out by screen readers, not shown
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#ui-page,
+#ui-spellcheck,
+#ui-language {
+  order: 2;
+}
+
+#ui-bottom:has(#ui-page-number) #ui-page {
+  margin-left: 0;
+}
+
 #ui-page {
   pointer-events: auto;
   cursor: pointer;
@@ -548,6 +579,11 @@ $bar-height: 44px;
   }
 }
 
+// the opacity of the faint text beside the text of the pages: the bands at
+// rest, where a page ends and the label of a page break. At least 3:1 on the
+// page in every theme (src/scss/themes.test.ts)
+$faint-text-opacity: 0.6;
+
 // a header or footer at rest: one faint line, like it prints
 .band-line {
   display: grid;
@@ -556,7 +592,7 @@ $bar-height: 44px;
   min-height: $band-height;
   align-items: center;
   font-size: 0.75rem;
-  opacity: 0.45;
+  opacity: $faint-text-opacity;
   background-color: var(--background-color);
   cursor: pointer;
   transition: opacity 150ms;
@@ -784,29 +820,9 @@ $bar-height: 44px;
 
 // the text fades while a strip is edited, and makes room for the strips; the
 // strips' own editors are ProseMirror editors too, so it goes by its id
-body.band-editing #editor {
-  opacity: 0.3;
-  transition: opacity 150ms;
-}
-
-body.has-header #editor {
-  padding-top: calc(48px + #{$band-height});
-}
-
-body.has-footer #editor {
-  padding-bottom: calc(48px + #{$band-height});
-}
-
-// the open strip takes room of its own, so it covers none of the text
+// the open strip takes room of its own, so it covers none of the text (see
+// #page-view below)
 $strip-height: 90px;
-
-body.editing-header #editor {
-  padding-top: calc(48px + #{$strip-height});
-}
-
-body.editing-footer #editor {
-  padding-bottom: calc(48px + #{$strip-height});
-}
 
 .boot-error {
   max-width: 720px;
@@ -1212,5 +1228,461 @@ body.editing-footer #editor {
     margin: 4px 0;
     background: var(--color);
     opacity: 0.2;
+  }
+}
+
+// The page view (src/ui/PageView.vue) paints the text as the layout engine
+// laid it out. The editor's own DOM stays in the document, focused, for the
+// keys, the IME and screen readers, but isn't seen; src/editor/hidden.ts
+// moves it so its caret is under the painted one.
+#editor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 640px;
+  max-width: none;
+  opacity: 0;
+  pointer-events: none;
+  caret-color: transparent;
+}
+
+// with the pages shown, the hidden editor is set in the system's font: its
+// first layout then waits for no web font (500 ms of the start with Plex),
+// and its lines break apart from the pages' anyway; hidden.ts measures where
+// its caret is to move it under the painted one, so the input method's
+// window still opens there. Without the engine it shows the text in Plex.
+body:not(.without-engine) #editor {
+  font-family: system-ui, sans-serif;
+}
+
+// if the layout engine can't load, the editor shows the text itself, as
+// before the page view
+body.without-engine {
+  #editor {
+    position: static;
+    width: auto;
+    max-width: 1200px;
+    opacity: 1;
+    pointer-events: auto;
+    caret-color: auto;
+    transform: none !important;
+  }
+
+  #page-view {
+    display: none;
+  }
+}
+
+#page-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: var(--color);
+  background-color: var(--background-color);
+  cursor: default;
+  user-select: none;
+
+  &.pages {
+    // a calm desk, a shade off the paper, darker in dark themes
+    background-color: var(--desk-color);
+  }
+}
+
+.page-desk {
+  position: relative;
+}
+
+// text is where the pages are, not the desk around them
+.page-frame {
+  position: absolute;
+  cursor: text;
+  // a page lays out on its own, so one that comes into view or changes
+  // lays out none of the others
+  contain: layout style;
+}
+
+// the paper of a sheet in "pages", under the selection and the text, which
+// its frame paints over it. An edge and a solid shadow without blur, in
+// black, so dark themes don't glow: a blurred one made the compositor redraw
+// it on every step of a scroll (see .claude/rules/layout-engine.md)
+.page-sheet {
+  position: absolute;
+  background-color: var(--background-color);
+  box-shadow:
+    0 0 0 1px var(--sheet-edge),
+    0 2px 0 1px var(--sheet-shadow);
+}
+
+.page-canvas {
+  display: block;
+}
+
+// the selected text in colours of its own over the selection, on a page
+// with a selection while the editor has the focus (see src/ui/PageFrame.vue)
+.page-selected {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+// the header and footer of a sheet, painted apart from its text over it,
+// in strips as high as the margins (see src/ui/pageLayers.ts; the top is set
+// where they are painted); positioned without a z-index, so they make no
+// layer of their own
+.page-bands {
+  position: absolute;
+  left: 0;
+}
+
+// where a page of "page ends" ends: its footer, then the next page's header
+// (MARK_HEIGHT in src/engine/frames.ts)
+// the room between a header or footer and the page's text in "page ends",
+// BAND_GAP in src/engine/frames.ts
+$band-gap: 32px;
+// MARK_HEIGHT in src/engine/frames.ts
+$page-end-height: 64px + 2 * $band-gap;
+
+// the three slots of a header or footer shown beside the pages: left,
+// centre and right
+%page-band-text {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  min-height: 1.3em;
+  // in line with the page's text, see PageFrame.vue
+  padding: 0 var(--band-inset, 24px);
+
+  // a long one stays on its line, cut short; clip rather than hidden, whose
+  // text WebKitWebDriver reads as empty
+  span {
+    min-width: 0;
+    overflow: clip;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  span:nth-child(2) {
+    text-align: center;
+  }
+
+  span:nth-child(3) {
+    text-align: right;
+  }
+}
+
+.page-end {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: $page-end-height;
+  box-sizing: border-box;
+  // the footer right after the page's text and the next header right before
+  // its text, each a gap away, and the line between them
+  padding: $band-gap 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: $faint-text-opacity;
+  pointer-events: none;
+
+  .band {
+    @extend %page-band-text;
+  }
+
+  // the space between the footer and the header, with the dashed line in
+  // its middle, fainter than the text on it, which keeps the mark's opacity
+  .line {
+    position: relative;
+    flex: 1;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      border-top: 1px dashed var(--color);
+      opacity: 0.6;
+    }
+
+    // its digits end where the text does; the padding covers the dashes
+    // around them
+    .number {
+      position: absolute;
+      right: calc(var(--band-inset, 24px) - 0.5em);
+      top: calc(50% - 0.7em);
+      padding: 0 0.5em;
+      background-color: var(--background-color);
+    }
+  }
+}
+
+// the first page's header in "page ends", above its text, and the last
+// page's footer below it, like the bands where a page ends
+.page-first-header,
+.page-last-footer {
+  @extend %page-band-text;
+  position: absolute;
+  box-sizing: border-box;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: $faint-text-opacity;
+  cursor: pointer;
+
+  // over its line of text, as the bands where a page ends, not the gap
+  // below it
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 8%, transparent);
+    background-clip: content-box;
+  }
+}
+
+.page-first-header {
+  align-items: end;
+  // placed where the page's text starts (firstHeaderPlace), a gap above it
+  padding: 0 0 $band-gap;
+}
+
+.page-last-footer {
+  align-items: start;
+  // placed where the page's text ends (lastFooterPlace), a gap below it, as
+  // the footer of the mark where a page ends
+  padding: $band-gap 0 0;
+}
+
+// a placeholder that comes out empty, e.g. {author} with no author set,
+// named in its place in the bands beside the pages and on the sheets: quiet,
+// in italics, as the strips show their placeholders as chips. Only the
+// screen shows it; the PDF and Word print nothing there.
+.band-placeholder {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+// the slots of a sheet's band that name a placeholder, over what the engine
+// painted there (sheetSlots in src/ui/pageViewModel.ts)
+.page-band-names {
+  position: absolute;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--color);
+  pointer-events: none;
+
+  &.center {
+    text-align: center;
+  }
+
+  &.right {
+    text-align: right;
+  }
+
+  .band-placeholder {
+    opacity: 0.45;
+  }
+
+  // the text the engine painted only keeps the names in their places
+  .painted {
+    visibility: hidden;
+  }
+
+  // beside painted text, a name goes where its placeholder is and takes no
+  // room, so the text stays where it was painted
+  &:not(.named) .band-placeholder {
+    position: absolute;
+
+    // the width of the space before it, which painted text leaves out
+    &.spaced {
+      margin-left: 0.26em;
+    }
+  }
+}
+
+// the header and footer margins of a sheet, and the bands where a page
+// ends: a click opens the strip of the band
+.page-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+
+  &.header {
+    top: 0;
+  }
+
+  &.footer {
+    bottom: 0;
+  }
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 4%, transparent);
+  }
+}
+
+.page-end .band {
+  pointer-events: auto;
+  cursor: pointer;
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--color) 8%, transparent);
+    // over its line of text, between the insets that line it up with the
+    // page's text
+    background-clip: content-box;
+  }
+}
+
+// the open strip of a header or footer takes room of its own at the top or
+// bottom of the window, so it covers none of the pages
+body.editing-header #page-view {
+  top: $strip-height;
+}
+
+body.editing-footer #page-view {
+  bottom: $strip-height;
+}
+
+body.band-editing #page-view {
+  opacity: 0.3;
+  transition: opacity 150ms;
+}
+
+// the selected text or cells, in the theme's selection colour under the
+// text, which the pages paint over it (see src/scss/themes.test.ts)
+.page-selection {
+  position: absolute;
+  background-color: var(--selection-color);
+  pointer-events: none;
+}
+
+// the selection dims while the editor hasn't the focus, e.g. behind a dialog
+.page-selection.inactive {
+  background-color: var(--selection-inactive-color);
+}
+
+// a selected image, rule or page break, as the editor outlined it
+.page-node-selection {
+  position: absolute;
+  min-height: 2px;
+  outline: 2px solid var(--color);
+  outline-offset: 4px;
+  pointer-events: none;
+}
+
+// the text an input method is composing
+.page-composition {
+  position: absolute;
+  border-bottom: 1.5px solid var(--color);
+  pointer-events: none;
+}
+
+// a misspelled word: a wavy line in the theme's spelling colour along the
+// bottom of its text
+.page-misspelling {
+  position: absolute;
+  pointer-events: none;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background-color: var(--spelling-color);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 3 L1.5 1 L3 3 L4.5 1 L6 3' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E")
+      repeat-x left bottom / 6px 4px;
+  }
+}
+
+// a page break: a dashed line with its name, as in the editor; it isn't
+// printed
+.page-break-mark {
+  position: absolute;
+  pointer-events: none;
+  border-top: 1px dashed var(--color);
+  opacity: $faint-text-opacity;
+
+  &::after {
+    content: "Page break";
+    position: absolute;
+    top: -0.65em;
+    left: 50%;
+    padding: 0 0.6em;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color);
+    background-color: var(--background-color);
+    transform: translateX(-50%);
+  }
+}
+
+// in "page ends" a page break ends the page right there: its name sits on
+// the line of the mark where the page ends, between its footer and the next
+// page's header
+#page-view.page-ends .page-break-mark {
+  border-top: none;
+  opacity: $faint-text-opacity;
+
+  &::after {
+    top: calc(#{$page-end-height} / 2 - 0.65em);
+  }
+}
+
+// Ctrl (Cmd) + click opens the link under the pointer
+#page-view.follow-links,
+#page-view.follow-links .page-frame {
+  cursor: pointer;
+}
+
+// the line with the document's properties above the first page
+#page-view .doc-properties {
+  position: absolute;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+// its width and place on whole device pixels are set where it's drawn
+.page-caret {
+  position: absolute;
+  background-color: var(--color);
+  pointer-events: none;
+  animation: page-caret-blink 1.1s steps(1) 0.5s infinite;
+}
+
+// where dragged text would drop: the caret's colour, still, in any theme
+.page-drop-caret {
+  animation: none;
+}
+
+@keyframes page-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+// with the system asking for less motion, the caret stays still, and the
+// strips, hints and the faded pages change at once
+@media (prefers-reduced-motion: reduce) {
+  .page-caret,
+  .band-editor,
+  .band-editor.footer {
+    animation: none;
+  }
+
+  .band-line,
+  .band-hint,
+  body.band-editing #page-view {
+    transition: none;
   }
 }

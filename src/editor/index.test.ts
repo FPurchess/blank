@@ -147,3 +147,24 @@ describe("bootEditor", () => {
     expect(transaction.value?.docChanged).toBe(true);
   });
 });
+
+describe("the editor's first focus", () => {
+  beforeEach(async () => {
+    await localforage.clear();
+    mockCliArgs();
+    transaction.value = null;
+  });
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("leaves an editor that's gone by then", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { view } = await bootEditor();
+    const focus = vi.spyOn(view, "focus");
+    view.dom.remove();
+    vi.advanceTimersByTime(100);
+    expect(focus).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});

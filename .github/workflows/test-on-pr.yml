@@ -55,10 +55,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # the spell check engine, on every platform. tauri-action has built the frontend
-      # (dist/), which the Rust side needs to compile
+      # the app crate (the spell check engine and the system fonts) on every
+      # platform; the layout engine is tested by the engine job of test.yml,
+      # with poppler. tauri-action has built the frontend (dist/), which the
+      # Rust side needs to compile
       - name: run rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml -p blank
 
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)

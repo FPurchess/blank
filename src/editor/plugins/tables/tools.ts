@@ -10,8 +10,12 @@ import { isInTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import { gfmBlocker, type GfmBlocker } from "../../../markdown/tables";
+import { watch } from "vue";
+
 import {
   announce as announceNow,
+  pageLayoutState,
+  pageViewport,
   tableToolbar,
   type TableToolbarItem,
 } from "../../../state";
@@ -22,7 +26,20 @@ import {
 } from "../../commands/table/actions";
 import { setCaption } from "../../commands/table/format";
 import { tableKeyBinding } from "../../keyBindings";
+import { PAGE_PRESS } from "../../pagePointer";
+import { blockBoxes, caretPage } from "../../../engine/geometry";
+import { engineless } from "../../../engine/engine";
 import { tableAround } from "./util";
+
+/**
+ * tableBox returns the box of the table at `pos` on the page the cursor is
+ * on, or on its first page, as the page view shows it
+ */
+const tableBox = (view: EditorView, pos: number, size: number) => {
+  const boxes = blockBoxes(pos, pos + size);
+  const page = caretPage(view.state.selection.head);
+  return boxes.find((box) => box.page === page) ?? boxes[0] ?? null;
+};
 
 // how a table is saved, for the announcement when that changes
 type Format = GfmBlocker | "gfm";
@@ -191,13 +208,13 @@ export const tableTools = () => {
    */
   const publish = (view: EditorView) => {
     const table = tableAround(view.state.selection.$head);
-    const dom = table && view.nodeDOM(table.pos);
-    if (!table || !(dom instanceof HTMLElement)) {
+    const box = table && tableBox(view, table.pos, table.node.nodeSize);
+    if (!table || !box) {
       if (tableToolbar.value) tableToolbar.value = null;
       return;
     }
     const tools = toolsKey.getState(view.state) ?? IDLE;
-    const { left, top, bottom, right } = dom.getBoundingClientRect();
+    const { left, top, bottom, right } = box;
     tableToolbar.value = {
       anchor: { left, top, bottom, right },
       items: currentItems(view),
@@ -258,7 +275,7 @@ export const tableTools = () => {
       },
       handleTextInput: (view) => !!toolsKey.getState(view.state)?.keys,
       handleDOMEvents: {
-        mousedown: (view) => {
+        [PAGE_PRESS]: (view) => {
           if (toolsKey.getState(view.state)?.keys) {
             setTools(view, { keys: false });
           }
@@ -267,9 +284,16 @@ export const tableTools = () => {
       },
     },
     view(view) {
-      const reposition = () => publish(view);
-      window.addEventListener("scroll", reposition, true);
-      window.addEventListener("resize", reposition);
+      // the page view scrolled, resized or switched, or the pages were laid
+      // out again, e.g. once an image above loaded
+      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
+        flush: "sync",
+      });
+      // without the engine, the editor itself scrolls
+      const scrolled = () => {
+        if (engineless()) publish(view);
+      };
+      window.addEventListener("scroll", scrolled, true);
       publish(view);
       return {
         update: (view) => {
@@ -282,8 +306,8 @@ export const tableTools = () => {
           publish(view);
         },
         destroy: () => {
-          window.removeEventListener("scroll", reposition, true);
-          window.removeEventListener("resize", reposition);
+          stop();
+          window.removeEventListener("scroll", scrolled, true);
           tableToolbar.value = null;
         },
       };

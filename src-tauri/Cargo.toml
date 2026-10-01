@@ -15,6 +15,9 @@ edition = "2021"
 name = "blank_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[workspace]
+members = ["layout"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -35,9 +38,19 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 futures-util = { version = "0.3", default-features = false }
 tokio = { version = "1", features = ["fs", "sync"] }
+# the system's fonts for scripts Blank's fonts lack, see src/fonts.rs
+fontique = "0.11"
+unicode-script = "0.5"
+# the version fontique uses; reads a fallback font's licence (fsType) and outlines
+read-fonts = "0.41"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"
+
+# the primary selection, which a middle click pastes (src/primary.rs); the
+# version tauri's webview already uses
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
 
 
 [dev-dependencies]
@@ -48,3 +61,17 @@ tiny_http = "0.12"
 # `tauri dev` and the debug builds of the e2e tests lag
 [profile.dev.package.spellbook]
 opt-level = 3
+
+# the layout engine for the webview, see scripts/build-engine.sh
+[profile.wasm]
+inherits = "release"
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+# the same, optimized for size, see "Size" in .claude/rules/layout-engine.md
+# for how they compare
+[profile.wasm-small]
+inherits = "wasm"
+opt-level = "s"

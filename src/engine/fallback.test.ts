@@ -1,0 +1,123 @@
+import { invoke } from "@tauri-apps/api/core";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  fallbackFonts,
+  findFonts,
+  forgetFallbacks,
+  missingOf,
+} from "./fallback";
+import { EMOJI_FAMILY } from "./fonts";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+
+describe("fallback fonts", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3]))),
+    );
+    vi.mocked(invoke).mockResolvedValue([
+      { family: "Noto Sans CJK SC", path: "/fonts/cjk-regular.ttc" },
+      { family: "Noto Sans CJK SC", path: "/fonts/cjk-bold.ttc" },
+    ]);
+    vi.mocked(readFile).mockResolvedValue(new Uint8Array([4, 5]));
+  });
+
+  afterEach(() => {
+    forgetFallbacks();
+    vi.unstubAllGlobals();
+  });
+
+  it("tells emoji apart from other characters", () => {
+    expect(missingOf("😀中🎉")).toEqual({
+      emoji: ["😀", "🎉"],
+      other: ["中"],
+    });
+  });
+
+  it("loads the emoji font and the system's fonts, once", async () => {
+    const found = await findFonts("😀中", "zh");
+    expect(found.map((font) => font.family)).toEqual([
+      EMOJI_FAMILY,
+      "Noto Sans CJK SC",
+      "Noto Sans CJK SC",
+    ]);
+    expect(invoke).toHaveBeenCalledWith("fallback_fonts", {
+      text: "中",
+      language: "zh",
+    });
+    expect(readFile).toHaveBeenCalledWith("/fonts/cjk-bold.ttc");
+    expect(fallbackFonts.value).toHaveLength(3);
+    // asked before: nothing more to load
+    expect(await findFonts("😀中", "zh")).toEqual([]);
+    // another emoji uses the font loaded
+    expect(await findFonts("👍", "zh")).toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("looks again for what a lookup that failed was to find", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("busy"));
+    expect(await findFonts("中", "zh")).toEqual([]);
+
+    const found = await findFonts("中", "zh");
+    expect(found.map((font) => font.family)).toEqual([
+      "Noto Sans CJK SC",
+      "Noto Sans CJK SC",
+    ]);
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("looks again for emoji once their font loads", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
+    expect(await findFonts("😀", "en")).toEqual([]);
+    expect((await findFonts("😀", "en")).map((font) => font.family)).toEqual([
+      EMOJI_FAMILY,
+    ]);
+  });
+
+  it("looks up one at a time, so the same characters load once", async () => {
+    const [first, second] = await Promise.all([
+      findFonts("中", "zh"),
+      findFonts("中", "zh"),
+    ]);
+    expect(first).toHaveLength(2);
+    expect(second).toEqual([]);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("looks again for characters in another language", async () => {
+    await findFonts("中", "zh");
+    expect(await findFonts("中", "zh")).toEqual([]);
+    vi.mocked(invoke).mockResolvedValue([
+      { family: "Noto Sans CJK JP", path: "/fonts/cjk-jp.ttc" },
+    ]);
+    const found = await findFonts("中", "ja");
+    expect(found.map((font) => font.family)).toEqual(["Noto Sans CJK JP"]);
+    expect(invoke).toHaveBeenLastCalledWith("fallback_fonts", {
+      text: "中",
+      language: "ja",
+    });
+  });
+
+  it("reads a system font once for lookups that overlap", async () => {
+    // other characters of the same script, looked for at the same time
+    await Promise.all([findFonts("中", "zh"), findFonts("文", "zh")]);
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(fallbackFonts.value.map((font) => font.family)).toEqual([
+      "Noto Sans CJK SC",
+      "Noto Sans CJK SC",
+    ]);
+  });
+
+  it("goes on without what it can't find or read", async () => {
+    vi.mocked(invoke).mockRejectedValue(new Error("no fonts"));
+    vi.mocked(fetch).mockRejectedValue(new Error("offline"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await findFonts("😀中", "en")).toEqual([]);
+    expect(fallbackFonts.value).toEqual([]);
+  });
+});

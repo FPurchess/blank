@@ -1,14 +1,84 @@
 import type { Command } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-import { config } from "../../config";
-import { type Band, documentFields } from "../../layout/bands";
+import { CommandIdentifier, config, getKeyBinding } from "../../config";
+import { pageEngine } from "../../engine/engine";
+import {
+  type Band,
+  bandsOn,
+  documentFields,
+  fieldValues,
+} from "../../layout/bands";
 import { changesOf } from "../../layout/choices";
 import { localeUnit, systemLocale } from "../../layout/paper";
+import { emptyBandNotice, pageBandParts } from "../../layout/placeholders";
 import { resolveLayout } from "../../layout/resolve";
-import { bandSettings } from "../../layout/settings";
-import { bandEditor, path } from "../../state";
+import { bandSettings, SLOTS } from "../../layout/settings";
+import { expand } from "../../layout/tokens";
+import {
+  announce,
+  bandEditor,
+  engineMissing,
+  pagePosition,
+  path,
+} from "../../state";
+import { formatShortcut } from "../keyBindings";
 import { writePage } from "./frontmatter";
+
+/**
+ * chapterOf returns the first heading 1 of a document, what {chapter}
+ * stands for without the layout engine, which knows it for each page
+ */
+const chapterOf = (doc: EditorView["state"]["doc"]) => {
+  let chapter: string | null = null;
+  doc.descendants((node) => {
+    if (
+      chapter === null &&
+      node.type.name === "heading" &&
+      node.attrs.level === 1
+    )
+      chapter = node.textContent;
+    return chapter === null;
+  });
+  return chapter;
+};
+
+/**
+ * tellIfEmpty tells, through the status line, when a band that has
+ * something written comes out empty on the page of the selection, because
+ * its placeholders have nothing to put in there yet, e.g. {author} with no
+ * author set (see emptyBandNotice)
+ */
+const tellIfEmpty = (view: EditorView, band: Band) => {
+  const { doc } = view.state;
+  const { layout } = resolveLayout(
+    doc.attrs.frontmatter as string | null,
+    config.value.layout.page,
+  );
+  const fields = documentFields(doc, path.value);
+  const { page, pages } = pagePosition.value ?? { page: 1, pages: 1 };
+  const chapter = chapterOf(doc);
+  // the texts the page shows: the engine's, which knows the chapter of each
+  // page, or written in here without it
+  const engine = engineMissing.value ? null : pageEngine;
+  const shown =
+    engine?.bands(page - 1) ??
+    (() => {
+      const bands = bandsOn(layout, page);
+      const values = fieldValues(layout, page, pages, fields, chapter ?? "");
+      return [bands.header, bands.footer].flatMap((slots) =>
+        SLOTS.map((slot) => expand(slots[slot], values)),
+      );
+    })();
+  const slots = pageBandParts(layout, page - 1, pages, fields, shown);
+  const notice = emptyBandNotice(
+    band,
+    band === "header" ? slots.slice(0, 3) : slots.slice(3, 6),
+    chapter !== null,
+    formatShortcut(getKeyBinding(CommandIdentifier.PAGE_SETUP)),
+  );
+  if (notice) announce(notice);
+};
 
 /**
  * openBand opens the strip of the header or footer of the document of
@@ -38,6 +108,7 @@ export const openBand = (view: EditorView, band: Band, insert?: string) => {
         localeUnit(locale),
       );
       view.focus();
+      tellIfEmpty(view, band);
     },
   };
 };

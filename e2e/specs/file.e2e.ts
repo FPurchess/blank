@@ -4,13 +4,21 @@ import path from "node:path";
 
 import { browser, $, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, restartApp, type } from "../helpers.ts";
+import {
+  clickInto,
+  expectEditorText,
+  focusEditor,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 /**
  * appends `text` to the first paragraph and saves with Mod-s
  */
 const appendAndSave = async (text: string) => {
-  await $("#editor p").click();
+  await clickInto("#editor p");
   await type(Key.End);
   await type(text);
   await pressMod("s");
@@ -43,16 +51,16 @@ describe("file", () => {
   });
 
   it("opens the file passed via command-line argument", async () => {
-    await expect($("#editor h1")).toHaveText("E2E Fixture");
-    await expect($("#editor p")).toHaveText("Original paragraph.");
+    await expectEditorText("#editor h1", "E2E Fixture");
+    await expectEditorText("#editor p", "Original paragraph.");
     await expect($("#ui-top")).toHaveText(`» ${fixturePath}`);
   });
 
   it("saves changes to the opened file", async () => {
-    await $("#editor p").click();
+    await clickInto("#editor p");
     await type(Key.End);
     await type(" Appended");
-    await expect($("#editor p")).toHaveText("Original paragraph. Appended");
+    await expectEditorText("#editor p", "Original paragraph. Appended");
 
     // the path is known, hence saving does not open a dialog
     await pressMod("s");
@@ -91,7 +99,7 @@ describe("file access", () => {
     fs.writeFileSync(filePath, "Hidden note.\n");
 
     await restartApp([filePath]);
-    await expect($("#editor p")).toHaveText("Hidden note.");
+    await expectEditorText("#editor p", "Hidden note.");
     await appendAndSave(" Saved");
 
     await waitForFile(filePath, "Hidden note. Saved");
@@ -105,7 +113,7 @@ describe("file access", () => {
     fs.symlinkSync(path.join("real", "note.md"), link);
 
     await restartApp([link]);
-    await expect($("#editor p")).toHaveText("Linked note.");
+    await expectEditorText("#editor p", "Linked note.");
     await appendAndSave(" Saved");
 
     await waitForFile(target, "Linked note. Saved");
@@ -120,7 +128,7 @@ describe("file access", () => {
     expect(relative.startsWith("..")).toBe(true);
 
     await restartApp([relative]);
-    await expect($("#editor p")).toHaveText("Relative note.");
+    await expectEditorText("#editor p", "Relative note.");
     // the app remembers the absolute path, so it doesn't depend on where it was started
     await expect($("#ui-top")).toHaveText(`» ${filePath}`);
     await appendAndSave(" Saved");
@@ -133,11 +141,11 @@ describe("file access", () => {
     fs.writeFileSync(filePath, "Keep me.\n");
 
     await restartApp([filePath]);
-    await expect($("#editor p")).toHaveText("Keep me.");
+    await expectEditorText("#editor p", "Keep me.");
     await focusEditor();
     await pressMod("z");
     await pressMod("z");
-    await expect($("#editor p")).toHaveText("Keep me.");
+    await expectEditorText("#editor p", "Keep me.");
 
     await pressMod("s");
     await waitForFile(filePath, "Keep me.");

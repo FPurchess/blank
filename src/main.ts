@@ -4,6 +4,13 @@ import { bootConfig } from "./config";
 import { bootState } from "./state";
 import { bootStorage } from "./storage";
 import { bootEditor } from "./editor";
+import {
+  bootEngine,
+  exposeEngineHooks,
+  useFallbackEditor,
+} from "./engine/engine";
+import { exposeGeometry } from "./engine/geometry";
+import { bootMark, exposePerf } from "./engine/perf";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
@@ -28,15 +35,44 @@ const showBootError = (error: unknown) => {
   document.body.appendChild(message);
 };
 
+// the hooks E2E tests measure and break the page view with, in `bun run
+// dev` and the debug builds they run
+const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
+
 (async () => {
   let editorReady = false;
   try {
+    bootMark("start");
+    if (testHooks) {
+      exposePerf();
+      exposeEngineHooks();
+    }
+    // the page view's layout engine loads while the rest boots, and the
+    // editor lays out its document once it's there (see pageSync). Without
+    // it, the editor shows the text itself.
+    void bootEngine().then(
+      () => bootMark("engine"),
+      (error: unknown) => {
+        console.error("failed to load the layout engine", error);
+        useFallbackEditor("unavailable");
+      },
+    );
     bootState();
     await bootConfig();
+    bootMark("config");
     await bootStorage();
+    bootMark("storage");
+    // not waiting for the engine: the editor and the UI mount while it loads
+    // (fetching its wasm takes ~120 ms, compiling it ~15 ms), and the pages
+    // show once it laid the document out. Measured in the debug app on a
+    // quiet machine: the pages show ~50 ms sooner (~575 ms after the window
+    // opens instead of ~630), and the hidden editor is never shown meanwhile.
     const editor = await bootEditor();
+    bootMark("editor");
     editorReady = true;
+    if (testHooks) exposeGeometry(editor.view);
     bootUI(editor);
+    bootMark("ui");
     // doesn't wait for the dictionary, which may need a download
     bootSpellcheck();
   } catch (error) {

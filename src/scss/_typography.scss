@@ -1,12 +1,16 @@
 @use "sass:math";
+@use "fallback-ranges" as fallback;
 
-@mixin font-face($family, $file, $weight, $style) {
+@mixin font-face($family, $file, $weight, $style, $range: null) {
   @font-face {
     font-family: $family;
     src: url("/fonts/#{$file}.woff2") format("woff2");
     font-weight: $weight;
     font-style: $style;
     font-display: block;
+    @if $range {
+      unicode-range: $range;
+    }
   }
 }
 
@@ -18,18 +22,27 @@
 @include font-face("IBM Plex Sans", "IBMPlexSans-Bold", 700, normal);
 @include font-face("IBM Plex Sans", "IBMPlexSans-BoldItalic", 700, italic);
 
-// fallback for characters IBM Plex Sans lacks, such as the ⇒ arrows
-@include font-face("DejaVu Sans", "dejavu-sans", 400, normal);
-@include font-face("DejaVu Sans", "dejavu-sans-bold", 700, normal);
-@include font-face("DejaVu Sans", "dejavu-sans-oblique", 400, italic);
-@include font-face("DejaVu Sans", "dejavu-sans-bold-oblique", 700, italic);
+// fallback for characters IBM Plex Sans lacks, such as the ⇒ arrows, loaded
+// only when one of them shows (scripts/build-fallback-ranges.ts)
+$dejavu: fallback.$fallback-range;
+@include font-face("DejaVu Sans", "dejavu-sans", 400, normal, $dejavu);
+@include font-face("DejaVu Sans", "dejavu-sans-bold", 700, normal, $dejavu);
+@include font-face("DejaVu Sans", "dejavu-sans-oblique", 400, italic, $dejavu);
+@include font-face(
+  "DejaVu Sans",
+  "dejavu-sans-bold-oblique",
+  700,
+  italic,
+  $dejavu
+);
 
 $font-weight-regular: 400;
 $font-weight-medium: 500;
 $font-weight-bold: 700;
 
-// Headings step up on a major third. The PDF export mirrors these values in
-// src/exporters/pdf/template.ts.
+// Headings step up on a major third. The layout engine, which paints the
+// pages and writes the PDF, mirrors these values in
+// src-tauri/layout/src/style.rs.
 $scale-ratio: 1.25;
 
 // Margins are given relative to the body size, so they stay the same whatever

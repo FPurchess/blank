@@ -1,9 +1,14 @@
 import { afterEach, vi } from "vitest";
 import { clearMocks } from "@tauri-apps/api/mocks";
 
+import { installCanvasStub } from "./test/canvas";
+
 // There is no Tauri IPC in jsdom, so every plugin the app calls is mocked for
 // all tests. `mockReset: true` resets these mocks before each test, so set
 // return values inside the test (or its `beforeEach`).
+
+// canvases record what is painted, see src/test/canvas.ts
+installCanvasStub();
 
 vi.mock("@tauri-apps/plugin-notification", async (importOriginal) => {
   const actual = (await importOriginal()) as unknown as object;

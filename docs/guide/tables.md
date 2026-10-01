@@ -37,7 +37,7 @@ The first row is the header. It's bold and tinted, and screen readers announce i
 
 ## Write in a cell {#cells}
 
-A cell is a small page of its own. Bold, italic, code, links and images all work in it.
+A cell is a small page of its own. Bold, italic, code, links and images all work in it, and so do several paragraphs, lists, quotes and code blocks. Only headings, tables and horizontal lines stay outside cells.
 
 <img class="shot" src="/screenshots/table-cells.gif" alt="Enter starts a second line in a cell; Shift and the left arrow select two cells, which Backspace clears" />
 
@@ -137,7 +137,7 @@ Blank opens both kinds, so you can also open markdown files with tables written 
 
 ## PDF and Word {#export}
 
-Tables go into your [PDF and Word documents](./files) the way you see them in Blank: the tinted header, the lines between the rows and columns, the alignment of each column, merged cells, lists in cells and the caption above the table. Columns get the widths you set, or else their width from their content, like in the editor.
+Tables go into your [PDF and Word documents](./files) the way you see them in Blank: the tinted header, the lines between the rows and columns, the alignment of each column, merged cells and the caption above the table. Everything a cell holds comes along too: several paragraphs, lists, quotes, code and images. Columns get the widths you set, or else their width from their content, like in the editor.
 
 - A table longer than a page repeats its header row at the top of every page.
 - Rows stay whole instead of breaking across two pages, unless a row is too tall for one.

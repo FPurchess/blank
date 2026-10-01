@@ -24,6 +24,17 @@ if (!input) {
 // the markdown parser reads HTML tables with the DOM, which bun doesn't have
 globalThis.DOMParser = new JSDOM().window.DOMParser;
 
+// the Word export fetches the fonts it embeds by their `?url` import, which
+// bun resolves to the file's path; fetch can't load a path, so read it
+const fetchUrl = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (url: string | URL | Request, init?: RequestInit) =>
+    typeof url === "string" && url.startsWith("/") && existsSync(url)
+      ? Promise.resolve(new Response(readFileSync(url)))
+      : fetchUrl(url, init),
+  fetchUrl,
+);
+
 // the app reads local images through the Tauri fs plugin, which doesn't run
 // here, so they are inlined as data: URLs
 const inlineImages = (markdown: string) =>

@@ -1,6 +1,12 @@
 import { $, browser, expect } from "@wdio/globals";
 
-import { focusEditor, Key, pressMod, type } from "../helpers.ts";
+import {
+  expectEditorText,
+  focusEditor,
+  Key,
+  pressMod,
+  type,
+} from "../helpers.ts";
 
 const dialog = () => $("#link-dialog");
 
@@ -32,13 +38,13 @@ describe("links", () => {
 
     await expect(dialog()).not.toBeExisting();
     await expect($("#editor a")).toHaveAttribute("href", BLANK);
-    await expect($("#editor a")).toHaveText("Blank");
+    await expectEditorText("#editor a", "Blank");
   });
 
   it("returns the focus to the editor", async () => {
     await type(" rocks");
 
-    await expect($("#editor p")).toHaveText("Blank rocks");
+    await expectEditorText("#editor p", "Blank rocks");
   });
 
   it("cancels the dialog on Escape", async () => {
@@ -49,7 +55,7 @@ describe("links", () => {
 
     await expect(dialog()).not.toBeExisting();
     await type("!");
-    await expect($("#editor p")).toHaveText("Blank rocks!");
+    await expectEditorText("#editor p", "Blank rocks!");
   });
 
   it("edits the link at the cursor and converts it to text", async () => {
@@ -67,7 +73,7 @@ describe("links", () => {
 
     await expect(dialog()).not.toBeExisting();
     await expect($("#editor a")).not.toBeExisting();
-    await expect($("#editor p")).toHaveText("Blank rocks!");
+    await expectEditorText("#editor p", "Blank rocks!");
   });
 
   it("links markdown typed as [title](url)", async () => {
@@ -76,6 +82,6 @@ describe("links", () => {
     await type(`[Docs](${DOCS}) `);
 
     await expect($("#editor a")).toHaveAttribute("href", DOCS);
-    await expect($("#editor a")).toHaveText("Docs");
+    await expectEditorText("#editor a", "Docs");
   });
 });

@@ -1,9 +1,12 @@
 import JSZip from "jszip";
 
+import { CODE_FONT } from "./template";
+
 // Fixes to the package docx 9.7.2 writes, applied to the zipped document.
 
 const COMMENTS = "word/comments.xml";
 const STYLES = "word/styles.xml";
+const FONT_TABLE = "word/fontTable.xml";
 
 const read = (zip: JSZip, name: string) => zip.file(name)?.async("string");
 
@@ -52,6 +55,23 @@ const markNormalAsDefault = (zip: JSZip) =>
   );
 
 /**
+ * markCodeFontFixed gives the font of code a fixed pitch and the family of
+ * monospaced fonts in the font table: docx writes every embedded font as of
+ * variable pitch, so a reader without the embedded font got a proportional
+ * one in its place, and the columns of code lost their alignment
+ */
+const markCodeFontFixed = (zip: JSZip) =>
+  rewrite(zip, FONT_TABLE, (xml) =>
+    xml.replace(
+      new RegExp(`<w:font w:name="${CODE_FONT}">.*?</w:font>`, "s"),
+      (font) =>
+        font
+          .replace(/<w:pitch w:val="[^"]*"\/>/, '<w:pitch w:val="fixed"/>')
+          .replace(/<w:family w:val="[^"]*"\/>/, '<w:family w:val="modern"/>'),
+    ),
+  );
+
+/**
  * fixPackage applies the fixes to a .docx file written by docx
  * @param contents the .docx file
  * @returns the fixed .docx file
@@ -60,5 +80,6 @@ export const fixPackage = async (contents: Uint8Array) => {
   const zip = await JSZip.loadAsync(contents);
   await stripEmptyComments(zip);
   await markNormalAsDefault(zip);
+  await markCodeFontFixed(zip);
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 };

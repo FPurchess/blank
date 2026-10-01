@@ -94,12 +94,18 @@ const ROMAN: [number, string][] = [
   [1, "i"],
 ];
 
+// the largest number written in roman numerals, MMMCMXCIX
+export const LARGEST_ROMAN = 3999;
+
 /**
  * formatNumber writes a page number in a style: 4, iv or IV. Roman
- * numerals start at 1, so 0 stays 0, as in Word.
+ * numerals start at 1, so 0 stays 0, as in Word, and end at LARGEST_ROMAN,
+ * after which the number stays arabic, as the layout engine writes it
+ * (src-tauri/layout/src/bands.rs).
  */
 export const formatNumber = (number: number, style: NumberStyle) => {
-  if (style === "1" || number < 1) return String(number);
+  if (style === "1" || number < 1 || number > LARGEST_ROMAN)
+    return String(number);
   let rest = number;
   let roman = "";
   for (const [value, letters] of ROMAN) {
@@ -184,34 +190,14 @@ export const documentFields = (
     options,
   );
 
-// a heading 1 and the page it starts on
-export interface Chapter {
-  page: number;
-  text: string;
-}
-
-/**
- * chapterOn returns what {chapter} stands for on a page: the first heading 1
- * on it, or else the last one before it, like Word's STYLEREF field
- * @param chapters the headings 1 in the order of the document
- */
-export const chapterOn = (chapters: Chapter[], page: number) => {
-  let text = "";
-  for (const chapter of chapters) {
-    if (chapter.page > page) break;
-    text = chapter.text;
-    if (chapter.page === page) break;
-  }
-  return text;
-};
-
 /**
  * fieldValues returns what the placeholders of a page stand for. Like Word's
  * NUMPAGES, {pages} counts every page, whatever the first number, in
  * arabic numerals.
  * @param page the page, counted from 1
  * @param pages how many pages there are
- * @param chapter the heading 1 of the page, see chapterOn
+ * @param chapter the heading 1 of the page: the first on it, or else the
+ *   last one before it, like Word's STYLEREF field
  */
 export const fieldValues = (
   layout: Layout,

@@ -6,7 +6,9 @@ import { browser, $, $$, expect } from "@wdio/globals";
 
 import {
   clickInto,
+  expectEditorText,
   Key,
+  paintedInk,
   paste,
   pressMod,
   restartApp,
@@ -26,6 +28,81 @@ const waitForSaved = async (filePath: string, text: string) => {
   return fs.readFileSync(filePath, "utf8");
 };
 
+/**
+ * tableLayout returns where the rows and columns of the first table start,
+ * and where the last ones end, in viewport px, on the first page it is on
+ */
+const tableLayout = () =>
+  browser.execute(() => {
+    type Piece = {
+      box: { left: number; top: number; right: number; bottom: number };
+      rows: number[];
+      columns: number[];
+    };
+    const geometry = (
+      window as unknown as {
+        blankGeometry: { tables: () => { pieces: Piece[] }[] };
+      }
+    ).blankGeometry;
+    const { box, rows, columns } = geometry.tables()[0].pieces[0];
+    return { box, rows, columns };
+  });
+
+/**
+ * expectGridPainted checks that the pages paint the lines of the first
+ * table where its geometry says they are: a line between each two columns
+ * and one along the bottom of each row (see items.rs), each a thin strip
+ * with ink, and more of it than a strip beside the line
+ */
+const gridPainted = async () => {
+  const { box, rows, columns } = await tableLayout();
+  for (const x of columns.slice(1, -1)) {
+    const along = await paintedInk({
+      left: x - 1,
+      right: x + 2,
+      top: box.top + 3,
+      bottom: box.bottom - 3,
+    });
+    // inside the cell, left of the line, where the cell's padding is
+    const beside = await paintedInk({
+      left: x - 7,
+      right: x - 4,
+      top: box.top + 3,
+      bottom: box.bottom - 3,
+    });
+    expect(along.share).toBeGreaterThan(0.2);
+    expect(along.share).toBeGreaterThan(beside.share + 0.1);
+  }
+  // the lines sit on the inside of each row's bottom edge
+  for (const y of rows.slice(1)) {
+    const along = await paintedInk({
+      left: box.left + 3,
+      right: box.right - 3,
+      top: y - 2,
+      bottom: y + 1,
+    });
+    expect(along.share).toBeGreaterThan(0.2);
+  }
+};
+
+const expectGridPainted = async () => {
+  // the pages paint again in the frames after the change
+  let last = "";
+  await browser
+    .waitUntil(async () => {
+      try {
+        await gridPainted();
+        return true;
+      } catch (error) {
+        last = String(error);
+        return false;
+      }
+    })
+    .catch(() => {
+      throw new Error(`the table's lines aren't painted: ${last}`);
+    });
+};
+
 describe("tables", () => {
   let dir: string;
   let file: string;
@@ -33,6 +110,7 @@ describe("tables", () => {
   const open = async (content: string) => {
     fs.writeFileSync(file, content);
     await restartApp([file]);
+    await $("#page-view .page-canvas").waitForExist();
   };
 
   before(() => {
@@ -88,7 +166,7 @@ describe("tables", () => {
 
     await expect($$("#editor th")).toBeElementsArrayOfSize(2);
     await type("x");
-    await expect($$("#editor td")[0]).toHaveText("x");
+    await expectEditorText("#editor td", "x");
   });
 
   it("saves a line break in a cell as <br>", async () => {
@@ -263,29 +341,9 @@ describe("tables", () => {
   describe("with the mouse", () => {
     /**
      * where the first table's rows and columns start, and where the last
-     * one ends, in viewport px
+     * one ends, in viewport px, as the page view shows it
      */
-    const layout = () =>
-      browser.execute(() => {
-        const table = document.querySelector("#editor table")!;
-        const box = table.getBoundingClientRect();
-        const rows = [...table.querySelectorAll("tr")].map(
-          (row) => row.getBoundingClientRect().top,
-        );
-        const columns = [...table.querySelectorAll("tr:first-child > *")].map(
-          (cell) => cell.getBoundingClientRect().left,
-        );
-        return {
-          rows: [...rows, box.bottom],
-          columns: [...columns, box.right],
-          box: {
-            left: box.left,
-            top: box.top,
-            right: box.right,
-            bottom: box.bottom,
-          },
-        };
-      });
+    const layout = () => tableLayout();
     const at = (x: number, y: number) => ({
       x: Math.round(x),
       y: Math.round(y),
@@ -350,7 +408,16 @@ describe("tables", () => {
       await drag(line, at(box.left + (box.right - box.left) * 0.25, y), line);
 
       const saved = await save("<colgroup>");
-      expect(saved).toContain('    <col style="width: 25');
+      // the drag lands on whole pixels, so about a quarter, adding up to all
+      const widths = [...saved.matchAll(/<col style="width: ([\d.]+)%"/g)].map(
+        (match) => Number(match[1]),
+      );
+      expect(widths).toHaveLength(2);
+      expect(Math.abs(widths[0] - 25)).toBeLessThanOrEqual(1);
+      expect(Math.abs(widths[1] - 75)).toBeLessThanOrEqual(1);
+      expect(widths[0] + widths[1]).toBeCloseTo(100, 0);
+      // the lines are painted where the columns are now
+      await expectGridPainted();
 
       await browser
         .action("pointer")
@@ -395,12 +462,22 @@ describe("tables", () => {
 
   it("deletes a row from the table menu", async () => {
     await open("| a |\n| - |\n| b |\n| c |\n");
-    await $$("#editor td")[0].click({ button: "right" });
+    const { box, rows } = await tableLayout();
+    await browser
+      .action("pointer")
+      .move({
+        x: Math.round(box.left + 20),
+        y: Math.round((rows[1] + rows[2]) / 2),
+        origin: "viewport",
+      })
+      .down({ button: 2 })
+      .up({ button: 2 })
+      .perform();
     await $('[data-id="table"]').click();
     await $('[data-id="table-row-delete"]').click();
 
     await pressMod("s");
-    const saved = await waitForSaved(file, "| c");
+    const saved = await waitForSaved(file, "| --- |");
     expect(saved).toBe("| a   |\n| --- |\n| c   |");
   });
 });

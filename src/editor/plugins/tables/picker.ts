@@ -4,6 +4,7 @@ import { Plugin } from "prosemirror-state";
 import { tablePicker } from "../../../state";
 import { resizePicker } from "../../commands/table/pickerSize";
 import { tableKeyBinding } from "../../keyBindings";
+import { PAGE_PRESS } from "../../pagePointer";
 
 /**
  * tablePickerKeys handles the keyboard while the table picker is open, so the
@@ -49,7 +50,7 @@ export const tablePickerKeys = () => {
       },
       handleTextInput: () => tablePicker.value !== null,
       handleDOMEvents: {
-        mousedown: () => {
+        [PAGE_PRESS]: () => {
           tablePicker.value?.cancel();
           return false;
         },

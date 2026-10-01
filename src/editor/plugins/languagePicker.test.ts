@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { PAGE_PRESS } from "../pagePointer";
+import { pagePointer } from "../../test/pagePointer";
 import {
   createState,
   createTestView,
@@ -152,15 +154,14 @@ describe("plugin.languagePicker", () => {
     expect(pickerState.value.selected).toBe("de");
   });
 
-  it("closes when the editor is clicked", () => {
+  it("closes when the pages are pressed", () => {
     const { plugin, view } = setup();
-    const mousedown = plugin.props.handleDOMEvents!.mousedown!;
+    const press = plugin.props.handleDOMEvents![PAGE_PRESS]!;
+    const event = () => new CustomEvent(PAGE_PRESS, { detail: pagePointer(1) });
 
-    expect(mousedown.call(plugin, view, new MouseEvent("mousedown"))).toBe(
-      false,
-    );
+    expect(press.call(plugin, view, event())).toBe(false);
     openPicker();
-    mousedown.call(plugin, view, new MouseEvent("mousedown"));
+    press.call(plugin, view, event());
 
     expect(pickerState.value.open).toBe(false);
   });

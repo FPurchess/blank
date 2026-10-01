@@ -12,6 +12,7 @@ export * from "./focus";
 export * from "./language";
 export * from "./messages";
 export * from "./page";
+export * from "./pageView";
 export * from "./popups";
 export * from "./spellcheck";
 

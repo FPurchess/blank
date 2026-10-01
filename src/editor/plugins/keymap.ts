@@ -33,6 +33,7 @@ import {
   tableKey,
   pageSetup,
   editBand,
+  togglePageView,
 } from "../commands";
 
 import * as exporters from "../../exporters";
@@ -40,6 +41,7 @@ import { CommandIdentifier, getKeyBinding } from "../../config";
 import { Command } from "prosemirror-state";
 import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
+import { indentCode, outdentCode } from "../commands/codeIndent";
 
 export { normalizeBinding };
 
@@ -79,8 +81,15 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.INSERT_PAGE_BREAK]: outsideCells(
     insertBlock(schema.nodes.page_break),
   ),
-  [CommandIdentifier.FORMAT_INDENT]: sinkListItem(schema.nodes.list_item),
-  [CommandIdentifier.FORMAT_UNINDENT]: liftListItem(schema.nodes.list_item),
+  // the lines of a code block first, then list items
+  [CommandIdentifier.FORMAT_INDENT]: chainCommands(
+    indentCode,
+    sinkListItem(schema.nodes.list_item),
+  ),
+  [CommandIdentifier.FORMAT_UNINDENT]: chainCommands(
+    outdentCode,
+    liftListItem(schema.nodes.list_item),
+  ),
   [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
   [CommandIdentifier.FORMAT_ITALIC]: toggleMark(schema.marks.em),
   [CommandIdentifier.FORMAT_CODE]: toggleMark(schema.marks.code),
@@ -105,6 +114,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.PAGE_SETUP]: pageSetup(),
   [CommandIdentifier.EDIT_HEADER]: editBand("header"),
   [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
+  [CommandIdentifier.VIEW_PAGES]: togglePageView(),
 };
 
 /**
