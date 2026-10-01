@@ -41,7 +41,7 @@ The tasks of `TASK.md`, ticked as each one is committed. The integrator deletes 
   - `engine/navigate.rs`: `Hit`, positions, caret, hit, word, vertical, line edges
   - `engine/select.rs`: selection, boxes, page spans, `table_grid`
   - `engine/display.rs`: `Op`, `page_ops`, the bands' boxes
-  - `engine/text_layer.rs`: `Word`, `lines`, `words`
+  - `engine/text_layer.rs`: `Word`, `words` (it also had `lines`, removed in task 17)
   - `engine/test_support.rs`: the builders the tests share
 - Every test now sits next to the code it tests.
 - `items.rs` is split into `items/mod.rs` and `items/table.rs` (the table layout).
@@ -315,6 +315,19 @@ The self-review's findings, with the numbers from the report to the coordinator.
 - M3 (609b867): repeated header rows are `Part::Repeat`, drawn as `PaginationOther` artifacts with untagged link annotations. Test: `puts_repeated_header_rows_in_the_structure_once` (pdfinfo finds "Heading" once).
 - M4 (f5a30e2): a cell's content is tagged in its reading order (`tags::cell_content`): markers go by their baseline to their text box, lists in cells become L > LI > Lbl + LBody through `Builder`, and images and alt texts are Figures. Test: `exact.rs` `pdf_tags_a_cell_in_its_reading_order`.
 - M5 (1666b4f): a link is tagged around its own text. `Part::Linked {item, text, link}` covers its runs and `Part::Link {…, link}` its annotations, `Ids` keeps the order things were drawn in, and `tags::text_nodes` builds a text box's leaves with one Link per link, inline. Test: `exact.rs` `pdf_tags_links_around_their_text` (48 Links, each with its text before its annotation).
+
+- M9 (575da0c): the cut search for slicing tall rows is a binary search (`items::table::allowed_cuts`: spans sorted by top with the lowest bottom reached so far). Tests: `finds_the_cuts_between_lines` against the old search by hand, and `slices_a_cell_of_thousands_of_lines_in_time` (3000 lines; 2000 took 2.6 s before, in debug).
+- m3 (3b23e22): the first body row is sliced to the room under the caption and the header rows, so a caption is never left alone. Test: `keeps_the_caption_with_a_first_row_nearly_a_page_tall`, which fails with the old rule.
+- m5 (fae6142): `keep_height` stops at a heading that starts a new page, and at a page break. Test: `keeps_a_heading_with_what_follows_only_up_to_a_new_page` (pages [0, 0, 1, 1], before [0, 1, 2, 2]).
+- m2 (3791056): `TextBox::notdef` reads the widened cluster ranges, so a mark no font has is reported. Test: `tells_a_mark_no_font_has`.
+- m7 (this commit, two parts):
+  - `paginate_from` paginates into scratch vectors (`Paginator::frag_base` gives them their final indices) and splices them into `Engine::pages`/`frags` in place. The old tail stays where it is: its pages' bounds move by one offset, and its fragments' items are rewritten only when `delta != 0`.
+  - A changed chapter list expands every page's bands again only if a slot shows `{chapter}` (`bands::uses_field`). A changed page count still redoes all, since moved pages have other numbers.
+  - `Stats` counts both (`bands_expanded`, `frags_rewritten`). Tests:
+    - `redoes_the_bands_only_where_they_change`, which fails with the old rule
+    - `leaves_the_fragments_after_a_change_in_place`
+    - the property test, also with 2000 edits in release
+  - Timings at a load average of 20–24, the best of 3 alternate runs, before → after: 0.325 → 0.315, 0.342 → 0.370, 0.539 → 0.449 and 1.597 → 1.536 ms at 1, 39, 200 and 823 pages. Within the noise; the counters show the work saved.
 
 ### Where the review fixes stand (stopped at 00:17 on 2026-10-01 for the night)
 

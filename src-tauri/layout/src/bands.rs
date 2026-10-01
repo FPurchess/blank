@@ -77,6 +77,25 @@ pub fn format_number(number: i64, style: &str) -> String {
     }
 }
 
+/// whether a slot of any band shows `{field}`, e.g. "chapter"
+pub fn uses_field(settings: &Settings, field: &str) -> bool {
+    let token = format!("{{{field}}}");
+    let shows = |slots: &Slots| {
+        [&slots.left, &slots.center, &slots.right]
+            .iter()
+            .any(|slot| slot.contains(&token))
+    };
+    let own = match &settings.first_page {
+        FirstPage::Own(bands) => shows(&bands.header) || shows(&bands.footer),
+        FirstPage::Named(_) => false,
+    };
+    let even = settings
+        .even_pages
+        .as_ref()
+        .is_some_and(|bands| shows(&bands.header) || shows(&bands.footer));
+    shows(&settings.header) || shows(&settings.footer) || own || even
+}
+
 /// a heading 1 and the page it starts on
 #[derive(Clone, Debug, PartialEq)]
 pub struct Chapter {

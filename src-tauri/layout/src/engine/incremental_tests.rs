@@ -792,3 +792,72 @@ fn update_timing() {
         println!("{pages} pages: {best:.3} ms per update");
     }
 }
+
+/// a document of 200 paragraphs with a chapter heading every 20
+fn chapters(settings: Settings) -> (Engine, Vec<Item>) {
+    use super::test_support::{heading, paragraph};
+    let mut items = vec![];
+    let mut pos = 0u32;
+    for index in 0..200 {
+        let item = if index % 20 == 0 {
+            heading(pos + 1, 1, "Chapter")
+        } else {
+            paragraph(pos + 1, LONG)
+        };
+        pos = item.to() + 1;
+        items.push(item);
+    }
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings);
+    engine.set_items(items.clone());
+    (engine, items)
+}
+
+/// types a letter into item `index`'s text
+fn type_into(engine: &mut Engine, items: &[Item], index: usize) {
+    let mut changed = items[index].clone();
+    if let Content::Text(text) = &mut changed.content {
+        text.text.insert(0, 'x');
+    }
+    engine.update(index, 1, vec![changed], 1);
+}
+
+#[test]
+fn redoes_the_bands_only_where_they_change() {
+    // typing into a chapter heading changes the chapters: the bands of
+    // every page are written again only if a slot shows {chapter}
+    let mut numbers = Settings::default();
+    numbers.footer.center = "{page}".into();
+    let (mut engine, items) = chapters(numbers);
+    let pages = engine.pages.len();
+    assert!(pages > 10);
+    type_into(&mut engine, &items, 100);
+    assert!(
+        engine.stats.bands_expanded <= 3,
+        "{}",
+        engine.stats.bands_expanded
+    );
+    let mut running = Settings::default();
+    running.header.left = "{chapter}".into();
+    let (mut engine, items) = chapters(running);
+    type_into(&mut engine, &items, 100);
+    assert_eq!(engine.stats.bands_expanded, engine.pages.len());
+}
+
+#[test]
+fn leaves_the_fragments_after_a_change_in_place() {
+    // typing into a paragraph moves no item: the fragments after it aren't
+    // rewritten, only spliced around
+    let (mut engine, items) = chapters(Settings::default());
+    type_into(&mut engine, &items, 101);
+    assert!(engine.stats.settled_at.is_some());
+    assert_eq!(engine.stats.frags_rewritten, 0);
+    // a new paragraph moves the items after it
+    engine.update(
+        50,
+        0,
+        vec![super::test_support::paragraph(items[50].from(), "new")],
+        5,
+    );
+    assert!(engine.stats.frags_rewritten > 0);
+}

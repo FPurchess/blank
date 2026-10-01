@@ -203,9 +203,17 @@ impl TextBox {
                 let PositionedLayoutItem::GlyphRun(run) = item else {
                     continue;
                 };
+                // a cluster's text with the marks and ligature parts that
+                // belong to it: a mark no font has is in the base letter's
+                // cluster, which Parley gives only the letter's text
+                let ranges = cluster_ranges(run.run());
                 for cluster in run.run().visual_clusters() {
                     if cluster.glyphs().any(|glyph| glyph.id == 0) {
-                        let range = cluster.text_range();
+                        let own = cluster.text_range();
+                        let range = ranges
+                            .iter()
+                            .find(|(known, _)| *known == own)
+                            .map_or(own, |(_, text)| text.clone());
                         for char in self.text[range].chars() {
                             if !char.is_whitespace()
                                 && !char.is_control()
@@ -898,5 +906,14 @@ mod tests {
         );
         let (end, _) = wrapped.line_end(0);
         assert_eq!(&wrapped.text[..(end - 1) as usize], "aaaa");
+    }
+
+    #[test]
+    fn tells_a_mark_no_font_has() {
+        // U+1AB5, a combining mark Blank's fonts lack, on an a: the a's
+        // cluster shows the missing glyph, and the mark is what's missing
+        let mut fonts = repository_fonts();
+        let boxed = TextBox::new(&mut fonts, &text("a\u{1AB5}b"), 300.0, Alignment::Start);
+        assert!(boxed.missing.contains(&'\u{1AB5}'), "{:?}", boxed.missing);
     }
 }

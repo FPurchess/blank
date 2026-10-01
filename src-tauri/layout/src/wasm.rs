@@ -147,7 +147,6 @@ impl LayoutEngine {
         })
     }
 
-    /// sets the page; the pages that changed, as `update` gives them
     /// an engine with the fonts of `other`, fallbacks added with `addFont`
     /// included, without copying their files, e.g. for an export; it has
     /// its own page, items and images
@@ -192,6 +191,7 @@ impl LayoutEngine {
             .unwrap_or_default()
     }
 
+    /// sets the page; the pages that changed, as `update` gives them
     #[wasm_bindgen(js_name = setSettings)]
     pub fn set_settings(&mut self, json: &str) -> Result<Vec<u32>, JsError> {
         let settings: Settings = serde_json::from_str(json).map_err(error)?;
@@ -281,7 +281,8 @@ impl LayoutEngine {
     }
 
     /// what a page shows: rectangles, images, links and glyph runs, of its
-    /// body and its header and footer
+    /// body and its header and footer. Deprecated: `pageBody` and
+    /// `pageBands` give them apart, with their own versions
     pub fn page(&mut self, page: u32) -> String {
         display(self.engine.page_ops(page as usize, true))
     }
