@@ -377,10 +377,11 @@ pub(super) fn table_units(
         let (y0, y1) = (tops[start], tops[end]);
         // the room the group has: on the pages the table goes on, that is
         // under its header rows, which repeat above it
-        let row_room = if header_rows > 0 && !header {
-            slice_room(false)
-        } else {
+        // and the first body row also under the caption, which stays with it
+        let row_room = if header {
             room
+        } else {
+            slice_room(start == header_rows)
         };
         if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
             for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
@@ -1170,5 +1171,50 @@ mod tests {
             "{:?}",
             started.elapsed()
         );
+    }
+
+    #[test]
+    fn keeps_the_caption_with_a_first_row_nearly_a_page_tall() {
+        use crate::model::Row;
+        // a first row that fits under the header row, but not under the
+        // caption as well: it was kept whole and moved on, leaving the
+        // caption alone on the page
+        let settings = crate::model::Settings::default();
+        let room = settings.content_bottom() - settings.content_top();
+        let mut checked = false;
+        for lines in 30..60 {
+            let tall = vec!["x"; lines].join("\n");
+            let rows = vec![
+                Row {
+                    cells: vec![cell(3, "Head")],
+                    header: true,
+                },
+                Row {
+                    cells: vec![cell(12, &tall)],
+                    header: false,
+                },
+            ];
+            let engine = test_support::engine(vec![table_item(rows, Some("Caption"))]);
+            let laid = &engine.laid[0];
+            let caption = laid.units[0].height;
+            let head = laid.units[1].height;
+            let row = laid.texts[1].height() + 2.0 * crate::style::CELL_PADDING_Y;
+            if !(row + head <= room && row + head + caption > room) {
+                continue;
+            }
+            checked = true;
+            let pages: Vec<usize> = (0..engine.frags.len())
+                .map(|frag| engine.pages.partition_point(|page| page.end <= frag))
+                .collect();
+            assert_eq!(
+                pages[0], pages[1],
+                "the caption and the header row: {pages:?}"
+            );
+            assert_eq!(
+                pages[1], pages[2],
+                "the header row and the first of the row: {pages:?}"
+            );
+        }
+        assert!(checked, "no row of the height");
     }
 }
