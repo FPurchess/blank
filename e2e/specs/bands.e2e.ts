@@ -279,4 +279,63 @@ describe("header and footer", () => {
       expect([selector, Math.abs(at - edge) <= 1]).toEqual([selector, true]);
     }
   });
+
+  it("names the placeholders that come out empty, in both views", async () => {
+    // no author, and no heading for a chapter
+    const file = path.join(fixtureDir, "unnamed.md");
+    fs.writeFileSync(
+      file,
+      '---\npage:\n  header: {left: "{author} {chapter}"}\n---\n\n',
+    );
+    await restartApp([file]);
+    await expect($("#page-view .page-canvas")).toBeExisting();
+    const names = (selector: string) =>
+      browser.execute(
+        (selector: string) =>
+          [...document.querySelectorAll(`${selector} .band-placeholder`)].map(
+            (name) => name.textContent,
+          ),
+        selector,
+      );
+    // above the text, where the header keeps its room
+    const header = $(".page-first-header");
+    await expect(header).toBeDisplayed();
+    expect(await names(".page-first-header")).toEqual(["Author", "Chapter"]);
+    await header.doubleClick();
+    await expect(strip()).toBeDisplayed();
+    await expect(strip()).toHaveElementClass("header");
+    await tool("Done").click();
+    await expect(strip()).not.toExist();
+    // which tells why it shows nothing on the page, and how to set an author
+    await expect($("#ui-announcement")).toHaveText(
+      expect.stringContaining(
+        "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as Text in Page Setup",
+      ),
+    );
+    // and on the sheet, in its top margin
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    await expect($(".page-band-names")).toBeDisplayed();
+    expect(await names(".page-band-names")).toEqual(["Author", "Chapter"]);
+    const margin = await browser.execute(() => {
+      const sheet = document
+        .querySelector('.page-frame[data-page="1"]')!
+        .getBoundingClientRect();
+      const name = document
+        .querySelector(".page-band-names")!
+        .getBoundingClientRect();
+      return { top: name.top - sheet.top, sheet: sheet.height };
+    });
+    expect(margin.top).toBeGreaterThan(0);
+    expect(margin.top).toBeLessThan(margin.sheet * 0.1);
+    await browser.saveScreenshot(
+      path.resolve(import.meta.dirname, "../screenshots/engine-unnamed.png"),
+    );
+    await $(".page-band.header").doubleClick();
+    await expect(strip()).toBeDisplayed();
+    await browser.keys(Key.Escape);
+    await expect(strip()).not.toExist();
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
+  });
 });

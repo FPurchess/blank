@@ -5,14 +5,16 @@ import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { FrameLayout } from "../engine/frames";
-import { pageLayoutState } from "../state";
+import { pageBandParts } from "../layout/placeholders";
+import { pageFields, pageLayout, pageLayoutState } from "../state";
+import BandSlots from "./BandSlots.vue";
 import { bandTitle, lastFooterPlace } from "./pageViewModel";
 
 // The last page's footer in "page ends", right below its text, where the
 // marks between the pages show the footers of the others: the last page
 // doesn't end in a mark, since the text goes on there. It isn't there when
-// the last page has no footer, so an empty document shows nothing but the
-// caret. The sheets of "pages" show every footer themselves.
+// the last page has no footer written, so an empty document shows nothing
+// but the caret; a placeholder that comes out empty shows its name. The sheets of "pages" show every footer themselves.
 const props = defineProps<{ layout: FrameLayout }>();
 const editor = useEditor();
 
@@ -28,16 +30,22 @@ const version = computed(
     pageLayoutState.value?.versions[page.value] ??
     0,
 );
-// the footer's slots as one string, read from the engine only where the
-// footer shows, and again only when the page or its version changes
+// the footer's slots, read from the engine only where the footer shows, and
+// again only when the page, its version, the page setup or the
+// placeholders' values change
 const slots = computed(() => {
   const engine = pageEngine;
   void version.value;
-  if (!engine || !here.value) return "";
-  return engine.bands(page.value).slice(3, 6).join("\u0000");
+  if (!engine || !here.value) return [];
+  return pageBandParts(
+    pageLayout.value.layout,
+    page.value,
+    page.value + 1,
+    pageFields.value,
+    engine.bands(page.value),
+  ).slice(3, 6);
 });
-const parts = computed(() => slots.value.split("\u0000"));
-const shown = computed(() => parts.value.some(Boolean));
+const shown = computed(() => slots.value.some((parts) => parts.length));
 
 // a double click opens its strip, which takes the focus
 const open = () => editor.run(editBand("footer"), { focus: false });
@@ -57,6 +65,6 @@ const open = () => editor.run(editBand("footer"), { focus: false });
     }"
     @dblclick="open"
   >
-    <span v-for="(slot, index) in parts" :key="index">{{ slot }}</span>
+    <BandSlots :slots="slots" />
   </div>
 </template>

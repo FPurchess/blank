@@ -1454,6 +1454,55 @@ $page-end-height: 64px + 2 * $band-gap;
   padding: $band-gap 0 0;
 }
 
+// a placeholder that comes out empty, e.g. {author} with no author set,
+// named in its place in the bands beside the pages and on the sheets: quiet,
+// in italics, as the strips show their placeholders as chips. Only the
+// screen shows it; the PDF and Word print nothing there.
+.band-placeholder {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+// the slots of a sheet's band that name a placeholder, over what the engine
+// painted there (sheetSlots in src/ui/pageViewModel.ts)
+.page-band-names {
+  position: absolute;
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--color);
+  pointer-events: none;
+
+  &.center {
+    text-align: center;
+  }
+
+  &.right {
+    text-align: right;
+  }
+
+  .band-placeholder {
+    opacity: 0.45;
+  }
+
+  // the text the engine painted only keeps the names in their places
+  .painted {
+    visibility: hidden;
+  }
+
+  // beside painted text, a name goes where its placeholder is and takes no
+  // room, so the text stays where it was painted
+  &:not(.named) .band-placeholder {
+    position: absolute;
+
+    // the width of the space before it, which painted text leaves out
+    &.spaced {
+      margin-left: 0.26em;
+    }
+  }
+}
+
 // the header and footer margins of a sheet, and the bands where a page
 // ends: a click opens the strip of the band
 .page-band {

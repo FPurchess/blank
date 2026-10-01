@@ -12,6 +12,7 @@ import {
   pageLabel,
   propertiesPlace,
   scrollFor,
+  sheetSlots,
   viewAnchor,
 } from "./pageViewModel";
 
@@ -134,6 +135,50 @@ describe("lastFooterPlace", () => {
     expect(
       lastFooterPlace({ ...pageEnds, footerRoom: 52, frames: [] }),
     ).toBeNull();
+  });
+});
+
+describe("sheetSlots", () => {
+  it("places the slots that name a placeholder where the engine sets them", () => {
+    const page = {
+      width: 600,
+      height: 800,
+      margins: { top: 72, right: 60, bottom: 72, left: 60 },
+    };
+    const none: { text: string }[] = [];
+    const slots = sheetSlots(
+      [
+        [{ field: "author" }],
+        none,
+        [{ text: "x" }],
+        none,
+        [{ text: "by " }, { field: "author" }],
+        none,
+      ],
+      page,
+      2,
+    );
+    // a third of the text's width each, at 8.8 pt
+    expect(slots).toEqual([
+      expect.objectContaining({
+        key: 0,
+        slot: "left",
+        named: true,
+        left: 120,
+        top: 72,
+        width: 320,
+        size: 17.6,
+      }),
+      expect.objectContaining({
+        key: 4,
+        slot: "center",
+        named: false,
+        left: 440,
+        // the footer as far above the bottom edge as the header is below the
+        // top: 800 - 36 - 8.8 * 1.3
+        top: expect.closeTo((800 - 36 - 8.8 * 1.3) * 2, 6),
+      }),
+    ]);
   });
 });
 
