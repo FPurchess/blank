@@ -76,6 +76,22 @@ describe("main", () => {
       expect(order).toEqual([...order].sort((a, b) => a - b));
     },
   );
+  it("boots the editor and the UI while the engine still loads", async () => {
+    const engine = deferred();
+    vi.mocked(bootEngine).mockReturnValue(engine.promise as never);
+
+    await importMain();
+    await flushPromises();
+
+    expect(bootEditor).toHaveBeenCalled();
+    expect(bootUI).toHaveBeenCalled();
+    // the hidden editor stays hidden: the pages come once it's laid out
+    expect(document.body.classList).not.toContain("without-engine");
+    engine.resolve();
+    await flushPromises();
+    expect(document.body.classList).not.toContain("without-engine");
+  });
+
   it("lets the editor show the text if the engine can't load", async () => {
     vi.mocked(bootEngine).mockRejectedValue(new Error("no wasm"));
 
