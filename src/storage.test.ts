@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
 import { schema } from "./markdown";
@@ -33,6 +33,15 @@ const bootFresh = async () => {
 };
 
 describe("storage", () => {
+  // The first import of the state graph (markdown-it, ProseMirror, every
+  // state module) transforms them, about 200 ms here and many times that on
+  // a loaded machine. bootFresh imports them again after vi.resetModules,
+  // which only evaluates them, so pay the first import once, here, with a
+  // timeout of its own, rather than in whichever test runs first.
+  beforeAll(async () => {
+    await Promise.all([import("./state"), import("./storage")]);
+  }, 60_000);
+
   beforeEach(async () => {
     await localforage.clear();
     closeHandler = undefined;

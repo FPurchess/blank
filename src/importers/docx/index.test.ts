@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import {
   markdownSerializer,
@@ -68,7 +68,18 @@ const setCore = (bytes: Uint8Array, title: string, author: string) =>
 const PNG = dataUrl("image/png", IMAGES.png);
 
 describe("importers.docx", () => {
-  describe("round trip through the Word export", () => {
+  // The first Word export and import load docx and mammoth
+  // (src/exporters/docx/index.ts, ./index.ts) and set them up: about 350 ms
+  // here, against 110 ms for each one after it, and many times that on a
+  // loaded machine. Pay that once, here, with a timeout of its own, rather
+  // than in whichever test runs first.
+  beforeAll(async () => {
+    await roundTrip("warm up");
+  }, 60_000);
+
+  // each test writes a .docx and reads it back through docx, JSZip and
+  // mammoth, about 110 ms here; give them room on a machine under heavy load
+  describe("round trip through the Word export", { timeout: 20_000 }, () => {
     it.each([
       ["a pipe table", "| Name | Qty |\n| ---- | --- |\n| a    | 1   |"],
       [
