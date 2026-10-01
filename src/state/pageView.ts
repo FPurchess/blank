@@ -22,7 +22,7 @@ export interface PageLayoutState {
   // changes when what a page shows changes, so only those pages are
   // painted again
   versions: Uint32Array;
-  // the versions of each page's text and of its header and footer, which change apart (see SEAM.md)
+  // the versions of each page's text and of its header and footer, which change apart (see .claude/rules/layout-engine.md)
   bodyVersions?: Uint32Array;
   bandVersions?: Uint32Array;
   // where the text of each page ends, from its top edge
@@ -50,7 +50,7 @@ export interface PageRect {
 // the caret, null while the selection isn't empty or a node is selected
 export const pageCaret = shallowRef<PageRect | null>(null);
 
-// where the selection's head is painted, with its line's affinity (see SEAM.md S1), e.g. for the input method's window; null without pages
+// where the selection's head is painted, with its line's affinity (see .claude/rules/layout-engine.md), e.g. for the input method's window; null without pages
 export const pageHeadBox = shallowRef<PageRect | null>(null);
 
 // the selection's rectangles, empty while it is a caret: the text of a

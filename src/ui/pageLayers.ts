@@ -2,7 +2,7 @@ import type { PageDisplay, PageEngine } from "../engine/engine";
 import type { PageLayoutState } from "../state";
 
 // The two layers of a painted page: its text (the body) and its header and
-// footer (the bands), which the engine versions apart (S6 in SEAM.md), so a
+// footer (the bands), which the engine versions apart (see .claude/rules/layout-engine.md), so a
 // change of one paints only that layer, e.g. {pages} in every footer when a
 // page is added.
 

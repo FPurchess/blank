@@ -13,7 +13,7 @@ default = ["test-hooks"]
 # what only tests use: Engine::words and the wasm's words() and stats().
 # scripts/build-engine.sh builds with the default features, and the TS tests
 # use both; a production build without them needs --no-default-features and
-# a separate build for the tests (see SEAM.md)
+# a separate build for the tests (see .claude/rules/layout-engine.md)
 test-hooks = []
 
 # the exactness tests compare the PDF with Engine::words

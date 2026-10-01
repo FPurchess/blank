@@ -48,7 +48,7 @@ export type EngineCellBlock =
 export interface EngineCell {
   // the cell's paragraphs, when it holds nothing else
   paragraphs: EngineText[];
-  // what it holds otherwise: lists, quotes and images, see SEAM.md S2
+  // what it holds otherwise: lists, quotes and images, see .claude/rules/layout-engine.md
   blocks?: EngineCellBlock[];
   header: boolean;
   align?: string;
