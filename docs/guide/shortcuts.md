@@ -4,20 +4,20 @@
 
 ## Files
 
-| Command                                         | Shortcut          |
-| ----------------------------------------------- | ----------------- |
-| New file                                        | `Mod` `N`         |
-| Open file                                       | `Mod` `O`         |
-| Save                                            | `Mod` `S`         |
-| Save as                                         | `Mod` `Shift` `S` |
-| Export as PDF                                   | `Mod` `Alt` `P`   |
-| Export as Word                                  | `Mod` `Alt` `W`   |
-| Page setup                                      | `Mod` `Alt` `U`   |
-| Edit header                                     | `Mod` `Alt` `H`   |
-| Edit footer                                     | `Mod` `Alt` `F`   |
-| [Pages or page ends](./pages#on-the-screen)     | `Mod` `Alt` `V`   |
-| Cycle themes                                    | `Mod` `Alt` `T`   |
-| Choose language                                 | `Mod` `Alt` `L`   |
+| Command                                     | Shortcut          |
+| ------------------------------------------- | ----------------- |
+| New file                                    | `Mod` `N`         |
+| Open file                                   | `Mod` `O`         |
+| Save                                        | `Mod` `S`         |
+| Save as                                     | `Mod` `Shift` `S` |
+| Export as PDF                               | `Mod` `Alt` `P`   |
+| Export as Word                              | `Mod` `Alt` `W`   |
+| Page setup                                  | `Mod` `Alt` `U`   |
+| Edit header                                 | `Mod` `Alt` `H`   |
+| Edit footer                                 | `Mod` `Alt` `F`   |
+| [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`   |
+| Cycle themes                                | `Mod` `Alt` `T`   |
+| Choose language                             | `Mod` `Alt` `L`   |
 
 ## Editing
 
@@ -31,18 +31,20 @@
 
 ## Blocks
 
-| Command           | Shortcut        |
-| ----------------- | --------------- |
-| Paragraph         | `Mod` `0`       |
-| Heading 1 – 6     | `Mod` `1` … `6` |
-| Bullet list       | `Mod` `8`       |
-| Numbered list     | `Mod` `9`       |
-| Indent list item  | `Tab`           |
-| Outdent list item | `Shift` `Tab`   |
-| Blockquote        | `Mod` `G`       |
-| Horizontal line   | `Mod` `H`       |
-| Page break        | `Mod` `Enter`   |
-| Table             | `Mod` `T`       |
+| Command            | Shortcut        |
+| ------------------ | --------------- |
+| Paragraph          | `Mod` `0`       |
+| Heading 1 – 6      | `Mod` `1` … `6` |
+| Bullet list        | `Mod` `8`       |
+| Numbered list      | `Mod` `9`       |
+| Indent list item   | `Tab`           |
+| Outdent list item  | `Shift` `Tab`   |
+| Indent code lines  | `Tab`           |
+| Outdent code lines | `Shift` `Tab`   |
+| Blockquote         | `Mod` `G`       |
+| Horizontal line    | `Mod` `H`       |
+| Page break         | `Mod` `Enter`   |
+| Table              | `Mod` `T`       |
 
 ## Tables
 
