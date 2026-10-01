@@ -47,10 +47,10 @@ const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
       exposePerf();
       exposeEngineHooks();
     }
-    // the page view's layout engine loads while the rest boots; the editor
-    // lays out its document once it's there. Without it, the editor shows
-    // the text itself.
-    const engine = bootEngine().then(
+    // the page view's layout engine loads while the rest boots, and the
+    // editor lays out its document once it's there (see pageSync). Without
+    // it, the editor shows the text itself.
+    void bootEngine().then(
       () => bootMark("engine"),
       (error: unknown) => {
         console.error("failed to load the layout engine", error);
@@ -62,9 +62,11 @@ const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
     bootMark("config");
     await bootStorage();
     bootMark("storage");
-    // the engine compiles best while nothing else runs, before the editor
-    // renders its document
-    await engine;
+    // not waiting for the engine: the editor and the UI mount while it loads
+    // (fetching its wasm takes ~120 ms, compiling it ~15 ms), and the pages
+    // show once it laid the document out. Measured in the debug app on a
+    // quiet machine: the pages show ~50 ms sooner (~575 ms after the window
+    // opens instead of ~630), and the hidden editor is never shown meanwhile.
     const editor = await bootEditor();
     bootMark("editor");
     editorReady = true;
