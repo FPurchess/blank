@@ -198,4 +198,75 @@ describe("header and footer", () => {
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("page-ends");
   });
+
+  it("lines the bands up with the text where pages end", async () => {
+    const file = path.join(fixtureDir, "aligned.md");
+    fs.writeFileSync(
+      file,
+      [
+        "---",
+        "page:",
+        "  header: {left: '{title}', right: 'draft'}",
+        "  footer: {left: 'left foot', right: 'right foot'}",
+        "---",
+        "",
+        "# report",
+        "",
+        ...Array.from(
+          { length: 40 },
+          () =>
+            "Writing is thinking on paper, and every line of it ends where the layout says.\n",
+        ),
+      ].join("\n"),
+    );
+    await restartApp([file]);
+    await expect($(".page-end .band.footer")).toBeExisting();
+    const edges = await browser.execute(() => {
+      const geometry = (
+        window as unknown as {
+          blankGeometry: {
+            find: (text: string) => number;
+            caretBox: (pos: number) => { left: number } | null;
+          };
+        }
+      ).blankGeometry;
+      // where the page's text starts, and its column ends: "page ends"
+      // shows as much room beside it on both sides
+      const left = geometry.caretBox(geometry.find("Writing"))!.left;
+      const frame = document
+        .querySelector('.page-frame[data-page="1"]')!
+        .getBoundingClientRect();
+      const right = frame.right - (left - frame.left);
+      // where each slot's text is drawn
+      const text = (selector: string) => {
+        const slot = document.querySelector(selector)!;
+        const range = document.createRange();
+        range.selectNodeContents(slot);
+        const rect = range.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+      };
+      return {
+        left,
+        right,
+        slots: [
+          [".page-first-header span:first-child", "left"],
+          [".page-end .band.footer span:first-child", "left"],
+          [".page-end .band.header span:first-child", "left"],
+          [".page-first-header span:last-child", "right"],
+          [".page-end .band.footer span:last-child", "right"],
+          [".page-end .band.header span:last-child", "right"],
+          // the number of a page whose footer doesn't show it
+          [".page-end .line .number", "right"],
+        ].map(([selector, side]) => ({
+          selector,
+          side,
+          at: text(selector)[side as "left" | "right"],
+        })),
+      };
+    });
+    for (const { selector, side, at } of edges.slots) {
+      const edge = side === "left" ? edges.left : edges.right;
+      expect([selector, Math.abs(at - edge) <= 1]).toEqual([selector, true]);
+    }
+  });
 });

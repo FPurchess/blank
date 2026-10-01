@@ -50,6 +50,7 @@ From the self-review (the integrator's order; M1 is with engine-editor):
 - [x] 7. The bitmap cache is cleared once the engine is missing (`engineMissing`) and keeps one bitmap per page layer and scale, the newest
 - [x] 8. Less work per key: the first header reads the engine only when page 1's band version changes and only in "page ends", and the overlay reads its layer before the refs
 - [x] 9. "Page N of M" shows the physical position (the owner's choice); a stable, visually hidden live region (`#ui-page-spoken`) says only "Page N" when the page changes (`StatusBars.test.ts` lists it in the bar)
+- [x] The integrator's band spacing (BAND_GAP 32): looked at in both views and all six themes; the hover over page 1's header and the page-end bands now covers their line of text only, and the page number where a page ends ends where the text does. `bands.e2e.ts` checks that every band's left and right slot, and the number, are within 1 px of the text's edges.
 - [ ] 10. layerOf in a .ts module, frameRenders behind `__TEST_HOOKS__`, one colour cache, the page-break opacity as a theme variable, the rule file's wording
 - [ ] 11. The test gaps
 - [x] 5. The IME aligns at `pageHeadBox`, the head as the plugin paints it, with its line's affinity (on the base since 194178c)

@@ -1384,9 +1384,8 @@ $page-end-height: 64px + 2 * $band-gap;
     @extend %page-band-text;
   }
 
-  // the dashed line, fainter than the text on it, which keeps the opacity
-  // of the mark
-  // the space between the footer and the header, with the line in its middle
+  // the space between the footer and the header, with the dashed line in
+  // its middle, fainter than the text on it, which keeps the mark's opacity
   .line {
     position: relative;
     flex: 1;
@@ -1401,9 +1400,11 @@ $page-end-height: 64px + 2 * $band-gap;
       opacity: 0.6;
     }
 
+    // its digits end where the text does; the padding covers the dashes
+    // around them
     .number {
       position: absolute;
-      right: var(--band-inset, 24px);
+      right: calc(var(--band-inset, 24px) - 0.5em);
       top: calc(50% - 0.7em);
       padding: 0 0.5em;
       background-color: var(--background-color);
@@ -1425,8 +1426,11 @@ $page-end-height: 64px + 2 * $band-gap;
   opacity: $faint-text-opacity;
   cursor: pointer;
 
+  // over its line of text, as the bands where a page ends, not the gap
+  // below it
   &:hover {
     background-color: color-mix(in srgb, var(--color) 8%, transparent);
+    background-clip: content-box;
   }
 }
 
@@ -1457,6 +1461,9 @@ $page-end-height: 64px + 2 * $band-gap;
 
   &:hover {
     background-color: color-mix(in srgb, var(--color) 8%, transparent);
+    // over its line of text, between the insets that line it up with the
+    // page's text
+    background-clip: content-box;
   }
 }
 
