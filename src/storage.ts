@@ -6,6 +6,7 @@ import { type Ref, watch } from "vue";
 import {
   importedFrom,
   language,
+  outlinePinned,
   PAGE_VIEW_MODES,
   pageView,
   type PageViewMode,
@@ -151,6 +152,10 @@ export const bootStorage = async () => {
     ? (_pageView as PageViewMode)
     : "page-ends";
   persist(pageView, "pageView");
+
+  // the outline closed until the user keeps it open
+  outlinePinned.value = (await localforage.getItem("outline")) === true;
+  persist(outlinePinned, "outline");
 
   watch(
     transaction,

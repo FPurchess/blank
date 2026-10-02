@@ -2,10 +2,12 @@ import type { Node } from "prosemirror-model";
 import { NodeSelection } from "prosemirror-state";
 import { TableMap } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
+import { computed } from "vue";
 
 import {
   type PageLayoutState,
   pageLayoutState,
+  pageScrollRequest,
   pageView,
   type PageViewMode,
   type PageViewport,
@@ -79,20 +81,43 @@ const framesNow = (): {
   const state = pageLayoutState.value;
   const viewport = pageViewport.value;
   if (!state || !viewport) return null;
-  const mode = pageView.value;
+  return { frames: framesAt(state, pageView.value, viewport.width), viewport };
+};
+
+/**
+ * framesAt returns where the page view shows the pages of `state` at
+ * `width`, the same layout while they stay the same
+ */
+const framesAt = (
+  state: PageLayoutState,
+  mode: PageViewMode,
+  width: number,
+) => {
   if (
     cached?.state !== state ||
     cached.mode !== mode ||
-    cached.width !== viewport.width
+    cached.width !== width
   ) {
-    cached = {
-      state,
-      mode,
-      width: viewport.width,
-      frames: frameLayout(state, mode, viewport.width),
-    };
+    cached = { state, mode, width, frames: frameLayout(state, mode, width) };
   }
-  return { frames: cached.frames, viewport };
+  return cached.frames;
+};
+
+// the page view's width alone, which notifies only when it changes, not on
+// every scroll as pageViewport does
+const viewWidth = computed(() => pageViewport.value?.width ?? null);
+
+/**
+ * deskFrames returns where the page view shows the pages, like framesNow,
+ * without following the scrolling: a computed that measures with it isn't
+ * worked out again on every scroll
+ */
+const deskFrames = (): FrameLayout | null => {
+  const state = pageLayoutState.value;
+  const width = viewWidth.value;
+  return state && width !== null
+    ? framesAt(state, pageView.value, width)
+    : null;
 };
 
 // the editor, which the geometry measures without the engine
@@ -411,6 +436,88 @@ export const tablePositions = (doc: Node) => {
 };
 
 /**
+ * scrollTops returns where the text at each of `positions` starts, in the
+ * coordinates of what scrolls: the page view's desk, or the document while
+ * the editor shows the text itself; null for a position that isn't laid out.
+ * It doesn't follow the scrolling, so it's worked out once per layout.
+ */
+export const scrollTops = (positions: readonly number[]): (number | null)[] => {
+  const view = measured();
+  if (view)
+    return positions.map((pos) => {
+      const box = shownCaret(view, pos, false);
+      return box ? box.top + window.scrollY : null;
+    });
+  const frames = deskFrames();
+  const engine = pageEngine;
+  if (!frames || !engine) return positions.map(() => null);
+  return positions.map((pos) => {
+    const caret = engine.caret(pos);
+    return caret ? (onDesk(frames, caret)?.top ?? null) : null;
+  });
+};
+
+/**
+ * pageTops returns where each page starts on the page view's desk, in order;
+ * null while no pages show, as without the engine. Like scrollTops, it
+ * doesn't follow the scrolling.
+ */
+export const pageTops = (): number[] | null =>
+  measured() ? null : (deskFrames()?.frames.map((frame) => frame.top) ?? null);
+
+/**
+ * scrollState returns how far what shows the text is scrolled, how high it
+ * is and how far it can scroll; null while nothing shows it
+ */
+export const scrollState = (): {
+  top: number;
+  height: number;
+  max: number;
+} | null => {
+  if (measured()) {
+    const height = window.innerHeight;
+    return {
+      top: window.scrollY,
+      height,
+      max: Math.max(0, document.documentElement.scrollHeight - height),
+    };
+  }
+  const viewport = pageViewport.value;
+  const frames = deskFrames();
+  if (!viewport || !frames) return null;
+  return {
+    top: viewport.scrollTop,
+    height: viewport.height,
+    max: Math.max(0, frames.height - viewport.height),
+  };
+};
+
+/**
+ * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
+ * top of the view, as far as the view scrolls, without moving the selection
+ */
+export const scrollToText = (pos: number, at: number) => {
+  const view = measured();
+  if (view) {
+    const box = shownCaret(view, pos, false);
+    if (box) window.scrollBy({ top: box.top - at });
+    return;
+  }
+  const caret = pageEngine?.caret(pos);
+  // a new request each time, which the page view serves once
+  if (caret) pageScrollRequest.value = { ...caret, at };
+};
+
+/**
+ * scrollViewBy scrolls what shows the text by `dy` pixels, e.g. for a wheel
+ * turned over the outline
+ */
+export const scrollViewBy = (dy: number) => {
+  if (measured()) window.scrollBy({ top: dy });
+  else document.getElementById("page-view")?.scrollBy({ top: dy });
+};
+
+/**
  * exposeGeometry lets E2E tests measure the pages as the page view shows
  * them, through `window.blankGeometry`, since what is painted has no DOM
  * @param view the editor
@@ -427,6 +534,10 @@ export const exposeGeometry = (view: EditorView) => {
       rangeRects,
       blockBoxes,
       hitAt,
+      // where the text at positions starts, and how far the view scrolled,
+      // e.g. where the outline's jumps land
+      scrollTops,
+      scrollState,
       tables: () => tablePositions(doc()).map(({ pos }) => tableGeometry(pos)),
       find: (text: string, index = 0) => findText(doc(), text, index),
       // whether the engine is still laying out the rest of a long document

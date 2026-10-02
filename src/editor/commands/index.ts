@@ -13,3 +13,4 @@ export { tableKey } from "./table";
 export { default as pageSetup, openPageSetup } from "./pageSetup";
 export { editBand, openBand } from "./editBand";
 export { togglePageView } from "./pageView";
+export { showOutline } from "./outline";

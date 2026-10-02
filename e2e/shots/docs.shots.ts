@@ -559,6 +559,61 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "page-views.gif"), 545);
   });
 
+  it("records the outline", async () => {
+    const film = await filmNew();
+    const story = [
+      ["h1", "The lighthouse"],
+      ["h2", "The keeper"],
+      ["h2", "The lamp"],
+      ["h1", "The storm"],
+      ["h2", "The night"],
+      ["h2", "The ship"],
+      ["h1", "The morning"],
+    ]
+      .map(
+        ([tag, title]) =>
+          `<${tag}>${title}</${tag}>` +
+          "<p>The keeper climbed the stairs every evening, lit the lamp and wrote down the weather, the ships and the wind.</p>".repeat(
+            4,
+          ),
+      )
+      .join("");
+    await paste({ "text/html": story });
+    await browser.execute(() => {
+      document.querySelector("#page-view")!.scrollTop = 0;
+    });
+    await film.pause(1);
+    const centre = (selector: string, text?: string) =>
+      browser.execute(
+        (selector, text) => {
+          const element = [...document.querySelectorAll(selector)].find(
+            (found) => !text || found.textContent?.trim() === text,
+          )!;
+          const box = element.getBoundingClientRect();
+          return {
+            x: Math.round(box.left + box.width / 2),
+            y: Math.round(box.top + box.height / 2),
+          };
+        },
+        selector,
+        text,
+      );
+    // pointing at the dashes shows the headings, a click scrolls to one
+    await film.moveTo(await centre(".outline-dashes"), 1);
+    await film.pause(1.2);
+    await film.moveTo(await centre(".outline-entry", "The storm"), 0.8);
+    await film.click(1.6);
+    // away again, and the list goes with the pointer
+    await film.moveTo({ x: 400, y: 300 }, 0.6);
+    await film.hidePointer();
+    await film.pause(0.6);
+    // the shortcut opens it and puts it away
+    await film.shortcut(["Mod", "Alt", "O"], () => pressMod(Key.Alt, "o"), 1.8);
+    await film.shortcut(["Mod", "Alt", "O"], () => pressMod(Key.Alt, "o"), 1);
+    await film.pause(0.6);
+    film.save(path.join(outDir, "outline.gif"), 545);
+  });
+
   it("captures a page break", async () => {
     await pressMod("n");
     await type("the end of the first chapter.");

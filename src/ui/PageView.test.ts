@@ -34,6 +34,7 @@ import { testLayout } from "../test/layout";
 import { hasBand } from "../layout/placeholders";
 import { bootApp } from "./mount";
 import { viewAnchor } from "./pageViewModel";
+import { READING_LINE } from "./readingLine";
 import { alignHiddenEditor } from "../editor/hidden";
 
 vi.mock("../editor/hidden", () => ({ alignHiddenEditor: vi.fn() }));
@@ -602,10 +603,21 @@ describe("page view", () => {
     vi.useRealTimers();
   });
 
-  it("shows the page of the caret in the bottom bar", async () => {
+  it("shows the page in view in the bottom bar, wherever the caret is", async () => {
     layOut();
     dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
-    pageCaret.value = { page: 1, x: 100, y: 100, width: 0, height: 20 };
+    await nextTick();
+    expect(
+      document.getElementById("ui-page-number")!.textContent!.trim(),
+    ).toMatch(/^Page 1 of \d+$/);
+    // scrolled until the second page reaches the reading line
+    const viewport = pageViewport.value!;
+    const second = frameLayout(
+      pageLayoutState.value!,
+      pageView.value,
+      viewport.width,
+    ).frames[1];
+    pageViewport.value = { ...viewport, scrollTop: second.top - READING_LINE };
     await nextTick();
     const status = document.getElementById("ui-page-number")!;
     expect(status.textContent!.trim()).toMatch(/^Page 2 of \d+$/);

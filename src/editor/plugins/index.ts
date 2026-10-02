@@ -16,3 +16,4 @@ export {
   tableTools,
   tableView,
 } from "./tables";
+export { headings } from "./headings";

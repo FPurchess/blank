@@ -1,8 +1,8 @@
-// Line icons for the table toolbar, drawn on a 20 × 20 grid with round ends
-// in the text colour, so they follow the theme. IconGlyph (src/ui/components)
-// draws them.
+// Line icons for the table toolbar and the outline, drawn on a 20 × 20 grid
+// with round ends in the text colour, so they follow the theme. IconGlyph
+// (src/ui/components) draws them.
 
-const TABLE_ICONS: Record<string, string> = {
+const ICONS: Record<string, string> = {
   "row-above": "M4 9h12v8H4z M4 13h12 M10 2v5 M7.5 4.5h5",
   "row-below": "M4 3h12v8H4z M4 7h12 M10 13v5 M7.5 15.5h5",
   "row-delete": "M4 9h12v8H4z M4 13h12 M7.5 4.5h5",
@@ -25,11 +25,13 @@ const TABLE_ICONS: Record<string, string> = {
   "widths-reset":
     "M3 4v12 M17 4v12 M6 10h8 M8 7.5 5.5 10 8 12.5 M12 7.5l2.5 2.5-2.5 2.5",
   "table-delete": "M4 6h12 M8 6V4h4v2 M6 6l1 10h6l1-10 M9 9v4.5 M11 9v4.5",
+  // the outline's: put it away
+  close: "M5.5 5.5l9 9 M14.5 5.5l-9 9",
 };
 
 /**
  * iconPath returns the SVG path of the icon `name`, drawn on a 20 × 20 grid
  */
-export const iconPath = (name: string) => TABLE_ICONS[name] ?? "";
+export const iconPath = (name: string) => ICONS[name] ?? "";
 
-export const iconNames = Object.keys(TABLE_ICONS);
+export const iconNames = Object.keys(ICONS);
