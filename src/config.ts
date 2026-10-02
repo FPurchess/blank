@@ -247,8 +247,8 @@ const getUserConfig = async (): Promise<Record<string, unknown>> => {
 };
 
 /**
- * mergeKeymap takes the user's bindings that are strings and keeps the
- * defaults for the rest
+ * mergeKeymap takes the user's bindings of known commands that are strings
+ * and keeps the defaults for the rest
  */
 const mergeKeymap = (user: unknown, problems: string[]): Config["keymap"] => {
   const keymap = { ...defaultConfig.keymap };
@@ -258,7 +258,12 @@ const mergeKeymap = (user: unknown, problems: string[]): Config["keymap"] => {
     return keymap;
   }
   for (const [command, binding] of Object.entries(user)) {
-    if (typeof binding !== "string") {
+    // a command Blank doesn't know, e.g. a typo, would bind nothing; own
+    // keys only, since JSON.parse makes "__proto__" one
+    if (
+      typeof binding !== "string" ||
+      !Object.hasOwn(defaultConfig.keymap, command)
+    ) {
       problems.push(`keymap.${command}`);
       continue;
     }

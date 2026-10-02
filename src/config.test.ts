@@ -198,6 +198,22 @@ describe("config", () => {
       );
     });
 
+    it("reports bindings of commands it doesn't know, in the file's order", async () => {
+      await bootWith(
+        '{"keymap": {"format.bolt": "Mod-b", "format.bold": 42, ' +
+          '"__proto__": "Mod-p", "toString": "Mod-t", "format.italic": "Mod-j"}}',
+      );
+
+      expect(getKeyBinding(CommandIdentifier.FORMAT_ITALIC)).toBe("Mod-j");
+      expect(Object.keys(config.value.keymap)).not.toContain("format.bolt");
+      expect(Object.hasOwn(config.value.keymap, "toString")).toBe(false);
+      expect(Object.getPrototypeOf(config.value.keymap)).toBe(Object.prototype);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: keymap.format.bolt, " +
+          "keymap.format.bold, keymap.__proto__, keymap.toString",
+      );
+    });
+
     it("keeps the default for autocorrect settings of the wrong type", async () => {
       await bootWith(
         JSON.stringify({
