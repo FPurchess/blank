@@ -211,10 +211,7 @@ fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, S
         .status()
     {
         Ok(status) => status,
-        Err(_) if std::env::var_os("CI").is_some() => {
-            panic!("pdftotext is missing: install poppler-utils, CI doesn't skip the comparison")
-        }
-        Err(_) => return None,
+        Err(_) => return missing_tool("pdftotext", "poppler-utils"),
     };
     assert!(status.success());
     let html = std::fs::read_to_string(&out).unwrap();
@@ -424,7 +421,8 @@ fn the_pdf_holds_tables_with_lists_and_quotes() {
 }
 
 /// what a missing tool means: on CI a failure, as there the checks must
-/// run, and else a skip
+/// run, and else a skip (`poppler` in src/pdf.rs does the same for the unit
+/// tests, which can't reach this)
 fn missing_tool<T>(tool: &str, package: &str) -> Option<T> {
     if std::env::var_os("CI").is_some() {
         panic!("{tool} is missing: install {package}, CI doesn't skip the check");

@@ -757,22 +757,47 @@ mod tests {
         }
     }
 
-    /// the plain text of a PDF, if pdftotext is there; on CI it must be
+    /// runs a tool of poppler-utils with `args`, if it is there; on CI it
+    /// must be, so the checks can't pass by skipping (`missing_tool` in
+    /// tests/exact.rs, which can't share this, does the same)
+    fn poppler(tool: &str, args: &[&std::ffi::OsStr]) -> Option<std::process::Output> {
+        match std::process::Command::new(tool).args(args).output() {
+            Ok(out) => {
+                assert!(
+                    out.status.success(),
+                    "{tool} failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                Some(out)
+            }
+            Err(_) if std::env::var_os("CI").is_some() => {
+                panic!("{tool} is missing: install poppler-utils, CI doesn't skip the check")
+            }
+            Err(_) => None,
+        }
+    }
+
+    /// the PDF's structure as pdfinfo shows it, if pdfinfo is there
+    fn structure_of(pdf: &[u8], name: &str) -> Option<String> {
+        let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
+        std::fs::write(&path, pdf).unwrap();
+        let out = poppler("pdfinfo", &["-struct-text".as_ref(), path.as_os_str()])?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// the plain text of a PDF, if pdftotext is there
     fn text_of(pdf: &[u8], name: &str) -> Option<String> {
         let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
         std::fs::write(&path, pdf).unwrap();
-        let out = std::process::Command::new("pdftotext")
-            .args(["-enc", "UTF-8"])
-            .arg(&path)
-            .arg("-")
-            .output();
-        let out = match out {
-            Ok(out) => out,
-            Err(_) if std::env::var_os("CI").is_some() => {
-                panic!("pdftotext is missing: install poppler-utils, CI doesn't skip the check")
-            }
-            Err(_) => return None,
-        };
+        let out = poppler(
+            "pdftotext",
+            &[
+                "-enc".as_ref(),
+                "UTF-8".as_ref(),
+                path.as_os_str(),
+                "-".as_ref(),
+            ],
+        )?;
         Some(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 
@@ -1015,16 +1040,9 @@ mod tests {
             );
         }
         let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
-        let path = std::env::temp_dir().join("blank-layout-unit-repeats.pdf");
-        std::fs::write(&path, pdf).unwrap();
-        let Ok(out) = std::process::Command::new("pdfinfo")
-            .arg("-struct-text")
-            .arg(&path)
-            .output()
-        else {
+        let Some(structure) = structure_of(&pdf, "repeats") else {
             return;
         };
-        let structure = String::from_utf8_lossy(&out.stdout);
         assert_eq!(structure.matches("\"Heading\"").count(), 1, "{structure}");
     }
 
@@ -1086,16 +1104,9 @@ mod tests {
             },
         );
         let pdf = write(&mut engine, &images, &info()).unwrap();
-        let path = std::env::temp_dir().join("blank-layout-unit-listed-image.pdf");
-        std::fs::write(&path, pdf).unwrap();
-        let Ok(out) = std::process::Command::new("pdfinfo")
-            .arg("-struct-text")
-            .arg(&path)
-            .output()
-        else {
+        let Some(structure) = structure_of(&pdf, "listed-image") else {
             return;
         };
-        let structure = String::from_utf8_lossy(&out.stdout);
         let body = structure.find("LBody").expect("a list item");
         assert!(structure[..body].contains("Lbl"), "{structure}");
         assert!(structure[body..].contains("Figure"), "{structure}");
