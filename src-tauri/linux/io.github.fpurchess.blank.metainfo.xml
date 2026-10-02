@@ -76,6 +76,12 @@
   </screenshots>
 
   <releases>
+    <release version="3.0.0" date="2026-10-02">
+      <url type="details">https://github.com/FPurchess/blank/releases/tag/v3.0.0</url>
+      <description>
+        <p>Blank now lays out real pages with its own layout engine, so the screen shows exactly what the PDF will be. It adds tables (with a toolbar, mouse handles and pasting from spreadsheets), page setup with paper, orientation and margins, page breaks, headers, footers and page numbers, and keeps the frontmatter, exporting title and author to PDF and Word.</p>
+      </description>
+    </release>
     <release version="2.1.0" date="2026-09-26">
       <url type="details">https://github.com/FPurchess/blank/releases/tag/v2.1.0</url>
       <description>

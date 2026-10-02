@@ -25,13 +25,13 @@ The small things take care of themselves. Quotes curl, dashes find their length,
 
 Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it.
 
-What you see is what you print. Blank sets your text in pages as you write, and every line and every page ends on the screen exactly where it ends in the PDF, headers, footers and page numbers included. [See your pages](https://fpurchess.github.io/blank/guide/pages).
+What you see is what you print. Blank sets your text in pages as you write, and every line and every page ends on the screen exactly where it ends in the PDF, headers, footers and page numbers included. [See your pages](https://blank-writer.xyz/guide/pages).
 
 ## Download
 
-- **macOS:** [Apple Silicon](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_aarch64.dmg) · [Intel](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_x64.dmg)
-- **Windows:** [Installer (.msi)](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_x64_en-US.msi) · [Setup (.exe)](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_x64-setup.exe)
-- **Linux:** [.deb](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_amd64.deb) · [.rpm](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank-2.1.0-1.x86_64.rpm) · [AppImage](https://github.com/FPurchess/blank/releases/download/v2.1.0/blank_2.1.0_amd64.AppImage)
+- **macOS:** [Apple Silicon](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_aarch64.dmg) · [Intel](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_x64.dmg)
+- **Windows:** [Installer (.msi)](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_x64_en-US.msi) · [Setup (.exe)](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_x64-setup.exe)
+- **Linux:** [.deb](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_amd64.deb) · [.rpm](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank-3.0.0-1.x86_64.rpm) · [AppImage](https://github.com/FPurchess/blank/releases/download/v3.0.0/blank_3.0.0_amd64.AppImage)
 
 **macOS** blocks Blank on first open because it isn't notarized by Apple. **Linux** needs glibc 2.35+ and WebKitGTK 4.1 (Ubuntu 22.04+, Debian 12+). See the [install guide](https://blank-writer.xyz/guide/install) for both.
 
