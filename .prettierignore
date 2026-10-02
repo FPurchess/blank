@@ -2,3 +2,4 @@ src-tauri
 dist
 .claude
 src/engine/wasm
+src/engine/__fixtures__/contract.json

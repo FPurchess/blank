@@ -179,6 +179,20 @@ describe("flatten", () => {
     const [listed] = flatten(doc(ul(li(p("a")))), noSizes);
     expect(plain.key).not.toBe(listed.key);
   });
+
+  it("keys records by whether their quote bars reach the next item", () => {
+    // the bars of "a" reach down to "b", which stands in the same quote,
+    // so an edit that ends the quote after "a" must change its key
+    const [a, b, after] = flatten(
+      doc(blockquote(p("a"), p("b")), p("after")),
+      noSizes,
+    );
+    expect(a.build().barsContinue).toBe(true);
+    expect(b.build().barsContinue).toBe(false);
+    expect(a.key.endsWith("|c")).toBe(true);
+    expect(b.key.endsWith("|c")).toBe(false);
+    expect(after.key.endsWith("|c")).toBe(false);
+  });
 });
 
 describe("diff", () => {

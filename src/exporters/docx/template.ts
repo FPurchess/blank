@@ -16,7 +16,8 @@ export const FONT = "IBM Plex Sans";
 // (see font.ts), so Word slants or emboldens it itself where code is italic
 // or bold
 export const CODE_FONT = "IBM Plex Mono";
-const CODE_BACKGROUND = "F2F2F2";
+// the code fill on paper, as the pages show it (see src/layout/paperColors.ts)
+export const CODE_BACKGROUND = "EFF0F1";
 
 export const twips = (points: number) => Math.round(points * 20);
 // borders are measured in eighths of a point

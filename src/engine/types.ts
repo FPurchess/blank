@@ -79,6 +79,9 @@ export type Content =
       caption?: string;
     };
 
+// The keys are written as they are here, in camelCase, and model.rs reads
+// them by these names; src/engine/contract.test.ts and model.rs's
+// reads_every_key_the_webview_sends check both sides.
 export type EngineItem = Content & {
   indent: number;
   before: number;
