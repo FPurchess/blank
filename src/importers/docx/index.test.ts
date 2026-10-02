@@ -332,6 +332,14 @@ describe("importers.docx", () => {
       );
     });
 
+    it("splits a list at a page break in an item", async () => {
+      // the break and the new page stay; what follows it in the item comes
+      // back as a paragraph of its own, as in a quote
+      expect(await roundTrip("- a\n\n  <!-- pagebreak -->\n\n  b\n- c")).toBe(
+        "* a\n\n<!-- pagebreak -->\n\nb\n\n* c",
+      );
+    });
+
     it("merges adjacent blockquotes", async () => {
       expect(
         await roundTrip(doc(blockquote(p("one")), blockquote(p("two")))),

@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import { parseMarkdown, schema } from "../../markdown";
 import type { Node } from "prosemirror-model";
 
-import { createState } from "../../test/editor";
+import { createState, doc, li, p, ul } from "../../test/editor";
 import { IMAGES, dataUrl } from "../../test/images";
 import toDOCX from ".";
 import { pageGeometry } from "../../layout/resolve";
@@ -410,6 +410,44 @@ describe("exporter.docx", () => {
       expect(await breaks(exported)).toEqual([
         ["a", false],
         ["b", true],
+      ]);
+    });
+
+    it("starts a page in a list item", async () => {
+      const exported = await exportMarkdown(
+        "- a\n\n  <!-- pagebreak -->\n\n  b\n- c",
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+        ["c", false],
+      ]);
+    });
+
+    it("starts a page with a list item that begins with a page break", async () => {
+      const pageBreak = schema.nodes.page_break.create();
+      const exported = await exportDoc(
+        doc(p("a"), ul(li(pageBreak, p("b")), li(p("c")))),
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+        ["c", false],
+      ]);
+    });
+
+    it("starts the page after a list item that ends with a page break", async () => {
+      const pageBreak = schema.nodes.page_break.create();
+      const exported = await exportDoc(doc(ul(li(p("a"), pageBreak)), p("b")));
+
+      // the item's break leaves an empty paragraph that starts the page, as a
+      // break at the end of a quote does
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["", true],
+        ["b", false],
       ]);
     });
 

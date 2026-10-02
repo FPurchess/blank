@@ -144,7 +144,10 @@ class Serializer {
     return { border: { left: QUOTE_BORDER } };
   }
 
-  blocks(parent: Node, position: Position): Block[] {
+  /**
+   * blocks writes the blocks of `parent`, from its child `from` on
+   */
+  blocks(parent: Node, position: Position, from = 0): Block[] {
     const blocks: Block[] = [];
     // A page break starts the page of the block after it, as Word's "Page
     // break before": a paragraph that holds a break would start the next
@@ -153,7 +156,8 @@ class Serializer {
     // does before it.
     let pageBreak = false;
     const newPage = () => ({ pageBreakBefore: true, ...this.indent(position) });
-    parent.forEach((node) => {
+    parent.forEach((node, _, index) => {
+      if (index < from) return;
       if (node.type.name === "page_break") {
         if (pageBreak) blocks.push(newPage());
         pageBreak = true;
@@ -246,30 +250,32 @@ class Serializer {
 
     const blocks: Block[] = [];
     node.forEach((item) => {
-      item.forEach((child, _, index) => {
-        if (index === 0 && child.type.name === "paragraph") {
-          // the item's own paragraph carries the bullet or number, indented
-          // by the numbering unless it is quoted
-          blocks.push({
-            children: this.inline(child),
-            numbering: { reference, level, instance },
-            ...this.decoration(itemPosition, false),
-            ...(position.quotes
-              ? {
-                  indent: {
-                    left:
-                      QUOTE_INDENT * position.quotes +
-                      LIST_INDENT * (level + 1),
-                    hanging: LIST_HANGING,
-                  },
-                }
-              : {}),
-            ...(tight ? { spacing: { after: LIST_ITEM_SPACING } } : {}),
-          });
-        } else {
-          blocks.push(...this.block(child, itemPosition));
-        }
+      const first = item.firstChild;
+      if (first?.type.name !== "paragraph") {
+        // an item can start with any block, e.g. a page break, and then has
+        // no bullet or number
+        blocks.push(...this.blocks(item, itemPosition));
+        return;
+      }
+      // the item's own paragraph carries the bullet or number, indented by
+      // the numbering unless it is quoted
+      blocks.push({
+        children: this.inline(first),
+        numbering: { reference, level, instance },
+        ...this.decoration(itemPosition, false),
+        ...(position.quotes
+          ? {
+              indent: {
+                left:
+                  QUOTE_INDENT * position.quotes + LIST_INDENT * (level + 1),
+                hanging: LIST_HANGING,
+              },
+            }
+          : {}),
+        ...(tight ? { spacing: { after: LIST_ITEM_SPACING } } : {}),
       });
+      // the blocks after it, page breaks included
+      blocks.push(...this.blocks(item, itemPosition, 1));
     });
     // a list is spaced from the next block like a paragraph, also when it is tight
     const last = blocks[blocks.length - 1];
