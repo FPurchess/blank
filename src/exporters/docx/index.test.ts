@@ -608,6 +608,8 @@ describe("exporter.docx", () => {
         (element) => attr(element, "styleId") === id,
       )!;
       expect(attr(child(style, "rFonts"), "ascii")).toBe("IBM Plex Mono");
+      // on the fill the pages and the PDF show
+      expect(attr(child(style, "shd"), "fill")).toBe("EFF0F1");
     }
     expect(await exported.text("word/styles.xml")).not.toMatch(/Courier/);
     // monospaced where a reader lacks it, so code keeps its columns
@@ -696,9 +698,10 @@ describe("exporter.docx tables", () => {
   };
 
   it("writes a table with its header row repeated and rows kept whole", async () => {
-    const { rows } = await tableOf(
-      await exportMarkdown("| Name | Qty |\n| ---- | --: |\n| a    |   1 |"),
+    const exported = await exportMarkdown(
+      "| Name | Qty |\n| ---- | --: |\n| a    |   1 |",
     );
+    const { rows } = await tableOf(exported);
 
     expect(rows.map(({ header, cantSplit }) => [header, cantSplit])).toEqual([
       [true, true],
@@ -712,6 +715,10 @@ describe("exporter.docx tables", () => {
       { text: "a", fill: null, style: null },
       { text: "1", align: "right" },
     ]);
+    // the line under the header row, in the colour of the PDF's
+    expect(await exported.text("word/document.xml")).toMatch(
+      /w:color="82898E"/,
+    );
   });
 
   it("draws lines like the PDF and sizes the columns by their content", async () => {

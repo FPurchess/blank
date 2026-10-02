@@ -5,7 +5,8 @@ import type { Painter, PaintOptions, Snapshot, Surface } from "./types";
 // every glyph as its outline from the font file, at the spot the layout gave
 // it, which is also where the PDF puts it.
 
-// what the roles of the engine stand for on screen (see Role in items.rs):
+// what the roles of the engine stand for on screen (see Role in
+// src-tauri/layout/src/items/mod.rs):
 // the theme's text colour at an opacity
 export const ROLE_OPACITY = [
   1, // text
@@ -13,7 +14,7 @@ export const ROLE_OPACITY = [
   0.07, // code
   0.2, // table lines
   0.55, // the line under the header rows
-  0.05, // header cells
+  0.06, // header cells
   0.15, // an image that isn't loaded yet
   0.5, // the underline of a link, softer than the text as in the editor
   0.6, // the alt text of an image that isn't loaded

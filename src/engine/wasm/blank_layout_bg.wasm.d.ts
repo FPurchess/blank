@@ -27,6 +27,7 @@ export const layoutengine_pageCount: (a: number) => number;
 export const layoutengine_pageSpan: (a: number, b: number) => [number, number];
 export const layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
 export const layoutengine_pdfWarnings: (a: number) => [number, number];
+export const layoutengine_roleColor: (a: number, b: number) => number;
 export const layoutengine_selection: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
 export const layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];

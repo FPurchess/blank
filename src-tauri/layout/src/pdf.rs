@@ -117,18 +117,27 @@ fn parse_date(text: &str) -> Option<DateTime> {
     )
 }
 
-/// the colour of each role on paper
-fn color(role: Role) -> rgb::Color {
+/// the colour of each role on paper, as red, green and blue: the light
+/// theme's text colour mixed onto white at the opacity the pages show it at
+/// (ROLE_OPACITY in src/ui/painter/canvas2d.ts, checked by
+/// src/ui/painter/colors.test.ts), except the text, the bands and what stands
+/// for images, which have colours of their own
+pub(crate) fn paper_rgb(role: Role) -> (u8, u8, u8) {
     match role {
         // the PDF shows links and alt text in the text's colour, as pdfmake
         // did
-        Role::Text | Role::LinkLine | Role::Hint => rgb::Color::new(0, 0, 0),
-        Role::Band => rgb::Color::new(0x66, 0x66, 0x66),
-        Role::CodeFill => rgb::Color::new(0xf1, 0xf2, 0xf3),
-        Role::TableLine | Role::Placeholder => rgb::Color::new(0xd1, 0xd4, 0xd6),
-        Role::HeaderLine => rgb::Color::new(0x82, 0x89, 0x90),
-        Role::HeaderFill => rgb::Color::new(0xf1, 0xf2, 0xf3),
+        Role::Text | Role::LinkLine | Role::Hint => (0, 0, 0),
+        Role::Band => (0x66, 0x66, 0x66),
+        Role::CodeFill => (0xef, 0xf0, 0xf1),
+        Role::TableLine | Role::Placeholder => (0xd1, 0xd4, 0xd6),
+        Role::HeaderLine => (0x82, 0x89, 0x8e),
+        Role::HeaderFill => (0xf1, 0xf2, 0xf3),
     }
+}
+
+fn color(role: Role) -> rgb::Color {
+    let (red, green, blue) = paper_rgb(role);
+    rgb::Color::new(red, green, blue)
 }
 
 fn fill(role: Role) -> Fill {

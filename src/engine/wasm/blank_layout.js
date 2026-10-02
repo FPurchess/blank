@@ -371,6 +371,15 @@ export class LayoutEngine {
         return v5;
     }
     /**
+     * the colour of a role on paper, as 0xRRGGBB; for tests
+     * @param {number} role
+     * @returns {number | undefined}
+     */
+    roleColor(role) {
+        const ret = wasm.layoutengine_roleColor(this.__wbg_ptr, role);
+        return ret === Number.MAX_SAFE_INTEGER ? undefined : ret;
+    }
+    /**
      * the selection's rectangles: page, x, y, width and height each
      * @param {number} from
      * @param {number} to

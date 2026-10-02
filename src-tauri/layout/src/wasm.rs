@@ -457,6 +457,14 @@ impl LayoutEngine {
         ]
     }
 
+    /// the colour of a role on paper, as 0xRRGGBB; for tests
+    #[cfg(feature = "test-hooks")]
+    #[wasm_bindgen(js_name = roleColor)]
+    pub fn role_color(&self, role: u8) -> Option<u32> {
+        let (red, green, blue) = pdf::paper_rgb(crate::items::Role::from_u8(role)?);
+        Some(u32::from(red) << 16 | u32::from(green) << 8 | u32::from(blue))
+    }
+
     /// the words as laid out, for checking the PDF against the layout; for
     /// tests
     #[cfg(feature = "test-hooks")]
