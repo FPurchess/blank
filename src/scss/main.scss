@@ -1626,15 +1626,16 @@ body.outline-docked.outline-desk {
   }
 }
 
-// the headings on a panel of their own: open below the top bar, flush with
-// the right edge (beside the page view's scrollbar, or the window's edge
-// when docked), or floating left of the dashes
+// the headings on a panel of their own: open, it fills the room between the
+// top and the bottom bar, flush with the right edge (beside the page view's
+// scrollbar, or the window's edge when docked); a peek floats left of the
+// dashes
 .outline-list {
   position: fixed;
-  top: 56px;
+  top: $bar-height;
+  bottom: $bar-height;
   box-sizing: border-box;
   width: $outline-width;
-  max-height: calc(100vh - 112px);
   overflow-y: auto;
   padding: 16px;
   pointer-events: auto;
@@ -1650,6 +1651,8 @@ body.outline-docked.outline-desk {
 
   &.peek {
     top: 50%;
+    bottom: auto;
+    max-height: calc(100vh - #{2 * $bar-height});
     right: calc(
       #{$outline-gap + $outline-dashes + 8px} + var(--scrollbar, 0px)
     );

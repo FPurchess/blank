@@ -107,6 +107,13 @@ describe("the outline", () => {
     await expect($("#outline.docked, #outline.beside")).toBeExisting();
     await expect($(".outline-list:not(.peek)")).toBeExisting();
     await expect($(".outline-dashes")).not.toBeExisting();
+    // a short outline still fills the room between the bars
+    const room = await browser.execute(() => {
+      const list = document.querySelector(".outline-list")!;
+      const { top, bottom } = list.getBoundingClientRect();
+      return { top, below: window.innerHeight - bottom };
+    });
+    expect(room).toEqual({ top: 44, below: 44 });
 
     await restartApp([file]);
     await browser.setWindowSize(1280, 800);
