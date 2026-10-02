@@ -137,6 +137,29 @@ describe("storage", () => {
     });
   });
 
+  describe("outline", () => {
+    it("is closed on first start and keeps the choice", async () => {
+      const { outlinePinned } = await bootFresh();
+      expect(outlinePinned.value).toBe(false);
+
+      outlinePinned.value = true;
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("outline")).toBe(true),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.outlinePinned.value).toBe(true);
+    });
+
+    it("ignores a stored value it doesn't know", async () => {
+      await localforage.setItem("outline", "open");
+
+      const { outlinePinned } = await bootFresh();
+
+      expect(outlinePinned.value).toBe(false);
+    });
+  });
+
   describe("language", () => {
     it("restores a stored regional language", async () => {
       await localforage.setItem("language", "de-CH");

@@ -76,7 +76,8 @@ export const pageDropCaret = shallowRef<PageRect | null>(null);
 export const engineMissing = shallowRef(false);
 
 // the page the selection's head is on, counted from 1, and how many there
-// are, for "Page N of M"
+// are, e.g. for the header or footer of that page; the bottom bar counts the
+// page in view instead (src/ui/PageStatus.vue)
 export const pagePosition = computed(() => {
   const layout = pageLayoutState.value;
   if (!layout) return null;

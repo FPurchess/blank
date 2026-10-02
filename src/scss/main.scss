@@ -1551,6 +1551,201 @@ body.band-editing #page-view {
   transition: opacity 150ms;
 }
 
+// the outline (src/ui/DocumentOutline.vue): the headings as dashes at the
+// right edge, which open into a list of them, floating over the pages or
+// open beside them. The dashes follow Notion's, measured on its own pages.
+
+// the open list's width, and the gap from it to the text and from the
+// dashes to the edge
+$outline-width: 264px;
+$outline-gap: 16px;
+// the room the open list takes when it can't lie beside the pages,
+// OUTLINE_DOCK in src/ui/outlineModel.ts (src/scss/themes.test.ts)
+$outline-dock: $outline-width + $outline-gap;
+// the dashes' column: narrow, so it keeps clear of the text on a small
+// window
+$outline-dashes: 24px;
+// how much darker than the desk the list's panel is, so it stands out from
+// the page and the desk in every theme (src/scss/themes.test.ts)
+$outline-shade: 12%;
+
+body.outline-docked #page-view {
+  right: $outline-dock;
+}
+
+// without the engine the editor shows the text in the window itself
+body.without-engine.outline-docked {
+  padding-right: $outline-dock;
+}
+
+// the room beside the sheets has the desk's colour, as the page view has
+body.outline-docked.outline-desk {
+  background-color: var(--desk-color);
+}
+
+#outline {
+  position: fixed;
+  // with the bars, under the toolbar, the dialogs and the menus
+  z-index: 2;
+  // only its dashes, its list and its button take the pointer
+  pointer-events: none;
+  user-select: none;
+  color: var(--color);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+// one dash per heading, as long as its level is high, cut off below 400 px
+// as on Notion
+.outline-dashes {
+  position: fixed;
+  top: 50%;
+  right: calc(#{$outline-gap} + var(--scrollbar, 0px));
+  transform: translateY(-50%);
+  box-sizing: border-box;
+  width: $outline-dashes;
+  max-height: 400px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 6px 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.outline-dash {
+  flex: none;
+  height: 2px;
+  border-radius: 2px;
+  background-color: color-mix(in srgb, var(--color) 30%, transparent);
+
+  &.current {
+    background-color: var(--color);
+  }
+}
+
+// the headings on a panel of their own: open below the top bar, flush with
+// the right edge (beside the page view's scrollbar, or the window's edge
+// when docked), or floating left of the dashes
+.outline-list {
+  position: fixed;
+  top: 56px;
+  box-sizing: border-box;
+  width: $outline-width;
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  padding: 16px;
+  pointer-events: auto;
+  background-color: color-mix(in srgb, var(--desk-color), #000 $outline-shade);
+
+  #outline.beside & {
+    right: var(--scrollbar, 0px);
+  }
+
+  #outline.docked & {
+    right: 0;
+  }
+
+  &.peek {
+    top: 50%;
+    right: calc(
+      #{$outline-gap + $outline-dashes + 8px} + var(--scrollbar, 0px)
+    );
+    transform: translateY(-50%);
+  }
+}
+
+// the title and the button that puts the list away
+.outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 0 0 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color) 10%, transparent);
+}
+
+.outline-title {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: $faint-text-opacity;
+}
+
+.outline-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: $faint-text-opacity;
+
+  &:hover {
+    opacity: 1;
+    background-color: color-mix(in srgb, var(--color) 12%, transparent);
+  }
+
+  .icon {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+// quiet like the bars, the current heading at full strength
+.outline-entry {
+  padding: 6px 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 150ms;
+}
+
+.outline-list:hover .outline-entry {
+  opacity: $faint-text-opacity;
+}
+
+.outline-list .outline-entry:hover,
+.outline-list .outline-entry.current {
+  opacity: 1;
+}
+
+// each level's dash shorter, and its heading deeper in the list
+@for $level from 1 through 6 {
+  .outline-dash.level-#{$level} {
+    width: 16px - 2px * ($level - 1);
+  }
+
+  .outline-entry.level-#{$level} {
+    padding-left: 12px * $level;
+  }
+}
+
+// while a header or footer is edited, the outline dims with the pages and
+// takes no clicks
+body.band-editing #outline {
+  opacity: 0.3;
+  transition: opacity 150ms;
+
+  * {
+    pointer-events: none;
+  }
+}
+
 // the selected text or cells, in the theme's selection colour under the
 // text, which the pages paint over it (see src/scss/themes.test.ts)
 .page-selection {
@@ -1682,7 +1877,9 @@ body.band-editing #page-view {
 
   .band-line,
   .band-hint,
-  body.band-editing #page-view {
+  body.band-editing #page-view,
+  .outline-entry,
+  body.band-editing #outline {
     transition: none;
   }
 }

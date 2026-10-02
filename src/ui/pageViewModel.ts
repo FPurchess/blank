@@ -254,7 +254,7 @@ export const caretLine = (left: number, ratio: number) => {
 };
 
 /**
- * pageLabel returns "Page N of M" as the bar shows it: where the caret is
+ * pageLabel returns "Page N of M" as the bar shows it: the page in view
  * among the pages, counted from 1, whatever number the pages show, for
  * finding one's way in the document
  */

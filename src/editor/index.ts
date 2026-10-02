@@ -8,6 +8,7 @@ import { transaction, uiTakesFocus } from "../state";
 import {
   autocomplete,
   contextMenu,
+  headings,
   images,
   keymap,
   languagePicker,
@@ -43,6 +44,8 @@ export const bootEditor = async () => {
       plugins: [
         // lays out first, so the other plugins' views measure the new layout
         pageSync(),
+        // the headings, for the outline
+        headings(),
         // without the engine, the clicks on the editor's own text
         nativePointer(),
         history(),

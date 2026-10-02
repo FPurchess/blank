@@ -453,7 +453,8 @@ const onMouseUp = (event: MouseEvent) => {
 const move = pageMove({
   view: editor.view,
   posAt: (event) => pointerAt(event).pos,
-  // on the pages the view shows: in the window, not on the bars over it
+  // on the pages the view shows: in the window, not on the bars or the
+  // outline over it
   inView: ({ clientX: x, clientY: y }) => {
     const within = (box?: DOMRect) =>
       !!box &&
@@ -467,8 +468,9 @@ const move = pageMove({
       y >= 0 &&
       x <= window.innerWidth &&
       y <= window.innerHeight &&
-      !["ui-top", "ui-bottom"].some((id) =>
-        within(document.getElementById(id)?.getBoundingClientRect()),
+      !["#ui-top", "#ui-bottom", ".outline-dashes", ".outline-list"].some(
+        (selector) =>
+          within(document.querySelector(selector)?.getBoundingClientRect()),
       )
     );
   },

@@ -16,6 +16,7 @@
 | Edit header                                 | `Mod` `Alt` `H`   |
 | Edit footer                                 | `Mod` `Alt` `F`   |
 | [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`   |
+| [Outline](./pages#outline)                  | `Mod` `Alt` `O`   |
 | Cycle themes                                | `Mod` `Alt` `T`   |
 | Choose language                             | `Mod` `Alt` `L`   |
 

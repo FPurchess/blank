@@ -11,7 +11,17 @@ Blank shows your text the way it prints: every line and every page ends on the s
 
 <img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
 
-Blank remembers your choice. The bar at the bottom tells you which page you're on, like _Page 3 of 12_. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
+Blank remembers your choice. The bar at the bottom tells you which page you're looking at, like _Page 3 of 12_, and counts along as you scroll. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
+
+## Find your way with the outline {#outline}
+
+Once your document has two headings, a short dash for each of them sits at the right edge of the window, longer for a heading 1 and shorter for the levels below. The bright one marks the section you're reading.
+
+Point at the dashes to see all your headings, and click one to scroll straight to it. Your cursor stays where you were writing, so you can look something up and keep typing right away.
+
+<img class="shot" src="/screenshots/outline.gif" alt="Pointing at the dashes on the right shows the headings of the document; a click on one scrolls to it, and Mod Alt O opens and closes the list" />
+
+To keep the outline open, click the dashes or press `Mod` `Alt` `O`. On a window at least 1000 pixels wide, the list stays beside your pages, and they move over a little if they need the room. On a smaller window it floats over the pages until you click a heading or somewhere else. `Mod` `Alt` `O` or the × at the top of the list puts it away again, and Blank remembers whether you keep it open.
 
 ## Page setup {#page-setup}
 

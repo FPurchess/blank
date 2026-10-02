@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pageSync } from "../editor/plugins/pageView";
 import { schema } from "../markdown";
-import { pageViewport } from "../state";
+import { computed } from "vue";
+
+import { pageScrollRequest, pageViewport } from "../state";
 import { doc, p, table, td, th, tr } from "../test/editor";
 import { hidePages, showPages, TEST_VIEWPORT } from "../test/engine";
 import {
@@ -13,7 +15,12 @@ import {
   caretPage,
   findText,
   hitAt,
+  pageTops,
   rangeRects,
+  scrollState,
+  scrollToText,
+  scrollTops,
+  scrollViewBy,
   setGeometryView,
   tableGeometry,
   viewBox,
@@ -88,6 +95,64 @@ describe("geometry", () => {
     expect(tableGeometry(0)).toBeNull();
   });
 
+  it("gives where text starts on the desk, whatever the scrolling", () => {
+    const end = node.content.size - 2;
+    const [intro, last] = scrollTops([3, end]);
+    expect(intro).toBeCloseTo(caretBox(3)!.top);
+    expect(last).toBeGreaterThan(TEST_VIEWPORT.height);
+    pageViewport.value = { ...TEST_VIEWPORT, scrollTop: 300 };
+    expect(scrollTops([3, end])).toEqual([intro, last]);
+  });
+
+  it("measures the desk again for a new layout, but not for a scroll", () => {
+    let runs = 0;
+    const tops = computed(() => (runs++, scrollTops([3])));
+    void tops.value;
+    pageViewport.value = { ...TEST_VIEWPORT, scrollTop: 200 };
+    void tops.value;
+    expect(runs).toBe(1);
+    pageViewport.value = { ...TEST_VIEWPORT, width: 700 };
+    void tops.value;
+    expect(runs).toBe(2);
+  });
+
+  it("gives where each page starts on the desk", () => {
+    const tops = pageTops()!;
+    expect(tops.length).toBeGreaterThan(1);
+    expect(tops[1]).toBeGreaterThan(tops[0]);
+    pageViewport.value = { ...TEST_VIEWPORT, scrollTop: 400 };
+    expect(pageTops()).toEqual(tops);
+  });
+
+  it("tells how far the view is scrolled and can scroll", () => {
+    pageViewport.value = { ...TEST_VIEWPORT, scrollTop: 50 };
+    const state = scrollState()!;
+    expect(state.top).toBe(50);
+    expect(state.height).toBe(TEST_VIEWPORT.height);
+    expect(state.max).toBeGreaterThan(TEST_VIEWPORT.height);
+  });
+
+  it("asks the page view to show text below its top, keeping the selection", () => {
+    const selection = view.state.selection;
+    scrollToText(3, 108);
+    expect(pageScrollRequest.value).toMatchObject({ page: 0, at: 108 });
+    const first = pageScrollRequest.value;
+    scrollToText(3, 108);
+    // a new request, which the page view serves again
+    expect(pageScrollRequest.value).not.toBe(first);
+    expect(view.state.selection).toBe(selection);
+    pageScrollRequest.value = null;
+  });
+
+  it("scrolls the page view by a wheel's turn", () => {
+    const scroller = document.body.appendChild(document.createElement("div"));
+    scroller.id = "page-view";
+    scroller.scrollBy = vi.fn();
+    scrollViewBy(40);
+    expect(scroller.scrollBy).toHaveBeenCalledWith({ top: 40 });
+    scroller.remove();
+  });
+
   it("measures nothing while the pages aren't shown", () => {
     pageViewport.value = null;
     expect(caretBox(3)).toBeNull();
@@ -96,6 +161,9 @@ describe("geometry", () => {
     expect(tableGeometry(7)).toBeNull();
     expect(hitAt(10, 10)).toBeNull();
     expect(viewBox()).toBeNull();
+    expect(scrollTops([3])).toEqual([null]);
+    expect(scrollState()).toBeNull();
+    expect(pageTops()).toBeNull();
   });
 });
 
@@ -193,6 +261,29 @@ describe("geometry without the engine", () => {
     expect(hitAt(50, 30)).toEqual({ node: false, pos: 3 });
     hit.mockReturnValue(null);
     expect(hitAt(50, 30)).toBeNull();
+  });
+
+  it("measures and scrolls the window, which scrolls the editor", () => {
+    vi.spyOn(view, "coordsAtPos").mockReturnValue({
+      left: 5,
+      right: 6,
+      top: 300,
+      bottom: 320,
+    });
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    window.scrollY = 1000;
+    try {
+      expect(scrollTops([3])).toEqual([1300]);
+      expect(scrollState()).toMatchObject({ top: 1000 });
+      // no pages without the engine
+      expect(pageTops()).toBeNull();
+      scrollToText(3, 108);
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 192 });
+      scrollViewBy(40);
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 40 });
+    } finally {
+      window.scrollY = 0;
+    }
   });
 
   it("measures nothing while the engine runs but the pages aren't shown", () => {

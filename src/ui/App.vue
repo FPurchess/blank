@@ -12,6 +12,7 @@ import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
+import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
 import TablePicker from "./TablePicker.vue";
@@ -27,6 +28,7 @@ import TopBar from "./TopBar.vue";
   <PageView />
   <TopBar />
   <BottomBar />
+  <DocumentOutline />
   <TableToolbar v-if="tableToolbar" :state="tableToolbar" />
   <TablePicker v-if="tablePicker" :state="tablePicker" />
   <LinkDialog
