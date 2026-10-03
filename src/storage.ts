@@ -91,6 +91,25 @@ const persist = <T>(ref: Readonly<Ref<T>>, key: string) =>
     { flush: "sync" },
   );
 
+/**
+ * restore sets `ref` to what is stored under `key`, or to `fallback` when
+ * nothing valid is, and then persists it
+ */
+const restore = async <T>(
+  key: string,
+  ref: Ref<T>,
+  valid: (value: unknown) => value is T,
+  fallback: T,
+) => {
+  const stored = await localforage.getItem(key);
+  ref.value = valid(stored) ? stored : fallback;
+  persist(ref, key);
+};
+
+const isTrue = (value: unknown): value is boolean => value === true;
+const isPageViewMode = (value: unknown): value is PageViewMode =>
+  PAGE_VIEW_MODES.includes(value as PageViewMode);
+
 // false when the storage can't be used, so nothing is restored or persisted
 let storageAvailable = true;
 
@@ -125,10 +144,7 @@ export const bootStorage = async () => {
     { flush: "sync" },
   );
 
-  const _theme = await localforage.getItem("theme");
-  theme.value = isTheme(_theme) ? _theme : themes[0];
-
-  persist(theme, "theme");
+  await restore("theme", theme, isTheme, themes[0]);
 
   // the system language on first start, the chosen one afterwards
   const _language = await localforage.getItem("language");
@@ -140,19 +156,11 @@ export const bootStorage = async () => {
   persist(language, "language");
 
   // off until the user turns it on
-  spellcheck.value = (await localforage.getItem("spellcheck")) === true;
-  persist(spellcheck, "spellcheck");
-
+  await restore("spellcheck", spellcheck, isTrue, false);
   // the page view the user chose last, "page ends" at first
-  const _pageView = await localforage.getItem("pageView");
-  pageView.value = PAGE_VIEW_MODES.includes(_pageView as PageViewMode)
-    ? (_pageView as PageViewMode)
-    : "page-ends";
-  persist(pageView, "pageView");
-
+  await restore("pageView", pageView, isPageViewMode, "page-ends");
   // the outline closed until the user keeps it open
-  outlinePinned.value = (await localforage.getItem("outline")) === true;
-  persist(outlinePinned, "outline");
+  await restore("outline", outlinePinned, isTrue, false);
 
   watch(
     transaction,
