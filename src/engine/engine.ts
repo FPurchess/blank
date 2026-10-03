@@ -664,11 +664,6 @@ export class PageEngine {
     return this.call(0, () => this.raw.pageCount());
   }
 
-  // changes when what a page shows changes
-  versions() {
-    return this.call(new Uint32Array(), () => this.raw.versions());
-  }
-
   // where the text of each page ends
   bottoms() {
     return this.call(new Float32Array(), () => this.raw.bottoms());
