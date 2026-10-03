@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  TextSelection,
-  type Command,
-  type EditorState,
-} from "prosemirror-state";
+import { TextSelection } from "prosemirror-state";
 
 import {
   createState,
@@ -20,6 +16,7 @@ import {
   cellTexts,
   cellTypes,
   cursorAt,
+  runCommand,
   selectCells,
   selectedText,
 } from "../../../test/tables";
@@ -67,12 +64,6 @@ describe("insertTable", () => {
   });
 });
 
-const run = (command: Command, state: EditorState) => {
-  const view = createTestView(state);
-  expect(command(view.state, view.dispatch)).toBe(true);
-  return view.state;
-};
-
 // a table with a header row, a right-aligned column and three rows
 const grid = () =>
   doc(
@@ -86,7 +77,7 @@ const grid = () =>
 
 describe("addRows", () => {
   it("adds a row below and puts the cursor in it", () => {
-    const state = run(addRows("below"), cursorAt(grid(), "a2"));
+    const state = runCommand(addRows("below"), cursorAt(grid(), "a2"));
 
     expect(cellTexts(state.doc)).toEqual([
       ["h1", "h2"],
@@ -101,7 +92,7 @@ describe("addRows", () => {
   });
 
   it("adds as many rows as are selected and selects them", () => {
-    const state = run(
+    const state = runCommand(
       addRows("above"),
       selectCells(cursorAt(grid(), "a1"), "a1", "b2"),
     );
@@ -117,7 +108,7 @@ describe("addRows", () => {
   });
 
   it("adds body rows below the header", () => {
-    const state = run(addRows("below"), cursorAt(grid(), "h1"));
+    const state = runCommand(addRows("below"), cursorAt(grid(), "h1"));
 
     expect(cellTypes(state.doc)[1]).toEqual(["td", "td"]);
   });
@@ -130,7 +121,7 @@ describe("addRows", () => {
 
   it("gives a new row the header cell of a header column", () => {
     const node = doc(table(tr(th("h"), th("x")), tr(th("r"), td("v"))), p());
-    const state = run(addRows("below"), cursorAt(node, "v"));
+    const state = runCommand(addRows("below"), cursorAt(node, "v"));
 
     expect(cellTypes(state.doc)[2]).toEqual(["th", "td"]);
   });
@@ -142,7 +133,7 @@ describe("addRows", () => {
 
 describe("addColumns", () => {
   it("adds a column right, with a header cell in the header row", () => {
-    const state = run(addColumns("right"), cursorAt(grid(), "a1"));
+    const state = runCommand(addColumns("right"), cursorAt(grid(), "a1"));
 
     expect(cellTexts(state.doc)[0]).toEqual(["h1", "", "h2"]);
     expect(cellTypes(state.doc).map((row) => row[1])).toEqual([
@@ -155,7 +146,7 @@ describe("addColumns", () => {
   });
 
   it("adds as many columns as are selected and selects them", () => {
-    const state = run(
+    const state = runCommand(
       addColumns("left"),
       selectCells(cursorAt(grid(), "a1"), "a1", "a2"),
     );

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
-import { history } from "prosemirror-history";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { save } from "@tauri-apps/plugin-dialog";
@@ -19,15 +18,11 @@ import {
 import {
   blockquote,
   codeBlock,
-  createState,
-  createTestView,
   doc,
   h,
   li,
   ol,
   p,
-  pressKey,
-  type StateOptions,
   table,
   td,
   th,
@@ -37,18 +32,7 @@ import {
 import { flushPromises } from "../../test/async";
 import { schema } from "../../markdown";
 import { keymap, normalizeBinding } from "./keymap";
-
-/**
- * setup creates a view of `node` with the keymap (and history) plugin and
- * returns a function to press keys in it.
- */
-const setup = (node: Node, options: StateOptions = {}) => {
-  const plugin = keymap();
-  const view = createTestView(
-    createState(node, { ...options, plugins: [history(), plugin] }),
-  );
-  return { view, press: (combo: string) => pressKey(view, plugin, combo) };
-};
+import { withKeymap } from "../../test/keymap";
 
 describe("plugin.keymap", () => {
   const defaultConfig = config.value;
@@ -74,7 +58,7 @@ describe("plugin.keymap", () => {
     ["Mod-5", "heading", 5],
     ["Mod-6", "heading", 6],
   ])("%s turns the block into a %s of level %i", (combo, type, level) => {
-    const { view, press } = setup(doc(p("text")));
+    const { view, press } = withKeymap(doc(p("text")));
 
     expect(press(combo)).toBe(true);
 
@@ -83,7 +67,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-0 turns a heading back into a paragraph", () => {
-    const { view, press } = setup(doc(h(2, "text")));
+    const { view, press } = withKeymap(doc(h(2, "text")));
 
     press("Mod-0");
 
@@ -95,7 +79,7 @@ describe("plugin.keymap", () => {
     ["Mod-i", "em"],
     ["Mod-e", "code"],
   ])("%s marks the selection as %s", (combo, mark) => {
-    const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
+    const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
     expect(press(combo)).toBe(true);
 
@@ -107,7 +91,7 @@ describe("plugin.keymap", () => {
     ["Mod-8", "bullet_list"],
     ["Mod-9", "ordered_list"],
   ])("%s wraps the block in a %s", (combo, type) => {
-    const { view, press } = setup(doc(p("item")));
+    const { view, press } = withKeymap(doc(p("item")));
 
     press(combo);
 
@@ -117,7 +101,7 @@ describe("plugin.keymap", () => {
 
   it("Tab indents a list item and Shift-Tab outdents it again", () => {
     const flat = doc(ul(li(p("one")), li(p("two"))));
-    const { view, press } = setup(flat);
+    const { view, press } = withKeymap(flat);
 
     expect(press("Tab")).toBe(true);
     expect(view.state.doc.toJSON()).toEqual(
@@ -134,7 +118,7 @@ describe("plugin.keymap", () => {
     });
 
     it("opens the link dialog for the selection", async () => {
-      const { press } = setup(doc(p("text")), { cursor: [1, 5] });
+      const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
       expect(press("Mod-k")).toBe(true);
 
@@ -142,7 +126,7 @@ describe("plugin.keymap", () => {
     });
 
     it("is not handled in a code block", async () => {
-      const { press } = setup(doc(codeBlock("code")));
+      const { press } = withKeymap(doc(codeBlock("code")));
 
       expect(press("Mod-k")).toBe(false);
       await flushPromises();
@@ -152,7 +136,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-g wraps the block in a blockquote", () => {
-    const { view, press } = setup(doc(p("quote")));
+    const { view, press } = withKeymap(doc(p("quote")));
 
     press("Mod-g");
 
@@ -162,7 +146,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-h inserts a horizontal rule", () => {
-    const { view, press } = setup(doc(p("text")));
+    const { view, press } = withKeymap(doc(p("text")));
 
     press("Mod-h");
 
@@ -172,7 +156,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Shift-Enter inserts a hard break", () => {
-    const { view, press } = setup(doc(p("text")));
+    const { view, press } = withKeymap(doc(p("text")));
 
     expect(press("Shift-Enter")).toBe(true);
 
@@ -180,7 +164,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-Enter inserts a page break, splitting the paragraph", () => {
-    const { view, press } = setup(doc(p("before after")), { cursor: 8 });
+    const { view, press } = withKeymap(doc(p("before after")), { cursor: 8 });
 
     expect(press("Mod-Enter")).toBe(true);
 
@@ -192,7 +176,7 @@ describe("plugin.keymap", () => {
   it("Backspace at the start of the next line removes a page break", () => {
     const pageBreak = schema.node("page_break");
     // the start of "b": after the paragraph "a" (3) and the break (1)
-    const { view, press } = setup(doc(p("a"), pageBreak, p("b")), {
+    const { view, press } = withKeymap(doc(p("a"), pageBreak, p("b")), {
       cursor: 5,
     });
     // the cursor is at the start of its line, which the stub view can't tell
@@ -204,7 +188,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-Enter leaves a code block, as before", () => {
-    const { view, press } = setup(doc(codeBlock("code")));
+    const { view, press } = withKeymap(doc(codeBlock("code")));
 
     press("Mod-Enter");
 
@@ -214,7 +198,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Enter continues a list", () => {
-    const { view, press } = setup(doc(ol(li(p("one")))));
+    const { view, press } = withKeymap(doc(ol(li(p("one")))));
 
     press("Enter");
 
@@ -224,7 +208,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Enter splits a paragraph", () => {
-    const { view, press } = setup(doc(p("text")));
+    const { view, press } = withKeymap(doc(p("text")));
 
     press("Enter");
 
@@ -241,7 +225,7 @@ describe("plugin.keymap", () => {
       "%s does nothing",
       (combo) => {
         const node = inCell();
-        const { view, press } = setup(node, { cursor: cursor(node) });
+        const { view, press } = withKeymap(node, { cursor: cursor(node) });
 
         expect(press(combo)).toBe(false);
         expect(view.state.doc.eq(node)).toBe(true);
@@ -250,7 +234,7 @@ describe("plugin.keymap", () => {
 
     it("Mod-8 starts a list in the cell", () => {
       const node = inCell();
-      const { view, press } = setup(node, { cursor: cursor(node) });
+      const { view, press } = withKeymap(node, { cursor: cursor(node) });
 
       press("Mod-8");
       const cell = view.state.doc.firstChild!.lastChild!.firstChild!;
@@ -259,7 +243,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-t opens the table picker", () => {
-    const { view, press } = setup(doc(p()), { cursor: 1 });
+    const { view, press } = withKeymap(doc(p()), { cursor: 1 });
     Object.assign(view, { focus: () => {} });
 
     expect(press("Mod-t")).toBe(true);
@@ -268,7 +252,7 @@ describe("plugin.keymap", () => {
   });
 
   it("Mod-z undoes and Mod-Shift-z redoes", () => {
-    const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
+    const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
     press("Mod-b");
     const bold = view.state.doc;
 
@@ -286,7 +270,7 @@ describe("plugin.keymap", () => {
     });
 
     it("Mod-Alt-t cycles the theme", () => {
-      const { press } = setup(doc(p()));
+      const { press } = withKeymap(doc(p()));
 
       expect(press("Mod-Alt-t")).toBe(true);
 
@@ -294,7 +278,7 @@ describe("plugin.keymap", () => {
     });
 
     it("Mod-Alt-l opens the language picker", () => {
-      const { press } = setup(doc(p()));
+      const { press } = withKeymap(doc(p()));
 
       expect(press("Mod-Alt-l")).toBe(true);
 
@@ -305,7 +289,7 @@ describe("plugin.keymap", () => {
       ["Mod-Alt-h", "header"],
       ["Mod-Alt-f", "footer"],
     ])("%s opens the %s strip", (combo, band) => {
-      const { press } = setup(doc(p("text")));
+      const { press } = withKeymap(doc(p("text")));
 
       expect(press(combo)).toBe(true);
 
@@ -314,7 +298,7 @@ describe("plugin.keymap", () => {
     });
 
     it("Mod-Alt-i opens the image dialog", () => {
-      const { press } = setup(doc(p("text")));
+      const { press } = withKeymap(doc(p("text")));
 
       expect(press("Mod-Alt-i")).toBe(true);
 
@@ -323,7 +307,7 @@ describe("plugin.keymap", () => {
     });
 
     it("Mod-Alt-w exports a Word document", async () => {
-      const { press } = setup(doc(p("text")));
+      const { press } = withKeymap(doc(p("text")));
       vi.mocked(save).mockResolvedValue(null);
 
       expect(press("Mod-Alt-w")).toBe(true);
@@ -336,7 +320,7 @@ describe("plugin.keymap", () => {
     });
 
     it("Mod-n starts a new file", () => {
-      const { view, press } = setup(doc(p("text")));
+      const { view, press } = withKeymap(doc(p("text")));
 
       expect(press("Mod-n")).toBe(true);
 
@@ -353,7 +337,7 @@ describe("plugin.keymap", () => {
         [CommandIdentifier.FORMAT_BOLD]: "Mod-d",
       },
     };
-    const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
+    const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
     expect(press("Mod-b")).toBe(false);
     expect(view.state.doc.firstChild?.firstChild?.marks).toHaveLength(0);
@@ -379,7 +363,7 @@ describe("plugin.keymap", () => {
         [CommandIdentifier.FORMAT_CODE]: "super-u",
       },
     };
-    const { view, press } = setup(doc(p("text")), { cursor: [1, 5] });
+    const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
     expect(press("Alt-d")).toBe(true);
     expect(press("Meta-j")).toBe(true);
@@ -399,7 +383,7 @@ describe("plugin.keymap", () => {
       },
     };
 
-    const { press } = setup(doc(p("text")), { cursor: [1, 5] });
+    const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
     expect(press("Mod-s")).toBe(true);
     expect(sendNotification).toHaveBeenCalledOnce();

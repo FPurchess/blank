@@ -4,7 +4,7 @@ import { documentFields } from "../layout/bands";
 import { blockquote, doc, h, li, p, table, td, tr, ul } from "../test/editor";
 import { engineMissing } from "../state";
 import { schema } from "../markdown";
-import { testEngine } from "../test/engine";
+import { noSizes, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import {
   bootEngine,
@@ -18,8 +18,6 @@ import {
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
-
-const noSizes = () => undefined;
 
 const long = (count: number) =>
   doc(h(1, "Title"), ...Array.from({ length: count }, () => p(LONG)));

@@ -6,7 +6,7 @@ import { spellcheck, spellcheckKey } from "../editor/plugins/spellcheck";
 import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { doc, p } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import type { PageEngine } from "../engine/engine";
 import { PageMarksMemo, shownMarks } from "./pageMarks";
@@ -23,9 +23,7 @@ const node = doc(
 );
 
 const setup = () => {
-  const engine = testEngine();
-  engine.setSettings(testLayout(), documentFields(node));
-  engine.sync(node, () => undefined);
+  const engine = layOutPages(node);
   let state = EditorState.create({
     schema,
     doc: node,

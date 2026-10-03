@@ -1,14 +1,25 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import type { Node } from "prosemirror-model";
+
 import {
   createEngine,
   loadEngineSync,
   type PageEngine,
   setPageEngine,
 } from "../engine/engine";
+import type { ImageSizes } from "../engine/flatten";
 import { FONT_FILES } from "../engine/fonts";
-import { pageView, pageViewport, type PageViewMode } from "../state";
+import { documentFields } from "../layout/bands";
+import type { Layout } from "../layout/resolve";
+import {
+  type PageLayoutState,
+  pageView,
+  pageViewport,
+  type PageViewMode,
+} from "../state";
+import { testLayout } from "./layout";
 
 const root = resolve(import.meta.dirname, "../..");
 let fonts: Uint8Array[] | null = null;
@@ -24,6 +35,39 @@ export const testEngine = (): PageEngine => {
   fonts = FONT_FILES.map((file) => readFileSync(resolve(root, "fonts", file)));
   return loadEngineSync(wasm, fonts);
 };
+
+// no image is loaded
+export const noSizes: ImageSizes = () => undefined;
+
+/**
+ * layOutPages lays `node` out on a new engine, on `layout`
+ */
+export const layOutPages = (node: Node, layout: Layout = testLayout()) => {
+  const engine = testEngine();
+  engine.setSettings(layout, documentFields(node));
+  engine.sync(node, noSizes);
+  return engine;
+};
+
+// the A4 page with 2.5 cm margins of testLayout(), in points
+export const TEST_PAGE = {
+  width: 595.28,
+  height: 841.89,
+  margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
+};
+
+/**
+ * laidOutState returns what the editor's plugin publishes once `engine` has
+ * laid a document out on TEST_PAGE
+ */
+export const laidOutState = (engine: PageEngine): PageLayoutState => ({
+  ...TEST_PAGE,
+  margins: { ...TEST_PAGE.margins },
+  pages: engine.pages(),
+  bodyVersions: engine.raw.bodyVersions(),
+  bandVersions: engine.raw.bandVersions(),
+  bottoms: engine.raw.bottoms(),
+});
 
 /**
  * pageOf returns what a page of `engine` shows: its text and its header and

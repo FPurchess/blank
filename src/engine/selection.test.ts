@@ -2,11 +2,9 @@ import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import { describe, expect, it } from "vitest";
 
-import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { doc, p, table, td, th, tr } from "../test/editor";
-import { testEngine } from "../test/engine";
-import { testLayout } from "../test/layout";
+import { layOutPages } from "../test/engine";
 import { cellRects, shownSelection } from "./selection";
 
 // "intro" at 0, a table of 2 × 3 at 7, and a rule
@@ -18,9 +16,7 @@ const node = doc(
 );
 
 const setup = () => {
-  const engine = testEngine();
-  engine.setSettings(testLayout(), documentFields(node));
-  engine.sync(node, () => undefined);
+  const engine = layOutPages(node);
   const state = EditorState.create({ schema, doc: node });
   return { engine, state };
 };

@@ -1,32 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Node } from "prosemirror-model";
-import { history, undo, undoDepth } from "prosemirror-history";
+import { undo, undoDepth } from "prosemirror-history";
 
 import { config } from "../../config";
-import {
-  codeBlock,
-  createState,
-  createTestView,
-  doc,
-  li,
-  p,
-  pressKey,
-  type StateOptions,
-  ul,
-} from "../../test/editor";
-import { keymap } from "../plugins/keymap";
+import { codeBlock, doc, li, p, ul } from "../../test/editor";
 import { columnOf } from "./codeIndent";
+import { withKeymap } from "../../test/keymap";
 
 // Tab and Shift-Tab in code blocks, through the keymap, as the user presses
 // them. The code block's text starts at position 1.
-
-const setup = (node: Node, options: StateOptions = {}) => {
-  const plugin = keymap();
-  const view = createTestView(
-    createState(node, { ...options, plugins: [history(), plugin] }),
-  );
-  return { view, press: (combo: string) => pressKey(view, plugin, combo) };
-};
 
 // the [from, to] of the text from `start` to `end` in the code block
 const span = (code: string, start: string, end: string): [number, number] => [
@@ -34,10 +15,10 @@ const span = (code: string, start: string, end: string): [number, number] => [
   1 + code.indexOf(end) + end.length,
 ];
 
-const code = (view: ReturnType<typeof setup>["view"]) =>
+const code = (view: ReturnType<typeof withKeymap>["view"]) =>
   view.state.doc.firstChild!.textContent;
 
-const selected = (view: ReturnType<typeof setup>["view"]) =>
+const selected = (view: ReturnType<typeof withKeymap>["view"]) =>
   view.state.doc.textBetween(
     view.state.selection.from,
     view.state.selection.to,
@@ -64,7 +45,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("outdents every selected line to the previous tab stop", () => {
     const text = "a\n      six\n  two\n    four\nend";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: span(text, "six", "four"),
     });
     expect(press("Shift-Tab")).toBe(true);
@@ -73,7 +54,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("indents every selected line to the next tab stop", () => {
     const text = "  two\nnone\n     five";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     expect(press("Tab")).toBe(true);
@@ -82,7 +63,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("leaves lines without indentation and empty lines as they are", () => {
     const text = "    a\nb\n\n    c";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Shift-Tab");
@@ -94,7 +75,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("outdents lines of only spaces too", () => {
     const text = "    a\n      \n    b";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Shift-Tab");
@@ -103,7 +84,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("keeps tabs as tabs", () => {
     const text = "\t\ta\n\tb";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Shift-Tab");
@@ -116,7 +97,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
   it("measures mixed tabs and spaces in columns and writes them in the line's style", () => {
     // "\t  " reaches column 6 and "  \t" column 4
     const text = "\t  a\n  \tb\n      c";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Shift-Tab");
@@ -125,7 +106,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("leaves out the last line when the selection ends at its start", () => {
     const text = "    a\n    b";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, 1 + text.indexOf("    b")],
     });
     press("Shift-Tab");
@@ -134,7 +115,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("keeps the same lines selected, so another press goes on", () => {
     const text = "x\n        a\n        b\ny";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: span(text, "a", "b"),
     });
     press("Shift-Tab");
@@ -151,7 +132,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
   it("keeps a backward selection backward", () => {
     const text = "    a\n    b";
     const [from, to] = span(text, "a", "b");
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [to, from],
     });
     press("Shift-Tab");
@@ -162,7 +143,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("is one undo step per press", () => {
     const text = "        a\n        b";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Shift-Tab");
@@ -174,7 +155,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("inserts one step at a cursor with Tab", () => {
     const text = "ab";
-    const { view, press } = setup(doc(codeBlock(text)), { cursor: 2 });
+    const { view, press } = withKeymap(doc(codeBlock(text)), { cursor: 2 });
     press("Tab");
     // from column 1 to the tab stop at 4
     expect(code(view)).toBe("a   b");
@@ -183,14 +164,14 @@ describe("code blocks: Tab and Shift-Tab", () => {
 
   it("inserts a tab at a cursor in a line indented with tabs", () => {
     const text = "\tab";
-    const { view, press } = setup(doc(codeBlock(text)), { cursor: 3 });
+    const { view, press } = withKeymap(doc(codeBlock(text)), { cursor: 3 });
     press("Tab");
     expect(code(view)).toBe("\ta\tb");
   });
 
   it("outdents the cursor's line with Shift-Tab", () => {
     const text = "x\n      ab";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: 1 + text.indexOf("b"),
     });
     press("Shift-Tab");
@@ -202,7 +183,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
   });
 
   it("does nothing, but keeps the key, on a line without indentation", () => {
-    const { view, press } = setup(doc(codeBlock("ab")), { cursor: 2 });
+    const { view, press } = withKeymap(doc(codeBlock("ab")), { cursor: 2 });
     const before = view.state;
     expect(press("Shift-Tab")).toBe(true);
     expect(view.state).toBe(before);
@@ -211,7 +192,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
   it("indents by the size set in blank.json", () => {
     config.value = { ...defaultConfig, editor: { indentSize: 2 } };
     const text = "a\n   b\n    c";
-    const { view, press } = setup(doc(codeBlock(text)), {
+    const { view, press } = withKeymap(doc(codeBlock(text)), {
       cursor: [1, text.length + 1],
     });
     press("Tab");
@@ -222,7 +203,7 @@ describe("code blocks: Tab and Shift-Tab", () => {
   });
 
   it("leaves Tab in lists to the list commands", () => {
-    const { view, press } = setup(doc(ul(li(p("one")), li(p("two")))), {
+    const { view, press } = withKeymap(doc(ul(li(p("one")), li(p("two")))), {
       cursor: 10,
     });
     expect(press("Tab")).toBe(true);
@@ -230,13 +211,13 @@ describe("code blocks: Tab and Shift-Tab", () => {
   });
 
   it("doesn't take Tab outside code blocks", () => {
-    const { press } = setup(doc(p("text")), { cursor: 2 });
+    const { press } = withKeymap(doc(p("text")), { cursor: 2 });
     expect(press("Tab")).toBe(false);
     expect(press("Shift-Tab")).toBe(false);
   });
 
   it("doesn't take a selection that leaves the code block", () => {
-    const { press } = setup(doc(codeBlock("    a"), p("b")), {
+    const { press } = withKeymap(doc(codeBlock("    a"), p("b")), {
       cursor: [2, 10],
     });
     expect(press("Shift-Tab")).toBe(false);
