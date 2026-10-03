@@ -60,7 +60,7 @@ const marked = schema.node("paragraph", null, [
   ]),
 ]);
 
-const document = docWithFrontmatter(
+const rich = docWithFrontmatter(
   FRONTMATTER,
   h(1, "Chapter"),
   marked,
@@ -84,13 +84,13 @@ const document = docWithFrontmatter(
 describe("the engine's contract", () => {
   it("sends every key the engine reads", async () => {
     const sizes = () => ({ width: 120, height: 80 });
-    const items = flatten(document, sizes).map((record) => record.build());
+    const items = flatten(rich, sizes).map((record) => record.build());
     const { layout } = resolveLayout(
-      document.attrs.frontmatter as string,
+      rich.attrs.frontmatter as string,
       DEFAULT_PAGE,
       "de-DE",
     );
-    const fields = documentFields(document, "/notes/contract.md", {
+    const fields = documentFields(rich, "/notes/contract.md", {
       now: new Date("2026-01-01T00:00:00Z"),
       locale: "en-GB",
     });

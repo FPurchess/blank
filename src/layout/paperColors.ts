@@ -1,8 +1,7 @@
-// The colours of the PDF and the Word export: what the pages show at an
-// opacity of the theme's text colour, mixed onto white paper with the light
-// theme's text colour (src/scss/themes/_light.scss). See paper_rgb in
-// src-tauri/layout/src/pdf.rs and src/ui/painter/colors.test.ts, which checks
-// that they agree.
+// The colours of the PDF and the Word export: the light theme's text colour
+// (src/scss/themes/_light.scss) at the opacity the pages show a role in,
+// mixed onto white paper. paper_rgb in src-tauri/layout/src/pdf.rs repeats
+// them, and src/ui/painter/colors.test.ts checks that both agree.
 
 export const LIGHT_TEXT = [27, 40, 50] as const;
 
