@@ -359,7 +359,7 @@ describe("the PDF's images", () => {
     );
 
     expect(screen.pages()).toBe(pdf.pages());
-    const shown = (engine: typeof pdf) => engine.display(0, 1).i;
+    const shown = (engine: typeof pdf) => engine.bodyDisplay(0, 1).i;
     expect(shown(screen)).toHaveLength(1);
     expect(shown(screen)).toEqual(shown(pdf));
   });

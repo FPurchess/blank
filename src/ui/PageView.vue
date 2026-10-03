@@ -38,8 +38,7 @@ import {
   pageView,
   pageViewport,
 } from "../state";
-import PageFirstHeader from "./PageFirstHeader.vue";
-import PageLastFooter from "./PageLastFooter.vue";
+import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
@@ -673,8 +672,8 @@ onUnmounted(() => {
         :ratio="ratio"
         :focused="focused"
       />
-      <PageFirstHeader :layout="layout" />
-      <PageLastFooter :layout="layout" />
+      <PageEdgeBand band="header" :layout="layout" />
+      <PageEdgeBand band="footer" :layout="layout" />
       <PageProperties :layout="layout" />
     </div>
   </div>

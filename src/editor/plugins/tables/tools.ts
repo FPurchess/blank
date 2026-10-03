@@ -10,12 +10,9 @@ import { isInTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import { gfmBlocker, type GfmBlocker } from "../../../markdown/tables";
-import { watch } from "vue";
 
 import {
   announce as announceNow,
-  pageLayoutState,
-  pageViewport,
   tableToolbar,
   type TableToolbarItem,
 } from "../../../state";
@@ -28,7 +25,7 @@ import { setCaption } from "../../commands/table/format";
 import { tableKeyBinding } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 import { blockBoxes, caretPage } from "../../../engine/geometry";
-import { engineless } from "../../../engine/engine";
+import { followLayout } from "./followLayout";
 import { tableAround } from "./util";
 
 /**
@@ -284,16 +281,7 @@ export const tableTools = () => {
       },
     },
     view(view) {
-      // the page view scrolled, resized or switched, or the pages were laid
-      // out again, e.g. once an image above loaded
-      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
-        flush: "sync",
-      });
-      // without the engine, the editor itself scrolls
-      const scrolled = () => {
-        if (engineless()) publish(view);
-      };
-      window.addEventListener("scroll", scrolled, true);
+      const unfollow = followLayout(() => publish(view));
       publish(view);
       return {
         update: (view) => {
@@ -306,8 +294,7 @@ export const tableTools = () => {
           publish(view);
         },
         destroy: () => {
-          stop();
-          window.removeEventListener("scroll", scrolled, true);
+          unfollow();
           tableToolbar.value = null;
         },
       };

@@ -54,7 +54,7 @@ import {
   forgetEngineFailure,
   pageEngine,
 } from "../../engine/engine";
-import { hidePages, showPages, testEngine } from "../../test/engine";
+import { hidePages, pageOf, showPages, testEngine } from "../../test/engine";
 import { caretBox } from "../../engine/geometry";
 import { forgetImages, loadedImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
@@ -573,7 +573,7 @@ describe("images on the pages", () => {
       doc(p("text"), schema.node("paragraph", null, image)),
     );
     const shownImages = () =>
-      pageEngine!.display(0, pageLayoutState.value!.versions[0]).i;
+      pageEngine!.bodyDisplay(0, pageLayoutState.value!.bodyVersions[0]).i;
 
     // no folder to look for it in
     expect(loads).toEqual([]);
@@ -952,11 +952,9 @@ describe("the pages after many real edits", () => {
         fresh.setSettings(pageLayout.value.layout, pageFields.value);
         fresh.sync(view.state.doc, () => undefined);
         expect(engine.pages(), `after ${step}`).toBe(fresh.pages());
-        const ours = engine.versions();
-        const theirs = fresh.versions();
         for (let page = 0; page < fresh.pages(); page++)
-          expect(engine.display(page, ours[page]), `after ${step}`).toEqual(
-            fresh.display(page, theirs[page]),
+          expect(pageOf(engine, page), `after ${step}`).toEqual(
+            pageOf(fresh, page),
           );
         for (let pos = 0; pos <= view.state.doc.content.size; pos++)
           for (const after of [false, true])

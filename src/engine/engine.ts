@@ -5,7 +5,6 @@ import { shallowRef } from "vue";
 import type { DocumentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
 import {
-  type Change,
   diff,
   flattenBlocks,
   type FlatRecord,
@@ -305,10 +304,6 @@ export class PageEngine {
   private sizesKey = "";
   private settings = "";
   private frozen = "";
-  private displays = new Map<
-    number,
-    { version: number; display: PageDisplay }
-  >();
   // what each page's body and bands show, by their own versions
   private bodies = new Map<number, { version: number; display: PageDisplay }>();
   private bandsShown = new Map<
@@ -424,7 +419,6 @@ export class PageEngine {
       added = true;
     }
     if (added) {
-      this.displays.clear();
       this.bodies.clear();
       this.bandsShown.clear();
     }
@@ -485,16 +479,17 @@ export class PageEngine {
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
     const same = frozenKey === this.frozen && sizesKey === this.sizesKey;
-    if (doc === this.doc && same && blocks.length === 0) return false;
+    const unchanged = doc === this.doc;
+    if (unchanged && same && blocks.length === 0) return false;
     this.frozen = frozenKey;
     this.sizesKey = sizesKey;
     // what is still to lay out goes first, so the engine has all of it
     this.finish();
-    const ranges = doc === this.doc ? [] : changes?.ranges;
+    const ranges = unchanged ? [] : changes?.ranges;
     if (
       same &&
       ranges &&
-      (doc === this.doc || changes?.from === this.doc) &&
+      (unchanged || changes?.from === this.doc) &&
       this.syncBlocks(doc, ranges, blocks, sizes, frozen)
     )
       return true;
@@ -520,7 +515,14 @@ export class PageEngine {
       }
     } else {
       const shift = doc.content.size - this.doc.content.size;
-      this.send(diff(this.records, records, shift), 0);
+      const change = diff(this.records, records, shift);
+      if (change.delete > 0 || change.records.length > 0 || change.shift !== 0)
+        this.raw.update(
+          change.start,
+          change.delete,
+          JSON.stringify(change.records.map((record) => record.build())),
+          change.shift,
+        );
     }
     this.records = records;
     this.blockStarts = startsOf(blocks, 0);
@@ -609,22 +611,6 @@ export class PageEngine {
     }
     this.doc = doc;
     return true;
-  }
-
-  // hands the engine a change, whose records start at `offset`
-  private send(change: Change, offset: number) {
-    if (
-      change.delete === 0 &&
-      change.records.length === 0 &&
-      change.shift === 0
-    )
-      return;
-    this.raw.update(
-      offset + change.start,
-      change.delete,
-      JSON.stringify(change.records.map((record) => record.build())),
-      change.shift,
-    );
   }
 
   // the first layout of a long document, laid out a chunk at a time after
@@ -725,20 +711,6 @@ export class PageEngine {
       // a trapped engine may not free, which leaves its memory to the wasm
       console.error("failed to free the layout engine", error);
     }
-  }
-
-  /**
-   * display returns what a page shows, read again only when it changed
-   * @deprecated paint bodyDisplay and bandDisplay, which change apart
-   */
-  display(page: number, version: number): PageDisplay {
-    const cached = this.displays.get(page);
-    if (cached?.version === version) return cached.display;
-    return this.call(EMPTY_DISPLAY, () => {
-      const display = JSON.parse(this.raw.page(page)) as PageDisplay;
-      this.displays.set(page, { version, display });
-      return display;
-    });
   }
 
   /**

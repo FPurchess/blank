@@ -23,7 +23,7 @@ import { trackChanges, type TrackedChanges } from "../editor/plugins/pageView";
 import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { blockquote, doc, h, li, p, table, td, tr, ul } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { pageOf, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import type { PageEngine } from "./engine";
 import * as flattening from "./flatten";
@@ -96,12 +96,8 @@ const editor = () => {
 };
 
 // the pages of an engine, each read again
-const pagesOf = (engine: PageEngine) => {
-  const versions = engine.versions();
-  return Array.from({ length: engine.pages() }, (_, page) =>
-    engine.display(page, versions[page]),
-  );
-};
+const pagesOf = (engine: PageEngine) =>
+  Array.from({ length: engine.pages() }, (_, page) => pageOf(engine, page));
 
 // the same as a fresh engine lays it out
 const expectFresh = ({ state, engine, layout }: ReturnType<typeof editor>) => {

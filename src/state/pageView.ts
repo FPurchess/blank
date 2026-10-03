@@ -19,12 +19,11 @@ export interface PageLayoutState {
   height: number;
   margins: { top: number; right: number; bottom: number; left: number };
   pages: number;
-  // changes when what a page shows changes, so only those pages are
-  // painted again
-  versions: Uint32Array;
-  // the versions of each page's text and of its header and footer, which change apart (see .claude/rules/layout-engine.md)
-  bodyVersions?: Uint32Array;
-  bandVersions?: Uint32Array;
+  // the versions of each page's text and of its header and footer, which
+  // change only when what they show changes, and apart, so only those are
+  // painted again (see .claude/rules/layout-engine.md)
+  bodyVersions: Uint32Array;
+  bandVersions: Uint32Array;
   // where the text of each page ends, from its top edge
   bottoms: Float32Array;
   // whether the line with the document's properties shows above the first

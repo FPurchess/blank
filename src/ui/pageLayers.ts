@@ -23,14 +23,13 @@ export const layerDisplay = (
     : engine.bandDisplay(page, version);
 
 /**
- * layerVersions returns the versions of each page's body and bands, or the
- * combined ones of a layout published without them
+ * layerVersions returns the versions of each page's body and bands
  */
 export const layerVersions = (
   state: PageLayoutState,
 ): Record<Layer, Uint32Array> => ({
-  body: state.bodyVersions ?? state.versions,
-  bands: state.bandVersions ?? state.versions,
+  body: state.bodyVersions,
+  bands: state.bandVersions,
 });
 
 // the colours a theme paints the pages in: its text, the selection, and the

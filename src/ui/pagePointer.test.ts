@@ -41,7 +41,8 @@ describe("targetAt", () => {
       height: 841.89,
       margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
       pages: engine.pages(),
-      versions: engine.raw.versions(),
+      bodyVersions: engine.raw.bodyVersions(),
+      bandVersions: engine.raw.bandVersions(),
       bottoms: engine.raw.bottoms(),
     };
     pageLayoutState.value = state;

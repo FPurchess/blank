@@ -79,10 +79,10 @@ describe("PageEngine", () => {
     engine.setSettings(testLayout(), documentFields(node));
     engine.sync(node, noSizes);
     expect(engine.pages()).toBeGreaterThan(2);
-    const display = engine.display(0, engine.raw.versions()[0]);
+    const display = engine.bodyDisplay(0, engine.bodyVersions()[0]);
     expect(display.g.length).toBeGreaterThan(20);
     // the same version is read only once
-    expect(engine.display(0, engine.raw.versions()[0])).toBe(display);
+    expect(engine.bodyDisplay(0, engine.bodyVersions()[0])).toBe(display);
   });
 
   it("follows edits, keeping the pages after them", () => {
@@ -216,7 +216,7 @@ describe("the body and the bands of a page", () => {
     const glyphs = (display: { g: number[][] }) =>
       display.g.reduce((sum, run) => sum + (run.length - 3) / 3, 0);
     expect(glyphs(body) + glyphs(bands)).toBe(
-      glyphs(engine.display(0, engine.versions()[0])),
+      glyphs(JSON.parse(engine.raw.page(0))),
     );
 
     const typed = doc(p("Some more text"));
@@ -241,7 +241,7 @@ describe("an image in a table cell", () => {
     const engine = testEngine();
     engine.setSettings(testLayout(), documentFields(node));
     engine.sync(node, (src) => (src === "x.png" ? size : undefined));
-    const [shown] = engine.display(0, engine.versions()[0]).i;
+    const [shown] = engine.bodyDisplay(0, engine.bodyVersions()[0]).i;
     const grid = engine.tableGrid(0)!;
     return { engine, shown, cellWidth: grid.columns[1] - grid.columns[0] };
   };

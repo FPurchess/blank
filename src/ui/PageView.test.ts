@@ -58,7 +58,8 @@ const layOut = () => {
     height: 841.89,
     margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
     pages: engine.pages(),
-    versions: engine.raw.versions(),
+    bodyVersions: engine.raw.bodyVersions(),
+    bandVersions: engine.raw.bandVersions(),
     bottoms: engine.raw.bottoms(),
   };
   return engine;
@@ -301,7 +302,8 @@ describe("page view", () => {
       height: 841.89,
       margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
       pages: engine.pages(),
-      versions: engine.raw.versions(),
+      bodyVersions: engine.raw.bodyVersions(),
+      bandVersions: engine.raw.bandVersions(),
       bottoms: engine.raw.bottoms(),
       header: true,
     };
@@ -342,7 +344,8 @@ describe("page view", () => {
     );
     pageLayoutState.value = {
       ...pageLayoutState.value,
-      versions: engine.raw.versions(),
+      bodyVersions: engine.raw.bodyVersions(),
+      bandVersions: engine.raw.bandVersions(),
       header: false,
     };
     await nextTick();
@@ -361,7 +364,7 @@ describe("page view", () => {
       height: 841.89,
       margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
       pages,
-      versions: engine.raw.versions(),
+      bodyVersions: engine.raw.bodyVersions(),
       bandVersions: engine.raw.bandVersions(),
       bottoms: engine.raw.bottoms(),
       // as the editor's plugin sets them, from what is written
@@ -410,6 +413,8 @@ describe("page view", () => {
     await nextTick();
     expect(view().querySelector(".page-end")).toBeNull();
     expect(slotsOf(lastFooter())).toEqual(["Foot", "", "1"]);
+    // the same component shows the first page's header, which it has none of
+    expect(view().querySelector(".page-first-header")).toBeNull();
     // right below the text of the page, with room for it on the desk
     const frame = frames()[0];
     expect(parseFloat(lastFooter()!.style.top)).toBe(

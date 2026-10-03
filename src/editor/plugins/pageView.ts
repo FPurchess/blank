@@ -19,7 +19,7 @@ import {
   ReplaceStep,
 } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
-import { computed, watch } from "vue";
+import { computed, type EffectScope, effectScope, watch } from "vue";
 
 import {
   pageEngine,
@@ -151,7 +151,6 @@ const publishLayout = (engine: PageEngine) => {
     height,
     margins,
     pages,
-    versions: engine.versions(),
     bodyVersions: engine.bodyVersions(),
     bandVersions: engine.bandVersions(),
     bottoms: engine.bottoms(),
@@ -400,11 +399,14 @@ export const pageSync = () => {
       // document only: a new document gets a new view
       let frozen: FrozenWidths | null = null;
       let engine: PageEngine | null = null;
-      let stops: (() => void)[] = [];
+      // the watchers of the engine laying out, stopped when it gives up;
+      // like a watcher of its own, the scope belongs to whatever scope is
+      // active when the engine starts
+      let engineScope: EffectScope | null = null;
       // the engine gave up (see PageEngine.call): the editor shows the text
       const teardown = () => {
-        stops.forEach((stop) => stop());
-        stops = [];
+        engineScope?.stop();
+        engineScope = null;
         if (engine) {
           engine.onProgress = null;
           engine.finish();
@@ -430,7 +432,8 @@ export const pageSync = () => {
         if (engine !== ready) return;
         bootMark("layout");
         publishSelection(ready, view.state, false);
-        stops.push(
+        engineScope = effectScope();
+        engineScope.run(() => {
           // fonts found for what Blank's fonts lack
           watch(
             fallbackFonts,
@@ -442,7 +445,7 @@ export const pageSync = () => {
               publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
-          ),
+          );
           // the page setup, the fields of headers and footers, loaded
           // images, and the document's folder, which relative images are in
           watch(
@@ -476,8 +479,8 @@ export const pageSync = () => {
               if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
-          ),
-        );
+          );
+        });
       };
       // the engine loads while the editor boots, and is gone once it failed
       const watching = watch(
@@ -541,16 +544,19 @@ export const pageView = () => {
   // the x the caret keeps while it moves up and down, in points
   let goal: number | null = null;
 
+  /**
+   * move puts the head at `target`, keeping `anchor` when the selection is
+   * extended, and tells the page view how it got there
+   */
   const move = (
     view: EditorView,
-    selection: Selection,
-    by: PageViewState["by"],
-    at?: number,
-    after = false,
+    target: Hit,
+    anchor: number | undefined,
+    { by, at, after = false }: PageViewState,
   ) => {
     view.dispatch(
       view.state.tr
-        .setSelection(selection)
+        .setSelection(selectionAt(view.state, target, anchor))
         .setMeta(pageViewKey, { by, at, after } satisfies PageViewState)
         .scrollIntoView(),
     );
@@ -582,12 +588,10 @@ export const pageView = () => {
     const edge = down ? Selection.atEnd(doc).to : 0;
     const target =
       hit && hit.pos !== selection.head ? hit : { node: false, pos: edge };
-    move(
-      view,
-      selectionAt(view.state, target, extend ? selection.anchor : undefined),
-      "page",
-      caret.top - box.top,
-    );
+    move(view, target, extend ? selection.anchor : undefined, {
+      by: "page",
+      at: caret.top - box.top,
+    });
     goal = current;
     return true;
   };
@@ -640,17 +644,10 @@ export const pageView = () => {
               after: false,
             } satisfies Move);
           const current = goal;
-          move(
-            view,
-            selectionAt(
-              view.state,
-              target,
-              event.shiftKey ? selection.anchor : undefined,
-            ),
-            "vertical",
-            undefined,
-            target.after,
-          );
+          move(view, target, event.shiftKey ? selection.anchor : undefined, {
+            by: "vertical",
+            after: target.after,
+          });
           goal = current;
           return true;
         }
@@ -666,14 +663,9 @@ export const pageView = () => {
           if (edge === null) return false;
           move(
             view,
-            selectionAt(
-              view.state,
-              { node: false, pos: edge.pos },
-              event.shiftKey ? selection.anchor : undefined,
-            ),
-            null,
-            undefined,
-            edge.after,
+            { node: false, pos: edge.pos },
+            event.shiftKey ? selection.anchor : undefined,
+            { by: null, after: edge.after },
           );
           return true;
         }

@@ -25,6 +25,15 @@ export const testEngine = (): PageEngine => {
   return loadEngineSync(wasm, fonts);
 };
 
+/**
+ * pageOf returns what a page of `engine` shows: its text and its header and
+ * footer, at their current versions
+ */
+export const pageOf = (engine: PageEngine, page: number) => ({
+  body: engine.bodyDisplay(page, engine.bodyVersions()[page]),
+  bands: engine.bandDisplay(page, engine.bandVersions()[page]),
+});
+
 // the window of the page view in tests: 800 × 600 at the top left
 export const TEST_VIEWPORT = {
   left: 0,
