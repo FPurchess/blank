@@ -92,3 +92,39 @@ describe("the bands of the engine and of Blank's exports", () => {
     }
   });
 });
+
+describe("the bands of the engine and of Blank's exports, for odd text", () => {
+  // the second page starts without a heading 1, so it shows the chapter it
+  // continues, the last one before it, as Word's STYLEREF does
+  const continued = doc(
+    h(1, "One"),
+    p("text"),
+    pageBreak(),
+    p("more text"),
+    pageBreak(),
+    h(1, "Two"),
+  );
+
+  it("are the same for braces, names they don't know and a continued chapter", () => {
+    const layout: Layout = {
+      ...testLayout(),
+      header: slots("{{page}} {{", "{nope} {page", "{chapter}"),
+      footer: slots("}{page}{", "{{{title}}}", "{ chapter }"),
+    };
+    const fields = documentFields(continued, "/docs/report.md");
+    const engine = testEngine();
+    engine.setSettings(layout, fields);
+    engine.sync(continued, () => undefined);
+    expect(engine.pages()).toBe(3);
+
+    const chapterOn = ["One", "One", "Two"];
+    for (let page = 1; page <= 3; page++) {
+      const bands = bandsOn(layout, page);
+      const values = fieldValues(layout, page, 3, fields, chapterOn[page - 1]);
+      expect(engine.bands(page - 1), `page ${page}`).toEqual([
+        ...SLOTS.map((slot) => expand(bands.header[slot], values)),
+        ...SLOTS.map((slot) => expand(bands.footer[slot], values)),
+      ]);
+    }
+  });
+});

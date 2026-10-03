@@ -43,6 +43,17 @@ export class LayoutEngine {
         wasm.layoutengine_addImage(this.__wbg_ptr, ptr0, len0, ptr1, len1, jpeg);
     }
     /**
+     * the size, distance from the edge and line of the headers and footers,
+     * which the page view repeats; for tests
+     * @returns {Float32Array}
+     */
+    bandMetrics() {
+        const ret = wasm.layoutengine_bandMetrics(this.__wbg_ptr);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * each page's header and footer change with its band version
      * @returns {Uint32Array}
      */
@@ -101,6 +112,17 @@ export class LayoutEngine {
     boxes(from, to) {
         const ret = wasm.layoutengine_boxes(this.__wbg_ptr, from, to);
         var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * the names of Blank's font files, in the order the webview loads
+     * them; for tests
+     * @returns {string[]}
+     */
+    bundledFontFiles() {
+        const ret = wasm.layoutengine_bundledFontFiles(this.__wbg_ptr);
+        var v1 = getArrayJsValueFromWasm0(ret[0], ret[1]);
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v1;
     }
@@ -445,6 +467,19 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * the styles text is set in, which the Word styles repeat: for each of
+     * p, h1 to h6, code and caption its size, its line height as a factor of
+     * the font's natural one, weight, slant (1 for italic), tracking and
+     * whether it is monospaced; for tests
+     * @returns {Float32Array}
+     */
+    textStyles() {
+        const ret = wasm.layoutengine_textStyles(this.__wbg_ptr);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * @param {number} font
      * @returns {number}
      */
@@ -590,6 +625,11 @@ function __wbg_get_imports() {
         __wbg_error_035268df37369d3d: function(arg0, arg1) {
             console.error(getStringFromWasm0(arg0, arg1));
         },
+        __wbindgen_generic_0000000000000001: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(String) -> Externref`.
+            const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
+        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -631,6 +671,17 @@ function getArrayI32FromWasm0(ptr, len) {
     return getInt32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
 }
 
+function getArrayJsValueFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    const mem = getDataViewMemory0();
+    const result = [];
+    for (let i = ptr; i < ptr + 4 * len; i += 4) {
+        result.push(wasm.__wbindgen_externrefs.get(mem.getUint32(i, true)));
+    }
+    wasm.__externref_drop_slice(ptr, len);
+    return result;
+}
+
 function getArrayU32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
@@ -639,6 +690,14 @@ function getArrayU32FromWasm0(ptr, len) {
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+
+let cachedDataViewMemory0 = null;
+function getDataViewMemory0() {
+    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
+        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
+    }
+    return cachedDataViewMemory0;
 }
 
 let cachedFloat32ArrayMemory0 = null;
@@ -780,6 +839,7 @@ function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedDataViewMemory0 = null;
     cachedFloat32ArrayMemory0 = null;
     cachedFloat64ArrayMemory0 = null;
     cachedInt32ArrayMemory0 = null;

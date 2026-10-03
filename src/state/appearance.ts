@@ -1,16 +1,20 @@
 import { shallowRef, watch } from "vue";
 
-export const themes: string[] = [
+// each needs a partial in src/scss/themes/, which _index.scss uses
+export const themes = [
   "light",
   "dark",
   "black",
   "red",
   "green",
   "blue",
-];
+] as const;
 
-export type themeType = (typeof themes)[number];
-export const theme = shallowRef<themeType>("light");
+export type ThemeName = (typeof themes)[number];
+export const theme = shallowRef<ThemeName>("light");
+
+export const isTheme = (value: unknown): value is ThemeName =>
+  (themes as readonly unknown[]).includes(value);
 
 /**
  * bootAppearance applies the theme to the document body, which the themes

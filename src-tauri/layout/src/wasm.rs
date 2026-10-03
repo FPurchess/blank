@@ -457,6 +457,50 @@ impl LayoutEngine {
         ]
     }
 
+    /// the styles text is set in, which the Word styles repeat: for each of
+    /// p, h1 to h6, code and caption its size, its line height as a factor of
+    /// the font's natural one, weight, slant (1 for italic), tracking and
+    /// whether it is monospaced; for tests
+    #[cfg(feature = "test-hooks")]
+    #[wasm_bindgen(js_name = textStyles)]
+    pub fn text_styles(&self) -> Vec<f32> {
+        use crate::style::{text_style, NATURAL};
+        ["p", "h1", "h2", "h3", "h4", "h5", "h6", "code", "caption"]
+            .into_iter()
+            .flat_map(|name| {
+                let style = text_style(name);
+                [
+                    style.size,
+                    style.line / (style.size * NATURAL),
+                    style.weight,
+                    f32::from(u8::from(style.italic)),
+                    style.tracking,
+                    f32::from(u8::from(style.mono)),
+                ]
+            })
+            .collect()
+    }
+
+    /// the size, distance from the edge and line of the headers and footers,
+    /// which the page view repeats; for tests
+    #[cfg(feature = "test-hooks")]
+    #[wasm_bindgen(js_name = bandMetrics)]
+    pub fn band_metrics(&self) -> Vec<f32> {
+        use crate::bands::{BAND_DISTANCE, BAND_LINE, BAND_SIZE};
+        vec![BAND_SIZE, BAND_DISTANCE, BAND_LINE]
+    }
+
+    /// the names of Blank's font files, in the order the webview loads
+    /// them; for tests
+    #[cfg(feature = "test-hooks")]
+    #[wasm_bindgen(js_name = bundledFontFiles)]
+    pub fn bundled_font_files(&self) -> Vec<String> {
+        crate::fonts::FONT_FILES
+            .iter()
+            .map(|name| name.to_string())
+            .collect()
+    }
+
     /// the colour of a role on paper, as 0xRRGGBB; for tests
     #[cfg(feature = "test-hooks")]
     #[wasm_bindgen(js_name = roleColor)]

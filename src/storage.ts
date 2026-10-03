@@ -13,8 +13,8 @@ import {
   path,
   spellcheck,
   transaction,
+  isTheme,
   theme,
-  themeType,
   themes,
 } from "./state";
 import {
@@ -126,9 +126,7 @@ export const bootStorage = async () => {
   );
 
   const _theme = await localforage.getItem("theme");
-  theme.value = themes.includes(_theme as string)
-    ? (_theme as themeType)
-    : themes[0];
+  theme.value = isTheme(_theme) ? _theme : themes[0];
 
   persist(theme, "theme");
 
