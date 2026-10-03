@@ -16,21 +16,11 @@ const bootTimes = async () => {
   await expect($("#page-view .page-canvas")).toBeExisting();
   await browser.waitUntil(
     async () =>
-      (await browser.execute(
-        () =>
-          (
-            window as unknown as {
-              blankBootTimes: () => Record<string, number>;
-            }
-          ).blankBootTimes().pages,
-      )) !== undefined,
+      (await browser.execute(() => window.blankBootTimes().pages)) !==
+      undefined,
     { timeoutMsg: "the pages weren't painted" },
   );
-  return browser.execute(() =>
-    (
-      window as unknown as { blankBootTimes: () => Record<string, number> }
-    ).blankBootTimes(),
-  );
+  return browser.execute(() => window.blankBootTimes());
 };
 
 const load = () => fs.readFileSync("/proc/loadavg", "utf8").split(" ")[0];

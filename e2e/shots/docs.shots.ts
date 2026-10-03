@@ -15,6 +15,7 @@ import {
   restartApp,
   type,
   hoverEdge,
+  pressShift,
 } from "../helpers.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,26 +50,6 @@ const setTheme = async (theme: string) => {
   }
 };
 
-/**
- * shift presses `key` with Shift held, as separate actions: WebKitWebDriver
- * drops the Shift of `browser.keys`
- */
-const shift = async (key: string) => {
-  await browser.performActions([
-    {
-      type: "key",
-      id: "keyboard",
-      actions: [
-        { type: "keyDown", value: Key.Shift },
-        { type: "keyDown", value: key },
-        { type: "keyUp", value: key },
-        { type: "keyUp", value: Key.Shift },
-      ],
-    },
-  ]);
-  await browser.releaseActions();
-};
-
 // the symbols typed with Shift on a US keyboard, and the keys they're on
 const SHIFTED = '~!@#$%^&*()_+{}|:"<>?';
 const UNSHIFTED = "`1234567890-=[]\\;',./";
@@ -79,8 +60,10 @@ const UNSHIFTED = "`1234567890-=[]\\;',./";
  */
 const typeChar = (char: string) => {
   const index = SHIFTED.indexOf(char);
-  if (index >= 0) return shift(UNSHIFTED[index]);
-  return char === char.toLowerCase() ? type(char) : shift(char.toLowerCase());
+  if (index >= 0) return pressShift(UNSHIFTED[index]);
+  return char === char.toLowerCase()
+    ? type(char)
+    : pressShift(char.toLowerCase());
 };
 
 /**
@@ -209,16 +192,7 @@ class Recorder {
    */
   async clickInto(selector: string, seconds = 0.6, move = 0.5) {
     const at = await browser.execute((selector: string) => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            endOf: (element: Element) => number;
-            caretBox: (
-              pos: number,
-            ) => { left: number; top: number; bottom: number } | null;
-          };
-        }
-      ).blankGeometry;
+      const geometry = window.blankGeometry;
       const box = geometry.caretBox(
         geometry.endOf(document.querySelector(selector)!),
       )!;
@@ -707,7 +681,7 @@ describe("docs screenshots", () => {
     await film.pause(1);
     // from the start of the cell, Shift+← selects both cells of the row
     await film.press("Home", Key.Home, 0.4);
-    await film.shortcut(["Shift", "←"], () => shift(Key.ArrowLeft), 0.9);
+    await film.shortcut(["Shift", "←"], () => pressShift(Key.ArrowLeft), 0.9);
     await film.press("Backspace", Key.Backspace, 1);
     await film.pause(2);
     film.save(path.join(outDir, "table-cells.gif"), 360);
@@ -754,12 +728,7 @@ describe("docs screenshots", () => {
     );
     // Tab in the last cell adds a row, where two more rows get pasted
     const lastCell = await browser.execute(() => {
-      type Piece = { rows: number[]; columns: number[] };
-      const [table] = (
-        window as unknown as {
-          blankGeometry: { tables: () => { pieces: Piece[] }[] };
-        }
-      ).blankGeometry.tables();
+      const table = window.blankGeometry.tables()[0]!;
       const { rows, columns } = table.pieces[table.pieces.length - 1];
       return {
         x: Math.round(columns[columns.length - 2] + 30),
@@ -800,16 +769,7 @@ describe("docs screenshots", () => {
     // the painted table, see src/engine/geometry.ts
     const layout = () =>
       browser.execute(() => {
-        type Piece = {
-          box: { left: number; bottom: number };
-          rows: number[];
-          columns: number[];
-        };
-        const [table] = (
-          window as unknown as {
-            blankGeometry: { tables: () => { pieces: Piece[] }[] };
-          }
-        ).blankGeometry.tables();
+        const table = window.blankGeometry.tables()[0]!;
         const { box, rows, columns } = table.pieces[0];
         return { rows, columns, left: box.left, bottom: box.bottom };
       });

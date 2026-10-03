@@ -6,8 +6,9 @@ import {
   editorText,
   focusEditor,
   pressMod,
-  textBox,
   type,
+  nextFrames,
+  pointAt,
 } from "../helpers.ts";
 
 // The primary selection of X11 and Wayland: the text selected on the pages
@@ -24,11 +25,6 @@ const hasXclip = (() => {
     return false;
   }
 })();
-
-const frames = () =>
-  browser.executeAsync((done: () => void) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => done())),
-  );
 
 const readPrimary = () =>
   execFileSync("xclip", ["-o", "-selection", "primary"], {
@@ -47,22 +43,12 @@ const setPrimary = async (text: string) => {
   await browser.waitUntil(() => readPrimary() === text, { timeout: 3000 });
 };
 
-// the middle of the `offset`th character of `text` on the pages
-const pointAt = async (text: string, offset = 0) => {
-  const box = await textBox(text, offset);
-  return {
-    x: Math.round(box.left + 1),
-    y: Math.round((box.top + box.bottom) / 2),
-    origin: "viewport" as const,
-  };
-};
-
 (hasXclip ? describe : describe.skip)("the primary selection", () => {
   beforeEach(async () => {
     await focusEditor();
     await pressMod("a");
     await type("hello world");
-    await frames();
+    await nextFrames();
   });
 
   it("is what's selected on the pages", async () => {
@@ -76,7 +62,7 @@ const pointAt = async (text: string, offset = 0) => {
       .down()
       .up()
       .perform();
-    await frames();
+    await nextFrames();
     await browser.waitUntil(() => readPrimary() === "world", {
       timeout: 3000,
     });

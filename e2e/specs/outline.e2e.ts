@@ -29,18 +29,10 @@ const file = path.join(
   "outline.md",
 );
 
-type Geometry = {
-  blankGeometry: {
-    find: (text: string) => number;
-    scrollTops: (positions: number[]) => (number | null)[];
-    scrollState: () => { top: number; height: number; max: number } | null;
-  };
-};
-
 // how far below the top of the view the text of the heading `text` starts
 const headingOffset = (text: string) =>
   browser.execute((text) => {
-    const { blankGeometry } = window as unknown as Geometry;
+    const { blankGeometry } = window;
     const [top] = blankGeometry.scrollTops([blankGeometry.find(text)]);
     const state = blankGeometry.scrollState();
     return top === null || !state ? null : top - state.top;

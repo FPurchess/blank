@@ -5,8 +5,9 @@ import {
   focusEditor,
   paste,
   pressMod,
-  textBox,
   type,
+  nextFrames,
+  pointAt,
 } from "../helpers.ts";
 
 // Moving selected text on the painted pages with the pointer, and the clicks
@@ -16,28 +17,13 @@ import {
 const LINE = "alpha beta gamma delta";
 const SHOWN = "Alpha beta gamma delta";
 
-// the point in the middle of the `offset`th character of `text`
-const pointAt = async (text: string, offset = 0) => {
-  const box = await textBox(text, offset);
-  return {
-    x: Math.round(box.left + 2),
-    y: Math.round((box.top + box.bottom) / 2),
-    origin: "viewport" as const,
-  };
-};
-
-const frames = () =>
-  browser.executeAsync((done: () => void) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => done())),
-  );
-
 // what the editor has selected, from its hidden DOM
 const selected = () =>
   browser.execute(() => window.getSelection()?.toString() ?? "");
 
 // a double click, which selects a word
 const selectWord = async (word: string) => {
-  const at = await pointAt(word, 1);
+  const at = await pointAt(word, 1, 2);
   await browser
     .action("pointer")
     .move(at)
@@ -47,7 +33,7 @@ const selectWord = async (word: string) => {
     .down()
     .up()
     .perform();
-  await frames();
+  await nextFrames();
   // not a third click
   await browser.pause(600);
 };
@@ -57,11 +43,11 @@ describe("moving text on the pages", () => {
     await focusEditor();
     await pressMod("a");
     await type(LINE);
-    await frames();
+    await nextFrames();
   });
 
   it("selects the line with a triple click in a selected word", async () => {
-    const at = await pointAt("beta", 1);
+    const at = await pointAt("beta", 1, 2);
     await browser
       .action("pointer")
       .move(at)
@@ -74,15 +60,15 @@ describe("moving text on the pages", () => {
       .down()
       .up()
       .perform();
-    await frames();
+    await nextFrames();
     expect(await selected()).toBe(SHOWN);
   });
 
   it("moves a selected word where it's dropped", async () => {
     await selectWord("gamma");
     expect(await selected()).toBe("gamma");
-    const from = await pointAt("gamma", 2);
-    const to = await pointAt("Alpha", 0);
+    const from = await pointAt("gamma", 2, 2);
+    const to = await pointAt("Alpha", 0, 2);
     await browser
       .action("pointer")
       .move(from)
@@ -91,14 +77,14 @@ describe("moving text on the pages", () => {
       .move({ ...to, duration: 100 })
       .up()
       .perform();
-    await frames();
+    await nextFrames();
     // where "gamma" was, its spaces stay
     expect((await editorText())[0]).toBe("gammaAlpha beta  delta");
   });
 
   it("leaves the text where it was when it's let go on the bar below the pages", async () => {
     await selectWord("beta");
-    const from = await pointAt("beta", 2);
+    const from = await pointAt("beta", 2, 2);
     // the bottom bar, below the pages
     const bar = await browser.execute(() => {
       const box = document.getElementById("ui-bottom")!.getBoundingClientRect();
@@ -117,7 +103,7 @@ describe("moving text on the pages", () => {
       })
       .up()
       .perform();
-    await frames();
+    await nextFrames();
     expect((await editorText())[0]).toBe(SHOWN);
   });
 
@@ -129,11 +115,11 @@ describe("moving text on the pages", () => {
         "\n\n",
       ),
     });
-    await frames();
+    await nextFrames();
     await pressMod("Home");
-    await frames();
+    await nextFrames();
     await selectWord("beta");
-    const from = await pointAt("beta", 2);
+    const from = await pointAt("beta", 2, 2);
     const height = await browser.execute(() => window.innerHeight);
     await browser
       .action("pointer")
@@ -147,7 +133,7 @@ describe("moving text on the pages", () => {
       .move({ ...from, y: Math.round(height / 2), duration: 100 })
       .up()
       .perform();
-    await frames();
+    await nextFrames();
     const scrolled = await browser.execute(
       () => document.getElementById("page-view")!.scrollTop,
     );

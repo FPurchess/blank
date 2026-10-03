@@ -134,11 +134,7 @@ describe("when the layout engine fails while running", () => {
     // still works
     await focusEditor();
     // a debug hook of engine-editor's that makes the engine's next call fail
-    await browser.execute(() =>
-      (
-        window as unknown as { blankBreakEngine: () => void }
-      ).blankBreakEngine(),
-    );
+    await browser.execute(() => window.blankBreakEngine());
     // nothing has called it yet
     await expect($("body")).not.toHaveElementClass("without-engine");
     // a word the welcome document doesn't have, typed into the failing

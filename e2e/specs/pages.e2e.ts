@@ -11,6 +11,7 @@ import {
   restartApp,
   topPage,
   type,
+  nextFrames,
 } from "../helpers.ts";
 
 const checked = (row: string) =>
@@ -195,9 +196,7 @@ describe("page setup", () => {
     for (const mode of ["pages", "page-ends"]) {
       await pressMod(Key.Alt, "v");
       await expect($("#page-view")).toHaveElementClass(mode);
-      await browser.executeAsync((done: () => void) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => done())),
-      );
+      await nextFrames();
       expect(await topPage()).toBe(before);
     }
   });
