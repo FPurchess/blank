@@ -21,7 +21,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | Module | Holds |
 |---|---|
 | `document.ts` | `path`, `importedFrom`, `transaction` (every editor transaction), `textContent` (50 ms after the last one) |
-| `appearance.ts` | `themes`, `theme` |
+| `appearance.ts` | `themes`, `theme`, `isTheme` |
 | `language.ts` | `language`, `languagePicker` |
 | `spellcheck.ts` | `spellcheck`, `spellcheckStatus`, `spellchecker` |
 | `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and of the open header or footer strip (`bandEditor`) |

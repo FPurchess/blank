@@ -24,7 +24,7 @@ pub enum Role {
     TableLine = 3,
     HeaderLine = 4,
     HeaderFill = 5,
-    // 6 was an image that isn't loaded yet, now drawn by its alt text (Hint)
+    // 6 is no longer used; ROLE_OPACITY keeps its place
     /// the underline of a link
     LinkLine = 7,
     /// what stands for an image that isn't loaded: its alt text

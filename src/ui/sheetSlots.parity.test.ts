@@ -31,7 +31,7 @@ describe("the slots of a sheet's header and footer", () => {
     // page view places them all
     const slot = (text: string) => `${text} {author}`;
     const layout: Layout = {
-      ...testLayout(settings as Partial<Layout>),
+      ...testLayout(settings),
       header: { left: slot("L"), center: slot("C"), right: slot("R") },
       footer: { left: slot("l"), center: slot("c"), right: slot("r") },
     };
