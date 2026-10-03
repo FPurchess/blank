@@ -494,11 +494,6 @@ impl LayoutEngine {
             .insert(src.to_string(), ImageData { bytes, jpeg });
     }
 
-    #[wasm_bindgen(js_name = clearImages)]
-    pub fn clear_images(&mut self) {
-        self.images.clear();
-    }
-
     /// the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
     /// "de-CH", none if left out or empty), made at `date` (ISO 8601 with
     /// its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An

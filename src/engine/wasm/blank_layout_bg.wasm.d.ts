@@ -10,7 +10,6 @@ export const layoutengine_bodyVersions: (a: number) => [number, number];
 export const layoutengine_bottoms: (a: number) => [number, number];
 export const layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_caret: (a: number, b: number, c: number) => [number, number];
-export const layoutengine_clearImages: (a: number) => void;
 export const layoutengine_fontFile: (a: number, b: number) => [number, number];
 export const layoutengine_fontFileCount: (a: number) => number;
 export const layoutengine_fontFileFamily: (a: number, b: number) => [number, number];

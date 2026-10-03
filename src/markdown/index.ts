@@ -8,13 +8,7 @@ import { markdownSerializer } from "./serializer";
 // read and write them, and the frontmatter. Import the schema, parser and
 // serializer from here, never from prosemirror-markdown.
 
-export {
-  alignment,
-  type Alignment,
-  headerRowCount,
-  isHeaderCell,
-  schema,
-} from "./schema";
+export { type Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
 export {
   type DocumentProperties,
   frontmatterError,

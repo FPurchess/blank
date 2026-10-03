@@ -116,9 +116,6 @@ export class LayoutEngine {
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v1;
     }
-    clearImages() {
-        wasm.layoutengine_clearImages(this.__wbg_ptr);
-    }
     /**
      * how many font files the engine has, each once, in the order they
      * came: the ones it was made with, then the ones `addFont` added

@@ -37,7 +37,6 @@ export class LayoutEngine {
      * page, x, y and height of the caret at a position, or nothing
      */
     caret(pos: number, after: boolean): Float32Array;
-    clearImages(): void;
     /**
      * how many font files the engine has, each once, in the order they
      * came: the ones it was made with, then the ones `addFont` added
@@ -201,7 +200,6 @@ export interface InitOutput {
     readonly layoutengine_bottoms: (a: number) => [number, number];
     readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
-    readonly layoutengine_clearImages: (a: number) => void;
     readonly layoutengine_fontFile: (a: number, b: number) => [number, number];
     readonly layoutengine_fontFileCount: (a: number) => number;
     readonly layoutengine_fontFileFamily: (a: number, b: number) => [number, number];

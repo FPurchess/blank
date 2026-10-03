@@ -97,7 +97,6 @@ let storageAvailable = true;
 export const bootStorage = async () => {
   try {
     await localforage.ready();
-    storageAvailable = true;
   } catch (error) {
     storageAvailable = false;
     language.value = detectLanguage();

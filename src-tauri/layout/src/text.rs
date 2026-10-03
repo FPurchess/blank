@@ -27,7 +27,6 @@ pub struct TextBox {
     pub x: f32,
     pub y: f32,
     pub width: f32,
-    pub style: TextStyle,
     /// the characters no font had a glyph for, see Engine::missing
     pub missing: Vec<char>,
     /// its lines, as Parley broke them
@@ -143,7 +142,6 @@ impl TextBox {
             x: 0.0,
             y: 0.0,
             width,
-            style,
             missing: vec![],
             lines: vec![],
             run_fonts: vec![],

@@ -362,7 +362,7 @@ pub(super) fn tag_tree(engine: &Engine, ids: &mut Ids, language: &str) -> TagTre
 
 /// the bookmarks of the document: every heading, its level, text, page and
 /// where on it it starts
-pub fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
+fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
     let mut entries = vec![];
     for (index, item) in engine.items.iter().enumerate() {
         let Content::Text(text) = &item.content else {

@@ -536,11 +536,6 @@ export const waitForInk = async (
 };
 
 /**
- * screenColor returns the mean colour a screenshot shows in `box`
- */
-export const screenColor = async (box: Box) => (await screenStats(box)).mean;
-
-/**
  * luminance returns the relative luminance of a colour of 0–255 channels,
  * as WCAG defines it
  */
