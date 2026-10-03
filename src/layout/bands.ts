@@ -3,6 +3,7 @@ import type { Node } from "prosemirror-model";
 import {
   type DocumentProperties,
   firstHeading,
+  frontmatterOf,
   readProperties,
 } from "../markdown";
 import type { Layout } from "./resolve";
@@ -184,7 +185,7 @@ export const documentFields = (
   options: { now?: Date; locale?: string } = {},
 ): DocumentFields =>
   fieldsOf(
-    readProperties(doc.attrs.frontmatter as string | null),
+    readProperties(frontmatterOf(doc)),
     () => firstHeading(doc),
     path,
     options,

@@ -4,13 +4,13 @@ import { computed } from "vue";
 import { config } from "../config";
 import { type DocumentFields, fieldsOf, sameFields } from "../layout/bands";
 import { resolveLayout } from "../layout/resolve";
-import { firstHeading, readProperties } from "../markdown";
+import { firstHeading, frontmatterOf, readProperties } from "../markdown";
 import { path, transaction } from "./document";
 
 // the frontmatter of the document, which only notifies when it changes,
 // not on every key typed
-export const frontmatter = computed(
-  () => (transaction.value?.doc.attrs.frontmatter ?? null) as string | null,
+export const frontmatter = computed(() =>
+  transaction.value ? frontmatterOf(transaction.value.doc) : null,
 );
 
 // the page setup of the document over the user's defaults, with what of it

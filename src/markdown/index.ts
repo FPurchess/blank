@@ -1,6 +1,10 @@
 import type { Node } from "prosemirror-model";
 
-import { joinFrontmatter, splitFrontmatter } from "./frontmatter";
+import {
+  frontmatterOf,
+  joinFrontmatter,
+  splitFrontmatter,
+} from "./frontmatter";
 import { markdownParser } from "./parser";
 import { markdownSerializer } from "./serializer";
 
@@ -12,6 +16,7 @@ export { type Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
 export {
   type DocumentProperties,
   frontmatterError,
+  frontmatterOf,
   propertiesOf,
   readFrontmatter,
   readProperties,
@@ -38,10 +43,7 @@ export const parseMarkdown = (text: string): Node => {
  * serializeMarkdown writes a document as a markdown file, with its frontmatter
  */
 export const serializeMarkdown = (doc: Node): string =>
-  joinFrontmatter(
-    doc.attrs.frontmatter as string | null,
-    markdownSerializer.serialize(doc),
-  );
+  joinFrontmatter(frontmatterOf(doc), markdownSerializer.serialize(doc));
 
 /**
  * firstHeading returns the text of the first heading, or "" if there is none

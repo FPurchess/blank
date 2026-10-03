@@ -10,7 +10,7 @@ import { layoutWarnings } from "../../layout/describe";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { resolveLayout } from "../../layout/resolve";
 import { BAND_KEYS, PAGE_KEYS, type PageKey } from "../../layout/settings";
-import { frontmatterError } from "../../markdown";
+import { frontmatterError, frontmatterOf } from "../../markdown";
 import { pageSetup } from "../../state";
 import { setFrontmatter, writePage } from "./frontmatter";
 
@@ -28,7 +28,7 @@ export const openPageSetup = (view: EditorView) => {
   const locale = systemLocale();
   const unit = localeUnit(locale);
   const defaults = config.value.layout.page;
-  const frontmatter = view.state.doc.attrs.frontmatter as string | null;
+  const frontmatter = frontmatterOf(view.state.doc);
   const { settings, problems } = resolveLayout(frontmatter, defaults, locale);
 
   pageSetup.value = {

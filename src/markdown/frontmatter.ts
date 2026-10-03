@@ -1,3 +1,4 @@
+import type { Node } from "prosemirror-model";
 import { type Document, isMap, parse, parseDocument } from "yaml";
 
 // Frontmatter is the YAML block between two `---` lines at the very top of a
@@ -19,6 +20,13 @@ const isFrontmatter = (yaml: string) => {
   if (yaml.trim() === "") return true;
   return isMap(parseDocument(yaml).contents);
 };
+
+/**
+ * frontmatterOf returns the frontmatter of a document as written, without
+ * its `---` lines, or null if it has none
+ */
+export const frontmatterOf = (doc: Node): string | null =>
+  (doc.attrs.frontmatter as string | null | undefined) ?? null;
 
 /**
  * splitFrontmatter separates the frontmatter of a markdown file from its body

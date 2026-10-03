@@ -9,6 +9,7 @@ import { type exporterFunc } from "../../exporters";
 import { describePaper, layoutWarnings } from "../../layout/describe";
 import { resolveLayout } from "../../layout/resolve";
 import { localeUnit } from "../../layout/paper";
+import { frontmatterOf } from "../../markdown";
 import { extname } from "../../paths";
 import { engineStatus } from "../../engine/engine";
 import { announce, path } from "../../state";
@@ -77,7 +78,7 @@ export default (
       }
 
       const { layout, problems } = resolveLayout(
-        state.doc.attrs.frontmatter as string | null,
+        frontmatterOf(state.doc),
         config.value.layout.page,
       );
       const { contents, warnings, pages } = await exporter(state, {

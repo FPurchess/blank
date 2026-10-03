@@ -8,6 +8,7 @@ import {
   HEADING_BEFORE,
   ITEM_SPACE,
 } from "../layout/spacing";
+import { listMarker } from "../markdown/lists";
 import type {
   Content,
   EngineCellBlock,
@@ -28,8 +29,6 @@ const RULE_AFTER = 22;
 // the indent of a list level, and of a quote: its bar and the space after it
 export const LIST_INDENT = 18;
 export const QUOTE_INDENT = 2.25 + 11;
-
-const BULLETS = ["•", "◦", "▪"];
 
 // an image's size before the engine fits it into the room it has, in points
 export type ImageSizes = (
@@ -123,6 +122,23 @@ const styleOf = (node: Node) => {
 };
 
 /**
+ * imageContent builds an image, which stands on a line of its own at `pos`
+ * @param size its size once it is loaded
+ */
+const imageContent = (
+  image: Node,
+  pos: number,
+  size: ReturnType<ImageSizes>,
+) => ({
+  kind: "image" as const,
+  pos,
+  src: image.attrs.src as string,
+  width: size?.width ?? 0,
+  height: size?.height ?? 0,
+  alt: (image.attrs.alt as string | null) ?? "",
+});
+
+/**
  * textOf builds the text of a textblock's children, which start at `pos`
  */
 const textOf = (
@@ -199,15 +215,9 @@ const cellBlocks = (
       pieces(node, at).forEach((piece, index) => {
         const first = index === 0 && marker ? { marker } : {};
         if (piece.image) {
-          const src = piece.image.attrs.src as string;
-          const size = sizes(src);
+          const size = sizes(piece.image.attrs.src as string);
           blocks.push({
-            kind: "image",
-            pos: piece.pos,
-            src,
-            width: size?.width ?? 0,
-            height: size?.height ?? 0,
-            alt: (piece.image.attrs.alt as string | null) ?? "",
+            ...imageContent(piece.image, piece.pos, size),
             indent,
             bars,
             ...first,
@@ -233,12 +243,8 @@ const cellBlocks = (
         ),
       );
     } else if (name === "bullet_list" || name === "ordered_list") {
-      const start = (node.attrs.order as number | undefined) ?? 1;
       node.forEach((item, offset, index) => {
-        const bullet =
-          name === "ordered_list"
-            ? `${start + index}.`
-            : BULLETS[depth % BULLETS.length];
+        const bullet = listMarker(node, index, depth);
         item.forEach((child, childOffset, childIndex) =>
           walk(
             child,
@@ -368,14 +374,7 @@ export const flattenBlocks = (
       barsContinue: barsContinue(index),
       ...(extra.marker ? { marker: extra.marker } : {}),
     });
-    records.push({
-      node,
-      pos,
-      key: "",
-      build: item,
-    });
-    const record = records[index];
-    record.key = [
+    const key = [
       context.indent,
       space.before,
       space.after,
@@ -384,6 +383,7 @@ export const flattenBlocks = (
       context.top ? 1 : 0,
       extra.key ?? "",
     ].join("|");
+    records.push({ node, pos, key, build: item });
   };
 
   const barsContinue = (index: number) => {
@@ -462,7 +462,6 @@ export const flattenBlocks = (
         depth: context.depth + 1,
         top: false,
       };
-      const start = (node.attrs.order as number | undefined) ?? 1;
       node.forEach((item, offset, index) => {
         const first = index === 0;
         const last = index === node.childCount - 1;
@@ -470,10 +469,7 @@ export const flattenBlocks = (
           before: ITEM_SPACE + (first ? space.before : 0),
           after: ITEM_SPACE + (last ? space.after : 0),
         };
-        const bullet =
-          name === "ordered_list"
-            ? `${start + index}.`
-            : BULLETS[context.depth % BULLETS.length];
+        const bullet = listMarker(node, index, context.depth);
         children(
           item,
           pos + 1 + offset,
@@ -541,21 +537,13 @@ export const flattenBlocks = (
       const pieceMarker = index === 0 ? marker : undefined;
       if (piece.image) {
         const image = piece.image;
-        const src = image.attrs.src as string;
-        const size = sizes(src);
+        const size = sizes(image.attrs.src as string);
         push(
           image,
           piece.pos,
           context,
           pieceSpace,
-          () => ({
-            kind: "image",
-            pos: piece.pos,
-            src,
-            width: size?.width ?? 0,
-            height: size?.height ?? 0,
-            alt: (image.attrs.alt as string | null) ?? "",
-          }),
+          () => imageContent(image, piece.pos, size),
           {
             marker: pieceMarker,
             key: size ? `${size.width}x${size.height}` : "?",

@@ -1,5 +1,6 @@
 import mono from "../../../fonts/IBMPlexMono-Regular.ttf?url";
 import sans from "../../../fonts/IBMPlexSans-Regular.ttf?url";
+import { CODE_FONT, FONT } from "./template";
 
 // The fonts the Word export embeds as they are (see CLAUDE.md): the regular
 // faces of IBM Plex Sans for the text and IBM Plex Mono for code, loaded on
@@ -11,8 +12,8 @@ export interface EmbeddedFont {
 }
 
 const FILES = [
-  { name: "IBM Plex Sans", url: sans },
-  { name: "IBM Plex Mono", url: mono },
+  { name: FONT, url: sans },
+  { name: CODE_FONT, url: mono },
 ];
 
 const loaded = new Map<string, Promise<Uint8Array>>();

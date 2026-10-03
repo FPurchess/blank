@@ -15,6 +15,9 @@ import {
   prepareImages,
 } from "../../images/prepare";
 import { pageGeometry } from "../../layout/resolve";
+import { frontmatterOf } from "../../markdown";
+import { listStart } from "../../markdown/lists";
+import type { NodeName } from "../../markdown/schema";
 import { POINTS_PER_PIXEL } from "../../layout/units";
 import {
   cellShare,
@@ -178,8 +181,9 @@ class Serializer {
 
   private block(node: Node, position: Position): Block[] {
     const { HeadingLevel } = this.docx;
+    const name = node.type.name as NodeName;
 
-    switch (node.type.name) {
+    switch (name) {
       case "heading":
         return [
           {
@@ -232,15 +236,30 @@ class Serializer {
       case "table":
         return this.table(node, position);
 
-      default:
-        // there are no other block nodes in the markdown schema
+      // blocks() turns page breaks into "page break before"; the others are
+      // never blocks of their own, but written by the block they are in
+      case "page_break":
+      case "doc":
+      case "list_item":
+      case "table_row":
+      case "table_cell":
+      case "table_header":
+      case "text":
+      case "image":
+      case "hard_break":
         return [];
+
+      default: {
+        // a node type without a case here fails the type check
+        const unhandled: never = name;
+        return unhandled;
+      }
     }
   }
 
   private list(node: Node, position: Position): Block[] {
     const ordered = node.type.name === "ordered_list";
-    const start = (node.attrs.order as number | undefined) ?? 1;
+    const start = listStart(node);
     if (ordered) this.starts.add(start);
     const reference = ordered ? orderedReference(start) : BULLET_REFERENCE;
     const instance = ++this.instances;
@@ -266,8 +285,7 @@ class Serializer {
         ...(position.quotes
           ? {
               indent: {
-                left:
-                  QUOTE_INDENT * position.quotes + LIST_INDENT * (level + 1),
+                left: indentOf(itemPosition),
                 hanging: LIST_HANGING,
               },
             }
@@ -504,7 +522,7 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   });
   const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP), serializer);
 
-  const frontmatter = state.doc.attrs.frontmatter as string | null;
+  const frontmatter = frontmatterOf(state.doc);
   const fields = documentFields(state.doc, docPath);
   const { titlePage, evenAndOddHeaderAndFooters, ...bands } = bandSections(
     docx,

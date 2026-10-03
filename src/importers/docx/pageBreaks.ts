@@ -1,6 +1,6 @@
 import type JSZip from "jszip";
 
-import { child, isOn, val, W } from "./xml";
+import { child, DOCUMENT_PART, isOn, parsePart, val, W } from "./xml";
 
 // mammoth drops page breaks, so they are turned into marker paragraphs
 // before the conversion, which styleMap.ts and cleanup.ts turn into Blank's
@@ -8,8 +8,6 @@ import { child, isOn, val, W } from "./xml";
 // - a page break inside a paragraph, <w:br w:type="page"/>
 // - a paragraph with its own "Page break before", <w:pageBreakBefore/>
 // - the end of a section that starts the next one on a new page
-
-const DOCUMENT = "word/document.xml";
 
 // the style of the marker paragraphs, matched by its id in styleMap.ts
 export const PAGE_BREAK_STYLE = "BlankPageBreak";
@@ -136,10 +134,8 @@ const startsNewPage = (sectPr: Element | undefined) =>
  * @returns whether it had to be rewritten
  */
 export const markPageBreaks = async (zip: JSZip) => {
-  const xml = await zip.file(DOCUMENT)?.async("string");
-  if (xml === undefined) return false;
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) return false;
+  const doc = await parsePart(zip, DOCUMENT_PART);
+  if (!doc) return false;
 
   let changed = false;
   for (const p of [...doc.getElementsByTagNameNS(W, "p")]) {
@@ -160,6 +156,7 @@ export const markPageBreaks = async (zip: JSZip) => {
       changed = true;
     }
   }
-  if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));
+  if (changed)
+    zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
   return changed;
 };
