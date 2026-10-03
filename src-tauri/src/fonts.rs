@@ -4,7 +4,7 @@
 //! PDF alike, with the fonts found here. The PDF embeds a subset of each, so
 //! only fonts whose licence allows that are used (see `embeddable`).
 
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use fontique::{
@@ -66,11 +66,7 @@ pub fn warm(fonts: &Mutex<Option<Collection>>) {
 
 /// `text` cut to at most MAX_TEXT bytes, on a character boundary
 fn capped(text: &str) -> &str {
-    let mut end = text.len().min(MAX_TEXT);
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    &text[..end]
+    &text[..text.floor_char_boundary(MAX_TEXT)]
 }
 
 /// `language` if it looks like a language tag, like "zh" or "zh-Hant-TW"
@@ -169,17 +165,13 @@ fn fonts_covering(
     let mut generic: Vec<FamilyId> = collection.generic_families(GenericFamily::Math).collect();
     generic.extend(collection.generic_families(GenericFamily::SansSerif));
     for id in generic {
-        if !ids.contains(&id) {
-            ids.push(id);
-        }
+        push_unique(&mut ids, id);
     }
     let mut names: Vec<String> = collection.family_names().map(str::to_string).collect();
     names.sort();
     for name in names {
         if let Some(id) = collection.family_id(&name) {
-            if !ids.contains(&id) {
-                ids.push(id);
-            }
+            push_unique(&mut ids, id);
         }
     }
     let mut left = chars.to_vec();
@@ -188,25 +180,38 @@ fn fonts_covering(
         if left.is_empty() {
             break;
         }
-        let Some(family) = collection.family(id) else {
+        let Some((has, fonts)) = usable(collection, id, &left) else {
             continue;
         };
-        let has = covered(&family, &left);
-        if has.is_empty() {
-            continue;
-        }
-        let fonts = faces_of(&family);
-        if fonts.is_empty() {
-            continue;
-        }
         left.retain(|char| !has.contains(char));
         for font in fonts {
-            if !found.contains(&font) {
-                found.push(font);
-            }
+            push_unique(&mut found, font);
         }
     }
     found
+}
+
+/// which of `chars` the family `id` has, and its fonts, if it has some of
+/// them and its fonts may be embedded
+fn usable(
+    collection: &mut Collection,
+    id: FamilyId,
+    chars: &[char],
+) -> Option<(Vec<char>, Vec<FallbackFont>)> {
+    let family = collection.family(id)?;
+    let has = covered(&family, chars);
+    if has.is_empty() {
+        return None;
+    }
+    let fonts = faces_of(&family);
+    (!fonts.is_empty()).then_some((has, fonts))
+}
+
+/// adds `item` to `list` unless it is in it already
+fn push_unique<T: PartialEq>(list: &mut Vec<T>, item: T) {
+    if !list.contains(&item) {
+        list.push(item);
+    }
 }
 
 // OS/2 fsType: the licence's embedding permissions
@@ -252,7 +257,7 @@ fn embeddable_file(font: &FontInfo) -> Option<String> {
 
 /// the regular and bold fonts of a family, if its regular one may be embedded
 fn faces_of(family: &FamilyInfo) -> Vec<FallbackFont> {
-    let mut paths = BTreeMap::new();
+    let mut paths = BTreeSet::new();
     for weight in [FontWeight::NORMAL, FontWeight::BOLD] {
         let Some(font) = family.match_font(Default::default(), FontStyle::Normal, weight, true)
         else {
@@ -260,7 +265,7 @@ fn faces_of(family: &FamilyInfo) -> Vec<FallbackFont> {
         };
         match embeddable_file(font) {
             Some(path) => {
-                paths.insert(path, ());
+                paths.insert(path);
             }
             // without a regular font the family is of no use
             None if weight == FontWeight::NORMAL => return vec![],
@@ -268,7 +273,7 @@ fn faces_of(family: &FamilyInfo) -> Vec<FallbackFont> {
         }
     }
     paths
-        .into_keys()
+        .into_iter()
         .map(|path| FallbackFont {
             family: family.name().to_string(),
             path,
@@ -301,22 +306,12 @@ fn fonts_for(
         ids.extend(collection.fallback_families((script, language)));
     }
     for id in collection.fallback_families(script) {
-        if !ids.contains(&id) {
-            ids.push(id);
-        }
+        push_unique(&mut ids, id);
     }
     for id in ids {
-        let Some(family) = collection.family(id) else {
+        let Some((has, fonts)) = usable(collection, id, chars) else {
             continue;
         };
-        let has = covered(&family, chars);
-        if has.is_empty() {
-            continue;
-        }
-        let fonts = faces_of(&family);
-        if fonts.is_empty() {
-            continue;
-        }
         let left = chars
             .iter()
             .copied()
@@ -354,9 +349,7 @@ fn lookup_in(collection: &mut Collection, text: &str, language: &str) -> Vec<Fal
     }
     let mut found: Vec<FallbackFont> = vec![];
     for font in fonts {
-        if !found.contains(&font) {
-            found.push(font);
-        }
+        push_unique(&mut found, font);
     }
     found
 }

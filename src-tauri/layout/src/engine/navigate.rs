@@ -141,7 +141,7 @@ impl Engine {
 
     /// the text box of a fragment nearest to a point, with the point in
     /// the box's coordinates
-    fn box_near(&self, frag_index: usize, x: f32, y: f32) -> Option<(usize, usize, f32, f32)> {
+    fn box_near(&self, frag_index: usize, x: f32, y: f32) -> Option<BoxPoint> {
         let frag = self.frags[frag_index];
         let unit = &self.laid[frag.item].units[frag.unit];
         let texts = &self.laid[frag.item].texts;
@@ -171,12 +171,7 @@ impl Engine {
 
     /// the fragment of a page nearest to a point, and the text box in it
     /// nearest to it, see `box_near`
-    fn near(
-        &self,
-        page: usize,
-        x: f32,
-        y: f32,
-    ) -> Option<(usize, Option<(usize, usize, f32, f32)>)> {
+    fn near(&self, page: usize, x: f32, y: f32) -> Option<(usize, Option<BoxPoint>)> {
         if !(x.is_finite() && y.is_finite()) {
             return None;
         }
@@ -357,6 +352,10 @@ impl Engine {
         })
     }
 }
+
+/// a text box near a point: its item, its index among the item's boxes, and
+/// the point in the box's coordinates
+type BoxPoint = (usize, usize, f32, f32);
 
 /// how far `v` is from the span of `len` from `start`: 0 within it
 fn gap(v: f32, start: f32, len: f32) -> f32 {
