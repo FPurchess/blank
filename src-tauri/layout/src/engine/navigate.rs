@@ -131,13 +131,7 @@ impl Engine {
         for index in self.frags_on(page) {
             let frag = self.frags[index];
             let unit = &self.laid[frag.item].units[frag.unit];
-            let distance = if y < frag.y {
-                frag.y - y
-            } else if y > frag.y + unit.height {
-                y - frag.y - unit.height
-            } else {
-                0.0
-            };
+            let distance = gap(y, frag.y, unit.height);
             if best.is_none_or(|(_, least)| distance < least) {
                 best = Some((index, distance));
             }
@@ -160,21 +154,8 @@ impl Engine {
         let mut best: Option<(usize, f32)> = None;
         for index in unit.texts.clone() {
             let boxed = &texts[index];
-            let dx = if item_x < boxed.x {
-                boxed.x - item_x
-            } else if item_x > boxed.x + boxed.width {
-                item_x - boxed.x - boxed.width
-            } else {
-                0.0
-            };
-            let dy = if item_y < boxed.y {
-                boxed.y - item_y
-            } else if item_y > boxed.y + boxed.height() {
-                item_y - boxed.y - boxed.height()
-            } else {
-                0.0
-            };
-            let distance = dx * 1000.0 + dy;
+            let distance =
+                gap(item_x, boxed.x, boxed.width) * 1000.0 + gap(item_y, boxed.y, boxed.height());
             if best.is_none_or(|(_, least)| distance < least) {
                 best = Some((index, distance));
             }
@@ -188,26 +169,33 @@ impl Engine {
         Some((frag.item, index, item_x - boxed.x, local_y))
     }
 
-    /// the position at a point of a page
-    pub fn hit(&self, page: usize, x: f32, y: f32) -> Option<Hit> {
+    /// the fragment of a page nearest to a point, and the text box in it
+    /// nearest to it, see `box_near`
+    fn near(
+        &self,
+        page: usize,
+        x: f32,
+        y: f32,
+    ) -> Option<(usize, Option<(usize, usize, f32, f32)>)> {
         if !(x.is_finite() && y.is_finite()) {
             return None;
         }
         let frag_index = self.frag_near(page, y)?;
-        let frag = self.frags[frag_index];
-        match self.box_near(frag_index, x, y) {
+        Some((frag_index, self.box_near(frag_index, x, y)))
+    }
+
+    /// the position at a point of a page
+    pub fn hit(&self, page: usize, x: f32, y: f32) -> Option<Hit> {
+        let (frag_index, found) = self.near(page, x, y)?;
+        match found {
             Some((item, text, x, y)) => Some(Hit::Text(self.laid[item].texts[text].hit(x, y))),
-            None => Some(Hit::Node(self.items[frag.item].from())),
+            None => Some(Hit::Node(self.items[self.frags[frag_index].item].from())),
         }
     }
 
     /// the word at a point of a page
     pub fn word(&self, page: usize, x: f32, y: f32) -> Option<(u32, u32)> {
-        if !(x.is_finite() && y.is_finite()) {
-            return None;
-        }
-        let frag_index = self.frag_near(page, y)?;
-        let (item, text, x, y) = self.box_near(frag_index, x, y)?;
+        let (item, text, x, y) = self.near(page, x, y)?.1?;
         Some(self.laid[item].texts[text].word(x, y))
     }
 
@@ -229,11 +217,15 @@ impl Engine {
                 // next line of the box, or else the next paragraph of the
                 // cell, before the next unit
                 if self.laid[item].units[unit].line.is_none() {
+                    // the position on a line of a box nearest to the goal
+                    let on_line = |boxed: &TextBox, line: usize| {
+                        let x = goal - self.settings.margins.left - boxed.x;
+                        let (pos, after) = boxed.hit_line(line, x);
+                        Some((Hit::Text(pos), after))
+                    };
                     let target = if down { line + 1 } else { line.wrapping_sub(1) };
                     if target < boxed.line_count() {
-                        let x = goal - self.settings.margins.left - boxed.x;
-                        let (pos, after) = boxed.hit_line(target, x);
-                        return Some((Hit::Text(pos), after));
+                        return on_line(boxed, target);
                     }
                     if let Some(other) = self.box_in_column(item, unit, text, down) {
                         let other_box = &self.laid[item].texts[other];
@@ -242,9 +234,7 @@ impl Engine {
                         } else {
                             other_box.line_count().saturating_sub(1)
                         };
-                        let x = goal - self.settings.margins.left - other_box.x;
-                        let (pos, after) = other_box.hit_line(target, x);
-                        return Some((Hit::Text(pos), after));
+                        return on_line(other_box, target);
                     }
                 }
                 self.frag_of(item, unit)?
@@ -365,6 +355,17 @@ impl Engine {
         } else {
             (boxed.line_bounds(line).0, false)
         })
+    }
+}
+
+/// how far `v` is from the span of `len` from `start`: 0 within it
+fn gap(v: f32, start: f32, len: f32) -> f32 {
+    if v < start {
+        start - v
+    } else if v > start + len {
+        v - start - len
+    } else {
+        0.0
     }
 }
 

@@ -75,14 +75,6 @@ pub struct LineInfo {
     pub end: usize,
 }
 
-fn weight(bold: bool, style: &TextStyle) -> f32 {
-    if bold {
-        BOLD
-    } else {
-        style.weight
-    }
-}
-
 impl TextBox {
     /// lays out `text` in `width` points
     pub fn new(fonts: &mut Fonts, text: &Text, width: f32, alignment: Alignment) -> TextBox {
@@ -431,22 +423,17 @@ impl TextBox {
         let Some(info) = lines.get(line) else {
             return self.text.len();
         };
-        let mut end = info.end;
+        let end = info.end;
+        if line + 1 == lines.len() {
+            return end;
+        }
         // at a hard break, before the break only: the spaces before it are
         // text, as the editor keeps them
-        if line + 1 < lines.len() && self.text[..end].ends_with('\n') {
+        if self.text[..end].ends_with('\n') {
             return end - 1;
         }
-        if line + 1 < lines.len() {
-            while end > info.start && self.text[..end].ends_with(|c: char| c.is_whitespace()) {
-                end = self.text[..end]
-                    .char_indices()
-                    .last()
-                    .map(|(index, _)| index)
-                    .unwrap_or(info.start);
-            }
-        }
-        end
+        // at a soft break, before the spaces the line ends with
+        info.start + self.text[info.start..end].trim_end().len()
     }
 
     /// the end of a line, and whether the caret there must be painted with
@@ -571,7 +558,7 @@ fn push_span(
     }
     if span.bold {
         builder.push(
-            StyleProperty::FontWeight(FontWeight::new(weight(true, style))),
+            StyleProperty::FontWeight(FontWeight::new(BOLD)),
             range.clone(),
         );
     }

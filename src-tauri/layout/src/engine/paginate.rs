@@ -7,7 +7,7 @@ use crate::items::Laid;
 use crate::model::{Content, Item, Settings};
 
 impl Engine {
-    pub(super) fn page_of_frag(&self, frag: usize) -> usize {
+    pub(crate) fn page_of_frag(&self, frag: usize) -> usize {
         self.pages
             .partition_point(|page| page.end <= frag)
             .min(self.pages.len().saturating_sub(1))

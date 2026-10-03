@@ -256,9 +256,14 @@ fn table_node(engine: &Engine, index: usize, ids: &mut Ids) -> Node {
         .map(|cell| cell.row)
         .max()
         .map_or(0, |last| last + 1);
-    for row in 0..rows {
+    // every row, also one that merged cells cover entirely, which has none
+    let mut by_row = vec![Vec::new(); rows];
+    for cell in &laid.cells {
+        by_row[cell.row].push(cell);
+    }
+    for row in by_row {
         let mut cells = vec![];
-        for cell in laid.cells.iter().filter(|cell| cell.row == row) {
+        for cell in row {
             let content = cell_content(laid, index, cell, ids);
             cells.push(if cell.header {
                 group(Tag::TH(TableHeaderScope::Column), content)
@@ -377,11 +382,12 @@ fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
         let Some(placed) = engine.frags.get(frag) else {
             continue;
         };
-        let page = engine
-            .pages
-            .partition_point(|page| page.end <= frag)
-            .min(engine.pages.len().saturating_sub(1));
-        entries.push((text.level, text.text.clone(), page, placed.y));
+        entries.push((
+            text.level,
+            text.text.clone(),
+            engine.page_of_frag(frag),
+            placed.y,
+        ));
     }
     entries
 }

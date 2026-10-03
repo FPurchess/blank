@@ -73,30 +73,14 @@ pub enum Deco {
 
 impl Deco {
     pub fn moved(&self, dx: f32, dy: f32) -> Deco {
-        match self {
-            Deco::Rect { x, y, w, h, role } => Deco::Rect {
-                x: x + dx,
-                y: y + dy,
-                w: *w,
-                h: *h,
-                role: *role,
-            },
-            Deco::Image {
-                src,
-                alt,
-                x,
-                y,
-                w,
-                h,
-            } => Deco::Image {
-                src: src.clone(),
-                alt: alt.clone(),
-                x: x + dx,
-                y: y + dy,
-                w: *w,
-                h: *h,
-            },
+        let mut moved = self.clone();
+        match &mut moved {
+            Deco::Rect { x, y, .. } | Deco::Image { x, y, .. } => {
+                *x += dx;
+                *y += dy;
+            }
         }
+        moved
     }
 }
 
@@ -143,6 +127,7 @@ impl Unit {
     }
 }
 
+#[derive(Default)]
 pub struct Laid {
     pub units: Vec<Unit>,
     pub texts: Vec<TextBox>,
@@ -316,14 +301,7 @@ impl Laid {
                 decos,
                 ..Default::default()
             }],
-            texts: vec![],
-            marker: None,
-            label: None,
-            columns: vec![],
-            extras: vec![],
-            cell_images: vec![],
-            cells: vec![],
-            missing: vec![],
+            ..Default::default()
         }
     }
 
@@ -365,12 +343,6 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
     Laid {
         units,
         texts: vec![boxed],
-        marker: None,
-        label: None,
-        columns: vec![],
-        extras: vec![],
-        cell_images: vec![],
-        cells: vec![],
-        missing: vec![],
+        ..Default::default()
     }
 }

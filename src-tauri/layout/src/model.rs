@@ -495,10 +495,7 @@ impl Item {
         self.indent = finite(self.indent, 0.0, 0.0, MAX_PAGE);
         self.before = finite(self.before, 0.0, 0.0, MAX_PAGE);
         self.after = finite(self.after, 0.0, 0.0, MAX_PAGE);
-        self.bars.truncate(MAX_BARS);
-        for bar in &mut self.bars {
-            *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
-        }
+        clamp_bars(&mut self.bars);
         match &mut self.content {
             Content::Image { width, height, .. } => image_size(width, height),
             Content::Table { widths, rows, .. } => {
@@ -512,11 +509,8 @@ impl Item {
                 {
                     match block {
                         CellBlock::Text(text) => {
-                            text.bars.truncate(MAX_BARS);
+                            clamp_bars(&mut text.bars);
                             text.indent = finite(text.indent, 0.0, 0.0, MAX_PAGE);
-                            for bar in &mut text.bars {
-                                *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
-                            }
                         }
                         CellBlock::Image {
                             width,
@@ -527,10 +521,7 @@ impl Item {
                         } => {
                             image_size(width, height);
                             *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
-                            bars.truncate(MAX_BARS);
-                            for bar in bars {
-                                *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
-                            }
+                            clamp_bars(bars);
                         }
                     }
                 }
@@ -564,6 +555,14 @@ pub const MAX_IMAGE: f32 = 100_000.0;
 /// the most quote bars an item has, nested quotes deep
 pub const MAX_BARS: usize = 64;
 
+/// keeps at most MAX_BARS quote bars, each on the page
+fn clamp_bars(bars: &mut Vec<f32>) {
+    bars.truncate(MAX_BARS);
+    for bar in bars {
+        *bar = finite(*bar, 0.0, 0.0, MAX_PAGE);
+    }
+}
+
 /// a position moved by `delta`, within what a position can be
 pub fn shift_pos(pos: u32, delta: i64) -> u32 {
     u32::try_from(i64::from(pos).saturating_add(delta).max(0)).unwrap_or(u32::MAX)
@@ -589,14 +588,9 @@ pub fn byte_of_utf16(text: &str, offset: u32) -> usize {
 /// the UTF-16 offset of a byte index into `text`
 pub fn utf16_of_byte(text: &str, byte: usize) -> u32 {
     let byte = byte.min(text.len());
-    text[..floor_char(text, byte)].encode_utf16().count() as u32
-}
-
-fn floor_char(text: &str, mut byte: usize) -> usize {
-    while byte > 0 && !text.is_char_boundary(byte) {
-        byte -= 1;
-    }
-    byte
+    text[..text.floor_char_boundary(byte)]
+        .encode_utf16()
+        .count() as u32
 }
 
 #[cfg(test)]

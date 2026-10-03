@@ -545,13 +545,12 @@ pub(super) fn table_units(
     Laid {
         units,
         texts,
-        marker: None,
         label,
         columns: edges,
         extras,
         cell_images,
         cells,
-        missing: vec![],
+        ..Default::default()
     }
 }
 

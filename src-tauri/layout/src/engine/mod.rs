@@ -1,6 +1,25 @@
 //! The engine: keeps the laid out items of a document, paginates them, and
 //! answers where positions are and what a page shows.
 
+/// counts each of `chars` once more in `counts`, of characters no font has
+fn count_missing(counts: &mut Vec<(char, usize)>, chars: &[char]) {
+    for char in chars {
+        match counts.iter_mut().find(|(known, _)| known == char) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((*char, 1)),
+        }
+    }
+}
+
+/// counts each of `chars` once less in `counts`, leaving characters at none
+fn uncount_missing(counts: &mut [(char, usize)], chars: &[char]) {
+    for char in chars {
+        if let Some((_, count)) = counts.iter_mut().find(|(known, _)| known == char) {
+            *count = count.saturating_sub(1);
+        }
+    }
+}
+
 #[cfg(test)]
 mod boundary_tests;
 mod display;
@@ -115,10 +134,11 @@ impl Engine {
         engine
     }
 
-    fn lay_out(&mut self, item: &Item) -> Laid {
-        let width = self.settings.content_width();
-        let room = self.settings.content_bottom() - self.settings.content_top();
-        let mut laid = Laid::new(&mut self.fonts, item, width, room);
+    /// lays out an item on the page of `settings`
+    fn lay_out(fonts: &mut Fonts, settings: &Settings, item: &Item) -> Laid {
+        let width = settings.content_width();
+        let room = settings.content_bottom() - settings.content_top();
+        let mut laid = Laid::new(fonts, item, width, room);
         if laid.units.is_empty() {
             laid.units.push(crate::items::Unit::default());
         }
@@ -154,10 +174,7 @@ impl Engine {
             || settings.margins != self.settings.margins;
         self.settings = settings;
         if relayout {
-            let items = std::mem::take(&mut self.items);
-            self.laid = items.iter().map(|item| self.lay_out(item)).collect();
-            self.items = items;
-            self.recount_missing();
+            self.lay_out_all();
             return self.paginate_from(0, None);
         }
         // the same items, only paginated again, e.g. for new bands: pages
@@ -173,11 +190,19 @@ impl Engine {
     /// everything again with it
     pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) -> Changes {
         self.fonts.add(bytes, family);
-        let items = std::mem::take(&mut self.items);
-        self.laid = items.iter().map(|item| self.lay_out(item)).collect();
-        self.items = items;
-        self.recount_missing();
+        self.lay_out_all();
         self.paginate_from(0, None)
+    }
+
+    /// lays out every item again, e.g. on another page or with another font
+    fn lay_out_all(&mut self) {
+        let (fonts, settings) = (&mut self.fonts, &self.settings);
+        self.laid = self
+            .items
+            .iter()
+            .map(|item| Self::lay_out(fonts, settings, item))
+            .collect();
+        self.recount_missing();
     }
 
     /// the characters of the document no font has a glyph for; kept up to
@@ -188,22 +213,19 @@ impl Engine {
 
     /// counts the characters every item misses, after all were laid out
     fn recount_missing(&mut self) {
-        let mut counts: Vec<(char, usize)> = vec![];
+        self.missing_chars.clear();
         for laid in &self.laid {
-            for char in &laid.missing {
-                match counts.iter_mut().find(|(known, _)| known == char) {
-                    Some((_, count)) => *count += 1,
-                    None => counts.push((*char, 1)),
-                }
-            }
+            count_missing(&mut self.missing_chars, &laid.missing);
         }
-        self.missing_chars = counts;
     }
 
     /// replaces all items
     pub fn set_items(&mut self, mut items: Vec<Item>) -> Changes {
         items.iter_mut().for_each(Item::sanitize);
-        self.laid = items.iter().map(|item| self.lay_out(item)).collect();
+        self.laid = items
+            .iter()
+            .map(|item| Self::lay_out(&mut self.fonts, &self.settings, item))
+            .collect();
         self.items = items;
         self.recount_missing();
         self.stats = Stats {
@@ -254,34 +276,18 @@ impl Engine {
                 restart_page = Some(0);
             }
             previous_end = start + count;
-            let laid: Vec<Laid> = inserted.iter().map(|item| self.lay_out(item)).collect();
-            let removed: Vec<Vec<char>> = self.laid[start..start + delete]
+            let laid: Vec<Laid> = inserted
                 .iter()
-                .map(|laid| laid.missing.clone())
+                .map(|item| Self::lay_out(&mut self.fonts, &self.settings, item))
                 .collect();
-            for missing in removed {
-                for char in missing {
-                    if let Some((_, count)) = self
-                        .missing_chars
-                        .iter_mut()
-                        .find(|(known, _)| *known == char)
-                    {
-                        *count = count.saturating_sub(1);
-                    }
-                }
+            // the removed items' characters first, so one removed and added
+            // again moves to the end
+            for old in &self.laid[start..start + delete] {
+                uncount_missing(&mut self.missing_chars, &old.missing);
             }
             self.missing_chars.retain(|(_, count)| *count > 0);
             for new in &laid {
-                for char in &new.missing {
-                    match self
-                        .missing_chars
-                        .iter_mut()
-                        .find(|(known, _)| known == char)
-                    {
-                        Some((_, count)) => *count += 1,
-                        None => self.missing_chars.push((*char, 1)),
-                    }
-                }
+                count_missing(&mut self.missing_chars, &new.missing);
             }
             self.items.splice(start..start + delete, inserted);
             self.laid.splice(start..start + delete, laid);

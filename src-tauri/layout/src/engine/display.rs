@@ -256,10 +256,11 @@ impl Engine {
 
     /// the header and footer of a page, laid out, with where they stand
     fn band_boxes(&mut self, page: usize) -> Vec<(TextBox, f32, f32)> {
-        let Some(texts) = self.pages.get(page).map(|page| page.bands.clone()) else {
+        let Some(page) = self.pages.get(page) else {
             return vec![];
         };
-        let settings = self.settings.clone();
+        // borrowed apart, since laying the text out needs the fonts mutably
+        let (texts, settings, fonts) = (&page.bands, &self.settings, &mut self.fonts);
         let width = settings.content_width() / 3.0;
         let alignments = [Alignment::Left, Alignment::Center, Alignment::Right];
         let tops = [
@@ -279,7 +280,7 @@ impl Engine {
                 style: "band".into(),
                 ..Default::default()
             };
-            let boxed = TextBox::new(&mut self.fonts, &text, width, alignments[slot]);
+            let boxed = TextBox::new(fonts, &text, width, alignments[slot]);
             boxes.push((
                 boxed,
                 settings.margins.left + width * slot as f32,
