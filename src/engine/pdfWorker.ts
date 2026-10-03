@@ -1,6 +1,7 @@
 import init, { LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { type PdfJob, type PdfResult, writePdf } from "./pdfJob";
+import { errorMessage } from "../errors";
 
 // The worker the PDF export runs in once the page view's wasm trapped: it
 // loads a wasm instance of its own, writes one PDF and is then terminated.
@@ -22,10 +23,7 @@ export const handleJob = async (
     const result = writePdf(LayoutEngine, job);
     reply({ result }, [result.pdf.buffer]);
   } catch (error) {
-    reply(
-      { error: error instanceof Error ? error.message : String(error) },
-      [],
-    );
+    reply({ error: errorMessage(error) }, []);
   }
 };
 

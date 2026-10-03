@@ -9,20 +9,7 @@ import { importedFrom, path } from "../../state";
 import { extname } from "../../paths";
 import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
-
-// files that saving markdown into would destroy, e.g. the Word document a
-// document was imported from
-const NOT_MARKDOWN = [
-  "docx",
-  "docm",
-  "dotx",
-  "dotm",
-  "doc",
-  "odt",
-  "rtf",
-  "pages",
-  "pdf",
-];
+import { MARKDOWN_FILTER, NOT_MARKDOWN } from "../../formats";
 
 const isMarkdownTarget = (target: string) =>
   !NOT_MARKDOWN.includes(extname(target));
@@ -42,7 +29,7 @@ export const _saveFile = async (state: EditorState, options: Options) => {
       !isMarkdownTarget(target)
     ) {
       target = await save({
-        filters: [{ name: "Markdown", extensions: ["md"] }],
+        filters: [MARKDOWN_FILTER],
         defaultPath: suggestPath("md"),
       });
       if (target === null) {

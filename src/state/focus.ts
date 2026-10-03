@@ -1,6 +1,6 @@
 import { computed } from "vue";
 
-import { bandEditor, imageDialog, linkDialog, pageSetup } from "./dialogs";
+import { focusTakingDialogs } from "./dialogs";
 import { contextMenu, tableToolbar } from "./popups";
 
 // uiTakesFocus is whether a part of the UI holds the focus, which the editor
@@ -9,10 +9,7 @@ import { contextMenu, tableToolbar } from "./popups";
 // buttons never take it, since the editor handles their keys.
 export const uiTakesFocus = computed(
   () =>
-    linkDialog.value !== null ||
-    imageDialog.value !== null ||
-    pageSetup.value !== null ||
-    bandEditor.value !== null ||
+    focusTakingDialogs.some((request) => request.value !== null) ||
     contextMenu.value !== null ||
     !!tableToolbar.value?.caption,
 );

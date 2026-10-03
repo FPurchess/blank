@@ -4,7 +4,6 @@ import {
   type EditorState,
   NodeSelection,
   TextSelection,
-  type Transaction,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { schema } from "../../markdown";
@@ -18,6 +17,7 @@ import { basename } from "../../paths";
 import { toDataUrl } from "../../images/dataUrl";
 import { optimizeForMarkdown } from "../../images/optimize";
 import { normalizeUrl } from "../../url";
+import { applyUnlessChanged } from "./applyUnlessChanged";
 import { errorMessage } from "../../errors";
 
 const imageType = schema.nodes.image;
@@ -105,19 +105,7 @@ export const _openImageDialog = (view: EditorView) => {
   const target = findImageTarget(view.state);
   if (!target) return;
   const { from, to, node } = target;
-  const openedDoc = view.state.doc;
-
-  // apply runs `change` unless the document changed while the dialog was open
-  const apply = (change: (tr: Transaction) => void) => {
-    if (view.state.doc !== openedDoc) {
-      sendNotification("Failed to change the image: the document changed");
-    } else {
-      const tr = view.state.tr;
-      change(tr);
-      view.dispatch(tr.scrollIntoView());
-    }
-    view.focus();
-  };
+  const apply = applyUnlessChanged(view, "image");
 
   imageDialog.value = {
     src: (node?.attrs.src as string | undefined) ?? "",

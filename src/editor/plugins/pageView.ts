@@ -49,12 +49,7 @@ import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { tableGrid } from "../../exporters/table";
 import type { FrozenWidths } from "../../engine/flatten";
-import {
-  CellSelection,
-  cellAround,
-  inSameTable,
-  TableMap,
-} from "prosemirror-tables";
+import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
 import {
@@ -226,7 +221,7 @@ export const frozenWidths = (
 ): FrozenWidths | null => {
   const table = tableAround(state.selection.$head);
   if (!table || columnPercents(table.node)) return null;
-  const { width } = TableMap.get(table.node);
+  const { width } = table.map;
   if (frozen?.pos === table.pos && frozen.widths.length === width)
     return frozen;
   return { pos: table.pos, widths: tableGrid(table.node).widths };

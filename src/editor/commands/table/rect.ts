@@ -9,6 +9,7 @@ import type { Node, NodeType } from "prosemirror-model";
 import { CellSelection, TableMap, type TableRect } from "prosemirror-tables";
 
 import { headerRowCount, isHeaderCell } from "../../../markdown";
+import { cellAt } from "../../../markdown/tables";
 
 // Helpers the table commands share, around prosemirror-tables' TableRect: the
 // selected cells of a table, with the table and its map.
@@ -27,7 +28,7 @@ export const refreshed = (tr: Transaction, rect: TableRect): TableRect => {
  * the table `rect` describes
  */
 export const cellPos = (rect: TableRect, row: number, col: number) =>
-  rect.tableStart + rect.map.map[row * rect.map.width + col];
+  rect.tableStart + cellAt(rect.map, row, col);
 
 /**
  * selectCells selects the rows `top` to `bottom` and the columns `left` to
@@ -78,7 +79,7 @@ export const hasHeaderColumn = (rect: TableRect) => {
   const body = headerRowCount(table);
   if (body >= map.height) return false;
   for (let row = body; row < map.height; row++) {
-    if (!isHeaderCell(table.nodeAt(map.map[row * map.width]))) return false;
+    if (!isHeaderCell(table.nodeAt(cellAt(map, row, 0)))) return false;
   }
   return true;
 };

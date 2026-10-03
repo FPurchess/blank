@@ -9,6 +9,7 @@ import {
 } from "prosemirror-tables";
 
 import { type Alignment, headerRowCount, schema } from "../../../markdown";
+import { cellAt } from "../../../markdown/tables";
 import { inCell } from "../../plugins/tables/util";
 import { cellPos, hasHeaderColumn, refreshed, selectCells } from "./rect";
 
@@ -143,7 +144,7 @@ const columnAligns = (rect: TableRect, row: number) =>
   Array.from(
     { length: rect.map.width },
     (_, col) =>
-      rect.table.nodeAt(rect.map.map[row * rect.map.width + col])!.attrs
+      rect.table.nodeAt(cellAt(rect.map, row, col))!.attrs
         .align as Alignment | null,
   );
 
@@ -152,6 +153,4 @@ const columnAligns = (rect: TableRect, row: number) =>
  * than being a cell above merged into it
  */
 const isNew = (rect: TableRect, row: number, col: number) =>
-  row === 0 ||
-  rect.map.map[row * rect.map.width + col] !==
-    rect.map.map[(row - 1) * rect.map.width + col];
+  row === 0 || cellAt(rect.map, row, col) !== cellAt(rect.map, row - 1, col);

@@ -50,5 +50,5 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 
 1. Add a `shallowRef` (with a comment on what it holds and when it's null) to the module of its domain, or a new module that `index.ts` re-exports.
 2. If it has rules (events, invariants), write it only through a function next to it.
-3. If a part of the UI takes the focus while it's open, add it to `uiTakesFocus` in `focus.ts`.
+3. If a part of the UI takes the focus while it's open, add it to `focusTakingDialogs` in `dialogs.ts` (a dialog) or to `uiTakesFocus` in `focus.ts` (anything else).
 4. Test the module next to it (`src/state/<domain>.test.ts`).

@@ -113,6 +113,14 @@ const wordAtCursor = (state: EditorState): Range | null => {
 const overlaps = ([from, to]: Range, ranges: Range[]) =>
   ranges.some(([a, b]) => from <= b && to >= a);
 
+// the state of a document nothing is known about yet: all of it is checked
+const fresh = (): SpellState => ({
+  decorations: DecorationSet.empty,
+  ignored: new Set(),
+  pending: null,
+  dirty: "all",
+});
+
 const apply = (
   tr: Transaction,
   value: SpellState,
@@ -122,14 +130,7 @@ const apply = (
   let { decorations, ignored, pending, dirty } = value;
   const meta = tr.getMeta(spellcheckKey) as Meta | undefined;
 
-  if (tr.getMeta(REPLACE_DOCUMENT)) {
-    return {
-      decorations: DecorationSet.empty,
-      ignored: new Set(),
-      pending: null,
-      dirty: "all",
-    };
-  }
+  if (tr.getMeta(REPLACE_DOCUMENT)) return fresh();
 
   if (tr.docChanged) {
     decorations = decorations.map(tr.mapping, tr.doc);
@@ -181,7 +182,7 @@ const apply = (
     decorations = decorations.remove(stale).add(
       tr.doc,
       meta.decorations.filter(
-        (d) => !pending || d.to < pending[0] || d.from > pending[1],
+        (d) => !pending || !overlaps([d.from, d.to], [pending]),
       ),
     );
     // unless more needs checking since the check started
@@ -200,8 +201,7 @@ const misspelled = (word: Word, checker: Spellchecker): Word[] => {
   const wrong = (w: Word) => checker.isCorrect(w.text) === false;
   if (!wrong(word)) return [];
   if (!word.parts?.length) return [word];
-  const parts = word.parts.filter(wrong);
-  return parts;
+  return word.parts.filter(wrong);
 };
 
 const decoration = (word: Word) =>
@@ -267,12 +267,7 @@ export const spellcheck = () =>
   new Plugin<SpellState>({
     key: spellcheckKey,
     state: {
-      init: () => ({
-        decorations: DecorationSet.empty,
-        ignored: new Set(),
-        pending: null,
-        dirty: "all",
-      }),
+      init: fresh,
       apply,
     },
     props: {

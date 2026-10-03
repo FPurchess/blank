@@ -2,6 +2,7 @@ import type { Command } from "prosemirror-state";
 import { isInTable, selectedRect, type TableRect } from "prosemirror-tables";
 
 import { headerRowCount } from "../../../markdown";
+import { cellAt } from "../../../markdown/tables";
 import { language } from "../../../state";
 import { selectCells } from "./rect";
 
@@ -143,13 +144,13 @@ export const sortColumn = (rect: TableRect) => {
   if (map.height - body < 2) return undefined;
   for (let row = Math.max(body - 1, 0); row < map.height - 1; row++) {
     for (let col = 0; col < map.width; col++) {
-      const here = map.map[row * map.width + col];
-      if (here === map.map[(row + 1) * map.width + col]) return undefined;
+      const here = cellAt(map, row, col);
+      if (here === cellAt(map, row + 1, col)) return undefined;
     }
   }
   const values: string[] = [];
   for (let row = body; row < map.height; row++) {
-    values.push(table.nodeAt(map.map[row * map.width + left])!.textContent);
+    values.push(table.nodeAt(cellAt(map, row, left))!.textContent);
   }
   return { body, values };
 };

@@ -3,16 +3,15 @@ import {
   type Command,
   type EditorState,
   TextSelection,
-  type Transaction,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { schema } from "../../markdown";
 
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
-import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { linkDialog } from "../../state";
 import { isAbsoluteUrl, isSavableUrl, normalizeUrl } from "../../url";
+import { applyUnlessChanged } from "./applyUnlessChanged";
 
 const linkType = schema.marks.link;
 
@@ -110,19 +109,7 @@ export const _openLinkDialog = async (view: EditorView) => {
     const target = findLinkTarget(view.state);
     if (!target) return;
     const { from, to, text, mark } = target;
-    const openedDoc = view.state.doc;
-
-    // apply runs `change` unless the document changed while the dialog was open
-    const apply = (change: (tr: Transaction) => void) => {
-      if (view.state.doc !== openedDoc) {
-        sendNotification("Failed to change the link: the document changed");
-      } else {
-        const tr = view.state.tr;
-        change(tr);
-        view.dispatch(tr.scrollIntoView());
-      }
-      view.focus();
-    };
+    const apply = applyUnlessChanged(view, "link");
 
     linkDialog.value = {
       url: mark ? (mark.attrs.href as string) : clipboardUrl,

@@ -77,3 +77,13 @@ export interface BandEditorRequest {
 // bandEditor holds the request of the open header or footer strip, or null
 // while none is open
 export const bandEditor = shallowRef<BandEditorRequest | null>(null);
+
+// the requests of everything here that takes the focus while it is open, so
+// the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
+// dialog goes here too
+export const focusTakingDialogs = [
+  linkDialog,
+  imageDialog,
+  pageSetup,
+  bandEditor,
+] as const;
