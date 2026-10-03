@@ -1,25 +1,6 @@
 //! The engine: keeps the laid out items of a document, paginates them, and
 //! answers where positions are and what a page shows.
 
-/// counts each of `chars` once more in `counts`, of characters no font has
-fn count_missing(counts: &mut Vec<(char, usize)>, chars: &[char]) {
-    for char in chars {
-        match counts.iter_mut().find(|(known, _)| known == char) {
-            Some((_, count)) => *count += 1,
-            None => counts.push((*char, 1)),
-        }
-    }
-}
-
-/// counts each of `chars` once less in `counts`, leaving characters at none
-fn uncount_missing(counts: &mut [(char, usize)], chars: &[char]) {
-    for char in chars {
-        if let Some((_, count)) = counts.iter_mut().find(|(known, _)| known == char) {
-            *count = count.saturating_sub(1);
-        }
-    }
-}
-
 #[cfg(test)]
 mod boundary_tests;
 mod display;
@@ -400,6 +381,27 @@ fn splice_runs(runs: &mut Vec<(usize, Option<usize>)>, start: usize, delete: usi
         runs.insert(index, (count, None));
     }
     runs.retain(|(length, _)| *length > 0);
+}
+
+/// adds one to the count of each of `chars` in `counts`, the characters no
+/// font has, starting a count at one for a new one
+fn count_missing(counts: &mut Vec<(char, usize)>, chars: &[char]) {
+    for char in chars {
+        match counts.iter_mut().find(|(known, _)| known == char) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((*char, 1)),
+        }
+    }
+}
+
+/// takes one off the count of each of `chars` in `counts`; the caller drops
+/// the ones left at none
+fn uncount_missing(counts: &mut [(char, usize)], chars: &[char]) {
+    for char in chars {
+        if let Some((_, count)) = counts.iter_mut().find(|(known, _)| known == char) {
+            *count = count.saturating_sub(1);
+        }
+    }
 }
 
 #[cfg(test)]
