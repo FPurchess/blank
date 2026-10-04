@@ -6,6 +6,7 @@ use serde::{Deserialize, Deserializer};
 /// A run of text with the same marks. Offsets count UTF-16 code units from
 /// the start of the item's text, like ProseMirror positions do.
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Span {
     pub from: u32,
     pub to: u32,
@@ -22,6 +23,7 @@ pub struct Span {
 /// A textblock: a paragraph, heading, code block or caption, wherever it is
 /// (in a list, a quote).
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Text {
     /// the ProseMirror position of the first character
     pub pos: u32,
@@ -47,6 +49,7 @@ fn paragraph() -> String {
 /// A textblock in a table cell, with where it stands in the cell: in a
 /// list, with its marker, or in a quote, with its bars.
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct CellText {
     #[serde(flatten)]
     pub text: Text,
@@ -64,6 +67,7 @@ pub struct CellText {
 /// A block of a table cell: a textblock, or an image, which is fitted to
 /// the width of the cell.
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum CellBlock {
     Text(CellText),
@@ -101,6 +105,7 @@ impl CellBlock {
 
 /// A cell of a table.
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Cell {
     /// its paragraphs, when it holds nothing else; see `blocks`
     #[serde(default)]
@@ -150,6 +155,7 @@ impl Cell {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Row {
     pub cells: Vec<Cell>,
     /// a header row, repeated at the top of each page the table continues on
@@ -158,6 +164,7 @@ pub struct Row {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Content {
     Text(Text),
@@ -193,8 +200,11 @@ pub enum Content {
     },
 }
 
-/// One block of the flow, with where it stands.
+/// One block of the flow, with where it stands. The webview writes the keys
+/// of its fields in camelCase; the test `reads_every_key_the_webview_sends`
+/// checks both sides against src/engine/__fixtures__/contract.json.
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Item {
     #[serde(flatten)]
     pub content: Content,
@@ -214,11 +224,12 @@ pub struct Item {
     #[serde(default)]
     pub bars: Vec<f32>,
     /// whether the quote bars reach down to the next item
-    #[serde(default)]
+    #[serde(default, rename = "barsContinue")]
     pub bars_continue: bool,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Margins {
     pub top: f32,
     pub right: f32,
@@ -227,6 +238,7 @@ pub struct Margins {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Slots {
     #[serde(default)]
     pub left: String,
@@ -243,6 +255,7 @@ impl Slots {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Bands {
     #[serde(default)]
     pub header: Slots,
@@ -252,6 +265,7 @@ pub struct Bands {
 
 /// "same", "plain" or the first page's own bands, as in settings.ts
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 #[serde(untagged)]
 pub enum FirstPage {
     Named(String),
@@ -266,6 +280,7 @@ impl Default for FirstPage {
 
 /// what {title}, {author}, {date} and {file} stand for
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Fields {
     #[serde(default)]
     pub title: String,
@@ -280,6 +295,7 @@ pub struct Fields {
 /// The page, as `pageGeometry` and the `Layout` of src/layout/resolve.ts
 /// give it.
 #[derive(Deserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub width: f32,
@@ -665,5 +681,53 @@ mod tests {
         .unwrap();
         assert_eq!(first.first_page, FirstPage::Named("plain".into()));
         assert_eq!(first.content_width(), 94.0);
+    }
+
+    /// the paths of every key in a JSON value, arrays counted as one element
+    fn keys(value: &serde_json::Value, path: &str, out: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                for (key, child) in map {
+                    let path = format!("{path}.{key}");
+                    keys(child, &path, out);
+                    out.push(path);
+                }
+            }
+            serde_json::Value::Array(list) => {
+                for child in list {
+                    keys(child, &format!("{path}[]"), out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn reads_every_key_the_webview_sends() {
+        // what flatten and settingsOf send for a document that uses every
+        // key (src/engine/contract.test.ts); a key serde doesn't know is
+        // dropped without an error, so it is missing when written back
+        let sent: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../src/engine/__fixtures__/contract.json"
+        ))
+        .unwrap();
+        let items: Vec<Item> = serde_json::from_value(sent["items"].clone()).unwrap();
+        let settings: Settings = serde_json::from_value(sent["settings"].clone()).unwrap();
+        let read = serde_json::json!({ "items": items, "settings": settings });
+        let (mut wanted, mut found) = (Vec::new(), Vec::new());
+        keys(&sent, "", &mut wanted);
+        keys(&read, "", &mut found);
+        // a cell's paragraphs are written like text items, whose kind
+        // they don't need
+        let unread = |key: &String| key.ends_with(".paragraphs[].kind");
+        let missing: Vec<_> = wanted
+            .iter()
+            .filter(|key| !found.contains(key) && !unread(key))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "keys the engine doesn't read: {missing:?}"
+        );
+        assert!(items.iter().any(|item| item.bars_continue));
     }
 }

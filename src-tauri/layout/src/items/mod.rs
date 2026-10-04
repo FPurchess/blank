@@ -31,6 +31,25 @@ pub enum Role {
     Hint = 8,
 }
 
+impl Role {
+    /// the role a number stands for on the webview's side, see `as u8`
+    pub fn from_u8(number: u8) -> Option<Role> {
+        [
+            Role::Text,
+            Role::Band,
+            Role::CodeFill,
+            Role::TableLine,
+            Role::HeaderLine,
+            Role::HeaderFill,
+            Role::Placeholder,
+            Role::LinkLine,
+            Role::Hint,
+        ]
+        .into_iter()
+        .find(|role| *role as u8 == number)
+    }
+}
+
 /// something drawn in an item besides its text
 #[derive(Clone, Debug, PartialEq)]
 pub enum Deco {

@@ -117,6 +117,10 @@ export class LayoutEngine {
      */
     pdf(title: string, author: string, language?: string | null, date?: string | null): Uint8Array;
     /**
+     * the colour of a role on paper, as 0xRRGGBB; for tests
+     */
+    roleColor(role: number): number | undefined;
+    /**
      * the selection's rectangles: page, x, y, width and height each
      */
     selection(from: number, to: number): Float32Array;
@@ -214,6 +218,7 @@ export interface InitOutput {
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
     readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
     readonly layoutengine_pdfWarnings: (a: number) => [number, number];
+    readonly layoutengine_roleColor: (a: number, b: number) => number;
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];

@@ -600,6 +600,12 @@ export const flattenBlocks = (
         : BLOCK_AFTER;
     const first = records.length;
     block(node, offset, top, { before, after });
+    // whether an item's quote bars reach down to the next item is known only
+    // once its block is done, and it must be in the key, or an edit that
+    // ends or extends a quote would keep the item above it as it was; a
+    // quote never reaches into the next block
+    for (let index = first; index < records.length; index++)
+      if (barsContinue(index)) records[index].key += "|c";
     blocks.push(records.slice(first));
     previous = node;
     offset += node.nodeSize;

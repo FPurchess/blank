@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import { parseMarkdown, schema } from "../../markdown";
 import type { Node } from "prosemirror-model";
 
-import { createState } from "../../test/editor";
+import { createState, doc, li, p, ul } from "../../test/editor";
 import { IMAGES, dataUrl } from "../../test/images";
 import toDOCX from ".";
 import { pageGeometry } from "../../layout/resolve";
@@ -413,6 +413,44 @@ describe("exporter.docx", () => {
       ]);
     });
 
+    it("starts a page in a list item", async () => {
+      const exported = await exportMarkdown(
+        "- a\n\n  <!-- pagebreak -->\n\n  b\n- c",
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+        ["c", false],
+      ]);
+    });
+
+    it("starts a page with a list item that begins with a page break", async () => {
+      const pageBreak = schema.nodes.page_break.create();
+      const exported = await exportDoc(
+        doc(p("a"), ul(li(pageBreak, p("b")), li(p("c")))),
+      );
+
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["b", true],
+        ["c", false],
+      ]);
+    });
+
+    it("starts the page after a list item that ends with a page break", async () => {
+      const pageBreak = schema.nodes.page_break.create();
+      const exported = await exportDoc(doc(ul(li(p("a"), pageBreak)), p("b")));
+
+      // the item's break leaves an empty paragraph that starts the page, as a
+      // break at the end of a quote does
+      expect(await breaks(exported)).toEqual([
+        ["a", false],
+        ["", true],
+        ["b", false],
+      ]);
+    });
+
     const headingBreaks = async (exported: Exported) =>
       all(await exported.xml("word/styles.xml"), "style")
         .filter((style) => /^Heading\d$/.test(attr(style, "styleId") ?? ""))
@@ -608,6 +646,8 @@ describe("exporter.docx", () => {
         (element) => attr(element, "styleId") === id,
       )!;
       expect(attr(child(style, "rFonts"), "ascii")).toBe("IBM Plex Mono");
+      // on the fill the pages and the PDF show
+      expect(attr(child(style, "shd"), "fill")).toBe("EFF0F1");
     }
     expect(await exported.text("word/styles.xml")).not.toMatch(/Courier/);
     // monospaced where a reader lacks it, so code keeps its columns
@@ -696,9 +736,10 @@ describe("exporter.docx tables", () => {
   };
 
   it("writes a table with its header row repeated and rows kept whole", async () => {
-    const { rows } = await tableOf(
-      await exportMarkdown("| Name | Qty |\n| ---- | --: |\n| a    |   1 |"),
+    const exported = await exportMarkdown(
+      "| Name | Qty |\n| ---- | --: |\n| a    |   1 |",
     );
+    const { rows } = await tableOf(exported);
 
     expect(rows.map(({ header, cantSplit }) => [header, cantSplit])).toEqual([
       [true, true],
@@ -712,6 +753,10 @@ describe("exporter.docx tables", () => {
       { text: "a", fill: null, style: null },
       { text: "1", align: "right" },
     ]);
+    // the line under the header row, in the colour of the PDF's
+    expect(await exported.text("word/document.xml")).toMatch(
+      /w:color="82898E"/,
+    );
   });
 
   it("draws lines like the PDF and sizes the columns by their content", async () => {

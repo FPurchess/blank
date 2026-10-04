@@ -117,18 +117,27 @@ fn parse_date(text: &str) -> Option<DateTime> {
     )
 }
 
-/// the colour of each role on paper
-fn color(role: Role) -> rgb::Color {
+/// the colour of each role on paper, as red, green and blue: the light
+/// theme's text colour mixed onto white at the opacity the pages show it at
+/// (ROLE_OPACITY in src/ui/painter/canvas2d.ts, checked by
+/// src/ui/painter/colors.test.ts), except the text, the bands and what stands
+/// for images, which have colours of their own
+pub(crate) fn paper_rgb(role: Role) -> (u8, u8, u8) {
     match role {
         // the PDF shows links and alt text in the text's colour, as pdfmake
         // did
-        Role::Text | Role::LinkLine | Role::Hint => rgb::Color::new(0, 0, 0),
-        Role::Band => rgb::Color::new(0x66, 0x66, 0x66),
-        Role::CodeFill => rgb::Color::new(0xf1, 0xf2, 0xf3),
-        Role::TableLine | Role::Placeholder => rgb::Color::new(0xd1, 0xd4, 0xd6),
-        Role::HeaderLine => rgb::Color::new(0x82, 0x89, 0x90),
-        Role::HeaderFill => rgb::Color::new(0xf1, 0xf2, 0xf3),
+        Role::Text | Role::LinkLine | Role::Hint => (0, 0, 0),
+        Role::Band => (0x66, 0x66, 0x66),
+        Role::CodeFill => (0xef, 0xf0, 0xf1),
+        Role::TableLine | Role::Placeholder => (0xd1, 0xd4, 0xd6),
+        Role::HeaderLine => (0x82, 0x89, 0x8e),
+        Role::HeaderFill => (0xf1, 0xf2, 0xf3),
     }
+}
+
+fn color(role: Role) -> rgb::Color {
+    let (red, green, blue) = paper_rgb(role);
+    rgb::Color::new(red, green, blue)
 }
 
 fn fill(role: Role) -> Fill {
@@ -748,22 +757,47 @@ mod tests {
         }
     }
 
-    /// the plain text of a PDF, if pdftotext is there; on CI it must be
+    /// runs a tool of poppler-utils with `args`, if it is there; on CI it
+    /// must be, so the checks can't pass by skipping (`missing_tool` in
+    /// tests/exact.rs, which can't share this, does the same)
+    fn poppler(tool: &str, args: &[&std::ffi::OsStr]) -> Option<std::process::Output> {
+        match std::process::Command::new(tool).args(args).output() {
+            Ok(out) => {
+                assert!(
+                    out.status.success(),
+                    "{tool} failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                Some(out)
+            }
+            Err(_) if std::env::var_os("CI").is_some() => {
+                panic!("{tool} is missing: install poppler-utils, CI doesn't skip the check")
+            }
+            Err(_) => None,
+        }
+    }
+
+    /// the PDF's structure as pdfinfo shows it, if pdfinfo is there
+    fn structure_of(pdf: &[u8], name: &str) -> Option<String> {
+        let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
+        std::fs::write(&path, pdf).unwrap();
+        let out = poppler("pdfinfo", &["-struct-text".as_ref(), path.as_os_str()])?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// the plain text of a PDF, if pdftotext is there
     fn text_of(pdf: &[u8], name: &str) -> Option<String> {
         let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
         std::fs::write(&path, pdf).unwrap();
-        let out = std::process::Command::new("pdftotext")
-            .args(["-enc", "UTF-8"])
-            .arg(&path)
-            .arg("-")
-            .output();
-        let out = match out {
-            Ok(out) => out,
-            Err(_) if std::env::var_os("CI").is_some() => {
-                panic!("pdftotext is missing: install poppler-utils, CI doesn't skip the check")
-            }
-            Err(_) => return None,
-        };
+        let out = poppler(
+            "pdftotext",
+            &[
+                "-enc".as_ref(),
+                "UTF-8".as_ref(),
+                path.as_os_str(),
+                "-".as_ref(),
+            ],
+        )?;
         Some(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 
@@ -1006,16 +1040,9 @@ mod tests {
             );
         }
         let pdf = write(&mut engine, &HashMap::new(), &info()).unwrap();
-        let path = std::env::temp_dir().join("blank-layout-unit-repeats.pdf");
-        std::fs::write(&path, pdf).unwrap();
-        let Ok(out) = std::process::Command::new("pdfinfo")
-            .arg("-struct-text")
-            .arg(&path)
-            .output()
-        else {
+        let Some(structure) = structure_of(&pdf, "repeats") else {
             return;
         };
-        let structure = String::from_utf8_lossy(&out.stdout);
         assert_eq!(structure.matches("\"Heading\"").count(), 1, "{structure}");
     }
 
@@ -1077,16 +1104,9 @@ mod tests {
             },
         );
         let pdf = write(&mut engine, &images, &info()).unwrap();
-        let path = std::env::temp_dir().join("blank-layout-unit-listed-image.pdf");
-        std::fs::write(&path, pdf).unwrap();
-        let Ok(out) = std::process::Command::new("pdfinfo")
-            .arg("-struct-text")
-            .arg(&path)
-            .output()
-        else {
+        let Some(structure) = structure_of(&pdf, "listed-image") else {
             return;
         };
-        let structure = String::from_utf8_lossy(&out.stdout);
         let body = structure.find("LBody").expect("a list item");
         assert!(structure[..body].contains("Lbl"), "{structure}");
         assert!(structure[body..].contains("Figure"), "{structure}");

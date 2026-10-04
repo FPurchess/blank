@@ -34,12 +34,12 @@ export interface TableGrid {
   widths: number[];
 }
 
-// the colours of the table theme in src/scss/main.scss, mixed from the text
-// colour of the light theme with white paper: 20% for the lines, 55% for the
-// line under the header rows and 6% for the tint of header cells
+// the colours of the table theme in src/scss/main.scss on paper (see
+// src/layout/paperColors.ts): 20% of the text colour for the lines, 55% for
+// the line under the header rows and 6% for the tint of header cells
 export const TABLE_COLORS = {
   line: "#d1d4d6",
-  headerLine: "#828990",
+  headerLine: "#82898e",
   headerFill: "#f1f2f3",
 };
 

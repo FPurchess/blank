@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
-import { doc, h, p, table, td, tr } from "../test/editor";
+import { blockquote, doc, h, li, p, table, td, tr, ul } from "../test/editor";
 import { engineMissing } from "../state";
 import { schema } from "../markdown";
 import { testEngine } from "../test/engine";
@@ -55,6 +55,22 @@ describe("PageEngine", () => {
     expect(again.laying).toBe(false);
     expect(again.pages()).toBe(full.pages());
     vi.useRealTimers();
+  });
+
+  it("draws a quote's bar down over the space before its next block", () => {
+    // the list ends with the space after a block, which the bar spans
+    const node = doc(blockquote(ul(li(p("a"))), p("b")), p("after"));
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    engine.sync(node, noSizes);
+    // the bars are the rectangles of the quote's width, one per block
+    const bars = engine
+      .bodyDisplay(0, engine.bodyVersions()[0])
+      .r.filter(([, , width]) => width === 2.25);
+    expect(bars).toHaveLength(2);
+    const [[, top, , height], [, next]] = bars;
+    expect(top + height).toBeCloseTo(next, 3);
+    engine.free();
   });
 
   it("lays out a document on pages", () => {

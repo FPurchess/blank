@@ -8,7 +8,7 @@ Blank reads its settings from `blank.json` in the app config folder. The file is
 | macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json` |
 | Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                     |
 
-Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as a key it doesn't know or `"false"` in quotes instead of `false`, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored.
+Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as `"false"` in quotes instead of `false`, or a shortcut for a command it doesn't know, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored. Other names it doesn't know are skipped.
 
 ## Keyboard shortcuts
 

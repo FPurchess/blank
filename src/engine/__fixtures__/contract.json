@@ -1,0 +1,364 @@
+{
+  "items": [
+    {
+      "kind": "text",
+      "pos": 1,
+      "text": "Chapter",
+      "spans": [],
+      "style": "h1",
+      "level": 1,
+      "top": true,
+      "indent": 0,
+      "before": 0,
+      "after": 5,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 10,
+      "text": "bold italic code link",
+      "spans": [
+        {
+          "from": 0,
+          "to": 5,
+          "bold": true
+        },
+        {
+          "from": 5,
+          "to": 12,
+          "italic": true
+        },
+        {
+          "from": 12,
+          "to": 17,
+          "code": true
+        },
+        {
+          "from": 17,
+          "to": 21,
+          "link": "https://example.org"
+        }
+      ],
+      "style": "p",
+      "level": 0,
+      "top": true,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 34,
+      "text": "quoted",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 13.25,
+      "before": 0,
+      "after": 0,
+      "bars": [
+        0
+      ],
+      "barsContinue": true
+    },
+    {
+      "kind": "text",
+      "pos": 42,
+      "text": "more quoted",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 13.25,
+      "before": 0,
+      "after": 8,
+      "bars": [
+        0
+      ],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 58,
+      "text": "first",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 18,
+      "before": 2,
+      "after": 0,
+      "bars": [],
+      "barsContinue": false,
+      "marker": "1."
+    },
+    {
+      "kind": "break",
+      "pos": 64,
+      "indent": 18,
+      "before": 2,
+      "after": 10,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 70,
+      "text": "item",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 18,
+      "before": 2,
+      "after": 10,
+      "bars": [],
+      "barsContinue": false,
+      "marker": "•"
+    },
+    {
+      "kind": "image",
+      "pos": 78,
+      "src": "top.png",
+      "width": 120,
+      "height": 80,
+      "alt": "an image",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 81,
+      "text": "code",
+      "spans": [],
+      "style": "code",
+      "level": 0,
+      "top": true,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "rule",
+      "pos": 86,
+      "indent": 0,
+      "before": 14,
+      "after": 30,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "table",
+      "pos": 87,
+      "end": 166,
+      "rows": [
+        {
+          "header": true,
+          "cells": [
+            {
+              "paragraphs": [
+                {
+                  "kind": "text",
+                  "pos": 91,
+                  "text": "left",
+                  "spans": [],
+                  "style": "p",
+                  "level": 0,
+                  "top": false
+                }
+              ],
+              "header": true,
+              "align": "left",
+              "col": 0,
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "paragraphs": [
+                {
+                  "kind": "text",
+                  "pos": 99,
+                  "text": "right",
+                  "spans": [],
+                  "style": "p",
+                  "level": 0,
+                  "top": false
+                }
+              ],
+              "header": true,
+              "align": "right",
+              "col": 1,
+              "colspan": 1,
+              "rowspan": 1
+            }
+          ]
+        },
+        {
+          "header": false,
+          "cells": [
+            {
+              "paragraphs": [
+                {
+                  "kind": "text",
+                  "pos": 110,
+                  "text": "wide",
+                  "spans": [],
+                  "style": "p",
+                  "level": 0,
+                  "top": false
+                }
+              ],
+              "header": false,
+              "col": 0,
+              "colspan": 2,
+              "rowspan": 1
+            }
+          ]
+        },
+        {
+          "header": false,
+          "cells": [
+            {
+              "paragraphs": [],
+              "blocks": [
+                {
+                  "kind": "text",
+                  "pos": 120,
+                  "text": "code in a cell",
+                  "spans": [],
+                  "style": "code",
+                  "level": 0,
+                  "top": false,
+                  "indent": 0,
+                  "bars": []
+                },
+                {
+                  "kind": "text",
+                  "pos": 138,
+                  "text": "a list",
+                  "spans": [],
+                  "style": "p",
+                  "level": 0,
+                  "top": false,
+                  "indent": 18,
+                  "bars": [],
+                  "marker": "•"
+                }
+              ],
+              "header": false,
+              "col": 0,
+              "colspan": 1,
+              "rowspan": 1
+            },
+            {
+              "paragraphs": [],
+              "blocks": [
+                {
+                  "kind": "image",
+                  "pos": 150,
+                  "src": "cell.png",
+                  "width": 120,
+                  "height": 80,
+                  "alt": "an image",
+                  "indent": 0,
+                  "bars": []
+                },
+                {
+                  "kind": "text",
+                  "pos": 154,
+                  "text": "a quote",
+                  "spans": [],
+                  "style": "p",
+                  "level": 0,
+                  "top": false,
+                  "indent": 13.25,
+                  "bars": [
+                    0
+                  ]
+                }
+              ],
+              "header": false,
+              "col": 1,
+              "colspan": 1,
+              "rowspan": 1
+            }
+          ]
+        }
+      ],
+      "widths": [
+        0.4,
+        0.6
+      ],
+      "caption": "A table",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    }
+  ],
+  "settings": {
+    "width": 595.28,
+    "height": 841.89,
+    "margins": {
+      "top": 70.86614173228347,
+      "right": 70.86614173228347,
+      "bottom": 70.86614173228347,
+      "left": 70.86614173228347
+    },
+    "newPageBefore": [
+      1
+    ],
+    "header": {
+      "left": "{title}",
+      "center": "",
+      "right": ""
+    },
+    "footer": {
+      "left": "",
+      "center": "{page} / {pages}",
+      "right": ""
+    },
+    "firstPage": {
+      "header": {
+        "left": "",
+        "center": "",
+        "right": "{author}"
+      },
+      "footer": {
+        "left": "",
+        "center": "",
+        "right": ""
+      }
+    },
+    "evenPages": {
+      "header": {
+        "left": "",
+        "center": "",
+        "right": ""
+      },
+      "footer": {
+        "left": "{chapter}",
+        "center": "",
+        "right": ""
+      }
+    },
+    "numberStyle": "i",
+    "startNumber": 3,
+    "fields": {
+      "title": "Contract",
+      "author": "Someone",
+      "date": "1 January 2026",
+      "file": "contract"
+    }
+  }
+}
