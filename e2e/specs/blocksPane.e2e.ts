@@ -123,6 +123,9 @@ describe("the blocks pane", () => {
   });
 
   it("stays open across a restart, until its shortcut closes it", async () => {
+    // a press on the pages put the floating pane away; the shortcut opens it
+    await focusEditor();
+    await pressMod(Key.Alt, "b");
     await expect($("#blocks-pane")).toBeDisplayed();
     await restartApp();
     await expect($("#blocks-pane")).toBeDisplayed();

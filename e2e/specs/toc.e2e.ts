@@ -98,8 +98,15 @@ describe("a table of contents", () => {
     await type(Key.Enter);
     await expect($("#toc-popover")).toBeDisplayed();
     await expect($("#toc-popover-depth")).toBeFocused();
-    // only the headings 1
-    await $("#toc-popover-depth").selectByIndex(0);
+    // only the headings 1: WebKitWebDriver's selectByIndex fires no change
+    // event, so the choice is made as the select makes it
+    await browser.execute(() => {
+      const select =
+        document.querySelector<HTMLSelectElement>("#toc-popover-depth")!;
+      select.value = "1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
     await type(Key.Escape);
     await expect($("#toc-popover")).not.toBeExisting();
   });
