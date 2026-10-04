@@ -143,6 +143,31 @@ fn fill(role: Role) -> Fill {
     }
 }
 
+/// the image `src` stands for, None for one left out or that can't be
+/// decoded, which is noted in `undecoded`
+fn load_image(
+    src: &str,
+    images: &HashMap<String, ImageData>,
+    skipped: &Skipped,
+    undecoded: &mut Vec<String>,
+) -> Option<Image> {
+    if skipped.images.iter().any(|skip| skip == src) {
+        return None;
+    }
+    let data = images.get(src)?;
+    let bytes = data.bytes.clone().into();
+    // PDF/A forbids smoothing images, and a normal PDF looks the same
+    let image = if data.jpeg {
+        Image::from_jpeg(bytes, false)
+    } else {
+        Image::from_png(bytes, false)
+    };
+    if image.is_err() {
+        undecoded.push(src.to_string());
+    }
+    image.ok()
+}
+
 /// what a part of a page that isn't text of the document is, as an
 /// artifact: its decorations, headers and footers, and the header rows a
 /// table repeats; None for the text, which is tagged
@@ -545,20 +570,25 @@ fn attempt(
     // the order everything is drawn in, for the structure
     let mut order = 0usize;
     let (width, height) = (engine.settings.width, engine.settings.height);
+    // what each page draws, with what of the document it is: its body, then
+    // its header and footer
+    let pages: Vec<Vec<(Op, Part)>> = (0..engine.pages.len())
+        .map(|page| {
+            let mut ops = engine.body_parts(page);
+            ops.extend(engine.band_parts(page));
+            ops
+        })
+        .collect();
     // the fonts whose missing glyph the document shows, for what no font has
     let mut missing: Vec<usize> = vec![];
-    for page_index in 0..engine.pages.len() {
-        for op in engine.page_ops(page_index, true) {
-            if let Op::Glyphs { run, .. } = op {
-                if run.glyphs.iter().any(|glyph| glyph.id == 0) && !missing.contains(&run.font) {
-                    missing.push(run.font);
-                }
+    for (op, _) in pages.iter().flatten() {
+        if let Op::Glyphs { run, .. } = op {
+            if run.glyphs.iter().any(|glyph| glyph.id == 0) && !missing.contains(&run.font) {
+                missing.push(run.font);
             }
         }
     }
-    for page_index in 0..engine.pages.len() {
-        let mut ops = engine.body_parts(page_index);
-        ops.extend(engine.band_parts(page_index));
+    for (page_index, ops) in pages.into_iter().enumerate() {
         let settings = PageSettings::from_wh(width, height)
             .ok_or_else(|| Failed::Other("the page has no size".into()))?;
         let mut page = document.start_page_with(settings);
@@ -624,24 +654,9 @@ fn attempt(
                         w,
                         h,
                     } => {
-                        let image = loaded.entry(src.clone()).or_insert_with(|| {
-                            if skipped.images.contains(&src) {
-                                return None;
-                            }
-                            let data = images.get(&src)?;
-                            let bytes = data.bytes.clone().into();
-                            // PDF/A forbids smoothing images, and a normal
-                            // PDF looks the same
-                            let image = if data.jpeg {
-                                Image::from_jpeg(bytes, false)
-                            } else {
-                                Image::from_png(bytes, false)
-                            };
-                            if image.is_err() {
-                                undecoded.push(src.clone());
-                            }
-                            image.ok()
-                        });
+                        let image = loaded
+                            .entry(src.clone())
+                            .or_insert_with(|| load_image(&src, images, skipped, &mut undecoded));
                         match (image.clone(), Size::from_wh(w, h)) {
                             (Some(image), Some(size)) => {
                                 surface.push_transform(&Transform::from_translate(x, y));
