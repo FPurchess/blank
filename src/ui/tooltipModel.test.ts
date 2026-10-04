@@ -100,7 +100,8 @@ describe("the tooltip of a control", () => {
     const tip = (attrs: Record<string, string>) =>
       describedBy(tipOf(control(attrs), 0)!);
     expect(tip({})).toBe(TIP_KEY_ID);
-    expect(tip({ "aria-label": "Bold (B)" })).toBe(TIP_KEY_ID);
+    expect(tip({ "aria-label": "Bold (Ctrl+B)" })).toBeUndefined();
+    expect(tip({ "aria-label": "Bold text" })).toBe(TIP_KEY_ID);
     expect(tip({ "data-tip-key": "" })).toBeUndefined();
     expect(tip({ "aria-label": "A4" })).toBe(TIP_ID);
   });
@@ -175,9 +176,15 @@ describe("watchTips", () => {
     vi.advanceTimersByTime(TIP_DELAY);
     window.dispatchEvent(new Event(type));
     expect(hide).toHaveBeenCalled();
-    // and doesn't come back while the pointer stays
+    // and doesn't come back while the pointer stays on the control
+    over(button.firstChild as Element);
     vi.advanceTimersByTime(TIP_DELAY);
     expect(show).toHaveBeenCalledOnce();
+    // but once it came back to it
+    out(button);
+    over(button);
+    vi.advanceTimersByTime(TIP_DELAY);
+    expect(show).toHaveBeenCalledTimes(2);
   });
 
   it("doesn't show once the window lost the focus", () => {
@@ -214,6 +221,16 @@ describe("watchTips", () => {
     button.dataset.tip = "Boldest";
     await Promise.resolve();
     expect(shown().name).toBe("Bolder");
+  });
+
+  it("goes when the control's tooltip goes while it shows", async () => {
+    const button = control({ "aria-describedby": "hint" });
+    over(button);
+    vi.advanceTimersByTime(TIP_DELAY);
+    delete button.dataset.tip;
+    await Promise.resolve();
+    expect(hide).toHaveBeenCalled();
+    expect(button.getAttribute("aria-describedby")).toBe("hint");
   });
 
   it("doesn't show for a control that went away", () => {

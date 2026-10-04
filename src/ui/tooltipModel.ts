@@ -80,7 +80,7 @@ export const describedBy = ({ target, name, key }: Tip) => {
     ""
   ).trim();
   if (!own.startsWith(name)) return TIP_ID;
-  return key ? TIP_KEY_ID : undefined;
+  return key && !own.includes(key) ? TIP_KEY_ID : undefined;
 };
 
 /**
@@ -108,12 +108,17 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
   // the control the pointer is on, and where it entered it
   let target: HTMLElement | null = null;
   let x = 0;
+  // the control a press or key dismissed the tooltip of, which stays
+  // without one until the pointer leaves it
+  let dismissed: HTMLElement | null = null;
   // while one shows: how to undo its description, and what watches it
   let undescribe = () => {};
   let observer: MutationObserver | null = null;
 
   const showTip = () => {
     const tip = target?.isConnected ? tipOf(target, x) : null;
+    // a control whose tooltip went away while it showed
+    if (!tip && observer) return close();
     if (!tip || tooltipsSuppressed.value) return;
     undescribe();
     undescribe = describe(tip.target, describedBy(tip));
@@ -141,6 +146,7 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
     close,
   });
   const dismiss = () => {
+    dismissed = target;
     target = null;
     intent.cancel();
     close();
@@ -148,14 +154,16 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
 
   listenOnWindow("mouseover", (event) => {
     const next = tipTarget(event.target);
-    if (next === target) return;
+    if (next === target || next === dismissed) return;
     if (target) intent.leave();
     target = next;
     x = event.clientX;
     if (next) intent.enter();
   });
   listenOnWindow("mouseout", (event) => {
-    if (target && !target.contains(event.relatedTarget as Node | null)) {
+    const to = event.relatedTarget as Node | null;
+    if (dismissed && !dismissed.contains(to)) dismissed = null;
+    if (target && !target.contains(to)) {
       target = null;
       intent.leave();
     }

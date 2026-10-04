@@ -1,6 +1,6 @@
 // Opening something after the pointer rested on it, and closing it a moment
-// after the pointer left: the tooltip (tooltipModel.ts) and the cards of the
-// status bar. One timer, so a leave cancels a pending open and an enter a
+// after the pointer left, like the tooltip (tooltipModel.ts) or a card that
+// opens on hover. One timer, so a leave cancels a pending open and an enter a
 // pending close, and moving from an anchor to its card (leave, then enter)
 // keeps the card open. It cancels on nothing by itself: presses and keys are
 // the caller's to wire up.

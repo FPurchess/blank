@@ -594,8 +594,7 @@ $faint-text-opacity: 0.6;
   font-size: 0.75rem;
   opacity: $faint-text-opacity;
   background-color: var(--background-color);
-  cursor: pointer;
-  transition: opacity 150ms;
+    transition: opacity 150ms;
 
   &:hover {
     opacity: 0.8;
@@ -641,8 +640,6 @@ $faint-text-opacity: 0.6;
     border: 1px dashed var(--color);
     border-radius: 3px;
     padding: 1px 8px;
-    cursor: pointer;
-
     &:hover {
       opacity: 1;
     }
@@ -754,8 +751,7 @@ $faint-text-opacity: 0.6;
       border: 1px solid transparent;
       border-radius: 3px;
       padding: 1px 8px;
-      cursor: pointer;
-      opacity: 0.75;
+            opacity: 0.75;
 
       &:hover,
       &:focus-visible {

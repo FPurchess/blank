@@ -62,6 +62,7 @@ describe("the command list", () => {
 
   it.each(commands)("finds $id by lower case words", ({ aliases }) => {
     for (const alias of aliases) expect(alias).toBe(alias.toLowerCase());
+    expect(new Set(aliases).size).toBe(aliases.length);
   });
 
   it("looks a command up", () => {

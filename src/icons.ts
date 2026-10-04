@@ -1,6 +1,8 @@
 // Line icons on a 24 × 24 grid, drawn with a 1.5 stroke, round ends and no
 // fill in the text color, so they follow the theme (see
-// .claude/rules/design.md). IconGlyph (src/ui/components) draws them.
+// .claude/rules/design.md). IconGlyph (src/ui/components) draws them. It
+// holds every icon of the design draft, so the parts of the redesign still
+// to come find theirs here.
 
 const ICONS: Record<string, string> = {
   bold: "M7 5h5.5a3.5 3.5 0 0 1 0 7H7z M7 12h6.5a3.5 3.5 0 0 1 0 7H7z",

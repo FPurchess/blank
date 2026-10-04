@@ -8,7 +8,7 @@ paths:
 
 # Design
 
-How Blank's controls look and behave, so every part of the UI looks the same without deciding it again. The long form, with the reasons, is the design draft in `design/next/` (branch `design/next-ui`: `rules.html`, `tokens.css`, `ui.css`, `proto.js`). **The draft shows behaviour and look, never code to copy**: it is plain DOM. Build in Blank's way (`ui-components.md`, `state.md`).
+How Blank's controls look and behave, so every part of the UI looks the same without deciding it again. The long form, with the reasons, is the design draft in `design/next/` (branch `design/next-ui`: `rules.html`, `tokens.css`, `ui.css`, `proto.js`). **The draft shows behavior and look, never code to copy**: it is plain DOM. Build in Blank's way (`ui-components.md`, `state.md`).
 
 ## Tokens (`src/scss/_tokens.scss`)
 
@@ -71,7 +71,10 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - It sets `data-tip` (the name: the command's label unless given) and `data-tip-key` (the command's shortcut via `commandShortcut`, unless `key` gives one).
   - For a command, it also sets `aria-keyshortcuts`.
 - **Never use `title` on a control.** A tooltip is the name plus the shortcut, never a sentence. Sentences over the pages (link hints, "Double-click to edit…") stay native titles.
-- **Behaviour:**
+- **Not moved yet**, each for the part of the redesign that rebuilds it:
+  - the bottom bar's items, which keep their `title` and their own `cursor` rules until the status bar;
+  - the header and footer strip (`BandEditor.vue`), which keeps its `title`s and its Title Case labels ("First Page ▾", "Odd & Even Pages").
+- **Behavior:**
   - It shows after 400ms of rest (`hoverIntent.ts`, the timer cards share).
   - It goes at once on leave, press, key, wheel or blur.
   - It sits above the control, or below near the top bar, at the pointer on wide controls (`placeTip`).

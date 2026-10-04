@@ -186,10 +186,9 @@ onUnmounted(() => {
 });
 
 // the dashes and the ×, with the shortcut that shows and hides the outline
-const dashesTip = tipAttrs({
-  name: "Outline",
-  command: CommandIdentifier.VIEW_OUTLINE,
-});
+const dashesTip = computed(() =>
+  tipAttrs({ name: "Outline", command: CommandIdentifier.VIEW_OUTLINE }),
+);
 </script>
 
 <template>

@@ -62,11 +62,11 @@ describe("the tooltip", () => {
     expect(tooltip()).toBeNull();
   });
 
-  it("shows its key in table mode, which describes the button", async () => {
+  it("shows its key in table mode, which the button's name already says", async () => {
     const button = await rest(true);
     expect(tooltip()?.querySelector("kbd")?.textContent).toBe("S");
-    const id = button.getAttribute("aria-describedby")!;
-    expect(document.getElementById(id)?.textContent).toBe("S");
+    expect(button.getAttribute("aria-label")).toBe("Sort by this column (S)");
+    expect(button.hasAttribute("aria-describedby")).toBe(false);
     expect(tooltip()!.style.top).not.toBe("");
   });
 });

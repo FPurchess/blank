@@ -92,7 +92,8 @@ $tip-key: 75%;
   }
 }
 
-// a text button in a bar, without its border until the pointer is over it
+// a text button in a bar, without a border: only the fill under the pointer
+// shows it's a button
 @mixin text-button-quiet {
   border-color: transparent;
 }
@@ -238,8 +239,9 @@ textarea:not(:disabled) {
   cursor: default;
 }
 
-// the ring of keyboard focus. main.scss's `outline: none` on the editors and
-// the menu has the same weight, and wins because it comes later
+// the ring of keyboard focus. main.scss turns it off where it has its own
+// sign of focus: on the editors with the same weight, winning because it
+// comes later, and on the menu by its id
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

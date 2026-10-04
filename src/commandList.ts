@@ -1,8 +1,9 @@
 import { CommandIdentifier, CommandIdentifier as C } from "./config";
 
 // One list of Blank's commands: what they're called, where they're grouped,
-// their icon and the other words a search finds them by. Menus, tooltips,
-// the toolbar and the list of shortcuts take their words from here; the keys
+// their icon and the other words a search finds them by. Whatever names a
+// command takes its words from here (so far the context menu and tooltips,
+// later the menu, its search and the toolbar); the keys
 // stay in the keymap (config.ts). Every CommandIdentifier needs an entry,
 // which the type below makes sure of. See .claude/rules/design.md.
 
@@ -239,7 +240,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     group: "View",
     label: "Next theme",
     icon: "palette",
-    aliases: ["dark", "light", "color", "color", "appearance"],
+    aliases: ["dark", "light", "color", "appearance"],
   },
   [C.SPELLCHECK_TOGGLE]: {
     group: "Tools",
