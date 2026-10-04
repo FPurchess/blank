@@ -207,6 +207,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "italic",
     aliases: ["emphasis", "em"],
   },
+  [C.FORMAT_UNDERLINE]: {
+    group: "Format",
+    label: "Underline",
+    icon: "underline",
+    aliases: ["underlined"],
+  },
   [C.FORMAT_CODE]: {
     group: "Format",
     label: "Code",
@@ -230,6 +236,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Numbered list",
     icon: "list-ordered",
     aliases: ["ol", "numbers"],
+  },
+  [C.BLOCKTYPE_CODE_BLOCK]: {
+    group: "Format",
+    label: "Code block",
+    icon: "source",
+    aliases: ["pre", "fenced", "program"],
   },
   [C.FORMAT_BLOCKQUOTE]: {
     group: "Format",
@@ -309,6 +321,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Previous part of the window",
     icon: "focus",
     aliases: ["focus", "tabs", "toolbar", "keyboard", "f6"],
+  },
+  [C.VIEW_TOOLBAR_FOCUS]: {
+    group: "View",
+    label: "Go to the toolbar",
+    icon: "more",
+    aliases: ["formatting", "focus", "keyboard"],
   },
   [C.VIEW_PAGES]: {
     group: "View",

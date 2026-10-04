@@ -48,13 +48,16 @@ describe("plugin.keymap", () => {
     config.value = defaultConfig;
   });
 
-  it("binds every command to its own key", () => {
-    const bindings = Object.values(CommandIdentifier).map(
-      (command) => config.value.keymap[command],
-    );
+  it("binds every command that has a key to its own", () => {
+    const bindings = Object.values(CommandIdentifier)
+      .map((command) => config.value.keymap[command])
+      .filter((binding) => binding !== "");
 
-    expect(bindings.every(Boolean)).toBe(true);
     expect(new Set(bindings).size).toBe(bindings.length);
+    // only the code block has none by default
+    expect(config.value.keymap[CommandIdentifier.BLOCKTYPE_CODE_BLOCK]).toBe(
+      "",
+    );
   });
 
   it.each([
@@ -437,7 +440,7 @@ describe("plugin.keymap", () => {
     expect(sendNotification).not.toHaveBeenCalled();
   });
 
-  it("skips bindings it can't use and notifies once", () => {
+  it("skips bindings it can't use and notifies once, but not an empty one", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     config.value = {
       ...defaultConfig,
@@ -453,7 +456,7 @@ describe("plugin.keymap", () => {
     expect(press("Mod-s")).toBe(true);
     expect(sendNotification).toHaveBeenCalledOnce();
     expect(sendNotification).toHaveBeenCalledWith(
-      "Ignored invalid key bindings in blank.json: format.bold: Hyper-b, format.italic: ",
+      "Ignored invalid key bindings in blank.json: format.bold: Hyper-b",
     );
   });
 });

@@ -28,6 +28,7 @@ export enum CommandIdentifier {
   BLOCKTYPE_HEADING6 = "blocktype.heading6",
   BLOCKTYPE_BULLET_LIST = "blocktype.bullet_list",
   BLOCKTYPE_ORDERED_LIST = "blocktype.ordered_list",
+  BLOCKTYPE_CODE_BLOCK = "blocktype.code_block",
   INSERT_HORIZONTAL_RULE = "insert.horizontal_rule",
   INSERT_IMAGE = "insert.image",
   INSERT_TABLE = "insert.table",
@@ -37,6 +38,7 @@ export enum CommandIdentifier {
   FORMAT_UNINDENT = "format.unindent",
   FORMAT_BOLD = "format.bold",
   FORMAT_ITALIC = "format.italic",
+  FORMAT_UNDERLINE = "format.underline",
   FORMAT_CODE = "format.code",
   FORMAT_LINK = "format.link",
   FORMAT_BLOCKQUOTE = "format.blockquote",
@@ -69,6 +71,7 @@ export enum CommandIdentifier {
   VIEW_OUTLINE = "view.outline",
   VIEW_FOCUS_NEXT = "view.focus_next",
   VIEW_FOCUS_PREVIOUS = "view.focus_previous",
+  VIEW_TOOLBAR_FOCUS = "view.toolbar_focus",
   TOOLS_STATS = "tools.stats",
 }
 
@@ -131,6 +134,9 @@ const defaultConfig: Config = {
     [CommandIdentifier.BLOCKTYPE_HEADING6]: "Mod-6",
     [CommandIdentifier.BLOCKTYPE_BULLET_LIST]: "Mod-8",
     [CommandIdentifier.BLOCKTYPE_ORDERED_LIST]: "Mod-9",
+    // no key of its own: from the toolbar's style menu, or one set in
+    // blank.json
+    [CommandIdentifier.BLOCKTYPE_CODE_BLOCK]: "",
     [CommandIdentifier.INSERT_HORIZONTAL_RULE]: "Mod-h",
     [CommandIdentifier.INSERT_IMAGE]: "Mod-Alt-i",
     [CommandIdentifier.INSERT_TABLE]: "Mod-t",
@@ -140,6 +146,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.FORMAT_UNINDENT]: "Shift-Tab",
     [CommandIdentifier.FORMAT_BOLD]: "Mod-b",
     [CommandIdentifier.FORMAT_ITALIC]: "Mod-i",
+    [CommandIdentifier.FORMAT_UNDERLINE]: "Mod-u",
     [CommandIdentifier.FORMAT_CODE]: "Mod-e",
     [CommandIdentifier.FORMAT_LINK]: "Mod-k",
     [CommandIdentifier.FORMAT_BLOCKQUOTE]: "Mod-g",
@@ -172,6 +179,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.VIEW_OUTLINE]: "Mod-Alt-o",
     [CommandIdentifier.VIEW_FOCUS_NEXT]: "F6",
     [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: "Shift-F6",
+    [CommandIdentifier.VIEW_TOOLBAR_FOCUS]: "Alt-F10",
     [CommandIdentifier.TOOLS_STATS]: "Mod-Alt-c",
   },
   autocorrect: {

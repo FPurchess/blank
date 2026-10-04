@@ -8,12 +8,10 @@ import {
   newlineInCode,
   splitBlockAs,
   toggleMark,
-  wrapIn,
 } from "prosemirror-commands";
 import {
   liftListItem,
   sinkListItem,
-  wrapInList,
   splitListItem,
 } from "prosemirror-schema-list";
 import { alignOf, fieldAt, schema } from "../../markdown";
@@ -48,7 +46,7 @@ import {
 
 import * as exporters from "../../exporters";
 import { CommandIdentifier, getKeyBinding } from "../../config";
-import type { Node } from "prosemirror-model";
+import type { MarkType, Node } from "prosemirror-model";
 import { Command } from "prosemirror-state";
 import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
@@ -56,6 +54,9 @@ import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
+import { toggleList } from "../commands/lists";
+import { toggleQuote } from "../commands/quote";
+import { focusToolbar } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
 
 export { normalizeBinding };
@@ -78,6 +79,13 @@ const outsideForms =
   (state, dispatch, view) =>
     !fieldAt(state.selection.$from) && command(state, dispatch, view);
 
+/**
+ * markCommand toggles `type`, but adds it to a selection only partly marked,
+ * as Word and Google Docs do
+ */
+const markCommand = (type: MarkType) =>
+  toggleMark(type, null, { removeWhenPresent: false });
+
 const heading = (level: number) =>
   outsideCells(setTextblock(schema.nodes.heading, { level }));
 
@@ -91,11 +99,14 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.BLOCKTYPE_HEADING4]: heading(4),
   [CommandIdentifier.BLOCKTYPE_HEADING5]: heading(5),
   [CommandIdentifier.BLOCKTYPE_HEADING6]: heading(6),
-  [CommandIdentifier.BLOCKTYPE_BULLET_LIST]: wrapInList(
+  [CommandIdentifier.BLOCKTYPE_BULLET_LIST]: toggleList(
     schema.nodes.bullet_list,
   ),
-  [CommandIdentifier.BLOCKTYPE_ORDERED_LIST]: wrapInList(
+  [CommandIdentifier.BLOCKTYPE_ORDERED_LIST]: toggleList(
     schema.nodes.ordered_list,
+  ),
+  [CommandIdentifier.BLOCKTYPE_CODE_BLOCK]: setTextblock(
+    schema.nodes.code_block,
   ),
   [CommandIdentifier.INSERT_HORIZONTAL_RULE]: outsideCells(
     insertBlock(schema.nodes.horizontal_rule),
@@ -115,11 +126,12 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     outdentCode,
     liftListItem(schema.nodes.list_item),
   ),
-  [CommandIdentifier.FORMAT_BOLD]: toggleMark(schema.marks.strong),
-  [CommandIdentifier.FORMAT_ITALIC]: toggleMark(schema.marks.em),
-  [CommandIdentifier.FORMAT_CODE]: toggleMark(schema.marks.code),
+  [CommandIdentifier.FORMAT_BOLD]: markCommand(schema.marks.strong),
+  [CommandIdentifier.FORMAT_ITALIC]: markCommand(schema.marks.em),
+  [CommandIdentifier.FORMAT_UNDERLINE]: markCommand(schema.marks.underline),
+  [CommandIdentifier.FORMAT_CODE]: markCommand(schema.marks.code),
   [CommandIdentifier.FORMAT_LINK]: editLink(),
-  [CommandIdentifier.FORMAT_BLOCKQUOTE]: wrapIn(schema.nodes.blockquote),
+  [CommandIdentifier.FORMAT_BLOCKQUOTE]: toggleQuote,
   [CommandIdentifier.FORMAT_ALIGN_LEFT]: alignText("left"),
   [CommandIdentifier.FORMAT_ALIGN_CENTER]: alignText("center"),
   [CommandIdentifier.FORMAT_ALIGN_RIGHT]: alignText("right"),
@@ -153,6 +165,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_OUTLINE]: showOutline(),
   [CommandIdentifier.VIEW_FOCUS_NEXT]: moveFocus(1),
   [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: moveFocus(-1),
+  [CommandIdentifier.VIEW_TOOLBAR_FOCUS]: (_state, dispatch) => {
+    if (dispatch) focusToolbar();
+    return true;
+  },
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
 };
 
@@ -164,9 +180,15 @@ const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
 };
 
 /**
+ * commandFor returns the command bound to `id`, the one its key runs, e.g.
+ * for the toolbar's buttons
+ */
+export const commandFor = (id: CommandIdentifier): Command => commandMap[id];
+
+/**
  * bindingsOf binds the commands `ids` to their configured keys, and then to
  * their fixed keys (see FIXED_KEYS). Bindings that can't be used are added
- * to `invalid`.
+ * to `invalid`; a command without a key (an empty one) is left out.
  */
 const bindingsOf = (
   ids: readonly CommandIdentifier[],
@@ -175,6 +197,8 @@ const bindingsOf = (
   const bindings: Record<string, Command> = {};
   for (const id of ids) {
     const binding = getKeyBinding(id);
+    // a command without a key, e.g. the code block's by default
+    if (binding === "") continue;
     const normalized = normalizeBinding(binding);
     if (normalized === undefined) {
       invalid.push(`${id}: ${binding}`);

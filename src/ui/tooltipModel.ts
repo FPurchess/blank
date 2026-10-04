@@ -35,7 +35,9 @@ export interface TipSpec {
  */
 export const tipAttrs = ({ name, command, key }: TipSpec) => ({
   "data-tip": name ?? (command ? commandLabel(command) : undefined),
-  "data-tip-key": key ?? (command ? commandShortcut(command) : undefined),
+  // a command without a key has none to show
+  "data-tip-key":
+    key ?? (command ? commandShortcut(command) || undefined : undefined),
   "aria-keyshortcuts": command
     ? ariaShortcut(getKeyBinding(command))
     : undefined,

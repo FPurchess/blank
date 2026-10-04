@@ -19,6 +19,7 @@
 | [Outline](./pages#outline)                  | `Mod` `Alt` `O`   |
 | [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`   |
 | Cycle themes                                | `Mod` `Alt` `T`   |
+| Go to the toolbar                           | `Alt` `F10`       |
 | Choose language                             | `Mod` `Alt` `L`   |
 
 ## Tabs
@@ -52,6 +53,7 @@
 | Heading 1 – 6                   | `Mod` `1` … `6` |
 | Bullet list                     | `Mod` `8`       |
 | Numbered list                   | `Mod` `9`       |
+| Code block                      | (none)          |
 | Indent list item                | `Tab`           |
 | Outdent list item               | `Shift` `Tab`   |
 | Indent code lines               | `Tab`           |
@@ -92,6 +94,7 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | -------------------- | --------------- |
 | Bold                 | `Mod` `B`       |
 | Italic               | `Mod` `I`       |
+| Underline            | `Mod` `U`       |
 | Code                 | `Mod` `E`       |
 | Insert or edit link  | `Mod` `K`       |
 | Open link in browser | `Mod` + Click   |

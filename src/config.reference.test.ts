@@ -76,7 +76,8 @@ describe("the shortcuts in the docs", () => {
 
   it("show every default binding", () => {
     for (const [command, binding] of Object.entries(defaults.keymap)) {
-      if (IN_ONE_ROW.has(command)) continue;
+      // a command without a key, which the docs name without one
+      if (IN_ONE_ROW.has(command) || binding === "") continue;
       expect(shortcuts, command).toContain(keycaps(binding));
     }
     expect(shortcuts).toContain("`Mod` `1` … `6`");
