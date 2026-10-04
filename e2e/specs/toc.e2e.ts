@@ -13,7 +13,7 @@ import {
   type,
 } from "../helpers.ts";
 
-// A table of contents: inserted from the block picker, its page numbers on
+// A table of contents: inserted from the blocks pane, its page numbers on
 // the pages, following a heading as it is renamed, its dialog on Enter, and
 // saved as its marker line.
 

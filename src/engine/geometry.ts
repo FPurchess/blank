@@ -617,6 +617,15 @@ export const exposeGeometry = (view: EditorView) => {
       find: (text: string, index = 0) => findText(doc(), text, index),
       // whether the engine is still laying out the rest of a long document
       laying: () => pageEngine?.laying ?? false,
+      // the blocks at the top of the document: their kind and where they
+      // start and end
+      topBlocks: () => {
+        const blocks: { type: string; from: number; to: number }[] = [];
+        doc().forEach((node, from) =>
+          blocks.push({ type: node.type.name, from, to: from + node.nodeSize }),
+        );
+        return blocks;
+      },
       // the page numbers each table of contents shows, in order
       tocNumbers: () => {
         const numbers: (string[] | null)[] = [];

@@ -76,7 +76,7 @@ The words you add to the dictionary are kept next to `blank.json`, in the `dicti
 
 ## Forms {#forms}
 
-The templates of your own forms are YAML files in the `templates` folder, next to `blank.json`. See [Your own forms](./blocks#your-own-forms) for what they say.
+Your own forms are form definitions, YAML files in the `forms` folder next to `blank.json`. See [Your own forms](./blocks#your-own-forms) for what they say.
 
 ## Page setup {#page-setup}
 

@@ -19,7 +19,7 @@ export interface EmbedType {
   // its plugin's namespace, its name and the version of its data, e.g.
   // "org.excalidraw/scene@1"
   type: string;
-  // what the block picker calls it
+  // what the blocks pane calls it
   name: string;
   description?: string;
   // makes a new one (`data` null) or edits one; null when the user gave up

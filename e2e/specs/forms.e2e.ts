@@ -6,7 +6,7 @@ import { browser, $, expect } from "@wdio/globals";
 
 import { clickInto, Key, pressMod, restartApp, type } from "../helpers.ts";
 
-// A form: put in from the block picker, laid out as its template says (the
+// A form: put in from the blocks pane, laid out as its definition says (the
 // photo beside the ingredients), filled in with Tab from field to field and
 // through its table, selected with Escape, and saved with its definition.
 

@@ -50,6 +50,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `text-button`, `text-button-primary`, `text-button-quiet`;
   - `status-item`;
   - `popover`;
+  - `side-pane`;
   - `separator`;
   - `field` (an input or select on the paper);
   - `group-label` (the small capitals naming a group);
@@ -64,6 +65,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
 - **The one depth cue:** `popover` (a 1px `--line` border, the `--r-pop` radius, one shadow), only on what floats (menus, toolbars, pickers). It's paper, so it re-points `--muted` to `--muted-on-paper`: whatever is inside just uses `--muted`. A new surface on the paper does the same, rather than a property of its own.
 - **Closing what a component opened** (a menu, a card, a floating list): `useDismiss(inside, close, options)` (`src/ui/composables/useDismiss.ts`) closes it on a press outside `inside()`, which lists its own elements and what belongs to it (the button that opened it, so a press there toggles), and optionally on Escape, any key, blur or resize. Don't add another window `pointerdown` listener for it.
 - **A command's key for code that handles it itself:** `commandBinding(id)` (`src/editor/keyBindings.ts`), normalized for prosemirror-keymap; `commandShortcut(id)` writes it for people.
+- **Side panes:** `side-pane($edge, $offset)` (the blocks pane, the outline's open list), with `side-pane-head`, `side-pane-title` and `side-pane-foot` (`SidePaneHead.vue`). A flat surface of the desk's color with a 1px `--line` on the side of the pages; below `OUTLINE_BREAKPOINT`, where it floats over the pages (class `floating`), the popovers' shadow. Its surface is the desk, so it keeps `--muted`.
 - **The pointer:**
   - The global rule gives the hand to buttons, links and the roles button, tab, menuitem*, option, radio and switch. Text fields get the text cursor, and anything `:disabled`/`aria-disabled` the arrow.
   - Give a clickable element a role rather than its own `cursor` rule.

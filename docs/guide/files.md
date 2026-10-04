@@ -45,7 +45,7 @@ The `title` and `author` also go into your PDF and Word documents, where readers
 
 ### Blocks from a newer Blank {#unknown-blocks}
 
-Some blocks are written as lines like `<!-- blank:… -->`, which other markdown apps don't show. A file saved by a newer Blank may hold blocks this Blank doesn't know yet. It shows each of them as a box that says so, and keeps it exactly as it was written, so nothing is lost when you edit the text around it and save. The box isn't in your Word documents, and your PDF shows it as on the pages.
+Some blocks are written as lines like `<!-- blank:… -->`, which other markdown apps don't show. A file saved by a newer Blank may hold blocks this Blank doesn't know yet. It shows each of them as a box that says so, and keeps it exactly as it was written, so nothing is lost when you edit the text around it and save. The box isn't in your Word documents, and your PDF shows it as on the pages. How the other blocks are kept in each format is in [Blocks](./blocks#storage).
 
 ## Share a PDF {#pdf}
 

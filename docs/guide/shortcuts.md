@@ -33,21 +33,21 @@
 
 ## Blocks
 
-| Command            | Shortcut        |
-| ------------------ | --------------- |
-| Paragraph          | `Mod` `0`       |
-| Heading 1 – 6      | `Mod` `1` … `6` |
-| Bullet list        | `Mod` `8`       |
-| Numbered list      | `Mod` `9`       |
-| Indent list item   | `Tab`           |
-| Outdent list item  | `Shift` `Tab`   |
-| Indent code lines  | `Tab`           |
-| Outdent code lines | `Shift` `Tab`   |
-| Blockquote         | `Mod` `G`       |
-| Horizontal line    | `Mod` `H`       |
-| Page break         | `Mod` `Enter`   |
-| Table              | `Mod` `T`       |
-| [Block](./blocks)  | `Mod` `Alt` `B` |
+| Command                         | Shortcut        |
+| ------------------------------- | --------------- |
+| Paragraph                       | `Mod` `0`       |
+| Heading 1 – 6                   | `Mod` `1` … `6` |
+| Bullet list                     | `Mod` `8`       |
+| Numbered list                   | `Mod` `9`       |
+| Indent list item                | `Tab`           |
+| Outdent list item               | `Shift` `Tab`   |
+| Indent code lines               | `Tab`           |
+| Outdent code lines              | `Shift` `Tab`   |
+| Blockquote                      | `Mod` `G`       |
+| Horizontal line                 | `Mod` `H`       |
+| Page break                      | `Mod` `Enter`   |
+| Table                           | `Mod` `T`       |
+| [Insert a block](./blocks#pane) | `Mod` `Alt` `B` |
 
 ## Forms
 

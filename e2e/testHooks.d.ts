@@ -35,6 +35,8 @@ interface BlankGeometry {
   find: (text: string, index?: number) => number;
   // whether the engine is still laying out the rest of a long document
   laying: () => boolean;
+  // the blocks at the top of the document: their kind, start and end
+  topBlocks: () => { type: string; from: number; to: number }[];
 }
 
 interface Window {

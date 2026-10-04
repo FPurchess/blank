@@ -32,7 +32,7 @@ Type ` ``` ` and Enter at the start of a line to start a code block. In it, `Tab
 
 ## Blocks
 
-Press `Mod` `Alt` `B` to put a block into your document that Blank fills in for you, such as a table of contents. See [Blocks](./blocks).
+The **Blocks** pane (`Mod` `Alt` `B`) puts a table of contents, a form such as a recipe, or a drawing into your document: click a tile, or drag it between two paragraphs. See [Blocks](./blocks).
 
 ## Tables
 

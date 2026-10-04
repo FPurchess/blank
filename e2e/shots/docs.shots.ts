@@ -641,11 +641,39 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "outline.gif"), FULL);
   });
 
+  it("records the blocks pane", async () => {
+    const film = await filmNew();
+    await film.type("The keeper climbed the stairs every evening.");
+    await film.enter(0.3);
+    await film.type("He lit the lamp and wrote down the weather.");
+    await film.pause(0.6);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1.2);
+    // a tile dragged between the two paragraphs, the line showing where
+    const tile = $('#blocks-pane .tile[data-block="toc"]');
+    const { x, y } = await tile.getLocation();
+    await film.moveTo({ x: Math.round(x + 40), y: Math.round(y + 30) }, 0.8);
+    const second = await browser.execute(() => {
+      const geometry = window.blankGeometry;
+      const box = geometry.caretBox(geometry.find("He lit"))!;
+      return { x: Math.round(box.left + 120), y: Math.round(box.top + 2) };
+    });
+    await film.drag(second, 1.2, 0.8);
+    await film.pause(1.4);
+    // a click inserts where the cursor is
+    await film.clickOn($('#blocks-pane .tile[data-block="blank/recipe"]'), 1.8);
+    await film.hidePointer();
+    await film.pause(0.6);
+    film.save(path.join(outDir, "blocks-pane.gif"), 545);
+  });
+
   it("records a table of contents", async () => {
     const film = await filmNew();
-    // the block picker, and a table of contents still without headings
-    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1.4);
-    await film.press("Enter", Key.Enter, 1.2);
+    // the pane, Enter for its first block, and the pane put away: a table
+    // of contents still without headings
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1.2);
+    await film.press("Enter", Key.Enter, 1);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.4);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.8);
     // the story, each chapter on a page of its own: the entries come
     const paragraph =
       "<p>The keeper climbed the stairs every evening, lit the lamp and wrote down the weather, the ships and the wind.</p>";
@@ -673,15 +701,36 @@ describe("docs screenshots", () => {
     await film.clickInto("#editor h1", 0.4);
     await film.hidePointer();
     await film.type(" at the cape");
-    await film.pause(2.2);
+    await film.pause(1.4);
+    // a click selects it, and the pencil opens its settings: only the
+    // headings 1
+    const toc = await browser.execute(() => {
+      const geometry = window.blankGeometry;
+      const block = geometry.topBlocks().find(({ type }) => type === "toc")!;
+      const box = geometry.blockBoxes(block.from, block.to)[0];
+      return {
+        x: Math.round((box.left + box.right) / 2),
+        y: Math.round((box.top + box.bottom) / 2),
+      };
+    });
+    await film.moveTo(toc, 0.6);
+    await film.click(0.8);
+    await film.clickOn($('#block-toolbar [data-id="block-edit"]'), 1);
+    await film.hidePointer();
+    await film.press("↑", Key.ArrowUp, 0.5);
+    await film.press("↑", Key.ArrowUp, 1.2);
+    await film.press("Esc", Key.Escape, 1.6);
     film.save(path.join(outDir, "toc.gif"), 545);
   });
 
   it("records filling in a form", async () => {
     const film = await filmNew();
-    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1);
-    await film.press("↓", Key.ArrowDown, 0.6);
-    await film.press("Enter", Key.Enter, 1.4);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.8);
+    await film.type("recipe");
+    await film.press("Enter", Key.Enter, 1);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.4);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.8);
+    await film.press("Enter", Key.Enter, 0.6);
     await film.type("Pancakes");
     await film.press("Tab", Key.Tab, 0.6);
     await film.press("Tab", Key.Tab, 0.6);
