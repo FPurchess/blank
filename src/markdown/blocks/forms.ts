@@ -11,7 +11,7 @@ import {
 // a field may hold by its kind (see src/markdown/blocks/definitions.ts):
 // - a text field: one textblock, in the field's style;
 // - an image field: one paragraph, for its picture;
-// - a table field: a table, which it starts with the template's columns;
+// - a table field: a table, which it starts with the definition's columns;
 // - a rich field: any blocks a field holds.
 
 const { paragraph, heading, table, table_row, table_header, table_cell } =
@@ -29,7 +29,7 @@ const textblockOf = (spec: FieldDefinition, content?: Fragment) => {
 };
 
 /**
- * tableOf returns a table of a template's columns: its header row and an
+ * tableOf returns a table of a definition's columns: its header row and an
  * empty row
  */
 const tableOf = (columns: readonly string[]) => {
@@ -166,7 +166,7 @@ export const fitField = (field: Node, spec: FieldDefinition): Node => {
         if (child.type === table) tables = true;
       });
       if (tables) return fitted;
-      // the template's table, after what isn't empty
+      // the definition's table, after what isn't empty
       const kept: Node[] = [];
       fitted.forEach((child) => {
         if (!child.isTextblock || child.content.size > 0) kept.push(child);

@@ -128,7 +128,7 @@ export type EngineItem = Content & {
   marker?: string;
   bars: number[];
   barsContinue: boolean;
-  // starts a new page, e.g. a form whose template says so
+  // starts a new page, e.g. a form whose definition says so
   pageStart?: boolean;
   // the column of a grid it stands in; its indent and bars count from the
   // column's left

@@ -5,11 +5,11 @@ import { closeMarker, fenceFor, formatMarker, parseMarker } from "./args";
 import { parseLength } from "../../layout/units";
 import { checkLayout, framedFields, type LayoutNode } from "./layout";
 
-// The definitions of forms: what a template says a form holds, its fields in
+// The definitions of forms: what a form definition says a form holds, its fields in
 // order, each with what it takes and what it says while it's empty. A form
-// placed from a template keeps a copy of its definition in the document (in
+// placed from a definition keeps a copy of its definition in the document (in
 // the definitions section at the end of the file), so it stays as it was
-// placed whatever becomes of the template. Definitions are read from files
+// placed whatever becomes of the definition. Definitions are read from files
 // someone else may have written, so they are checked before Blank uses them.
 
 export type FieldKind = "text" | "rich" | "image" | "table";
@@ -29,7 +29,7 @@ export interface FieldDefinition {
 }
 
 export interface Definition {
-  // namespace/name: blank/… for Blank's templates, user/… for the user's
+  // namespace/name: blank/… for Blank's forms, user/… for the user's
   id: string;
   version: number;
   name: string;
@@ -214,7 +214,7 @@ export const checkDefinition = (value: unknown): Definition | string => {
 
 /**
  * readDefinition reads a definition from YAML, or returns what is wrong with
- * it. A template's file has no id: its file gives it one, `id`.
+ * it. A form's file has no id: its file gives it one, `id`.
  */
 export const readDefinition = (
   yaml: string,
@@ -267,7 +267,7 @@ const hash8 = (text: string) => {
 
 /**
  * definitionKey returns the key a form names its definition by: its id, its
- * version, and a hash of what it says, so that two templates of the same
+ * version, and a hash of what it says, so that two definitions of the same
  * name and version that say different things are told apart
  */
 export const definitionKey = (definition: Definition) =>

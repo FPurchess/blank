@@ -410,7 +410,7 @@ class Serializer {
 
   /**
    * form writes a form as Word's content controls (see ./forms.ts): one for
-   * the form, which starts a new page if its template says so, holding one
+   * the form, which starts a new page if its definition says so, holding one
    * for each field, which says its placeholder while it's empty. Without
    * its definition, a form is the blocks it holds.
    */
@@ -433,7 +433,7 @@ class Serializer {
       const grid = place?.kind === "grid" ? place : undefined;
       if (band && band.place.band !== grid?.band) flush();
       let written = this.field(field, spec, place);
-      // the first field in the flow starts where its template says, below
+      // the first field in the flow starts where its definition says, below
       // its frames
       if (place?.kind !== "frame" && !flowing) {
         flowing = true;

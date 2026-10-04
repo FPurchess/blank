@@ -1,6 +1,6 @@
 import { parseLength } from "../../layout/units";
 
-// The layout of a form: where its fields stand on the page. A template
+// The layout of a form: where its fields stand on the page. A definition
 // without one stacks its fields in order. A layout is a list of:
 // - `{ field: name }`, a field across the width of the text;
 // - `{ grid: { columns, gap }, cells }`, a grid: its cells side by side, one

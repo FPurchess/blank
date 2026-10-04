@@ -5,14 +5,14 @@ import { browser, $, expect } from "@wdio/globals";
 
 import { appConfigDir, clickInto, Key, pressMod, type } from "../helpers.ts";
 
-// A letter, a template of the user's: its return address, address and
+// A letter, a form of the user's: its return address, address and
 // details stand where a window envelope wants them, in frames on its first
 // page, and its text below.
 
 const LETTER = `# A letter on a page of its own, laid out for a window envelope as DIN 5008
 # (form B) says: the return address and the address in the window, the
 # details beside it, then the subject and the text. See
-# docs/guide/blocks.md for what a template can say.
+# docs/guide/blocks.md for what a form definition can say.
 version: 1
 name: Letter
 description: A letter whose address shows in a window envelope (DIN 5008)

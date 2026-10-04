@@ -672,8 +672,8 @@ export const flattenBlocks = (
 
   // a form: its fields' blocks one after the other, as at the top of the
   // document, or in the frames and in the columns of grids where its
-  // template's layout puts them. An empty field says its placeholder, and
-  // the form starts a new page if its template says so.
+  // definition's layout puts them. An empty field says its placeholder, and
+  // the form starts a new page if its definition says so.
   const form = (node: Node, pos: number, context: Context, space: Space) => {
     const definition = formDefinition(doc, node);
     const places = placesOf(definition?.layout);

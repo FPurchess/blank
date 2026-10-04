@@ -190,7 +190,7 @@ const embed: NodeSpec = {
   ],
 };
 
-// a form placed from a template (src/markdown/blocks/definitions.ts): its
+// a form placed from a form definition (src/markdown/blocks/definitions.ts): its
 // fields, in the order its definition gives them. `def` is the key of its
 // definition in the doc's `definitions`; `extra` keeps arguments of its
 // marker that a newer Blank wrote. The editor's form guard keeps it as its

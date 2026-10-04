@@ -250,7 +250,7 @@ describe("flatten", () => {
       filled,
     ]);
     const [, sender, ann, street, date, body] = items(node);
-    // small print where the template says
+    // small print where the form definition says
     expect(sender).toMatchObject({ style: "small" });
     const mm = 72 / 25.4;
     // the first of each frame says so; the form starts a new page

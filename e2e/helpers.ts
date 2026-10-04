@@ -703,7 +703,7 @@ export { Key };
 
 /**
  * appConfigDir returns the app's config folder in the spec's profile (see
- * beforeSession in wdio.conf.ts), where e.g. the user's templates go
+ * beforeSession in wdio.conf.ts), where e.g. the user's forms go
  */
 export const appConfigDir = () => {
   const config = process.env.BLANK_E2E_CONFIG;

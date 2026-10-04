@@ -24,7 +24,7 @@ const form = [
 ].join("\n\n");
 
 describe("checkDefinition", () => {
-  it("takes a template's fields", () => {
+  it("takes a definition's fields", () => {
     expect(RECIPE.fields.map((field) => field.name)).toEqual([
       "title",
       "steps",

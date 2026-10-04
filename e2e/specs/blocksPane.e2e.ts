@@ -29,7 +29,9 @@ const tocBox = () =>
   });
 
 // a point in the upper half of the line of `text`, where a block dropped
-// goes before that paragraph
+// goes before that paragraph. Each paragraph is found by its second word,
+// which autocorrect never capitalizes, as it does the first once a space or
+// Enter follows it.
 const above = async (text: string) => {
   const at = await pointAt(text, 0, 2);
   return { ...at, y: at.y - 3 };
@@ -39,11 +41,11 @@ describe("the blocks pane", () => {
   before(async () => {
     await focusEditor();
     await pressMod("a");
-    await type("alpha");
+    await type("alpha one");
     await type(Key.Enter);
-    await type("beta");
+    await type("beta two");
     await type(Key.Enter);
-    await type("gamma");
+    await type("gamma three");
     await nextFrames();
   });
 
@@ -52,7 +54,7 @@ describe("the blocks pane", () => {
     const tile = $('#blocks-pane .tile[data-block="toc"]');
     await expect(tile).toBeDisplayed();
     const from = await tile.getLocation();
-    const to = await above("Gamma");
+    const to = await above("three");
     await browser
       .action("pointer")
       .move({ x: Math.round(from.x + 20), y: Math.round(from.y + 20) })
@@ -88,7 +90,7 @@ describe("the blocks pane", () => {
       x: Math.round((box.left + box.right) / 2),
       y: Math.round((box.top + box.bottom) / 2),
     };
-    const to = await above("Beta");
+    const to = await above("two");
     await browser
       .action("pointer")
       .move(from)

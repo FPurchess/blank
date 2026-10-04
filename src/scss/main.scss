@@ -1843,7 +1843,7 @@ body.without-engine.blocks-docked {
   position: fixed;
   // with the page view, after it, so the bars stay above
   z-index: 1;
-  outline: 1px solid var(--line-strong);
+  outline: 1px solid var(--line);
   outline-offset: 4px;
   pointer-events: none;
 }

@@ -233,7 +233,7 @@ const toField =
 /**
  * entry returns where the cursor goes into a field that starts at `pos`: its
  * start, or the first cell under a table's header row, which holds the
- * template's columns
+ * definition's columns
  */
 const entry = (field: Node, pos: number) => {
   const table = field.firstChild;
