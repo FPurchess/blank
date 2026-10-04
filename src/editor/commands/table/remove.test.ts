@@ -1,30 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { Command, EditorState } from "prosemirror-state";
 
-import {
-  createState,
-  createTestView,
-  doc,
-  p,
-  table,
-  td,
-  th,
-  tr,
-} from "../../../test/editor";
+import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import {
   cellTexts,
   cellTypes,
   cursorAt,
+  runCommand,
   selectCells,
   selectedText,
 } from "../../../test/tables";
 import { deleteColumns, deleteRows, deleteTable } from "./remove";
-
-const run = (command: Command, state: EditorState) => {
-  const view = createTestView(state);
-  expect(command(view.state, view.dispatch)).toBe(true);
-  return view.state;
-};
 
 const grid = () =>
   doc(
@@ -39,7 +24,7 @@ const grid = () =>
 
 describe("deleteRows", () => {
   it("deletes the row at the cursor and keeps the cursor in its column", () => {
-    const state = run(deleteRows, cursorAt(grid(), "a2"));
+    const state = runCommand(deleteRows, cursorAt(grid(), "a2"));
 
     expect(cellTexts(state.doc)).toEqual([
       ["h1", "h2", "h3"],
@@ -49,7 +34,7 @@ describe("deleteRows", () => {
   });
 
   it("deletes the selected rows", () => {
-    const state = run(
+    const state = runCommand(
       deleteRows,
       selectCells(cursorAt(grid(), "a1"), "a1", "b1"),
     );
@@ -58,14 +43,14 @@ describe("deleteRows", () => {
   });
 
   it("makes the row below the header when the header row goes", () => {
-    const state = run(deleteRows, cursorAt(grid(), "h1"));
+    const state = runCommand(deleteRows, cursorAt(grid(), "h1"));
 
     expect(cellTexts(state.doc)[0]).toEqual(["a1", "a2", "a3"]);
     expect(cellTypes(state.doc)[0]).toEqual(["th", "th", "th"]);
   });
 
   it("deletes the table when all its rows go", () => {
-    const state = run(
+    const state = runCommand(
       deleteRows,
       selectCells(cursorAt(grid(), "h1"), "h1", "b1"),
     );
@@ -80,14 +65,14 @@ describe("deleteRows", () => {
 
 describe("deleteColumns", () => {
   it("deletes the column at the cursor", () => {
-    const state = run(deleteColumns, cursorAt(grid(), "a2"));
+    const state = runCommand(deleteColumns, cursorAt(grid(), "a2"));
 
     expect(cellTexts(state.doc)[1]).toEqual(["a1", "a3"]);
     expect(selectedText(state)).toEqual(["a3"]);
   });
 
   it("deletes the selected columns", () => {
-    const state = run(
+    const state = runCommand(
       deleteColumns,
       selectCells(cursorAt(grid(), "a1"), "a2", "a3"),
     );
@@ -97,7 +82,7 @@ describe("deleteColumns", () => {
   });
 
   it("deletes the table when all its columns go", () => {
-    const state = run(
+    const state = runCommand(
       deleteColumns,
       selectCells(cursorAt(grid(), "a1"), "a1", "a3"),
     );
@@ -112,14 +97,17 @@ describe("deleteColumns", () => {
 
 describe("deleteTable", () => {
   it("deletes the table and puts the cursor where it was", () => {
-    const state = run(deleteTable, cursorAt(grid(), "b3"));
+    const state = runCommand(deleteTable, cursorAt(grid(), "b3"));
 
     expect(state.doc.eq(doc(p("before"), p("after")))).toBe(true);
     expect(state.selection.$head.parent.textContent).toBe("after");
   });
 
   it("leaves an empty paragraph where the table was all there was", () => {
-    const state = run(deleteTable, cursorAt(doc(table(tr(th("a")))), "a"));
+    const state = runCommand(
+      deleteTable,
+      cursorAt(doc(table(tr(th("a")))), "a"),
+    );
 
     expect(state.doc.eq(doc(p()))).toBe(true);
   });

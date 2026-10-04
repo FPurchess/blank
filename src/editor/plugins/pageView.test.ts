@@ -54,7 +54,8 @@ import {
   forgetEngineFailure,
   pageEngine,
 } from "../../engine/engine";
-import { hidePages, showPages, testEngine } from "../../test/engine";
+import { hidePages, pageOf, showPages, testEngine } from "../../test/engine";
+import { random } from "../../test/random";
 import { caretBox } from "../../engine/geometry";
 import { forgetImages, loadedImages } from "../../engine/images";
 import { perfSamples } from "../../engine/perf";
@@ -573,7 +574,7 @@ describe("images on the pages", () => {
       doc(p("text"), schema.node("paragraph", null, image)),
     );
     const shownImages = () =>
-      pageEngine!.display(0, pageLayoutState.value!.versions[0]).i;
+      pageEngine!.bodyDisplay(0, pageLayoutState.value!.bodyVersions[0]).i;
 
     // no folder to look for it in
     expect(loads).toEqual([]);
@@ -834,14 +835,6 @@ describe("the line a caret is on", () => {
 });
 
 describe("the pages after many real edits", () => {
-  // a seeded random number generator (mulberry32), so a failure repeats
-  const random = (seed: number) => () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
   const start = () =>
     doc(
       h(1, "Title"),
@@ -952,11 +945,9 @@ describe("the pages after many real edits", () => {
         fresh.setSettings(pageLayout.value.layout, pageFields.value);
         fresh.sync(view.state.doc, () => undefined);
         expect(engine.pages(), `after ${step}`).toBe(fresh.pages());
-        const ours = engine.versions();
-        const theirs = fresh.versions();
         for (let page = 0; page < fresh.pages(); page++)
-          expect(engine.display(page, ours[page]), `after ${step}`).toEqual(
-            fresh.display(page, theirs[page]),
+          expect(pageOf(engine, page), `after ${step}`).toEqual(
+            pageOf(fresh, page),
           );
         for (let pos = 0; pos <= view.state.doc.content.size; pos++)
           for (const after of [false, true])

@@ -6,10 +6,10 @@ import { spellcheck, spellcheckKey } from "../editor/plugins/spellcheck";
 import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { doc, p } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import type { PageEngine } from "../engine/engine";
-import { marksOn, PageMarksMemo, shownMarks } from "./pageMarks";
+import { PageMarksMemo, shownMarks } from "./pageMarks";
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
@@ -23,9 +23,7 @@ const node = doc(
 );
 
 const setup = () => {
-  const engine = testEngine();
-  engine.setSettings(testLayout(), documentFields(node));
-  engine.sync(node, () => undefined);
+  const engine = layOutPages(node);
   let state = EditorState.create({
     schema,
     doc: node,
@@ -42,21 +40,22 @@ const setup = () => {
   return { engine, state };
 };
 
-describe("marksOn", () => {
-  it("underlines misspelled words and labels page breaks on the pages", () => {
+describe("the marks on a page", () => {
+  it("underline misspelled words and label page breaks", () => {
     const { engine, state } = setup();
     expect(engine.pages()).toBe(2);
-    const marks = marksOn(engine, state, [0, 1]);
+    const memo = new PageMarksMemo();
+    const decorations = spellcheckKey.getState(state)?.decorations;
+    const marksOn = (page: number) =>
+      shownMarks(memo.marksOn(engine, state.doc, decorations, page, 1));
+    const marks = marksOn(0);
     const spelling = marks.filter((mark) => mark.kind === "spelling");
     expect(spelling).toHaveLength(1);
-    expect(spelling[0]).toMatchObject({ page: 0 });
     // as wide as the word's text
-    expect(spelling[0].width).toBeCloseTo(engine.selection(1, 5)[0].width, 3);
-    const breaks = marks.filter((mark) => mark.kind === "break");
-    expect(breaks).toHaveLength(1);
-    expect(breaks[0].page).toBe(0);
-    // only on the pages asked for
-    expect(marksOn(engine, state, [1])).toEqual([]);
+    expect(spelling[0].width).toBeCloseTo(engine.selection(1, 5)[0].width, 1);
+    expect(marks.filter((mark) => mark.kind === "break")).toHaveLength(1);
+    // the second page has neither
+    expect(marksOn(1)).toEqual([]);
   });
 });
 

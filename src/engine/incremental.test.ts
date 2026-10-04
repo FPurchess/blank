@@ -23,7 +23,8 @@ import { trackChanges, type TrackedChanges } from "../editor/plugins/pageView";
 import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { blockquote, doc, h, li, p, table, td, tr, ul } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { noSizes, pageOf, testEngine } from "../test/engine";
+import { random } from "../test/random";
 import { testLayout } from "../test/layout";
 import type { PageEngine } from "./engine";
 import * as flattening from "./flatten";
@@ -32,17 +33,6 @@ import { type FlatRecord, flatten } from "./flatten";
 // The engine flattens again only the blocks a change touched. After any
 // sequence of real edits, what it has must be what flattening the whole
 // document gives, and its pages what a fresh engine lays out.
-
-const noSizes = () => undefined;
-
-// a seeded random number generator (mulberry32), so a failure repeats
-const random = (seed: number) => () => {
-  seed |= 0;
-  seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
 
 const recordsOf = (engine: PageEngine) =>
   (engine as unknown as { records: FlatRecord[] }).records;
@@ -96,12 +86,8 @@ const editor = () => {
 };
 
 // the pages of an engine, each read again
-const pagesOf = (engine: PageEngine) => {
-  const versions = engine.versions();
-  return Array.from({ length: engine.pages() }, (_, page) =>
-    engine.display(page, versions[page]),
-  );
-};
+const pagesOf = (engine: PageEngine) =>
+  Array.from({ length: engine.pages() }, (_, page) => pageOf(engine, page));
 
 // the same as a fresh engine lays it out
 const expectFresh = ({ state, engine, layout }: ReturnType<typeof editor>) => {

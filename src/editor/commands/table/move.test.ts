@@ -1,29 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { Command, EditorState } from "prosemirror-state";
 
-import {
-  createState,
-  createTestView,
-  doc,
-  p,
-  table,
-  td,
-  th,
-  tr,
-} from "../../../test/editor";
+import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import {
   cellTexts,
   cursorAt,
+  runCommand,
   selectCells,
   selectedText,
 } from "../../../test/tables";
 import { moveColumns, moveRows } from "./move";
-
-const run = (command: Command, state: EditorState) => {
-  const view = createTestView(state);
-  expect(command(view.state, view.dispatch)).toBe(true);
-  return view.state;
-};
 
 const grid = () =>
   doc(
@@ -38,7 +23,7 @@ const grid = () =>
 
 describe("moveRows", () => {
   it("moves the row at the cursor down, and the cursor with it", () => {
-    const state = run(moveRows(1), cursorAt(grid(), "a2"));
+    const state = runCommand(moveRows(1), cursorAt(grid(), "a2"));
 
     expect(cellTexts(state.doc).map((row) => row[0])).toEqual([
       "h1",
@@ -50,7 +35,7 @@ describe("moveRows", () => {
   });
 
   it("moves the selected rows up as a block", () => {
-    const state = run(
+    const state = runCommand(
       moveRows(-1),
       selectCells(cursorAt(grid(), "b1"), "b1", "c3"),
     );
@@ -77,14 +62,14 @@ describe("moveRows", () => {
 
 describe("moveColumns", () => {
   it("moves the column at the cursor right, and the cursor with it", () => {
-    const state = run(moveColumns(1), cursorAt(grid(), "b1"));
+    const state = runCommand(moveColumns(1), cursorAt(grid(), "b1"));
 
     expect(cellTexts(state.doc)[0]).toEqual(["h2", "h1", "h3"]);
     expect(selectedText(state)).toEqual(["b1"]);
   });
 
   it("moves the selected columns left as a block", () => {
-    const state = run(
+    const state = runCommand(
       moveColumns(-1),
       selectCells(cursorAt(grid(), "a2"), "a2", "a3"),
     );

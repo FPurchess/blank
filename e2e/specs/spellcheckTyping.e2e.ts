@@ -67,9 +67,14 @@ const typing = async (label: string) => {
 (process.env.E2E_PERF ? describe : describe.skip)(
   "typing with spell check",
   () => {
+    let dir = "";
+    after(() => {
+      if (dir) fs.rmSync(dir, { recursive: true, force: true });
+    });
+
     it("keeps up nearly as without, and doesn't slow down", async function () {
       this.timeout(600_000);
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-spell-"));
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-spell-"));
       const file = path.join(dir, "long.md");
       fs.writeFileSync(
         file,

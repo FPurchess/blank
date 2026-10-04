@@ -203,7 +203,7 @@ const marked = computed(() =>
 
 // what the mark at the page's end shows, which follows the bands of the
 // page and of the next one, not their text; none after the last page, whose
-// footer PageLastFooter.vue shows
+// footer PageEdgeBand.vue shows
 const pages = computed(() => pageLayoutState.value?.pages ?? 1);
 // what the six slots of a page's header and footer show, with the
 // placeholders that come out empty named (see src/layout/placeholders.ts)

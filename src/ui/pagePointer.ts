@@ -80,9 +80,10 @@ export const targetAt = (
   const point = pointOnPage(layout, x, y);
   if (!point) return { pos: null, link: null };
   const hit = engine.hit(point.page, point.x, point.y);
-  const version = pageLayoutState.value?.versions[point.page] ?? 0;
+  // links are in the text, never in a header or footer
+  const version = pageLayoutState.value?.bodyVersions[point.page] ?? 0;
   const link = engine
-    .display(point.page, version)
+    .bodyDisplay(point.page, version)
     .l.find(
       ([, lx, ly, w, h]) =>
         point.x >= lx &&

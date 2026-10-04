@@ -230,14 +230,7 @@ describe("header and footer", () => {
     await restartApp([file]);
     await expect($(".page-end .band.footer")).toBeExisting();
     const edges = await browser.execute(() => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            find: (text: string) => number;
-            caretBox: (pos: number) => { left: number } | null;
-          };
-        }
-      ).blankGeometry;
+      const geometry = window.blankGeometry;
       // where the page's text starts, and its column ends: "page ends"
       // shows as much room beside it on both sides
       const left = geometry.caretBox(geometry.find("Writing"))!.left;

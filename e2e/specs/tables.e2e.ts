@@ -34,17 +34,8 @@ const waitForSaved = async (filePath: string, text: string) => {
  */
 const tableLayout = () =>
   browser.execute(() => {
-    type Piece = {
-      box: { left: number; top: number; right: number; bottom: number };
-      rows: number[];
-      columns: number[];
-    };
-    const geometry = (
-      window as unknown as {
-        blankGeometry: { tables: () => { pieces: Piece[] }[] };
-      }
-    ).blankGeometry;
-    const { box, rows, columns } = geometry.tables()[0].pieces[0];
+    const geometry = window.blankGeometry;
+    const { box, rows, columns } = geometry.tables()[0]!.pieces[0];
     return { box, rows, columns };
   });
 

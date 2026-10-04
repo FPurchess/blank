@@ -21,6 +21,7 @@ import {
   type,
   waitForInk,
   waitForRepaint,
+  nextFrames,
 } from "../helpers.ts";
 
 // How the painted text looks next to the webview's own: a line of the page
@@ -105,9 +106,7 @@ describe("rendering", () => {
       box.left,
       box.bottom + 12,
     );
-    await browser.executeAsync((done: () => void) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => done())),
-    );
+    await nextFrames();
     await browser.saveScreenshot(path.join(SHOTS, `render-${ratio}x.png`));
     fs.writeFileSync(
       path.join(SHOTS, `render-${ratio}x.json`),
@@ -170,9 +169,7 @@ describe("rendering", () => {
     );
     for (const theme of ["light", "dark", "black", "red", "green", "blue"]) {
       await themeTo(theme);
-      await browser.executeAsync((done: () => void) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => done())),
-      );
+      await nextFrames();
       const paper = (
         await screenStats({
           left: frame + 1,

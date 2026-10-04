@@ -4,7 +4,6 @@ import { EditorView } from "prosemirror-view";
 
 import { createEditorHandle } from "../editor/handle";
 import { setPageEngine } from "../engine/engine";
-import { documentFields } from "../layout/bands";
 import {
   pageCaret,
   pageDropCaret,
@@ -12,8 +11,7 @@ import {
   pageSelection,
 } from "../state";
 import { createState, doc, p } from "../test/editor";
-import { testEngine } from "../test/engine";
-import { testLayout } from "../test/layout";
+import { laidOutState, layOutPages } from "../test/engine";
 import { bootApp } from "./mount";
 
 // The caret and the selection over the pages: the caret shows while the
@@ -28,18 +26,9 @@ describe("the caret and the selection on the pages", () => {
 
   beforeEach(() => {
     document.body.innerHTML = '<div id="ui-bottom"></div>';
-    const engine = testEngine();
-    engine.setSettings(testLayout(), documentFields(node));
-    engine.sync(node, () => undefined);
+    const engine = layOutPages(node);
     setPageEngine(engine);
-    pageLayoutState.value = {
-      width: 595.28,
-      height: 841.89,
-      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-      pages: engine.pages(),
-      versions: engine.raw.versions(),
-      bottoms: engine.raw.bottoms(),
-    };
+    pageLayoutState.value = laidOutState(engine);
     editor = new EditorView(
       document.body.appendChild(document.createElement("div")),
       {

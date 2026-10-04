@@ -4,7 +4,7 @@ import { documentFields } from "../layout/bands";
 import { blockquote, doc, h, li, p, table, td, tr, ul } from "../test/editor";
 import { engineMissing } from "../state";
 import { schema } from "../markdown";
-import { testEngine } from "../test/engine";
+import { noSizes, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import {
   bootEngine,
@@ -18,8 +18,6 @@ import {
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
-
-const noSizes = () => undefined;
 
 const long = (count: number) =>
   doc(h(1, "Title"), ...Array.from({ length: count }, () => p(LONG)));
@@ -79,10 +77,10 @@ describe("PageEngine", () => {
     engine.setSettings(testLayout(), documentFields(node));
     engine.sync(node, noSizes);
     expect(engine.pages()).toBeGreaterThan(2);
-    const display = engine.display(0, engine.raw.versions()[0]);
+    const display = engine.bodyDisplay(0, engine.bodyVersions()[0]);
     expect(display.g.length).toBeGreaterThan(20);
     // the same version is read only once
-    expect(engine.display(0, engine.raw.versions()[0])).toBe(display);
+    expect(engine.bodyDisplay(0, engine.bodyVersions()[0])).toBe(display);
   });
 
   it("follows edits, keeping the pages after them", () => {
@@ -216,7 +214,7 @@ describe("the body and the bands of a page", () => {
     const glyphs = (display: { g: number[][] }) =>
       display.g.reduce((sum, run) => sum + (run.length - 3) / 3, 0);
     expect(glyphs(body) + glyphs(bands)).toBe(
-      glyphs(engine.display(0, engine.versions()[0])),
+      glyphs(JSON.parse(engine.raw.page(0))),
     );
 
     const typed = doc(p("Some more text"));
@@ -241,7 +239,7 @@ describe("an image in a table cell", () => {
     const engine = testEngine();
     engine.setSettings(testLayout(), documentFields(node));
     engine.sync(node, (src) => (src === "x.png" ? size : undefined));
-    const [shown] = engine.display(0, engine.versions()[0]).i;
+    const [shown] = engine.bodyDisplay(0, engine.bodyVersions()[0]).i;
     const grid = engine.tableGrid(0)!;
     return { engine, shown, cellWidth: grid.columns[1] - grid.columns[0] };
   };

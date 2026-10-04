@@ -26,7 +26,8 @@ const layout: PageLayoutState = {
   height: 800,
   margins: { top: margin, right: margin, bottom: margin, left: margin },
   pages: 3,
-  versions: new Uint32Array([1, 2, 3]),
+  bodyVersions: new Uint32Array([1, 2, 3]),
+  bandVersions: new Uint32Array([1, 2, 3]),
   bottoms: new Float32Array([700, 400, 0]),
 };
 
@@ -103,7 +104,8 @@ describe("visibleRange", () => {
       height: 800,
       margins: { top: 72, right: 72, bottom: 72, left: 72 },
       pages: 10,
-      versions: new Uint32Array(10),
+      bodyVersions: new Uint32Array(10),
+      bandVersions: new Uint32Array(10),
       bottoms: new Float32Array(10).fill(700),
     };
     const layout = frameLayout(state, "pages", 800);

@@ -1,9 +1,15 @@
 import type { Node } from "prosemirror-model";
-import { TextSelection, type EditorState } from "prosemirror-state";
+import {
+  type Command,
+  TextSelection,
+  type EditorState,
+} from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 
 import { isHeaderCell } from "../markdown";
-import { createState } from "./editor";
+import { expect } from "vitest";
+
+import { createState, createTestView } from "./editor";
 
 // Helpers for tests of tables, on top of the node builders in ./editor.ts.
 
@@ -83,4 +89,14 @@ export const selectedText = (state: EditorState) => {
   }
   const $head = (selection as TextSelection).$head;
   return [$head.node(-1).textContent];
+};
+
+/**
+ * runCommand runs `command` on `state`, which must apply it, and returns the
+ * state it leaves
+ */
+export const runCommand = (command: Command, state: EditorState) => {
+  const view = createTestView(state);
+  expect(command(view.state, view.dispatch)).toBe(true);
+  return view.state;
 };

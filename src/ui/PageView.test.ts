@@ -29,7 +29,7 @@ import {
   h,
   p,
 } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { laidOutState, layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import { hasBand } from "../layout/placeholders";
 import { bootApp } from "./mount";
@@ -49,18 +49,9 @@ const frames = () => [...view().querySelectorAll<HTMLElement>(".page-frame")];
 
 // the engine lays out the document, as the editor's plugin does
 const layOut = () => {
-  const engine = testEngine();
-  engine.setSettings(testLayout(), documentFields(node));
-  engine.sync(node, () => undefined);
+  const engine = layOutPages(node);
   setPageEngine(engine);
-  pageLayoutState.value = {
-    width: 595.28,
-    height: 841.89,
-    margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-    pages: engine.pages(),
-    versions: engine.raw.versions(),
-    bottoms: engine.raw.bottoms(),
-  };
+  pageLayoutState.value = laidOutState(engine);
   return engine;
 };
 
@@ -297,12 +288,7 @@ describe("page view", () => {
     engine.sync(short, () => undefined);
     setPageEngine(engine);
     pageLayoutState.value = {
-      width: 595.28,
-      height: 841.89,
-      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-      pages: engine.pages(),
-      versions: engine.raw.versions(),
-      bottoms: engine.raw.bottoms(),
+      ...laidOutState(engine),
       header: true,
     };
     dispose = bootApp(createTestHandle(createState(short, { cursor: 1 })));
@@ -342,7 +328,8 @@ describe("page view", () => {
     );
     pageLayoutState.value = {
       ...pageLayoutState.value,
-      versions: engine.raw.versions(),
+      bodyVersions: engine.raw.bodyVersions(),
+      bandVersions: engine.raw.bandVersions(),
       header: false,
     };
     await nextTick();
@@ -357,13 +344,7 @@ describe("page view", () => {
     const engine = pageEngineFor(content, settings);
     const pages = engine.pages();
     pageLayoutState.value = {
-      width: 595.28,
-      height: 841.89,
-      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-      pages,
-      versions: engine.raw.versions(),
-      bandVersions: engine.raw.bandVersions(),
-      bottoms: engine.raw.bottoms(),
+      ...laidOutState(engine),
       // as the editor's plugin sets them, from what is written
       header: hasBand(testLayout(settings), 1, "header"),
       footer: hasBand(testLayout(settings), pages, "footer"),
@@ -410,6 +391,8 @@ describe("page view", () => {
     await nextTick();
     expect(view().querySelector(".page-end")).toBeNull();
     expect(slotsOf(lastFooter())).toEqual(["Foot", "", "1"]);
+    // the same component shows the first page's header, which it has none of
+    expect(view().querySelector(".page-first-header")).toBeNull();
     // right below the text of the page, with room for it on the desk
     const frame = frames()[0];
     expect(parseFloat(lastFooter()!.style.top)).toBe(

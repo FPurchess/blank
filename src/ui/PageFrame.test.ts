@@ -11,7 +11,7 @@ import {
   theme,
 } from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
-import { testEngine } from "../test/engine";
+import { laidOutState, testEngine } from "../test/engine";
 import { flushPromises } from "../test/async";
 import { testLayout } from "../test/layout";
 import { bootApp } from "./mount";
@@ -67,16 +67,7 @@ const recorder = () => {
 
 // what the editor's plugin publishes once the engine laid out `laidOut`
 const publish = (engine: PageEngine) => {
-  pageLayoutState.value = {
-    width: 595.28,
-    height: 841.89,
-    margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-    pages: engine.pages(),
-    versions: engine.raw.versions(),
-    bodyVersions: engine.raw.bodyVersions(),
-    bandVersions: engine.raw.bandVersions(),
-    bottoms: engine.raw.bottoms(),
-  };
+  pageLayoutState.value = laidOutState(engine);
 };
 
 const layOut = (settings = testLayout(), laidOut = node) => {

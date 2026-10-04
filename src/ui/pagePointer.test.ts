@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { frameLayout } from "../engine/frames";
-import { documentFields } from "../layout/bands";
 import { schema } from "../markdown";
 import { pageLayoutState } from "../state";
 import { doc } from "../test/editor";
-import { testEngine } from "../test/engine";
-import { testLayout } from "../test/layout";
+import { laidOutState, layOutPages } from "../test/engine";
 import { edgeStep, targetAt } from "./pagePointer";
 
 describe("edgeStep", () => {
@@ -33,17 +31,8 @@ describe("targetAt", () => {
         schema.text(" here"),
       ]),
     );
-    const engine = testEngine();
-    engine.setSettings(testLayout(), documentFields(node));
-    engine.sync(node, () => undefined);
-    const state = {
-      width: 595.28,
-      height: 841.89,
-      margins: { top: 70.87, right: 70.87, bottom: 70.87, left: 70.87 },
-      pages: engine.pages(),
-      versions: engine.raw.versions(),
-      bottoms: engine.raw.bottoms(),
-    };
+    const engine = layOutPages(node);
+    const state = laidOutState(engine);
     pageLayoutState.value = state;
     const layout = frameLayout(state, "pages", 800);
     const frame = layout.frames[0];

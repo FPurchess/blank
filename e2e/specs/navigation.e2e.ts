@@ -14,6 +14,7 @@ import {
   restartApp,
   screenStats,
   textBox,
+  nextFrames,
 } from "../helpers.ts";
 
 // Moving through the painted lines with the keys and the pointer, as
@@ -22,9 +23,7 @@ import {
 
 // where the painted caret is, in the window
 const caretTop = async () => {
-  await browser.executeAsync((done: () => void) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => done())),
-  );
+  await nextFrames();
   return browser.execute(
     () =>
       document.querySelector("#page-view .page-caret")?.getBoundingClientRect()
@@ -112,14 +111,8 @@ describe("navigation", () => {
 
     // from the middle of one cell to another
     const { rows, columns } = await browser.execute(() => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            tables: () => { pieces: { rows: number[]; columns: number[] }[] }[];
-          };
-        }
-      ).blankGeometry;
-      return geometry.tables()[0].pieces[0];
+      const geometry = window.blankGeometry;
+      return geometry.tables()[0]!.pieces[0];
     });
     const at = (column: number, row: number) => ({
       x: Math.round((columns[column] + columns[column + 1]) / 2),

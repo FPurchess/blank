@@ -45,11 +45,7 @@ type Stats = {
 // often and how long in all, in ms
 const work = async () => {
   const samples = (await browser.execute(() =>
-    (
-      window as unknown as {
-        blankPageViewPerf: (clear: boolean) => Record<string, number[]>;
-      }
-    ).blankPageViewPerf(true),
+    window.blankPageViewPerf(true),
   )) as Record<string, number[]>;
   const sum = (values: number[] = []) => ({
     n: values.length,
@@ -67,11 +63,7 @@ const work = async () => {
 // what the page records about its frames while `run` scrolls it
 const startRecording = () =>
   browser.execute(() => {
-    (
-      window as unknown as {
-        blankPageViewPerf: (clear: boolean) => unknown;
-      }
-    ).blankPageViewPerf(true);
+    window.blankPageViewPerf(true);
     const times: number[] = [];
     let last = performance.now();
     let running = true;

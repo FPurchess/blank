@@ -1,20 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Command, EditorState } from "prosemirror-state";
+import type { EditorState } from "prosemirror-state";
 
-import {
-  createState,
-  createTestView,
-  doc,
-  p,
-  table,
-  td,
-  th,
-  tr,
-} from "../../../test/editor";
+import { createState, doc, p, table, td, th, tr } from "../../../test/editor";
 import {
   cellTexts,
   cellTypes,
   cursorAt,
+  runCommand,
   selectCells,
 } from "../../../test/tables";
 import {
@@ -25,12 +17,6 @@ import {
   toggleHeaderColumn,
   toggleHeaderRow,
 } from "./format";
-
-const run = (command: Command, state: EditorState) => {
-  const view = createTestView(state);
-  expect(command(view.state, view.dispatch)).toBe(true);
-  return view.state;
-};
 
 const grid = () =>
   doc(
@@ -49,7 +35,7 @@ const aligns = (state: EditorState) =>
 
 describe("alignColumns", () => {
   it("aligns the whole column, header included", () => {
-    const state = run(alignColumns("right"), cursorAt(grid(), "a2"));
+    const state = runCommand(alignColumns("right"), cursorAt(grid(), "a2"));
 
     expect(aligns(state)).toEqual([
       [null, "right"],
@@ -59,7 +45,7 @@ describe("alignColumns", () => {
   });
 
   it("aligns every selected column", () => {
-    const state = run(
+    const state = runCommand(
       alignColumns("center"),
       selectCells(cursorAt(grid(), "a1"), "a1", "a2"),
     );
@@ -68,8 +54,8 @@ describe("alignColumns", () => {
   });
 
   it("goes back to the default alignment when aligned that way already", () => {
-    const once = run(alignColumns("left"), cursorAt(grid(), "b1"));
-    const twice = run(alignColumns("left"), once);
+    const once = runCommand(alignColumns("left"), cursorAt(grid(), "b1"));
+    const twice = runCommand(alignColumns("left"), once);
 
     expect(aligns(twice).flat()).toEqual(Array(6).fill(null));
   });
@@ -77,28 +63,28 @@ describe("alignColumns", () => {
 
 describe("header row and column", () => {
   it("switches the header row off and on", () => {
-    const off = run(toggleHeaderRow, cursorAt(grid(), "a1"));
+    const off = runCommand(toggleHeaderRow, cursorAt(grid(), "a1"));
     expect(cellTypes(off.doc)[0]).toEqual(["td", "td"]);
 
-    const on = run(toggleHeaderRow, off);
+    const on = runCommand(toggleHeaderRow, off);
     expect(cellTypes(on.doc)[0]).toEqual(["th", "th"]);
   });
 
   it("switches a header column on and off", () => {
-    const on = run(toggleHeaderColumn, cursorAt(grid(), "a2"));
+    const on = runCommand(toggleHeaderColumn, cursorAt(grid(), "a2"));
     expect(cellTypes(on.doc)).toEqual([
       ["th", "th"],
       ["th", "td"],
       ["th", "td"],
     ]);
 
-    const off = run(toggleHeaderColumn, on);
+    const off = runCommand(toggleHeaderColumn, on);
     expect(cellTypes(off.doc)).toEqual(cellTypes(grid()));
   });
 
   it("keeps the corner a header cell while either is on", () => {
-    const column = run(toggleHeaderColumn, cursorAt(grid(), "a2"));
-    const noRow = run(toggleHeaderRow, column);
+    const column = runCommand(toggleHeaderColumn, cursorAt(grid(), "a2"));
+    const noRow = runCommand(toggleHeaderRow, column);
 
     expect(cellTypes(noRow.doc)).toEqual([
       ["th", "td"],
@@ -127,18 +113,18 @@ describe("mergeOrSplit", () => {
     const selected = selectCells(cursorAt(grid(), "a1"), "a1", "b1");
     expect(canMerge(selected)).toBe(true);
 
-    const state = run(mergeOrSplit, selected);
+    const state = runCommand(mergeOrSplit, selected);
     const merged = state.doc.firstChild!.child(1).firstChild!;
     expect(merged.attrs.rowspan).toBe(2);
     expect(merged.childCount).toBe(2);
   });
 
   it("splits a merged cell again", () => {
-    const merged = run(
+    const merged = runCommand(
       mergeOrSplit,
       selectCells(cursorAt(grid(), "a1"), "a1", "a2"),
     );
-    const state = run(mergeOrSplit, cursorAt(merged.doc, "a1"));
+    const state = runCommand(mergeOrSplit, cursorAt(merged.doc, "a1"));
 
     expect(cellTexts(state.doc)[1]).toHaveLength(2);
   });
@@ -153,10 +139,13 @@ describe("mergeOrSplit", () => {
 
 describe("setCaption", () => {
   it("sets the caption, tidying its spaces, and removes an empty one", () => {
-    const set = run(setCaption("  Fruit   stock "), cursorAt(grid(), "a1"));
+    const set = runCommand(
+      setCaption("  Fruit   stock "),
+      cursorAt(grid(), "a1"),
+    );
     expect(set.doc.firstChild!.attrs.caption).toBe("Fruit stock");
 
-    const removed = run(setCaption(" "), set);
+    const removed = runCommand(setCaption(" "), set);
     expect(removed.doc.firstChild!.attrs.caption).toBeNull();
   });
 

@@ -23,6 +23,7 @@ import {
   tr,
   ul,
 } from "../test/editor";
+import { noSizes } from "../test/engine";
 import {
   diff,
   flatten,
@@ -32,7 +33,6 @@ import {
   spansOf,
 } from "./flatten";
 
-const noSizes = () => undefined;
 const para = (...content: Node[]) => schema.node("paragraph", null, content);
 const items = (node: ReturnType<typeof doc>, sizes: ImageSizes = noSizes) =>
   flatten(node, sizes).map((record) => record.build());

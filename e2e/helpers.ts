@@ -68,14 +68,7 @@ export const clickInto = async (
 ) => {
   const box = await browser.executeAsync(
     (selector: string, index: number, done: (box: Box | null) => void) => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            endOf: (element: Element) => number;
-            caretBox: (pos: number) => Box | null;
-          };
-        }
-      ).blankGeometry;
+      const geometry = window.blankGeometry;
       const all = document.querySelectorAll(selector);
       // from the end for a negative index
       const element = all[index < 0 ? all.length + index : index];
@@ -100,6 +93,15 @@ export const clickInto = async (
 };
 
 /**
+ * nextFrames waits two frames of the app: the events queued before have run
+ * once the second one starts, and what they changed is painted
+ */
+export const nextFrames = () =>
+  browser.executeAsync((done: () => void) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => done())),
+  );
+
+/**
  * clickAt clicks with the pointer at `x`, `y` in the viewport, and waits
  * until the page has run the events it queued
  */
@@ -110,10 +112,7 @@ export const clickAt = async (x: number, y: number, button: 0 | 1 | 2 = 0) => {
     .down({ button })
     .up({ button })
     .perform();
-  await browser.executeAsync((done: () => void) => {
-    // two frames: the queued events have run once the second one starts
-    requestAnimationFrame(() => requestAnimationFrame(() => done()));
-  });
+  await nextFrames();
 };
 
 /**
@@ -170,14 +169,7 @@ export const textBox = async (text: string, offset = 0, index = 0) => {
       index: number,
       done: (box: Box | null) => void,
     ) => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            find: (text: string, index: number) => number;
-            caretBox: (pos: number) => Box | null;
-          };
-        }
-      ).blankGeometry;
+      const geometry = window.blankGeometry;
       const pos = geometry.find(text, index);
       if (pos < 0) return done(null);
       const view = document.getElementById("page-view")!;
@@ -197,6 +189,19 @@ export const textBox = async (text: string, offset = 0, index = 0) => {
   );
   if (!box) throw new Error(`"${text}" isn't painted on the pages`);
   return box;
+};
+
+/**
+ * pointAt returns a point on the `offset`th character of `text` as painted,
+ * `dx` px right of its left edge and halfway down, for pointer actions
+ */
+export const pointAt = async (text: string, offset = 0, dx = 1) => {
+  const box = await textBox(text, offset);
+  return {
+    x: Math.round(box.left + dx),
+    y: Math.round((box.top + box.bottom) / 2),
+    origin: "viewport" as const,
+  };
 };
 
 /**
@@ -265,14 +270,7 @@ export const boxOf = async (
   await textBox(target, offset, index);
   const box = await browser.execute(
     (text: string, from: number, count: number, index: number) => {
-      const geometry = (
-        window as unknown as {
-          blankGeometry: {
-            find: (text: string, index: number) => number;
-            rangeRects: (from: number, to: number) => Box[];
-          };
-        }
-      ).blankGeometry;
+      const geometry = window.blankGeometry;
       const pos = geometry.find(text, index);
       if (pos < 0) return null;
       const rects = geometry.rangeRects(pos + from, pos + from + count);
@@ -568,9 +566,7 @@ export const doubleClickAt = async (x: number, y: number) => {
     .down()
     .up()
     .perform();
-  await browser.executeAsync((done: () => void) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => done()));
-  });
+  await nextFrames();
 };
 
 /**

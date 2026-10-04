@@ -15,7 +15,8 @@ const a4: PageLayoutState = {
   height: 841.89,
   margins: { top: margin, right: margin, bottom: margin, left: margin },
   pages: 2,
-  versions: new Uint32Array([1, 1]),
+  bodyVersions: new Uint32Array([1, 1]),
+  bandVersions: new Uint32Array([1, 1]),
   bottoms: new Float32Array([700, 300]),
 };
 const letter: PageLayoutState = { ...a4, width: 612, height: 792 };

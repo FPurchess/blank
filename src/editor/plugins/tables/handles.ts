@@ -5,7 +5,6 @@ import type { EditorView } from "prosemirror-view";
 
 import { columnPercents, roundPercent } from "../../../markdown/tables";
 import { headerRowCount } from "../../../markdown";
-import { watch } from "vue";
 
 import {
   pageAt,
@@ -41,6 +40,7 @@ import {
 } from "../../commands/table/rect";
 import { setColumnWidths } from "../../commands/table/widths";
 import { openTableMenu } from "../contextMenu";
+import { followLayout } from "./followLayout";
 import { reporting } from "./tools";
 
 // how far around a table the mouse still shows its handles, which sit on and
@@ -324,16 +324,7 @@ export const tableHandles = () => {
       };
       window.addEventListener("mousemove", move);
       document.documentElement.addEventListener("mouseleave", leave);
-      // the page view scrolled, resized or switched, or the pages were laid
-      // out again, e.g. once an image above loaded
-      const stop = watch([pageViewport, pageLayoutState], () => publish(view), {
-        flush: "sync",
-      });
-      // without the engine, the editor itself scrolls
-      const scrolled = () => {
-        if (engineless()) publish(view);
-      };
-      window.addEventListener("scroll", scrolled, true);
+      const unfollow = followLayout(() => publish(view));
       return {
         update: (view, previous) => {
           // a change to the table or what's selected in it
@@ -345,8 +336,7 @@ export const tableHandles = () => {
         destroy: () => {
           window.removeEventListener("mousemove", move);
           document.documentElement.removeEventListener("mouseleave", leave);
-          stop();
-          window.removeEventListener("scroll", scrolled, true);
+          unfollow();
           clear();
         },
       };

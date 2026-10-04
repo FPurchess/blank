@@ -453,8 +453,8 @@ export const bootBandStrips = (editor: EditorHandle) => {
       { flush: "sync", immediate: true },
     );
     // the pages show the bands themselves, on the sheets, where each page
-    // ends and above the first page (src/ui/PageFrame.vue,
-    // PageFirstHeader.vue), and open their strips on a double click; the
+    // ends, above the first page and below the last (src/ui/PageFrame.vue,
+    // PageEdgeBand.vue), and open their strips on a double click; the
     // edges only offer to add one, near the bars. Without the layout engine,
     // from the start or once it failed, there are no pages, and the edges
     // show the bands.

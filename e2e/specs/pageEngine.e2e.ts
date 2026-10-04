@@ -15,6 +15,7 @@ import {
   type,
   waitForInk,
   waitForRepaint,
+  nextFrames,
 } from "../helpers.ts";
 
 // The page view the layout engine paints: typing and clicking on the
@@ -82,9 +83,7 @@ const clickOnPage = async (page: number, dx: number, dy: number) => {
     .down()
     .up()
     .perform();
-  await browser.executeAsync((done: () => void) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => done())),
-  );
+  await nextFrames();
 };
 
 // times from each key press until the frame after it is painted
@@ -314,9 +313,7 @@ describe("page view", () => {
     // every other theme, and back to the first
     for (let index = 0; index < 6; index++) {
       await pressMod(Key.Alt, "t");
-      await browser.executeAsync((done: () => void) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => done())),
-      );
+      await nextFrames();
       const theme = await browser.execute(() => document.body.dataset.theme);
       await browser.saveScreenshot(
         path.join(SHOTS, `engine-theme-${theme}.png`),
@@ -328,9 +325,7 @@ describe("page view", () => {
     await expect($("#page-view")).toHaveElementClass("pages");
     for (let index = 0; index < 6; index++) {
       await pressMod(Key.Alt, "t");
-      await browser.executeAsync((done: () => void) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => done())),
-      );
+      await nextFrames();
       const theme = await browser.execute(() => document.body.dataset.theme);
       const sheet = await browser.execute(() =>
         document
@@ -394,20 +389,8 @@ describe("page view", () => {
     );
     await restartApp([file]);
     await expect($("#page-view .page-canvas")).toBeExisting();
-    const tables = () =>
-      browser.execute(() =>
-        (
-          window as unknown as {
-            blankGeometry: {
-              tables: () => {
-                rowCount: number;
-                pieces: { page: number; firstRow: number }[];
-              }[];
-            };
-          }
-        ).blankGeometry.tables(),
-      );
-    const [merged, tall] = await tables();
+    const tables = () => browser.execute(() => window.blankGeometry.tables());
+    const [merged, tall] = (await tables()).map((table) => table!);
     expect(merged.rowCount).toBe(3);
     expect(merged.pieces).toHaveLength(1);
     // the tall row goes on over the pages
@@ -466,11 +449,7 @@ describe("page view", () => {
       const bootMs = Date.now() - booted;
       // when each step of the start-up was done, in ms since the window
       // opened, see bootMark
-      const boot = await browser.execute(() =>
-        (
-          window as unknown as { blankBootTimes: () => Record<string, number> }
-        ).blankBootTimes(),
-      );
+      const boot = await browser.execute(() => window.blankBootTimes());
       // a long document is laid out a chunk at a time: until its last page,
       // which the engine says where it can, or else once the count of the
       // pages stays the same for a second
@@ -478,11 +457,7 @@ describe("page view", () => {
       await browser.waitUntil(
         async () => {
           const laying = await browser.execute(() => {
-            const hooks = (
-              window as unknown as {
-                blankGeometry?: { laying?: () => boolean };
-              }
-            ).blankGeometry;
+            const hooks = window.blankGeometry;
             return hooks?.laying ? hooks.laying() : null;
           });
           if (laying === false) {
@@ -502,22 +477,12 @@ describe("page view", () => {
       expect(count).toBeGreaterThanOrEqual(Number(name) * 0.8);
       expect(count).toBeLessThanOrEqual(Number(name) * 1.25 + 1);
       await clickOnPage(1, 44, 58);
-      await browser.execute(() =>
-        (
-          window as unknown as {
-            blankPageViewPerf: (clear: boolean) => unknown;
-          }
-        ).blankPageViewPerf(true),
-      );
+      await browser.execute(() => window.blankPageViewPerf(true));
       await startLatency();
       await type(TYPED);
       await browser.executeAsync((done: () => void) => setTimeout(done, 300));
       const perf = (await browser.execute(() =>
-        (
-          window as unknown as {
-            blankPageViewPerf: (clear: boolean) => Record<string, number[]>;
-          }
-        ).blankPageViewPerf(false),
+        window.blankPageViewPerf(false),
       )) as Record<string, number[]>;
       const latency = (await browser.execute(
         () =>

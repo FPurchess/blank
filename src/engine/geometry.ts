@@ -262,6 +262,17 @@ const ready = (): {
 };
 
 /**
+ * pointOnPages returns which page a point of the window is on, or nearest
+ * to, and where on it, in points
+ */
+const pointOnPages = (
+  { frames, viewport }: { frames: FrameLayout; viewport: PageViewport },
+  x: number,
+  y: number,
+) =>
+  pointOnPage(frames, x - viewport.left, y - viewport.top + viewport.scrollTop);
+
+/**
  * toWindow returns where a box of a page is in the window
  */
 const toWindow = (
@@ -394,12 +405,7 @@ export const hitAt = (x: number, y: number): Hit | null => {
     const view = measured();
     return view ? shownHit(view, x, y) : null;
   }
-  const { frames, viewport } = shown;
-  const point = pointOnPage(
-    frames,
-    x - viewport.left,
-    y - viewport.top + viewport.scrollTop,
-  );
+  const point = pointOnPages(shown, x, y);
   return point ? shown.engine.hit(point.page, point.x, point.y) : null;
 };
 
@@ -413,12 +419,7 @@ export const pageAt = (
 ): { page: number; from: number; to: number } | null => {
   const shown = ready();
   if (!shown) return null;
-  const { frames, viewport } = shown;
-  const point = pointOnPage(
-    frames,
-    x - viewport.left,
-    y - viewport.top + viewport.scrollTop,
-  );
+  const point = pointOnPages(shown, x, y);
   const span = point && shown.engine.pageSpan(point.page);
   return point && span ? { page: point.page, ...span } : null;
 };
