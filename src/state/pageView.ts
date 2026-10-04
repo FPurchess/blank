@@ -71,6 +71,17 @@ export const pageComposition = shallowRef<PageRect[]>([]);
 // null while no text is dragged
 export const pageDropCaret = shallowRef<PageRect | null>(null);
 
+// where a dragged block would drop, a place between two blocks at the top of
+// the document, which src/ui/BlockMarks.vue shows as a line; null while no
+// block is dragged
+export const pageDropGap = shallowRef<number | null>(null);
+
+// the content block under the pointer, which the page view outlines with a
+// hairline: where it starts and ends; null while there is none
+export const pageHoverBlock = shallowRef<{ from: number; to: number } | null>(
+  null,
+);
+
 // true once the editor shows the text itself, without the layout engine (see useFallbackEditor)
 export const engineMissing = shallowRef(false);
 

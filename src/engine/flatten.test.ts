@@ -1,4 +1,4 @@
-import { type Node, Slice } from "prosemirror-model";
+import { Fragment, type Node, Slice } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import {
   CellSelection,
@@ -9,7 +9,16 @@ import {
 import { EditorView } from "prosemirror-view";
 import { describe, expect, it } from "vitest";
 
-import { schema } from "../markdown";
+import { createForm, definitionKey, schema } from "../markdown";
+import { embedSrc } from "../markdown/blocks/embeds";
+import { box } from "../test/embeds";
+import {
+  LETTER,
+  LETTER_KEY,
+  RECIPE,
+  SHORT_KEY,
+  SHORT_RECIPE,
+} from "../test/forms";
 import {
   blockquote,
   doc,
@@ -123,6 +132,214 @@ describe("flatten", () => {
       ["text", 8, 0, 8],
     ]);
     expect(result[1]).toMatchObject({ width: 100, height: 50, alt: "A" });
+  });
+
+  it("shows a content block Blank can't show as a box with its name", () => {
+    const unknown = schema.node("unknown_block", {
+      raw: '<!-- blank:toc@9 depth="3" -->',
+    });
+    const result = items(doc(p("a"), unknown, p("b")));
+    expect(result.map((item) => [item.kind, item.pos])).toEqual([
+      ["text", 1],
+      ["boxed", 3],
+      ["text", 5],
+    ]);
+    expect(result[1]).toMatchObject({
+      label: "Blank can't show this block (toc@9) and keeps it as it is",
+      after: 8,
+    });
+  });
+
+  it("lists the headings the outline and tables of contents list", () => {
+    const image = schema.nodes.image.create({ src: "a.png" });
+    const result = items(
+      doc(
+        h(1, "Title"),
+        schema.node("heading", { level: 2 }),
+        schema.node("heading", { level: 2 }, [image]),
+        blockquote(h(3, "Quoted")),
+        schema.node("heading", { level: 2 }, [image, schema.text("After")]),
+      ),
+    );
+    const listed = result
+      .filter((item) => item.kind === "text")
+      .map((item) => [item.text, item.listed ?? false]);
+    expect(listed).toEqual([
+      ["Title", true],
+      ["", false],
+      ["Quoted", false],
+      // on the text after the image, once
+      ["After", true],
+    ]);
+  });
+
+  it("gives a table of contents the headings up to its depth", () => {
+    const toc = schema.node("toc", { depth: 2, title: "Contents" });
+    const result = items(doc(toc, h(1, "One"), h(3, "Deep"), h(2, "Two")));
+    expect(result[0]).toMatchObject({
+      kind: "toc",
+      pos: 0,
+      title: "Contents",
+      depth: 2,
+      entries: [
+        { level: 1, text: "One" },
+        { level: 2, text: "Two" },
+      ],
+    });
+  });
+
+  it("lays out a form's fields as blocks of the document", () => {
+    const definition = SHORT_RECIPE;
+    const key = SHORT_KEY;
+    const form = schema.node("form_block", { def: key }, [
+      schema.node("form_field", { name: "title" }, [
+        schema.node("heading", { level: 1 }),
+      ]),
+      schema.node("form_field", { name: "steps" }, [p("Mix."), h(2, "Bake")]),
+    ]);
+    const node = schema.node("doc", { definitions: { [key]: definition } }, [
+      p("intro"),
+      form,
+    ]);
+    const result = items(node);
+    expect(
+      result.map((item) =>
+        item.kind === "text"
+          ? [item.text, item.before, item.after, item.top, item.listed ?? false]
+          : item.kind,
+      ),
+    ).toEqual([
+      ["intro", 0, 8, true, false],
+      // the empty title says its placeholder, and starts a new page
+      ["", 16, 5, true, false],
+      ["Mix.", 0, 8, true, false],
+      // a heading in a field is one of the document's
+      ["Bake", 16, 8, true, true],
+    ]);
+    expect(result[1]).toMatchObject({ hint: "Recipe name", pageStart: true });
+    expect(result[0]).not.toHaveProperty("pageStart");
+    expect(result[2]).not.toHaveProperty("hint");
+  });
+
+  it("shows a box for the picture of an empty image field", () => {
+    const definition = {
+      ...RECIPE,
+      fields: RECIPE.fields.map((field) =>
+        field.kind === "image" ? { ...field, placeholder: "A photo" } : field,
+      ),
+    };
+    const key = definitionKey(definition);
+    const node = schema.node("doc", { definitions: { [key]: definition } }, [
+      createForm(definition, key),
+    ]);
+    const [title, photo] = items(node);
+    expect(photo).toMatchObject({ hint: "A photo", picture: true });
+    expect(title).not.toHaveProperty("picture");
+  });
+
+  it("puts the fields of frames on the page, and the text below them", () => {
+    const form = createForm(LETTER, LETTER_KEY);
+    const filled = form.copy(
+      form.content.replaceChild(
+        1,
+        form.child(1).copy(Fragment.fromArray([p("Ann"), p("Street 1")])),
+      ),
+    );
+    const node = schema.node("doc", { definitions: { [LETTER_KEY]: LETTER } }, [
+      p("intro"),
+      filled,
+    ]);
+    const [, sender, ann, street, date, body] = items(node);
+    // small print where the form definition says
+    expect(sender).toMatchObject({ style: "small" });
+    const mm = 72 / 25.4;
+    // the first of each frame says so; the form starts a new page
+    expect(sender).toMatchObject({ pageStart: true, frame: { start: true } });
+    expect(ann).toMatchObject({
+      frame: { start: true, x: 20 * mm, y: 45 * mm, width: 85 * mm },
+    });
+    expect(street.frame).toEqual({ x: 20 * mm, y: 45 * mm, width: 85 * mm });
+    // line by line, as an address
+    expect([ann.after, street.before]).toEqual([0, 0]);
+    expect(date).toMatchObject({ frame: { start: true, x: 125 * mm } });
+    // the text starts below them, at the top of its own flow
+    expect(body).toMatchObject({ flowTop: 100 * mm, before: 0 });
+    expect(body).not.toHaveProperty("frame");
+  });
+
+  it("lays out an embed as the image of its drawing, at its width", () => {
+    const embed = schema.nodes.embed.create({
+      type: "org.blank.test/box@1",
+      id: "k3x9",
+      width: "60mm",
+      alt: "A red box",
+      svg: box("red"),
+    });
+    const node = doc(p("a"), embed);
+    // not loaded: its alt text
+    const [, waiting] = items(node);
+    expect(waiting).toMatchObject({
+      kind: "image",
+      width: 0,
+      alt: "A red box",
+    });
+    // loaded, 120 by 60: 60mm wide
+    const [, shown] = items(node, () => ({ width: 120, height: 60 }));
+    if (shown.kind !== "image") throw new Error("no image");
+    const mm = 72 / 25.4;
+    expect(shown.width).toBeCloseTo(60 * mm);
+    expect(shown.height).toBeCloseTo(30 * mm);
+    expect(shown.src).toBe(embedSrc(embed));
+  });
+
+  it("lays out the fields of a grid in its columns", () => {
+    const definition = {
+      ...RECIPE,
+      layout: [
+        { field: "title" },
+        {
+          grid: { columns: ["40mm", "1fr"] },
+          cells: [
+            [{ field: "photo" }, { field: "ingredients" }],
+            [{ field: "steps" }],
+          ],
+        },
+      ],
+    };
+    const key = definitionKey(definition);
+    const form = createForm(definition, key);
+    const filled = form.copy(
+      form.content.replaceChild(
+        3,
+        form.child(3).copy(Fragment.from(h(2, "Bake"))),
+      ),
+    );
+    const node = schema.node("doc", { definitions: { [key]: definition } }, [
+      filled,
+    ]);
+    const result = items(node);
+    const columns = result.map((item) => item.column);
+    // the title across the page, then the photo and the ingredients in the
+    // first column and the steps in the second, all in one band
+    expect(columns[0]).toBeUndefined();
+    expect(columns.slice(1).map((column) => column?.index)).toEqual([0, 0, 1]);
+    // the band's first item says so, which the engine counts bands by
+    expect(columns.slice(1).map((column) => column?.start ?? false)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(columns[1]).toMatchObject({
+      tracks: [
+        { pt: (40 * 72) / 25.4, fr: 0 },
+        { pt: 0, fr: 1 },
+      ],
+    });
+    // a heading in a column starts no page or chapter, but is listed
+    expect(result[3]).toMatchObject({ top: false, listed: true });
+    // a column starts as the band does, after the title
+    const afterTitle = items(doc(h(1, "Pancakes"), h(2, "Bake")))[1];
+    expect(result[3].before).toBe(afterTitle.before);
   });
 
   it("lays out tables by rows and cells", () => {

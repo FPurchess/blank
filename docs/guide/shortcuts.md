@@ -33,20 +33,30 @@
 
 ## Blocks
 
-| Command            | Shortcut        |
-| ------------------ | --------------- |
-| Paragraph          | `Mod` `0`       |
-| Heading 1 – 6      | `Mod` `1` … `6` |
-| Bullet list        | `Mod` `8`       |
-| Numbered list      | `Mod` `9`       |
-| Indent list item   | `Tab`           |
-| Outdent list item  | `Shift` `Tab`   |
-| Indent code lines  | `Tab`           |
-| Outdent code lines | `Shift` `Tab`   |
-| Blockquote         | `Mod` `G`       |
-| Horizontal line    | `Mod` `H`       |
-| Page break         | `Mod` `Enter`   |
-| Table              | `Mod` `T`       |
+| Command                         | Shortcut        |
+| ------------------------------- | --------------- |
+| Paragraph                       | `Mod` `0`       |
+| Heading 1 – 6                   | `Mod` `1` … `6` |
+| Bullet list                     | `Mod` `8`       |
+| Numbered list                   | `Mod` `9`       |
+| Indent list item                | `Tab`           |
+| Outdent list item               | `Shift` `Tab`   |
+| Indent code lines               | `Tab`           |
+| Outdent code lines              | `Shift` `Tab`   |
+| Blockquote                      | `Mod` `G`       |
+| Horizontal line                 | `Mod` `H`       |
+| Page break                      | `Mod` `Enter`   |
+| Table                           | `Mod` `T`       |
+| [Insert a block](./blocks#pane) | `Mod` `Alt` `B` |
+
+## Forms
+
+| Command                         | Shortcut              |
+| ------------------------------- | --------------------- |
+| Next / previous field           | `Tab` / `Shift` `Tab` |
+| Next field, from a one-line one | `Enter`               |
+| New line, in a one-line field   | `Shift` `Enter`       |
+| Select the whole form           | `Escape`              |
 
 ## Tables
 

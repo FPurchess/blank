@@ -183,6 +183,110 @@ hr.page-break {
   }
 }
 
+// a table of contents, as the editor shows it without the engine: its title
+// as a heading 2, and the headings it lists, indented by level, as links
+// (src/editor/plugins/toc.ts)
+nav.toc {
+  margin: 1.5em 0;
+
+  // as a heading 2, close to the entries
+  .toc-title {
+    @include heading(
+      2,
+      $weight: $font-weight-medium,
+      $line-height: 1.25,
+      $tracking: -0.01
+    );
+    margin: 0 0 0.5em;
+  }
+
+  .toc-level-1 {
+    font-weight: 500;
+  }
+
+  .toc-empty {
+    font-style: italic;
+    opacity: 0.6;
+  }
+
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @for $level from 1 through 6 {
+    .toc-level-#{$level} {
+      padding-left: ($level - 1) * 1.1em;
+    }
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+// a form, as the editor shows it without the engine: its fields one after
+// the other, each under its label (src/editor/plugins/forms)
+section.form {
+  margin: 1.5em 0;
+  padding-left: 0.8em;
+  border-left: 2px solid color-mix(in srgb, var(--color) 15%, transparent);
+
+  .field::before {
+    content: attr(aria-label);
+    display: block;
+    font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif;
+    font-size: 0.7em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+}
+
+// a content block Blank can't show: its source, faint, in an outline, as
+// the pages show it as a box
+pre.unknown-block {
+  position: relative;
+  padding: 1.6em 0.8em 0.8em;
+  border: 1px solid color-mix(in srgb, var(--color) 20%, transparent);
+  color: color-mix(in srgb, var(--color) 60%, transparent);
+  white-space: pre-wrap;
+
+  &::before {
+    content: "Block Blank can't show";
+    position: absolute;
+    top: 0.4em;
+    left: 0.8em;
+    font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif;
+    font-size: 0.7em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+// an embed: its drawing, as wide as it says, at most the text's width
+figure.embed {
+  margin: 0;
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+}
+
+// a content block the cursor selected, as a page break
+:is(
+  nav.toc,
+  section.form,
+  figure.embed,
+  pre.unknown-block
+).ProseMirror-selectednode {
+  outline: 2px solid var(--color);
+  outline-offset: 4px;
+}
+
 // Tables are set in the body size, with a bold header and a caption one step
 // down. The PDF and Word exports mirror these values.
 table {

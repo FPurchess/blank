@@ -1,0 +1,33 @@
+# A recipe on a page of its own: its name, a photo beside the ingredients,
+# and the steps. See docs/guide/blocks.md for what a form definition can say.
+version: 2
+name: Recipe
+description: A recipe on a page of its own, with a photo beside its ingredients and the steps
+newPage: true
+fields:
+  - name: title
+    kind: text
+    style: h1
+    label: Title
+    placeholder: The name of the dish
+  - name: photo
+    kind: image
+    label: Photo
+    placeholder: Click to add a photo
+  - name: ingredients
+    kind: table
+    label: Ingredients
+    columns: [Amount, Ingredient]
+  - name: steps
+    kind: rich
+    label: Steps
+    placeholder: How to make it, step by step
+layout:
+  - field: title
+  - grid:
+      columns: [1fr, 1fr]
+      gap: 8mm
+    cells:
+      - [field: photo]
+      - [field: ingredients]
+  - field: steps

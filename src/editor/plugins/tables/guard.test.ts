@@ -42,6 +42,21 @@ describe("tableGuard", () => {
     ).toBe(true);
   });
 
+  it("keeps paragraphs around content blocks, as around tables", () => {
+    const unknown = () =>
+      schema.node("unknown_block", { raw: "<!-- blank:x@1 -->" });
+    expect(
+      guarded(doc(unknown(), unknown())).eq(
+        doc(p(), unknown(), p(), unknown(), p()),
+      ),
+    ).toBe(true);
+    expect(
+      guarded(doc(unknown(), small())).eq(
+        doc(p(), unknown(), p(), small(), p()),
+      ),
+    ).toBe(true);
+  });
+
   it("leaves a document without tables alone", () => {
     const state = EditorState.create({
       schema,

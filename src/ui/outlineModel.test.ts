@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { PageLayoutState } from "../state";
+import { BLOCKS_DOCK, blocksDock } from "./blocksPaneModel";
 import {
   freeRight,
+  layoutWidth,
   OUTLINE_DOCK,
   outlinePlacement,
   wheelPixels,
@@ -77,5 +79,46 @@ describe("wheelPixels", () => {
     expect(wheelPixels({ deltaY: 30, deltaMode: 0 }, 600)).toBe(30);
     expect(wheelPixels({ deltaY: 3, deltaMode: 1 }, 600)).toBe(48);
     expect(wheelPixels({ deltaY: 1, deltaMode: 2 }, 600)).toBe(600);
+  });
+});
+
+describe("the outline beside the blocks pane", () => {
+  // where the outline shows with an A4 page, two headings and the outline
+  // kept open, with the blocks pane open or not
+  const placeAt = (windowWidth: number, paneOpen: boolean) =>
+    outlinePlacement(
+      2,
+      true,
+      windowWidth,
+      freeRight(
+        layoutWidth(windowWidth, 0, blocksDock(paneOpen, windowWidth)),
+        a4,
+        "pages",
+        false,
+      ),
+    );
+
+  it("counts the room the docked pane takes off the pages' width", () => {
+    expect(layoutWidth(1600, 15, BLOCKS_DOCK)).toBe(1600 - 15 - 248);
+    expect(blocksDock(true, 1000)).toBe(BLOCKS_DOCK);
+    expect(blocksDock(true, 999)).toBe(0);
+    expect(blocksDock(false, 1600)).toBe(0);
+  });
+
+  it("docks where the pane leaves too little room beside the pages", () => {
+    expect([1000, 1280, 1600].map((width) => placeAt(width, false))).toEqual([
+      "docked",
+      "docked",
+      "beside",
+    ]);
+    expect([1000, 1280, 1600].map((width) => placeAt(width, true))).toEqual([
+      "docked",
+      "docked",
+      "docked",
+    ]);
+  });
+
+  it("lies beside the pages once there is room for both", () => {
+    expect(placeAt(1900, true)).toBe("beside");
   });
 });

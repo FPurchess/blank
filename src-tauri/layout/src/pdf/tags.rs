@@ -240,9 +240,42 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             let alt = if alt.is_empty() { src } else { alt };
             Some(group(Tag::Figure(Some(alt.clone())), children))
         }
+        Content::Boxed { label, .. } => Some(group(
+            Tag::Figure(Some(label.clone())),
+            leaves(ids, Part::Label { item: index }),
+        )),
         Content::Table { .. } => Some(table_node(engine, index, ids)),
+        Content::Toc { entries, .. } => Some(toc_node(index, entries.len(), ids)),
         Content::Break { .. } | Content::Rule { .. } => None,
     }
+}
+
+/// a table of contents: its title, then an item per entry, holding a link
+/// to the heading with the entry's text and page number
+fn toc_node(index: usize, entries: usize, ids: &mut Ids) -> Node {
+    let mut children = vec![];
+    let title = leaves(ids, Part::Label { item: index });
+    if !title.is_empty() {
+        children.push(group(Tag::P, title));
+    }
+    for entry in 0..entries {
+        let extra = Part::Extra {
+            item: index,
+            extra: entry,
+        };
+        let mut content = leaves(ids, extra);
+        content.extend(leaves(ids, Part::TocNumber { item: index, entry }));
+        let annotation = leaves(ids, Part::TocLink { item: index, entry });
+        // a link to its heading, unless the heading isn't there
+        let child = if annotation.is_empty() {
+            group(Tag::P, content)
+        } else {
+            content.extend(annotation);
+            group(Tag::Link, content)
+        };
+        children.push(group(Tag::TOCI, vec![child]));
+    }
+    group(Tag::TOC, children)
 }
 
 fn table_node(engine: &Engine, index: usize, ids: &mut Ids) -> Node {
@@ -367,31 +400,20 @@ pub(super) fn tag_tree(engine: &Engine, ids: &mut Ids, language: &str) -> TagTre
     tree
 }
 
-/// the bookmarks of the document: every heading, its level, text, page and
-/// where on it it starts
-fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
-    let mut entries = vec![];
-    for (index, item) in engine.items.iter().enumerate() {
-        let Content::Text(text) = &item.content else {
-            continue;
-        };
-        if heading_level(text.level).is_none() || !text.top {
-            continue;
-        }
-        let Some(&frag) = engine.first_frag.get(index) else {
-            continue;
-        };
-        let Some(placed) = engine.frags.get(frag) else {
-            continue;
-        };
-        entries.push((
-            text.level,
-            text.text.clone(),
-            engine.page_of_frag(frag),
-            placed.y,
-        ));
-    }
-    entries
+/// the bookmarks of the document: every listed heading (see Text::listed),
+/// its level, text, page and where on it it starts
+pub fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
+    engine
+        .listed_headings()
+        .into_iter()
+        .filter_map(|heading| {
+            let (page, y) = heading.at?;
+            let Content::Text(text) = &engine.items[heading.item].content else {
+                return None;
+            };
+            Some((heading.level, text.text.clone(), page, y))
+        })
+        .collect()
 }
 
 /// the bookmarks, nested by the headings' levels

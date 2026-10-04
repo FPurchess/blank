@@ -6,6 +6,7 @@ import { bootDocumentState } from "./document";
 import { bootMessages } from "./messages";
 
 export * from "./appearance";
+export * from "./blocksPane";
 export * from "./dialogs";
 export * from "./document";
 export * from "./focus";

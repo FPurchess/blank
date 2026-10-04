@@ -281,30 +281,8 @@ body {
   }
 }
 
-// the page setup dialog, see src/ui/PageSetupDialog.vue
-.dialog.page-setup {
-  max-width: min(640px, calc(100% - 32px));
-
-  // the rules below set a display, which would show what is hidden
-  [hidden] {
-    display: none !important;
-  }
-
-  .body {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
-  }
-
-  .settings,
-  .text-editor {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-  }
-
+// a row of options in a dialog, see src/ui/components/OptionGroup.vue
+.dialog {
   .setting {
     display: flex;
     flex-direction: column;
@@ -334,6 +312,31 @@ body {
         opacity: 1;
       }
     }
+  }
+}
+
+// the page setup dialog, see src/ui/PageSetupDialog.vue
+.dialog.page-setup {
+  max-width: min(640px, calc(100% - 32px));
+
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
+  .body {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .settings,
+  .text-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
   }
 
   .custom {
@@ -509,7 +512,7 @@ $faint-text-opacity: 0.6;
   font-size: 0.75rem;
   opacity: $faint-text-opacity;
   background-color: var(--background-color);
-    transition: opacity 150ms;
+  transition: opacity 150ms;
 
   &:hover {
     opacity: 0.8;
@@ -674,7 +677,7 @@ $faint-text-opacity: 0.6;
       border: 1px solid transparent;
       border-radius: 3px;
       padding: 1px 8px;
-            opacity: 0.75;
+      opacity: 0.75;
 
       &:hover,
       &:focus-visible {
@@ -893,8 +896,9 @@ $strip-height: 90px;
   }
 }
 
-// the toolbar of the table the cursor is in, see src/ui/TableToolbar.vue
-.table-toolbar {
+// the toolbars of the table the cursor is in (src/ui/TableToolbar.vue) and of
+// the content block it is in or on (src/ui/BlockToolbar.vue)
+.toolbar {
   position: fixed;
   // below .dialog-backdrop, so a dialog covers it
   z-index: 5;
@@ -956,6 +960,20 @@ $strip-height: 90px;
     background: var(--background-color);
     border: 1px solid var(--line-strong);
     border-radius: 3px;
+  }
+
+  // the block toolbar: the block's icon and name, then its buttons
+  &.block-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .block-title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 0 var(--s2);
+    white-space: nowrap;
   }
 
   &.keys .hint {
@@ -1624,18 +1642,228 @@ body.band-editing #outline {
   pointer-events: none;
 }
 
+// The blocks pane (src/ui/BlocksPane.vue), a side pane (see side-pane in
+// _controls.scss): from OUTLINE_BREAKPOINT on it docks, the pages making
+// room; below, it floats over them.
+
+// the blocks pane's width, BLOCKS_DOCK in src/ui/blocksPaneModel.ts
+$blocks-dock: 248px;
+// the tiles of a row, TILE_COLUMNS there
+$tile-columns: 2;
+
+#blocks-pane {
+  @include side-pane(left);
+  top: $top-bar-height;
+  bottom: $status-height;
+  // between the bars, above the outline, the table handles and the
+  // toolbars it floats over, below the dialogs and the menus
+  z-index: 6;
+  width: $blocks-dock;
+  font-size: 0.85rem;
+}
+
+.side-pane-head {
+  @include side-pane-head;
+}
+
+.side-pane-title {
+  @include side-pane-title;
+}
+
+.side-pane-foot {
+  @include side-pane-foot;
+}
+
+body.blocks-docked #page-view {
+  left: $blocks-dock;
+}
+
+// without the engine the editor shows the text in the window itself
+body.without-engine.blocks-docked {
+  padding-left: $blocks-dock;
+}
+
+// the search: a field with the magnifier in it
+.blocks-search {
+  @include field;
+  // the field is paper on the pane's desk
+  --muted: var(--muted-on-paper);
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0 var(--s3) var(--s2);
+  color: var(--muted);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    font: inherit;
+    color: var(--color);
+    background: none;
+
+    &::placeholder {
+      color: var(--muted);
+    }
+  }
+}
+
+.blocks-groups {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--s3) var(--s3);
+}
+
+.blocks-group {
+  @include group-label;
+  margin: var(--s3) var(--s1) var(--s2);
+}
+
+.blocks-none {
+  margin: var(--s4) var(--s1);
+  color: var(--muted);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat($tile-columns, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+// a block to insert: its drawing over its name
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  min-width: 0;
+  padding: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  font: inherit;
+  color: inherit;
+  background: none;
+  @include states;
+
+  .thumb {
+    height: 56px;
+    width: auto;
+
+    .sheet {
+      fill: var(--background-color);
+      stroke: var(--line-strong);
+    }
+
+    .ink,
+    .wire {
+      fill: var(--line-strong);
+    }
+
+    .wire.image,
+    .wire.table {
+      fill: var(--line);
+      stroke: var(--line-strong);
+      stroke-width: 0.5;
+    }
+
+    .lines {
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 1.2;
+      stroke-linecap: round;
+    }
+
+    .dots {
+      stroke-dasharray: 0.1 2;
+    }
+  }
+}
+
+.tile-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-small);
+}
+
+// the settings of a table of contents, below its toolbar
+// (src/ui/TocPopover.vue)
+.toc-popover {
+  position: fixed;
+  // with the pickers and menus
+  z-index: 20;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  width: 260px;
+  padding: var(--s3) var(--s4) var(--s4);
+  font-size: 0.85rem;
+  @include popover;
+
+  h2 {
+    @include group-label;
+    margin: 0 0 var(--s1);
+  }
+
+  label {
+    margin-top: var(--s1);
+    color: var(--muted);
+  }
+
+  select,
+  input {
+    @include field;
+  }
+}
+
 // the selection dims while the editor hasn't the focus, e.g. behind a dialog
 .page-selection.inactive {
   background-color: var(--selection-inactive-color);
 }
 
-// a selected image, rule or page break, as the editor outlined it
+// a selected node, e.g. an image, a rule, a page break or a content block:
+// one ring in the accent
 .page-node-selection {
   position: absolute;
   min-height: 2px;
-  outline: 2px solid var(--color);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
   pointer-events: none;
+}
+
+// the content block under the pointer (src/ui/BlockMarks.vue): a hairline
+// where the ring of a selected one would be
+.block-hover {
+  position: fixed;
+  // with the page view, after it, so the bars stay above
+  z-index: 1;
+  outline: 1px solid var(--line);
+  outline-offset: 4px;
+  pointer-events: none;
+}
+
+// where a dragged block drops, between two blocks: a line in the accent
+// with a dot at its start
+.block-drop-line {
+  position: fixed;
+  z-index: 1;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
 }
 
 // the text an input method is composing
@@ -1699,9 +1927,12 @@ body.band-editing #outline {
   }
 }
 
-// Ctrl (Cmd) + click opens the link under the pointer
+// Ctrl (Cmd) + click opens the link under the pointer, and a click on the
+// box of an empty image field the image dialog
 #page-view.follow-links,
-#page-view.follow-links .page-frame {
+#page-view.follow-links .page-frame,
+#page-view.on-picture,
+#page-view.on-picture .page-frame {
   cursor: pointer;
 }
 

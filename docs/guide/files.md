@@ -43,6 +43,10 @@ Blank keeps this block exactly as it is, down to the comments and spacing, and s
 
 The `title` and `author` also go into your PDF and Word documents, where readers and search show them. Without a `title`, Blank uses your first heading.
 
+### Blocks from a newer Blank {#unknown-blocks}
+
+Some blocks are written as lines like `<!-- blank:… -->`, which other markdown apps don't show. A file saved by a newer Blank may hold blocks this Blank doesn't know yet. It shows each of them as a box that says so, and keeps it exactly as it was written, so nothing is lost when you edit the text around it and save. The box isn't in your Word documents, and your PDF shows it as on the pages. How the other blocks are kept in each format is in [Blocks](./blocks#storage).
+
 ## Share a PDF {#pdf}
 
 Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your document's name with `.pdf`.
@@ -89,7 +93,7 @@ Blank never writes to the Word document you opened. It won't even save markdown 
 
 ### What comes along {#what-comes-along}
 
-Headings, bold and italic text, links, lists, quotes, code, line breaks, page breaks, images and tables make it into your document, and so do the header, the footer and the page numbers. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
+Headings, bold and italic text, links, lists, quotes, code, line breaks, page breaks, images, tables and [tables of contents](./blocks#toc) make it into your document, and so do the header, the footer and the page numbers. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
 
 Word can do more than markdown, so a few things change on the way:
 

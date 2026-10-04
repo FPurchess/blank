@@ -9,6 +9,16 @@ use crate::items::Laid;
 use crate::model::{Content, Item, Settings};
 
 impl Engine {
+    /// the first item of the band of a grid `item` stands in, if it does
+    fn band_start(&self, item: usize) -> Option<usize> {
+        let band = self.items.get(item)?.band()?;
+        let mut start = item;
+        while start > 0 && self.items[start - 1].band() == Some(band) {
+            start -= 1;
+        }
+        Some(start)
+    }
+
     pub(crate) fn page_of_frag(&self, frag: usize) -> usize {
         self.pages
             .partition_point(|page| page.end <= frag)
@@ -30,7 +40,8 @@ impl Engine {
         let tail = change.as_ref().and_then(|change| change.tail);
         let old_first_frag = std::mem::take(&mut self.first_frag);
         let old_chapters = std::mem::take(&mut self.chapters);
-        let (from, start_item, start_unit) = self.restart_at(from, change.is_some());
+        let (from, start_item, start_unit) =
+            self.restart_at(from, change.is_some(), &old_first_frag);
         let keep_frags = self.pages.get(from).map(|page| page.start).unwrap_or(0);
         // what each page had before, for the changes
         let old_versions: Vec<(u32, u32)> = self
@@ -54,6 +65,7 @@ impl Engine {
             prev_after: 0.0,
             old: tail.map(|tail| (tail, &self.pages[from..])),
             settled: None,
+            band: None,
         };
         paginator.run(start_item, start_unit);
         let settled = paginator.settled;
@@ -86,6 +98,18 @@ impl Engine {
             settled_tail.map(|(_, tail)| (tail, old_copied_start, frag_offset)),
         );
         self.chapters = self.find_chapters();
+        // the pages that show an entry of a table of contents whose page
+        // number changed have a new body, even where their fragments are as
+        // before
+        let mut renumbered = vec![false; self.pages.len()];
+        let old_of = |item: usize| change.as_ref().and_then(|change| change.map.old_of(item));
+        for (item, units) in self.set_toc_numbers(old_of) {
+            for frag in self.frags_of(item) {
+                if units.binary_search(&self.frags[frag].unit).is_ok() {
+                    renumbered[self.page_of_frag(frag)] = true;
+                }
+            }
+        }
         // the band texts: every page's where the number of pages or the
         // chapters changed, else only the pages paginated again have new
         // ones. A moved page has another number, so a new page count redoes
@@ -97,18 +121,44 @@ impl Engine {
             change.is_some(),
             from,
             &repaginated,
+            &renumbered,
             all_bands,
             &old_versions,
         )
     }
 
     /// the page pagination restarts on, at or before `from`, and the item
-    /// and unit it starts with: the start of the document without a change
-    fn restart_at(&self, from: usize, changed: bool) -> (usize, usize, usize) {
+    /// and unit it starts with: the start of the document without a change.
+    /// A band of a grid is placed from its start, its columns side by side,
+    /// so from the page it starts on, which `old_first_frag` tells.
+    fn restart_at(
+        &self,
+        from: usize,
+        changed: bool,
+        old_first_frag: &[usize],
+    ) -> (usize, usize, usize) {
         let from = from.min(self.pages.len());
         let mut from = if changed { from } else { 0 };
-        while from > 0 && self.pages.get(from).is_none_or(|page| page.first.is_none()) {
-            from -= 1;
+        loop {
+            while from > 0 && self.pages.get(from).is_none_or(|page| page.first.is_none()) {
+                from -= 1;
+            }
+            let band_page = self
+                .pages
+                .get(from)
+                .and_then(|page| page.first)
+                .and_then(|(item, unit)| {
+                    let start = self.band_start(item)?;
+                    (start != item || unit > 0).then_some(start)
+                })
+                .and_then(|start| old_first_frag.get(start).copied())
+                .filter(|&frag| frag != usize::MAX)
+                .map(|frag| self.page_of_frag(frag))
+                .filter(|&page| page < from);
+            match band_page {
+                Some(page) => from = page,
+                None => break,
+            }
         }
         let (start_item, start_unit) = self
             .pages
@@ -265,14 +315,16 @@ impl Engine {
     /// gives every page its versions and band texts: the pages paginated
     /// again (`repaginated`, from `from`) keep the old page's where they show
     /// the same, the moved ones keep theirs, and the rest get new ones, as
-    /// all do without a change. Band texts are written again on the pages
-    /// paginated again, or on all (`all_bands`). Returns the pages whose
-    /// bodies and bands changed.
+    /// all do without a change, and those showing a page number of a table
+    /// of contents that changed (`renumbered`) get a new body. Band texts
+    /// are written again on the pages paginated again, or on all
+    /// (`all_bands`). Returns the pages whose bodies and bands changed.
     fn assign_versions(
         &mut self,
         changed: bool,
         from: usize,
         repaginated: &[Option<Before>],
+        renumbered: &[bool],
         all_bands: bool,
         old_versions: &[(u32, u32)],
     ) -> Changes {
@@ -315,6 +367,11 @@ impl Engine {
                     .then_some(page.band_version);
                 let version = band.map(|_| page.version);
                 (Some(page.body_version), band, version)
+            };
+            let (body, version) = if renumbered.get(index) == Some(&true) {
+                (None, None)
+            } else {
+                (body, version)
             };
             let body_version = body.unwrap_or_else(&mut new_version);
             let band_version = band.unwrap_or_else(&mut new_version);
@@ -405,6 +462,18 @@ struct Paginator<'a> {
     /// the old pages from where pagination started, see `Tail`
     old: Option<(Tail, &'a [Page])>,
     settled: Option<usize>,
+    /// the band of a grid being placed, see `band`
+    band: Option<Band>,
+}
+
+/// the columns of a band of a grid while they are placed: each from where
+/// the band starts, into fragments of its own, since a page's fragments
+/// come in the order of the items
+struct Band {
+    /// the fragments of each page from the one the band starts on
+    pages: Vec<Vec<Frag>>,
+    /// which of those the column being placed is on
+    page: usize,
 }
 
 /// room for rounding when a unit ends right at the bottom
@@ -417,6 +486,15 @@ impl Paginator<'_> {
     }
 
     fn open_page(&mut self) {
+        if let Some(band) = &mut self.band {
+            band.page += 1;
+            if band.page == band.pages.len() {
+                band.pages.push(vec![]);
+            }
+            self.y = self.settings.content_top();
+            self.empty = true;
+            return;
+        }
         let next = self.next_frag();
         if let Some(page) = self.pages.last_mut() {
             page.end = next;
@@ -437,13 +515,23 @@ impl Paginator<'_> {
 
     /// places a unit; false once the pages settled
     fn place(&mut self, item: usize, unit: usize, y: f32, repeat: bool) -> bool {
-        let height = self.laid[item].units[unit].height;
+        let frag = Frag {
+            item,
+            unit,
+            y,
+            repeat,
+        };
+        if let Some(band) = &mut self.band {
+            band.pages[band.page].push(frag);
+            self.y = y + self.laid[item].units[unit].height;
+            self.empty = false;
+            return true;
+        }
         // run opens the first page before it places anything
-        let Some(page) = self.pages.last_mut() else {
+        let Some(page) = self.pages.last() else {
             return false;
         };
         if !repeat && page.first.is_none() {
-            page.first = Some((item, unit));
             if let Some((tail, old_pages)) = self.old {
                 if item >= tail.start {
                     let old = (moved(item, tail.delta.saturating_neg()), unit);
@@ -475,32 +563,36 @@ impl Paginator<'_> {
                 }
             }
         }
-        self.frags.push(Frag {
-            item,
-            unit,
-            y,
-            repeat,
-        });
-        self.y = y + height;
+        self.push(frag);
+        true
+    }
+
+    /// puts a fragment on the last page
+    fn push(&mut self, frag: Frag) {
+        self.frags.push(frag);
+        self.y = frag.y + self.laid[frag.item].units[frag.unit].height;
         self.empty = false;
         let end = self.next_frag();
         if let Some(page) = self.pages.last_mut() {
+            if !frag.repeat && page.first.is_none() {
+                page.first = Some((frag.item, frag.unit));
+            }
             page.bottom = page.bottom.max(self.y);
             page.end = end;
         }
-        true
+    }
+
+    /// whether an item starts a page of its own: one that says so, e.g. a
+    /// form whose definition does, or a heading of a level `new_page_before`
+    /// lists
+    fn starts_page(&self, item: &Item) -> bool {
+        let level = item.heading_level();
+        let top = matches!(&item.content, Content::Text(text) if text.top);
+        item.page_start || top && level > 0 && self.settings.new_page_before.contains(&level)
     }
 
     /// the height a run of headings from `index` needs with the first unit
     /// of what follows them, and the units that stay with that
-    /// whether an item starts a page of its own: a heading of a level
-    /// `new_page_before` lists
-    fn starts_page(&self, item: &Item) -> bool {
-        let level = item.heading_level();
-        let top = matches!(&item.content, Content::Text(text) if text.top);
-        top && level > 0 && self.settings.new_page_before.contains(&level)
-    }
-
     fn keep_height(&self, index: usize) -> f32 {
         let mut height = 0.0;
         let mut current = index;
@@ -509,7 +601,10 @@ impl Paginator<'_> {
                 // what starts a page of its own isn't kept with: a page
                 // break, or a heading that starts a new page
                 let item = &self.items[current];
-                if self.starts_page(item) || matches!(item.content, Content::Break { .. }) {
+                // nor what stands in another column of a grid
+                let beside = item.beside(&self.items[current - 1]);
+                if self.starts_page(item) || beside || matches!(item.content, Content::Break { .. })
+                {
                     return height;
                 }
                 height += self.items[current - 1].after + self.items[current].before;
@@ -534,81 +629,210 @@ impl Paginator<'_> {
     }
 
     fn run(&mut self, start_item: usize, start_unit: usize) {
-        let bottom = self.settings.content_bottom();
         self.open_page();
-        for index in start_item..self.items.len() {
-            let item = &self.items[index];
-            let laid = &self.laid[index];
+        let mut index = start_item;
+        while index < self.items.len() {
             let first_unit = if index == start_item { start_unit } else { 0 };
-            let is_break = matches!(item.content, Content::Break { .. });
-            if first_unit == 0 && !self.empty {
-                if self.starts_page(item) {
-                    self.open_page();
-                } else if item.heading_level() > 0 {
-                    let needed = self.prev_after + item.before + self.keep_height(index);
-                    if self.y + needed > bottom + EPSILON {
-                        self.open_page();
-                    }
-                }
+            if first_unit == 0 && self.items[index].frame.is_some() {
+                index = self.frame(index);
+                continue;
             }
-            // the header rows of a table, repeated on each page it goes on
-            let headers: Vec<usize> = (0..laid.units.len())
-                .filter(|&unit| laid.units[unit].header)
-                .collect();
-            for unit_index in first_unit..laid.units.len() {
-                let unit = &laid.units[unit_index];
-                let mut y = if unit_index == first_unit {
-                    // no space above a page break, which takes no room
-                    let gap = if self.empty || first_unit > 0 || is_break {
-                        0.0
-                    } else {
-                        self.prev_after + item.before
-                    };
-                    self.y + gap
-                } else {
-                    let previous = &laid.units[unit_index - 1];
-                    self.y + unit.top - (previous.top + previous.height)
-                };
-                let fresh = self.empty;
-                // a unit that stays with the next, e.g. a caption with the
-                // header rows and the first row, goes on with them
-                let mut needed = unit.height;
-                let mut next = unit_index;
-                while laid.units[next].keep_next && next + 1 < laid.units.len() {
-                    next += 1;
-                    needed = laid.units[next].top + laid.units[next].height - unit.top;
-                }
-                // a page break never goes to a new page itself: the page it
-                // ends is the one it is on
-                if !fresh && !is_break && y + needed > bottom + EPSILON {
-                    self.open_page();
-                    y = self.y;
-                }
-                let last_header = headers.last().copied();
-                if self.empty && unit_index > 0 && last_header.is_some_and(|last| unit_index > last)
-                {
-                    // the table goes on: its header rows first
-                    for &header in &headers {
-                        let at = self.y;
-                        self.place(index, header, at, true);
-                    }
-                    y = self.y;
-                }
-                let was_empty = self.empty;
-                if !self.place(index, unit_index, y, false) {
-                    return;
-                }
-                // a page break takes no room: a page that holds only breaks
-                // is still empty, e.g. for a chapter that starts a new page
-                if is_break {
-                    self.empty = was_empty;
-                }
+            if first_unit == 0 && self.items[index].column.is_some() {
+                index = self.band(index);
+                continue;
             }
-            self.prev_after = if is_break { 0.0 } else { item.after };
-            if is_break && index > 0 {
+            if !self.item(index, first_unit) {
+                return;
+            }
+            index += 1;
+        }
+    }
+
+    /// places the units of an item from `first_unit`; false once the pages
+    /// settled
+    fn item(&mut self, index: usize, first_unit: usize) -> bool {
+        let bottom = self.settings.content_bottom();
+        let item = &self.items[index];
+        let laid = &self.laid[index];
+        let is_break = matches!(item.content, Content::Break { .. });
+        if first_unit == 0 && !self.empty {
+            if self.starts_page(item) {
                 self.open_page();
+            } else if item.heading_level() > 0 {
+                let needed = self.prev_after + item.before + self.keep_height(index);
+                if self.y + needed > bottom + EPSILON {
+                    self.open_page();
+                }
             }
         }
+        // the header rows of a table, repeated on each page it goes on
+        let headers: Vec<usize> = (0..laid.units.len())
+            .filter(|&unit| laid.units[unit].header)
+            .collect();
+        for unit_index in first_unit..laid.units.len() {
+            let unit = &laid.units[unit_index];
+            let mut y = if unit_index == first_unit {
+                // no space above a page break, which takes no room
+                let gap = if self.empty || first_unit > 0 || is_break {
+                    0.0
+                } else {
+                    self.prev_after + item.before
+                };
+                // no higher than the item says, e.g. below a letter's address
+                let lowest = if first_unit == 0 { item.flow_top } else { 0.0 };
+                (self.y + gap).max(lowest)
+            } else {
+                let previous = &laid.units[unit_index - 1];
+                self.y + unit.top - (previous.top + previous.height)
+            };
+            let fresh = self.empty;
+            // a unit that stays with the next, e.g. a caption with the
+            // header rows and the first row, goes on with them
+            let mut needed = unit.height;
+            let mut next = unit_index;
+            while laid.units[next].keep_next && next + 1 < laid.units.len() {
+                next += 1;
+                needed = laid.units[next].top + laid.units[next].height - unit.top;
+            }
+            // a page break never goes to a new page itself: the page it
+            // ends is the one it is on
+            if !fresh && !is_break && y + needed > bottom + EPSILON {
+                self.open_page();
+                y = self.y;
+            }
+            let last_header = headers.last().copied();
+            if self.empty && unit_index > 0 && last_header.is_some_and(|last| unit_index > last) {
+                // the table goes on: its header rows first
+                for &header in &headers {
+                    let at = self.y;
+                    self.place(index, header, at, true);
+                }
+                y = self.y;
+            }
+            let was_empty = self.empty;
+            if !self.place(index, unit_index, y, false) {
+                return false;
+            }
+            // a page break takes no room: a page that holds only breaks
+            // is still empty, e.g. for a chapter that starts a new page
+            if is_break {
+                self.empty = was_empty;
+            }
+        }
+        self.prev_after = if is_break { 0.0 } else { item.after };
+        if is_break && index > 0 {
+            self.open_page();
+        }
+        true
+    }
+
+    /// places the items of a frame from its first, `start`: one below the
+    /// other from its top, on this page, outside the flow, which goes on
+    /// where it was. It returns the index of the item after it.
+    fn frame(&mut self, start: usize) -> usize {
+        let id = self.items[start].frame.as_ref().map(|frame| frame.id);
+        let end = (start..self.items.len())
+            .find(|&index| self.items[index].frame.as_ref().map(|frame| frame.id) != id)
+            .unwrap_or(self.items.len());
+        // a frame that starts a new page, as a form can, starts it first
+        if self.items[start].page_start && !self.empty {
+            self.open_page();
+        }
+        let flow = (self.y, self.empty, self.prev_after);
+        let mut y = self.items[start]
+            .frame
+            .as_ref()
+            .map_or(0.0, |frame| frame.y);
+        for index in start..end {
+            let (item, laid) = (&self.items[index], &self.laid[index]);
+            if index > start {
+                y += self.items[index - 1].after + item.before;
+            }
+            for (unit_index, unit) in laid.units.iter().enumerate() {
+                self.push(Frag {
+                    item: index,
+                    unit: unit_index,
+                    y: y + unit.top,
+                    repeat: false,
+                });
+            }
+            y += laid.height();
+        }
+        (self.y, self.empty, self.prev_after) = flow;
+        end
+    }
+
+    /// places the columns of a band, the items from `start` to `end`, each
+    /// from where the band starts into `self.band`. It returns where the
+    /// longest ends (its page in the band, y, the space below its last item
+    /// and whether its page is empty), and whether each column started on
+    /// the band's first page.
+    fn columns(&mut self, start: usize, end: usize) -> ((usize, f32, f32, bool), bool) {
+        let at = (self.y, self.empty, self.prev_after);
+        self.band = Some(Band {
+            pages: vec![vec![]],
+            page: 0,
+        });
+        let mut longest = (0, at.0, at.2, at.1);
+        let mut together = true;
+        let mut index = start;
+        while index < end {
+            let run_end = (index + 1..end)
+                .find(|&next| self.items[next].beside(&self.items[index]))
+                .unwrap_or(end);
+            (self.y, self.empty, self.prev_after) = at;
+            if let Some(band) = &mut self.band {
+                band.page = 0;
+            }
+            for item in index..run_end {
+                // a band's fragments never settle the pages
+                self.item(item, 0);
+            }
+            let Some(band) = &self.band else {
+                break;
+            };
+            together &= band.pages[0].iter().any(|frag| frag.item == index);
+            if band.page > longest.0 || band.page == longest.0 && self.y > longest.1 {
+                longest = (band.page, self.y, self.prev_after, self.empty);
+            }
+            index = run_end;
+        }
+        (longest, together)
+    }
+
+    /// places a band of a grid from its first item, `start`: its columns
+    /// side by side from where it starts, and what follows below the
+    /// longest. It returns the index of the item after it.
+    fn band(&mut self, start: usize) -> usize {
+        let id = self.items[start].band();
+        let end = (start..self.items.len())
+            .find(|&index| self.items[index].band() != id)
+            .unwrap_or(self.items.len());
+        // a band that starts a new page starts it before its columns
+        if self.items[start].page_start && !self.empty {
+            self.open_page();
+        }
+        let (mut longest, together) = self.columns(start, end);
+        // the columns start side by side: when one of them can't start on
+        // this page, the band starts on the next
+        if !together && !self.empty {
+            self.band = None;
+            self.open_page();
+            longest = self.columns(start, end).0;
+        }
+        let pages = self.band.take().map(|band| band.pages).unwrap_or_default();
+        for (offset, mut frags) in pages.into_iter().enumerate() {
+            if offset > 0 {
+                self.open_page();
+            }
+            // in the order of the items: the columns one after the other
+            frags.sort_by_key(|frag| frag.item);
+            for frag in frags {
+                self.push(frag);
+            }
+        }
+        (_, self.y, self.prev_after, self.empty) = longest;
+        end
     }
 }
 
@@ -679,6 +903,19 @@ mod tests {
         assert_eq!(place(5.0), (1, 1));
         // room for the heading and a line after it: they stay
         assert_eq!(place(40.0), (0, 0));
+    }
+
+    #[test]
+    fn starts_a_new_page_where_an_item_says_so() {
+        let mut items = document(&["one", "two", "three"]);
+        items[1].page_start = true;
+        let started = engine(items);
+        assert_eq!(started.pages.len(), 2);
+        assert_eq!(started.pages[1].first, Some((1, 0)));
+        // not at the top of the first page
+        let mut first = document(&["one", "two"]);
+        first[0].page_start = true;
+        assert_eq!(engine(first).pages.len(), 1);
     }
 
     #[test]

@@ -25,19 +25,8 @@ import { setCaption } from "../../commands/table/format";
 import { CommandIdentifier } from "../../../config";
 import { commandBinding } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
-import { blockBoxes, caretPage } from "../../../engine/geometry";
-import { followLayout } from "./followLayout";
+import { boxOnCaretPage, followLayout } from "../followLayout";
 import { tableAround } from "./util";
-
-/**
- * tableBox returns the box of the table at `pos` on the page the cursor is
- * on, or on its first page, as the page view shows it
- */
-const tableBox = (view: EditorView, pos: number, size: number) => {
-  const boxes = blockBoxes(pos, pos + size);
-  const page = caretPage(view.state.selection.head);
-  return boxes.find((box) => box.page === page) ?? boxes[0] ?? null;
-};
 
 // how a table is saved, for the announcement when that changes
 type Format = GfmBlocker | "gfm";
@@ -206,7 +195,7 @@ export const tableTools = () => {
    */
   const publish = (view: EditorView) => {
     const table = tableAround(view.state.selection.$head);
-    const box = table && tableBox(view, table.pos, table.node.nodeSize);
+    const box = table && boxOnCaretPage(view, table.pos, table.node.nodeSize);
     if (!table || !box) {
       if (tableToolbar.value) tableToolbar.value = null;
       return;

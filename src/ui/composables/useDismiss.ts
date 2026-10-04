@@ -40,7 +40,13 @@ export const useDismiss = (
     listenOnWindow(
       "keydown",
       (event) => {
-        if (options.anyKey || event.key === "Escape") close();
+        // Escape is taken: closing may give the editor the focus, which
+        // would get the rest of the press as typing. Any other key goes on,
+        // e.g. typing on after a card that only showed something.
+        if (options.escape && event.key === "Escape") {
+          event.preventDefault();
+          close();
+        } else if (options.anyKey) close();
       },
       true,
     );

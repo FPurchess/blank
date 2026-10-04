@@ -1,12 +1,20 @@
-import { type EditorState, Plugin, TextSelection } from "prosemirror-state";
+import {
+  type EditorState,
+  NodeSelection,
+  Plugin,
+  TextSelection,
+} from "prosemirror-state";
 import { dropPoint } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 
 import { invoke } from "@tauri-apps/api/core";
 
 import { engineless, pageEngine } from "../engine/engine";
-import { pageDropCaret } from "../state";
+import { gapAt } from "../engine/geometry";
+import { topBlockAt } from "../markdown/topBlock";
+import { pageDropCaret, pageDropGap } from "../state";
 import { pageDrop } from "./commands/pageDrop";
+import { apartFrom } from "./plugins/embeds";
 import { pasteText } from "./plugins/tables/clipboard";
 
 // What the pointer does on the painted pages, told to the editor's plugins.
@@ -108,13 +116,24 @@ export const nativePointer = () =>
   });
 
 /**
+ * movesBlock tells whether the selection is a block at the top of the
+ * document, e.g. a table of contents or a form, which moves between the
+ * blocks there
+ */
+export const movesBlock = (state: EditorState) =>
+  state.selection instanceof NodeSelection &&
+  topBlockAt(state.doc, state.selection.from)?.node === state.selection.node;
+
+/**
  * moveCandidate tells whether a press at `pos` lands in the selected text,
- * where it may start dragging it
+ * or on the selected block at the top of the document, where it may start
+ * dragging it
  */
 export const moveCandidate = (state: EditorState, pos: number | null) => {
   const { selection } = state;
+  if (pos === null) return false;
+  if (movesBlock(state)) return pos >= selection.from && pos < selection.to;
   return (
-    pos !== null &&
     selection instanceof TextSelection &&
     !selection.empty &&
     pos > selection.from &&
@@ -155,14 +174,29 @@ export const showDropAt = (
 };
 
 /**
+ * showBlockDropAt shows where the dragged block would drop: the place
+ * between two blocks at the top of the document nearest a point of the
+ * window, or nothing for null
+ */
+export const showBlockDropAt = (
+  view: EditorView,
+  point: { x: number; y: number } | null,
+) => {
+  pageDropGap.value = point && gapAt(view.state.doc, point.x, point.y);
+};
+
+/**
  * dropMoved drops the selected text dragged on the pages at `pos`: moves
  * it there, or copies it
  */
 export const dropMoved = (view: EditorView, pos: number, copy: boolean) => {
   pageDropCaret.value = null;
-  const { selection } = view.state;
+  pageDropGap.value = null;
+  const { selection, doc } = view.state;
+  // a copy of an embed gets an id of its own
+  const content = selection.content();
   return pageDrop(
-    selection.content(),
+    copy ? apartFrom(content, doc) : content,
     pos,
     copy ? null : { from: selection.from, to: selection.to },
   )(view.state, view.dispatch);

@@ -6,6 +6,7 @@ import {
   type PreparedImage,
   prepareImages,
 } from "../images/prepare";
+import { unknownWarning } from "../markdown/blocks/unknown";
 import { documentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
 import {
@@ -287,6 +288,10 @@ const toPDF: exporterFunc = async (state, { docPath, layout }) => {
     warnings: [
       ...failureWarning(failures),
       ...describeWarnings(result.warnings, imageNames(state.doc)),
+      ...unknownWarning(state.doc, {
+        one: "is a box in the PDF",
+        more: "are boxes in the PDF",
+      }),
     ],
     pages: result.pages,
   };

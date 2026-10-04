@@ -21,6 +21,7 @@ import {
   type PageEngine,
 } from "./engine";
 import { cellAt } from "../markdown/tables";
+import { topBlockAt } from "../markdown/topBlock";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
@@ -410,6 +411,60 @@ export const hitAt = (x: number, y: number): Hit | null => {
 };
 
 /**
+ * gapAt returns the place between two blocks at the top of `doc` nearest a
+ * point of the window, where a dragged block drops: before the block under
+ * the point when it is in its upper half, else after it; null where no page
+ * is
+ */
+export const gapAt = (doc: Node, x: number, y: number): number | null => {
+  const hit = hitAt(x, y);
+  const block = hit && topBlockAt(doc, hit.pos);
+  if (!block) return null;
+  const boxes = blockBoxes(block.from, block.to);
+  if (boxes.length === 0) return block.from;
+  // the piece of the block nearest the point, which may be on another page
+  const distance = (box: Box) =>
+    y < box.top ? box.top - y : y > box.bottom ? y - box.bottom : 0;
+  const box = boxes.reduce((best, box) =>
+    distance(box) < distance(best) ? box : best,
+  );
+  const first = box === boxes[0];
+  const middle = (box.top + box.bottom) / 2;
+  return first && y < middle ? block.from : block.to;
+};
+
+// how far the line of a gap at a page's top or bottom stands from the block
+const GAP_EDGE = 4;
+
+/**
+ * gapLine returns the line that shows the gap at `pos` between two blocks
+ * at the top of `doc`, in the window: across the blocks' width, halfway
+ * between them on one page, or just above the block after it
+ */
+export const gapLine = (
+  doc: Node,
+  pos: number,
+): { left: number; right: number; y: number } | null => {
+  const $pos = doc.resolve(pos);
+  const before = $pos.nodeBefore;
+  const after = $pos.nodeAfter;
+  const aboveBoxes = before ? blockBoxes(pos - before.nodeSize, pos) : [];
+  const above = aboveBoxes[aboveBoxes.length - 1] ?? null;
+  const below = after ? blockBoxes(pos, pos + after.nodeSize)[0] : null;
+  const box = below ?? above;
+  if (!box) return null;
+  const y =
+    above && below
+      ? above.page === below.page
+        ? (above.bottom + below.top) / 2
+        : below.top - GAP_EDGE
+      : below
+        ? below.top - GAP_EDGE
+        : box.bottom + GAP_EDGE;
+  return { left: box.left, right: box.right, y };
+};
+
+/**
  * pageAt returns the page a point of the window is on, or nearest to, and
  * the positions its blocks start and end at; null while no pages show
  */
@@ -494,6 +549,11 @@ export const scrollState = (): {
   };
 };
 
+// The line the view is read at: where the outline and a table of contents
+// put a heading they scroll to, so many pixels below the top of the view, as
+// on Notion (64 px below its 44 px bar).
+export const READING_LINE = 108;
+
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
  * top of the view, as far as the view scrolls, without moving the selection
@@ -509,6 +569,14 @@ export const scrollToText = (pos: number, at: number) => {
   // a new request each time, which the page view serves once
   if (caret) pageScrollRequest.value = { ...caret, at };
 };
+
+/**
+ * scrollToHeading scrolls to the heading at `pos` so that it starts at the
+ * reading line, as the outline and a table of contents' entries jump, without
+ * moving the selection
+ */
+export const scrollToHeading = (pos: number) =>
+  scrollToText(pos + 1, READING_LINE);
 
 /**
  * scrollViewBy scrolls what shows the text by `dy` pixels, e.g. for a wheel
@@ -544,6 +612,25 @@ export const exposeGeometry = (view: EditorView) => {
       find: (text: string, index = 0) => findText(doc(), text, index),
       // whether the engine is still laying out the rest of a long document
       laying: () => pageEngine?.laying ?? false,
+      // the blocks at the top of the document: their kind and where they
+      // start and end
+      topBlocks: () => {
+        const blocks: { type: string; from: number; to: number }[] = [];
+        doc().forEach((node, from) =>
+          blocks.push({ type: node.type.name, from, to: from + node.nodeSize }),
+        );
+        return blocks;
+      },
+      // the page numbers each table of contents shows, in order
+      tocNumbers: () => {
+        const numbers: (string[] | null)[] = [];
+        doc().forEach((node, pos) => {
+          if (node.type.name === "toc") {
+            numbers.push(pageEngine?.tocNumbers(pos) ?? null);
+          }
+        });
+        return numbers;
+      },
     },
   });
 };

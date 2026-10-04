@@ -1,15 +1,30 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { parseMarkdown, schema } from "../../markdown";
+import {
+  createForm,
+  definitionKey,
+  parseMarkdown,
+  schema,
+} from "../../markdown";
+import {
+  LETTER,
+  LETTER_KEY,
+  RECIPE,
+  SHORT_KEY,
+  SHORT_RECIPE,
+} from "../../test/forms";
 import type { Node } from "prosemirror-model";
 
 import { createState, doc, li, p, ul } from "../../test/editor";
+import { box } from "../../test/embeds";
 import { IMAGES, dataUrl } from "../../test/images";
 import toDOCX from ".";
 import { pageGeometry } from "../../layout/resolve";
 import { testLayout } from "../../test/layout";
 import { NO_SLOTS } from "../../layout/settings";
 import { datePicture } from "./bands";
+import { setPageEngine } from "../../engine/engine";
+import { testEngine } from "../../test/engine";
 
 vi.mock("./font", () => ({
   loadFonts: async () => [
@@ -101,6 +116,337 @@ describe("exporter.docx", () => {
       ["HorizontalLine", ""],
       ["Heading6", "Six"],
     ]);
+  });
+
+  it("leaves out content blocks Blank can't show, and says so", async () => {
+    const exported = await exportMarkdown(
+      ["a", "<!-- blank:toc@9 -->", "<!-- blank:x@1 -->", "b"].join("\n\n"),
+    );
+    expect((await paragraphs(exported)).map(({ text }) => text)).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(exported.warnings).toEqual([
+      "2 blocks Blank can't show were left out",
+    ]);
+  });
+
+  describe("a table of contents", () => {
+    const markdown = [
+      '<!-- blank:toc@1 depth="2" title="Contents" -->',
+      "# One",
+      "text",
+      "## Two",
+      "### Three",
+      "# Four",
+    ].join("\n\n");
+
+    // the table of contents' field, its entries, and where they link to
+    const tocOf = async (exported: Exported) => {
+      const xml = await exported.xml("word/document.xml");
+      const sdt = all(xml, "sdt")[0];
+      return {
+        sdt,
+        instruction: all(sdt, "instrText")
+          .map((text) => text.textContent)
+          .join(""),
+        entries: all(sdt, "p")
+          .filter((p) => attr(child(p, "pStyle"), "val")?.startsWith("TOC"))
+          .map((p) => ({
+            style: attr(child(p, "pStyle"), "val"),
+            text: all(p, "t").map((t) => t.textContent),
+            anchor: attr(child(p, "hyperlink"), "anchor"),
+          })),
+        bookmarks: all(xml, "bookmarkStart").map((mark) => attr(mark, "name")),
+        tab: attr(
+          all(sdt, "tab").find((tab) => attr(tab, "val") === "right"),
+          "pos",
+        ),
+      };
+    };
+
+    afterEach(() => setPageEngine(null));
+
+    it("is Word's own, linked to the headings up to its depth", async () => {
+      const exported = await exportMarkdown(markdown);
+      const toc = await tocOf(exported);
+      expect(toc.instruction).toMatch(/^TOC\b/);
+      expect(toc.instruction).toContain('\\o "1-2"');
+      expect(toc.instruction).toContain("\\h");
+      expect(toc.entries.map(({ style, text }) => [style, text[0]])).toEqual([
+        ["TOC1", "One"],
+        ["TOC2", "Two"],
+        ["TOC1", "Four"],
+      ]);
+      expect(toc.bookmarks).toEqual([
+        "_BlankToc1",
+        "_BlankToc2",
+        "_BlankToc3",
+        "_BlankToc4",
+      ]);
+      expect(toc.entries.map(({ anchor }) => anchor)).toEqual([
+        "_BlankToc1",
+        "_BlankToc2",
+        "_BlankToc4",
+      ]);
+      // from Word's gallery of tables of contents
+      expect(
+        all(toc.sdt, "docPartGallery").map((part) => attr(part, "val")),
+      ).toEqual(["Table of Contents"]);
+      // the title before it, in Word's style for it
+      const titled = (await paragraphs(exported)).find(
+        ({ text }) => text === "Contents",
+      );
+      expect(titled?.style).toBe("TOCHeading");
+      // the page numbers at the right edge of the text
+      const { contentWidth } = pageGeometry(testLayout());
+      expect(Number(toc.tab)).toBe(Math.round(contentWidth * 20));
+    });
+
+    it("has the page numbers of Blank's pages", async () => {
+      const doc = parseMarkdown(
+        markdown.replace("text", "text\n\n<!-- pagebreak -->"),
+      );
+      const engine = testEngine();
+      engine.sync(doc, () => undefined);
+      setPageEngine(engine);
+      const toc = await tocOf(await exportDoc(doc));
+      expect(toc.entries.map(({ text }) => text[text.length - 1])).toEqual([
+        "1",
+        "2",
+        "2",
+      ]);
+    });
+
+    it("gives a heading that comes twice two bookmarks", async () => {
+      // ProseMirror may share one node between two places, e.g. after a copy
+      const twice = schema.node("heading", { level: 1 }, schema.text("Again"));
+      const node = schema.node("doc", null, [schema.node("toc"), twice, twice]);
+      const toc = await tocOf(await exportDoc(node));
+      expect(toc.bookmarks).toEqual(["_BlankToc1", "_BlankToc2"]);
+      expect(toc.entries.map(({ anchor }) => anchor)).toEqual([
+        "_BlankToc1",
+        "_BlankToc2",
+      ]);
+    });
+
+    it("leaves the headings without bookmarks when there is none", async () => {
+      const exported = await exportMarkdown("# One\n\ntext");
+      const xml = await exported.xml("word/document.xml");
+      expect(all(xml, "bookmarkStart")).toEqual([]);
+    });
+  });
+
+  describe("a form", () => {
+    const recipe = SHORT_RECIPE;
+    const key = SHORT_KEY;
+    const form = (title: Node) =>
+      schema.node("doc", { definitions: { [key]: recipe } }, [
+        schema.node("paragraph", null, schema.text("Intro")),
+        schema.node("form_block", { def: key }, [
+          schema.node("form_field", { name: "title" }, [title]),
+          schema.node("form_field", { name: "steps" }, [
+            schema.node("paragraph", null, schema.text("Mix.")),
+          ]),
+        ]),
+      ]);
+
+    it("is a locked group of content controls, one per field", async () => {
+      const exported = await exportDoc(
+        form(schema.node("heading", { level: 1 }, schema.text("Pancakes"))),
+      );
+      const xml = await exported.xml("word/document.xml");
+      const controls = all(xml, "sdt").map((sdt) => ({
+        tag: attr(child(sdt, "tag"), "val"),
+        alias: attr(child(sdt, "alias"), "val"),
+        lock: attr(child(sdt, "lock"), "val"),
+        group: !!child(child(sdt, "sdtPr")!, "group"),
+        text: all(child(sdt, "sdtContent")!, "t")
+          .map((t) => t.textContent)
+          .join(""),
+      }));
+      expect(controls).toEqual([
+        {
+          tag: `blank:form@1:${key}`,
+          alias: "Recipe",
+          lock: "sdtLocked",
+          group: true,
+          text: "PancakesMix.",
+        },
+        {
+          tag: "blank:field:title",
+          alias: "Title",
+          lock: "sdtLocked",
+          group: false,
+          text: "Pancakes",
+        },
+        {
+          tag: "blank:field:steps",
+          alias: "Steps",
+          lock: "sdtLocked",
+          group: false,
+          text: "Mix.",
+        },
+      ]);
+      // no marker is left, and the form starts a new page
+      const styles = (await paragraphs(exported)).map(({ style }) => style);
+      expect(styles).not.toContain("BlankControlOpen");
+      const title = (await paragraphs(exported)).find(
+        ({ text }) => text === "Pancakes",
+      )!;
+      expect(child(title.p, "pageBreakBefore")).toBeDefined();
+      expect(title.style).toBe("Heading1");
+      // the definitions go along
+      const custom = await exported.text("customXml/item1.xml");
+      expect(custom).toContain("id: blank/recipe");
+    });
+
+    it("says an empty field's placeholder", async () => {
+      const exported = await exportDoc(
+        form(schema.node("heading", { level: 1 })),
+      );
+      const xml = await exported.xml("word/document.xml");
+      const title = all(xml, "sdt")[1];
+      expect(child(child(title, "sdtPr")!, "showingPlcHdr")).toBeDefined();
+      expect(all(title, "t")[0].textContent).toBe("Recipe name");
+      expect(attr(child(title, "rStyle"), "val")).toBe("PlaceholderText");
+    });
+
+    it("starts a new page before a form that starts with a table", async () => {
+      const table = { ...RECIPE, newPage: true, fields: [RECIPE.fields[2]] };
+      const tableKey = definitionKey(table);
+      const exported = await exportDoc(
+        schema.node("doc", { definitions: { [tableKey]: table } }, [
+          schema.node("paragraph", null, schema.text("Intro")),
+          createForm(table, tableKey),
+        ]),
+      );
+      const xml = await exported.xml("word/document.xml");
+      const field = all(xml, "sdt")[1];
+      const first = child(field, "sdtContent")!.firstElementChild!;
+      expect(first.localName).toBe("p");
+      expect(child(first, "pageBreakBefore")).toBeDefined();
+      expect(first.nextElementSibling!.localName).toBe("tbl");
+    });
+
+    it("puts the columns of a grid side by side in a table without lines", async () => {
+      const grid = {
+        ...RECIPE,
+        layout: [
+          { field: "title" },
+          {
+            grid: { columns: ["1fr", "1fr"] },
+            cells: [
+              [{ field: "photo" }],
+              [{ field: "ingredients" }, { field: "steps" }],
+            ],
+          },
+        ],
+      };
+      const gridKey = definitionKey(grid);
+      const exported = await exportDoc(
+        schema.node("doc", { definitions: { [gridKey]: grid } }, [
+          createForm(grid, gridKey),
+        ]),
+      );
+      const xml = await exported.xml("word/document.xml");
+      const tags = (parent: Element) =>
+        all(parent, "tag").map((tag) => attr(tag, "val"));
+      const control = all(xml, "sdt").find(
+        (sdt) =>
+          attr(child(child(sdt, "sdtPr")!, "tag"), "val") === "blank:grid",
+      )!;
+      const table = child(child(control, "sdtContent")!, "tbl")!;
+      expect(
+        all(child(table, "tblPr")!, "tblBorders").flatMap((borders) =>
+          [...borders.children].map((border) => attr(border, "val")),
+        ),
+      ).toEqual(Array(6).fill("none"));
+      const cells = all(table, "tc").filter(
+        (cell) => cell.parentNode?.parentNode === table,
+      );
+      expect(cells.map(tags)).toEqual([
+        ["blank:field:photo"],
+        ["blank:field:ingredients", "blank:field:steps"],
+      ]);
+      // each cell ends with a paragraph, as Word wants
+      for (const cell of cells) {
+        expect(cell.lastElementChild!.localName).toBe("p");
+      }
+      // the ingredients' table is as wide as its column
+      const inner = all(cells[1], "tbl")[0];
+      const width = Number(attr(child(child(inner, "tblPr")!, "tblW"), "w"));
+      const column = Number(attr(child(child(cells[1], "tcPr")!, "tcW"), "w"));
+      expect(width).toBeLessThanOrEqual(column);
+    });
+
+    it("puts the fields of frames in Word's frames, the text below them", async () => {
+      const exported = await exportDoc(
+        schema.node("doc", { definitions: { [LETTER_KEY]: LETTER } }, [
+          schema.node("paragraph", null, schema.text("Intro")),
+          createForm(LETTER, LETTER_KEY),
+        ]),
+      );
+      const written = await paragraphs(exported);
+      const date = written.find(({ text }) => text === "The date")!;
+      const frame = child(date.p, "framePr")!;
+      const mm = (value: number) =>
+        String(Math.round((value * 72 * 20) / 25.4));
+      expect(attr(frame, "x")).toBe(mm(125));
+      expect(attr(frame, "y")).toBe(mm(50));
+      expect(attr(frame, "w")).toBe(mm(75));
+      expect(attr(frame, "hAnchor")).toBe("page");
+      expect(attr(frame, "vAnchor")).toBe("page");
+      // the address line by line, the return address in small print
+      const sender = written.find(({ style }) => style === "Small");
+      expect(sender).toBeDefined();
+      expect(attr(child(date.p, "spacing"), "after")).toBe("0");
+      // the letter's text starts 100mm below the page's top edge
+      const body = written[written.indexOf(date) + 1];
+      expect(child(body.p, "framePr")).toBeUndefined();
+      const margin = pageGeometry(testLayout()).margins.top;
+      expect(attr(child(body.p, "spacing"), "before")).toBe(
+        String(Math.round(((100 * 72) / 25.4 - margin) * 20)),
+      );
+    });
+
+    it("spaces the blocks in fields as if the markers weren't there", async () => {
+      const exported = await exportDoc(
+        schema.node("doc", { definitions: { [key]: recipe } }, [
+          schema.node("form_block", { def: key }, [
+            schema.node("form_field", { name: "title" }, [
+              schema.node("heading", { level: 1 }, schema.text("Pancakes")),
+            ]),
+            schema.node("form_field", { name: "steps" }, [
+              schema.node("heading", { level: 2 }, schema.text("Batter")),
+            ]),
+          ]),
+        ]),
+      );
+      const [title, batter] = await paragraphs(exported);
+      const before = (p: Element) => attr(child(p, "spacing"), "before");
+      // the document's first block, and a heading after a heading
+      expect(before(title.p)).toBe("0");
+      expect(before(batter.p)).toBe("80");
+    });
+  });
+
+  it("writes an embed as a picture in a content control, its data in a part", async () => {
+    const embed = schema.nodes.embed.create({
+      type: "org.blank.test/box@1",
+      id: "k3x9",
+      alt: "A red box",
+      data: '{"color":"red"}',
+      svg: box("red"),
+    });
+    const exported = await exportDoc(schema.node("doc", null, [embed]));
+    const xml = await exported.xml("word/document.xml");
+    const sdt = all(xml, "sdt")[0];
+    expect(attr(child(sdt, "tag"), "val")).toBe("blank:embed@1:k3x9");
+    expect(attr(child(sdt, "alias"), "val")).toBe("A red box");
+    const part = await exported.text("customXml/item2.xml");
+    expect(part).toContain("https://blank-writer.xyz/2026/embeds");
+    expect(part).toContain("org.blank.test/box@1");
   });
 
   it("defines the styles the import maps back", async () => {

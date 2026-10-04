@@ -41,6 +41,17 @@ export const freeRight = (
 };
 
 /**
+ * layoutWidth returns the width the pages are laid out at while the outline
+ * takes no room: the window's, without the page view's scrollbar and the
+ * room a pane docked at the left of the pages takes (see blocksDock)
+ */
+export const layoutWidth = (
+  windowWidth: number,
+  scrollbar: number,
+  leftDock: number,
+) => windowWidth - scrollbar - leftDock;
+
+/**
  * outlinePlacement returns where the outline shows
  * @param count how many headings it lists
  * @param pinned whether the user keeps it open

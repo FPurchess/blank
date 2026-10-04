@@ -1,7 +1,7 @@
 import { CommandIdentifier } from "../config";
 import { commandShortcut } from "../editor/keyBindings";
 import { separated } from "../separated";
-import type { TableToolbarItem } from "../state";
+import type { TableToolbarItem, ToolbarItem } from "../state";
 
 // what the toolbar shows in a row: a button, or a separator between groups
 export type ToolbarEntry =
@@ -19,8 +19,8 @@ export const toolbarEntries = (items: TableToolbarItem[]): ToolbarEntry[] =>
 /**
  * itemLabel labels the button of `item`, with its key in table mode
  */
-export const itemLabel = (item: TableToolbarItem, keys: boolean) =>
-  keys ? `${item.label} (${item.key})` : item.label;
+export const itemLabel = (item: ToolbarItem, keys: boolean) =>
+  keys && item.key ? `${item.label} (${item.key})` : item.label;
 
 /**
  * tableModeHint explains the keys of table mode

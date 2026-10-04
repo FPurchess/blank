@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { listedHeadings } from "../markdown/headings";
 import { doc, h, p } from "../test/editor";
 import { headings, publishHeadings } from "./headings";
 import { announcement } from "./messages";
@@ -22,7 +23,27 @@ describe("outlineEntries", () => {
     publishHeadings(doc(h(1, "One"), h(2), p("text"), h(3, "Three")));
     expect(outlineEntries.value).toEqual([
       { index: 0, level: 1, text: "One" },
-      { index: 2, level: 3, text: "Three" },
+      { index: 1, level: 3, text: "Three" },
+    ]);
+  });
+
+  it("lists what a table of contents lists, in its order", () => {
+    const node = doc(h(1, "One"), h(2), h(4, "Deep"), h(2, "Two"));
+    publishHeadings(node);
+    expect(
+      outlineEntries.value.map(({ level, text }) => ({ level, text })),
+    ).toEqual(listedHeadings(node).map(({ level, text }) => ({ level, text })));
+  });
+
+  it("keeps the entries before an empty heading as it gets text", () => {
+    publishHeadings(doc(h(1, "One"), h(2), h(2, "Two")));
+    const [one] = outlineEntries.value;
+    publishHeadings(doc(h(1, "One"), h(2, "N"), h(2, "Two")));
+    expect(outlineEntries.value[0]).toBe(one);
+    expect(outlineEntries.value.map(({ text }) => text)).toEqual([
+      "One",
+      "N",
+      "Two",
     ]);
   });
 

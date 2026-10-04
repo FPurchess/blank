@@ -35,13 +35,12 @@ export interface OutlineItem {
 // object while its level and text do, e.g. while typing above it moves it
 let kept: OutlineItem[] = [];
 
-// the headings the outline lists: those with text. The same entries while
-// they stay the same, so the outline re-renders none of them while typing
-// moves the headings.
+// the headings the outline lists. The same entries while they stay the
+// same, so the outline re-renders none of them while typing moves the
+// headings.
 export const outlineEntries = computed<readonly OutlineItem[]>(() => {
   const next: OutlineItem[] = [];
   headings.value.forEach((heading, index) => {
-    if (!heading.text) return;
     const before = kept[index];
     next[index] =
       before?.level === heading.level && before.text === heading.text
@@ -49,7 +48,7 @@ export const outlineEntries = computed<readonly OutlineItem[]>(() => {
         : { index, level: heading.level, text: heading.text };
   });
   kept = next;
-  return next.filter(Boolean);
+  return next;
 });
 
 /**

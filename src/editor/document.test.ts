@@ -484,7 +484,12 @@ describe("applyInitialDocument", () => {
   });
 
   describe("with a stored document that can't be restored", () => {
-    const corrupt = { type: "doc", content: [{ type: "no_such_node" }] };
+    // a node this Blank doesn't know inside a paragraph: one at the top
+    // would be kept as a block it can't show, see restorable in storage.ts
+    const corrupt = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "no_such_node" }] }],
+    };
 
     beforeEach(async () => {
       await localforage.clear();

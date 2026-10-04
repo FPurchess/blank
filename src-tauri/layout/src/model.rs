@@ -40,6 +40,28 @@ pub struct Text {
     /// a quote: only those start new pages and name chapters
     #[serde(default)]
     pub top: bool,
+    /// whether it is one of the document's headings, as `isListed` in
+    /// src/markdown/headings.ts says: in the outline, the PDF's bookmarks and
+    /// tables of contents
+    #[serde(default)]
+    pub listed: bool,
+    /// what it says while it's empty, e.g. the placeholder of a form's
+    /// field: on the screen only
+    #[serde(default)]
+    pub hint: Option<String>,
+    /// whether what it says while it's empty stands for a picture to come,
+    /// e.g. in a form's field for one: it is drawn in a box of a picture's
+    /// size, on the screen only
+    #[serde(default)]
+    pub picture: bool,
+}
+
+/// an entry of a table of contents: a heading's level and text
+#[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub struct TocEntry {
+    pub level: u8,
+    pub text: String,
 }
 
 fn paragraph() -> TextKind {
@@ -64,8 +86,13 @@ pub enum TextKind {
     Code,
     Th,
     Caption,
+    /// small print, e.g. a letter's return address
+    Small,
     Alt,
     Band,
+    /// a table of contents' title, and the entries of its headings 1
+    TocTitle,
+    Toc1,
     #[default]
     Other,
 }
@@ -84,8 +111,11 @@ impl TextKind {
             TextKind::Code => "code",
             TextKind::Th => "th",
             TextKind::Caption => "caption",
+            TextKind::Small => "small",
             TextKind::Alt => "alt",
             TextKind::Band => "band",
+            TextKind::TocTitle => "toc-title",
+            TextKind::Toc1 => "toc1",
             TextKind::Other => "",
         }
     }
@@ -104,8 +134,11 @@ impl From<&str> for TextKind {
             "code" => TextKind::Code,
             "th" => TextKind::Th,
             "caption" => TextKind::Caption,
+            "small" => TextKind::Small,
             "alt" => TextKind::Alt,
             "band" => TextKind::Band,
+            "toc-title" => TextKind::TocTitle,
+            "toc1" => TextKind::Toc1,
             _ => TextKind::Other,
         }
     }
@@ -253,6 +286,22 @@ pub enum Content {
     Rule {
         pos: u32,
     },
+    /// a block that is shown as a box with a label, e.g. a content block
+    /// this Blank can't show
+    Boxed {
+        pos: u32,
+        label: String,
+    },
+    /// a table of contents: the listed headings up to `depth`, the n-th
+    /// entry for the n-th of them, with the pages they start on
+    Toc {
+        pos: u32,
+        #[serde(default)]
+        title: String,
+        depth: u8,
+        #[serde(default)]
+        entries: Vec<TocEntry>,
+    },
     Image {
         pos: u32,
         src: String,
@@ -275,6 +324,114 @@ pub enum Content {
         #[serde(default)]
         caption: Option<String>,
     },
+}
+
+/// the width of a column of a grid: points, or a share (`fr`) of the
+/// width the columns of points and the gaps leave
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub struct Track {
+    #[serde(default)]
+    pub pt: f32,
+    #[serde(default)]
+    pub fr: f32,
+}
+
+/// the most columns a grid has
+pub const MAX_TRACKS: usize = 8;
+
+/// The column of a grid an item stands in. The items of a band, the
+/// columns of one row of a grid, come one column after the other, and the
+/// columns stand side by side from where the band starts: the band ends
+/// below its longest column.
+#[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub struct Column {
+    /// whether it is the first item of its band
+    #[serde(default)]
+    pub start: bool,
+    /// which band it is in, counted by the engine (`Engine::number_bands_and_frames`)
+    /// from the starts, so no edit can split one: what the webview sends
+    /// once isn't sent again when the items before it change
+    #[serde(skip)]
+    pub band: u32,
+    /// which of the band's columns
+    pub index: u32,
+    /// the widths of the band's columns
+    pub tracks: Vec<Track>,
+    /// the room between two columns, in points
+    #[serde(default)]
+    pub gap: f32,
+}
+
+impl Column {
+    /// where the column starts and ends, from the left of the text, which
+    /// is `width` wide
+    pub fn edges(&self, width: f32) -> (f32, f32) {
+        self.edges_of(self.index as usize, width)
+    }
+
+    /// where the column `index` of the band starts and ends, see `edges`
+    fn edges_of(&self, index: usize, width: f32) -> (f32, f32) {
+        let gaps = self.gap * self.tracks.len().saturating_sub(1) as f32;
+        let points: f32 = self.tracks.iter().map(|track| track.pt).sum();
+        let shares: f32 = self.tracks.iter().map(|track| track.fr).sum();
+        let free = (width - gaps - points).max(0.0);
+        let width_of = |track: &Track| {
+            track.pt
+                + if shares > 0.0 {
+                    free * track.fr / shares
+                } else {
+                    0.0
+                }
+        };
+        let index = index.min(self.tracks.len().saturating_sub(1));
+        let left: f32 = self.tracks[..index]
+            .iter()
+            .map(|track| width_of(track) + self.gap)
+            .sum();
+        let right = self
+            .tracks
+            .get(index)
+            .map_or(width, |track| left + width_of(track));
+        (left, right.min(width))
+    }
+
+    /// the column of its band nearest to `x`, from the left of the text,
+    /// which is `width` wide
+    pub fn at(&self, x: f32, width: f32) -> u32 {
+        let distance = |index: usize| {
+            let (left, right) = self.edges_of(index, width);
+            (left - x).max(x - right).max(0.0)
+        };
+        (0..self.tracks.len())
+            .min_by(|&a, &b| distance(a).total_cmp(&distance(b)))
+            .unwrap_or(0) as u32
+    }
+
+    /// whether `other` is another column of the same band
+    pub fn beside(&self, other: &Column) -> bool {
+        self.band == other.band && self.index != other.index
+    }
+}
+
+/// A frame on the page an item stands in, outside the flow: the items of a
+/// frame stand one below the other from its top, on the page where they
+/// come, and take no room in the flow. In points from the page's top left
+/// edge.
+#[derive(Deserialize, Clone, Debug, PartialEq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub struct Frame {
+    /// whether it is the first item of its frame
+    #[serde(default)]
+    pub start: bool,
+    /// which frame it is in, counted by the engine from the starts, as the
+    /// bands of grids are (`Engine::number_bands_and_frames`)
+    #[serde(skip)]
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
 }
 
 /// One block of the flow, with where it stands. The webview writes the keys
@@ -303,6 +460,21 @@ pub struct Item {
     /// whether the quote bars reach down to the next item
     #[serde(default, rename = "barsContinue")]
     pub bars_continue: bool,
+    /// whether it starts a new page, e.g. a form whose definition says so
+    #[serde(default, rename = "pageStart")]
+    pub page_start: bool,
+    /// the column of a grid it stands in, if it does; its indent and bars
+    /// count from the column's left
+    #[serde(default)]
+    pub column: Option<Column>,
+    /// the frame it stands in, if it does; its indent and bars count from
+    /// the frame's left
+    #[serde(default)]
+    pub frame: Option<Frame>,
+    /// where it starts at the highest, from the page's top edge, e.g. the
+    /// text of a letter below its address: 0 for anywhere
+    #[serde(default, rename = "flowTop")]
+    pub flow_top: f32,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Default)]
@@ -521,7 +693,11 @@ impl Item {
     pub fn from(&self) -> u32 {
         match &self.content {
             Content::Text(text) => text.pos,
-            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => *pos,
+            Content::Break { pos }
+            | Content::Rule { pos }
+            | Content::Boxed { pos, .. }
+            | Content::Toc { pos, .. }
+            | Content::Image { pos, .. } => *pos,
             Content::Table { pos, .. } => *pos,
         }
     }
@@ -530,11 +706,49 @@ impl Item {
     pub fn to(&self) -> u32 {
         match &self.content {
             Content::Text(text) => text.pos.saturating_add(utf16_len(&text.text)),
-            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => {
-                pos.saturating_add(1)
-            }
+            Content::Break { pos }
+            | Content::Rule { pos }
+            | Content::Boxed { pos, .. }
+            | Content::Toc { pos, .. }
+            | Content::Image { pos, .. } => pos.saturating_add(1),
             Content::Table { end, .. } => *end,
         }
+    }
+
+    /// where the room for the item starts and ends, from the left of the
+    /// text: the column it stands in, or the whole width
+    pub fn edges(&self, settings: &Settings) -> (f32, f32) {
+        let width = settings.content_width();
+        if let Some(frame) = &self.frame {
+            let left = frame.x - settings.margins.left;
+            return (left, left + frame.width);
+        }
+        self.column
+            .as_ref()
+            .map_or((0.0, width), |column| column.edges(width))
+    }
+
+    /// whether it stands somewhere else than across the text: in a column
+    /// of a grid or in a frame
+    pub fn placed(&self) -> bool {
+        self.column.is_some() || self.frame.is_some()
+    }
+
+    /// where its own text starts and ends, from the left of the text: from
+    /// its indent in its column to the column's end
+    pub fn text_edges(&self, settings: &Settings) -> (f32, f32) {
+        let (left, right) = self.edges(settings);
+        (left + self.indent, right)
+    }
+
+    /// whether `other` stands in another column of the same band
+    pub fn beside(&self, other: &Item) -> bool {
+        matches!((&self.column, &other.column), (Some(a), Some(b)) if a.beside(b))
+    }
+
+    /// the band of a grid it stands in, if it does
+    pub fn band(&self) -> Option<u32> {
+        self.column.as_ref().map(|column| column.band)
     }
 
     /// moves the item by `delta` positions, when text before it changed
@@ -542,9 +756,11 @@ impl Item {
         let moved = |pos: &mut u32| *pos = shift_pos(*pos, delta);
         match &mut self.content {
             Content::Text(text) => moved(&mut text.pos),
-            Content::Break { pos } | Content::Rule { pos } | Content::Image { pos, .. } => {
-                moved(pos)
-            }
+            Content::Break { pos }
+            | Content::Rule { pos }
+            | Content::Boxed { pos, .. }
+            | Content::Toc { pos, .. }
+            | Content::Image { pos, .. } => moved(pos),
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
                 moved(end);
@@ -573,8 +789,46 @@ impl Item {
         self.before = finite(self.before, 0.0, 0.0, MAX_PAGE);
         self.after = finite(self.after, 0.0, 0.0, MAX_PAGE);
         clamp_bars(&mut self.bars);
+        if let Some(column) = &mut self.column {
+            if column.tracks.is_empty() {
+                column.tracks.push(Track { pt: 0.0, fr: 1.0 });
+            }
+            column.tracks.truncate(MAX_TRACKS);
+            for track in &mut column.tracks {
+                track.pt = finite(track.pt, 0.0, 0.0, MAX_PAGE);
+                track.fr = finite(track.fr, 0.0, 0.0, 1e6);
+            }
+            column.gap = finite(column.gap, 0.0, 0.0, MAX_PAGE);
+            column.index = column.index.min(column.tracks.len() as u32 - 1);
+        }
+        if let Some(frame) = &mut self.frame {
+            frame.x = finite(frame.x, 0.0, 0.0, MAX_PAGE);
+            frame.y = finite(frame.y, 0.0, 0.0, MAX_PAGE);
+            frame.width = finite(frame.width, 100.0, 20.0, MAX_PAGE);
+            // a frame isn't in a column
+            self.column = None;
+        }
+        self.flow_top = finite(self.flow_top, 0.0, 0.0, MAX_PAGE);
         match &mut self.content {
+            Content::Text(Text {
+                hint: Some(hint), ..
+            }) => truncate(hint, MAX_LABEL),
             Content::Image { width, height, .. } => image_size(width, height),
+            Content::Boxed { label, .. } => truncate(label, MAX_LABEL),
+            Content::Toc {
+                title,
+                depth,
+                entries,
+                ..
+            } => {
+                truncate(title, MAX_LABEL);
+                *depth = (*depth).clamp(1, 6);
+                // an entry is as long as its heading, which is laid out too
+                entries.truncate(MAX_TOC_ENTRIES);
+                for entry in entries {
+                    entry.level = entry.level.clamp(1, 6);
+                }
+            }
             Content::Table { widths, rows, .. } => {
                 for share in widths {
                     *share = finite(*share, 0.0, 0.0, 1e6);
@@ -631,6 +885,18 @@ pub fn json_number(value: f32) -> String {
 pub const MAX_IMAGE: f32 = 100_000.0;
 /// the most quote bars an item has, nested quotes deep
 pub const MAX_BARS: usize = 64;
+/// the most characters of the label of a boxed item, of the title of a table
+/// of contents, and of a text's hint
+pub const MAX_LABEL: usize = 500;
+/// the most entries of a table of contents, far more than a book has
+pub const MAX_TOC_ENTRIES: usize = 10_000;
+
+/// cuts `text` to at most `max` characters
+fn truncate(text: &mut String, max: usize) {
+    if let Some((end, _)) = text.char_indices().nth(max) {
+        text.truncate(end);
+    }
+}
 
 /// keeps at most MAX_BARS quote bars, each on the page
 fn clamp_bars(bars: &mut Vec<f32>) {

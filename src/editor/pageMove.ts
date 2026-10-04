@@ -1,15 +1,20 @@
 import type { EditorView } from "prosemirror-view";
 
+import { pageDropGap } from "../state";
 import {
   dragCopies,
   dropMoved,
   moveCandidate,
+  movesBlock,
+  showBlockDropAt,
   showDropAt,
 } from "./pagePointer";
 
 // Moving the selected text on the pages to another place: a press in it and
 // a move of a few pixels, then where the pointer is let go. A press in it
-// without a move places the caret there, as a click does. The page view
+// without a move places the caret there, as a click does. A selected block
+// at the top of the document, like a table of contents or a form, moves the
+// same way, between the blocks there, which a line shows. The page view
 // (src/ui/PageView.vue) hands its pointer events to it.
 
 // how far the pointer moves before a press in the selection drags it, in px
@@ -49,11 +54,29 @@ export interface PageMove {
  * pageMove follows a move of the selected text on the pages
  */
 export const pageMove = (target: MoveTarget): PageMove => {
-  let moving: { x: number; y: number; dragging: boolean } | null = null;
+  let moving: {
+    x: number;
+    y: number;
+    dragging: boolean;
+    // whether a block at the top of the document moves, rather than text
+    block: boolean;
+  } | null = null;
 
   const cancel = () => {
     moving = null;
     showDropAt(target.view, null);
+    showBlockDropAt(target.view, null);
+  };
+
+  /**
+   * dropAt returns where the dragged text or block would drop for a point
+   * of the window, or null off the pages
+   */
+  const dropAt = (event: PointerEvent, block: boolean) => {
+    if (!target.inView(event)) return null;
+    if (!block) return target.posAt(event);
+    showBlockDropAt(target.view, { x: event.clientX, y: event.clientY });
+    return pageDropGap.value;
   };
 
   return {
@@ -62,7 +85,12 @@ export const pageMove = (target: MoveTarget): PageMove => {
       if (event.button !== 0 || event.shiftKey || target.ignores?.(event))
         return;
       if (!moveCandidate(target.view.state, target.posAt(event))) return;
-      moving = { x: event.clientX, y: event.clientY, dragging: false };
+      moving = {
+        x: event.clientX,
+        y: event.clientY,
+        dragging: false,
+        block: movesBlock(target.view.state),
+      };
       target.capture?.(event);
     },
     mouseDown(event, taken) {
@@ -82,21 +110,28 @@ export const pageMove = (target: MoveTarget): PageMove => {
       );
       if (!moving.dragging && far < DRAG_START) return;
       moving.dragging = true;
-      showDropAt(
-        target.view,
-        target.inView(event) ? target.posAt(event) : null,
-      );
+      if (moving.block) {
+        showBlockDropAt(
+          target.view,
+          target.inView(event) ? { x: event.clientX, y: event.clientY } : null,
+        );
+      } else {
+        showDropAt(
+          target.view,
+          target.inView(event) ? target.posAt(event) : null,
+        );
+      }
     },
     up(event) {
       const was = moving;
       moving = null;
       if (!was) return;
       if (was.dragging) {
-        showDropAt(target.view, null);
         // let go outside the view, the move is cancelled, as ProseMirror
         // cancels a drop outside the editor
-        if (!target.inView(event)) return;
-        const pos = target.posAt(event);
+        const pos = dropAt(event, was.block);
+        showDropAt(target.view, null);
+        showBlockDropAt(target.view, null);
         if (pos !== null) dropMoved(target.view, pos, dragCopies(event));
         return;
       }

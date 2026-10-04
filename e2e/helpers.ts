@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { browser, $, $$ } from "@wdio/globals";
 import { Key } from "webdriverio";
 
@@ -698,3 +700,13 @@ export const hoverEdge = async (edge: "top" | "bottom") => {
 };
 
 export { Key };
+
+/**
+ * appConfigDir returns the app's config folder in the spec's profile (see
+ * beforeSession in wdio.conf.ts), where e.g. the user's forms go
+ */
+export const appConfigDir = () => {
+  const config = process.env.BLANK_E2E_CONFIG;
+  if (!config) throw new Error("no E2E profile: run the spec through wdio");
+  return path.join(config, "com.github.fpurchess.blank");
+};

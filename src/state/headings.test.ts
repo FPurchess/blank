@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { schema } from "../markdown";
+import { listedHeadings } from "../markdown/headings";
 import { blockquote, doc, h, li, p, ul } from "../test/editor";
-import { headings, headingsOf, publishHeadings } from "./headings";
+import { headings, publishHeadings } from "./headings";
 
-describe("headingsOf", () => {
+describe("listedHeadings", () => {
   it("lists the top-level headings in order, with their level and position", () => {
     const node = doc(h(1, "One"), p("text"), h(2, "Two"), h(6, "Six"));
-    expect(headingsOf(node)).toEqual([
+    expect(listedHeadings(node)).toEqual([
       { level: 1, text: "One", pos: 0 },
       { level: 2, text: "Two", pos: 11 },
       { level: 6, text: "Six", pos: 16 },
@@ -20,7 +21,9 @@ describe("headingsOf", () => {
       ul(li(h(2, "Listed"))),
       h(1, "Top"),
     );
-    expect(headingsOf(node).map((heading) => heading.text)).toEqual(["Top"]);
+    expect(listedHeadings(node).map((heading) => heading.text)).toEqual([
+      "Top",
+    ]);
   });
 
   it("reads an image in a heading as a space", () => {
@@ -31,11 +34,15 @@ describe("headingsOf", () => {
         schema.text("words"),
       ]),
     );
-    expect(headingsOf(node)[0].text).toBe("Two words");
+    expect(listedHeadings(node)[0].text).toBe("Two words");
   });
 
-  it("keeps an empty heading, for those that want it", () => {
-    expect(headingsOf(doc(h(2)))).toEqual([{ level: 2, text: "", pos: 0 }]);
+  it("leaves out an empty heading, as a table of contents does", () => {
+    const node = doc(h(1, "One"), h(2), h(2, "Two"));
+    expect(listedHeadings(node).map((heading) => heading.text)).toEqual([
+      "One",
+      "Two",
+    ]);
   });
 });
 

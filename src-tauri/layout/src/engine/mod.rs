@@ -5,6 +5,10 @@
 mod boundary_tests;
 mod display;
 #[cfg(test)]
+mod frame_tests;
+#[cfg(test)]
+mod grid_tests;
+#[cfg(test)]
 mod incremental_tests;
 mod navigate;
 mod paginate;
@@ -13,6 +17,8 @@ mod select;
 pub(crate) mod test_support;
 #[cfg(feature = "test-hooks")]
 mod text_layer;
+mod toc;
+pub use toc::Listed;
 
 pub use display::{Op, Part};
 pub use navigate::Hit;
@@ -23,7 +29,7 @@ pub use text_layer::Word;
 use crate::bands::{bands_on, chapter_on, expand_slots, Chapter, Values};
 use crate::fonts::Fonts;
 use crate::items::Laid;
-use crate::model::{shift_pos, Item, Settings};
+use crate::model::{shift_pos, Content, Item, Settings};
 use paginate::{Change, ItemMap, Tail};
 
 /// a unit of an item placed on a page, at `y` from the page's top edge
@@ -89,6 +95,10 @@ pub struct Engine {
     /// the first fragment of each item
     pub first_frag: Vec<usize>,
     pub chapters: Vec<Chapter>,
+    /// the page numbers of each table of contents' entries, by its item
+    toc_labels: Vec<(usize, Vec<String>)>,
+    /// the page numbers as set in tables of contents, by number and style
+    number_boxes: std::collections::HashMap<(String, &'static str), crate::text::TextBox>,
     pub stats: Stats,
     next_version: u32,
     /// how many items miss each character, in the order the characters
@@ -107,6 +117,8 @@ impl Engine {
             pages: vec![],
             first_frag: vec![],
             chapters: vec![],
+            toc_labels: vec![],
+            number_boxes: Default::default(),
             stats: Stats::default(),
             next_version: 1,
             missing_chars: Default::default(),
@@ -117,9 +129,7 @@ impl Engine {
 
     /// lays out an item on the page of `settings`
     fn lay_out(fonts: &mut Fonts, settings: &Settings, item: &Item) -> Laid {
-        let width = settings.content_width();
-        let room = settings.content_bottom() - settings.content_top();
-        let mut laid = Laid::new(fonts, item, width, room);
+        let mut laid = Laid::new(fonts, item, settings);
         if laid.units.is_empty() {
             laid.units.push(crate::items::Unit::default());
         }
@@ -153,16 +163,42 @@ impl Engine {
         let relayout = settings.width != self.settings.width
             || settings.height != self.settings.height
             || settings.margins != self.settings.margins;
+        // the column of a table of contents is as wide as the page numbers
+        let renumbered = settings.number_style != self.settings.number_style
+            || settings.start_number != self.settings.start_number;
         self.settings = settings;
         if relayout {
             self.lay_out_all();
             return self.paginate_from(0, None);
         }
         // the same items, only paginated again, e.g. for new bands: pages
-        // that keep their fragments keep their bodies
+        // that keep their fragments keep their bodies. The tables of
+        // contents are laid out again for new page numbers, and count as
+        // new items.
+        let mut map = vec![];
+        let mut run_start = 0;
+        let mut relaid = false;
+        for index in 0..self.items.len() {
+            let toc = matches!(self.items[index].content, Content::Toc { .. });
+            if !(renumbered && toc) {
+                continue;
+            }
+            self.laid[index] = Self::lay_out(&mut self.fonts, &self.settings, &self.items[index]);
+            relaid = true;
+            if run_start < index {
+                map.push((run_start, index, run_start));
+            }
+            run_start = index + 1;
+        }
+        if run_start < self.items.len() {
+            map.push((run_start, self.items.len(), run_start));
+        }
+        if relaid {
+            self.recount_missing();
+        }
         let change = Change {
             tail: None,
-            map: ItemMap(vec![(0, self.items.len(), 0)]),
+            map: ItemMap(map),
         };
         self.paginate_from(0, Some(change))
     }
@@ -171,6 +207,8 @@ impl Engine {
     /// everything again with it
     pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) -> Changes {
         self.fonts.add(bytes, family);
+        // the page numbers of tables of contents are laid out in its fonts
+        self.number_boxes.clear();
         self.lay_out_all();
         self.paginate_from(0, None)
     }
@@ -208,6 +246,7 @@ impl Engine {
             .map(|item| Self::lay_out(&mut self.fonts, &self.settings, item))
             .collect();
         self.items = items;
+        self.number_bands_and_frames();
         self.recount_missing();
         self.stats = Stats {
             laid_out: self.items.len(),
@@ -288,6 +327,7 @@ impl Engine {
             splice_runs(&mut runs, start, delete, count);
             laid_out += count;
         }
+        self.number_bands_and_frames();
         self.stats = Stats {
             laid_out,
             ..Default::default()
@@ -315,6 +355,25 @@ impl Engine {
             map: ItemMap(map),
         };
         self.paginate_from(restart_page.unwrap_or(0), Some(change))
+    }
+
+    /// numbers the bands of grids and the frames: one starts at an item
+    /// that says so, or at the first item in one after one that isn't
+    fn number_bands_and_frames(&mut self) {
+        let (mut band, mut frame) = (0, 0);
+        let (mut in_band, mut in_frame) = (false, false);
+        for item in &mut self.items {
+            let column = item
+                .column
+                .as_mut()
+                .map(|column| (column.start, &mut column.band));
+            number(column, &mut band, &mut in_band);
+            let framed = item
+                .frame
+                .as_mut()
+                .map(|frame| (frame.start, &mut frame.id));
+            number(framed, &mut frame, &mut in_frame);
+        }
     }
 
     /// the page to paginate again from for a change at item `start`: a
@@ -345,6 +404,22 @@ impl Engine {
         let [a, b, c] = expand_slots(&bands.header, &values);
         let [d, e, f] = expand_slots(&bands.footer, &values);
         [a, b, c, d, e, f]
+    }
+}
+
+/// numbers what an item stands in, `(whether it starts, its number)`, as
+/// `number_bands_and_frames` does: `count` is the last number given, `inside` whether
+/// the item before stood in one
+fn number(of: Option<(bool, &mut u32)>, count: &mut u32, inside: &mut bool) {
+    match of {
+        Some((start, number)) => {
+            if start || !*inside {
+                *count += 1;
+            }
+            *number = *count;
+            *inside = true;
+        }
+        None => *inside = false,
     }
 }
 

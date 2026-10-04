@@ -5,7 +5,9 @@
 use super::test_support::LONG;
 use super::{Engine, Op, Page};
 use crate::fonts::repository_fonts;
-use crate::model::{Cell, CellBlock, CellText, Content, Item, Row, Settings, Text};
+use crate::model::{
+    Cell, CellBlock, CellText, Column, Content, Frame, Item, Row, Settings, Text, Track,
+};
 
 /// xorshift64, so the edits are the same on every run
 struct Random(u64);
@@ -44,6 +46,12 @@ enum Spec {
     Quote(String),
     Break,
     Rule,
+    /// a content block shown as its label
+    Boxed(String),
+    /// a table of contents, to its depth
+    Toc(u8),
+    /// a paragraph that starts a new page, as a form can
+    PageStart(String),
     /// width and height in points; 0 for not loaded
     Image(f32, f32),
     Table {
@@ -52,6 +60,19 @@ enum Spec {
         caption: Option<String>,
         /// cells of a list item and an image instead of a paragraph
         blocks: bool,
+    },
+    /// a band of a grid: its columns' paragraphs and headings (level 0 for
+    /// a paragraph), side by side, the first a column of points
+    Grid {
+        columns: Vec<Vec<(u8, String)>>,
+        page_start: bool,
+    },
+    /// a letter: its frames of paragraphs at (x, y), on a page of its own,
+    /// then its paragraphs below `flow_top`
+    Letter {
+        frames: Vec<(f32, f32, Vec<String>)>,
+        flow_top: f32,
+        body: Vec<String>,
     },
 }
 
@@ -67,6 +88,7 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, top: bool) -> Item {
             style: style.into(),
             level,
             top,
+            listed: top && level > 0,
             ..Default::default()
         }),
         indent: 0.0,
@@ -75,6 +97,10 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, top: bool) -> Item {
         marker: None,
         bars: vec![],
         bars_continue: false,
+        page_start: false,
+        column: None,
+        frame: None,
+        flow_top: 0.0,
     }
 }
 
@@ -83,6 +109,15 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, top: bool) -> Item {
 fn to_items(specs: &[Spec]) -> Vec<Item> {
     let mut pos = 0u32;
     let mut items = vec![];
+    // what a table of contents lists: the headings, as flatten.ts gives
+    // them to it
+    let headings: Vec<(u8, String)> = specs
+        .iter()
+        .filter_map(|spec| match spec {
+            Spec::Heading(level, text) => Some((*level, text.clone())),
+            _ => None,
+        })
+        .collect();
     for spec in specs {
         match spec {
             Spec::Paragraph(text) => {
@@ -118,6 +153,123 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
             Spec::Rule => {
                 items.push(Item {
                     content: Content::Rule { pos },
+                    ..text_item(0, "", "p", 0, true)
+                });
+                pos += 1;
+            }
+            Spec::Grid {
+                columns,
+                page_start,
+            } => {
+                // a form whose fields are the columns
+                let tracks: Vec<Track> = (0..columns.len())
+                    .map(|index| match index {
+                        0 => Track { pt: 120.0, fr: 0.0 },
+                        _ => Track {
+                            pt: 0.0,
+                            fr: index as f32,
+                        },
+                    })
+                    .collect();
+                let start = items.len();
+                pos += 1;
+                for (index, blocks) in columns.iter().enumerate() {
+                    pos += 1;
+                    for (level, text) in blocks {
+                        let style = if *level > 0 {
+                            format!("h{level}")
+                        } else {
+                            "p".into()
+                        };
+                        let mut item = text_item(pos + 1, text, &style, *level, false);
+                        if let Content::Text(text) = &mut item.content {
+                            text.listed = *level > 0;
+                        }
+                        item.column = Some(Column {
+                            start: items.len() == start,
+                            index: index as u32,
+                            tracks: tracks.clone(),
+                            gap: 12.0,
+                            ..Default::default()
+                        });
+                        items.push(item);
+                        pos += utf16(text) + 2;
+                    }
+                    pos += 1;
+                }
+                pos += 1;
+                if let Some(first) = items.get_mut(start) {
+                    first.page_start = *page_start;
+                }
+            }
+            Spec::Letter {
+                frames,
+                flow_top,
+                body,
+            } => {
+                let start = items.len();
+                pos += 1;
+                for (x, y, texts) in frames {
+                    pos += 1;
+                    for (index, text) in texts.iter().enumerate() {
+                        let mut item = text_item(pos + 1, text, "p", 0, false);
+                        item.frame = Some(Frame {
+                            start: index == 0,
+                            x: *x,
+                            y: *y,
+                            width: 160.0,
+                            ..Default::default()
+                        });
+                        items.push(item);
+                        pos += utf16(text) + 2;
+                    }
+                    pos += 1;
+                }
+                for (index, text) in body.iter().enumerate() {
+                    pos += 1;
+                    let mut item = text_item(pos + 1, text, "p", 0, false);
+                    if index == 0 {
+                        item.flow_top = *flow_top;
+                    }
+                    items.push(item);
+                    pos += utf16(text) + 3;
+                }
+                pos += 1;
+                if let Some(first) = items.get_mut(start) {
+                    first.page_start = true;
+                }
+            }
+            Spec::PageStart(text) => {
+                let mut item = text_item(pos + 1, text, "p", 0, true);
+                item.page_start = true;
+                items.push(item);
+                pos += utf16(text) + 2;
+            }
+            Spec::Toc(depth) => {
+                items.push(Item {
+                    content: Content::Toc {
+                        pos,
+                        title: "Contents".into(),
+                        depth: *depth,
+                        entries: headings
+                            .iter()
+                            .filter(|(level, _)| level <= depth)
+                            .map(|(level, text)| crate::model::TocEntry {
+                                level: *level,
+                                text: text.clone(),
+                            })
+                            .collect(),
+                    },
+                    ..text_item(0, "", "p", 0, true)
+                });
+                pos += 1;
+            }
+            Spec::Boxed(label) => {
+                items.push(Item {
+                    content: Content::Boxed {
+                        pos,
+                        label: label.clone(),
+                    },
                     ..text_item(0, "", "p", 0, true)
                 });
                 pos += 1;
@@ -239,7 +391,18 @@ fn random_spec(random: &mut Random, room: f32) -> Spec {
             let count = 1 + random.below(30);
             Spec::Quote(random.words(count))
         }
+        13 if random.chance(40) => Spec::Toc(1 + random.below(3) as u8),
+        13 if random.chance(50) => random_grid(random),
+        13 if random.chance(50) => random_letter(random),
+        13 if random.chance(40) => {
+            let count = 1 + random.below(30);
+            Spec::PageStart(random.words(count))
+        }
         13 => Spec::Break,
+        14 if random.chance(50) => {
+            let count = 1 + random.below(20);
+            Spec::Boxed(random.words(count))
+        }
         14 => Spec::Rule,
         15 | 16 => {
             if random.chance(20) {
@@ -274,6 +437,62 @@ fn random_spec(random: &mut Random, room: f32) -> Spec {
                 blocks: random.chance(30),
             }
         }
+    }
+}
+
+/// a band of a grid of one to three columns of a few blocks, some of them
+/// longer than a page
+fn random_grid(random: &mut Random) -> Spec {
+    let columns = (0..1 + random.below(3))
+        .map(|_| {
+            (0..1 + random.below(4))
+                .map(|_| {
+                    let words = if random.chance(10) {
+                        300 + random.below(400)
+                    } else {
+                        1 + random.below(60)
+                    };
+                    let level = if random.chance(20) {
+                        1 + random.below(3) as u8
+                    } else {
+                        0
+                    };
+                    (level, random.words(words))
+                })
+                .collect()
+        })
+        .collect();
+    Spec::Grid {
+        columns,
+        page_start: random.chance(20),
+    }
+}
+
+/// a letter of one to three frames of a few lines and a body
+fn random_letter(random: &mut Random) -> Spec {
+    let frames = (0..1 + random.below(3))
+        .map(|_| {
+            let x = 40.0 + random.below(350) as f32;
+            let y = 60.0 + random.below(300) as f32;
+            let lines = (0..1 + random.below(4))
+                .map(|_| {
+                    let count = 1 + random.below(12);
+                    random.words(count)
+                })
+                .collect();
+            (x, y, lines)
+        })
+        .collect();
+    let body = (0..1 + random.below(4))
+        .map(|_| {
+            let count = 1 + random.below(200);
+            random.words(count)
+        })
+        .collect();
+    Spec::Letter {
+        frames,
+        flow_top: random.below(400) as f32,
+        body,
     }
 }
 
@@ -334,11 +553,75 @@ fn restyle(random: &mut Random, spec: &mut Spec, room: f32) {
                 }
             }
         }
-        other @ (Spec::Break | Spec::Rule) => {
+        Spec::Grid {
+            mut columns,
+            page_start,
+        } => {
+            // type a word into one of its blocks, or make another band
+            if random.chance(30) {
+                random_grid(random)
+            } else {
+                let column = random.below(columns.len());
+                let block = random.below(columns[column].len());
+                let (_, text) = &mut columns[column][block];
+                text.push(' ');
+                let count = 1 + random.below(40);
+                text.push_str(&random.words(count));
+                Spec::Grid {
+                    columns,
+                    page_start,
+                }
+            }
+        }
+        Spec::Letter {
+            mut frames,
+            flow_top,
+            mut body,
+        } => {
+            // type a word into a frame or the body
+            let count = 1 + random.below(30);
+            let words = random.words(count);
+            if random.chance(50) {
+                let frame = random.below(frames.len());
+                let line = random.below(frames[frame].2.len());
+                frames[frame].2[line].push(' ');
+                frames[frame].2[line].push_str(&words);
+            } else {
+                let line = random.below(body.len());
+                body[line].push(' ');
+                body[line].push_str(&words);
+            }
+            Spec::Letter {
+                frames,
+                flow_top,
+                body,
+            }
+        }
+        other @ (Spec::Break | Spec::Rule | Spec::Boxed(_) | Spec::Toc(_) | Spec::PageStart(_)) => {
             let _ = other;
             random_spec(random, room)
         }
     };
+}
+
+/// the page numbers of tables of contents each page shows
+fn all_numbers(engine: &Engine) -> Vec<Vec<String>> {
+    (0..engine.pages.len())
+        .map(|page| {
+            engine
+                .body_parts(page)
+                .into_iter()
+                .filter_map(|(op, part)| match (op, part) {
+                    (Op::Glyphs { run, text, .. }, super::Part::TocNumber { .. }) => {
+                        let from = run.glyphs.first()?.start as usize;
+                        let to = run.glyphs.last()?.end as usize;
+                        Some(text[from..to].to_string())
+                    }
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// the change from one list of items to another, as update takes it: the
@@ -445,6 +728,7 @@ fn incremental_equals_full() {
         let mut fresh = Engine::new(repository_fonts());
         fresh.set_settings(settings.clone());
         let mut before_ops = all_ops(&mut engine);
+        let mut before_numbers = all_numbers(&engine);
         for step in 0..steps {
             let before_pages = engine.pages.clone();
             let before_frags = engine.frags.clone();
@@ -484,7 +768,20 @@ fn incremental_equals_full() {
             };
 
             // the shift moved every position the engine keeps
-            assert_eq!(engine.items, items, "{context}");
+            // (but the bands, which the engine numbers itself)
+            let unnumbered = |items: &[Item]| {
+                let mut items = items.to_vec();
+                for item in &mut items {
+                    if let Some(column) = &mut item.column {
+                        column.band = 0;
+                    }
+                    if let Some(frame) = &mut item.frame {
+                        frame.id = 0;
+                    }
+                }
+                items
+            };
+            assert_eq!(unnumbered(&engine.items), items, "{context}");
             fresh.set_items(items);
             for (index, (laid, full)) in engine.laid.iter().zip(&fresh.laid).enumerate() {
                 let a: Vec<u32> = laid.texts.iter().map(|text| text.pos).collect();
@@ -585,6 +882,7 @@ fn incremental_equals_full() {
             let moved = |frag: &super::Frag| -> Option<usize> {
                 old_index.get(frag.item).copied().flatten()
             };
+            let numbers = all_numbers(&engine);
             for (index, page) in engine.pages.iter().enumerate() {
                 let Some(old) = before_pages.get(index) else {
                     continue;
@@ -596,7 +894,9 @@ fn incremental_equals_full() {
                         moved(a) == Some(b.item)
                             && (a.unit, a.y, a.repeat) == (b.unit, b.y, b.repeat)
                     });
-                if same {
+                // and the page numbers of tables of contents on it, which
+                // are set in after paginating, are as before
+                if same && numbers.get(index) == before_numbers.get(index) {
                     assert_eq!(
                         page.body_version, old.body_version,
                         "{context}: page {index}'s body was painted again"
@@ -626,6 +926,7 @@ fn incremental_equals_full() {
                 "{context}: bands"
             );
             before_ops = ops;
+            before_numbers = numbers;
         }
     }
 }

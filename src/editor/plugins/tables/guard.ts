@@ -3,7 +3,7 @@ import { Plugin, type EditorState, type Transaction } from "prosemirror-state";
 
 import { schema } from "../../../markdown";
 import { CELL_SEPARATOR } from "../../../markdown/html";
-import { keepsParagraphAfter } from "./util";
+import { keepsParagraphAfter, standsApart } from "./util";
 
 type Visit = (node: Node, pos: number) => boolean | void;
 
@@ -82,16 +82,17 @@ const cleanCells = (tr: Transaction, old: Node, doc: Node) => {
 };
 
 /**
- * keepParagraphs puts an empty paragraph after a table that ends the
- * document, before one that starts it and between two tables, so the cursor
- * can always get out of a table, with the keyboard and the mouse
+ * keepParagraphs puts an empty paragraph after a table or content block that
+ * ends the document, before one that starts it and between two of them, so
+ * the cursor can always get out of a table, or past a block, with the
+ * keyboard and the mouse
  */
 const keepParagraphs = (tr: Transaction) => {
   const { doc } = tr;
-  const { table, paragraph } = schema.nodes;
+  const { paragraph } = schema.nodes;
   const missing: number[] = [];
   doc.forEach((node, offset, index) => {
-    if (node.type !== table) return;
+    if (!standsApart(node)) return;
     if (index === 0) missing.push(0);
     if (keepsParagraphAfter(doc, index)) missing.push(offset + node.nodeSize);
   });
@@ -100,7 +101,8 @@ const keepParagraphs = (tr: Transaction) => {
 
 /**
  * tableGuard keeps tables well placed: no table, heading or rule inside a
- * cell, and a paragraph next to tables at the edges of the document
+ * cell, and a paragraph next to tables and content blocks at the edges of
+ * the document
  */
 export const tableGuard = () =>
   new Plugin({

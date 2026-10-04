@@ -47,8 +47,9 @@ import { summarize } from "./properties";
 import { displaySrc } from "./images";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
+import { embedSrc } from "../../markdown/blocks/embeds";
 import { tableGrid } from "../../exporters/table";
-import type { FrozenWidths } from "../../engine/flatten";
+import { type FrozenWidths, headingsSignature } from "../../engine/flatten";
 import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
@@ -226,6 +227,27 @@ export const frozenWidths = (
   return { pos: table.pos, widths: tableGrid(table.node).widths };
 };
 
+// the headings each engine's tables of contents listed when it last laid
+// them out, see tocBlocks
+const listedHeadings = new WeakMap<PageEngine, string>();
+
+/**
+ * tocBlocks returns the tables of contents of `doc` to lay out again: all of
+ * them when the headings they list changed since `engine` last laid them out,
+ * as they depend on blocks other than themselves, else none
+ */
+const tocBlocks = (engine: PageEngine, doc: Node): number[] => {
+  const tocs: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    if (block.type.name === "toc") tocs.push(index);
+  });
+  if (tocs.length === 0) return tocs;
+  const signature = headingsSignature(doc);
+  if (listedHeadings.get(engine) === signature) return [];
+  listedHeadings.set(engine, signature);
+  return tocs;
+};
+
 /**
  * sync hands the engine what changed in the document, and the page
  * @param blocks top-level blocks to flatten again, e.g. once their image
@@ -248,7 +270,7 @@ const sync = (
   const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
-    blocks,
+    blocks: [...new Set([...blocks, ...tocBlocks(engine, state.doc)])],
     changes: tracked?.from
       ? { from: tracked.from, ranges: tracked.ranges }
       : null,
@@ -266,19 +288,21 @@ const sync = (
 };
 
 /**
- * imageBlocks returns the top-level blocks of `doc` with an image from one
- * of `urls`
+ * imageBlocks returns the top-level blocks of `doc` with an image, or an
+ * embed's drawing, from one of `urls`
  */
 const imageBlocks = (doc: Node, urls: ReadonlySet<string>) => {
+  const loaded = (src: string) => {
+    const url = displaySrc(src, path.value);
+    return url !== null && urls.has(url);
+  };
   const blocks: number[] = [];
   doc.forEach((block, _offset, index) => {
-    let found = false;
+    // an embed is shown as the image of its drawing
+    let found = block.type.name === "embed" && loaded(embedSrc(block));
     block.descendants((node) => {
       if (found) return false;
-      if (node.type.name === "image") {
-        const url = displaySrc(node.attrs.src as string, path.value);
-        found = url !== null && urls.has(url);
-      }
+      if (node.type.name === "image") found = loaded(node.attrs.src as string);
       return !found;
     });
     if (found) blocks.push(index);

@@ -5,7 +5,12 @@ export interface Anchor {
   left: number;
   top: number;
   bottom: number;
+  // its right end, which a popup lines up with when it opens at the end
+  right?: number;
 }
+
+// a box something sits on, e.g. a table or a block its toolbar is above
+export type BoxAnchor = Required<Anchor>;
 
 export interface TablePickerState {
   // the size of the table Enter inserts, the header row included
@@ -22,24 +27,32 @@ export interface TablePickerState {
 // tablePicker is the open picker for the size of a new table, or null
 export const tablePicker = shallowRef<TablePickerState | null>(null);
 
-export interface TableToolbarItem {
+// a button of a toolbar
+export interface ToolbarItem {
   id: string;
   label: string;
+  // what its tooltip says, where that isn't its label
+  tip?: string;
   // the name of its icon, see src/icons.ts
   icon: string;
-  // its key in table mode, e.g. "↑"
-  key: string;
-  // buttons of one group sit together
-  group: string;
   enabled: boolean;
   // for buttons that switch something on and off
   checked?: boolean;
+  // its key: shown in table mode, e.g. "↑", and on the block toolbar in
+  // its tooltip
+  key?: string;
   run(): void;
+}
+
+export interface TableToolbarItem extends ToolbarItem {
+  key: string;
+  // buttons of one group sit together
+  group: string;
 }
 
 export interface TableToolbarState {
   // the box of the table, in viewport coordinates, which the toolbar sits on
-  anchor: { left: number; top: number; bottom: number; right: number };
+  anchor: BoxAnchor;
   items: TableToolbarItem[];
   // table mode (Mod+T): the buttons show their keys, which work until Esc
   keys: boolean;
@@ -53,6 +66,20 @@ export interface TableToolbarState {
 
 // tableToolbar is the toolbar of the table the cursor is in, or null
 export const tableToolbar = shallowRef<TableToolbarState | null>(null);
+
+export interface BlockToolbarState {
+  // the box of the block, in viewport coordinates, which the toolbar sits on
+  anchor: BoxAnchor;
+  // what the block is, e.g. "Recipe", which the toolbar shows
+  label: string;
+  // the icon of its kind of block, see src/icons.ts
+  icon: string;
+  items: ToolbarItem[];
+}
+
+// blockToolbar is the toolbar of the content block the cursor is in (a
+// form) or on (a table of contents), or null
+export const blockToolbar = shallowRef<BlockToolbarState | null>(null);
 
 // a point in the window, in viewport coordinates, e.g. where the mouse is
 export interface Point {

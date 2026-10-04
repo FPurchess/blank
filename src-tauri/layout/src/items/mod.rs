@@ -2,18 +2,20 @@
 //! pagination places, which are lines for text and rows for tables.
 
 mod table;
+mod toc;
 
 use std::ops::Range;
 
 use parley::Alignment;
 
 use crate::fonts::Fonts;
-use crate::model::{Content, Item, Text, TextKind};
+use crate::model::{Content, Item, Settings, Text, TextKind};
 use crate::style::{MARKER_GAP, RULE};
 use crate::text::TextBox;
 
 use table::table_units;
 pub use table::{TableSpec, MAX_COLUMNS};
+pub use toc::{leaders, number_text, TocLaid, TocLine};
 
 /// what the colours of the screen and the PDF stand for
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +26,9 @@ pub enum Role {
     TableLine = 3,
     HeaderLine = 4,
     HeaderFill = 5,
-    // 6 is no longer used; ROLE_OPACITY keeps its place
+    /// the box of a picture to come, an empty image field's: on the screen
+    /// only
+    Placeholder = 6,
     /// the underline of a link
     LinkLine = 7,
     /// what stands for an image that isn't loaded: its alt text
@@ -41,6 +45,7 @@ impl Role {
             Role::TableLine,
             Role::HeaderLine,
             Role::HeaderFill,
+            Role::Placeholder,
             Role::LinkLine,
             Role::Hint,
         ]
@@ -133,8 +138,9 @@ pub struct Laid {
     pub texts: Vec<TextBox>,
     /// the list marker, drawn with the first unit
     pub marker: Option<TextBox>,
-    /// what stands in for an image that isn't loaded, drawn with the first
-    /// unit; it isn't text of the document
+    /// what stands in for an image that isn't loaded, a table's caption, a
+    /// table of contents' title, or what an empty text says: drawn with the
+    /// first unit; it isn't text of the document
     pub label: Option<TextBox>,
     /// for a table: where each column starts and where the last one ends,
     /// in the item's coordinates
@@ -148,6 +154,8 @@ pub struct Laid {
     pub cells: Vec<TableCell>,
     /// the characters no font has a glyph for in it, see Engine::missing
     pub missing: Vec<char>,
+    /// for a table of contents: where its page numbers go
+    pub toc: Option<TocLaid>,
 }
 
 /// a cell of a table as laid out: where it is in the grid, and what of the
@@ -194,24 +202,31 @@ pub struct CellImage {
 }
 
 impl Laid {
-    /// lays out an item in `width`, the width of the text on the page;
-    /// `room` is the height of the text on a page, which rows of a table
-    /// taller than it are sliced to
-    pub fn new(fonts: &mut Fonts, item: &Item, width: f32, room: f32) -> Laid {
-        let inner = (width - item.indent).max(20.0);
+    /// lays out an item in the width of the text on the page, or of its
+    /// column; rows of a table taller than the text on a page are sliced
+    /// to it
+    pub fn new(fonts: &mut Fonts, item: &Item, settings: &Settings) -> Laid {
+        let room = settings.content_bottom() - settings.content_top();
+        // in its column of a grid, if it stands in one
+        let (indent, right) = item.text_edges(settings);
+        let inner = (right - indent).max(20.0);
         let mut laid = match &item.content {
-            Content::Text(text) => text_units(fonts, text, item.indent, inner),
+            Content::Text(text) => text_units(fonts, text, indent, inner),
             Content::Break { .. } => Laid::single(0.0, vec![]),
             Content::Rule { .. } => Laid::single(
                 RULE,
                 vec![Deco::Rect {
-                    x: item.indent,
+                    x: indent,
                     y: 0.0,
                     w: inner,
                     h: RULE,
                     role: Role::Text,
                 }],
             ),
+            Content::Boxed { label, .. } => boxed(fonts, label, indent, inner),
+            Content::Toc { title, entries, .. } => {
+                toc::toc_units(fonts, title, entries, indent, inner, settings)
+            }
             Content::Image {
                 src,
                 width: image_width,
@@ -229,7 +244,7 @@ impl Laid {
                         vec![Deco::Image {
                             src: src.clone(),
                             alt: alt.clone(),
-                            x: item.indent,
+                            x: indent,
                             y: 0.0,
                             w,
                             h,
@@ -249,7 +264,7 @@ impl Laid {
                         ..Default::default()
                     };
                     let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
-                    label.x = item.indent;
+                    label.x = indent;
                     let mut laid = Laid::single(label.height(), vec![]);
                     laid.label = Some(label);
                     laid
@@ -267,7 +282,7 @@ impl Laid {
                     widths,
                     caption: caption.as_deref(),
                 },
-                item.indent,
+                indent,
                 inner,
                 room,
             ),
@@ -280,7 +295,7 @@ impl Laid {
             };
             let mut boxed = TextBox::new(fonts, &text, 100.0, Alignment::Start);
             let marker_width = boxed.layout.width();
-            boxed.x = item.indent - MARKER_GAP - marker_width;
+            boxed.x = indent - MARKER_GAP - marker_width;
             // on the baseline of the first line
             let first_baseline =
                 |boxed: &TextBox| boxed.lines().first().map_or(0.0, |line| line.baseline);
@@ -316,8 +331,31 @@ impl Laid {
 fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
     let mut boxed = TextBox::new(fonts, text, width, Alignment::Start);
     boxed.x = indent;
+    // what an empty text says, in its style, on the screen only; in the
+    // middle of a box for a picture to come
+    let picture = text.picture;
+    let hint = text
+        .hint
+        .as_ref()
+        .filter(|hint| text.text.is_empty() && !hint.is_empty())
+        .map(|hint| {
+            let shown = Text {
+                pos: 0,
+                text: hint.clone(),
+                style: text.style.clone(),
+                ..Default::default()
+            };
+            let (room, align) = if picture {
+                ((width - 2.0 * PICTURE_PADDING).max(10.0), Alignment::Center)
+            } else {
+                (width, Alignment::Start)
+            };
+            let mut label = TextBox::new(fonts, &shown, room, align);
+            label.x = indent + if picture { PICTURE_PADDING } else { 0.0 };
+            label
+        });
     let code = text.style == TextKind::Code;
-    let units = boxed
+    let mut units: Vec<Unit> = boxed
         .lines()
         .iter()
         .enumerate()
@@ -340,9 +378,79 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
             ..Default::default()
         })
         .collect();
+    let mut hint = hint;
+    if let (Some(label), Some(unit)) = (&mut hint, units.first_mut()) {
+        if picture {
+            // a box as a picture would be, what it says in its middle
+            let height = (width * PICTURE_SHARE)
+                .min(PICTURE_HEIGHT)
+                .max(label.height() + 2.0 * PICTURE_PADDING);
+            label.y = (height - label.height()) / 2.0;
+            unit.height = height;
+            unit.decos.push(Deco::Rect {
+                x: indent,
+                y: 0.0,
+                w: width,
+                h: height,
+                role: Role::Placeholder,
+            });
+        } else {
+            // the empty text's line as tall as what it says, which may wrap
+            unit.height = unit.height.max(label.height());
+        }
+    }
     Laid {
         units,
         texts: vec![boxed],
+        label: hint,
         ..Default::default()
     }
+}
+
+/// the box of a picture to come: as high as this share of its width, at
+/// most `PICTURE_HEIGHT` points, with room around what it says
+const PICTURE_SHARE: f32 = 0.6;
+const PICTURE_HEIGHT: f32 = 220.0;
+const PICTURE_PADDING: f32 = 12.0;
+
+/// the room between a boxed item's outline and its label, in points
+const BOX_PADDING: f32 = 8.0;
+
+/// lays out a boxed item: its label, in italics like the alt text of an
+/// image, in a thin outline
+fn boxed(fonts: &mut Fonts, label: &str, indent: f32, inner: f32) -> Laid {
+    let text = Text {
+        pos: 0,
+        text: label.to_string(),
+        style: "alt".into(),
+        ..Default::default()
+    };
+    let mut boxed = TextBox::new(
+        fonts,
+        &text,
+        (inner - 2.0 * BOX_PADDING).max(10.0),
+        Alignment::Start,
+    );
+    boxed.x = indent + BOX_PADDING;
+    boxed.y = BOX_PADDING;
+    let height = boxed.height() + 2.0 * BOX_PADDING;
+    let line = |x: f32, y: f32, w: f32, h: f32| Deco::Rect {
+        x,
+        y,
+        w,
+        h,
+        role: Role::TableLine,
+    };
+    let right = indent + inner - RULE;
+    let mut laid = Laid::single(
+        height,
+        vec![
+            line(indent, 0.0, inner, RULE),
+            line(indent, height - RULE, inner, RULE),
+            line(indent, 0.0, RULE, height),
+            line(right, 0.0, RULE, height),
+        ],
+    );
+    laid.label = Some(boxed);
+    laid
 }

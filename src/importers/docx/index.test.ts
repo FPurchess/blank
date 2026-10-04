@@ -3,12 +3,22 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
+import { stringify } from "yaml";
+
 import {
+  definitionKey,
   markdownSerializer,
   parseMarkdown,
   schema,
   serializeMarkdown,
 } from "../../markdown";
+import {
+  LETTER,
+  LETTER_KEY,
+  RECIPE,
+  SHORT_KEY,
+  SHORT_RECIPE,
+} from "../../test/forms";
 
 import toDOCX from "../../exporters/docx";
 import type { Node } from "prosemirror-model";
@@ -82,6 +92,252 @@ describe("importers.docx", () => {
 
   // each test writes a .docx and reads it back through docx, JSZip and
   // mammoth, about 110 ms here; give them room on a machine under heavy load
+  describe("tables of contents", { timeout: 20_000 }, () => {
+    const TOC_MARKDOWN = [
+      '<!-- blank:toc@1 depth="2" title="Contents" -->',
+      "# One",
+      "Text of the first chapter.",
+      "## Two",
+      "### Three",
+      "# Four",
+    ].join("\n\n");
+
+    it("comes back from Blank's own Word export", async () => {
+      expect(await roundTrip(TOC_MARKDOWN)).toBe(TOC_MARKDOWN);
+    });
+
+    it("keeps no title when it had none", async () => {
+      const untitled = TOC_MARKDOWN.replace('title="Contents"', 'title=""');
+      expect(await roundTrip(untitled)).toBe(untitled);
+    });
+
+    it.each([
+      ["pandoc", "toc-pandoc.docx", "Table of Contents"],
+      ["LibreOffice", "toc-libreoffice.docx", ""],
+    ])(
+      "reads the one %s writes, without its entries",
+      async (_, name, title) => {
+        const { markdown } = await toMarkdown(fixture(name));
+        // after the page setup LibreOffice writes
+        const body = markdown.replace(/^---\n[\s\S]*?\n---\n\n/, "");
+        expect(body.split("\n\n").slice(0, 3)).toEqual([
+          `<!-- blank:toc@1 depth="2" title="${title}" -->`,
+          "# One",
+          "Text of the first chapter.",
+        ]);
+      },
+    );
+
+    it("reads a TOC field outside a content control", async () => {
+      // the content control taken away, as an older Word might write it
+      const bytes = await rewriteDocx(
+        await exportDocx(TOC_MARKDOWN.replace('title="Contents"', 'title=""')),
+        "word/document.xml",
+        (xml = "") =>
+          xml
+            .replace(/<w:sdt><w:sdtPr>.*?<\/w:sdtPr><w:sdtContent>/s, "")
+            .replace(/<\/w:sdtContent><\/w:sdt>/, ""),
+      );
+      const { markdown } = await toMarkdown(bytes);
+      expect(markdown.split("\n\n")[0]).toBe(
+        '<!-- blank:toc@1 depth="2" title="" -->',
+      );
+      expect(markdown).not.toContain("One\t");
+    });
+
+    it("leaves a table of figures as its entries", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(TOC_MARKDOWN),
+        "word/document.xml",
+        (xml = "") =>
+          xml.replace("\\o &quot;1-2&quot;", "\\c &quot;Figure&quot;"),
+      );
+      const { markdown } = await toMarkdown(bytes);
+      expect(markdown).not.toContain("blank:toc");
+    });
+  });
+
+  describe("forms", { timeout: 20_000 }, () => {
+    const recipe = SHORT_RECIPE;
+    const key = SHORT_KEY;
+    const file = (title: string, steps: string) =>
+      [
+        "Intro",
+        `<!-- blank:form@1 def="${key}" -->`,
+        '<!-- blank:field name="title" -->',
+        title,
+        '<!-- blank:field name="steps" -->',
+        steps,
+        "<!-- /blank:form -->",
+        "<!-- blank:definitions@1 -->",
+        `\`\`\`\`yaml\n${stringify(recipe)}\`\`\`\``,
+        "<!-- /blank:definitions -->",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+    it("come back from Blank's own Word export", async () => {
+      const markdown = file("# Pancakes", "Mix.\n\n* flour\n* milk");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("come back with a field left empty", async () => {
+      const markdown = file("", "Mix.");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keep what a Word user wrote in a field", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(file("# Pancakes", "Mix.")),
+        "word/document.xml",
+        (xml = "") => xml.replace(">Mix.<", ">Mix well.<"),
+      );
+      const { markdown } = await toMarkdown(bytes);
+      expect(markdown).toBe(file("# Pancakes", "Mix well."));
+    });
+
+    it("become their blocks without their definitions", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(file("# Pancakes", "Mix.")),
+        "customXml/item1.xml",
+        () => "<other/>",
+      );
+      const { markdown } = await toMarkdown(bytes);
+      // the new page it started stays, as Word shows it
+      expect(markdown).toBe(
+        "Intro\n\n<!-- pagebreak -->\n\n# Pancakes\n\nMix.",
+      );
+    });
+
+    it("come back starting with a table on a new page", async () => {
+      const { id, version, name, fields } = RECIPE;
+      const table = {
+        id,
+        version,
+        name,
+        newPage: true,
+        fields: fields.slice(2),
+      };
+      const tableKey = definitionKey(table);
+      const markdown = [
+        "Intro",
+        `<!-- blank:form@1 def="${tableKey}" -->`,
+        '<!-- blank:field name="ingredients" -->',
+        "| Amount | Ingredient |\n| ------ | ---------- |\n| 1      | egg        |",
+        '<!-- blank:field name="steps" -->',
+        "Mix.",
+        "<!-- /blank:form -->",
+        "<!-- blank:definitions@1 -->",
+        `\`\`\`\`yaml\n${stringify(table)}\`\`\`\``,
+        "<!-- /blank:definitions -->",
+      ].join("\n\n");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it.each([
+      ["starting with it, on a new page", true],
+      ["after a field", false],
+    ])("come back with a grid %s", async (_, first) => {
+      const { id, version, name, fields } = RECIPE;
+      const grid = {
+        grid: { columns: ["40mm", "1fr"], gap: "4mm" },
+        cells: [
+          [{ field: "photo" }],
+          [{ field: "ingredients" }, { field: "steps" }],
+        ],
+      };
+      const definition = {
+        id,
+        version,
+        name,
+        newPage: true,
+        fields: first ? fields.slice(1) : fields,
+        layout: first ? [grid] : [{ field: "title" }, grid],
+      };
+      const key = definitionKey(definition);
+      const markdown = [
+        "Intro",
+        `<!-- blank:form@1 def="${key}" -->`,
+        ...(first ? [] : ['<!-- blank:field name="title" -->', "# Pancakes"]),
+        '<!-- blank:field name="photo" -->',
+        "A photo",
+        '<!-- blank:field name="ingredients" -->',
+        "| Amount | Ingredient |\n| ------ | ---------- |\n| 1      | egg        |",
+        '<!-- blank:field name="steps" -->',
+        "Mix.\n\n## Bake",
+        "<!-- /blank:form -->",
+        "After",
+        "<!-- blank:definitions@1 -->",
+        `\`\`\`\`yaml\n${stringify(definition)}\`\`\`\``,
+        "<!-- /blank:definitions -->",
+      ].join("\n\n");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("come back with their frames, as a letter", async () => {
+      const markdown = [
+        "Intro",
+        `<!-- blank:form@1 def="${LETTER_KEY}" -->`,
+        '<!-- blank:field name="sender" -->',
+        "Bea · Hill Road 3",
+        '<!-- blank:field name="address" -->',
+        "Ann Example\n\nLong Street 12",
+        '<!-- blank:field name="date" -->',
+        "Monday",
+        '<!-- blank:field name="body" -->',
+        "Dear Ann,\n\nhow are you?",
+        "<!-- /blank:form -->",
+        "<!-- blank:definitions@1 -->",
+        `\`\`\`\`yaml\n${stringify(LETTER)}\`\`\`\``,
+        "<!-- /blank:definitions -->",
+      ].join("\n\n");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("keep what a Word user wrote between their fields", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(file("# Pancakes", "Mix.")),
+        "word/document.xml",
+        (xml = "") =>
+          xml.replace(
+            /(<w:tag w:val="blank:field:steps"\/>.*?<\/w:sdt>)/,
+            "$1<w:p><w:r><w:t>Serve warm.</w:t></w:r></w:p>",
+          ),
+      );
+      const { markdown } = await toMarkdown(bytes);
+      // in the field before
+      expect(markdown).toBe(file("# Pancakes", "Mix.\n\nServe warm."));
+    });
+  });
+
+  describe("embeds", { timeout: 20_000 }, () => {
+    const SVG =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60"><rect width="120" height="60" fill="#d33"/></svg>';
+    const markdown = [
+      "Intro",
+      '<!-- blank:embed@1 type="org.example/sketch@1" id="k3x9" width="60mm" alt="A red box" -->',
+      '````json\n{"shapes": [1, 2]}\n````',
+      `\`\`\`\`svg\n${SVG}\n\`\`\`\``,
+      "<!-- /blank:embed -->",
+      "After",
+    ].join("\n\n");
+
+    it("come back from Blank's own Word export, data and all", async () => {
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("are their pictures without the part that holds them", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(markdown),
+        "customXml/item2.xml",
+        () => "<other/>",
+      );
+      const { markdown: imported } = await toMarkdown(bytes);
+      expect(imported).not.toContain("blank:embed");
+      expect(imported).toContain("Intro");
+    });
+  });
+
   describe("round trip through the Word export", { timeout: 20_000 }, () => {
     it.each([
       ["a pipe table", "| Name | Qty |\n| ---- | --- |\n| a    | 1   |"],

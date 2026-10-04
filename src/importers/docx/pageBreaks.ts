@@ -1,6 +1,14 @@
 import type JSZip from "jszip";
 
-import { child, DOCUMENT_PART, isOn, parsePart, val, W } from "./xml";
+import {
+  child,
+  DOCUMENT_PART,
+  isOn,
+  markerParagraph,
+  parsePart,
+  val,
+  W,
+} from "./xml";
 
 // mammoth drops page breaks, so they are turned into marker paragraphs
 // before the conversion, which styleMap.ts and cleanup.ts turn into Blank's
@@ -12,13 +20,7 @@ import { child, DOCUMENT_PART, isOn, parsePart, val, W } from "./xml";
 // the style of the marker paragraphs, matched by its id in styleMap.ts
 export const PAGE_BREAK_STYLE = "BlankPageBreak";
 
-const marker = (doc: Document) => {
-  const p = doc.createElementNS(W, "w:p");
-  const pPr = p.appendChild(doc.createElementNS(W, "w:pPr"));
-  const pStyle = pPr.appendChild(doc.createElementNS(W, "w:pStyle"));
-  pStyle.setAttributeNS(W, "w:val", PAGE_BREAK_STYLE);
-  return p;
-};
+const marker = (doc: Document) => markerParagraph(doc, PAGE_BREAK_STYLE);
 
 const isPageBreak = (element: Element) =>
   element.namespaceURI === W &&

@@ -14,10 +14,13 @@ import {
   caretBox,
   caretPage,
   findText,
+  gapAt,
+  gapLine,
   hitAt,
   pageTops,
   rangeRects,
   scrollState,
+  scrollToHeading,
   scrollToText,
   scrollTops,
   scrollViewBy,
@@ -84,6 +87,21 @@ describe("geometry", () => {
     expect(pages[1].top).toBeGreaterThan(pages[0].bottom);
   });
 
+  it("finds the place between two blocks nearest a point", () => {
+    const [intro] = blockBoxes(0, 7);
+    const x = (intro.left + intro.right) / 2;
+    // in the upper half of the intro, before it; in the lower half, after
+    expect(gapAt(node, x, intro.top + 1)).toBe(0);
+    expect(gapAt(node, x, intro.bottom - 1)).toBe(7);
+    // halfway between the intro and the table, across the width of the block below
+    const [table] = blockBoxes(7, 7 + node.child(1).nodeSize);
+    const line = gapLine(node, 7)!;
+    expect(line.y).toBeCloseTo((intro.bottom + table.top) / 2);
+    expect(line).toMatchObject({ left: table.left, right: table.right });
+    // above the first block
+    expect(gapLine(node, 0)!.y).toBeLessThan(intro.top);
+  });
+
   it("gives a table's rows and columns", () => {
     const grid = tableGeometry(7)!;
     expect(grid.rowCount).toBe(2);
@@ -130,6 +148,11 @@ describe("geometry", () => {
     expect(state.top).toBe(50);
     expect(state.height).toBe(TEST_VIEWPORT.height);
     expect(state.max).toBeGreaterThan(TEST_VIEWPORT.height);
+  });
+
+  it("scrolls to a heading at the reading line", () => {
+    scrollToHeading(2);
+    expect(pageScrollRequest.value).toMatchObject({ page: 0, at: 108 });
   });
 
   it("asks the page view to show text below its top, keeping the selection", () => {

@@ -1,6 +1,9 @@
 import JSZip from "jszip";
+import type { Attrs } from "prosemirror-model";
 
-import { CODE_FONT } from "./template";
+import type { Definition } from "../../markdown";
+import { addDefinitions, addEmbeds, contentControls } from "./forms";
+import { CODE_FONT, TOC_NAME } from "./template";
 
 // Fixes to the package docx 9.7.2 writes, applied to the zipped document.
 
@@ -72,14 +75,44 @@ const markCodeFontFixed = (zip: JSZip) =>
   );
 
 /**
- * fixPackage applies the fixes to a .docx file written by docx
+ * markTocs marks the tables of contents docx writes as Word's own, from its
+ * gallery of tables of contents: Word then offers its tools for them, and
+ * Blank's import knows them by it (src/importers/docx/toc.ts). docx writes
+ * only their alias.
+ */
+const markTocs = (zip: JSZip) =>
+  rewrite(zip, "word/document.xml", (xml) =>
+    xml.replaceAll(
+      `<w:sdtPr><w:alias w:val="${TOC_NAME}"/></w:sdtPr>`,
+      `<w:sdtPr><w:alias w:val="${TOC_NAME}"/><w:docPartObj><w:docPartGallery w:val="${TOC_NAME}"/><w:docPartUnique/></w:docPartObj></w:sdtPr>`,
+    ),
+  );
+
+/**
+ * fixPackage applies the fixes to a .docx file written by docx, and adds
+ * what it can't write: content controls, the definitions of forms and the
+ * embeds
  * @param contents the .docx file
  * @returns the fixed .docx file
  */
-export const fixPackage = async (contents: Uint8Array) => {
+export const fixPackage = async (
+  contents: Uint8Array,
+  {
+    definitions = [],
+    embeds = {},
+  }: {
+    definitions?: readonly Definition[];
+    // the embeds' attributes, by their ids
+    embeds?: Record<string, Attrs>;
+  } = {},
+) => {
   const zip = await JSZip.loadAsync(contents);
+  await contentControls(zip);
+  if (definitions.length) await addDefinitions(zip, definitions);
+  if (Object.keys(embeds).length) await addEmbeds(zip, embeds);
   await stripEmptyComments(zip);
   await markNormalAsDefault(zip);
   await markCodeFontFixed(zip);
+  await markTocs(zip);
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 };

@@ -40,11 +40,12 @@ impl Engine {
                     if let Some(frag_index) = self.frag_of(item, 0) {
                         let frag = self.frags[frag_index];
                         let unit = &laid.units[0];
+                        let (indent, end) = self.items[item].text_edges(&self.settings);
                         rects.push((
                             self.page_of_frag(frag_index),
-                            self.settings.margins.left + self.items[item].indent,
+                            self.settings.margins.left + indent,
                             frag.y,
-                            self.settings.content_width() - self.items[item].indent,
+                            end - indent,
                             unit.height.max(4.0),
                         ));
                     }
@@ -113,12 +114,8 @@ impl Engine {
         {
             return (left + x, frag.y, *w, unit.height);
         }
-        (
-            left + item.indent,
-            frag.y,
-            self.settings.content_width() - item.indent,
-            unit.height,
-        )
+        let (indent, end) = item.text_edges(&self.settings);
+        (left + indent, frag.y, end - indent, unit.height)
     }
 
     /// the boxes of the blocks from `from` to `to`, one per page they are
@@ -141,20 +138,7 @@ impl Engine {
                 self.cell_image_boxes(item, from, to, &mut boxes);
                 continue;
             }
-            let Some(first) = self.first_frag.get(item).copied() else {
-                continue;
-            };
-            if first == usize::MAX {
-                continue;
-            }
-            for index in first..self.frags.len() {
-                let frag = self.frags[index];
-                if frag.item != item {
-                    if frag.repeat {
-                        continue;
-                    }
-                    break;
-                }
+            for index in self.frags_of(item) {
                 let page = self.page_of_frag(index);
                 let (x, y, w, h) = self.frag_box(index);
                 match boxes.last_mut() {

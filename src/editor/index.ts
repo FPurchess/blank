@@ -7,7 +7,11 @@ import { schema } from "../markdown";
 import { transaction, uiTakesFocus } from "../state";
 import {
   autocomplete,
+  blockRemovals,
+  blockTools,
   contextMenu,
+  embeds,
+  forms,
   headings,
   images,
   keymap,
@@ -18,6 +22,7 @@ import {
   properties,
   spellcheck,
   tableGuard,
+  toc,
   tableKeys,
   tablePickerKeys,
   tableClipboard,
@@ -53,12 +58,19 @@ export const bootEditor = async () => {
         languagePicker(),
         tablePickerKeys(),
         tableTools(),
+        blockTools(),
+        blockRemovals(),
         contextMenu(),
         spellcheck(),
+        // Tab and Enter in a form, before autocorrect and the table keys
+        forms(),
+        embeds(),
         autocomplete(),
         tableKeys(),
         // moves by the lines the page view shows, before the keymap
         pageView(),
+        // Enter on a table of contents, and its links before openLink's
+        toc(),
         keymap(),
         openLink(),
         images(),

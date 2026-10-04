@@ -2,6 +2,7 @@ import type { Node, ResolvedPos } from "prosemirror-model";
 import { findTable, TableMap } from "prosemirror-tables";
 
 import { schema } from "../../../markdown";
+import { isContentBlock } from "../../../markdown/blocks/names";
 
 /**
  * isCell tells whether `node` is a table cell or header cell
@@ -55,13 +56,20 @@ export const tableAround = ($pos: ResolvedPos): TableAt | undefined => {
 };
 
 /**
+ * standsApart tells whether `node` is a block the cursor can't stand next to
+ * without a paragraph: a table, or a content block (see
+ * src/markdown/blocks/rules.ts), which the cursor can only select
+ */
+export const standsApart = (node: Node) =>
+  node.type === schema.nodes.table || isContentBlock(node);
+
+/**
  * keepsParagraphAfter tells whether Blank keeps a paragraph after the child
- * at `index` of `parent`, a table or the paragraph after one: when nothing
- * follows it, or a table does
+ * at `index` of `parent`, a table or content block, or the paragraph after
+ * one: when nothing follows it, or another one does
  */
 export const keepsParagraphAfter = (parent: Node, index: number) =>
-  index + 1 >= parent.childCount ||
-  parent.child(index + 1).type === schema.nodes.table;
+  index + 1 >= parent.childCount || standsApart(parent.child(index + 1));
 
 /**
  * isEmptyTable tells whether no cell of `table` holds any text or image

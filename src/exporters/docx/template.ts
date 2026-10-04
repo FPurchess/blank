@@ -73,6 +73,15 @@ const TABLE_LINE = {
   color: hex(TABLE_COLORS.line),
 } as const;
 const NO_LINE = { style: "none", size: 0, color: "auto" } as const;
+// a grid's table has no lines at all
+export const GRID_BORDERS = {
+  top: NO_LINE,
+  left: NO_LINE,
+  right: NO_LINE,
+  bottom: NO_LINE,
+  insideHorizontal: NO_LINE,
+  insideVertical: NO_LINE,
+};
 export const TABLE_BORDERS = {
   top: NO_LINE,
   left: NO_LINE,
@@ -161,6 +170,8 @@ const heading = (
 
 const BODY_LINE_HEIGHT = 1.12;
 
+const HEADING2 = heading(2, 17, 0.96, { characterSpacing: -4 });
+
 // the style names are what the Word import maps back, see
 // src/importers/docx/styleMap.ts
 export const STYLE = {
@@ -172,8 +183,15 @@ export const STYLE = {
   inlineCode: "InlineCode",
   hyperlink: "Hyperlink",
   caption: "Caption",
+  small: "Small",
   tableHeading: "TableHeading",
+  tocHeading: "TOCHeading",
+  placeholder: "PlaceholderText",
 };
+
+// the name Word gives a table of contents, and its gallery of them, which
+// the Word import knows one by (src/importers/docx/toc.ts)
+export const TOC_NAME = "Table of Contents";
 
 const codeShading = {
   type: "clear",
@@ -195,7 +213,7 @@ export const STYLES: IStylesOptions = {
       },
     },
     heading1: heading(1, 21.5, 0.92, { characterSpacing: -8 }),
-    heading2: heading(2, 17, 0.96, { characterSpacing: -4 }),
+    heading2: HEADING2,
     // 13.75pt doesn't fit half points
     heading3: heading(3, 13.75, 1),
     heading4: heading(4, BODY_SIZE, BODY_LINE_HEIGHT, { bold: true }),
@@ -259,12 +277,47 @@ export const STYLES: IStylesOptions = {
       paragraph: { keepNext: true, spacing: { after: twips(4) } },
     },
     {
+      // small print, e.g. a letter's return address: a step down, like the
+      // style "small" of the pages
+      id: STYLE.small,
+      name: "Small",
+      basedOn: "Normal",
+      quickFormat: true,
+      run: { size: halfPoints(BODY_SIZE / 1.25) },
+    },
+    {
       // the text of header cells, named like LibreOffice's style for it
       id: STYLE.tableHeading,
       name: STYLE_NAMES.tableHeading,
       basedOn: "Normal",
       run: { bold: true },
     },
+    {
+      // the title of a table of contents, Word's own style for it: as a
+      // heading 2, but no heading itself (no outline level), and close to
+      // the entries
+      id: STYLE.tocHeading,
+      name: "TOC Heading",
+      basedOn: "Normal",
+      next: "Normal",
+      run: HEADING2.run,
+      paragraph: {
+        keepNext: true,
+        spacing: { ...HEADING2.paragraph.spacing, before: 0, after: twips(8) },
+      },
+    },
+    // the entries of a table of contents, Word's own styles for them,
+    // indented by level as on the pages
+    ...[1, 2, 3, 4, 5, 6].map((level) => ({
+      id: `TOC${level}`,
+      name: `toc ${level}`,
+      basedOn: "Normal",
+      next: "Normal",
+      paragraph: {
+        indent: { left: (level - 1) * 240 },
+        spacing: { after: twips(2) },
+      },
+    })),
     {
       // also the name LibreOffice gives its horizontal line style
       id: STYLE.horizontalLine,
@@ -279,6 +332,12 @@ export const STYLES: IStylesOptions = {
     },
   ],
   characterStyles: [
+    {
+      // Word's own name, for what an empty content control says
+      id: STYLE.placeholder,
+      name: "Placeholder Text",
+      run: { color: "808080" },
+    },
     {
       id: STYLE.inlineCode,
       name: STYLE_NAMES.inlineCode,

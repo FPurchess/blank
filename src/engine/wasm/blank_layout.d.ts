@@ -159,6 +159,12 @@ export class LayoutEngine {
      * whether it is monospaced; for tests
      */
     textStyles(): Float32Array;
+    /**
+     * the page numbers of the entries of the table of contents at `pos`,
+     * as JSON (an array of strings, "" for an entry whose heading isn't
+     * there), or "null" for none
+     */
+    tocNumbers(pos: number): string;
     unitsPerEm(font: number): number;
     /**
      * several updates at once, `[[start, delete, items, shift], …]` in
@@ -242,6 +248,7 @@ export interface InitOutput {
     readonly layoutengine_stats: (a: number) => [number, number];
     readonly layoutengine_tableGrid: (a: number, b: number) => [number, number];
     readonly layoutengine_textStyles: (a: number) => [number, number];
+    readonly layoutengine_tocNumbers: (a: number, b: number) => [number, number];
     readonly layoutengine_unitsPerEm: (a: number, b: number) => number;
     readonly layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];

@@ -3,6 +3,7 @@ import { shallowRef } from "vue";
 import type { Band, DocumentFields } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
+import type { BoxAnchor } from "./popups";
 
 export interface LinkDialogRequest {
   url: string;
@@ -78,6 +79,22 @@ export interface BandEditorRequest {
 // while none is open
 export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 
+export interface TocPopoverRequest {
+  // the button or block it opens below, at its right end
+  anchor: BoxAnchor;
+  // the headings it lists, 1 to 6 levels deep
+  depth: number;
+  title: string;
+  // changes the table of contents at once, as one undo step
+  apply(depth: number, title: string): void;
+  // gives the editor the focus back, on the table of contents
+  close(): void;
+}
+
+// tocPopover holds the request of the open settings of a table of contents,
+// or null while they are closed
+export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
+
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
 // dialog goes here too
@@ -86,4 +103,5 @@ export const focusTakingDialogs = [
   imageDialog,
   pageSetup,
   bandEditor,
+  tocPopover,
 ] as const;

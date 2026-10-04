@@ -35,6 +35,7 @@ export const layoutengine_setSettings: (a: number, b: number, c: number) => [num
 export const layoutengine_stats: (a: number) => [number, number];
 export const layoutengine_tableGrid: (a: number, b: number) => [number, number];
 export const layoutengine_textStyles: (a: number) => [number, number];
+export const layoutengine_tocNumbers: (a: number, b: number) => [number, number];
 export const layoutengine_unitsPerEm: (a: number, b: number) => number;
 export const layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { blocksPaneFocused } from "./blocksPane";
 import {
   bandEditor,
   type BandEditorRequest,
@@ -9,6 +10,8 @@ import {
   type LinkDialogRequest,
   pageSetup,
   type PageSetupRequest,
+  tocPopover,
+  type TocPopoverRequest,
 } from "./dialogs";
 import { uiTakesFocus } from "./focus";
 import {
@@ -33,6 +36,8 @@ describe("uiTakesFocus", () => {
     bandEditor.value = null;
     contextMenu.value = null;
     tableToolbar.value = null;
+    tocPopover.value = null;
+    blocksPaneFocused.value = false;
   });
 
   it("is false while nothing takes the focus", () => {
@@ -45,6 +50,11 @@ describe("uiTakesFocus", () => {
     ["the page setup", () => (pageSetup.value = {} as PageSetupRequest)],
     ["a header strip", () => (bandEditor.value = {} as BandEditorRequest)],
     ["the context menu", () => (contextMenu.value = {} as ContextMenuRequest)],
+    [
+      "the settings of a table of contents",
+      () => (tocPopover.value = {} as TocPopoverRequest),
+    ],
+    ["the blocks pane, holding it", () => (blocksPaneFocused.value = true)],
     [
       "the caption field",
       () =>

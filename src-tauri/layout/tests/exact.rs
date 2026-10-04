@@ -17,6 +17,9 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, spans: Vec<Span>) -> 
             style: style.into(),
             level,
             top: true,
+            listed: level > 0,
+            hint: None,
+            picture: false,
         }),
         indent: 0.0,
         before: if level > 0 { 16.0 } else { 0.0 },
@@ -24,6 +27,10 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, spans: Vec<Span>) -> 
         marker: None,
         bars: vec![],
         bars_continue: false,
+        page_start: false,
+        column: None,
+        frame: None,
+        flow_top: 0.0,
     }
 }
 
@@ -347,6 +354,142 @@ fn the_pdf_holds_the_layout_on_other_paper() {
     compare(&mut engine, "a5");
 }
 
+/// the sample with twelve of its text blocks, which hold lists, in a band
+/// of a grid of two columns, the first of 150 points
+fn sample_with_grid() -> Vec<Item> {
+    use blank_layout::model::{Column, Track};
+    let mut items = sample();
+    let start = (0..items.len())
+        .find(|&start| {
+            items[start..]
+                .iter()
+                .take(12)
+                .all(|item| matches!(item.content, Content::Text(_)))
+                && items[start..]
+                    .iter()
+                    .take(12)
+                    .any(|item| item.marker.is_some())
+        })
+        .unwrap();
+    for (offset, item) in items[start..start + 12].iter_mut().enumerate() {
+        if let Content::Text(text) = &mut item.content {
+            text.top = false;
+        }
+        item.column = Some(Column {
+            start: offset == 0,
+            index: u32::from(offset >= 6),
+            tracks: vec![Track { pt: 150.0, fr: 0.0 }, Track { pt: 0.0, fr: 1.0 }],
+            gap: 18.0,
+            ..Default::default()
+        });
+    }
+    items
+}
+
+/// a letter: frames at the top of the page, the sample's text below them
+fn letter() -> Vec<Item> {
+    use blank_layout::model::Frame;
+    let mut items: Vec<Item> = sample()
+        .into_iter()
+        .map(|mut item| {
+            item.shift(100);
+            item
+        })
+        .collect();
+    items[0].flow_top = 280.0;
+    let frame = |pos: u32, text: &str, x: f32, y: f32, start: bool| Item {
+        frame: Some(Frame {
+            start,
+            x,
+            y,
+            width: 220.0,
+            ..Default::default()
+        }),
+        ..text_item(pos, text, "p", 0, vec![])
+    };
+    let mut letter = vec![
+        frame(2, "Ann Example", 60.0, 130.0, true),
+        frame(16, "Long Street 12, 12345 Town", 60.0, 130.0, false),
+        frame(46, "Monday, 1 June", 350.0, 140.0, true),
+    ];
+    letter.extend(items);
+    letter
+}
+
+#[test]
+fn the_pdf_holds_frames() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(letter());
+    compare(&mut engine, "letter");
+}
+
+#[test]
+fn the_pdf_holds_a_grid() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(sample_with_grid());
+    compare(&mut engine, "grid");
+}
+
+/// the sample with a table of contents of its headings before it
+fn sample_with_toc() -> Vec<Item> {
+    use blank_layout::model::TocEntry;
+    let mut items: Vec<Item> = sample()
+        .into_iter()
+        .map(|mut item| {
+            item.shift(1);
+            item
+        })
+        .collect();
+    let entries = items
+        .iter()
+        .filter_map(|item| match &item.content {
+            Content::Text(text) if text.listed => Some(TocEntry {
+                level: text.level,
+                text: text.text.clone(),
+            }),
+            _ => None,
+        })
+        .collect();
+    items.insert(
+        0,
+        Item {
+            content: Content::Toc {
+                pos: 0,
+                title: "Contents".into(),
+                depth: 3,
+                entries,
+            },
+            ..text_item(0, "", "p", 0, vec![])
+        },
+    );
+    items
+}
+
+#[test]
+fn the_pdf_holds_a_table_of_contents() {
+    let mut engine = Engine::new(repository_fonts());
+    let mut settings = settings();
+    settings.new_page_before = vec![1];
+    settings.number_style = "i".into();
+    engine.set_settings(settings);
+    engine.set_items(sample_with_toc());
+    // the entry of the last heading says the page it starts on, which is
+    // after the table of contents
+    let (page, _) = engine.listed_headings().last().unwrap().at.unwrap();
+    assert!(page > 0);
+    let last = blank_layout::bands::format_number(page as i64 + 1, "i");
+    let words = engine.words();
+    assert!(
+        words
+            .iter()
+            .any(|word| word.page < page && word.text == last),
+        "no {last} before page {page}"
+    );
+    compare(&mut engine, "toc");
+}
+
 /// a table whose cells hold a list, a quote and paragraphs, after some text
 fn table_with_blocks() -> Vec<Item> {
     use blank_layout::model::{Cell, CellBlock, CellText, Row};
@@ -601,7 +744,7 @@ fn verapdf(path: &str) {
 #[test]
 fn pdf_is_tagged() {
     use blank_layout::pdf::write_with;
-    let mut items = sample();
+    let mut items = sample_with_toc();
     let end = items.last().unwrap().to();
     items.extend(table_with_blocks().into_iter().map(|mut item| {
         item.shift(end as i64);
@@ -690,6 +833,8 @@ fn pdf_is_tagged() {
             "/BlockQuote",
             "/Figure",
             "/Link",
+            "/TOC",
+            "/TOCI",
         ] {
             assert!(has_role(&text, role), "no {role} in the structure");
         }

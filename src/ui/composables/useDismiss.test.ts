@@ -13,8 +13,11 @@ describe("useDismiss", () => {
     scope.run(() => useDismiss(() => [popup, anchor, null], close, options))!;
   const press = (target: EventTarget) =>
     target.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  // dispatches a key, and returns whether it went on (wasn't prevented)
   const key = (name: string) =>
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: name }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: name, cancelable: true }),
+    );
 
   beforeEach(() => {
     scope = effectScope();
@@ -54,18 +57,20 @@ describe("useDismiss", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it("closes on Escape but not on other keys", () => {
+  it("closes on Escape but not on other keys, and takes the Escape", () => {
     start({ escape: true });
-    key("a");
+    expect(key("a")).toBe(true);
     expect(close).not.toHaveBeenCalled();
-    key("Escape");
+    // the rest of the press never reaches what gets the focus as typing
+    expect(key("Escape")).toBe(false);
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("closes on any key", () => {
+  it("closes on any key, which goes on", () => {
     start({ anyKey: true });
-    key("a");
+    expect(key("a")).toBe(true);
     expect(close).toHaveBeenCalledOnce();
+    expect(key("Escape")).toBe(true);
   });
 
   it("closes on blur and resize", () => {
