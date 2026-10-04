@@ -88,6 +88,24 @@ describe("the blocks pane", () => {
     // jsdom's window is 1024 px wide
     expect(document.body.classList.contains("blocks-docked")).toBe(true);
     expect(pane()!.classList.contains("docked")).toBe(true);
+    // docked, a press elsewhere leaves it open
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(blocksPaneOpen.value).toBe(true);
+  });
+
+  it("floats over the pages at a narrow window, and goes on a press elsewhere", async () => {
+    const width = window.innerWidth;
+    window.innerWidth = 800;
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(pane()!.classList.contains("floating")).toBe(true);
+    expect(document.body.classList.contains("blocks-docked")).toBe(false);
+    tile("toc").dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(blocksPaneOpen.value).toBe(true);
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(blocksPaneOpen.value).toBe(false);
+    window.innerWidth = width;
+    window.dispatchEvent(new Event("resize"));
   });
 
   it("inserts a block where the cursor is on a click, and says so", () => {

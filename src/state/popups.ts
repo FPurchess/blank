@@ -5,7 +5,12 @@ export interface Anchor {
   left: number;
   top: number;
   bottom: number;
+  // its right end, which a popup lines up with when it opens at the end
+  right?: number;
 }
+
+// a box something sits on, e.g. a table or a block its toolbar is above
+export type BoxAnchor = Required<Anchor>;
 
 export interface TablePickerState {
   // the size of the table Enter inserts, the header row included
@@ -46,7 +51,7 @@ export interface TableToolbarItem extends ToolbarItem {
 
 export interface TableToolbarState {
   // the box of the table, in viewport coordinates, which the toolbar sits on
-  anchor: { left: number; top: number; bottom: number; right: number };
+  anchor: BoxAnchor;
   items: TableToolbarItem[];
   // table mode (Mod+T): the buttons show their keys, which work until Esc
   keys: boolean;
@@ -63,7 +68,7 @@ export const tableToolbar = shallowRef<TableToolbarState | null>(null);
 
 export interface BlockToolbarState {
   // the box of the block, in viewport coordinates, which the toolbar sits on
-  anchor: { left: number; top: number; bottom: number; right: number };
+  anchor: BoxAnchor;
   // what the block is, e.g. "Recipe", which the toolbar shows
   label: string;
   // the icon of its kind of block, see src/icons.ts

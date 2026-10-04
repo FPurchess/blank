@@ -3,15 +3,31 @@ import type { Anchor, TableToolbarState } from "./state";
 // space between a popup and the edges of the window
 const MARGIN = 4;
 
+export interface PlaceOptions {
+  // the item a submenu opens next to
+  side?: DOMRect;
+  // "end" lines the popup's right end up with the anchor's, as a popover
+  // below a button at a toolbar's right end
+  align?: "start" | "end";
+}
+
 /**
  * place moves `element` below `anchor`, or above it if it only fits there,
  * or else as far up as it needs to fit, like the system menus. A submenu opens
  * next to the item `side`.
  */
-export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
+export const place = (
+  element: HTMLElement,
+  anchor: Anchor,
+  { side, align = "start" }: PlaceOptions = {},
+) => {
   const { width, height } = element.getBoundingClientRect();
   const bottom = window.innerHeight - MARGIN;
-  let left = side ? side.right : anchor.left;
+  let left = side
+    ? side.right
+    : align === "end"
+      ? (anchor.right ?? anchor.left) - width
+      : anchor.left;
   let top = side ? side.top : anchor.bottom + 2;
   if (side && left + width > window.innerWidth - MARGIN) {
     left = side.left - width;
@@ -29,29 +45,6 @@ export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
  */
 const inWindow = (left: number, width: number) =>
   Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
-
-// the space between a popover and what it opens below
-const POPOVER_GAP = 6;
-
-/**
- * placeBelowEnd puts `element` below `anchor`, their right ends in line, as
- * a popover opens below the button at a toolbar's right end; above it where
- * there's no room below
- */
-export const placeBelowEnd = (
-  element: HTMLElement,
-  anchor: { top: number; bottom: number; right: number },
-) => {
-  const { width, height } = element.getBoundingClientRect();
-  const below = anchor.bottom + POPOVER_GAP;
-  const above = anchor.top - POPOVER_GAP - height;
-  const top =
-    below + height <= window.innerHeight - MARGIN || above < MARGIN
-      ? below
-      : above;
-  element.style.left = `${inWindow(anchor.right - width, width)}px`;
-  element.style.top = `${Math.max(MARGIN, top)}px`;
-};
 
 // the space between the toolbar and the table, which leaves room for the
 // handles on the table's top edge (src/ui/TableHandles.vue), and the

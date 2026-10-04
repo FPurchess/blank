@@ -1,42 +1,24 @@
 import type { Node } from "prosemirror-model";
 import { shallowRef } from "vue";
 
-import { forEachHeading, headingText } from "../markdown/headings";
+import { type ListedHeading, listedHeadings } from "../markdown/headings";
 
-// The document's headings, in order: its heading nodes at its top and in its
-// forms' fields, as the PDF's bookmarks have them, so a heading in a quote or
-// a list isn't one.
+// The document's headings, in order: the ones a table of contents lists, the
+// PDF's bookmarks have and the outline shows (listedHeadings): at its top and
+// in its forms' fields, with text, so neither a heading in a quote or a list
+// nor an empty one is one.
 // Published by the editor's headings plugin (src/editor/plugins/headings.ts)
-// whenever they change, and read by the outline (src/ui/DocumentOutline.vue).
-// It knows nothing about who shows them, so a table of contents can read the
-// same list.
+// whenever they change, and read by the outline (src/ui/DocumentOutline.vue)
+// and the status bar.
 
-export interface Heading {
-  // 1 … 6
-  level: number;
-  // its text, with a space for an image in it; empty while the heading is
-  text: string;
-  // where the heading node starts in the document
-  pos: number;
-}
+export type Heading = ListedHeading;
 
 export const headings = shallowRef<readonly Heading[]>([]);
 
 /**
- * headingsOf returns the headings of `doc` at its top and in its forms'
- * fields, in order (see forEachHeading)
+ * headingsOf returns the headings of `doc` (see listedHeadings), in order
  */
-export const headingsOf = (doc: Node): Heading[] => {
-  const found: Heading[] = [];
-  forEachHeading(doc, (node, pos) => {
-    found.push({
-      level: node.attrs.level as number,
-      text: headingText(node),
-      pos,
-    });
-  });
-  return found;
-};
+export const headingsOf = (doc: Node): Heading[] => listedHeadings(doc);
 
 const same = (a: readonly Heading[], b: readonly Heading[]) =>
   a.length === b.length &&

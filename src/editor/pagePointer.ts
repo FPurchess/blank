@@ -11,6 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { engineless, pageEngine } from "../engine/engine";
 import { gapAt } from "../engine/geometry";
+import { topBlockAt } from "../markdown/topBlock";
 import { pageDropCaret, pageDropGap } from "../state";
 import { pageDrop } from "./commands/pageDrop";
 import { pasteText } from "./plugins/tables/clipboard";
@@ -119,7 +120,8 @@ export const nativePointer = () =>
  * blocks there
  */
 export const movesBlock = (state: EditorState) =>
-  state.selection instanceof NodeSelection && state.selection.$from.depth === 0;
+  state.selection instanceof NodeSelection &&
+  topBlockAt(state.doc, state.selection.from)?.node === state.selection.node;
 
 /**
  * moveCandidate tells whether a press at `pos` lands in the selected text,

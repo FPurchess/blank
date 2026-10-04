@@ -3,6 +3,7 @@ import { shallowRef } from "vue";
 import type { Band, DocumentFields } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
+import type { BoxAnchor } from "./popups";
 
 export interface LinkDialogRequest {
   url: string;
@@ -80,7 +81,7 @@ export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 
 export interface TocPopoverRequest {
   // the button or block it opens below, at its right end
-  anchor: { left: number; top: number; bottom: number; right: number };
+  anchor: BoxAnchor;
   // the headings it lists, 1 to 6 levels deep
   depth: number;
   title: string;

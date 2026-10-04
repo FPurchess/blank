@@ -10,18 +10,19 @@ import {
   watch,
 } from "vue";
 
-import { CommandIdentifier, getKeyBinding } from "../config";
+import { CommandIdentifier } from "../config";
 import {
   hideBlocksPane,
   insertBlock,
   refreshBlocks,
 } from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
-import { normalizeBinding } from "../editor/keyBindings";
+import { commandBinding } from "../editor/keyBindings";
 import { listenOnWindow } from "../scope";
 import {
   blockChoices,
   blocksPaneFocused,
+  blocksPaneOpen,
   blocksPaneSearch,
   OUTLINE_BREAKPOINT,
 } from "../state";
@@ -30,6 +31,7 @@ import { groupsOf, tileStep } from "./blocksPaneModel";
 import IconGlyph from "./components/IconGlyph.vue";
 import SidePaneHead from "./components/SidePaneHead.vue";
 import { useBodyClass } from "./composables/useBodyClass";
+import { useDismiss } from "./composables/useDismiss";
 import { useWindowWidth } from "./composables/useWindowWidth";
 import { tileDrag } from "./tileDrag";
 
@@ -57,6 +59,17 @@ const currentId = computed(
 const windowWidth = useWindowWidth();
 const docked = computed(() => windowWidth.value >= OUTLINE_BREAKPOINT);
 useBodyClass("blocks-docked", () => docked.value);
+// floating over the pages, a press elsewhere puts it away, as the outline's
+// floating list goes
+useDismiss(
+  () => [root.value],
+  () => {
+    if (!docked.value) {
+      blocksPaneOpen.value = false;
+      blocksPaneFocused.value = false;
+    }
+  },
+);
 
 onMounted(() => {
   if (blockChoices.value.length === 0)
@@ -99,7 +112,7 @@ const insert = (id: string, gap?: number) => {
 };
 
 // the shortcut that opened the pane closes it while it has the focus
-const binding = normalizeBinding(getKeyBinding(CommandIdentifier.INSERT_BLOCK));
+const binding = commandBinding(CommandIdentifier.INSERT_BLOCK);
 const closeKey = keydownHandler(
   binding
     ? {

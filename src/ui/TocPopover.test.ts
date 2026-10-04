@@ -74,6 +74,23 @@ describe("the settings of a table of contents", () => {
     expect(tocPopover.value).toBeNull();
   });
 
+  it("closes when the window loses the focus", () => {
+    window.dispatchEvent(new Event("blur"));
+    expect(tocPopover.value).toBeNull();
+  });
+
+  it("leaves a press on the settings button to the button", () => {
+    const button = document.createElement("button");
+    button.dataset.id = "block-edit";
+    const bar = document.createElement("div");
+    bar.id = "block-toolbar";
+    bar.append(button);
+    document.body.append(bar);
+    button.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(tocPopover.value).not.toBeNull();
+    bar.remove();
+  });
+
   it("closes on a press elsewhere, but not on a press in it", () => {
     title().dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(tocPopover.value).not.toBeNull();

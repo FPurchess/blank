@@ -24,6 +24,7 @@ import {
   tocPopover,
 } from "../../state";
 import { blockName } from "../../markdown/blocks/names";
+import { topBlockAt } from "../../markdown/topBlock";
 import { embedTypes, type EmbedType } from "../../embeds/registry";
 import { type Form, loadForms } from "../../forms/library";
 import { boxOnCaretPage } from "../plugins/followLayout";
@@ -95,13 +96,8 @@ export const embedChoice = (type: EmbedType): Choice => ({
  * topBlockEnd returns where the block at the top of the document that holds
  * `pos` ends, or where the document's content ends
  */
-const topBlockEnd = (doc: Node, pos: number) => {
-  const $pos = doc.resolve(pos);
-  const index = $pos.index(0);
-  return index < doc.childCount
-    ? $pos.posAtIndex(index + 1, 0)
-    : doc.content.size;
-};
+const topBlockEnd = (doc: Node, pos: number) =>
+  topBlockAt(doc, pos)?.to ?? doc.content.size;
 
 /**
  * insertTopBlock puts `node` at the top of the document: at `at`, a place
@@ -276,12 +272,20 @@ export const selectedToc = (state: EditorState) => {
 
 /**
  * editToc opens the settings of the selected table of contents below it:
- * how deep it lists the headings and its title, which change it at once
+ * how deep it lists the headings and its title, which change it at once; or
+ * closes them while they are open
  */
 export const editToc = (): Command => (state, dispatch, view) => {
   const selected = selectedToc(state);
   if (!selected) return false;
   if (!dispatch || !view) return true;
+  // the settings button again closes them
+  const open = tocPopover.value;
+  if (open) {
+    tocPopover.value = null;
+    open.close();
+    return true;
+  }
   const { node, pos } = selected;
   // the table of contents still where the settings opened it
   const at = (state: EditorState) =>

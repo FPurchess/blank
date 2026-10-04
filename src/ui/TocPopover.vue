@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUpdated, shallowRef, useTemplateRef } from "vue";
 
-import { placeBelowEnd } from "../popup";
-import { listenOnWindow } from "../scope";
+import { place } from "../popup";
 import { tocPopover, type TocPopoverRequest } from "../state";
 import { closeDialog } from "./closeDialog";
-import { anchorOf, DEPTH_OPTIONS, titleOf } from "./tocPopoverModel";
+import { useDismiss } from "./composables/useDismiss";
+import {
+  anchorOf,
+  DEPTH_OPTIONS,
+  SETTINGS_BUTTON,
+  titleOf,
+} from "./tocPopoverModel";
 
 // The settings of a table of contents, below the toolbar's settings button
 // (Enter or a click on it, see src/editor/commands/contentBlocks.ts): how
@@ -19,37 +24,32 @@ const depthField = useTemplateRef<HTMLSelectElement>("depth");
 const depth = shallowRef(props.request.depth);
 const title = shallowRef(props.request.title);
 
-const place = () => placeBelowEnd(root.value!, anchorOf(props.request.anchor));
+const placeIt = () =>
+  place(root.value!, anchorOf(props.request.anchor), { align: "end" });
 onMounted(() => {
-  place();
+  placeIt();
   depthField.value!.focus();
 });
-onUpdated(place);
+onUpdated(placeIt);
 
 const apply = () => props.request.apply(depth.value, titleOf(title.value));
 const close = () => closeDialog(tocPopover, props.request.close);
 
+// Enter in the title closes them
 const onKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    close();
-  } else if (
-    event.key === "Enter" &&
-    event.target instanceof HTMLInputElement
-  ) {
+  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
     event.preventDefault();
     close();
   }
 };
 
-// a press elsewhere closes them, and keeps its own effect
-listenOnWindow(
-  "pointerdown",
-  (event) => {
-    if (!root.value?.contains(event.target as Node)) close();
-  },
-  true,
-);
+// a press elsewhere, Esc, leaving the window or resizing it closes them; a
+// press on the settings button is theirs, which closes them through it
+useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
+  escape: true,
+  blur: true,
+  resize: true,
+});
 </script>
 
 <template>

@@ -2,9 +2,9 @@
 import { onMounted, onUpdated, useTemplateRef } from "vue";
 
 import { placeToolbar } from "../popup";
-import type { BlockToolbarState, ToolbarItem } from "../state";
-import IconButton from "./components/IconButton.vue";
+import type { BlockToolbarState } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
+import ToolbarButton from "./ToolbarButton.vue";
 
 // The toolbar of the content block the cursor is in or on, above the
 // block's right end, as the table toolbar sits on its table
@@ -19,10 +19,6 @@ const root = useTemplateRef<HTMLElement>("root");
 const place = () => placeToolbar(root.value!, props.state.anchor);
 onMounted(place);
 onUpdated(place);
-
-const run = (item: ToolbarItem) => {
-  if (item.enabled) item.run();
-};
 </script>
 
 <template>
@@ -38,18 +34,13 @@ const run = (item: ToolbarItem) => {
       <IconGlyph :name="state.icon" />
       <span class="block-name">{{ state.label }}</span>
     </span>
-    <span class="separator" aria-hidden="true"></span>
-    <IconButton
+    <span class="separator" role="separator" aria-orientation="vertical" />
+    <ToolbarButton
       v-for="item in state.items"
       :key="item.id"
-      :icon="item.icon"
-      :label="item.tip ?? item.label"
-      :aria-label="item.label"
-      :tip-key="item.key"
-      :disabled="!item.enabled"
-      :focusable="false"
-      :data-id="item.id"
-      @click="run(item)"
+      :item="item"
+      :keys="false"
+      tip-keys
     />
   </div>
 </template>

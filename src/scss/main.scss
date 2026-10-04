@@ -512,7 +512,7 @@ $faint-text-opacity: 0.6;
   font-size: 0.75rem;
   opacity: $faint-text-opacity;
   background-color: var(--background-color);
-    transition: opacity 150ms;
+  transition: opacity 150ms;
 
   &:hover {
     opacity: 0.8;
@@ -677,7 +677,7 @@ $faint-text-opacity: 0.6;
       border: 1px solid transparent;
       border-radius: 3px;
       padding: 1px 8px;
-            opacity: 0.75;
+      opacity: 0.75;
 
       &:hover,
       &:focus-visible {
@@ -1680,15 +1680,15 @@ body.without-engine.blocks-docked {
   padding-left: $blocks-dock;
 }
 
+// the search: a field with the magnifier in it
 .blocks-search {
+  @include field;
+  // the field is paper on the pane's desk
+  --muted: var(--muted-on-paper);
   display: flex;
   align-items: center;
   gap: var(--s2);
-  height: var(--control);
   margin: 0 var(--s3) var(--s2);
-  padding: 0 var(--s2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-control);
   color: var(--muted);
 
   input {
@@ -1700,6 +1700,10 @@ body.without-engine.blocks-docked {
     font: inherit;
     color: var(--color);
     background: none;
+
+    &::placeholder {
+      color: var(--muted);
+    }
   }
 
   &:focus-within {
@@ -1715,12 +1719,8 @@ body.without-engine.blocks-docked {
 }
 
 .blocks-group {
+  @include group-label;
   margin: var(--s3) var(--s1) var(--s2);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .blocks-none {
@@ -1807,12 +1807,8 @@ body.without-engine.blocks-docked {
   @include popover;
 
   h2 {
+    @include group-label;
     margin: 0 0 var(--s1);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--muted);
   }
 
   label {
@@ -1822,14 +1818,7 @@ body.without-engine.blocks-docked {
 
   select,
   input {
-    box-sizing: border-box;
-    height: var(--control);
-    padding: 0 var(--s2);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r-control);
-    font: inherit;
-    color: var(--color);
-    background: var(--background-color);
+    @include field;
   }
 }
 

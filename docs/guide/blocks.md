@@ -2,8 +2,6 @@
 
 Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
 
-<img class="shot" src="/screenshots/blocks-pane.gif" alt="Mod Alt B opens the Blocks pane; the table of contents is dragged between two paragraphs, where a line shows it will go, and the recipe is inserted with a click" />
-
 ## The Blocks pane {#pane}
 
 Press `Mod` `Alt` `B` to open the pane. Each block is a tile with a small drawing of it; rest the pointer on one to read what it is.

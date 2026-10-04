@@ -212,6 +212,15 @@ describe("editToc", () => {
     expect(view.state.selection).toBeInstanceOf(NodeSelection);
   });
 
+  it("closes its settings when asked again, as the settings button does", () => {
+    const view = selected();
+    editToc()(view.state, view.dispatch, view);
+    const close = vi.spyOn(tocPopover.value!, "close");
+    expect(editToc()(view.state, view.dispatch, view)).toBe(true);
+    expect(tocPopover.value).toBeNull();
+    expect(close).toHaveBeenCalled();
+  });
+
   it("changes nothing for settings it already has", () => {
     const view = selected();
     editToc()(view.state, view.dispatch, view);

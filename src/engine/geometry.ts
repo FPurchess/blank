@@ -21,6 +21,7 @@ import {
   type PageEngine,
 } from "./engine";
 import { cellAt } from "../markdown/tables";
+import { topBlockAt } from "../markdown/topBlock";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
@@ -407,20 +408,6 @@ export const hitAt = (x: number, y: number): Hit | null => {
   }
   const point = pointOnPages(shown, x, y);
   return point ? shown.engine.hit(point.page, point.x, point.y) : null;
-};
-
-/**
- * topBlockAt returns the block at the top of `doc` that holds `pos`, with
- * where it starts and ends, or null in an empty document
- */
-const topBlockAt = (doc: Node, pos: number) => {
-  if (doc.childCount === 0) return null;
-  const index = Math.min(
-    doc.resolve(Math.min(pos, doc.content.size)).index(0),
-    doc.childCount - 1,
-  );
-  const from = doc.resolve(0).posAtIndex(index, 0);
-  return { index, from, to: from + doc.child(index).nodeSize };
 };
 
 /**

@@ -2,6 +2,7 @@ import type { Node } from "prosemirror-model";
 
 import { type Box, blockBoxes, gapLine } from "../engine/geometry";
 import { isContentBlock } from "../markdown/blocks/names";
+import { topBlockAt } from "../markdown/topBlock";
 
 // What BlockMarks.vue shows over the pages: the line where a dragged block
 // drops, and the hairline around the content block under the pointer.
@@ -43,12 +44,9 @@ export const styleOf = (box: Box) => ({
  * holds `pos` starts and ends, or null where there is none
  */
 export const contentBlockAt = (doc: Node, pos: number | null) => {
-  if (pos === null || pos < 0 || pos > doc.content.size) return null;
-  const $pos = doc.resolve(pos);
-  const index = $pos.index(0);
-  if (index >= doc.childCount) return null;
-  const node = doc.child(index);
-  if (!isContentBlock(node)) return null;
-  const from = $pos.posAtIndex(index, 0);
-  return { from, to: from + node.nodeSize };
+  if (pos === null || pos < 0 || pos >= doc.content.size) return null;
+  const block = topBlockAt(doc, pos);
+  return block && isContentBlock(block.node)
+    ? { from: block.from, to: block.to }
+    : null;
 };

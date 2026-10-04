@@ -39,7 +39,7 @@ const checks = computed(() => hasChecks(props.items));
 const rowAt = (index: number) => root.value!.children[index] as HTMLElement;
 
 const placeMenu = () =>
-  place(root.value!, props.anchor, props.side ?? undefined);
+  place(root.value!, props.anchor, { side: props.side ?? undefined });
 onMounted(placeMenu);
 onUpdated(placeMenu);
 

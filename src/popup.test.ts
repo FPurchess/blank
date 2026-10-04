@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { placeBelowEnd, placeTip, placeToolbar } from "./popup";
+import { place, placeTip, placeToolbar } from "./popup";
 
 // jsdom's window is 1024 × 768
 const toolbar = (width = 200, height = 30) => {
@@ -112,18 +112,25 @@ describe("placeTip", () => {
   });
 });
 
-describe("placeBelowEnd", () => {
+describe("place at the end", () => {
+  const button = (top: number, right: number) => ({
+    left: right - 28,
+    top,
+    bottom: top + 28,
+    right,
+  });
+
   it("puts a popover below a button, their right ends in line", () => {
     const element = toolbar(260, 150);
-    placeBelowEnd(element, { top: 100, bottom: 128, right: 700 });
+    place(element, button(100, 700), { align: "end" });
     expect(element.style.left).toBe(`${700 - 260}px`);
-    expect(element.style.top).toBe(`${128 + 6}px`);
+    expect(element.style.top).toBe(`${128 + 2}px`);
   });
 
   it("goes above where there's no room below, and stays in the window", () => {
     const element = toolbar(260, 150);
-    placeBelowEnd(element, { top: 700, bottom: 728, right: 100 });
-    expect(element.style.top).toBe(`${700 - 6 - 150}px`);
+    place(element, button(700, 100), { align: "end" });
+    expect(element.style.top).toBe(`${700 - 150 - 2}px`);
     expect(element.style.left).toBe("4px");
   });
 });
