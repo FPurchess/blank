@@ -81,6 +81,7 @@ defineExpose({
       <div
         v-else
         :role="roleOf(item)"
+        :class="item.look"
         :aria-checked="item.checked"
         :data-id="item.id"
         :tabindex="index === focused ? 0 : -1"

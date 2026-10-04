@@ -1,4 +1,9 @@
-import { CommandIdentifier, CommandIdentifier as C } from "./config";
+import {
+  CommandIdentifier,
+  CommandIdentifier as C,
+  getKeyBinding,
+} from "./config";
+import type { MenuItem } from "./state";
 
 // One list of Blank's commands: what they're called, where they're grouped,
 // their icon and the other words a search finds them by. Whatever names a
@@ -390,3 +395,19 @@ export const commandInfo = (command: CommandIdentifier) => byId[command];
  * commandLabel returns what `command` is called
  */
 export const commandLabel = (command: CommandIdentifier) => byId[command].label;
+
+/**
+ * commandItem returns the menu item of a command, named and with the key as
+ * the command list and the keymap have them, e.g. for the context menu and
+ * the toolbar's menus
+ */
+export const commandItem = (
+  id: string,
+  command: CommandIdentifier,
+  item: Omit<Exclude<MenuItem, "separator">, "id" | "label" | "shortcut">,
+): MenuItem => ({
+  id,
+  label: commandLabel(command),
+  shortcut: getKeyBinding(command) || undefined,
+  ...item,
+});

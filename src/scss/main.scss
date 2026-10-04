@@ -1037,6 +1037,37 @@ $strip-height: 88px;
   }
 }
 
+// the items of the toolbar's style menu, each drawn like what it makes, as
+// on the major-third scale of the headings, a step smaller
+.context-menu .style-heading1 {
+  font-size: 1.56em;
+  font-weight: 500;
+}
+.context-menu .style-heading2 {
+  font-size: 1.25em;
+  font-weight: 500;
+}
+.context-menu .style-heading3 {
+  font-size: 1.1em;
+  font-weight: 500;
+}
+.context-menu .style-heading4 {
+  font-weight: 700;
+}
+.context-menu .style-heading5 {
+  font-weight: 700;
+  font-style: italic;
+}
+.context-menu .style-heading6 {
+  font-style: italic;
+}
+.context-menu .style-quote {
+  font-style: italic;
+}
+.context-menu .style-code_block .label {
+  font-family: monospace;
+}
+
 .context-menu {
   position: fixed;
   z-index: 20;
@@ -1469,6 +1500,11 @@ body.outline-docked #page-view {
   right: $outline-dock;
 }
 
+// the formatting toolbar stays centered over the pages
+body.outline-docked #format-toolbar {
+  padding-right: $outline-dock;
+}
+
 // without the engine the editor shows the text in the window itself
 body.without-engine.outline-docked {
   padding-right: $outline-dock;
@@ -1684,6 +1720,10 @@ $tile-columns: 2;
 
 body.blocks-docked #page-view {
   left: $blocks-dock;
+}
+
+body.blocks-docked #format-toolbar {
+  padding-left: $blocks-dock;
 }
 
 // without the engine the editor shows the text in the window itself

@@ -754,6 +754,18 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "form.gif"), FULL);
   });
 
+  it("captures the formatting toolbar", async () => {
+    await pressMod("n");
+    await type("a centered heading");
+    await pressMod("1");
+    await pressMod(Key.Shift, "e");
+    await type(Key.Enter);
+    await type("the toolbar shows how the text at the caret is set.");
+    await setCaret(false);
+    await shot("toolbar");
+    await setCaret(true);
+  });
+
   it("captures a page break", async () => {
     await pressMod("n");
     await type("the end of the first chapter.");

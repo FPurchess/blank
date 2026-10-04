@@ -1,5 +1,7 @@
 import { shallowRef } from "vue";
 
+import type { CommandIdentifier } from "../config";
+
 // where a popup like a menu is shown: below the cursor, in viewport coordinates
 export interface Anchor {
   left: number;
@@ -41,6 +43,8 @@ export interface ToolbarItem {
   // its key: shown in table mode, e.g. "↑", and on the block toolbar in
   // its tooltip
   key?: string;
+  // the command it runs, whose shortcut its tooltip shows
+  command?: CommandIdentifier;
   run(): void;
 }
 
@@ -139,6 +143,9 @@ export type MenuItem =
       detail?: string;
       // the name of an icon before the label, see src/icons.ts
       icon?: string;
+      // a class that draws the item like what it makes, e.g. a heading's
+      // item in a style menu
+      look?: string;
       // the key binding, e.g. "Mod-z"
       shortcut?: string;
       disabled?: boolean;

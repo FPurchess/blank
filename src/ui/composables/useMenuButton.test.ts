@@ -43,13 +43,21 @@ describe("useMenuButton", () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 
-  it("opens from the keyboard when the button has the focus", () => {
-    const menu = scope.run(() => useMenuButton(() => {}))!;
+  it("opens from the keyboard when the button has the focus, and says so when it closes", () => {
+    const closed = vi.fn();
+    const menu = scope.run(() => useMenuButton(closed))!;
     const element = button();
     element.focus();
 
     menu.toggle(clickOn(element), items);
     expect(contextMenu.value?.keyboard).toBe(true);
+    contextMenu.value!.close();
+    expect(closed).toHaveBeenCalledWith(true);
+
+    element.blur();
+    menu.toggle(clickOn(element), items);
+    contextMenu.value!.close();
+    expect(closed).toHaveBeenLastCalledWith(false);
   });
 
   it("leaves a menu opened since then alone when it closes", () => {
