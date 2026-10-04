@@ -266,12 +266,12 @@ mod tests {
 
     #[test]
     fn follows_links_to_the_file_itself() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("a.md");
-        std::fs::write(&file, "a").unwrap();
-        let canonical = std::fs::canonicalize(&file).unwrap();
         #[cfg(unix)]
         {
+            let dir = tempfile::tempdir().unwrap();
+            let file = dir.path().join("a.md");
+            std::fs::write(&file, "a").unwrap();
+            let canonical = std::fs::canonicalize(&file).unwrap();
             let link = dir.path().join("link.md");
             std::os::unix::fs::symlink(&file, &link).unwrap();
             assert_eq!(
