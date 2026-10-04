@@ -3,7 +3,7 @@ import { Plugin } from "prosemirror-state";
 import type { EditorView, NodeView } from "prosemirror-view";
 import { watch } from "vue";
 
-import { READING_LINE, scrollToText } from "../../engine/geometry";
+import { scrollToHeading } from "../../engine/geometry";
 import { listedHeadings } from "../../markdown/headings";
 import { headings } from "../../state";
 import { pasteTopBlocks } from "../commands/contentBlocks";
@@ -37,7 +37,7 @@ export const followEntry = (view: EditorView, pos: number, entry: number) => {
     entry
   ];
   if (!heading) return false;
-  scrollToText(heading.pos + 1, READING_LINE);
+  scrollToHeading(heading.pos);
   return true;
 };
 

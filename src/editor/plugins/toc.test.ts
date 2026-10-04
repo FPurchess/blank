@@ -2,7 +2,7 @@ import { EditorState, type Transaction } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { scrollToText } from "../../engine/geometry";
+import { scrollToHeading } from "../../engine/geometry";
 import { schema } from "../../markdown";
 import { headings, headingsOf, tocPopover } from "../../state";
 import { doc, h } from "../../test/editor";
@@ -11,7 +11,7 @@ import { followEntry, toc } from "./toc";
 
 vi.mock("../../engine/geometry", async (original) => ({
   ...(await original<typeof import("../../engine/geometry")>()),
-  scrollToText: vi.fn(),
+  scrollToHeading: vi.fn(),
 }));
 
 const contents = (depth = 2) =>
@@ -41,7 +41,7 @@ describe("toc plugin", () => {
     view = mount();
     expect(followEntry(view, 0, 1)).toBe(true);
     // into the heading "Two", after "One" (5) and "Deep" (6)
-    expect(scrollToText).toHaveBeenCalledWith(1 + 5 + 6 + 1, 108);
+    expect(scrollToHeading).toHaveBeenCalledWith(1 + 5 + 6);
     expect(followEntry(view, 0, 5)).toBe(false);
     expect(followEntry(view, 1, 0)).toBe(false);
   });
@@ -69,9 +69,9 @@ describe("toc plugin", () => {
     };
     // a plain click selects it, as any block
     expect(press({})).toBe(false);
-    expect(scrollToText).not.toHaveBeenCalled();
+    expect(scrollToHeading).not.toHaveBeenCalled();
     expect(press({ ctrlKey: true })).toBe(true);
-    expect(scrollToText).toHaveBeenCalledWith(2, 108);
+    expect(scrollToHeading).toHaveBeenCalledWith(1);
     // other links are openLink's
     expect(press({ ctrlKey: true, link: "https://example.org" })).toBe(false);
   });

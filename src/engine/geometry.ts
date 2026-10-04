@@ -584,6 +584,14 @@ export const scrollToText = (pos: number, at: number) => {
 };
 
 /**
+ * scrollToHeading scrolls to the heading at `pos` so that it starts at the
+ * reading line, as the outline and a table of contents' entries jump, without
+ * moving the selection
+ */
+export const scrollToHeading = (pos: number) =>
+  scrollToText(pos + 1, READING_LINE);
+
+/**
  * scrollViewBy scrolls what shows the text by `dy` pixels, e.g. for a wheel
  * turned over the outline
  */

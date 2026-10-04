@@ -294,6 +294,8 @@ textarea:not(:disabled) {
 // the page view's scrollbar; a rule after the include may change it. Its
 // parts: `side-pane-head` (the title and
 // the button that hides it), `side-pane-title` and `side-pane-foot`.
+// Its surface is the desk, floating or not, so it keeps `--muted` (unlike
+// `popover`, which is paper).
 @mixin side-pane($edge: left, $offset: 0) {
   position: fixed;
   #{$edge}: $offset;

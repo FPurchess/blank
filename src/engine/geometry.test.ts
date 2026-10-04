@@ -20,6 +20,7 @@ import {
   pageTops,
   rangeRects,
   scrollState,
+  scrollToHeading,
   scrollToText,
   scrollTops,
   scrollViewBy,
@@ -147,6 +148,11 @@ describe("geometry", () => {
     expect(state.top).toBe(50);
     expect(state.height).toBe(TEST_VIEWPORT.height);
     expect(state.max).toBeGreaterThan(TEST_VIEWPORT.height);
+  });
+
+  it("scrolls to a heading at the reading line", () => {
+    scrollToHeading(2);
+    expect(pageScrollRequest.value).toMatchObject({ page: 0, at: 108 });
   });
 
   it("asks the page view to show text below its top, keeping the selection", () => {
