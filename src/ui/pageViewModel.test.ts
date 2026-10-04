@@ -33,7 +33,8 @@ describe("scrollFor", () => {
     expect(scrollFor({ top: 900, height: 20 }, 0, 600)).toBe(
       900 + 20 + 64 - 600,
     );
-    expect(scrollFor({ top: 100, height: 20 }, 500, 600)).toBe(36);
+    // less room above, where the top area no longer covers the view
+    expect(scrollFor({ top: 100, height: 20 }, 500, 600)).toBe(80);
   });
 });
 

@@ -1,3 +1,4 @@
+import { TOP_BAR_HEIGHT } from "./chrome";
 import type { Anchor, TableToolbarState } from "./state";
 
 // space between a popup and the edges of the window
@@ -50,8 +51,8 @@ const inWindow = (left: number, width: number) =>
 // handles on the table's top edge (src/ui/TableHandles.vue), and the
 // window's edges
 const TOOLBAR_GAP = 10;
-// the top bar with the file name, which the toolbar stays below
-const TOOLBAR_TOP = 36;
+// the top area, which the toolbar stays below
+const TOOLBAR_TOP = TOP_BAR_HEIGHT + 4;
 
 type ToolbarAnchor = TableToolbarState["anchor"];
 
@@ -84,7 +85,7 @@ const TIP_WIDE = 160;
 
 /**
  * placeTip puts a tooltip above its control, centered on it, or below it
- * where the top bar leaves no room; on a wide control, at the pointer's `x`
+ * where the top area leaves no room; on a wide control, at the pointer's `x`
  */
 export const placeTip = (element: HTMLElement, target: DOMRect, x: number) => {
   const { width, height } = element.getBoundingClientRect();

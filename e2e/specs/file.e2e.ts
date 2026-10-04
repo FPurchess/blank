@@ -53,7 +53,7 @@ describe("file", () => {
   it("opens the file passed via command-line argument", async () => {
     await expectEditorText("#editor h1", "E2E Fixture");
     await expectEditorText("#editor p", "Original paragraph.");
-    await expect($("#ui-top")).toHaveText(`» ${fixturePath}`);
+    await expect($("#ui-title")).toHaveText(`» ${fixturePath}`);
   });
 
   it("saves changes to the opened file", async () => {
@@ -130,7 +130,7 @@ describe("file access", () => {
     await restartApp([relative]);
     await expectEditorText("#editor p", "Relative note.");
     // the app remembers the absolute path, so it doesn't depend on where it was started
-    await expect($("#ui-top")).toHaveText(`» ${filePath}`);
+    await expect($("#ui-title")).toHaveText(`» ${filePath}`);
     await appendAndSave(" Saved");
 
     await waitForFile(filePath, "Relative note. Saved");

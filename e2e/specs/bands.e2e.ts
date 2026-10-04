@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
+import { TOP_BAR_HEIGHT } from "../../src/chrome.ts";
+
 import {
   clickText,
   editorText,
@@ -136,6 +138,50 @@ describe("header and footer", () => {
     await expect($("body")).toHaveElementClass("band-editing");
     await browser.keys(Key.Escape);
     await expect($("body")).not.toHaveElementClass("band-editing");
+  });
+
+  it("makes room for the open strips, below the top area and above the status bar", async () => {
+    // where the strip and the page view are, once the strip has slid in
+    const edges = async () => {
+      let last = "";
+      let found: Record<string, number> = {};
+      await browser.waitUntil(
+        async () => {
+          found = await browser.execute(() => {
+            const box = (selector: string) =>
+              document.querySelector(selector)!.getBoundingClientRect();
+            const strip = box("#band-editor .band-inner");
+            const view = box("#page-view");
+            return {
+              stripTop: strip.top,
+              stripBottom: strip.bottom,
+              viewTop: view.top,
+              viewBottom: view.bottom,
+            };
+          });
+          const now = JSON.stringify(found);
+          const settled = now === last;
+          last = now;
+          return settled;
+        },
+        { interval: 200, timeoutMsg: "the strip didn't settle" },
+      );
+      return found;
+    };
+    await pressMod(Key.Alt, "h");
+    await expect(strip()).toBeDisplayed();
+    const header = await edges();
+    expect(header.stripTop).toBeGreaterThanOrEqual(TOP_BAR_HEIGHT - 1);
+    expect(header.viewTop).toBeGreaterThanOrEqual(header.stripBottom - 1);
+    await browser.keys(Key.Escape);
+    await expect(strip()).not.toExist();
+
+    await pressMod(Key.Alt, "f");
+    await expect(strip()).toBeDisplayed();
+    const footer = await edges();
+    expect(footer.viewBottom).toBeLessThanOrEqual(footer.stripTop + 1);
+    await browser.keys(Key.Escape);
+    await expect(strip()).not.toExist();
   });
 
   it("keeps the main text apart from the strip's editors", async () => {

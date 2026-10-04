@@ -34,7 +34,7 @@ import { bootTabs, restoreTabs } from "./tabs";
 import { nativePointer } from "./pagePointer";
 import { setGeometryView } from "../engine/geometry";
 import { createEditorHandle, syncPlugin } from "./handle";
-import { STATUS_HEIGHT } from "../chrome";
+import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { timed } from "../engine/perf";
 
 /**
@@ -94,8 +94,13 @@ export const bootEditor = async () => {
     // share the .ProseMirror class with
     attributes: { id: "editor" },
     // without the layout engine the editor shows the text itself, and keeps
-    // the caret clear of the status bar when it scrolls to it
-    scrollMargin: { top: 5, left: 5, right: 5, bottom: STATUS_HEIGHT + 8 },
+    // the caret clear of the top area and the status bar when it scrolls to it
+    scrollMargin: {
+      top: TOP_BAR_HEIGHT + 8,
+      left: 5,
+      right: 5,
+      bottom: STATUS_HEIGHT + 8,
+    },
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
         // the dialogs take the focus while they are open

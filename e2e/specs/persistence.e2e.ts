@@ -28,7 +28,7 @@ describe("persistence", () => {
     await restartApp();
 
     await expectEditorText("#editor p", "Remember me 4711");
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await expect($("#ui-title")).toHaveText("» Untitled");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
     await expect($("#ui-language")).toHaveText("FR");
   });

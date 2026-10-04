@@ -17,7 +17,7 @@ describe("editing", () => {
     await pressMod("n");
 
     await expectEditorText("#editor", "");
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await expect($("#ui-title")).toHaveText("» Untitled");
     await expect($("#ui-stats")).toHaveText("0 words");
   });
 

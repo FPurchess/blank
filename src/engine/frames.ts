@@ -11,8 +11,8 @@ import type {
 // page one after the other, with a mark between two pages where the first
 // ends.
 
-// room above the first and below the last page, for the bars
-export const VIEW_TOP = 56;
+// room above the first page, below the top area the page view starts under
+export const VIEW_TOP = 24;
 // more room above the first page for the line with the document's
 // properties
 export const PROPERTIES_ROOM = 28;

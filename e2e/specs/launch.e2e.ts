@@ -49,7 +49,7 @@ describe("launch", () => {
   });
 
   it("shows an untitled document", async () => {
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await expect($("#ui-title")).toHaveText("» Untitled");
   });
 
   it("counts the words", async () => {

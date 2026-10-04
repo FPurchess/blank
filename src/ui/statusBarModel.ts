@@ -5,7 +5,7 @@ import type { SpellcheckStatus } from "../spellcheck/types";
 import type { ListedHeading } from "../markdown/headings";
 import type { MenuItem, PageViewMode } from "../state";
 
-// What the bars at the top and bottom of the window say (TopBar.vue,
+// What the bars at the top and bottom of the window say (TopTitle.vue,
 // BottomBar.vue and the items in it).
 
 /**

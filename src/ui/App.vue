@@ -26,7 +26,7 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
-import TopBar from "./TopBar.vue";
+import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
@@ -39,7 +39,7 @@ import UiTooltip from "./UiTooltip.vue";
   <BandStrips />
   <PageView />
   <BlockMarks />
-  <TopBar />
+  <TopArea />
   <BottomBar />
   <DocumentOutline />
   <BlocksPane v-if="blocksPaneOpen" />

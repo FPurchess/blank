@@ -113,11 +113,13 @@ describe("visibleRange", () => {
     };
     const layout = frameLayout(state, "pages", 800);
     const sheet = layout.frames[1].top - layout.frames[0].top;
+    // the last 32 px of the third page and the top of the fourth
+    const top = layout.frames[3].top - SHEET_GAP - 32;
     expect(visibleRange(layout, 0, 600, 0)).toBe("0-0");
     expect(visibleRange(layout, 10, 600, 0)).toBe("0-0");
-    expect(visibleRange(layout, sheet * 3, 600, 0)).toBe("2-3");
+    expect(visibleRange(layout, top, 600, 0)).toBe("2-3");
     // with the room around the view
-    expect(visibleRange(layout, sheet * 3, 600)).toBe("2-4");
+    expect(visibleRange(layout, top, 600)).toBe("2-4");
     expect(visibleRange(layout, sheet * 100, 600, 0)).toBe("");
   });
 });

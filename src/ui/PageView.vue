@@ -16,7 +16,7 @@ import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
 import { pictureBoxAt } from "../editor/plugins/forms";
 import {
   dropExternal,
-  hasPrimarySelection,
+  noPrimaryPaste,
   pastePrimary,
   PAGE_MENU,
   PAGE_PRESS,
@@ -482,12 +482,6 @@ const onMouseDown = (event: MouseEvent) => {
   dragAt = { x: event.clientX, y: event.clientY };
 };
 
-// the webview pastes the primary selection itself when the middle button
-// is let go, with its markup and where the caret was: pastePrimary did
-const onMouseUp = (event: MouseEvent) => {
-  if (event.button === 1 && hasPrimarySelection()) event.preventDefault();
-};
-
 // moving the selected text to another place, see src/editor/pageMove.ts
 const move = pageMove({
   view: editor.view,
@@ -673,7 +667,7 @@ onUnmounted(() => {
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
-    @mouseup="onMouseUp"
+    @mouseup="noPrimaryPaste"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"

@@ -24,6 +24,7 @@ import {
   h,
 } from "../test/editor";
 import { formatShortcut } from "../editor/keyBindings";
+import { TOP_BAR_HEIGHT } from "../chrome";
 import { NEAR_BOTTOM, NEAR_TOP } from "./bandStripsModel";
 import { flushPromises } from "../test/async";
 import { bootApp } from "./mount";
@@ -208,7 +209,9 @@ describe("band strips", () => {
     });
 
     it("shows the hints while the mouse is near an edge", async () => {
-      window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+      window.dispatchEvent(
+        new MouseEvent("mousemove", { clientY: TOP_BAR_HEIGHT + 10 }),
+      );
       await settle();
       expect(document.body.classList).toContain("near-top");
 
@@ -685,7 +688,9 @@ describe("band strips", () => {
     });
 
     it("shows only the hint of the edge the mouse is near", async () => {
-      window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+      window.dispatchEvent(
+        new MouseEvent("mousemove", { clientY: TOP_BAR_HEIGHT + 10 }),
+      );
       await settle();
       expect(document.body.classList).toContain("near-top");
       expect(document.body.classList).not.toContain("near-bottom");
@@ -839,7 +844,9 @@ describe("band strips in the app", () => {
     const dispose = bootApp(createTestHandle());
     await publish('page:\n  header: { left: "x" }');
     const request = await open();
-    window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+    window.dispatchEvent(
+      new MouseEvent("mousemove", { clientY: TOP_BAR_HEIGHT + 10 }),
+    );
     await settle();
     expect(document.body.classList).toContain("near-top");
 

@@ -56,7 +56,7 @@ describe("Word import", () => {
       "src",
       expect.stringMatching(/^data:image\/png;base64,/),
     );
-    await expect($("#ui-top")).toHaveText("» report.docx (imported)");
+    await expect($("#ui-title")).toHaveText("» report.docx (imported)");
   });
 
   it("never writes to the Word document", async () => {
@@ -74,6 +74,6 @@ describe("Word import", () => {
     await restartApp();
 
     await expectEditorText("#editor h1", "Fixture edited");
-    await expect($("#ui-top")).toHaveText("» report.docx (imported)");
+    await expect($("#ui-title")).toHaveText("» report.docx (imported)");
   });
 });

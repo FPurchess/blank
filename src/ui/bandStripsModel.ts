@@ -15,9 +15,9 @@ export const INSERTS = (
   ["title", "author", "chapter", "date", "file"] as const
 ).map((field) => ({ label: FIELD_NAMES[field], text: `{${field}}` }));
 
-// how near the top or bottom of the window the mouse shows the hints to add
-// a band: on the top bar, and on the status bar or the hint just above it
-export const NEAR_TOP = TOP_BAR_HEIGHT;
+// where the mouse shows the hints to add a band: just below the top area,
+// where the hint shows, and on the status bar or the hint just above it
+export const NEAR_TOP = TOP_BAR_HEIGHT + BAND_HEIGHT;
 export const NEAR_BOTTOM = STATUS_HEIGHT + BAND_HEIGHT;
 
 // the status bar's controls and the word count's card, over which the hint
@@ -26,11 +26,12 @@ export const BAR_CONTROLS = ".status-item, #ui-language, #word-count-card";
 
 /**
  * nearEdge returns the edge whose hint the mouse at `y` shows, in a window
- * `height` high: the top one on the top bar, the bottom one on the status bar
- * or just above it, unless it's on one of the bar's controls
+ * `height` high: the top one just below the top area (never on its tabs and
+ * buttons), the bottom one on the status bar or just above it, unless it's on
+ * one of the bar's controls
  */
 export const nearEdge = (y: number, height: number, onControl: boolean) =>
-  y < NEAR_TOP
+  y >= TOP_BAR_HEIGHT && y < NEAR_TOP
     ? "top"
     : y > height - NEAR_BOTTOM && !onControl
       ? "bottom"

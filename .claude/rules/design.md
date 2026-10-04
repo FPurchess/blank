@@ -82,7 +82,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - It shows once the pointer has rested on the control for 400ms with no button held (`hoverIntent.ts`, the timer cards share).
   - It goes at once on leave, press, key, wheel, scroll or blur, and stays away from a control pressed or typed on until the pointer leaves it.
   - Listeners of the wheel and scroll are passive (`listenOnWindow` takes addEventListener's options), so they never hold up scrolling.
-  - It sits above the control, or below near the top bar, at the pointer on wide controls (`placeTip`).
+  - It sits above the control, or below it in the top area and near it, at the pointer on wide controls (`placeTip`).
   - It never takes the focus. While shown, it describes the control (`aria-describedby`) by what its own name doesn't say.
 - **`tooltipsSuppressed`** (`src/state/popups.ts`) hides them, e.g. while focus mode fades the controls.
 

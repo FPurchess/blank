@@ -4,6 +4,7 @@
 @use "controls" as *;
 @use "typography";
 @use "statusbar" as *;
+@use "toparea" as *;
 
 html {
   overflow-y: auto;
@@ -14,20 +15,6 @@ body {
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-}
-
-#ui-top {
-  opacity: 0.3;
-  position: fixed;
-  // above the page view
-  z-index: 2;
-  top: 0;
-  left: 0;
-  padding: 12px 24px;
-  font-size: 0.9rem;
-  text-align: start;
-  user-select: none;
-  box-sizing: border-box;
 }
 
 // read out by screen readers, not shown
@@ -446,9 +433,6 @@ body {
 // the header and footer strips, see src/ui/BandStrips.vue: pinned below the top
 // bar and above the bottom bar, lined up with the text column
 $band-height: 28px;
-// the top bar (TOP_BAR_HEIGHT in src/chrome.ts, like $band-height); the
-// status bar below has its own height, $status-height
-$top-bar-height: 44px;
 
 .band-edge,
 .band-editor {
@@ -519,12 +503,12 @@ $faint-text-opacity: 0.6;
   }
 }
 
-// where there is none, a hint shows while the mouse is near: in the middle of
-// the top bar, and just above the status bar, whose items fill the bottom
-// row; only its buttons take clicks, and only while it shows
+// where there is none, a hint shows while the mouse is near: just below the
+// top area and just above the status bar, whose controls fill the rows; only
+// its buttons take clicks, and only while it shows
 .band-edge.empty {
   &.header {
-    top: 0;
+    top: $top-bar-height;
   }
 
   &.footer {
@@ -540,14 +524,10 @@ $faint-text-opacity: 0.6;
   display: flex;
   justify-content: center;
   gap: 12px;
-  height: $top-bar-height;
+  height: $band-height;
   align-items: center;
   opacity: 0;
   transition: opacity 150ms;
-
-  .footer & {
-    height: $band-height;
-  }
 
   body.near-top .header &,
   body.near-bottom .footer & {
@@ -742,9 +722,10 @@ $faint-text-opacity: 0.6;
 
 // the text fades while a strip is edited, and makes room for the strips; the
 // strips' own editors are ProseMirror editors too, so it goes by its id
-// the open strip takes room of its own, so it covers none of the text (see
-// #page-view below)
-$strip-height: 90px;
+// the open strip takes room of its own below the top area or above the status
+// bar, so it covers none of the text (see #page-view below): its rows of
+// pages, slots and placeholders (bands.e2e.ts checks it)
+$strip-height: 88px;
 
 .boot-error {
   max-width: 720px;
@@ -1161,7 +1142,9 @@ body:not(.without-engine) #editor {
 // if the layout engine can't load, the editor shows the text itself, as
 // before the page view
 body.without-engine {
-  // the text scrolls up out from under the status bar
+  // the text starts below the top area and scrolls up out from under the
+  // status bar
+  padding-top: $top-bar-height;
   padding-bottom: $status-height;
 
   #editor {
@@ -1181,8 +1164,9 @@ body.without-engine {
 
 #page-view {
   position: fixed;
-  // above the status bar, which would cover the last lines and the caret
-  inset: 0 0 $status-height;
+  // below the top area and above the status bar, which would cover the
+  // first and last lines and the caret
+  inset: $top-bar-height 0 $status-height;
   z-index: 1;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1446,11 +1430,11 @@ $page-end-height: 64px + 2 * $band-gap;
 // the open strip of a header or footer takes room of its own at the top or
 // bottom of the window, so it covers none of the pages
 body.editing-header #page-view {
-  top: $strip-height;
+  top: $top-bar-height + $strip-height;
 }
 
 body.editing-footer #page-view {
-  bottom: $strip-height;
+  bottom: $status-height + $strip-height;
 }
 
 body.band-editing #page-view {

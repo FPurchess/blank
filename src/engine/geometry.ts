@@ -20,6 +20,7 @@ import {
   type PageBox,
   type PageEngine,
 } from "./engine";
+import { READING_LINE, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { cellAt } from "../markdown/tables";
 import { topBlockAt } from "../markdown/topBlock";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
@@ -503,7 +504,8 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
   if (view)
     return positions.map((pos) => {
       const box = shownCaret(view, pos, false);
-      return box ? box.top + window.scrollY : null;
+      // the window scrolls under the top area
+      return box ? box.top + window.scrollY - TOP_BAR_HEIGHT : null;
     });
   const frames = deskFrames();
   const engine = pageEngine;
@@ -532,11 +534,15 @@ export const scrollState = (): {
   max: number;
 } | null => {
   if (measured()) {
-    const height = window.innerHeight;
+    // what shows between the top area and the status bar
+    const height = window.innerHeight - TOP_BAR_HEIGHT - STATUS_HEIGHT;
     return {
       top: window.scrollY,
       height,
-      max: Math.max(0, document.documentElement.scrollHeight - height),
+      max: Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      ),
     };
   }
   const viewport = pageViewport.value;
@@ -549,10 +555,7 @@ export const scrollState = (): {
   };
 };
 
-// The line the view is read at: where the outline and a table of contents
-// put a heading they scroll to, so many pixels below the top of the view, as
-// on Notion (64 px below its 44 px bar).
-export const READING_LINE = 108;
+export { READING_LINE };
 
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
@@ -562,7 +565,7 @@ export const scrollToText = (pos: number, at: number) => {
   const view = measured();
   if (view) {
     const box = shownCaret(view, pos, false);
-    if (box) window.scrollBy({ top: box.top - at });
+    if (box) window.scrollBy({ top: box.top - TOP_BAR_HEIGHT - at });
     return;
   }
   const caret = pageEngine?.caret(pos);

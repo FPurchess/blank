@@ -23,13 +23,13 @@ import {
 import { createState, createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 
-// The bars at the top and bottom of the window: TopBar.vue, BottomBar.vue
-// and the items in it
+// The bars at the top and bottom of the window: TopArea.vue (its title),
+// BottomBar.vue and the items in it
 
 let dispose = () => {};
 afterEach(() => dispose());
 
-const uiTop = () => document.querySelector<HTMLElement>("#ui-top");
+const uiTop = () => document.querySelector<HTMLElement>("#ui-title");
 const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
 const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
@@ -73,6 +73,30 @@ describe("top bar and counter", () => {
 
       expect(uiTop()?.textContent).toBe("» /tmp/<img src=x>.md");
       expect(uiTop()?.children).toHaveLength(0);
+    });
+  });
+
+  describe("top area", () => {
+    const press = (type: string, button = 0) => {
+      const event = new MouseEvent(type, {
+        button,
+        bubbles: true,
+        cancelable: true,
+      });
+      uiTop()!.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    it("keeps the editor's focus when it is pressed", () => {
+      expect(press("mousedown")).toBe(true);
+    });
+
+    it("pastes nothing on a middle click, where Linux would paste", () => {
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+      expect(press("mouseup", 1)).toBe(true);
+      expect(press("mouseup", 0)).toBe(false);
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+      expect(press("mouseup", 1)).toBe(false);
     });
   });
 

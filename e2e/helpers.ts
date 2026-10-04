@@ -3,6 +3,7 @@ import path from "node:path";
 import { browser, $, $$ } from "@wdio/globals";
 import { Key } from "webdriverio";
 
+import { BAND_HEIGHT, TOP_BAR_HEIGHT } from "../src/chrome.ts";
 import { application } from "./app.ts";
 
 // the geometry of what the page view paints, see src/engine/geometry.ts
@@ -687,12 +688,12 @@ export const paste = (data: Record<string, string>) =>
   }, data);
 
 /**
- * moves the mouse to the middle of the top or bottom edge of the window,
- * where the hints to add a header or footer show
+ * moves the mouse to the middle of the window just below the top area or just
+ * above its bottom edge, where the hints to add a header or footer show
  */
 export const hoverEdge = async (edge: "top" | "bottom") => {
   const { width, height } = await browser.getWindowSize();
-  const y = edge === "top" ? 20 : height - 20;
+  const y = edge === "top" ? TOP_BAR_HEIGHT + BAND_HEIGHT / 2 : height - 20;
   await browser
     .action("pointer")
     .move({ x: Math.round(width / 2), y: Math.round(y), origin: "viewport" })

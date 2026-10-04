@@ -26,11 +26,11 @@ export const scrollFor = (
   rect: { top: number; height: number },
   top: number,
   height: number,
-  room = 64,
+  { above = 20, below = 64 } = {},
 ) => {
-  if (rect.top - room < top) return Math.max(0, rect.top - room);
-  if (rect.top + rect.height + room > top + height) {
-    return rect.top + rect.height + room - height;
+  if (rect.top - above < top) return Math.max(0, rect.top - above);
+  if (rect.top + rect.height + below > top + height) {
+    return rect.top + rect.height + below - height;
   }
   return null;
 };
