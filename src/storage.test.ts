@@ -53,6 +53,14 @@ describe("storage", () => {
     } as unknown as ReturnType<typeof getCurrentWindow>);
   });
 
+  it("lets E2E tests store what is pending, as closing the window does", async () => {
+    const storage = await bootFresh();
+    storage.exposeStorage();
+    expect(
+      (window as unknown as { blankFlushStorage: unknown }).blankFlushStorage,
+    ).toBe(storage.flush);
+  });
+
   describe("theme", () => {
     it("restores a stored theme", async () => {
       await localforage.setItem("theme", "green");

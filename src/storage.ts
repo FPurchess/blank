@@ -76,6 +76,15 @@ const schedule = () => {
 export const flush = (): Promise<void> =>
   pending ? write() : Promise.resolve();
 
+/**
+ * exposeStorage lets E2E tests store what is pending before they restart
+ * the app, as closing its window does (see onCloseRequested below), through
+ * `window.blankFlushStorage`
+ */
+export const exposeStorage = () => {
+  Object.assign(window, { blankFlushStorage: flush });
+};
+
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 

@@ -45,10 +45,30 @@ export const waitForAppReady = async () => {
 
 /**
  * restarts the app by creating a new session. tauri-driver keeps running, hence
- * the app keeps its profile (storage) from the previous run.
+ * the app keeps its profile (storage) from the previous run. What is pending
+ * is stored first, as closing the window stores it, which ending the session
+ * doesn't do.
  * @param args CLI arguments to launch the app with
+ * @param crash restart as if the app crashed, without storing what is pending
  */
-export const restartApp = async (args: string[] = []) => {
+export const restartApp = async (
+  args: string[] = [],
+  { crash = false } = {},
+) => {
+  if (!crash) {
+    await browser
+      .executeAsync((done: () => void) => {
+        const flush = (
+          window as unknown as { blankFlushStorage?: () => Promise<void> }
+        ).blankFlushStorage;
+        void Promise.resolve(flush?.()).then(
+          () => done(),
+          () => done(),
+        );
+      })
+      // an app that stopped answering has nothing to store
+      .catch(() => {});
+  }
   await browser.reloadSession({
     "tauri:options": { application, args },
   } as unknown as WebdriverIO.Capabilities);

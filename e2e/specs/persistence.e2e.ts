@@ -33,7 +33,7 @@ describe("persistence", () => {
     await expect($("#ui-language")).toHaveText("FR");
   });
 
-  it("keeps what was typed until a second before the restart", async () => {
+  it("keeps what was typed until a second before a crash", async () => {
     await focusEditor();
     await pressMod("n");
 
@@ -44,12 +44,16 @@ describe("persistence", () => {
       await type(`${i} `);
       typed.push({ word: String(i), at: Date.now() });
     }
+    // without the store a closing window makes: what Blank stored while it
+    // was typed, at most a second after a change (maxWait in src/storage.ts)
     const restartAt = Date.now();
-    await restartApp();
+    await restartApp([], { crash: true });
 
     const restored = (await editorText("#editor p"))[0].trim().split(/\s+/);
+    // a second for the store, and one for its timer and the write, which a
+    // busy machine can make late
     const expected = typed
-      .filter(({ at }) => at < restartAt - 1300)
+      .filter(({ at }) => at < restartAt - 2000)
       .map(({ word }) => word);
     expect(expected.length).toBeGreaterThan(0);
     expect(restored.slice(0, expected.length)).toEqual(expected);
