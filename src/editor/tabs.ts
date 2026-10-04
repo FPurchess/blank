@@ -25,6 +25,7 @@ import {
   path,
   spellchecker,
   type Tab,
+  tabAnnouncement,
   tabLabel,
   tabs,
   tabSwitch,
@@ -280,12 +281,9 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
     next.checker = spellchecker.value;
     v.dispatch(resetSpellcheck(v.state.tr));
   }
-  const index = tabs.value.indexOf(tab);
-  const unsaved = tab.unsaved ? ", unsaved changes" : "";
-  announce(
-    `${tabLabel(tab)}, tab ${index + 1} of ${tabs.value.length}${unsaved}`,
-    { quiet: true },
-  );
+  announce(tabAnnouncement(tab, tabs.value.indexOf(tab), tabs.value.length), {
+    quiet: true,
+  });
 };
 
 /**

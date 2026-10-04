@@ -4,9 +4,9 @@
 
 Blank is not notarized by Apple. See [Install → macOS](./install#macos) for how to allow it.
 
-## Where is my document stored?
+## Where are my documents stored?
 
-Files you save are ordinary markdown files wherever you saved them. On top of that, Blank keeps the open document in its own app storage and restores it on the next start, so closing the window doesn't lose it. This is not a backup, though: `Mod` `N` replaces the document with an empty one right away, so save first what you want to keep.
+Files you save are ordinary markdown files wherever you saved them. On top of that, Blank keeps every open tab in its own app storage, unsaved changes included, and restores them on the next start, so closing the window doesn't lose anything. `Mod` `N` opens a new tab and leaves the others as they are. This is not a backup, though: a tab you close with **Don't save** is gone, so save what you want to keep.
 
 ## Why did Blank change what I typed?
 

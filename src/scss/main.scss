@@ -5,6 +5,7 @@
 @use "typography";
 @use "statusbar" as *;
 @use "toparea" as *;
+@use "tabs";
 
 html {
   overflow-y: auto;

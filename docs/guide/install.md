@@ -33,7 +33,7 @@ The `.deb` and `.rpm` put Blank in your app menu and in **Open With** for markdo
 
 ## Open a file from the terminal
 
-Pass a path to open a markdown file directly:
+Pass one or more paths to open markdown files directly. Each opens in a tab; while Blank is running, they open as new tabs in its window rather than in a second one:
 
 ::: code-group
 
@@ -47,6 +47,8 @@ blank ~/Documents/notes.md
 
 :::
 
-With a path, `Mod` `S` saves to that file right away.
+With a path, `Mod` `S` saves to that file right away. Opening files from your file manager, with **Open With**, `xdg-open` or `open`, works the same way, and on macOS so does a double-click in Finder.
+
+On Linux, Blank finds its running window through the session bus, which every desktop has. Without one, as in some minimal setups, each start opens a window of its own, and only the first remembers its tabs. On Wayland, the window may only flash in the taskbar instead of coming to the front.
 
 `blank --version` shows which version you have, and `blank --help` what you can pass, without opening a window.

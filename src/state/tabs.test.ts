@@ -7,6 +7,7 @@ import {
   type Tab,
   tabLabel,
   tabs,
+  tabAnnouncement,
   tabTooltip,
   updateTab,
 } from "./tabs";
@@ -86,5 +87,16 @@ describe("updateTab and activeTab", () => {
     expect(tabs.value).not.toBe(before);
     expect(tabs.value[0]).toBe(before[0]);
     expect(activeTab.value).toMatchObject({ id: "b", unsaved: true });
+  });
+});
+
+describe("tabAnnouncement", () => {
+  it("tells which tab of how many shows", () => {
+    expect(
+      tabAnnouncement(tab("a", { path: "/notes.md", unsaved: true }), 1, 5),
+    ).toBe("notes, tab 2 of 5, unsaved changes");
+    expect(tabAnnouncement(tab("a", { path: "/notes.md" }), 0, 1)).toBe(
+      "notes, tab 1 of 1",
+    );
   });
 });

@@ -9,6 +9,7 @@ import {
   tablePicker,
   tableToolbar,
   tocPopover,
+  unsavedDialog,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
 import BlockMarks from "./BlockMarks.vue";
@@ -28,6 +29,7 @@ import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
+import UnsavedDialog from "./UnsavedDialog.vue";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
 // part is keyed by what makes it the same: a dialog by its request, so each
@@ -61,6 +63,11 @@ import UiTooltip from "./UiTooltip.vue";
     v-if="pageSetup"
     :key="keyOf(pageSetup)"
     :request="pageSetup"
+  />
+  <UnsavedDialog
+    v-if="unsavedDialog"
+    :key="keyOf(unsavedDialog)"
+    :request="unsavedDialog"
   />
   <TocPopover
     v-if="tocPopover"

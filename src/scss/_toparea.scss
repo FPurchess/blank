@@ -1,5 +1,5 @@
 // The top area of the window (src/ui/TopArea.vue): two rows on the desk, the
-// tab row (for now the document's title) and the formatting toolbar, each with
+// tab row and the formatting toolbar, each with
 // a line below it. The pages start below it. The rows bring their own styles.
 @use "controls" as *;
 
@@ -28,15 +28,4 @@ $top-bar-height: $tab-row-height + $toolbar-height;
   min-width: 0;
   box-sizing: border-box;
   border-bottom: 1px solid var(--line);
-}
-
-#ui-title {
-  min-width: 0;
-  padding: 0 var(--s4);
-  overflow: clip;
-  font-size: var(--ui-small);
-  line-height: 16px;
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

@@ -105,3 +105,10 @@ export const freeUntitledNumber = (list: readonly Tab[]): number => {
   while (used.has(number)) number++;
   return number;
 };
+
+/**
+ * tabAnnouncement returns what screen readers hear when the tab at `index`
+ * of `count` shows, e.g. "notes, tab 2 of 5, unsaved changes"
+ */
+export const tabAnnouncement = (tab: Tab, index: number, count: number) =>
+  `${tabLabel(tab)}, tab ${index + 1} of ${count}${tab.unsaved ? ", unsaved changes" : ""}`;

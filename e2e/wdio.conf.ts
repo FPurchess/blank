@@ -90,6 +90,13 @@ export const config: WebdriverIO.Config = {
     profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-"));
     // for the specs, which run in this process, see appConfigDir in helpers.ts
     process.env.BLANK_E2E_CONFIG = path.join(profileDir, "config");
+    // the app runs as an instance of its own, which a second start in the
+    // same profile hands its files to, and nothing else does (see
+    // src-tauri/src/open.rs and secondStart in helpers.ts)
+    process.env.BLANK_E2E_PROFILE = profileDir;
+    process.env.BLANK_INSTANCE_ID = path
+      .basename(profileDir)
+      .replace(/\W/g, "_");
     expectingExit = false;
 
     const mirrorUrl = await startMirror();
@@ -108,6 +115,7 @@ export const config: WebdriverIO.Config = {
           XDG_DATA_HOME: path.join(profileDir, "data"),
           XDG_CONFIG_HOME: path.join(profileDir, "config"),
           XDG_CACHE_HOME: path.join(profileDir, "cache"),
+          BLANK_INSTANCE_ID: process.env.BLANK_INSTANCE_ID,
         },
       },
     );

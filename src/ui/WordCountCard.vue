@@ -3,10 +3,9 @@ import { computed, onMounted, onUpdated, useTemplateRef } from "vue";
 
 import { useEditor } from "../editor/handle";
 import { place } from "../popup";
-import { importedFrom, path } from "../state";
+import { activeTab, tabLabel } from "../state";
 import { wordCountOf, wordCountRows } from "../wordCount";
 import { useDismiss } from "./composables/useDismiss";
-import { titleOf } from "./statusBarModel";
 
 // The details of the word count, above it in the bottom bar: the document's
 // words, characters, pages, how long it takes to read, and the words
@@ -20,7 +19,9 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const editor = useEditor();
-const name = computed(() => titleOf(path.value, importedFrom.value, "name"));
+const name = computed(() =>
+  activeTab.value ? tabLabel(activeTab.value) : "Untitled",
+);
 const rows = computed(() => wordCountRows(wordCountOf(editor.state.value)));
 
 const root = useTemplateRef<HTMLElement>("root");

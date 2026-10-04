@@ -8,14 +8,15 @@ import { $, browser } from "@wdio/globals";
 import {
   editorText,
   focusEditor,
-  textBox,
+  hoverEdge,
   Key,
+  onlyNewTab,
   paste,
   pressMod,
-  restartApp,
-  type,
-  hoverEdge,
   pressShift,
+  restartApp,
+  textBox,
+  type,
 } from "../helpers.ts";
 import {
   BAND_HEIGHT,
@@ -439,8 +440,8 @@ const recordings: string[] = [];
 const filmNew = async () => {
   const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
   recordings.push(frames);
-  await pressMod("n");
-  await expect($("#ui-title")).toHaveText("» Untitled");
+  // one tab, so the recordings don't show the tabs of the ones before
+  await onlyNewTab();
   // the pointer in the middle of the text, so no button looks hovered and
   // no hint shows at the edges
   await browser
@@ -988,8 +989,7 @@ describe("docs screenshots", () => {
   it("records the writing demo", async () => {
     const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
     const film = new Recorder(frames);
-    await pressMod("n");
-    await expect($("#ui-title")).toHaveText("» Untitled");
+    await onlyNewTab();
 
     // an empty page and a blinking cursor, then a writer finding their way in.
     // autocorrect does the rest: headings, quotes, dashes, apostrophes and capitals

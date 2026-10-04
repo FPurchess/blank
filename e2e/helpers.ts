@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
-import { browser, $, $$ } from "@wdio/globals";
+import { browser, $, $$, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
 
 import { BAND_HEIGHT, TOP_BAR_HEIGHT } from "../src/chrome.ts";
@@ -72,10 +74,144 @@ export const restartApp = async (
       // an app that stopped answering has nothing to store
       .catch(() => {});
   }
+  // Blank runs as one instance: a new start while the last one is still
+  // quitting would hand its files to that one and exit (see
+  // src-tauri/src/open.rs). What was pending is stored by now.
+  await endApp();
   await browser.reloadSession({
     "tauri:options": { application, args },
   } as unknown as WebdriverIO.Capabilities);
   await waitForAppReady();
+};
+
+/**
+ * appPids returns the processes of this spec's Blank: the app, started
+ * with this spec's instance id
+ */
+const appPids = () => {
+  const instance = `BLANK_INSTANCE_ID=${process.env.BLANK_INSTANCE_ID}`;
+  return fs.readdirSync("/proc").filter((pid) => {
+    if (!/^\d+$/.test(pid)) return false;
+    try {
+      const exe = fs.readlinkSync(`/proc/${pid}/exe`);
+      const environ = fs.readFileSync(`/proc/${pid}/environ`, "utf8");
+      return exe === application && environ.split("\0").includes(instance);
+    } catch {
+      // gone meanwhile, or not ours to read
+      return false;
+    }
+  });
+};
+
+/**
+ * endApp ends this spec's Blank and waits until it's gone
+ */
+const endApp = async () => {
+  for (const pid of appPids()) {
+    try {
+      process.kill(Number(pid), "SIGKILL");
+    } catch {
+      // gone meanwhile
+    }
+  }
+  await browser.waitUntil(async () => appPids().length === 0, {
+    timeout: 10_000,
+    interval: 50,
+    timeoutMsg: "the app didn't quit",
+  });
+};
+
+/** the selected tab of the tab row, which the editor shows */
+export const activeTab = () => $('#tab-row [role="tab"][aria-selected="true"]');
+
+/**
+ * the names of the tabs, in their order, and the selected one's with its
+ * tooltip. Read from the DOM: WebKitWebDriver's text of the tabs, which
+ * don't let their text be selected, comes back empty.
+ */
+const tabState = () =>
+  browser.execute(() => {
+    const tabs = [...document.querySelectorAll("#tab-row [role=tab]")];
+    const active = tabs.find(
+      (tab) => tab.getAttribute("aria-selected") === "true",
+    );
+    const label = (tab: Element) =>
+      tab.querySelector(".tab-label")?.textContent?.trim() ?? "";
+    return {
+      labels: tabs.map(label),
+      active: active ? label(active) : null,
+      tip: active?.getAttribute("data-tip") ?? null,
+    };
+  });
+
+/** the tabs of the tab row, in their order */
+export const tabLabels = async () => (await tabState()).labels;
+
+/**
+ * expects the selected tab to be named `label`, and its tooltip to say
+ * where the document is (`tip`), if given; waits for it, as a switch to
+ * another tab may still be under way
+ */
+export const expectActiveTab = async (label: string, tip?: string) => {
+  let state: Awaited<ReturnType<typeof tabState>> | undefined;
+  await browser
+    .waitUntil(
+      async () => {
+        state = await tabState();
+        return (
+          state.active === label && (tip === undefined || state.tip === tip)
+        );
+      },
+      { timeout: 5000, interval: 100 },
+    )
+    .catch(() => {});
+  expect(state?.active).toBe(label);
+  if (tip !== undefined) expect(state?.tip).toBe(tip);
+};
+
+/** clicks the tab named `label` */
+export const clickTab = async (label: string) => {
+  const tabs = await $$("#tab-row [role=tab]");
+  for (const tab of tabs) {
+    const name = await tab.$(".tab-label");
+    const text = await browser.execute(
+      (element) => element.textContent?.trim(),
+      name,
+    );
+    if (text === label) return name.click();
+  }
+  throw new Error(`no tab named ${label}`);
+};
+
+/**
+ * answers the question whether to save a tab's changes, once it's asked
+ */
+export const answerUnsaved = async (
+  choice: "Save" | "Don't save" | "Cancel",
+) => {
+  const dialog = $("#unsaved-dialog");
+  await dialog.waitForExist();
+  const button = await dialog.$(`button=${choice}`);
+  await button.click();
+  await dialog.waitForExist({ reverse: true });
+};
+
+/**
+ * leaves one new, empty "Untitled" tab: closes the other tabs and the
+ * current one without saving them, the way the tab row and Mod+W do
+ */
+export const onlyNewTab = async () => {
+  const tab = await activeTab();
+  await tab.click({ button: "right" });
+  await $('.context-menus [data-id="close-others"]').click();
+  // one question for each tab with changes
+  while (await $("#unsaved-dialog").isExisting()) {
+    await answerUnsaved("Don't save");
+  }
+  await pressMod("w");
+  if (await $("#unsaved-dialog").isExisting())
+    await answerUnsaved("Don't save");
+  expect(await tabLabels()).toEqual(["Untitled"]);
 };
 
 /**
@@ -710,4 +846,27 @@ export const appConfigDir = () => {
   const config = process.env.BLANK_E2E_CONFIG;
   if (!config) throw new Error("no E2E profile: run the spec through wdio");
   return path.join(config, "com.github.fpurchess.blank");
+};
+
+/**
+ * secondStart starts Blank a second time in this spec's profile, as
+ * `blank file` in a terminal does while it runs: it hands `args` to the
+ * running Blank, as tabs, and exits
+ * @param cwd the directory relative paths are given in
+ * @returns its exit code
+ */
+export const secondStart = (args: string[], cwd = process.cwd()) => {
+  const profile = process.env.BLANK_E2E_PROFILE;
+  if (!profile) throw new Error("no E2E profile: run the spec through wdio");
+  const started = spawnSync(application, args, {
+    cwd,
+    timeout: 20_000,
+    env: {
+      ...process.env,
+      XDG_DATA_HOME: path.join(profile, "data"),
+      XDG_CONFIG_HOME: path.join(profile, "config"),
+      XDG_CACHE_HOME: path.join(profile, "cache"),
+    },
+  });
+  return started.status;
 };

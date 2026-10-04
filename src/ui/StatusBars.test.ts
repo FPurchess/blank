@@ -23,13 +23,12 @@ import {
 import { createState, createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 
-// The bars at the top and bottom of the window: TopArea.vue (its title),
-// BottomBar.vue and the items in it
+// The bars at the top and bottom of the window: TopArea.vue (its tabs are
+// in TabRow.test.ts), BottomBar.vue and the items in it
 
 let dispose = () => {};
 afterEach(() => dispose());
 
-const uiTop = () => document.querySelector<HTMLElement>("#ui-title");
 const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
 const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
@@ -42,40 +41,6 @@ describe("top bar and counter", () => {
     dispose = bootApp(createTestHandle());
   });
 
-  describe("file path", () => {
-    it("shows Untitled without a path", async () => {
-      expect(uiTop()?.textContent).toBe("» Untitled");
-    });
-
-    it("shows the current path", async () => {
-      path.value = "/this/is/a/test/path";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» /this/is/a/test/path");
-
-      path.value = null;
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» Untitled");
-    });
-
-    it("shows the name of an imported Word document until it is saved", async () => {
-      importedFrom.value = "/docs/report.docx";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» report.docx (imported)");
-
-      path.value = "/docs/report.md";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» /docs/report.md");
-    });
-
-    it("shows a path containing markup as plain text", async () => {
-      path.value = "/tmp/<img src=x>.md";
-      await nextTick();
-
-      expect(uiTop()?.textContent).toBe("» /tmp/<img src=x>.md");
-      expect(uiTop()?.children).toHaveLength(0);
-    });
-  });
-
   describe("top area", () => {
     const press = (type: string, button = 0) => {
       const event = new MouseEvent(type, {
@@ -83,7 +48,7 @@ describe("top bar and counter", () => {
         bubbles: true,
         cancelable: true,
       });
-      uiTop()!.dispatchEvent(event);
+      document.querySelector("#ui-top .toolbar-row")!.dispatchEvent(event);
       return event.defaultPrevented;
     };
 

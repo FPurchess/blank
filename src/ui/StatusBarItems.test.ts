@@ -4,14 +4,14 @@ import { nextTick } from "vue";
 import { showWordCount } from "../editor/commands";
 import { formatShortcut } from "../editor/keyBindings";
 import {
+  activeTabId,
   announcement,
   engineMissing,
-  importedFrom,
   pageView,
-  path,
   spellcheck,
   spellcheckMessage,
   spellcheckStatus,
+  tabs,
   textContent,
   wordCountCard,
 } from "../state";
@@ -42,11 +42,22 @@ describe("word count card", () => {
     vi.useFakeTimers();
     document.body.innerHTML = "";
     wordCountCard.value = false;
-    path.value = "/notes/field notes.md";
-    importedFrom.value = null;
+    tabs.value = [
+      {
+        id: "a",
+        path: "/notes/field notes.md",
+        importedFrom: null,
+        untitledNumber: null,
+        unsaved: false,
+        viewAnchor: null,
+      },
+    ];
+    activeTabId.value = "a";
     textContent.value = "one two three";
   });
   afterEach(() => {
+    tabs.value = [];
+    activeTabId.value = null;
     wordCountCard.value = false;
     vi.useRealTimers();
   });
@@ -97,7 +108,7 @@ describe("word count card", () => {
     byId("ui-stats")!.click();
     await nextTick();
 
-    expect(card()!.querySelector(".name")!.textContent).toBe("field notes.md");
+    expect(card()!.querySelector(".name")!.textContent).toBe("field notes");
     expect(rowsOf()).toEqual([
       ["Words", "3"],
       ["Characters", "13"],

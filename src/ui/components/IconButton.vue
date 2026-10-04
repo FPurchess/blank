@@ -6,7 +6,8 @@ import { tipAttrs } from "../tooltipModel";
 import IconGlyph from "./IconGlyph.vue";
 
 // A button that shows only an icon: named for screen readers by `label`, its
-// tooltip the label and the command's shortcut (or `tipKey`). `pressed`
+// tooltip the label (or `tip`, e.g. the command's longer name) and the
+// command's shortcut (or `tipKey`). `pressed`
 // makes it a toggle; `focusable: false` keeps it out of the tab order, for
 // bars whose keys the editor handles. It's disabled with aria-disabled, so
 // it still shows its tooltip; the click is the parent's, which checks.
@@ -16,6 +17,7 @@ const props = withDefaults(
   defineProps<{
     icon: string;
     label: string;
+    tip?: string;
     command?: CommandIdentifier;
     tipKey?: string;
     pressed?: boolean;
@@ -24,6 +26,7 @@ const props = withDefaults(
     large?: boolean;
   }>(),
   {
+    tip: undefined,
     command: undefined,
     tipKey: undefined,
     pressed: undefined,
@@ -32,7 +35,11 @@ const props = withDefaults(
 );
 
 const tip = computed(() =>
-  tipAttrs({ name: props.label, command: props.command, key: props.tipKey }),
+  tipAttrs({
+    name: props.tip ?? props.label,
+    command: props.command,
+    key: props.tipKey,
+  }),
 );
 </script>
 

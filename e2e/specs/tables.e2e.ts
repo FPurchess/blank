@@ -98,7 +98,11 @@ describe("tables", () => {
   let dir: string;
   let file: string;
 
+  // a file of its own each time: one that's open already, with what a test
+  // before typed into it, would only have its tab shown
+  let opened = 0;
   const open = async (content: string) => {
+    file = path.join(dir, `tables-${++opened}.md`);
     fs.writeFileSync(file, content);
     await restartApp([file]);
     await $("#page-view .page-canvas").waitForExist();
@@ -106,7 +110,6 @@ describe("tables", () => {
 
   before(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-tables-"));
-    file = path.join(dir, "tables.md");
   });
 
   after(() => {

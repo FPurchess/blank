@@ -6,6 +6,7 @@ import { browser, $, expect } from "@wdio/globals";
 
 import {
   clickInto,
+  expectActiveTab,
   expectEditorText,
   focusEditor,
   Key,
@@ -42,7 +43,7 @@ describe("file", () => {
     fixturePath = path.join(fixtureDir, "fixture.md");
     fs.writeFileSync(fixturePath, "# E2E Fixture\n\nOriginal paragraph.\n");
 
-    // open the file via command-line argument, see readDocumentFromCliArgs
+    // open the file via command-line argument, see src-tauri/src/open.rs
     await restartApp([fixturePath]);
   });
 
@@ -53,7 +54,7 @@ describe("file", () => {
   it("opens the file passed via command-line argument", async () => {
     await expectEditorText("#editor h1", "E2E Fixture");
     await expectEditorText("#editor p", "Original paragraph.");
-    await expect($("#ui-title")).toHaveText(`» ${fixturePath}`);
+    await expectActiveTab("fixture", fixturePath);
   });
 
   it("saves changes to the opened file", async () => {
@@ -130,7 +131,7 @@ describe("file access", () => {
     await restartApp([relative]);
     await expectEditorText("#editor p", "Relative note.");
     // the app remembers the absolute path, so it doesn't depend on where it was started
-    await expect($("#ui-title")).toHaveText(`» ${filePath}`);
+    await expectActiveTab("relative", filePath);
     await appendAndSave(" Saved");
 
     await waitForFile(filePath, "Relative note. Saved");

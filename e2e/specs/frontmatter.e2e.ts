@@ -67,7 +67,8 @@ describe("frontmatter", () => {
   it("restores the frontmatter with the document", async () => {
     // the document is written to storage at most 1000ms after a change (see
     // src/storage.ts), later on a busy machine: wait until it's there
-    // (localforage's IndexedDB "Blank", store "keyvaluepairs"), with the
+    // (localforage's IndexedDB "Blank", store "keyvaluepairs", under the
+    // active tab of the session), with the
     // frontmatter and the text typed in the test before
     await browser.waitUntil(
       async () => {
@@ -76,12 +77,20 @@ describe("frontmatter", () => {
             const open = indexedDB.open("Blank");
             open.onerror = () => done("");
             open.onsuccess = () => {
-              const get = open.result
+              // the active tab's document, stored under its id
+              const store = open.result
                 .transaction("keyvaluepairs")
-                .objectStore("keyvaluepairs")
-                .get("doc");
-              get.onerror = () => done("");
-              get.onsuccess = () => done(JSON.stringify(get.result ?? null));
+                .objectStore("keyvaluepairs");
+              const session = store.get("session");
+              session.onerror = () => done("");
+              session.onsuccess = () => {
+                const active = (session.result as { active?: string } | null)
+                  ?.active;
+                if (!active) return done("");
+                const get = store.get(`tab:${active}`);
+                get.onerror = () => done("");
+                get.onsuccess = () => done(JSON.stringify(get.result ?? null));
+              };
             };
           },
         );

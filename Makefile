@@ -73,8 +73,8 @@ test-rust: ## Build the frontend and run the Rust tests of the workspace (spell 
 test-e2e: install-e2e ## Build the debug app and run the e2e tests (Linux only)
 	bun run test:e2e
 
-test-e2e-headless: install-e2e ## Same as test-e2e, in a virtual display (xvfb)
-	xvfb-run -a bun run test:e2e
+test-e2e-headless: install-e2e ## Same as test-e2e, in a virtual display (xvfb) with a session bus
+	dbus-run-session -- xvfb-run -a bun run test:e2e
 
 check: lint format-check test ## Run the checks of the pre-commit hook
 

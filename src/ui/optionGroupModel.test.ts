@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chooseAt, firstStop, isOn, stepTo } from "./optionGroupModel";
+import { chooseAt, firstStop, isOn } from "./optionGroupModel";
 
 const OPTIONS = ["a", "b", "c"].map((value) => ({ value, label: value }));
 
@@ -29,16 +29,5 @@ describe("firstStop", () => {
     expect(firstStop("b", OPTIONS)).toBe(1);
     expect(firstStop("x", OPTIONS)).toBe(0);
     expect(firstStop(["c"], OPTIONS)).toBe(0);
-  });
-});
-
-describe("stepTo", () => {
-  it("moves with ←→, wrapping around, and to the ends with Home and End", () => {
-    expect(stepTo("ArrowRight", 0, 3)).toBe(1);
-    expect(stepTo("ArrowRight", 2, 3)).toBe(0);
-    expect(stepTo("ArrowLeft", 0, 3)).toBe(2);
-    expect(stepTo("Home", 2, 3)).toBe(0);
-    expect(stepTo("End", 0, 3)).toBe(2);
-    expect(stepTo("ArrowDown", 0, 3)).toBeUndefined();
   });
 });

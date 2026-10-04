@@ -165,6 +165,21 @@ describe("the controls' colors", () => {
     },
   );
 
+  it.each(themes)("mark the active tab in the accent in %s", (theme) => {
+    const { color, paper } = grounds(theme, "accent");
+    expect(contrast(color("tab-mark", paper), paper)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("mark the active tab by its paper alone in mono", () => {
+    const tokens = readFileSync(
+      resolve(import.meta.dirname, "_tokens.scss"),
+      "utf8",
+    );
+    expect(tokens).toMatch(
+      /\[data-color="mono"\] \{[^}]*--tab-mark: transparent;/,
+    );
+  });
+
   it.each(cases)("write on the accent in %s, %s", (theme, mode) => {
     const { color, desk } = grounds(theme, mode);
     const accent = color("accent", desk);
