@@ -1,5 +1,4 @@
 import { CommandIdentifier } from "../config";
-import { commandShortcut } from "../editor/keyBindings";
 import { type Band, hasText, variantsOf } from "../layout/bands";
 import { FIELD_NAMES } from "../layout/placeholders";
 import type { PageSettings } from "../layout/settings";
@@ -35,10 +34,3 @@ export const bandCommand = (band: Band) =>
   band === "header"
     ? CommandIdentifier.EDIT_HEADER
     : CommandIdentifier.EDIT_FOOTER;
-
-/**
- * editBandShortcut returns the shortcut that opens the strip of `band`, as
- * the hints show it
- */
-export const editBandShortcut = (band: Band) =>
-  commandShortcut(bandCommand(band));

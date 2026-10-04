@@ -10,6 +10,7 @@ import {
   luminance,
   mix,
   parseColor,
+  mixinValues,
   type Mode,
   scssNumber,
   themeColor,
@@ -145,6 +146,20 @@ describe("the controls' colors", () => {
       expect(
         contrast(color("muted-on-paper", paper), paper),
       ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each(cases)(
+    "read as secondary text inside a popover in %s, %s",
+    (theme, mode) => {
+      // as the popover mixin re-points --muted for what's inside it
+      const surface = mixinValues("_controls.scss", "popover");
+      expect(surface.muted).toBe("var(--muted-on-paper)");
+      const color = themeColor(theme, mode, surface);
+      const paper = color("background-color", [0, 0, 0]);
+      expect(contrast(color("muted", paper), paper)).toBeGreaterThanOrEqual(
+        4.5,
+      );
     },
   );
 

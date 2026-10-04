@@ -8,6 +8,7 @@ import {
   type MenuItem,
   spellcheck,
 } from "../state";
+import { useDismiss } from "./composables/useDismiss";
 import MenuList from "./MenuList.vue";
 import {
   enabledAt,
@@ -230,25 +231,21 @@ watch(
 
 onMounted(focusCurrent);
 
-// what closes the menu while it's open
-const outside = (event: Event) =>
-  !(event.target instanceof Node && container.value?.contains(event.target));
-listenOnWindow(
-  "mousedown",
-  (event) => {
-    if (outside(event)) close();
-  },
-  true,
-);
+// what closes the menu while it's open: a press or a scroll outside it, but
+// for the scroll the menu's own opening caused
+const { contains } = useDismiss(() => [container.value], close, {
+  resize: true,
+  blur: true,
+});
 listenOnWindow(
   "scroll",
   (event) => {
-    if (Date.now() - openedAt > SCROLL_GRACE && outside(event)) close();
+    if (Date.now() - openedAt > SCROLL_GRACE && !contains(event.target)) {
+      close();
+    }
   },
   true,
 );
-listenOnWindow("resize", close, true);
-listenOnWindow("blur", close);
 watch([spellcheck, language], close);
 </script>
 

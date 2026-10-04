@@ -732,11 +732,11 @@ describe("contextMenu", () => {
       language.value = before.language;
     });
 
-    it("closes on a mouse down outside", async () => {
+    it("closes on a press outside", async () => {
       await open();
 
       document.body.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true }),
+        new PointerEvent("pointerdown", { bubbles: true }),
       );
 
       await settle();
@@ -903,7 +903,7 @@ describe("context menu listeners", () => {
     ]);
     expect(listeners.map(([type]) => type).sort()).toEqual([
       "blur",
-      "mousedown",
+      "pointerdown",
       "resize",
       "scroll",
     ]);

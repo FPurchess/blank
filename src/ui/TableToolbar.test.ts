@@ -89,7 +89,7 @@ describe("table toolbar", () => {
     ).not.toBe("");
     expect(button("y").getAttribute("aria-pressed")).toBe("true");
     expect(button("x").hasAttribute("aria-pressed")).toBe(false);
-    expect(button("x").getAttribute("aria-disabled")).toBe("false");
+    expect(button("x").hasAttribute("aria-disabled")).toBe(false);
     expect(button("z").getAttribute("aria-disabled")).toBe("true");
   });
 

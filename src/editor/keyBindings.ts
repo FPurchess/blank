@@ -42,11 +42,12 @@ export const normalizeBinding = (binding: string): string | undefined => {
 };
 
 /**
- * tableKeyBinding returns the key that inserts a table, and switches table
- * mode on and off, normalized for prosemirror-keymap
+ * commandBinding returns the key bound to `command`, normalized for
+ * prosemirror-keymap, for code that handles the key itself (e.g. the table
+ * keys, which insert a table and switch table mode on and off)
  */
-export const tableKeyBinding = () =>
-  normalizeBinding(getKeyBinding(CommandIdentifier.INSERT_TABLE));
+export const commandBinding = (command: CommandIdentifier) =>
+  normalizeBinding(getKeyBinding(command));
 
 /**
  * formatShortcut returns a key binding like "Mod-Shift-z" as the platform

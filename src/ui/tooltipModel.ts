@@ -99,15 +99,18 @@ const describe = (target: HTMLElement, id: string | undefined) => {
 
 /**
  * watchTips calls `show` with the tooltip of the control the pointer rested
- * on for TIP_DELAY, again when the control's tooltip changes while it shows,
- * and `hide` at once when the pointer leaves it, on a press, a key, the
- * wheel or when the window loses the focus, and while tooltipsSuppressed.
+ * on, still for TIP_DELAY and with no button held, again when the control's
+ * tooltip changes while it shows, and `hide` at once when the pointer leaves
+ * it, on a press, a key, the wheel, a scroll or when the window loses the
+ * focus, and while tooltipsSuppressed.
  * Its listeners and timer go with the current scope (a component's setup).
  */
 export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
-  // the control the pointer is on, and where it entered it
+  // the control the pointer is on, and where the pointer is
   let target: HTMLElement | null = null;
   let x = 0;
+  // whether its tooltip shows
+  let shown = false;
   // the control a press or key dismissed the tooltip of, which stays
   // without one until the pointer leaves it
   let dismissed: HTMLElement | null = null;
@@ -116,12 +119,18 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
   let observer: MutationObserver | null = null;
 
   const showTip = () => {
-    const tip = target?.isConnected ? tipOf(target, x) : null;
+    // not once the control has opened what it controls, e.g. a card that
+    // opens on hover before the tooltip would
+    const tip =
+      target?.isConnected && tipTarget(target) === target
+        ? tipOf(target, x)
+        : null;
     // a control whose tooltip went away while it showed
-    if (!tip && observer) return close();
+    if (!tip && shown) return close();
     if (!tip || tooltipsSuppressed.value) return;
     undescribe();
     undescribe = describe(tip.target, describedBy(tip));
+    shown = true;
     show(tip);
   };
   const open = () => {
@@ -129,7 +138,7 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
     if (!target || observer) return;
     observer = new MutationObserver(showTip);
     observer.observe(target, {
-      attributeFilter: ["data-tip", "data-tip-key"],
+      attributeFilter: ["data-tip", "data-tip-key", "aria-expanded"],
     });
   };
   const close = () => {
@@ -137,6 +146,7 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
     observer = null;
     undescribe();
     undescribe = () => {};
+    shown = false;
     hide();
   };
   const intent = hoverIntent({
@@ -146,20 +156,32 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
     close,
   });
   const dismiss = () => {
-    dismissed = target;
+    dismissed = target ?? dismissed;
     target = null;
     intent.cancel();
     close();
   };
 
   listenOnWindow("mouseover", (event) => {
-    const next = tipTarget(event.target);
+    // none while a button is held, e.g. dragging
+    const next = event.buttons ? null : tipTarget(event.target);
     if (next === target || next === dismissed) return;
     if (target) intent.leave();
     target = next;
     x = event.clientX;
     if (next) intent.enter();
   });
+  // the pointer rests once it stops moving: the wait starts again, at where
+  // it is now, until the tooltip shows
+  listenOnWindow(
+    "mousemove",
+    (event) => {
+      if (!target || shown || event.buttons) return;
+      x = event.clientX;
+      intent.enter();
+    },
+    { passive: true },
+  );
   listenOnWindow("mouseout", (event) => {
     const to = event.relatedTarget as Node | null;
     if (dismissed && !dismissed.contains(to)) dismissed = null;
@@ -168,9 +190,12 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
       intent.leave();
     }
   });
-  for (const type of ["mousedown", "keydown", "wheel"] as const) {
-    listenOnWindow(type, dismiss, true);
-  }
+  listenOnWindow("mousedown", dismiss, true);
+  listenOnWindow("keydown", dismiss, true);
+  // passive, so they never hold up scrolling; a scroll doesn't bubble, but
+  // the window sees it while capturing
+  listenOnWindow("wheel", dismiss, { capture: true, passive: true });
+  listenOnWindow("scroll", dismiss, { capture: true, passive: true });
   listenOnWindow("blur", dismiss);
   watch(tooltipsSuppressed, (suppressed) => suppressed && dismiss(), {
     flush: "sync",

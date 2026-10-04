@@ -27,7 +27,6 @@ import {
 } from "../bandStrip";
 import { shownIn } from "../dom";
 import { SLOTS } from "../layout/settings";
-import { listenOnWindow } from "../scope";
 import type { SlotEditor } from "../slotEditor";
 import {
   type BandEditorRequest,
@@ -37,6 +36,7 @@ import {
 } from "../state";
 import { INSERTS } from "./bandStripsModel";
 import { useBodyClass } from "./composables/useBodyClass";
+import { useDismiss } from "./composables/useDismiss";
 import SlotField from "./SlotField.vue";
 
 // The open header or footer strip, at the top or bottom of the window: which
@@ -168,13 +168,9 @@ const onKeydown = (event: KeyboardEvent) => {
 
 // a click anywhere else but on the strip and its menus, submenus included
 // (src/ui/ContextMenu.vue), keeps what was typed
-listenOnWindow(
-  "mousedown",
-  (event) => {
-    const target = event.target as Element | null;
-    if (!target?.closest("#band-editor, .context-menus")) done();
-  },
-  true,
+useDismiss(
+  () => [root.value, document.querySelector(".context-menus")],
+  () => done(),
 );
 
 // a strip that goes without done, e.g. with the app, focuses nothing more

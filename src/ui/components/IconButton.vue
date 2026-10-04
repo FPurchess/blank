@@ -43,7 +43,7 @@ const tip = computed(() =>
     v-bind="tip"
     :aria-label="label"
     :aria-pressed="pressed"
-    :aria-disabled="disabled"
+    :aria-disabled="disabled || undefined"
     :tabindex="focusable ? undefined : -1"
   >
     <IconGlyph :name="icon" :size="large ? 'large' : undefined" />

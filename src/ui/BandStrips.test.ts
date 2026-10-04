@@ -523,16 +523,16 @@ describe("band strips", () => {
     it("stops listening for clicks outside once it is closed", async () => {
       const add = vi.spyOn(window, "addEventListener");
       const remove = vi.spyOn(window, "removeEventListener");
-      const mousedown = (spy: typeof add) =>
-        spy.mock.calls.filter(([type]) => type === "mousedown");
+      const pointerdown = (spy: typeof add) =>
+        spy.mock.calls.filter(([type]) => type === "pointerdown");
 
       await open();
       await click(button("Done"));
       await open({ band: "footer" });
       await click(button("Done"));
 
-      expect(mousedown(add)).toHaveLength(2);
-      expect(mousedown(remove)).toEqual(mousedown(add));
+      expect(pointerdown(add)).toHaveLength(2);
+      expect(pointerdown(remove)).toEqual(pointerdown(add));
       add.mockRestore();
       remove.mockRestore();
     });
@@ -543,7 +543,7 @@ describe("band strips", () => {
       });
 
       document.body.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true }),
+        new PointerEvent("pointerdown", { bubbles: true }),
       );
       await settle();
 
@@ -564,12 +564,12 @@ describe("band strips", () => {
       document.body.append(menus);
 
       slot("left").dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true }),
+        new PointerEvent("pointerdown", { bubbles: true }),
       );
       await settle();
-      menu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      menu.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       await settle();
-      submenu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      submenu.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       await settle();
 
       expect(request.apply).not.toHaveBeenCalled();

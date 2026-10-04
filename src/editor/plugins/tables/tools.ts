@@ -22,7 +22,8 @@ import {
   type TableAction,
 } from "../../commands/table/actions";
 import { setCaption } from "../../commands/table/format";
-import { tableKeyBinding } from "../../keyBindings";
+import { CommandIdentifier } from "../../../config";
+import { commandBinding } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 import { blockBoxes, caretPage } from "../../../engine/geometry";
 import { followLayout } from "./followLayout";
@@ -157,7 +158,7 @@ export const tableTools = () => {
   const actions = tableActions((view) => setTools(view, { caption: true }));
   // the format changes told so far: once each is enough per session
   const told = new Set<string>();
-  const binding = tableKeyBinding();
+  const binding = commandBinding(CommandIdentifier.INSERT_TABLE);
   const toggle = keydownHandler(
     binding
       ? {
