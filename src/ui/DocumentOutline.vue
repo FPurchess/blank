@@ -5,7 +5,7 @@ import { CommandIdentifier } from "../config";
 import {
   scrollState,
   scrollTops,
-  scrollToText,
+  scrollToHeading,
   scrollViewBy,
 } from "../engine/geometry";
 import { listenOnWindow } from "../scope";
@@ -22,21 +22,23 @@ import {
   pageViewport,
   toggleOutline,
 } from "../state";
-import IconButton from "./components/IconButton.vue";
+import SidePaneHead from "./components/SidePaneHead.vue";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
 import { useWindowWidth } from "./composables/useWindowWidth";
+import { hoverIntent } from "./hoverIntent";
 import OutlineEntry from "./OutlineEntry.vue";
 import { tipAttrs } from "./tooltipModel";
 import { blocksDock } from "./blocksPaneModel";
 import {
   freeRight,
   layoutWidth,
+  listShape,
   OUTLINE_DOCK,
   outlinePlacement,
   wheelPixels,
 } from "./outlineModel";
-import { READING_LINE, sectionAt } from "./readingLine";
+import { sectionAt } from "./readingLine";
 
 // The outline: the document's headings as dashes at the right edge, which
 // open into a list of them on hover or a click; a click on a heading scrolls
@@ -88,6 +90,7 @@ const place = computed(() =>
 const open = computed(
   () => place.value === "beside" || place.value === "docked",
 );
+const shape = computed(() => listShape(open.value, outlinePeek.value));
 
 // where each heading starts, once per layout, not per scroll. Without the
 // engine the editor's own layout follows the document and the window's
@@ -119,7 +122,7 @@ const current = computed(() => {
 });
 
 // the page view gives up its right for the docked list, on the desk's
-// colour in Pages
+// color in Pages
 useBodyClass("outline-docked", () => place.value === "docked");
 useBodyClass("outline-desk", () => pageView.value === "pages");
 
@@ -137,23 +140,23 @@ useDismiss(
   },
 );
 
-let leaving: ReturnType<typeof setTimeout> | undefined;
-const peekIn = () => {
-  clearTimeout(leaving);
+// the peek opens as the pointer reaches the dashes and closes a moment after
+// it left them and the list, which it can reach on the way
+const peek = hoverIntent({
+  openAfter: 0,
+  closeAfter: PEEK_GRACE,
   // the open list isn't a peek, so putting it away leaves none behind
-  if (!open.value) outlinePeek.value ??= "hover";
-};
-const peekOut = () => {
-  clearTimeout(leaving);
-  if (outlinePeek.value !== "hover") return;
-  leaving = setTimeout(() => {
+  open: () => {
+    if (!open.value) outlinePeek.value ??= "hover";
+  },
+  close: () => {
     if (outlinePeek.value === "hover") outlinePeek.value = null;
-  }, PEEK_GRACE);
-};
+  },
+});
 
 const jump = (index: number) => {
   const heading = headings.value[index];
-  if (heading) scrollToText(heading.pos + 1, READING_LINE);
+  if (heading) scrollToHeading(heading.pos);
   if (outlinePeek.value === "sticky") outlinePeek.value = null;
 };
 
@@ -165,13 +168,14 @@ const collapse = () => {
 const onWheel = (event: WheelEvent) =>
   scrollViewBy(wheelPixels(event, window.innerHeight));
 
-// the open list keeps the current heading in sight, scrolling itself only,
-// never the window
+// the list, open or floating, keeps the current heading in sight, scrolling
+// its entries only, never the window (they're positioned, so the offsets are
+// theirs)
 watch(
-  [current, place],
+  [current, shape],
   () => {
     const element = list.value;
-    if (!open.value || !element) return;
+    if (shape.value === "peek" || !element) return;
     const shown = element.querySelector<HTMLElement>(".outline-entry.current");
     if (!shown) return;
     const top = shown.offsetTop;
@@ -184,7 +188,7 @@ watch(
 );
 
 onUnmounted(() => {
-  clearTimeout(leaving);
+  peek.cancel();
   if (scrolled !== undefined) cancelAnimationFrame(scrolled);
 });
 
@@ -200,17 +204,22 @@ const dashesTip = computed(() =>
     v-if="place !== 'hidden'"
     id="outline"
     ref="root"
-    aria-label="Outline"
+    :aria-labelledby="shape === 'peek' ? undefined : 'outline-title'"
     :class="place"
     :style="{ '--scrollbar': `${scrollbar}px` }"
     @mousedown.prevent
   >
+    <!-- hidden while the list floats over them -->
     <div
-      v-if="place === 'dashes'"
+      v-if="place === 'dashes' && outlinePeek !== 'sticky'"
       class="outline-dashes"
+      role="button"
+      tabindex="-1"
+      aria-label="Outline"
+      :aria-expanded="!!outlinePeek"
       v-bind="dashesTip"
-      @mouseenter="peekIn"
-      @mouseleave="peekOut"
+      @mouseenter="peek.enter"
+      @mouseleave="peek.leave"
       @click="toggleOutline(windowWidth)"
       @wheel.passive="onWheel"
     >
@@ -223,30 +232,31 @@ const dashesTip = computed(() =>
     </div>
     <div
       v-if="open || outlinePeek"
-      ref="list"
       class="outline-list"
-      :class="{ peek: !open }"
-      @mouseenter="peekIn"
-      @mouseleave="peekOut"
+      :class="shape"
+      @mouseenter="peek.enter"
+      @mouseleave="peek.leave"
     >
-      <div v-if="open || outlinePeek === 'sticky'" class="outline-head">
-        <span class="outline-title">Outline</span>
-        <IconButton
-          class="outline-collapse"
-          icon="x"
-          label="Hide outline"
-          :command="CommandIdentifier.VIEW_OUTLINE"
-          :focusable="false"
-          @click="collapse"
+      <!-- a pane has a head, a peek is only a glance -->
+      <SidePaneHead
+        v-if="shape !== 'peek'"
+        title="Outline"
+        title-id="outline-title"
+        hide-icon="x"
+        hide-label="Hide outline"
+        :command="CommandIdentifier.VIEW_OUTLINE"
+        :focusable="false"
+        @hide="collapse"
+      />
+      <div ref="list" class="outline-entries">
+        <OutlineEntry
+          v-for="(entry, index) in entries"
+          :key="entry.index"
+          :entry="entry"
+          :current="index === current"
+          @jump="jump"
         />
       </div>
-      <OutlineEntry
-        v-for="(entry, index) in entries"
-        :key="entry.index"
-        :entry="entry"
-        :current="index === current"
-        @jump="jump"
-      />
     </div>
   </nav>
 </template>

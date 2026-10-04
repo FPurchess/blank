@@ -1459,8 +1459,10 @@ body.band-editing #page-view {
 }
 
 // the outline (src/ui/DocumentOutline.vue): the headings as dashes at the
-// right edge, which open into a list of them, floating over the pages or
-// open beside them. The dashes follow Notion's, measured on its own pages.
+// right edge, which open into a list of them: open beside the pages or
+// floating over them as a side pane (see side-pane in _controls.scss), or
+// peeking on the popover surface while the pointer is on the dashes. The
+// dashes follow Notion's, measured on its own pages.
 
 // the open list's width, and the gap from it to the text and from the
 // dashes to the edge
@@ -1472,9 +1474,6 @@ $outline-dock: $outline-width + $outline-gap;
 // the dashes' column: narrow, so it keeps clear of the text on a small
 // window
 $outline-dashes: 24px;
-// how much darker than the desk the list's panel is, so it stands out from
-// the page and the desk in every theme (src/scss/themes.test.ts)
-$outline-shade: 12%;
 
 body.outline-docked #page-view {
   right: $outline-dock;
@@ -1485,25 +1484,26 @@ body.without-engine.outline-docked {
   padding-right: $outline-dock;
 }
 
-// the room beside the sheets has the desk's colour, as the page view has
+// the room beside the sheets has the desk's color, as the page view has
 body.outline-docked.outline-desk {
   background-color: var(--desk-color);
 }
 
 #outline {
   position: fixed;
-  // with the bars, under the toolbar, the dialogs and the menus
+  // with the bars, under the blocks pane, the toolbar, the dialogs and the
+  // menus
   z-index: 2;
   // only its dashes, its list and its button take the pointer
   pointer-events: none;
   user-select: none;
   color: var(--color);
   font-size: 0.8rem;
-  letter-spacing: 0.05em;
 }
 
 // one dash per heading, as long as its level is high, cut off below 400 px
-// as on Notion
+// as on Notion; the column lights up under the pointer, since a click keeps
+// the list open
 .outline-dashes {
   position: fixed;
   top: 50%;
@@ -1517,46 +1517,54 @@ body.outline-docked.outline-desk {
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
-  padding: 6px 0;
-  cursor: pointer;
+  // the longest dash fills the column inside it
+  padding: 6px 4px;
+  border-radius: var(--r-control);
   pointer-events: auto;
+  transition: background-color var(--fade-out) var(--ease);
+
+  &:hover {
+    background-color: var(--hover);
+  }
 }
 
 .outline-dash {
   flex: none;
   height: 2px;
   border-radius: 2px;
-  background-color: color-mix(in srgb, var(--color) 30%, transparent);
+  background-color: var(--line-strong);
 
   &.current {
-    background-color: var(--color);
+    background-color: var(--accent);
   }
 }
 
-// the headings on a panel of their own: open, it fills the room between the
-// top and the bottom bar, flush with the right edge (beside the page view's
-// scrollbar, or the window's edge when docked); a peek floats left of the
-// dashes
+// the headings: a head (when it's a pane) and their own scrolling body,
+// between the top and the bottom bar
 .outline-list {
   position: fixed;
   top: $top-bar-height;
   bottom: $status-height;
   box-sizing: border-box;
   width: $outline-width;
-  overflow-y: auto;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
   pointer-events: auto;
-  background-color: color-mix(in srgb, var(--desk-color), #000 $outline-shade);
 
-  #outline.beside & {
-    right: var(--scrollbar, 0px);
+  // open beside the pages or floating over them: a side pane, flush with the
+  // page view's scrollbar, or with the window's edge when docked
+  &:not(.peek) {
+    @include side-pane(right, var(--scrollbar, 0px));
   }
 
   #outline.docked & {
     right: 0;
   }
 
+  // a glance while the pointer is on the dashes: a popover left of them (on
+  // the paper, whose muted it gives its entries)
   &.peek {
+    @include popover;
     top: 50%;
     bottom: auto;
     max-height: calc(100vh - #{$top-bar-height + $status-height});
@@ -1567,49 +1575,59 @@ body.outline-docked.outline-desk {
   }
 }
 
-// the title and the button that puts the list away
-.outline-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-  padding: 0 0 6px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color) 10%, transparent);
-}
+// the entries scroll on their own, under the head; positioned, so the
+// current entry's offsets, which keep it in sight, are theirs
+.outline-entries {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--s2) var(--s3);
 
-.outline-title {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: $faint-text-opacity;
-}
-
-.outline-collapse {
-  opacity: $faint-text-opacity;
-
-  &:hover {
-    opacity: 1;
+  .peek & {
+    padding: var(--s1);
   }
 }
 
-// quiet like the bars, the current heading at full strength
+// a heading: muted, ink under the pointer, and where you are in ink with a
+// line in the accent color
 .outline-entry {
-  padding: 6px 12px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--control);
+  padding: 4px var(--s2);
+  border-radius: var(--r-control);
+  color: var(--muted);
   line-height: 1.35;
   overflow-wrap: anywhere;
-  cursor: pointer;
-  opacity: 0.3;
-  transition: opacity 150ms;
-}
+  transition:
+    color var(--fade-out) var(--ease),
+    background-color var(--fade-out) var(--ease);
 
-.outline-list:hover .outline-entry {
-  opacity: $faint-text-opacity;
-}
+  // the controls' hover and pressed fills, and ink under the pointer
+  @include states;
 
-.outline-list .outline-entry:hover,
-.outline-list .outline-entry.current {
-  opacity: 1;
+  &:hover {
+    color: var(--color);
+  }
+
+  &.current {
+    color: var(--color);
+    font-weight: 500;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      border-radius: 1px;
+      background-color: var(--accent);
+    }
+  }
 }
 
 // each level's dash shorter, and its heading deeper in the list
@@ -1990,6 +2008,7 @@ body.without-engine.blocks-docked {
   .band-line,
   .band-hint,
   body.band-editing #page-view,
+  .outline-dashes,
   .outline-entry,
   body.band-editing #outline {
     transition: none;

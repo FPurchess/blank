@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
+import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../../src/chrome.ts";
 import { Key, pressMod, restartApp } from "../helpers.ts";
 
 // The outline: the dashes at the right edge, the list they open, a click on
@@ -84,10 +85,13 @@ describe("the outline", () => {
   it("floats over the pages on a narrow window from the keyboard", async () => {
     expect(await windowWidth()).toBeLessThan(1000);
     await pressMod(Key.Alt, "o");
-    await expect($(".outline-list.peek")).toBeExisting();
-    await expect($(".outline-collapse")).toBeExisting();
+    // a side pane over the pages, which hides the dashes until it closes
+    await expect($(".outline-list.floating")).toBeExisting();
+    await expect($('button[aria-label="Hide outline"]')).toBeExisting();
+    await expect($(".outline-dashes")).not.toBeExisting();
     await pressMod(Key.Alt, "o");
     await expect($(".outline-list")).not.toBeExisting();
+    await expect($(".outline-dashes")).toBeExisting();
   });
 
   it("stays open beside the pages on a wide window, across restarts", async () => {
@@ -97,7 +101,7 @@ describe("the outline", () => {
     });
     await pressMod(Key.Alt, "o");
     await expect($("#outline.docked, #outline.beside")).toBeExisting();
-    await expect($(".outline-list:not(.peek)")).toBeExisting();
+    await expect($(".outline-list.open")).toBeExisting();
     await expect($(".outline-dashes")).not.toBeExisting();
     // a short outline still fills the room between the top bar and the
     // status bar
@@ -106,13 +110,13 @@ describe("the outline", () => {
       const { top, bottom } = list.getBoundingClientRect();
       return { top, below: window.innerHeight - bottom };
     });
-    expect(room).toEqual({ top: 44, below: 32 });
+    expect(room).toEqual({ top: TOP_BAR_HEIGHT, below: STATUS_HEIGHT });
 
     await restartApp([file]);
     await browser.setWindowSize(1280, 800);
-    await expect($(".outline-list:not(.peek)")).toBeExisting();
+    await expect($(".outline-list.open")).toBeExisting();
 
-    await $(".outline-collapse").click();
+    await $('button[aria-label="Hide outline"]').click();
     await expect($(".outline-list")).not.toBeExisting();
     await expect($(".outline-dashes")).toBeExisting();
   });

@@ -22,7 +22,8 @@ export const outlinePinned = shallowRef(false);
 // the pointer is over the dashes or the list, "sticky" after a click on the
 // dashes or the shortcut on a narrow window, until a click elsewhere, a
 // jump or the shortcut closes it. Never kept.
-export const outlinePeek = shallowRef<"hover" | "sticky" | null>(null);
+export type OutlinePeek = "hover" | "sticky" | null;
+export const outlinePeek = shallowRef<OutlinePeek>(null);
 
 // a heading the outline lists, by its index in `headings`
 export interface OutlineItem {

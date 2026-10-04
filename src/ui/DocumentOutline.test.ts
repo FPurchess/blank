@@ -4,7 +4,7 @@ import { nextTick } from "vue";
 import {
   scrollState,
   scrollTops,
-  scrollToText,
+  scrollToHeading,
   scrollViewBy,
 } from "../engine/geometry";
 import {
@@ -14,11 +14,11 @@ import {
   pageView,
   pageViewport,
   publishHeadings,
+  toggleOutline,
 } from "../state";
 import { createState, createTestHandle, doc, h, p } from "../test/editor";
 import { bootApp } from "./mount";
 import { OUTLINE_DOCK } from "./outlineModel";
-import { READING_LINE } from "./readingLine";
 
 // what the outline measures and scrolls with, which needs laid out pages
 vi.mock("../engine/geometry", async (original) => {
@@ -29,7 +29,7 @@ vi.mock("../engine/geometry", async (original) => {
       positions.map(() => null),
     ),
     scrollState: vi.fn(() => null),
-    scrollToText: vi.fn(),
+    scrollToHeading: vi.fn(),
     scrollViewBy: vi.fn(),
   };
 });
@@ -50,6 +50,9 @@ const mount = async (width = 800, node = text) => {
 const outline = () => document.querySelector<HTMLElement>("#outline");
 const dashes = () => document.querySelector<HTMLElement>(".outline-dashes");
 const list = () => document.querySelector<HTMLElement>(".outline-list");
+// the pane's button that hides it, by its name
+const hideButton = () =>
+  document.querySelector<HTMLElement>('button[aria-label="Hide outline"]');
 const entries = () => [
   ...document.querySelectorAll<HTMLElement>(".outline-entry"),
 ];
@@ -104,14 +107,18 @@ describe("the outline", () => {
     vi.useFakeTimers();
     dashes()!.dispatchEvent(new MouseEvent("mouseenter"));
     await nextTick();
-    expect(list()?.classList.contains("peek")).toBe(true);
+    expect(list()?.className).toBe("outline-list peek");
+    // the dashes say what they opened, so their tooltip keeps out of the way
+    expect(dashes()?.getAttribute("aria-expanded")).toBe("true");
+    // a glance has no title to name the outline by
+    expect(outline()?.hasAttribute("aria-labelledby")).toBe(false);
     expect(entries().map((entry) => entry.textContent?.trim())).toEqual([
       "One",
       "Two",
       "Three",
     ]);
-    // only a click opens it with a button to close it
-    expect(document.querySelector(".outline-collapse")).toBeNull();
+    // a glance, not a pane: no head with a button to close it
+    expect(document.querySelector(".side-pane-head")).toBeNull();
 
     // on the way from the dashes to the list
     dashes()!.dispatchEvent(new MouseEvent("mouseleave"));
@@ -144,14 +151,19 @@ describe("the outline", () => {
     await nextTick();
     expect(outlinePinned.value).toBe(true);
     expect(dashes()).toBeNull();
-    expect(list()?.classList.contains("peek")).toBe(false);
+    expect(list()?.className).toBe("outline-list open");
+    // the pane is named by its title
+    expect(outline()?.getAttribute("aria-labelledby")).toBe("outline-title");
+    expect(document.querySelector("#outline-title")?.textContent).toBe(
+      "Outline",
+    );
     // nothing is laid out, so there's no room beside the pages
     expect(outline()?.className).toBe("docked");
     expect(document.body.classList.contains("outline-docked")).toBe(true);
 
     // the pointer over the open list opens no peek, which would stay
     list()!.dispatchEvent(new MouseEvent("mouseenter"));
-    const collapse = document.querySelector<HTMLElement>(".outline-collapse")!;
+    const collapse = hideButton()!;
     expect(collapse.getAttribute("aria-label")).toBe("Hide outline");
     expect(collapse.getAttribute("aria-keyshortcuts")).toBe("Control+Alt+O");
     expect(collapse.tabIndex).toBe(-1);
@@ -170,8 +182,10 @@ describe("the outline", () => {
     await nextTick();
     expect(outlinePinned.value).toBe(false);
     expect(outlinePeek.value).toBe("sticky");
-    expect(list()?.classList.contains("peek")).toBe(true);
-    expect(document.querySelector(".outline-collapse")).not.toBeNull();
+    // a side pane with a shadow, over the dashes, which it hides
+    expect(list()?.className).toBe("outline-list floating");
+    expect(hideButton()).not.toBeNull();
+    expect(dashes()).toBeNull();
 
     // a click elsewhere closes it, one in it doesn't
     list()!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
@@ -181,6 +195,30 @@ describe("the outline", () => {
     );
     expect(outlinePeek.value).toBeNull();
   });
+
+  it.each([
+    ["its ×", () => hideButton()!.click()],
+    ["the shortcut", () => toggleOutline(800)],
+    [
+      "a click elsewhere",
+      () =>
+        document.body.dispatchEvent(
+          new PointerEvent("pointerdown", { bubbles: true }),
+        ),
+    ],
+  ])(
+    "brings the dashes back when %s closes the floating list",
+    async (_, close) => {
+      await mount(800);
+      dashes()!.click();
+      await nextTick();
+      expect(dashes()).toBeNull();
+      close();
+      await nextTick();
+      expect(list()).toBeNull();
+      expect(dashes()).not.toBeNull();
+    },
+  );
 
   it("closes the floating list when the window grows wide enough", async () => {
     await mount(800);
@@ -205,7 +243,7 @@ describe("the outline", () => {
     const selection = handle.state.value.selection;
     entries()[1].click();
     // the second heading, "Two", after "One" (5) and "text" (6)
-    expect(scrollToText).toHaveBeenCalledWith(12, READING_LINE);
+    expect(scrollToHeading).toHaveBeenCalledWith(11);
     expect(handle.state.value.selection).toBe(selection);
     // the list a click opened closes after the jump
     expect(outlinePeek.value).toBeNull();
@@ -216,7 +254,7 @@ describe("the outline", () => {
     outlinePeek.value = "hover";
     await nextTick();
     entries()[0].click();
-    expect(scrollToText).toHaveBeenCalledWith(1, READING_LINE);
+    expect(scrollToHeading).toHaveBeenCalledWith(0);
     expect(outlinePeek.value).toBe("hover");
   });
 
@@ -249,6 +287,55 @@ describe("the outline", () => {
     expect(current()).toBe(1);
     // a scroll measures no heading again
     expect(vi.mocked(scrollTops).mock.calls.length).toBe(measured);
+  });
+
+  it("keeps the current heading in sight, scrolling its entries, never the window", async () => {
+    vi.mocked(scrollTops).mockReturnValue([100, 800, 1600]);
+    vi.mocked(scrollState).mockReturnValue({ top: 0, height: 600, max: 3000 });
+    outlinePinned.value = true;
+    await mount(1200);
+    // jsdom lays nothing out: three entries of 30 px in a body 50 px high
+    const body = document.querySelector<HTMLElement>(".outline-entries")!;
+    let scrolled = 0;
+    Object.defineProperty(body, "clientHeight", { value: 50 });
+    Object.defineProperty(body, "scrollTop", {
+      get: () => scrolled,
+      set: (value: number) => (scrolled = value),
+    });
+    entries().forEach((entry, index) => {
+      Object.defineProperty(entry, "offsetTop", { value: index * 30 });
+      Object.defineProperty(entry, "offsetHeight", { value: 30 });
+    });
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+
+    vi.mocked(scrollState).mockReturnValue({
+      top: 1600,
+      height: 600,
+      max: 3000,
+    });
+    pageViewport.value = {
+      left: 0,
+      top: 0,
+      width: 1200,
+      height: 600,
+      scrollTop: 1600,
+    };
+    await nextTick();
+    await nextTick();
+    // the third entry ends at 90 px: the body scrolls it into its 50 px
+    expect(scrolled).toBe(40);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollBy).not.toHaveBeenCalled();
+    expect(window.scrollY).toBe(0);
+  });
+
+  it("makes the dashes a button the keys never reach", async () => {
+    await mount();
+    expect(dashes()?.getAttribute("role")).toBe("button");
+    expect(dashes()?.tabIndex).toBe(-1);
+    expect(dashes()?.getAttribute("aria-label")).toBe("Outline");
+    expect(dashes()?.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("keeps clear of the page view's scrollbar, docked or not", async () => {

@@ -74,33 +74,11 @@ describe("the faint text beside the pages", () => {
   });
 });
 
-describe("the outline", () => {
-  const opacity = scssNumber("main.scss", "faint-text-opacity");
-  const shade = scssNumber("main.scss", "outline-shade") / 100;
-  // the list's panel: the desk with a little black
-  const panelOf = (theme: string) =>
-    mix([0, 0, 0], colorsOf(theme).color("desk-color"), shade);
-
-  it.each(themes)("reads at 3:1 at least on its panel in %s", (theme) => {
-    const { text } = colorsOf(theme);
-    const panel = panelOf(theme);
-    // its headings at the faint text's opacity while the pointer is over it
-    expect(contrast(mix(text, panel, opacity), panel)).toBeGreaterThanOrEqual(
-      3,
-    );
-  });
-
-  it.each(themes)("stands out from the page in %s", (theme) => {
-    const { background, color } = colorsOf(theme);
-    const panel = panelOf(theme);
-    expect(luminance(panel)).toBeLessThan(luminance(background));
-    // and from the desk, but in Black, whose desk is black already, so the
-    // panel is as black as it, beside the sheets in Pages
-    expect(luminance(panel)).toBeLessThanOrEqual(
-      luminance(color("desk-color")),
-    );
-  });
-
+// The outline's and the blocks pane's colors are the controls' tokens
+// (--muted, --muted-on-paper, --line-strong, --accent), which "the
+// controls' colors" checks in every theme and color; only their room is
+// theirs.
+describe("the side panes", () => {
   it("takes the room the outline's model gives it", () => {
     // the open list's width and the gap to the text
     expect(
