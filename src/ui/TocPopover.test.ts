@@ -74,9 +74,9 @@ describe("the settings of a table of contents", () => {
     expect(tocPopover.value).toBeNull();
   });
 
-  it("closes when the window loses the focus", () => {
+  it("stays while the window loses the focus, as to a select's menu", () => {
     window.dispatchEvent(new Event("blur"));
-    expect(tocPopover.value).toBeNull();
+    expect(tocPopover.value).not.toBeNull();
   });
 
   it("leaves a press on the settings button to the button", () => {

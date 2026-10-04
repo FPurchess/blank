@@ -114,13 +114,19 @@ describe("a table of contents", () => {
   it("is saved as one line, and back after a restart", async () => {
     await focusEditor();
     await pressMod("s");
-    await browser.waitUntil(
-      () =>
-        fs
-          .readFileSync(file, "utf8")
-          .includes('<!-- blank:toc@1 depth="1" title="Contents" -->'),
-      { timeoutMsg: `not saved: ${fs.readFileSync(file, "utf8")}` },
-    );
+    const saved = () =>
+      fs
+        .readFileSync(file, "utf8")
+        .includes('<!-- blank:toc@1 depth="1" title="Contents" -->');
+    await browser.waitUntil(saved).catch(async () => {
+      // what the file and the editor hold then, not when the wait began
+      const blocks = await browser.execute(() =>
+        window.blankGeometry.topBlocks().map((block) => block.type),
+      );
+      throw new Error(
+        `not saved: ${fs.readFileSync(file, "utf8")}\nblocks: ${blocks.join(", ")}`,
+      );
+    });
     await restartApp([file]);
     await expect($("#editor nav.toc")).toBeExisting();
     expect(await entries()).toEqual(["one", "two and more"]);

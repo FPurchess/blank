@@ -43,11 +43,12 @@ const onKeyDown = (event: KeyboardEvent) => {
   }
 };
 
-// a press elsewhere, Esc, leaving the window or resizing it closes them; a
-// press on the settings button is theirs, which closes them through it
+// a press elsewhere, Esc or resizing the window closes them; a press on the
+// settings button is theirs, which closes them through it. Not the window's
+// blur: WebKitGTK shows the list of a select as a menu of its own, which
+// takes the window's focus.
 useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
   escape: true,
-  blur: true,
   resize: true,
 });
 </script>
