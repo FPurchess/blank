@@ -32,9 +32,13 @@ const control = (attrs: Record<string, string> = {}) => {
   return button;
 };
 
-const over = (target: Element, x = 10) =>
+const over = (target: Element, x = 10, buttons = 0) =>
   target.dispatchEvent(
-    new MouseEvent("mouseover", { bubbles: true, clientX: x }),
+    new MouseEvent("mouseover", { bubbles: true, clientX: x, buttons }),
+  );
+const move = (target: Element, x: number, buttons = 0) =>
+  target.dispatchEvent(
+    new MouseEvent("mousemove", { bubbles: true, clientX: x, buttons }),
   );
 const out = (target: Element, to: Element | null = document.body) =>
   target.dispatchEvent(
@@ -170,22 +174,58 @@ describe("watchTips", () => {
     expect(shown().name).toBe("Italic");
   });
 
-  it.each(["mousedown", "keydown", "wheel"])("goes on a %s", (type) => {
+  it("waits until the pointer rests, and shows where it stopped", () => {
     const button = control();
-    over(button);
-    vi.advanceTimersByTime(TIP_DELAY);
-    window.dispatchEvent(new Event(type));
-    expect(hide).toHaveBeenCalled();
-    // and doesn't come back while the pointer stays on the control
-    over(button.firstChild as Element);
+    over(button, 10);
+    vi.advanceTimersByTime(TIP_DELAY - 100);
+    move(button, 40);
+    vi.advanceTimersByTime(TIP_DELAY - 1);
+    expect(show).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(shown().x).toBe(40);
+    // once it shows, moving over the control leaves it
+    move(button, 60);
     vi.advanceTimersByTime(TIP_DELAY);
     expect(show).toHaveBeenCalledOnce();
-    // but once it came back to it
-    out(button);
-    over(button);
-    vi.advanceTimersByTime(TIP_DELAY);
-    expect(show).toHaveBeenCalledTimes(2);
   });
+
+  it("shows nothing while a button is held, e.g. dragging", () => {
+    const button = control();
+    over(button, 10, 1);
+    move(button, 20, 1);
+    vi.advanceTimersByTime(TIP_DELAY);
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it("stays away after a second press on the same control", () => {
+    const button = control();
+    over(button);
+    window.dispatchEvent(new Event("mousedown"));
+    window.dispatchEvent(new Event("keydown"));
+    over(button.firstChild as Element);
+    vi.advanceTimersByTime(TIP_DELAY);
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it.each(["mousedown", "keydown", "wheel", "scroll"])(
+    "goes on a %s",
+    (type) => {
+      const button = control();
+      over(button);
+      vi.advanceTimersByTime(TIP_DELAY);
+      window.dispatchEvent(new Event(type));
+      expect(hide).toHaveBeenCalled();
+      // and doesn't come back while the pointer stays on the control
+      over(button.firstChild as Element);
+      vi.advanceTimersByTime(TIP_DELAY);
+      expect(show).toHaveBeenCalledOnce();
+      // but once it came back to it
+      out(button);
+      over(button);
+      vi.advanceTimersByTime(TIP_DELAY);
+      expect(show).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("doesn't show once the window lost the focus", () => {
     over(control());

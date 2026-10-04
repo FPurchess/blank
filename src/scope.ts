@@ -15,13 +15,15 @@ export const bootScope = (setup: () => void) => {
 
 /**
  * listenOnWindow adds `listener` to the window for `type` until the scope it's
- * called in, e.g. a boot's, stops
+ * called in, e.g. a boot's, stops. `options` are addEventListener's: whether
+ * it captures, or e.g. `{ capture: true, passive: true }` for a listener of
+ * the wheel that mustn't hold up scrolling.
  */
 export const listenOnWindow = <K extends keyof WindowEventMap>(
   type: K,
   listener: (event: WindowEventMap[K]) => void,
-  capture = false,
+  options: boolean | AddEventListenerOptions = false,
 ) => {
-  window.addEventListener(type, listener, capture);
-  onScopeDispose(() => window.removeEventListener(type, listener, capture));
+  window.addEventListener(type, listener, options);
+  onScopeDispose(() => window.removeEventListener(type, listener, options));
 };

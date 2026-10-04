@@ -75,8 +75,9 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - the bottom bar's items, which keep their `title` and their own `cursor` rules until the status bar;
   - the header and footer strip (`BandEditor.vue`), which keeps its `title`s and its Title Case labels ("First Page ▾", "Odd & Even Pages").
 - **Behavior:**
-  - It shows after 400ms of rest (`hoverIntent.ts`, the timer cards share).
-  - It goes at once on leave, press, key, wheel or blur.
+  - It shows once the pointer has rested on the control for 400ms with no button held (`hoverIntent.ts`, the timer cards share).
+  - It goes at once on leave, press, key, wheel, scroll or blur, and stays away from a control pressed or typed on until the pointer leaves it.
+  - Listeners of the wheel and scroll are passive (`listenOnWindow` takes addEventListener's options), so they never hold up scrolling.
   - It sits above the control, or below near the top bar, at the pointer on wide controls (`placeTip`).
   - It never takes the focus. While shown, it describes the control (`aria-describedby`) by what its own name doesn't say.
 - **`tooltipsSuppressed`** (`src/state/popups.ts`) hides them, e.g. while focus mode fades the controls.
