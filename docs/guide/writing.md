@@ -8,8 +8,6 @@ Blank shows your text as it will look, not as markdown syntax, and on the lines 
 
 The row under the tabs has everything to format your text, and shows how the text at the cursor is set: Bold lights up in bold text, the list you're in is pressed, and the style menu says _Heading 2_ while you're in one.
 
-<img class="shot" src="/screenshots/toolbar.png" alt="The formatting toolbar above a centered heading" />
-
 From left to right: undo and redo; the style menu (text, headings 1–6, quote and code block, each shown in its own style); bold, italic, underline, code and link; bulleted and numbered lists, quote, outdent and indent; the four alignments; and **Insert** for an image, a table, a horizontal line or a page break. Clicking a button leaves your cursor and selection where they were, so you can go on typing. Hover over a button to see its shortcut.
 
 In a narrow window, what doesn't fit moves into the **More** button (⋯) at the end of the row: first Insert, then alignment, then indent and quote, then the lists.
