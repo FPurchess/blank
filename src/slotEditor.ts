@@ -57,37 +57,49 @@ const shown = (field: Field, fields: DocumentFields) =>
     ? field
     : fields[field as keyof DocumentFields] || FIELD_NAMES[field];
 
+// what a slot shows at rest, part by part: text, and chips for the
+// placeholders that differ from page to page
+export type PrintedPart =
+  { text: string } | { field: Field; title: string; text: string };
+
 /**
- * chip creates the chip of a placeholder: the page numbers by name, the
- * title and author as they read
+ * chipOf returns what the chip of a placeholder says and its tooltip: the
+ * page numbers by name, the title and author as they read
+ */
+export const chipOf = (field: Field, fields: DocumentFields) => ({
+  field,
+  title: FIELD_NAMES[field],
+  text: shown(field, fields),
+});
+
+/**
+ * chip creates the chip of a placeholder in the slot editor
  */
 export const chip = (field: Field, fields: DocumentFields) => {
+  const { title, text } = chipOf(field, fields);
   const element = document.createElement("span");
   element.className = "chip";
   element.dataset.field = field;
-  element.title = FIELD_NAMES[field];
-  element.textContent = shown(field, fields);
+  element.title = title;
+  element.textContent = text;
   return element;
 };
 
 /**
- * renderSlot writes the text of a slot into `element` as it prints: the
+ * printedParts returns the text of a slot as the edges show it at rest: the
  * placeholders as their values, and those that differ per page as chips
  */
-export const renderSlot = (
-  element: HTMLElement,
+export const printedParts = (
   text: string,
   fields: DocumentFields,
-) =>
-  element.replaceChildren(
-    ...segments(text).map((segment) => {
-      if (typeof segment === "string") return document.createTextNode(segment);
-      const { field } = segment;
-      return PER_PAGE.has(field)
-        ? chip(field, fields)
-        : document.createTextNode(fields[field as keyof DocumentFields]);
-    }),
-  );
+): PrintedPart[] =>
+  segments(text).map((segment) => {
+    if (typeof segment === "string") return { text: segment };
+    const { field } = segment;
+    return PER_PAGE.has(field)
+      ? chipOf(field, fields)
+      : { text: fields[field as keyof DocumentFields] };
+  });
 
 const nodesOf = (text: string) =>
   segments(text).map((segment) =>
@@ -109,6 +121,13 @@ export const slotText = (doc: Node) => {
   return text.trim();
 };
 
+// what Tab, Shift+Tab, Enter and Escape do in a slot editor
+export interface SlotKeys {
+  next(): boolean;
+  previous(): boolean;
+  done(): boolean;
+}
+
 export interface SlotEditor {
   view: EditorView;
   text(): string;
@@ -126,11 +145,7 @@ export const createSlotEditor = (
   place: HTMLElement,
   text: string,
   fields: DocumentFields,
-  keys: {
-    next(): boolean;
-    previous(): boolean;
-    done(): boolean;
-  },
+  keys: SlotKeys,
 ): SlotEditor => {
   const setEmpty = (doc: Node) => {
     place.dataset.empty = String(doc.childCount === 0);

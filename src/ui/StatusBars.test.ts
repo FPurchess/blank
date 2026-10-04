@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import { config } from "../config";
+import { formatShortcut } from "../editor/keyBindings";
 import { closePicker, move, openPicker, typeChar } from "../languagePicker";
 import { schema } from "../markdown";
 import {
@@ -247,7 +248,7 @@ describe("page button", () => {
     // jsdom's locale is en-US
     expect(uiPage().textContent).toBe("Letter (portrait)");
     expect(uiPage().getAttribute("role")).toBe("button");
-    expect(uiPage().title).toBe("Page setup (Mod-Alt-u)");
+    expect(uiPage().title).toBe(`Page setup (${formatShortcut("Mod-Alt-u")})`);
   });
 
   it("follows the page setup of the document", async () => {

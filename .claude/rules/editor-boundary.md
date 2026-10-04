@@ -3,13 +3,12 @@ paths:
   - "src/editor/**"
   - "src/ui/**"
   - "src/ui.ts"
-  - "src/table*.ts"
   - "src/state/focus.ts"
 ---
 
 # Between the editor and the UI
 
-Blank's text is a ProseMirror editor; the UI around it (bars, dialogs, menus, pickers, toolbars) is Vue, or imperative modules that are being ported (see `vue-migration.md`). This file is about where one ends and the other begins.
+Blank's text is a ProseMirror editor; the UI around it (bars, dialogs, menus, pickers, toolbars, the header and footer strips, the table handles) is Vue (see `ui-components.md`). This file is about where one ends and the other begins.
 
 ## What stays ProseMirror code
 

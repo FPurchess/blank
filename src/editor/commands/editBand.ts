@@ -83,7 +83,7 @@ const tellIfEmpty = (view: EditorView, band: Band) => {
 
 /**
  * openBand opens the strip of the header or footer of the document of
- * `view`, see src/bandStrips.ts
+ * `view`, see src/ui/BandEditor.vue
  * @param insert what to put into the center once it opens, e.g. "{page}"
  */
 export const openBand = (view: EditorView, band: Band, insert?: string) => {

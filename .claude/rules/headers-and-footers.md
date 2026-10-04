@@ -2,7 +2,10 @@
 paths:
   - "src/layout/**"
   - "src/bandStrip.ts"
-  - "src/bandStrips.ts"
+  - "src/ui/Band*.vue"
+  - "src/ui/SlotField.vue"
+  - "src/ui/SlotText.vue"
+  - "src/ui/bandStripsModel.ts"
   - "src/slotEditor.ts"
   - "src/state/page.ts"
   - "src/state/dialogs.ts"
@@ -36,7 +39,7 @@ paths:
 - A placeholder that comes out empty on a page ({author} with no author set, {chapter} before the first heading 1, {title}, {file}) is named on the screen only, so the band can still be seen and opened: `src/layout/placeholders.ts` splits each slot into text and such placeholders (`slotParts`, `pageBandParts`). Page ends show the name as an `em.band-placeholder` (`src/ui/BandSlots.vue` in the marks of `PageFrame.vue`), and the sheets in the `.page-band-names` overlay over the painted band. The PDF and Word print the text alone and stay empty there.
   - `hasBand` follows what is written in the templates, not what comes out, so a band whose placeholders are all empty keeps its room on the screen and its double-click.
   - `emptyBandNotice` runs when the strip's change is applied (`tellIfEmpty` in `src/editor/commands/editBand.ts`): if the band comes out empty on that page although something is written, the status line says which placeholders and why, and how to set the author.
-  - `FIELD_NAMES` names the placeholders as the strips' insert buttons do (`src/bandStrips.ts`). `src/slotEditor.ts` keeps its own, longer names for its chips' tooltips ("Page number", "File name").
+  - `FIELD_NAMES` names the placeholders as the strips' insert buttons do (`INSERTS` in `src/ui/bandStripsModel.ts`). `src/slotEditor.ts` keeps its own, longer names for its chips' tooltips ("Page number", "File name").
   - `sheetSlots` (`src/ui/pageViewModel.ts`) places the overlay's names where the engine sets the band: it repeats `band_boxes` in `src-tauri/layout/src/engine/display.rs` (each slot a third of the text width; the header `BAND_DISTANCE`, 36 pt, below the top edge; the footer at the bottom margin, moved down by what the margin leaves beyond 36 pt and one band line; `BAND_SIZE` 8.8 pt with line height 1.3, `BAND_LINE`, in `src-tauri/layout/src/bands.rs`, which `BAND` in `src/layout/bands.ts` mirrors). A change to that geometry must change both; `src/ui/sheetSlots.parity.test.ts` checks that the engine's band text lies in the slots `sheetSlots` gives.
 - Word (`src/exporters/docx/bands.ts`):
   - One paragraph per band in Word's `Header`/`Footer` style, with center and right tab stops.
@@ -48,12 +51,12 @@ paths:
   - It descends into `w:sdt` content controls, where Word's page number gallery puts its fields.
   - It maps the fields back, and keeps the shown text of other fields.
   - It warns about pictures, tables, several lines and number styles Blank lacks.
-- The strips (`src/bandStrips.ts`) are edited at the top and bottom of the window, not in the dialog.
+- The strips (`src/ui/BandStrips.vue`) are edited at the top and bottom of the window, not in the dialog.
   - At rest the page view shows the bands: on the sheets in "pages", and where each page ends in "page ends" (`src/ui/PageFrame.vue`). A double click on a sheet's top or bottom margin, or on the footer or header of a page-end mark, runs `editBand` through the editor's handle. The edges only show a hint to add a band that has no text, while the pointer is on the bar; the line of a band with text is kept, hidden, for tests.
   - While a strip is open, the page view makes room for it (`body.editing-header #page-view`) and fades.
   - They show what `pageLayout` resolves and `pageFields` fills in (`src/state/page.ts`). Both stay the same while typing leaves the frontmatter, the first heading and the file alone, so the strips render again only then.
-  - Opening a band (a double click on the pages, a click on the edge line) runs `editBand(band, insert?)` (`src/editor/commands/editBand.ts`) through the editor's handle, which `bootUI` gives `bootBandStrips(editor)` (see `editor-boundary.md`). `insert` is what the strip puts into its center, `{page}` for **# Page numbers**.
+  - Opening a band (a double click on the pages, a click on the edge line) runs `editBand(band, insert?)` (`src/editor/commands/editBand.ts`) through the editor's handle (`useEditor()` in `BandEdge.vue`, see `editor-boundary.md`). `insert` is what the strip puts into its center, `{page}` for **# Page numbers**.
   - `openBand` publishes a `bandEditor` request, whose `apply` writes all band settings as one undo step.
-  - `bootBandStrips()` runs in `bootScope()`: its watchers, the window listeners and the elements and body classes it adds all go with its `dispose`, which also closes an open strip, and booting again replaces it. The open strip runs in a detached scope of its own, which closing it stops.
-  - What the open strip does is in `src/bandStrip.ts`, without its DOM: `openStrip`, the functions that change the strip, its menus, and `stripSettings`, what it keeps. `bandStrips.ts` only renders it and wires the DOM.
-  - The open strip has tabs for the first and even pages when they have their own. `src/slotEditor.ts` is the small ProseMirror editor of one slot, with the fields as atom chips.
+  - `BandStrips.vue`, first in `App.vue` so the table toolbar paints above a strip it overlaps (both z-index 5), renders the two edges (`BandEdge.vue`) and the open strip (`BandEditor.vue`, keyed by its request). The body classes (`has-header`, `near-top`, `band-editing`, `editing-header`, …) come from `useBodyClass` (`src/ui/composables/useBodyClass.ts`), and the window listeners from `listenOnWindow`, so they all go when the component does; unmounting the strips also closes an open strip, without keeping it.
+  - What the open strip does is in `src/bandStrip.ts`, without its DOM: `openStrip`, the functions that change the strip, its menus, and `stripSettings`, what it keeps. `BandEditor.vue` only renders it and wires the keys, the menus and the slot editors: Tab goes around the buttons and slots (`shownIn`), Esc on a button, Enter or Esc in a slot, Done, and a press outside the strip and its menus keep what was typed.
+  - The open strip has tabs for the first and even pages when they have their own. `src/slotEditor.ts` is the small ProseMirror editor of one slot, with the fields as atom chips; `SlotField.vue` mounts one and leaves its DOM to ProseMirror, and a change of the pages shown mounts new ones (their key counts those changes). The edges show a slot as it prints with `SlotText.vue`, from `printedParts`, whose chips say what the editor's say (`chipOf`).

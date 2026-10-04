@@ -18,7 +18,7 @@ import type { MenuItem } from "./state";
 
 // The open header or footer strip without its DOM: what it edits, which
 // pages it shows, its menus, and what it keeps when it closes.
-// bandStrips.ts renders it; the functions here return a new strip.
+// src/ui/BandEditor.vue renders it; the functions here return a new strip.
 
 // the pages a strip edits the band of: the first page when it has its own,
 // every page, or even pages when they have their own
@@ -40,7 +40,11 @@ export interface Strip {
   pages: Pages;
 }
 
-const NAMES: Record<Band, string> = { header: "Header", footer: "Footer" };
+// what a band is called on its strip and its edge
+export const NAMES: Record<Band, string> = {
+  header: "Header",
+  footer: "Footer",
+};
 
 export const NUMBER_STYLES: { style: NumberStyle; label: string }[] = [
   { style: "1", label: "1, 2, 3" },

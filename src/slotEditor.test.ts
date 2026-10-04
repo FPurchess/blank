@@ -4,7 +4,7 @@ import { TextSelection } from "prosemirror-state";
 import {
   chip,
   createSlotEditor,
-  renderSlot,
+  printedParts,
   type SlotEditor,
   slotText,
 } from "./slotEditor";
@@ -137,25 +137,29 @@ describe("slotText", () => {
   });
 });
 
-describe("renderSlot and chip", () => {
+describe("printedParts and chip", () => {
   it("writes the title and author as text, the page numbers as chips", () => {
-    const element = document.createElement("span");
-    renderSlot(element, "{title} {author}· {page}", fields);
-
-    expect(element.textContent).toBe("The Lighthouse · page");
-    expect(element.querySelectorAll(".chip")).toHaveLength(1);
+    expect(printedParts("{title} {author}· {page}", fields)).toEqual([
+      { text: "The Lighthouse" },
+      { text: " " },
+      { text: "" },
+      { text: "· " },
+      { field: "page", title: "Page number", text: "page" },
+    ]);
   });
 
   it("writes the date and file as text, the chapter as a chip", () => {
-    const element = document.createElement("span");
-    renderSlot(element, "{date}, {file}, {chapter}", fields);
+    const parts = printedParts("{date}, {file}, {chapter}", fields);
 
-    expect(element.textContent).toBe("27 September 2026, , chapter");
-    expect(element.querySelectorAll(".chip")).toHaveLength(1);
+    expect(parts.map((part) => part.text).join("")).toBe(
+      "27 September 2026, , chapter",
+    );
+    expect(parts.filter((part) => "field" in part)).toHaveLength(1);
   });
 
   it("names chips and falls back to their name without a value", () => {
     expect(chip("author", fields).textContent).toBe("Author");
     expect(chip("pages", fields).title).toBe("Number of pages");
+    expect(chip("page", fields).dataset.field).toBe("page");
   });
 });

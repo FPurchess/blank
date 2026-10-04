@@ -7,7 +7,8 @@ import {
 import { CellSelection } from "prosemirror-tables";
 
 import { isHeaderCell } from "../markdown";
-import { expect } from "vitest";
+import type { TableHandlesState } from "../state";
+import { expect, vi } from "vitest";
 
 import { createState, createTestView } from "./editor";
 
@@ -100,3 +101,34 @@ export const runCommand = (command: Command, state: EditorState) => {
   expect(command(view.state, view.dispatch)).toBe(true);
   return view.state;
 };
+
+/**
+ * fakeTableHandles returns the handles state of a table of three rows (the
+ * first a header row) and three columns, 300 px wide, at 100, 100, with
+ * spies for its actions
+ */
+export const fakeTableHandles = (
+  change: Partial<TableHandlesState> = {},
+): TableHandlesState => ({
+  box: { left: 100, top: 100, right: 400, bottom: 220 },
+  visible: { left: 100, right: 400 },
+  rows: [100, 140, 180, 220],
+  firstRow: 0,
+  rowCount: 3,
+  columns: [100, 200, 300, 400],
+  headerRows: 1,
+  headerColumn: false,
+  smallest: { cols: 2, rows: 2 },
+  percents: [30, 30, 40],
+  selected: null,
+  insertRow: vi.fn(),
+  insertColumn: vi.fn(),
+  selectRows: vi.fn(),
+  selectColumns: vi.fn(),
+  moveRows: vi.fn(),
+  moveColumns: vi.fn(),
+  resize: vi.fn(),
+  setWidths: vi.fn(),
+  hold: vi.fn(),
+  ...change,
+});

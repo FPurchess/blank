@@ -27,22 +27,20 @@ const TEXT_CONTENT_DELAY = 50;
 export const bootDocumentState = () =>
   bootScope(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    watch(
-      transaction,
-      (tx) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          if (!tx) return;
-          const { doc } = tx;
-          // separate blocks and inline leaves like hard breaks and images by a
-          // space
-          textContent.value = doc
-            .textBetween(0, doc.content.size, " ", " ")
-            .replace(/\s+/g, " ")
-            .trim();
-        }, TEXT_CONTENT_DELAY);
-      },
-      { flush: "sync" },
-    );
+    // after the writes of a tick, so the timer is reset once per tick rather
+    // than once per transaction
+    watch(transaction, (tx) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!tx) return;
+        const { doc } = tx;
+        // separate blocks and inline leaves like hard breaks and images by a
+        // space
+        textContent.value = doc
+          .textBetween(0, doc.content.size, " ", " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }, TEXT_CONTENT_DELAY);
+    });
     onScopeDispose(() => clearTimeout(timer));
   });

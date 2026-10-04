@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  onUnmounted,
-  shallowRef,
-  useTemplateRef,
-  watch,
-  watchEffect,
-} from "vue";
+import { computed, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { formatShortcut } from "../editor/keyBindings";
@@ -30,6 +23,7 @@ import {
   toggleOutline,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
+import { useBodyClass } from "./composables/useBodyClass";
 import OutlineEntry from "./OutlineEntry.vue";
 import {
   freeRight,
@@ -118,10 +112,8 @@ const current = computed(() => {
 
 // the page view gives up its right for the docked list, on the desk's
 // colour in Pages
-watchEffect(() => {
-  document.body.classList.toggle("outline-docked", place.value === "docked");
-  document.body.classList.toggle("outline-desk", pageView.value === "pages");
-});
+useBodyClass("outline-docked", () => place.value === "docked");
+useBodyClass("outline-desk", () => pageView.value === "pages");
 
 // a wide window shows the outline open or not at all, never floating
 watch(windowWidth, (width) => {
@@ -191,7 +183,6 @@ watch(
 onUnmounted(() => {
   clearTimeout(leaving);
   if (scrolled !== undefined) cancelAnimationFrame(scrolled);
-  document.body.classList.remove("outline-docked", "outline-desk");
 });
 
 const shortcut = computed(() =>
