@@ -35,20 +35,24 @@ onUpdated(placeIt);
 const apply = () => props.request.apply(depth.value, titleOf(title.value));
 const close = () => closeDialog(tocPopover, props.request.close);
 
-// Enter in the title closes them
+// Esc, and Enter in the title, close them. They take the key, since the
+// focus goes back to the editor while it's pressed: the rest of the press
+// would reach the editor as typing and replace the table of contents.
 const onKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+  if (
+    event.key === "Escape" ||
+    (event.key === "Enter" && event.target instanceof HTMLInputElement)
+  ) {
     event.preventDefault();
     close();
   }
 };
 
-// a press elsewhere, Esc or resizing the window closes them; a press on the
+// a press elsewhere or resizing the window closes them; a press on the
 // settings button is theirs, which closes them through it. Not the window's
 // blur: WebKitGTK shows the list of a select as a menu of its own, which
 // takes the window's focus.
 useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
-  escape: true,
   resize: true,
 });
 </script>

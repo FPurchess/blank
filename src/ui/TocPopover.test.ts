@@ -57,10 +57,15 @@ describe("the settings of a table of contents", () => {
     expect(request.apply).toHaveBeenLastCalledWith(5, "Contents");
   });
 
-  it("closes on Esc, and gives the focus back", async () => {
-    depth().dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
+  it("closes on Esc, taking the key, and gives the focus back", async () => {
+    const escape = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    depth().dispatchEvent(escape);
+    // the rest of the press never reaches the editor as typing
+    expect(escape.defaultPrevented).toBe(true);
     expect(tocPopover.value).toBeNull();
     expect(request.close).toHaveBeenCalled();
     await nextTick();
