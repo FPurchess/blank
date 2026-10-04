@@ -31,10 +31,17 @@ const tocBox = () =>
 // a point in the upper half of the line of `text`, where a block dropped
 // goes before that paragraph. Each paragraph is found by its second word,
 // which autocorrect never capitalizes, as it does the first once a space or
-// Enter follows it.
+// Enter follows it. The point keeps right of the pane, which floats over
+// the pages' left side in E2E's 800 px wide window, and a drop there goes
+// nowhere.
 const above = async (text: string) => {
   const at = await pointAt(text, 0, 2);
-  return { ...at, y: at.y - 3 };
+  const pane = await browser.execute(
+    () =>
+      document.getElementById("blocks-pane")?.getBoundingClientRect().right ??
+      0,
+  );
+  return { ...at, x: Math.max(at.x, Math.round(pane) + 60), y: at.y - 3 };
 };
 
 describe("the blocks pane", () => {
