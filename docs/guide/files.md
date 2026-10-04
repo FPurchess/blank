@@ -23,6 +23,8 @@ Everything you write is kept as markdown: plain text with a few marks like `#` f
 | Save         | `Mod` `S`         |
 | Save as      | `Mod` `Shift` `S` |
 
+Alignment and underlining have no mark in markdown, so Blank writes them as the bit of HTML that GitHub and most markdown apps show too: centered text goes between `<div align="center">` and `</div>`, with the markdown inside kept as it is, and underlined text between `<u>` and `</u>`. Blank reads `<p align="…">` and `style="text-align: …"` from other apps as well.
+
 The open dialog shows your markdown files and Word documents together, and you can pick several at once: each opens in a [tab](./writing#tabs) of its own. A tab with changes you haven't saved shows a dot, and Blank asks before it closes. Closed the whole window without saving? Nothing is lost: every tab comes back with its text, see [Blank remembers your documents](./writing#blank-remembers-your-documents).
 
 ### Properties on top of the file {#frontmatter}
@@ -93,14 +95,14 @@ Blank never writes to the Word document you opened. It won't even save markdown 
 
 ### What comes along {#what-comes-along}
 
-Headings, bold and italic text, links, lists, quotes, code, line breaks, page breaks, images, tables and [tables of contents](./blocks#toc) make it into your document, and so do the header, the footer and the page numbers. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
+Headings, bold, italic and underlined text, the alignment of paragraphs, headings and table columns (also when it comes from a Word style such as a centered title or justified body text), links, lists, quotes, code, line breaks, page breaks, images, tables and [tables of contents](./blocks#toc) make it into your document, and so do the header, the footer and the page numbers. Tables keep their merged cells, header rows and header columns, and their caption. A table without a header row gets its first row as the header, since a markdown table needs one. Images are stored inside the markdown file, so it stays a single file you can move and send; large pictures are scaled down to a size that still prints well.
 
 Word can do more than markdown, so a few things change on the way:
 
 - a table inside a table cell becomes text, one line per row with the cells separated by `|`,
-- the alignment of table columns is left out,
 - footnotes move to the end of the document,
-- comments, underlining and colours are left out,
+- comments and colours are left out, and links lose the underline Word gives them, since every link shows underlined anyway,
+- alignment inside lists and quotes is left out,
 - tracked changes count as accepted,
 - charts and drawings Blank can't show are replaced by their description,
 - numbered lists start at 1.
@@ -117,7 +119,7 @@ A colleague sends you a Word document to work on:
 2. Write, and keep your version with `Mod` `S`, as markdown.
 3. Send it back with `Mod` `Alt` `W`.
 
-On their side, headings, quotes, lists, links, images and tables arrive as they know them from Word. When they send it back, only the alignment of table columns needs setting again.
+On their side, headings, quotes, lists, links, images and tables arrive as they know them from Word, aligned as you aligned them, and come back the same way.
 
 ## Good to know {#good-to-know}
 

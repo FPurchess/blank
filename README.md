@@ -19,7 +19,7 @@
 
 Every piece of writing begins the same way: an empty page, a blinking cursor, and the quiet question of what comes next.
 
-Blank is made for that moment and for everything after it. There are no toolbars, no buttons, no panels asking for your attention. There is the page and the sentence you are writing. Your hands stay on the keyboard, and the formatting follows them: type `#` and a space, and a heading appears, press `Mod` `I` and your words lean into italics.
+Blank is made for that moment and for everything after it. Nothing asks for your attention: one quiet row of formatting buttons when you want it, and otherwise the page and the sentence you are writing. Your hands can stay on the keyboard, and the formatting follows them: type `#` and a space, and a heading appears, press `Mod` `I` and your words lean into italics.
 
 The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. When you are ready to proofread, spell check underlines what it doesn't know and offers what you meant. Close the window mid-thought and Blank keeps your words for the next time you open it.
 
