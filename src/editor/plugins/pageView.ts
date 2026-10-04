@@ -40,6 +40,7 @@ import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
 import { summarize } from "./properties";
 import { displaySrc } from "./images";
+import { isMac } from "../../platform";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { embedSrc } from "../../markdown/blocks/embeds";
@@ -379,6 +380,37 @@ const merged = (ranges: [number, number][]): [number, number][] => {
 };
 
 const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
+
+/**
+ * verticalStart returns where ↑ or ↓ moves from: the head, but for a selected
+ * block with text in it, like a form, its text nearest to where it goes, so
+ * the caret leaves it rather than moving into it
+ */
+const verticalStart = (selection: Selection, down: boolean) => {
+  if (!(selection instanceof NodeSelection) || selection.node.isLeaf)
+    return selection.head;
+  const { from, to, $from, $to } = selection;
+  const inner = Selection.findFrom(down ? $to : $from, down ? -1 : 1, true);
+  return inner && inner.head > from && inner.head < to
+    ? inner.head
+    : selection.head;
+};
+
+/**
+ * documentEdge tells whether a key goes to the end of the document (true) or
+ * its start (false): Ctrl+Home and Ctrl+End, and on macOS Cmd with Home, End,
+ * ↑ or ↓; or undefined for any other key
+ */
+const documentEdge = (event: KeyboardEvent) => {
+  const mac = isMac();
+  const mod = mac
+    ? event.metaKey && !event.ctrlKey
+    : event.ctrlKey && !event.metaKey;
+  if (!mod || event.altKey) return undefined;
+  if (event.key === "Home" || (mac && event.key === "ArrowUp")) return false;
+  if (event.key === "End" || (mac && event.key === "ArrowDown")) return true;
+  return undefined;
+};
 // how much of the view's height Page Up and Down move
 const PAGE_STEP = 0.85;
 
@@ -642,20 +674,32 @@ export const pageView = () => {
     props: {
       handleKeyDown(view, event) {
         const engine = pageEngine;
-        if (!engine || event.ctrlKey || event.metaKey || event.altKey)
-          return false;
+        if (!engine || event.altKey) return false;
         const { selection } = view.state;
-        const down = VERTICAL[event.key];
         // prosemirror-tables' tableEditing grows a cell selection by
         // cells; the other keys leave it to the editor
         if (selection instanceof CellSelection) return false;
+        const end = documentEdge(event);
+        if (end !== undefined) {
+          const pos = end ? Selection.atEnd(view.state.doc).to : 0;
+          move(
+            view,
+            { node: false, pos },
+            event.shiftKey ? selection.anchor : undefined,
+            { by: null },
+          );
+          return true;
+        }
+        if (event.ctrlKey || event.metaKey) return false;
+        const down = VERTICAL[event.key];
         const after = headAfter(view.state);
         if (down !== undefined) {
-          const caret = engine.caret(selection.head, after);
+          const from = verticalStart(selection, down);
+          const caret = engine.caret(from, after);
           if (!caret) return false;
           goal ??= caret.x;
           const target =
-            engine.verticalAt(selection.head, after, down, goal) ??
+            engine.verticalAt(from, after, down, goal) ??
             // from the first or last line to the start or end
             ({
               node: false,
@@ -674,6 +718,9 @@ export const pageView = () => {
           return page(view, engine, event.key === "PageDown", event.shiftKey);
         }
         if (event.key === "Home" || event.key === "End") {
+          // a selected block is a line of its own, at both of its ends
+          if (selection instanceof NodeSelection && !selection.node.isInline)
+            return true;
           const edge = engine.lineBoundary(
             selection.head,
             after,

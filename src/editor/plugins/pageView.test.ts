@@ -21,7 +21,9 @@ import { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { schema } from "../../markdown";
+import type { Node } from "prosemirror-model";
+import { createForm, schema } from "../../markdown";
+import { RECIPE, RECIPE_KEY } from "../../test/forms";
 import {
   engineMissing,
   pageFields,
@@ -771,6 +773,127 @@ describe("a table of contents on the pages", () => {
     expect(laid).toHaveBeenCalledOnce();
     const blocks = flattened.mock.calls.map(([, from, to]) => [from, to]);
     expect(blocks).toEqual([[0, 1]]);
+  });
+});
+
+describe("the keys on a selected block", () => {
+  let mounted: ReturnType<typeof mount>;
+  beforeEach(() => showPages());
+  afterEach(() => {
+    mounted.view.destroy();
+    hidePages();
+    vi.restoreAllMocks();
+  });
+
+  const embed = () =>
+    schema.nodes.embed.create({
+      type: "org.blank.test/box@1",
+      id: "k3x9",
+      alt: "A red box",
+      svg: box("red"),
+    });
+  // the blocks, and whether they're selected as a whole
+  const blocks: [string, () => Node, boolean][] = [
+    ["a table of contents", () => schema.node("toc", { depth: 2 }), true],
+    ["a form", () => createForm(RECIPE, RECIPE_KEY), false],
+    ["an embed", embed, true],
+  ];
+
+  // a paragraph, the block, and a heading the block's entries can list
+  const around = (block: Node) =>
+    schema.node("doc", { definitions: { [RECIPE_KEY]: RECIPE } }, [
+      p("before"),
+      block,
+      h(1, "After"),
+    ]);
+  const select = (pos: number) =>
+    mounted.view.dispatch(
+      mounted.view.state.tr.setSelection(
+        NodeSelection.create(mounted.view.state.doc, pos),
+      ),
+    );
+  const blockPos = () => mounted.view.state.doc.child(0).nodeSize;
+  const afterPos = () => blockPos() + mounted.view.state.doc.child(1).nodeSize;
+
+  for (const [name, block, atom] of blocks) {
+    it(`leaves ${name} with ↓ and ↑`, () => {
+      mounted = mount(around(block()));
+      const { view, press } = mounted;
+      select(blockPos());
+      expect(press("ArrowDown")).toBe(true);
+      // into the heading below, in the column it came from
+      expect(view.state.selection).toBeInstanceOf(TextSelection);
+      expect(view.state.selection.head).toBeGreaterThan(afterPos());
+      select(blockPos());
+      expect(press("ArrowUp")).toBe(true);
+      expect(view.state.selection).toBeInstanceOf(TextSelection);
+      expect(view.state.selection.head).toBeLessThan(blockPos());
+    });
+
+    it(`enters ${name} with ↓ and ↑`, () => {
+      mounted = mount(around(block()));
+      const { view, press } = mounted;
+      // the block is selected, or, a form, its first or last field
+      const entered = () =>
+        atom
+          ? view.state.selection instanceof NodeSelection &&
+            view.state.selection.from === blockPos()
+          : view.state.selection.head > blockPos() &&
+            view.state.selection.head < afterPos();
+      press("ArrowDown");
+      expect(entered()).toBe(true);
+      view.dispatch(
+        view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, afterPos() + 2),
+        ),
+      );
+      press("ArrowUp");
+      expect(entered()).toBe(true);
+    });
+  }
+
+  it("keeps the block selected on Home and End", () => {
+    mounted = mount(around(schema.node("toc", { depth: 2 })));
+    select(blockPos());
+    const selected = mounted.view.state.selection;
+    for (const key of ["Home", "End", "Shift-Home", "Shift-End"]) {
+      expect(mounted.press(key)).toBe(true);
+      expect(mounted.view.state.selection.eq(selected)).toBe(true);
+    }
+  });
+
+  it("goes to the document's start and end, from a block or the text", () => {
+    mounted = mount(around(schema.node("toc", { depth: 2 })));
+    const { view, press } = mounted;
+    const end = view.state.doc.content.size - 1;
+    select(blockPos());
+    expect(press("Mod-End")).toBe(true);
+    expect(view.state.selection.head).toBe(end);
+    expect(press("Mod-Home")).toBe(true);
+    expect(view.state.selection.head).toBe(1);
+    // with Shift, it selects from where the caret was
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)),
+    );
+    press("Shift-Mod-End");
+    expect(view.state.selection).toMatchObject({ anchor: 3, head: end });
+    press("Shift-Mod-Home");
+    expect(view.state.selection).toMatchObject({ anchor: 3, head: 1 });
+    // elsewhere than on macOS, Ctrl+↑ and ↓ are the editor's
+    expect(press("Mod-ArrowDown")).toBe(false);
+  });
+
+  it("takes Cmd with ↑ and ↓ to the document's start and end on macOS", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    mounted = mount(around(schema.node("toc", { depth: 2 })));
+    const { view, press } = mounted;
+    expect(press("Meta-ArrowDown")).toBe(true);
+    expect(view.state.selection.head).toBe(view.state.doc.content.size - 1);
+    expect(press("Meta-ArrowUp")).toBe(true);
+    expect(view.state.selection.head).toBe(1);
+    expect(press("Meta-End")).toBe(true);
+    // Ctrl is no modifier for these on macOS
+    expect(press("Ctrl-Home")).toBe(false);
   });
 });
 

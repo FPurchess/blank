@@ -54,13 +54,16 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 
 ## Editing
 
-| Command                 | Shortcut                |
-| ----------------------- | ----------------------- |
-| Undo                    | `Mod` `Z`               |
-| Redo                    | `Mod` `Shift` `Z`       |
-| Insert line break       | `Shift` `Enter`         |
-| A screen up / down      | `Page Up` / `Page Down` |
-| Start / end of the line | `Home` / `End`          |
+| Command                     | Shortcut                                                     |
+| --------------------------- | ------------------------------------------------------------ |
+| Undo                        | `Mod` `Z`                                                    |
+| Redo                        | `Mod` `Shift` `Z`                                            |
+| Insert line break           | `Shift` `Enter`                                              |
+| A screen up / down          | `Page Up` / `Page Down`                                      |
+| Start / end of the line     | `Home` / `End`                                               |
+| Start / end of the document | `Ctrl` `Home` / `Ctrl` `End`, on macOS `Cmd` `↑` / `Cmd` `↓` |
+
+Add `Shift` to the last three to select as you go. When a block like a table of contents or an embed is selected, `↑` and `↓` move on to the text above or below it.
 
 ## Blocks
 

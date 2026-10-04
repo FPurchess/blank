@@ -153,7 +153,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
-    use super::super::{Op, Part};
+    use super::super::{Hit, Op, Part};
     use crate::items::Role;
     use crate::model::{Content, Item, Settings, TocEntry};
 
@@ -367,5 +367,28 @@ mod tests {
         assert!(engine.laid[0].texts.is_empty());
         // and the title stays with it
         assert!(engine.laid[0].units[0].keep_next);
+    }
+
+    #[test]
+    fn is_left_below_its_entries_and_entered_from_above_and_below() {
+        let engine = engine(vec![
+            paragraph(1, "before"),
+            toc(8, &[(1, "One"), (1, "Two")]),
+            heading(10, 1, "One"),
+            heading(15, 1, "Two"),
+        ]);
+        // the title and the entries are units of their own
+        assert!(engine.laid[1].units.len() > 1);
+        let goal = engine.settings.margins.left;
+        // ↓ from the selected table of contents goes past its entries
+        let (down, _) = engine.vertical(9, false, true, goal).unwrap();
+        assert_eq!(down, Hit::Text(10));
+        // ↑ from it goes to the block above, and into it from either side
+        let (up, _) = engine.vertical(9, false, false, goal).unwrap();
+        assert!(matches!(up, Hit::Text(pos) if pos < 8), "{up:?}");
+        let (from_below, _) = engine.vertical(10, false, false, goal).unwrap();
+        assert_eq!(from_below, Hit::Node(8));
+        let (from_above, _) = engine.vertical(1, false, true, goal).unwrap();
+        assert_eq!(from_above, Hit::Node(8));
     }
 }
