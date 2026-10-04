@@ -21,6 +21,7 @@ import {
   refreshed,
   setCellType,
 } from "../../commands/table/rect";
+import { blocksMarkdown } from "../blockClipboard";
 
 // Tables and the clipboard: tables pasted from spreadsheets and web pages,
 // tab-separated text, which spreadsheets copy too, pasted as a table, cells
@@ -295,8 +296,10 @@ export const tableClipboard = () => {
         } as EditorView;
         return handlePaste(retyped, event, slice);
       },
-      // anything but cells is copied as ProseMirror copies it, for ""
-      clipboardTextSerializer: (slice) => tsvOf(slice) ?? "",
+      // cells as tab-separated values, content blocks as their markdown
+      // (./blockClipboard.ts), anything else as ProseMirror copies it, for ""
+      clipboardTextSerializer: (slice, view) =>
+        tsvOf(slice) ?? blocksMarkdown(slice, view.state.doc) ?? "",
     },
   });
 };

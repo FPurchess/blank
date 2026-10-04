@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { type Ref, watch } from "vue";
 
 import {
+  blocksPaneOpen,
   importedFrom,
   language,
   outlinePinned,
@@ -179,6 +180,8 @@ export const bootStorage = async () => {
   await restore("pageView", pageView, isPageViewMode, "page-ends");
   // the outline closed until the user keeps it open
   await restore("outline", outlinePinned, isTrue, false);
+  // the blocks pane closed until the user opens it
+  await restore("blocksPane", blocksPaneOpen, isTrue, false);
 
   watch(
     transaction,

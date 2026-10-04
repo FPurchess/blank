@@ -10,6 +10,7 @@ import {
 } from "../engine/geometry";
 import { listenOnWindow } from "../scope";
 import {
+  blocksPaneOpen,
   engineMissing,
   headings,
   OUTLINE_BREAKPOINT,
@@ -24,10 +25,13 @@ import {
 import IconButton from "./components/IconButton.vue";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
+import { useWindowWidth } from "./composables/useWindowWidth";
 import OutlineEntry from "./OutlineEntry.vue";
 import { tipAttrs } from "./tooltipModel";
+import { blocksDock } from "./blocksPaneModel";
 import {
   freeRight,
+  layoutWidth,
   OUTLINE_DOCK,
   outlinePlacement,
   wheelPixels,
@@ -48,8 +52,7 @@ const root = useTemplateRef<HTMLElement>("root");
 const list = useTemplateRef<HTMLElement>("list");
 const entries = outlineEntries;
 
-const windowWidth = shallowRef(window.innerWidth);
-listenOnWindow("resize", () => (windowWidth.value = window.innerWidth));
+const windowWidth = useWindowWidth();
 
 // the page view's scrollbar, which the outline keeps clear of; the same
 // number while scrolling, so nothing that depends on it follows the scroll.
@@ -71,7 +74,11 @@ const place = computed(() =>
     outlinePinned.value,
     windowWidth.value,
     freeRight(
-      windowWidth.value - scrollbar.value,
+      layoutWidth(
+        windowWidth.value,
+        scrollbar.value,
+        blocksDock(blocksPaneOpen.value, windowWidth.value),
+      ),
       pageLayoutState.value,
       pageView.value,
       engineMissing.value,

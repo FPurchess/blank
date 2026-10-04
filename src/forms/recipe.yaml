@@ -1,5 +1,5 @@
 # A recipe on a page of its own: its name, a photo beside the ingredients,
-# and the steps. See docs/guide/blocks.md for what a template can say.
+# and the steps. See docs/guide/blocks.md for what a form definition can say.
 version: 2
 name: Recipe
 description: A recipe on a page of its own, with a photo beside its ingredients and the steps

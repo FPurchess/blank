@@ -188,7 +188,7 @@ export const checkDefinition = (value: unknown): Definition | string => {
   // frames and where the flow starts are on the form's own first page
   const framed = framedFields(placed);
   if ((framed.length || flowTop !== undefined) && newPage !== true) {
-    return "a template with frames or a flowTop starts a new page: newPage: true";
+    return "a form with frames or a flowTop starts a new page: newPage: true";
   }
   if (
     flowTop !== undefined &&

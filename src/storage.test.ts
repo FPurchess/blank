@@ -145,6 +145,21 @@ describe("storage", () => {
     });
   });
 
+  describe("blocks pane", () => {
+    it("is closed on first start and keeps the choice", async () => {
+      const { blocksPaneOpen } = await bootFresh();
+      expect(blocksPaneOpen.value).toBe(false);
+
+      blocksPaneOpen.value = true;
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("blocksPane")).toBe(true),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.blocksPaneOpen.value).toBe(true);
+    });
+  });
+
   describe("outline", () => {
     it("is closed on first start and keeps the choice", async () => {
       const { outlinePinned } = await bootFresh();

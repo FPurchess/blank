@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { type EmbedType, registerEmbedType } from "../../embeds/registry";
 import { schema } from "../../markdown";
-import { announcement, blockPicker } from "../../state";
+import { announcement } from "../../state";
 import { flushPromises } from "../../test/async";
 import { createState, createTestView, doc, p } from "../../test/editor";
 import { box, boxType } from "../../test/embeds";
@@ -15,12 +15,11 @@ import { editEmbed, makeEmbed } from "./embeds";
 let unregister = () => {};
 afterEach(() => {
   unregister();
-  blockPicker.value = null;
   announcement.value = null;
 });
 
 /**
- * insertEmbed puts in a new embed of `type`, as the block picker does
+ * insertEmbed puts in a new embed of `type`, as the blocks pane does
  */
 const insertEmbed = async (
   view: ReturnType<typeof createTestView>,

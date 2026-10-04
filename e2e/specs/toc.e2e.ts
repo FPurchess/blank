@@ -58,14 +58,23 @@ describe("a table of contents", () => {
 
   after(() => fs.rmSync(path.dirname(file), { recursive: true, force: true }));
 
-  it("is inserted from the block picker, with the pages of its headings", async () => {
+  it("is inserted from the blocks pane, with the pages of its headings", async () => {
     await clickInto("#editor p");
     await pressMod(Key.Alt, "b");
-    await expect($("#block-picker")).toBeDisplayed();
-    await expect($("#block-picker .choice")).toBeFocused();
+    await expect($("#blocks-pane")).toBeDisplayed();
+    await expect($("#blocks-pane input[type=search]")).toBeFocused();
+    await type(Key.ArrowDown);
+    await expect($('#blocks-pane .tile[data-block="toc"]')).toBeFocused();
     await type(Key.Enter);
-    await expect($("#block-picker")).not.toBeExisting();
     await expect($("#editor nav.toc")).toBeExisting();
+    await expect($("#ui-announcement")).toHaveText(
+      "Table of contents inserted",
+    );
+    // the pane stays open until its shortcut closes it
+    await expect($("#blocks-pane")).toBeDisplayed();
+    await pressMod(Key.Alt, "b");
+    await pressMod(Key.Alt, "b");
+    await expect($("#blocks-pane")).not.toBeExisting();
     expect(await entries()).toEqual(["one", "two"]);
     await browser.waitUntil(
       async () => JSON.stringify(await numbers()) === '[["1","2"]]',
@@ -82,16 +91,17 @@ describe("a table of contents", () => {
     expect(await numbers()).toEqual([["1", "2"]]);
   });
 
-  it("opens its dialog on Enter once selected", async () => {
+  it("opens its settings on Enter once selected, which apply at once", async () => {
     // from the paragraph above it, down onto it
     await clickInto("#editor p");
     await type(Key.ArrowDown);
     await type(Key.Enter);
-    await expect($("#toc-dialog")).toBeDisplayed();
-    // only the headings 1, then saved
-    await $$('#toc-dialog [data-row="depth"] button')[0].click();
-    await $("#toc-dialog").$("button=Save").click();
-    await expect($("#toc-dialog")).not.toBeExisting();
+    await expect($("#toc-popover")).toBeDisplayed();
+    await expect($("#toc-popover-depth")).toBeFocused();
+    // only the headings 1
+    await $("#toc-popover-depth").selectByIndex(0);
+    await type(Key.Escape);
+    await expect($("#toc-popover")).not.toBeExisting();
   });
 
   it("is saved as one line, and back after a restart", async () => {
@@ -113,10 +123,11 @@ describe("a table of contents", () => {
     await clickInto("#editor p");
     await type(Key.ArrowDown);
     await $('#block-toolbar [data-id="block-edit"]').click();
-    await expect($("#toc-dialog")).toBeDisplayed();
+    await expect($("#toc-popover")).toBeDisplayed();
     await type(Key.Escape);
-    await expect($("#toc-dialog")).not.toBeExisting();
+    await expect($("#toc-popover")).not.toBeExisting();
     await $('#block-toolbar [data-id="block-remove"]').click();
     await expect($("#editor nav.toc")).not.toBeExisting();
+    await expect($("#ui-announcement")).toHaveText("Table of contents removed");
   });
 });

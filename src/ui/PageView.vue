@@ -32,6 +32,7 @@ import { listenOnWindow } from "../scope";
 import {
   engineMissing,
   pageHeadBox,
+  pageHoverBlock,
   pageLayoutState,
   pageScrollRequest,
   type PageScrollRequest,
@@ -39,6 +40,7 @@ import {
   pageView,
   pageViewport,
 } from "../state";
+import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
@@ -468,9 +470,14 @@ const move = pageMove({
       y >= 0 &&
       x <= window.innerWidth &&
       y <= window.innerHeight &&
-      !["#ui-top", "#ui-bottom", ".outline-dashes", ".outline-list"].some(
-        (selector) =>
-          within(document.querySelector(selector)?.getBoundingClientRect()),
+      ![
+        "#ui-top",
+        "#ui-bottom",
+        ".outline-dashes",
+        ".outline-list",
+        "#blocks-pane",
+      ].some((selector) =>
+        within(document.querySelector(selector)?.getBoundingClientRect()),
       )
     );
   },
@@ -543,6 +550,13 @@ const onHover = (event: MouseEvent) => {
   const pointer = pointerAt(event);
   hoverLink.value = pointer.link;
   hoverPicture.value = pictureBoxAt(editor.view.state, pointer);
+  hoverBlock(contentBlockAt(editor.view.state.doc, pointer.pos));
+};
+// the content block under the pointer, which BlockMarks.vue outlines
+const hoverBlock = (block: { from: number; to: number } | null) => {
+  const was = pageHoverBlock.value;
+  if (was?.from !== block?.from || was?.to !== block?.to)
+    pageHoverBlock.value = block;
 };
 const onModifier = (event: KeyboardEvent) => {
   opening.value = hasOpenModifier(event);
@@ -629,6 +643,7 @@ onUnmounted(() => {
     @mouseleave="
       hoverLink = null;
       hoverPicture = false;
+      hoverBlock(null);
     "
     @contextmenu="onContextMenu"
   >

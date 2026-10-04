@@ -8,7 +8,14 @@ import { flushPromises } from "../../test/async";
 import { boxType } from "../../test/embeds";
 import { registerEmbedType } from "../../embeds/registry";
 import { mockTauriPath } from "../../test/tauri";
-import { blockPicker, tocDialog } from "../../state";
+import {
+  announcement,
+  blockChoices,
+  blocksPaneFocused,
+  blocksPaneOpen,
+  blocksPaneSearch,
+  tocPopover,
+} from "../../state";
 import {
   blockquote,
   createState,
@@ -22,17 +29,22 @@ import {
   ul,
 } from "../../test/editor";
 import {
-  chooseBlock,
   editToc,
+  insertBlock,
   insertTopBlock,
   pasteTopBlocks,
+  readBlocks,
+  toggleBlocksPane,
 } from "./contentBlocks";
 
 const toc = (attrs = {}) => schema.node("toc", attrs);
 
 afterEach(() => {
-  blockPicker.value = null;
-  tocDialog.value = null;
+  blocksPaneOpen.value = false;
+  blocksPaneFocused.value = false;
+  blocksPaneSearch.value = null;
+  blockChoices.value = [];
+  tocPopover.value = null;
 });
 
 describe("insertTopBlock", () => {
@@ -40,8 +52,20 @@ describe("insertTopBlock", () => {
     const view = createTestView(createState(doc(p("a"), p()), { cursor: 4 }));
     insertTopBlock(view, toc());
     expect(view.state.doc.eq(doc(p("a"), toc(), p()))).toBe(true);
-    // the cursor goes on below it
-    expect(view.state.selection.$from.parent).toBe(view.state.doc.child(2));
+    // it is selected, and said to be there
+    const { selection } = view.state;
+    expect(selection).toBeInstanceOf(NodeSelection);
+    expect(selection.from).toBe(3);
+    expect(announcement.value?.text).toBe("Table of contents inserted");
+  });
+
+  it("puts it at a place between two blocks it is given", () => {
+    const view = createTestView(
+      createState(doc(p("a"), p("b")), { cursor: 5 }),
+    );
+    insertTopBlock(view, toc(), undefined, 3);
+    expect(view.state.doc.eq(doc(p("a"), toc(), p("b")))).toBe(true);
+    expect(view.state.selection.from).toBe(3);
   });
 
   it("puts it after the paragraph the cursor is in, keeping the text", () => {
@@ -63,55 +87,81 @@ describe("insertTopBlock", () => {
   });
 });
 
-describe("chooseBlock", () => {
+describe("the blocks pane", () => {
   beforeEach(() => {
     mockTauriPath();
-    // no templates of the user's
+    // no forms of the user's
     vi.mocked(exists).mockResolvedValue(false);
   });
 
-  const open = async (view: ReturnType<typeof createTestView>) => {
-    expect(chooseBlock()(view.state, view.dispatch, view)).toBe(true);
-    await flushPromises();
-    return blockPicker.value!;
+  const read = async () => {
+    await readBlocks();
+    return blockChoices.value;
   };
 
-  it("offers the table of contents and Blank's templates", async () => {
+  it("opens with the focus in its search, and closes while it has it", () => {
     const view = createTestView(createState(doc(p())));
-    const picker = await open(view);
-    expect(picker.choices.map((choice) => choice.id)).toEqual([
-      "toc",
-      "blank/recipe",
+    expect(toggleBlocksPane()(view.state, view.dispatch, view)).toBe(true);
+    expect(blocksPaneOpen.value).toBe(true);
+    expect(blocksPaneSearch.value).not.toBeNull();
+    // the shortcut again while the text has the focus asks for the search
+    // again
+    const asked = blocksPaneSearch.value;
+    toggleBlocksPane()(view.state, view.dispatch, view);
+    expect(blocksPaneOpen.value).toBe(true);
+    expect(blocksPaneSearch.value).not.toBe(asked);
+    blocksPaneFocused.value = true;
+    toggleBlocksPane()(view.state, view.dispatch, view);
+    expect(blocksPaneOpen.value).toBe(false);
+    expect(blocksPaneFocused.value).toBe(false);
+  });
+
+  it("offers the table of contents and Blank's forms", async () => {
+    const choices = await read();
+    expect(choices.map(({ id, group }) => [id, group])).toEqual([
+      ["toc", "contents"],
+      ["blank/recipe", "forms"],
     ]);
-    picker.pick("toc");
+    // a form's tile draws its definition
+    expect(choices[1].definition?.name).toBe("Recipe");
+    const view = createTestView(createState(doc(p())));
+    expect(insertBlock("toc")(view.state, view.dispatch, view)).toBe(true);
     expect(view.state.doc.child(0).type.name).toBe("toc");
   });
 
-  it("opens once, however often it is asked while the templates are read", async () => {
-    const view = createTestView(createState(doc(p())));
-    chooseBlock()(view.state, view.dispatch, view);
-    const picker = await open(view);
+  it("reads the forms once, however often it is asked meanwhile", async () => {
+    void readBlocks();
+    await read();
     expect(exists).toHaveBeenCalledTimes(1);
-    expect(blockPicker.value).toBe(picker);
   });
 
-  it("offers the embeds of the types Blank has", async () => {
-    const unregister = registerEmbedType(boxType(["red"]));
+  it("inserts nothing for a block it doesn't offer", async () => {
+    await read();
     const view = createTestView(createState(doc(p())));
-    const picker = await open(view);
-    expect(picker.choices[picker.choices.length - 1]).toMatchObject({
+    expect(insertBlock("user/gone")(view.state, view.dispatch, view)).toBe(
+      false,
+    );
+  });
+
+  it("offers the drawings of the types Blank has", async () => {
+    const unregister = registerEmbedType(boxType(["red"]));
+    const choices = await read();
+    expect(choices[choices.length - 1]).toMatchObject({
       id: "org.blank.test/box@1",
+      group: "drawings",
       label: "Box",
     });
-    picker.pick("org.blank.test/box@1");
+    const view = createTestView(createState(doc(p())));
+    insertBlock("org.blank.test/box@1")(view.state, view.dispatch, view);
     await flushPromises();
     expect(view.state.doc.child(0).type.name).toBe("embed");
     unregister();
   });
 
-  it("puts in a form with its definition, the cursor in its first field", async () => {
+  it("puts in a form with its definition, selected", async () => {
+    await read();
     const view = createTestView(createState(doc(p())));
-    (await open(view)).pick("blank/recipe");
+    insertBlock("blank/recipe")(view.state, view.dispatch, view);
     const form = view.state.doc.child(0);
     expect(form.type.name).toBe("form_block");
     const definitions = view.state.doc.attrs.definitions as Record<
@@ -119,8 +169,17 @@ describe("chooseBlock", () => {
       Definition
     >;
     expect(definitions[form.attrs.def as string].name).toBe("Recipe");
-    const { $from } = view.state.selection;
-    expect($from.node(2).attrs.name).toBe("title");
+    expect(view.state.selection).toBeInstanceOf(NodeSelection);
+    expect(announcement.value?.text).toBe("Recipe inserted");
+  });
+
+  it("puts a block at the place it was dropped", async () => {
+    await read();
+    const view = createTestView(
+      createState(doc(p("a"), p("b")), { cursor: 2 }),
+    );
+    insertBlock("toc", 3)(view.state, view.dispatch, view);
+    expect(view.state.doc.eq(doc(p("a"), toc(), p("b")))).toBe(true);
   });
 });
 
@@ -138,24 +197,36 @@ describe("editToc", () => {
       createState(doc(p("a"), toc(), p("b")), { cursor: 2 }),
     );
     expect(editToc()(view.state, view.dispatch, view)).toBe(false);
-    expect(tocDialog.value).toBeNull();
+    expect(tocPopover.value).toBeNull();
   });
 
-  it("changes its depth and title, and keeps it selected", () => {
+  it("changes its depth and title at once, and keeps it selected", () => {
     const view = selected();
     expect(editToc()(view.state, view.dispatch, view)).toBe(true);
-    expect(tocDialog.value).toMatchObject({ depth: 2, title: "Contents" });
-    tocDialog.value!.submit(4, "Overview");
+    expect(tocPopover.value).toMatchObject({ depth: 2, title: "Contents" });
+    tocPopover.value!.apply(4, "Contents");
+    expect(view.state.doc.child(1).attrs).toMatchObject({ depth: 4 });
+    tocPopover.value!.apply(4, "Overview");
     const node = view.state.doc.child(1);
     expect(node.attrs).toMatchObject({ depth: 4, title: "Overview" });
     expect(view.state.selection).toBeInstanceOf(NodeSelection);
   });
 
-  it("removes it", () => {
+  it("changes nothing for settings it already has", () => {
     const view = selected();
     editToc()(view.state, view.dispatch, view);
-    tocDialog.value!.remove();
-    expect(view.state.doc.eq(doc(p("a"), p("b")))).toBe(true);
+    const before = view.state;
+    tocPopover.value!.apply(2, "Contents");
+    expect(view.state).toBe(before);
+  });
+
+  it("changes nothing once the table of contents is gone", () => {
+    const view = selected();
+    editToc()(view.state, view.dispatch, view);
+    view.dispatch(view.state.tr.delete(3, 4));
+    const before = view.state.doc;
+    tocPopover.value!.apply(5, "Gone");
+    expect(view.state.doc).toBe(before);
   });
 });
 

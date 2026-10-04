@@ -10,7 +10,7 @@ import { parseLength } from "../../layout/units";
 // - `{ frame: { x, y, width, height }, field }`, a frame: a field at a place
 //   of the page, from its top left edge, outside the flow of the text, like
 //   the address of a letter, growing below its height if it must. Frames
-//   come first, on the form's first page, which a template with frames
+//   come first, on the form's first page, which a form with frames
 //   starts (see checkDefinition). A frame holds one field: Word puts the
 //   paragraphs of one frame on top of each other.
 // The fields come in the layout in the order of the definition's fields,

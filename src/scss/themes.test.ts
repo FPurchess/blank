@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { themes } from "../state/appearance";
+import { BLOCKS_DOCK } from "../ui/blocksPaneModel";
 import { OUTLINE_DOCK } from "../ui/outlineModel";
 import {
   contrast,
@@ -106,6 +107,10 @@ describe("the outline", () => {
       scssNumber("main.scss", "outline-width") +
         scssNumber("main.scss", "outline-gap"),
     ).toBe(OUTLINE_DOCK);
+  });
+
+  it("gives the blocks pane the room its model gives it", () => {
+    expect(scssNumber("main.scss", "blocks-dock")).toBe(BLOCKS_DOCK);
   });
 });
 

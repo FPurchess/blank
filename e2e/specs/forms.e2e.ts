@@ -58,13 +58,26 @@ describe("a form", () => {
 
   after(() => fs.rmSync(path.dirname(file), { recursive: true, force: true }));
 
-  it("is put in from the block picker, the cursor in its first field", async () => {
+  it("is put in from the blocks pane, selected", async () => {
     await clickInto("#editor p");
     await pressMod(Key.Alt, "b");
-    await expect($('#block-picker [data-block="blank/recipe"]')).toBeExisting();
+    await expect(
+      $('#blocks-pane .tile[data-block="blank/recipe"]'),
+    ).toBeExisting();
+    await type("recipe");
     await type(Key.ArrowDown);
+    await expect(
+      $('#blocks-pane .tile[data-block="blank/recipe"]'),
+    ).toBeFocused();
     await type(Key.Enter);
-    await expect($("#editor section.form")).toBeExisting();
+    await expect(
+      $("#editor section.form.ProseMirror-selectednode"),
+    ).toBeExisting();
+    await expect($("#ui-announcement")).toHaveText("Recipe inserted");
+    // the shortcut twice: the pane takes the focus, then closes
+    await pressMod(Key.Alt, "b");
+    await pressMod(Key.Alt, "b");
+    await expect($("#blocks-pane")).not.toBeExisting();
     expect((await fields()).map(([name]) => name)).toEqual([
       "title",
       "photo",
@@ -88,6 +101,8 @@ describe("a form", () => {
   });
 
   it("is filled in with Tab from field to field", async () => {
+    // Enter on the selected form goes into its first field
+    await type(Key.Enter);
     await type("pancakes");
     await type(Key.Tab);
     // past the photo, into the table under its header

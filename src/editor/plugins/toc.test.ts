@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { scrollToText } from "../../engine/geometry";
 import { schema } from "../../markdown";
-import { headings, headingsOf, tocDialog } from "../../state";
+import { headings, headingsOf, tocPopover } from "../../state";
 import { doc, h } from "../../test/editor";
 import { PAGE_PRESS, type PagePointer } from "../pagePointer";
 import { followEntry, toc } from "./toc";
@@ -32,7 +32,7 @@ let view: EditorView | null = null;
 afterEach(() => {
   view?.destroy();
   view = null;
-  tocDialog.value = null;
+  tocPopover.value = null;
   headings.value = [];
 });
 

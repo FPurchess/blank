@@ -1,12 +1,18 @@
 import type { Node } from "prosemirror-model";
-import { type EditorState, NodeSelection, Plugin } from "prosemirror-state";
+import {
+  type Command,
+  type EditorState,
+  NodeSelection,
+  Plugin,
+  Selection,
+} from "prosemirror-state";
 import { isInTable } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
-import { fieldAt, formDefinition, schema } from "../../markdown";
-import { announce, blockToolbar, type ToolbarItem } from "../../state";
+import { fieldAt } from "../../markdown";
+import { blockName, isContentBlock } from "../../markdown/blocks/names";
+import { blockToolbar, type ToolbarItem } from "../../state";
 import { editBlock, removeTopBlock } from "../commands/contentBlocks";
-import { embedLabel } from "../../markdown/blocks/embeds";
 import { boxOnCaretPage, followLayout } from "./followLayout";
 
 // The toolbar of a content block, for the mouse: over a form while the
@@ -20,40 +26,44 @@ import { boxOnCaretPage, followLayout } from "./followLayout";
  * null
  */
 const blockAt = (state: EditorState) => {
-  const { selection } = state;
+  const { selection, doc } = state;
   if (selection instanceof NodeSelection) {
     const { node, from: pos } = selection;
-    if (node.type === schema.nodes.toc) {
-      return { node, pos, name: "Table of Contents" };
-    }
-    if (node.type === schema.nodes.form_block) {
-      return { node, pos, name: formName(state.doc, node) };
-    }
-    if (node.type === schema.nodes.embed) {
-      return { node, pos, name: embedLabel(node) };
-    }
-    return null;
+    return isContentBlock(node)
+      ? { node, pos, name: blockName(doc, node) }
+      : null;
   }
   if (isInTable(state)) return null;
   const at = fieldAt(selection.$head);
   return (
-    at && { node: at.form, pos: at.formPos, name: formName(state.doc, at.form) }
+    at && { node: at.form, pos: at.formPos, name: blockName(doc, at.form) }
   );
 };
 
-/**
- * formName returns what a form is called: its template's name
- */
-const formName = (doc: Node, form: Node) =>
-  formDefinition(doc, form)?.name ?? "Form";
+// the icon a toolbar shows by the name of its block
+const ICONS: Record<string, string> = {
+  toc: "toc",
+  form_block: "form",
+  embed: "embed",
+  unknown_block: "info",
+};
 
 /**
- * remove removes the block at `pos`, and says so
+ * enterForm puts the cursor into the first field of the selected form
  */
-const remove = (view: EditorView, pos: number, name: string) => {
-  removeTopBlock(view, pos);
-  announce(`${name} removed`);
-  view.focus();
+export const enterForm: Command = (state, dispatch) => {
+  const { selection } = state;
+  if (
+    !(selection instanceof NodeSelection) ||
+    selection.node.type.name !== "form_block"
+  )
+    return false;
+  dispatch?.(
+    state.tr
+      .setSelection(Selection.near(state.doc.resolve(selection.from + 1)))
+      .scrollIntoView(),
+  );
+  return true;
 };
 
 /**
@@ -73,8 +83,9 @@ export const blockTools = () => {
       ? [
           {
             id: "block-edit",
-            label: `Edit ${name}`,
+            label: "Settings",
             icon: "pencil",
+            key: "Enter",
             enabled: true,
             run: () => {
               editBlock()(view.state, view.dispatch, view);
@@ -85,9 +96,14 @@ export const blockTools = () => {
     {
       id: "block-remove",
       label: `Remove ${name}`,
+      tip: "Remove block",
       icon: "trash",
+      key: "Backspace",
       enabled: true,
-      run: () => remove(view, pos, name),
+      run: () => {
+        removeTopBlock(view, pos);
+        view.focus();
+      },
     },
   ];
 
@@ -128,20 +144,29 @@ export const blockTools = () => {
     blockToolbar.value = {
       anchor: { left, top, bottom, right },
       label: block.name,
+      icon: ICONS[block.node.type.name] ?? "info",
       items: itemsFor.items,
     };
   };
 
   return new Plugin({
     props: {
-      // Enter edits the selected block
+      // Enter edits the selected block, or goes into a selected form
       handleKeyDown: (view, event) =>
         event.key === "Enter" &&
         !event.shiftKey &&
         !event.ctrlKey &&
         !event.metaKey &&
         !event.altKey &&
-        editBlock()(view.state, view.dispatch, view),
+        (editBlock()(view.state, view.dispatch, view) ||
+          enterForm(view.state, view.dispatch)),
+      // typing on a selected form, as after inserting it, fills its first
+      // field rather than replacing the form
+      handleTextInput: (view, _from, _to, text) => {
+        if (!enterForm(view.state, view.dispatch)) return false;
+        view.dispatch(view.state.tr.insertText(text));
+        return true;
+      },
     },
     view(view) {
       const unfollow = followLayout(() => publish(view));

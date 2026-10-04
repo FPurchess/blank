@@ -410,6 +410,74 @@ export const hitAt = (x: number, y: number): Hit | null => {
 };
 
 /**
+ * topBlockAt returns the block at the top of `doc` that holds `pos`, with
+ * where it starts and ends, or null in an empty document
+ */
+const topBlockAt = (doc: Node, pos: number) => {
+  if (doc.childCount === 0) return null;
+  const index = Math.min(
+    doc.resolve(Math.min(pos, doc.content.size)).index(0),
+    doc.childCount - 1,
+  );
+  const from = doc.resolve(0).posAtIndex(index, 0);
+  return { index, from, to: from + doc.child(index).nodeSize };
+};
+
+/**
+ * gapAt returns the place between two blocks at the top of `doc` nearest a
+ * point of the window, where a dragged block drops: before the block under
+ * the point when it is in its upper half, else after it; null where no page
+ * is
+ */
+export const gapAt = (doc: Node, x: number, y: number): number | null => {
+  const hit = hitAt(x, y);
+  const block = hit && topBlockAt(doc, hit.pos);
+  if (!block) return null;
+  const boxes = blockBoxes(block.from, block.to);
+  if (boxes.length === 0) return block.from;
+  // the piece of the block nearest the point, which may be on another page
+  const distance = (box: Box) =>
+    y < box.top ? box.top - y : y > box.bottom ? y - box.bottom : 0;
+  const box = boxes.reduce((best, box) =>
+    distance(box) < distance(best) ? box : best,
+  );
+  const first = box === boxes[0];
+  const middle = (box.top + box.bottom) / 2;
+  return first && y < middle ? block.from : block.to;
+};
+
+// how far the line of a gap at a page's top or bottom stands from the block
+const GAP_EDGE = 4;
+
+/**
+ * gapLine returns the line that shows the gap at `pos` between two blocks
+ * at the top of `doc`, in the window: across the blocks' width, halfway
+ * between them on one page, or just above the block after it
+ */
+export const gapLine = (
+  doc: Node,
+  pos: number,
+): { left: number; right: number; y: number } | null => {
+  const $pos = doc.resolve(pos);
+  const before = $pos.nodeBefore;
+  const after = $pos.nodeAfter;
+  const aboveBoxes = before ? blockBoxes(pos - before.nodeSize, pos) : [];
+  const above = aboveBoxes[aboveBoxes.length - 1] ?? null;
+  const below = after ? blockBoxes(pos, pos + after.nodeSize)[0] : null;
+  const box = below ?? above;
+  if (!box) return null;
+  const y =
+    above && below
+      ? above.page === below.page
+        ? (above.bottom + below.top) / 2
+        : below.top - GAP_EDGE
+      : below
+        ? below.top - GAP_EDGE
+        : box.bottom + GAP_EDGE;
+  return { left: box.left, right: box.right, y };
+};
+
+/**
  * pageAt returns the page a point of the window is on, or nearest to, and
  * the positions its blocks start and end at; null while no pages show
  */

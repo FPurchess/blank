@@ -7,6 +7,7 @@ import { schema } from "../markdown";
 import { transaction, uiTakesFocus } from "../state";
 import {
   autocomplete,
+  blockRemovals,
   blockTools,
   contextMenu,
   embeds,
@@ -58,6 +59,7 @@ export const bootEditor = async () => {
         tablePickerKeys(),
         tableTools(),
         blockTools(),
+        blockRemovals(),
         contextMenu(),
         spellcheck(),
         // Tab and Enter in a form, before autocorrect and the table keys

@@ -78,39 +78,21 @@ export interface BandEditorRequest {
 // while none is open
 export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 
-export interface BlockChoice {
-  id: string;
-  label: string;
-  // what it is, in a few words, or why it can't be inserted
-  description: string;
-  // a template whose file can't be used
-  disabled?: boolean;
-}
-
-export interface BlockPickerRequest {
-  // the content blocks that can be inserted, see
-  // src/editor/commands/contentBlocks.ts
-  choices: readonly BlockChoice[];
-  pick(id: string): void;
-  cancel(): void;
-}
-
-// blockPicker holds the request of the open block picker, or null while it
-// is closed
-export const blockPicker = shallowRef<BlockPickerRequest | null>(null);
-
-export interface TocDialogRequest {
+export interface TocPopoverRequest {
+  // the button or block it opens below, at its right end
+  anchor: { left: number; top: number; bottom: number; right: number };
   // the headings it lists, 1 to 6 levels deep
   depth: number;
   title: string;
-  submit(depth: number, title: string): void;
-  remove(): void;
-  cancel(): void;
+  // changes the table of contents at once, as one undo step
+  apply(depth: number, title: string): void;
+  // gives the editor the focus back, on the table of contents
+  close(): void;
 }
 
-// tocDialog holds the request of the open dialog of a table of contents, or
-// null while it is closed
-export const tocDialog = shallowRef<TocDialogRequest | null>(null);
+// tocPopover holds the request of the open settings of a table of contents,
+// or null while they are closed
+export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
 
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
@@ -120,6 +102,5 @@ export const focusTakingDialogs = [
   imageDialog,
   pageSetup,
   bandEditor,
-  blockPicker,
-  tocDialog,
+  tocPopover,
 ] as const;

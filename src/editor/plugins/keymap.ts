@@ -45,7 +45,7 @@ import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { chooseBlock } from "../commands/contentBlocks";
+import { toggleBlocksPane } from "../commands/contentBlocks";
 
 export { normalizeBinding };
 
@@ -94,7 +94,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.INSERT_PAGE_BREAK]: outsideForms(
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),
-  [CommandIdentifier.INSERT_BLOCK]: chooseBlock(),
+  [CommandIdentifier.INSERT_BLOCK]: toggleBlocksPane(),
   // the lines of a code block first, then list items
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
     indentCode,

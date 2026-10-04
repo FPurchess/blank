@@ -2,25 +2,25 @@ import { exists, readDir, readTextFile } from "@tauri-apps/plugin-fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockTauriPath } from "../test/tauri";
-import { loadTemplates } from "./library";
+import { loadForms } from "./library";
 
 const file = (name: string) =>
   ({ name, isFile: true, isDirectory: false, isSymlink: false }) as Awaited<
     ReturnType<typeof readDir>
   >[number];
 
-describe("loadTemplates", () => {
+describe("loadForms", () => {
   beforeEach(() => mockTauriPath({ appConfigDir: "/config" }));
 
-  it("has Blank's recipe, which is a template", async () => {
+  it("has Blank's recipe, which is a form", async () => {
     vi.mocked(exists).mockResolvedValue(false);
-    const [recipe, ...others] = await loadTemplates();
+    const [recipe, ...others] = await loadForms();
     expect(recipe.id).toBe("blank/recipe");
     expect(typeof recipe.definition).not.toBe("string");
     expect(others).toEqual([]);
   });
 
-  it("reads the user's templates, named after their files", async () => {
+  it("reads the user's forms, named after their files", async () => {
     vi.mocked(exists).mockResolvedValue(true);
     vi.mocked(readDir).mockResolvedValue([
       file("Letter Head.yaml"),
@@ -32,19 +32,17 @@ describe("loadTemplates", () => {
         ? "version: 1\nname: Broken\n"
         : "version: 2\nname: Letter\nfields:\n  - {name: to, kind: rich, label: To}\n",
     );
-    const templates = (await loadTemplates()).slice(1);
-    expect(templates.map((template) => template.id)).toEqual([
+    const forms = (await loadForms()).slice(1);
+    expect(forms.map((form) => form.id)).toEqual([
       "user/broken",
       "user/letter-head",
     ]);
-    expect(templates[0].definition).toBe("it needs fields");
-    expect(templates[1].definition).toMatchObject({
+    expect(forms[0].definition).toBe("it needs fields");
+    expect(forms[1].definition).toMatchObject({
       id: "user/letter-head",
       version: 2,
     });
-    expect(readTextFile).toHaveBeenCalledWith(
-      "/config/templates/Letter Head.yaml",
-    );
+    expect(readTextFile).toHaveBeenCalledWith("/config/forms/Letter Head.yaml");
   });
 
   it("takes only one of two files that make one id", async () => {
@@ -53,16 +51,16 @@ describe("loadTemplates", () => {
     vi.mocked(readTextFile).mockResolvedValue(
       "version: 1\nname: Note\nfields:\n  - {name: text, kind: rich, label: Text}\n",
     );
-    const [first, second] = (await loadTemplates()).slice(1);
+    const [first, second] = (await loadForms()).slice(1);
     expect(first.definition).toMatchObject({ id: "user/note" });
     expect(second.definition).toBe(
-      "another file of the templates folder has the name note",
+      "another file of the forms folder has the name note",
     );
   });
 
   it("does without the folder when it can't be read", async () => {
     vi.mocked(exists).mockRejectedValue(new Error("denied"));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await loadTemplates()).toHaveLength(1);
+    expect(await loadForms()).toHaveLength(1);
   });
 });

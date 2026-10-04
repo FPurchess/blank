@@ -76,21 +76,27 @@ const MM = 72 / 25.4;
 
 describe("a letter", () => {
   before(() => {
-    const templates = path.join(appConfigDir(), "templates");
-    fs.mkdirSync(templates, { recursive: true });
-    fs.writeFileSync(path.join(templates, "letter.yaml"), LETTER);
+    const forms = path.join(appConfigDir(), "forms");
+    fs.mkdirSync(forms, { recursive: true });
+    fs.writeFileSync(path.join(forms, "letter.yaml"), LETTER);
   });
 
-  it("is put in from the block picker, on a page of its own", async () => {
+  it("is put in from the blocks pane, on a page of its own", async () => {
     await clickInto("#editor p");
     await type(Key.End);
     await type(Key.Enter);
     await pressMod(Key.Alt, "b");
-    await expect($('#block-picker [data-block="user/letter"]')).toBeExisting();
-    await type(Key.ArrowDown);
-    await type(Key.ArrowDown);
+    await expect(
+      $('#blocks-pane .tile[data-block="user/letter"]'),
+    ).toBeExisting();
+    await type("letter");
     await type(Key.Enter);
     await expect($("#editor section.form")).toBeExisting();
+    await pressMod(Key.Alt, "b");
+    await pressMod(Key.Alt, "b");
+    await expect($("#blocks-pane")).not.toBeExisting();
+    // into its first field
+    await type(Key.Enter);
   });
 
   it("stands where a window envelope wants it", async () => {

@@ -30,6 +30,29 @@ export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
 const inWindow = (left: number, width: number) =>
   Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
 
+// the space between a popover and what it opens below
+const POPOVER_GAP = 6;
+
+/**
+ * placeBelowEnd puts `element` below `anchor`, their right ends in line, as
+ * a popover opens below the button at a toolbar's right end; above it where
+ * there's no room below
+ */
+export const placeBelowEnd = (
+  element: HTMLElement,
+  anchor: { top: number; bottom: number; right: number },
+) => {
+  const { width, height } = element.getBoundingClientRect();
+  const below = anchor.bottom + POPOVER_GAP;
+  const above = anchor.top - POPOVER_GAP - height;
+  const top =
+    below + height <= window.innerHeight - MARGIN || above < MARGIN
+      ? below
+      : above;
+  element.style.left = `${inWindow(anchor.right - width, width)}px`;
+  element.style.top = `${Math.max(MARGIN, top)}px`;
+};
+
 // the space between the toolbar and the table, which leaves room for the
 // handles on the table's top edge (src/ui/TableHandles.vue), and the
 // window's edges

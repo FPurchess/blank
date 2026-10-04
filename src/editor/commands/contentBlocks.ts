@@ -3,7 +3,6 @@ import {
   type Command,
   type EditorState,
   NodeSelection,
-  Selection,
   TextSelection,
 } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
@@ -15,60 +14,81 @@ import {
   definitionKey,
   schema,
 } from "../../markdown";
-import { type BlockChoice, blockPicker, tocDialog } from "../../state";
+import {
+  announce,
+  type BlockChoice,
+  blockChoices,
+  blocksPaneFocused,
+  blocksPaneOpen,
+  focusBlocksSearch,
+  tocPopover,
+} from "../../state";
+import { blockName } from "../../markdown/blocks/names";
 import { embedTypes, type EmbedType } from "../../embeds/registry";
-import { loadTemplates, type Template } from "../../templates/library";
+import { type Form, loadForms } from "../../forms/library";
+import { boxOnCaretPage } from "../plugins/followLayout";
 import { editEmbed, makeEmbed } from "./embeds";
 
 // Content blocks: blocks Blank makes besides the text, see
 // src/markdown/blocks. They stand at the top of the document, never in a
 // list, a quote or a table.
 
-// a block the picker offers, with how it puts it in
+// a block the pane offers, with how it puts it in: where the cursor is, or
+// at `at`, a place between two blocks at the top of the document
 interface Choice extends BlockChoice {
-  insert?: (view: EditorView) => void;
+  insert?: (view: EditorView, at?: number) => void;
 }
 
 const TOC: Choice = {
   id: "toc",
+  group: "contents",
   label: "Table of contents",
   description: "The headings, with the pages they start on",
-  insert: (view) => insertTopBlock(view, schema.nodes.toc.create()),
+  insert: (view, at) =>
+    insertTopBlock(view, schema.nodes.toc.create(), undefined, at),
 };
 
 /**
- * templateChoice offers a form of a template, or says what is wrong with
- * its file
+ * formChoice offers a form, or says what is wrong with its file
  */
-const templateChoice = ({ id, definition }: Template): Choice =>
+const formChoice = ({ id, definition }: Form): Choice =>
   typeof definition === "string"
     ? {
         id,
-        label: id,
+        group: "forms",
+        label: id.replace(/^user\//, ""),
         description: `Can't be used: ${definition}`,
         disabled: true,
       }
     : {
         id,
+        group: "forms",
         label: definition.name,
         description: definition.description ?? "",
-        insert: (view) => {
+        definition,
+        insert: (view, at) => {
           const def = definitionKey(definition);
-          insertTopBlock(view, createForm(definition, def), {
-            [def]: definition,
-          });
+          insertTopBlock(
+            view,
+            createForm(definition, def),
+            { [def]: definition },
+            at,
+          );
         },
       };
 
 /**
  * embedChoice offers an embed of a type a plugin brought
  */
-const embedChoice = (type: EmbedType): Choice => ({
+export const embedChoice = (type: EmbedType): Choice => ({
   id: type.type,
+  group: "drawings",
   label: type.name,
   description: type.description ?? "",
-  insert: (view) =>
-    void makeEmbed(type).then((embed) => embed && insertTopBlock(view, embed)),
+  insert: (view, at) =>
+    void makeEmbed(type).then(
+      (embed) => embed && insertTopBlock(view, embed, undefined, at),
+    ),
 });
 
 /**
@@ -84,30 +104,37 @@ const topBlockEnd = (doc: Node, pos: number) => {
 };
 
 /**
- * insertTopBlock puts `node` at the top of the document, where the cursor is:
- * in place of the empty paragraph it is in, else after the block (the
- * paragraph, list, quote or table) it is in, with the `definitions` a form
- * needs. The cursor goes on in the paragraph after it, as after a page
- * break, or into a form's first field.
+ * insertTopBlock puts `node` at the top of the document: at `at`, a place
+ * between two blocks there, or else where the cursor is, in place of the
+ * empty paragraph it is in, or after the block (the paragraph, list, quote
+ * or table) it is in, with the `definitions` a form needs. The new block is
+ * selected, and said to be there.
  */
 export const insertTopBlock = (
   view: EditorView,
   node: Node,
   definitions?: Record<string, Definition>,
+  at?: number,
 ) => {
   const { state } = view;
   const { $from } = state.selection;
   const block = $from.depth > 0 ? $from.node(1) : null;
   const tr = state.tr;
-  let at: number;
-  if (block?.type === schema.nodes.paragraph && block.content.size === 0) {
-    at = $from.before(1);
-    tr.replaceWith(at, $from.after(1), node);
+  let pos: number;
+  if (at !== undefined) {
+    pos = at;
+    tr.insert(pos, node);
+  } else if (
+    block?.type === schema.nodes.paragraph &&
+    block.content.size === 0
+  ) {
+    pos = $from.before(1);
+    tr.replaceWith(pos, $from.after(1), node);
   } else {
-    at = topBlockEnd(state.doc, $from.pos);
-    tr.insert(at, node);
+    pos = topBlockEnd(state.doc, $from.pos);
+    tr.insert(pos, node);
   }
-  const after = at + node.nodeSize;
+  const after = pos + node.nodeSize;
   if (!tr.doc.resolve(after).nodeAfter?.isTextblock) {
     tr.insert(after, schema.nodes.paragraph.create());
   }
@@ -115,45 +142,89 @@ export const insertTopBlock = (
     const own = tr.doc.attrs.definitions as Record<string, Definition>;
     tr.setDocAttribute("definitions", { ...own, ...definitions });
   }
-  // into a form's first field, or else on below the block
-  tr.setSelection(
-    node.isAtom
-      ? TextSelection.create(tr.doc, after + 1)
-      : Selection.near(tr.doc.resolve(at + 1)),
-  );
+  tr.setSelection(NodeSelection.create(tr.doc, pos));
   view.dispatch(tr.scrollIntoView());
+  announce(`${blockName(view.state.doc, node)} inserted`);
+};
+
+// whether the blocks are being read
+let reading: Promise<void> | null = null;
+// the blocks the pane offers, by id
+let offered = new Map<string, Choice>();
+
+/**
+ * readBlocks reads the blocks the pane offers again, the forms (see
+ * src/forms/library.ts) among them, so a form just written shows up
+ */
+export const readBlocks = () =>
+  (reading ??= loadForms()
+    .then((forms) => {
+      const choices = [
+        TOC,
+        ...forms.map(formChoice),
+        ...embedTypes().map(embedChoice),
+      ];
+      offered = new Map(choices.map((choice) => [choice.id, choice]));
+      blockChoices.value = choices.map(
+        ({ id, group, label, description, disabled, definition }) => ({
+          id,
+          group,
+          label,
+          description,
+          disabled,
+          definition,
+        }),
+      );
+    })
+    .finally(() => {
+      reading = null;
+    }));
+
+/**
+ * hideBlocksPane closes the blocks pane, and gives the editor the focus
+ */
+export const hideBlocksPane = (view: EditorView) => {
+  blocksPaneOpen.value = false;
+  blocksPaneFocused.value = false;
+  view.focus();
 };
 
 /**
- * chooseBlock opens the block picker, which inserts the content block the
- * user picks: a table of contents, or a form of one of the templates (see
- * src/templates/library.ts), which are read as it opens
+ * toggleBlocksPane shows the blocks pane with the focus in its search, or
+ * hides it while it has the focus
  */
-// whether the picker is about to open, while the templates are read
-let opening = false;
-
-export const chooseBlock = (): Command => (_state, dispatch, view) => {
+export const toggleBlocksPane = (): Command => (_state, dispatch, view) => {
   if (!dispatch || !view) return true;
-  if (blockPicker.value || opening) return true;
-  opening = true;
-  void loadTemplates().then((templates) => {
-    opening = false;
-    const choices = [
-      TOC,
-      ...templates.map(templateChoice),
-      ...embedTypes().map(embedChoice),
-    ];
-    blockPicker.value = {
-      choices,
-      pick: (id) => {
-        choices.find((choice) => choice.id === id)?.insert?.(view);
-        view.focus();
-      },
-      cancel: () => view.focus(),
-    };
-  });
+  if (blocksPaneOpen.value && blocksPaneFocused.value) {
+    hideBlocksPane(view);
+    return true;
+  }
+  blocksPaneOpen.value = true;
+  focusBlocksSearch();
+  void readBlocks();
   return true;
 };
+
+/**
+ * refreshBlocks reads the blocks the pane offers again
+ */
+export const refreshBlocks = (): Command => (_state, dispatch) => {
+  if (dispatch) void readBlocks();
+  return true;
+};
+
+/**
+ * insertBlock inserts the block the pane offers as `id`: where the cursor
+ * is, or at `at`, a place between two blocks at the top of the document
+ */
+export const insertBlock =
+  (id: string, at?: number): Command =>
+  (_state, dispatch, view) => {
+    const choice = offered.get(id);
+    if (!choice?.insert) return false;
+    if (dispatch && view) choice.insert(view, at);
+    return true;
+  };
 
 /**
  * editBlock edits the selected content block: a table of contents in its
@@ -204,39 +275,35 @@ export const selectedToc = (state: EditorState) => {
 };
 
 /**
- * editToc opens the dialog of the selected table of contents: how deep it
- * lists the headings and its title
+ * editToc opens the settings of the selected table of contents below it:
+ * how deep it lists the headings and its title, which change it at once
  */
 export const editToc = (): Command => (state, dispatch, view) => {
   const selected = selectedToc(state);
   if (!selected) return false;
   if (!dispatch || !view) return true;
   const { node, pos } = selected;
-  // the table of contents still where the dialog opened it
+  // the table of contents still where the settings opened it
   const at = (state: EditorState) =>
     state.doc.nodeAt(pos)?.type === schema.nodes.toc ? pos : null;
-  tocDialog.value = {
+  const box = boxOnCaretPage(view, pos, node.nodeSize);
+  tocPopover.value = {
+    anchor: box ?? { left: 0, top: 0, bottom: 0, right: 0 },
     depth: node.attrs.depth as number,
     title: node.attrs.title as string,
-    submit: (depth, title) => {
+    apply: (depth, title) => {
       const pos = at(view.state);
-      if (pos !== null) {
-        const attrs = view.state.doc.nodeAt(pos)!.attrs;
-        const tr = view.state.tr.setNodeMarkup(pos, null, {
-          ...attrs,
-          depth,
-          title,
-        });
-        view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
-      }
-      view.focus();
+      if (pos === null) return;
+      const attrs = view.state.doc.nodeAt(pos)!.attrs;
+      if (attrs.depth === depth && attrs.title === title) return;
+      const tr = view.state.tr.setNodeMarkup(pos, null, {
+        ...attrs,
+        depth,
+        title,
+      });
+      view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
     },
-    remove: () => {
-      const pos = at(view.state);
-      if (pos !== null) removeTopBlock(view, pos);
-      view.focus();
-    },
-    cancel: () => view.focus(),
+    close: () => view.focus(),
   };
   return true;
 };

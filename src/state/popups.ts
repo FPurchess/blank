@@ -26,6 +26,8 @@ export const tablePicker = shallowRef<TablePickerState | null>(null);
 export interface ToolbarItem {
   id: string;
   label: string;
+  // what its tooltip says, where that isn't its label
+  tip?: string;
   // the name of its icon, see src/icons.ts
   icon: string;
   enabled: boolean;
@@ -62,8 +64,10 @@ export const tableToolbar = shallowRef<TableToolbarState | null>(null);
 export interface BlockToolbarState {
   // the box of the block, in viewport coordinates, which the toolbar sits on
   anchor: { left: number; top: number; bottom: number; right: number };
-  // what the block is, e.g. "Recipe", for screen readers
+  // what the block is, e.g. "Recipe", which the toolbar shows
   label: string;
+  // the icon of its kind of block, see src/icons.ts
+  icon: string;
   items: ToolbarItem[];
 }
 

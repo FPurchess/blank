@@ -264,7 +264,6 @@ pre.unknown-block {
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-
 }
 
 // an embed: its drawing, as wide as it says, at most the text's width
@@ -278,7 +277,12 @@ figure.embed {
 }
 
 // a content block the cursor selected, as a page break
-:is(nav.toc, section.form, figure.embed, pre.unknown-block).ProseMirror-selectednode {
+:is(
+  nav.toc,
+  section.form,
+  figure.embed,
+  pre.unknown-block
+).ProseMirror-selectednode {
   outline: 2px solid var(--color);
   outline-offset: 4px;
 }

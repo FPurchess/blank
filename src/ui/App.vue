@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  blockPicker,
+  blocksPaneOpen,
   blockToolbar,
   contextMenu,
   imageDialog,
@@ -8,10 +8,11 @@ import {
   pageSetup,
   tablePicker,
   tableToolbar,
-  tocDialog,
+  tocPopover,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
-import BlockPicker from "./BlockPicker.vue";
+import BlockMarks from "./BlockMarks.vue";
+import BlocksPane from "./BlocksPane.vue";
 import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
@@ -24,7 +25,7 @@ import PageView from "./PageView.vue";
 import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
-import TocDialog from "./TocDialog.vue";
+import TocPopover from "./TocPopover.vue";
 import TopBar from "./TopBar.vue";
 import UiTooltip from "./UiTooltip.vue";
 
@@ -37,9 +38,11 @@ import UiTooltip from "./UiTooltip.vue";
   <!-- before the toolbar, which paints above a strip it overlaps (both 5) -->
   <BandStrips />
   <PageView />
+  <BlockMarks />
   <TopBar />
   <BottomBar />
   <DocumentOutline />
+  <BlocksPane v-if="blocksPaneOpen" />
   <TableHandles />
   <BlockToolbar v-if="blockToolbar" :state="blockToolbar" />
   <TableToolbar v-if="tableToolbar" :state="tableToolbar" />
@@ -59,12 +62,11 @@ import UiTooltip from "./UiTooltip.vue";
     :key="keyOf(pageSetup)"
     :request="pageSetup"
   />
-  <BlockPicker
-    v-if="blockPicker"
-    :key="keyOf(blockPicker)"
-    :request="blockPicker"
+  <TocPopover
+    v-if="tocPopover"
+    :key="keyOf(tocPopover)"
+    :request="tocPopover"
   />
-  <TocDialog v-if="tocDialog" :key="keyOf(tocDialog)" :request="tocDialog" />
   <ContextMenu
     v-if="contextMenu"
     :key="keyOf(contextMenu.close)"
