@@ -75,6 +75,28 @@ pub struct LineInfo {
     pub end: usize,
 }
 
+/// how text set `align` lines up: a paragraph's or heading's alignment, or
+/// a table cell's (center, right, justify, anything else the start)
+pub fn alignment_of(align: Option<&str>) -> Alignment {
+    match align {
+        Some("center") => Alignment::Center,
+        Some("right") => Alignment::Right,
+        Some("justify") => Alignment::Justify,
+        _ => Alignment::Start,
+    }
+}
+
+/// where a box `width` wide starts in `room`, aligned `align` like text: in
+/// the middle for center, at the end for right, at the start otherwise
+pub fn align_offset(align: Option<&str>, room: f32, width: f32) -> f32 {
+    let free = (room - width).max(0.0);
+    match align {
+        Some("center") => free / 2.0,
+        Some("right") => free,
+        _ => 0.0,
+    }
+}
+
 impl TextBox {
     /// lays out `text` in `width` points
     pub fn new(fonts: &mut Fonts, text: &Text, width: f32, alignment: Alignment) -> TextBox {
@@ -900,5 +922,100 @@ mod tests {
         let mut fonts = repository_fonts();
         let boxed = TextBox::new(&mut fonts, &text("a\u{1AB5}b"), 300.0, Alignment::Start);
         assert!(boxed.missing.contains(&'\u{1AB5}'), "{:?}", boxed.missing);
+    }
+
+    /// where the ink of each line starts and ends: its first and last glyph
+    /// that isn't a space, as painted
+    fn line_edges(fonts: &Fonts, boxed: &TextBox) -> Vec<(f32, f32)> {
+        (0..boxed.line_count())
+            .map(|line| {
+                let glyphs: Vec<Glyph> = boxed
+                    .glyph_runs(fonts, line)
+                    .into_iter()
+                    .flat_map(|run| run.glyphs)
+                    .filter(|glyph| {
+                        !boxed.text[glyph.start as usize..glyph.end as usize]
+                            .trim()
+                            .is_empty()
+                    })
+                    .collect();
+                let left = glyphs.iter().map(|g| g.x).fold(f32::MAX, f32::min);
+                let right = glyphs
+                    .iter()
+                    .map(|g| g.x + g.advance)
+                    .fold(f32::MIN, f32::max);
+                (left, right)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn maps_alignments_and_offsets() {
+        assert_eq!(alignment_of(Some("center")), Alignment::Center);
+        assert_eq!(alignment_of(Some("right")), Alignment::Right);
+        assert_eq!(alignment_of(Some("justify")), Alignment::Justify);
+        assert_eq!(alignment_of(Some("left")), Alignment::Start);
+        assert_eq!(alignment_of(None), Alignment::Start);
+        assert_eq!(align_offset(Some("center"), 100.0, 40.0), 30.0);
+        assert_eq!(align_offset(Some("right"), 100.0, 40.0), 60.0);
+        assert_eq!(align_offset(Some("justify"), 100.0, 40.0), 0.0);
+        assert_eq!(align_offset(None, 100.0, 140.0), 0.0);
+    }
+
+    #[test]
+    fn centers_and_right_aligns_each_line() {
+        let mut fonts = repository_fonts();
+        let words = "Some words that wrap onto a second line here";
+        let center = TextBox::new(&mut fonts, &text(words), 200.0, Alignment::Center);
+        let right = TextBox::new(&mut fonts, &text(words), 200.0, Alignment::Right);
+        assert!(center.line_count() >= 2);
+        for (left, end) in line_edges(&fonts, &center) {
+            assert!(((200.0 - end) - left).abs() < 1.0, "{left} {end}");
+        }
+        for (_, end) in line_edges(&fonts, &right) {
+            assert!((end - 200.0).abs() < 0.5, "{end}");
+        }
+    }
+
+    #[test]
+    fn justifies_every_line_but_the_last_and_those_before_a_break() {
+        let mut fonts = repository_fonts();
+        let words = "Some words that wrap onto more lines than one, all of them full but the last one\nand this.";
+        let mut value = text(words);
+        // a run in another face in the middle of the first line
+        value.spans = vec![Span {
+            from: 5,
+            to: 10,
+            bold: true,
+            ..Default::default()
+        }];
+        let boxed = TextBox::new(&mut fonts, &value, 200.0, Alignment::Justify);
+        let edges = line_edges(&fonts, &boxed);
+        let last = edges.len() - 1;
+        assert!(last >= 2, "{edges:?}");
+        for (line, (left, end)) in edges.iter().enumerate() {
+            assert!(left.abs() < 0.5, "line {line} starts at {left}");
+            // line_end counts from the text's position, 1
+            let end_at = (boxed.line_end(line).0 - 1) as usize;
+            let before_break = boxed.text[..end_at].trim_end().ends_with("last one");
+            if line == last || before_break {
+                assert!(*end < 199.0, "line {line} ends at {end}");
+            } else {
+                assert!((end - 200.0).abs() < 0.5, "line {line} ends at {end}");
+            }
+        }
+    }
+
+    #[test]
+    fn justifies_a_heading_with_its_tracking() {
+        let mut fonts = repository_fonts();
+        let mut value = text("A heading long enough that it takes two lines");
+        value.style = "h1".into();
+        let boxed = TextBox::new(&mut fonts, &value, 300.0, Alignment::Justify);
+        let edges = line_edges(&fonts, &boxed);
+        assert!(edges.len() >= 2, "{edges:?}");
+        let (_, end) = edges[0];
+        // the tracking after the last letter may stand past the ink
+        assert!(end > 297.0 && end <= 300.5, "{end}");
     }
 }

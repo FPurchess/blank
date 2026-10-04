@@ -13,6 +13,7 @@ import {
   schema,
 } from "../markdown";
 import {
+  aligned,
   blockquote,
   captioned,
   codeBlock,
@@ -125,6 +126,9 @@ const rich = docWithFrontmatter(
   ol(li(p("first"), schema.nodes.page_break.create())),
   ul(li(p("item"))),
   image("top.png"),
+  aligned("center", p("centered")),
+  aligned("right", h(2, "to the right")),
+  aligned("center", image("centered.png")),
   codeBlock("code"),
   schema.nodes.horizontal_rule.create(),
   captioned(

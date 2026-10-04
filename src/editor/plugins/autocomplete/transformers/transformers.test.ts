@@ -114,7 +114,7 @@ describe("transformer.blockquote", () => {
       const block = view.state.doc.child(index);
       expect(block.toJSON()).toEqual({
         type: "blockquote",
-        content: [{ type: "paragraph" }],
+        content: [{ type: "paragraph", attrs: { align: null } }],
       });
       expect(view.state.selection.$from.parent).toBe(block.firstChild);
     },

@@ -1,6 +1,6 @@
 import { EditorView } from "prosemirror-view";
-import { setBlockType } from "prosemirror-commands";
 import { schema } from "../../../../markdown";
+import { setTextblock } from "../../../commands/setTextblock";
 
 import type { BlockTransformer } from "../types";
 import { applyBlockCommand } from "./util";
@@ -18,7 +18,8 @@ const _transformer: BlockTransformer<Props> = {
   transform: (view: EditorView, line, { level }: Props): boolean =>
     applyBlockCommand(
       view,
-      setBlockType(schema.nodes.heading, { level }),
+      // a centered paragraph becomes a centered heading
+      setTextblock(schema.nodes.heading, { level }),
       line.length,
     ),
 };

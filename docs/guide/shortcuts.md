@@ -96,6 +96,10 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Insert or edit link  | `Mod` `K`       |
 | Open link in browser | `Mod` + Click   |
 | Insert or edit image | `Mod` `Alt` `I` |
+| Align left           | `Mod` `Shift` `L` |
+| Center               | `Mod` `Shift` `E` |
+| Align right          | `Mod` `Shift` `R` |
+| Justify              | `Mod` `Shift` `J` |
 
 ## Spell check
 

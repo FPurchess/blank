@@ -282,6 +282,7 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
                         width: *width,
                         height: *height,
                         alt: "a picture".into(),
+                        align: None,
                     },
                     ..text_item(0, "", "p", 0, true)
                 });

@@ -14,7 +14,9 @@ import {
   setProperties,
   settleForms,
   updateFrontmatter,
+  withoutNestedAlignment,
 } from "../../markdown";
+import { mapTables, withColumnAlignment } from "../../markdown/tables";
 import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
 import { type WordLayout, pageChanges } from "./layout";
 import { type WordProperties, prepareDocx } from "./prepare";
@@ -157,7 +159,12 @@ export const importDocx = async (
   // an inert document: nothing in it runs or loads
   const dom = new DOMParser().parseFromString(html, "text/html");
   const report = cleanup(dom);
-  const body = SchemaParser.fromSchema(schema).parse(dom.body);
+  const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
+  // only blocks at the top keep an alignment (src/markdown/alignment.ts), and
+  // a column the alignment its body cells agree on, as markdown aligns
+  const body = withoutNestedAlignment(
+    parsed.copy(mapTables(parsed.content, withColumnAlignment)),
+  );
   const { frontmatter, page } = frontmatterOf(
     properties,
     layout,

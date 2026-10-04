@@ -137,6 +137,51 @@
     {
       "kind": "text",
       "pos": 81,
+      "text": "centered",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": true,
+      "align": "center",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 91,
+      "text": "to the right",
+      "spans": [],
+      "style": "h2",
+      "level": 2,
+      "top": true,
+      "listed": true,
+      "align": "right",
+      "indent": 0,
+      "before": 16,
+      "after": 5,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "image",
+      "pos": 105,
+      "src": "centered.png",
+      "width": 120,
+      "height": 80,
+      "alt": "an image",
+      "align": "center",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 108,
       "text": "code",
       "spans": [],
       "style": "code",
@@ -150,7 +195,7 @@
     },
     {
       "kind": "rule",
-      "pos": 86,
+      "pos": 113,
       "indent": 0,
       "before": 14,
       "after": 30,
@@ -159,8 +204,8 @@
     },
     {
       "kind": "table",
-      "pos": 87,
-      "end": 166,
+      "pos": 114,
+      "end": 193,
       "rows": [
         {
           "header": true,
@@ -169,7 +214,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 91,
+                  "pos": 118,
                   "text": "left",
                   "spans": [],
                   "style": "p",
@@ -187,7 +232,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 99,
+                  "pos": 126,
                   "text": "right",
                   "spans": [],
                   "style": "p",
@@ -210,7 +255,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 110,
+                  "pos": 137,
                   "text": "wide",
                   "spans": [],
                   "style": "p",
@@ -233,7 +278,7 @@
               "blocks": [
                 {
                   "kind": "text",
-                  "pos": 120,
+                  "pos": 147,
                   "text": "code in a cell",
                   "spans": [],
                   "style": "code",
@@ -244,7 +289,7 @@
                 },
                 {
                   "kind": "text",
-                  "pos": 138,
+                  "pos": 165,
                   "text": "a list",
                   "spans": [],
                   "style": "p",
@@ -265,7 +310,7 @@
               "blocks": [
                 {
                   "kind": "image",
-                  "pos": 150,
+                  "pos": 177,
                   "src": "cell.png",
                   "width": 120,
                   "height": 80,
@@ -275,7 +320,7 @@
                 },
                 {
                   "kind": "text",
-                  "pos": 154,
+                  "pos": 181,
                   "text": "a quote",
                   "spans": [],
                   "style": "p",
@@ -308,13 +353,17 @@
     },
     {
       "kind": "toc",
-      "pos": 166,
+      "pos": 193,
       "title": "Contents",
       "depth": 2,
       "entries": [
         {
           "level": 1,
           "text": "Chapter"
+        },
+        {
+          "level": 2,
+          "text": "to the right"
         }
       ],
       "indent": 0,
@@ -325,7 +374,7 @@
     },
     {
       "kind": "boxed",
-      "pos": 167,
+      "pos": 194,
       "label": "Blank can't show this block (chart@3) and keeps it as it is",
       "indent": 0,
       "before": 0,
@@ -335,7 +384,7 @@
     },
     {
       "kind": "image",
-      "pos": 168,
+      "pos": 195,
       "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2260%22%2F%3E",
       "width": 170.07874015748033,
       "height": 113.38582677165354,
@@ -348,7 +397,7 @@
     },
     {
       "kind": "text",
-      "pos": 172,
+      "pos": 199,
       "text": "Ann Example",
       "spans": [],
       "style": "p",
@@ -369,7 +418,7 @@
     },
     {
       "kind": "text",
-      "pos": 185,
+      "pos": 212,
       "text": "Long Street 12",
       "spans": [],
       "style": "p",
@@ -388,7 +437,7 @@
     },
     {
       "kind": "text",
-      "pos": 203,
+      "pos": 230,
       "text": "Bea · Hill Road 3",
       "spans": [],
       "style": "small",
@@ -408,7 +457,7 @@
     },
     {
       "kind": "text",
-      "pos": 224,
+      "pos": 251,
       "text": "",
       "spans": [],
       "style": "h1",
@@ -424,7 +473,7 @@
     },
     {
       "kind": "text",
-      "pos": 228,
+      "pos": 255,
       "text": "",
       "spans": [],
       "style": "p",
@@ -455,7 +504,7 @@
     },
     {
       "kind": "text",
-      "pos": 232,
+      "pos": 259,
       "text": "a note",
       "spans": [],
       "style": "p",

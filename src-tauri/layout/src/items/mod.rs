@@ -11,7 +11,7 @@ use parley::Alignment;
 use crate::fonts::Fonts;
 use crate::model::{Content, Item, Settings, Text, TextKind};
 use crate::style::{MARKER_GAP, RULE};
-use crate::text::TextBox;
+use crate::text::{align_offset, alignment_of, TextBox};
 
 use table::table_units;
 pub use table::{TableSpec, MAX_COLUMNS};
@@ -232,6 +232,7 @@ impl Laid {
                 width: image_width,
                 height,
                 alt,
+                align,
                 ..
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
@@ -244,7 +245,8 @@ impl Laid {
                         vec![Deco::Image {
                             src: src.clone(),
                             alt: alt.clone(),
-                            x: indent,
+                            // aligned like the paragraph it stands in
+                            x: indent + align_offset(align.as_deref(), inner, w),
                             y: 0.0,
                             w,
                             h,
@@ -263,7 +265,8 @@ impl Laid {
                         style: TextKind::Alt,
                         ..Default::default()
                     };
-                    let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
+                    let mut label =
+                        TextBox::new(fonts, &text, inner, alignment_of(align.as_deref()));
                     label.x = indent;
                     let mut laid = Laid::single(label.height(), vec![]);
                     laid.label = Some(label);
@@ -329,7 +332,8 @@ impl Laid {
 }
 
 fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
-    let mut boxed = TextBox::new(fonts, text, width, Alignment::Start);
+    let alignment = alignment_of(text.align.as_deref());
+    let mut boxed = TextBox::new(fonts, text, width, alignment);
     boxed.x = indent;
     // what an empty text says, in its style, on the screen only; in the
     // middle of a box for a picture to come
@@ -345,10 +349,13 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
                 style: text.style.clone(),
                 ..Default::default()
             };
+            // one line of hint, aligned like the text it stands for
             let (room, align) = if picture {
                 ((width - 2.0 * PICTURE_PADDING).max(10.0), Alignment::Center)
-            } else {
+            } else if alignment == Alignment::Justify {
                 (width, Alignment::Start)
+            } else {
+                (width, alignment)
             };
             let mut label = TextBox::new(fonts, &shown, room, align);
             label.x = indent + if picture { PICTURE_PADDING } else { 0.0 };

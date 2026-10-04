@@ -54,6 +54,10 @@ pub struct Text {
     /// size, on the screen only
     #[serde(default)]
     pub picture: bool,
+    /// how a paragraph or heading at the top of the document is aligned:
+    /// center, right or justify, none for left (see `alignment_of`)
+    #[serde(default)]
+    pub align: Option<String>,
 }
 
 /// an entry of a table of contents: a heading's level and text
@@ -311,6 +315,9 @@ pub enum Content {
         height: f32,
         #[serde(default)]
         alt: String,
+        /// the alignment of the paragraph it stands in: center or right
+        #[serde(default)]
+        align: Option<String>,
     },
     Table {
         pos: u32,

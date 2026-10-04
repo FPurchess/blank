@@ -17,9 +17,10 @@ import {
   prepareImages,
 } from "../../images/prepare";
 import { pageGeometry } from "../../layout/resolve";
-import { frontmatterOf } from "../../markdown";
+import { alignOf, frontmatterOf } from "../../markdown";
 import { listStart } from "../../markdown/lists";
-import type { NodeName } from "../../markdown/schema";
+import type { Alignment, NodeName } from "../../markdown/schema";
+import type { TextAlignment } from "../../markdown/alignment";
 import {
   isListed,
   type ListedHeading,
@@ -155,6 +156,14 @@ const tocClass = (docx: Docx, width: number) => {
   };
 };
 
+/**
+ * wordAlignment names an alignment as Word does: justified text is "both"
+ */
+const wordAlignment = (
+  align: Alignment | TextAlignment,
+): "left" | "center" | "right" | "both" =>
+  align === "justify" ? "both" : align;
+
 class Serializer {
   // the ordered list starts that need a numbering definition
   private starts = new Set<number>();
@@ -265,6 +274,15 @@ class Serializer {
     return blocks;
   }
 
+  /**
+   * alignment returns the alignment of a paragraph or heading for Word, which
+   * calls justified text "both"
+   */
+  private alignment(node: Node) {
+    const align = alignOf(node);
+    return align ? { alignment: wordAlignment(align) } : {};
+  }
+
   private block(node: Node, position: Position): Block[] {
     const { HeadingLevel } = this.docx;
     const name = node.type.name as NodeName;
@@ -288,6 +306,7 @@ class Serializer {
               : children,
             ...this.decoration(position, false),
             ...this.indent(position),
+            ...this.alignment(node),
           },
         ];
       }
@@ -298,6 +317,7 @@ class Serializer {
             children: this.inline(node),
             ...this.decoration(position, true),
             ...this.indent(position),
+            ...this.alignment(node),
           },
         ];
 
@@ -776,7 +796,7 @@ class Serializer {
     const blocks = this.blocks(cell.node, TOP);
     this.maxImageWidth = outer;
 
-    const align = cell.node.attrs.align as "left" | "center" | "right" | null;
+    const align = cell.node.attrs.align as Alignment | null;
     return blocks.map((block, index) =>
       this.isBuilt(block)
         ? block
@@ -785,7 +805,7 @@ class Serializer {
             ...(cell.header && !block.style
               ? { style: STYLE.tableHeading }
               : {}),
-            ...(align ? { alignment: align } : {}),
+            ...(align ? { alignment: wordAlignment(align) } : {}),
             ...(index === blocks.length - 1
               ? { spacing: { ...block.spacing, after: 0 } }
               : {}),
@@ -1009,6 +1029,9 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
       data: data as unknown as Buffer,
     })),
     styles: stylesFor(layout.newPageBefore),
+    // a justified line that ends in a line break isn't stretched, as on
+    // Blank's pages
+    compatibility: { doNotExpandShiftReturn: true },
     numbering: serializer.numbering(),
     sections: [
       {

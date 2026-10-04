@@ -84,6 +84,7 @@ const ICONS: Record<string, string> = {
   "align-left": "M4 6h16 M4 12h10 M4 18h14",
   "align-center": "M4 6h16 M7 12h10 M5 18h14",
   "align-right": "M4 6h16 M10 12h10 M6 18h14",
+  "align-justify": "M4 6h16 M4 12h16 M4 18h16",
   "row-plus": "M3 4h18v7H3z M12 15v6 M9 18h6",
   "col-plus": "M4 3h7v18H4z M15 12h6 M18 9v6",
   sort: "M7 4v16 M3 16l4 4 4-4 M14 6h7 M14 12h5 M14 18h3",

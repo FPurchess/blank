@@ -12,6 +12,7 @@ import {
   EMBED_CLASS,
   FORM_CLASS,
 } from "./styleMap";
+import { ALIGN_MARKER, alignClass, type WordAlignment } from "./align";
 
 // Turns the HTML mammoth makes of a .docx into HTML the markdown schema can
 // hold, see src/importers/docx/index.ts. Works on an inert document, so no
@@ -108,6 +109,38 @@ const attachCaption = (table: HTMLTableElement, sibling: Element | null) => {
   caption.append(...sibling.childNodes);
   table.prepend(caption);
   sibling.remove();
+};
+
+const ALIGNMENTS: WordAlignment[] = ["left", "center", "right", "justify"];
+
+/**
+ * alignments turns the marker runs of align.ts into the alignment of their
+ * paragraph or heading, or of the cell it is the first of, and removes them
+ * with their text: a cell takes left, center and right, as markdown aligns a
+ * column; a block at the top takes all but left, the default. Any marker
+ * character left anywhere goes too, so none ever reaches the document.
+ */
+const alignments = (doc: Document) => {
+  for (const align of ALIGNMENTS) {
+    doc.querySelectorAll(`span.${alignClass(align)}`).forEach((span) => {
+      const block = span.closest("p, h1, h2, h3, h4, h5, h6");
+      const cell = block?.parentElement?.closest("td, th");
+      if (cell && block?.parentElement === cell) {
+        if (align !== "justify" && !cell.hasAttribute("align")) {
+          cell.setAttribute("align", align);
+        }
+      } else if (block && align !== "left") {
+        (block as HTMLElement).style.textAlign = align;
+      }
+      span.remove();
+    });
+  }
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeValue?.includes(ALIGN_MARKER)) {
+      node.nodeValue = node.nodeValue.split(ALIGN_MARKER).join("");
+    }
+  }
 };
 
 /**
@@ -282,6 +315,9 @@ const tightLists = (doc: Document) => {
  * @returns what had to change, for the warnings shown after the import
  */
 export const cleanup = (doc: Document): CleanupReport => {
+  // first, so the markers' text counts nowhere, e.g. as an empty
+  // paragraph's
+  alignments(doc);
   tocs(doc);
   forms(doc);
   embeds(doc);

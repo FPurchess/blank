@@ -1,7 +1,13 @@
 import { schema as base } from "prosemirror-markdown";
-import { type Node, NodeSpec, Schema } from "prosemirror-model";
+import {
+  type AttributeSpec,
+  type Node,
+  NodeSpec,
+  Schema,
+} from "prosemirror-model";
 import { tableNodes } from "prosemirror-tables";
 
+import { textAlignment } from "./alignment";
 import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
 import {
   checkEmbed,
@@ -45,8 +51,10 @@ const cells = tableNodes({
       default: null,
       getFromDOM: (dom) =>
         alignment(dom.style.textAlign || dom.getAttribute("align")),
+      // what the clipboard and the HTML tables of src/markdown/tables.ts
+      // write, which GitHub would strip as a style
       setDOMAttr: (value, attrs) => {
-        if (value) attrs.style = `text-align: ${value}`;
+        if (value) attrs.align = value as string;
       },
     },
   },
@@ -233,6 +241,39 @@ const formField: NodeSpec = {
   ],
 };
 
+// how a paragraph or heading is aligned (see ./alignment.ts): null for left
+const align: AttributeSpec = {
+  default: null,
+  validate: (value) => {
+    if (value !== null && textAlignment(value) !== value) {
+      throw new RangeError(`not an alignment: ${String(value)}`);
+    }
+  },
+};
+
+const blockAlignment = (dom: HTMLElement) =>
+  textAlignment(dom.style.textAlign || dom.getAttribute("align"));
+
+const alignedStyle = (node: Node) =>
+  node.attrs.align ? { style: `text-align: ${node.attrs.align}` } : {};
+
+const paragraph: NodeSpec = {
+  ...base.spec.nodes.get("paragraph"),
+  attrs: { align },
+  parseDOM: [{ tag: "p", getAttrs: (dom) => ({ align: blockAlignment(dom) }) }],
+  toDOM: (node) => ["p", alignedStyle(node), 0],
+};
+
+const heading: NodeSpec = {
+  ...base.spec.nodes.get("heading"),
+  attrs: { ...base.spec.nodes.get("heading")!.attrs, align },
+  parseDOM: [1, 2, 3, 4, 5, 6].map((level) => ({
+    tag: `h${level}`,
+    getAttrs: (dom: HTMLElement) => ({ level, align: blockAlignment(dom) }),
+  })),
+  toDOM: (node) => [`h${node.attrs.level}`, alignedStyle(node), 0],
+};
+
 // the blocks a field holds: those of the document but page breaks and
 // content blocks (the tokens they're read from are FIELD_CONTENT in
 // ./blocks/rules.ts)
@@ -248,6 +289,8 @@ const FIELD_CONTENT = [
 ];
 
 const nodes = base.spec.nodes
+  .update("paragraph", paragraph)
+  .update("heading", heading)
   .update("doc", {
     ...base.spec.nodes.get("doc"),
     content: "(block | top_block)+",

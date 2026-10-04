@@ -1,5 +1,6 @@
 import type { Node } from "prosemirror-model";
 
+import { withoutNestedAlignment } from "./alignment";
 import { definitionsSection, usedDefinitions } from "./blocks/definitions";
 import { settleForms } from "./blocks/forms";
 import type { BlocksEnv } from "./blocks/rules";
@@ -16,6 +17,13 @@ import { markdownSerializer } from "./serializer";
 // serializer from here, never from prosemirror-markdown.
 
 export { type Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
+export {
+  alignOf,
+  nestedAlignments,
+  type TextAlignment,
+  textAlignment,
+  withoutNestedAlignment,
+} from "./alignment";
 export {
   type DocumentProperties,
   frontmatterError,
@@ -76,7 +84,9 @@ export { tokenizer } from "./tokenizer";
 export const parseMarkdown = (text: string): Node => {
   const { frontmatter, body } = splitFrontmatter(text);
   const env: BlocksEnv = {};
-  const doc = markdownParser.parse(body, env);
+  // only blocks at the top keep an alignment, e.g. not a form's fields inside
+  // a <div align>, see ./alignment.ts
+  const doc = withoutNestedAlignment(markdownParser.parse(body, env));
   // its forms as their definitions say, e.g. an empty title as a heading
   return settleForms(
     doc.type.create(

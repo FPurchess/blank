@@ -3,36 +3,8 @@ import { Plugin, type EditorState, type Transaction } from "prosemirror-state";
 
 import { schema } from "../../../markdown";
 import { CELL_SEPARATOR } from "../../../markdown/html";
+import { changedDescendants } from "../changed";
 import { keepsParagraphAfter, standsApart } from "./util";
-
-type Visit = (node: Node, pos: number) => boolean | void;
-
-/**
- * changedDescendants calls `f` for the descendants of `cur` that aren't in
- * `old`, descending into a node when `f` doesn't return false
- */
-const changedDescendants = (old: Node, cur: Node, offset: number, f: Visit) => {
-  const oldSize = old.childCount;
-  let j = 0;
-  outer: for (let i = 0; i < cur.childCount; i++) {
-    const child = cur.child(i);
-    for (let scan = j, end = Math.min(oldSize, i + 3); scan < end; scan++) {
-      if (old.child(scan) === child) {
-        j = scan + 1;
-        offset += child.nodeSize;
-        continue outer;
-      }
-    }
-    if (f(child, offset) !== false) {
-      if (j < oldSize && old.child(j).sameMarkup(child)) {
-        changedDescendants(old.child(j), child, offset + 1, f);
-      } else {
-        child.nodesBetween(0, child.content.size, f, offset + 1);
-      }
-    }
-    offset += child.nodeSize;
-  }
-};
 
 /**
  * flattened returns what replaces a node a cell can't hold: a heading becomes

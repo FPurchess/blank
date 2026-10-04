@@ -576,10 +576,22 @@ describe("importers.docx", () => {
       );
     });
 
-    it("loses the alignment of table columns", async () => {
+    it("keeps the alignment of table columns, left as the default", async () => {
       expect(
         await roundTrip("| a   |   b |\n| :-- | --: |\n| c   |   d |"),
-      ).toBe("| a   | b   |\n| --- | --- |\n| c   | d   |");
+      ).toBe("| a   |   b |\n| --- | --: |\n| c   |   d |");
+    });
+
+    it("keeps the alignment of paragraphs and headings", async () => {
+      const aligned = [
+        '<div align="center">\n\n# Title\n\nCentered.\n\n</div>',
+        '<div align="justify">\n\nJustified.\n\n</div>',
+        "Left.",
+        '<div align="right">\n\nRight.\n\n</div>',
+      ].join("\n\n");
+      const back = await roundTrip(aligned);
+      expect(back).toBe(aligned);
+      expect(back).not.toContain("\u2063");
     });
 
     it("splits a quote at a page break in it", async () => {

@@ -796,6 +796,7 @@ mod tests {
                 width: 120.0,
                 height: 60.0,
                 alt: format!("the picture {src}"),
+                align: None,
             },
             ..paragraph(0, "")
         }

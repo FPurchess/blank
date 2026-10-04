@@ -1,6 +1,7 @@
 import { DOMParser as SchemaParser, Node } from "prosemirror-model";
 import { TableMap } from "prosemirror-tables";
 
+import { withoutNestedAlignment } from "./alignment";
 import { alignment, schema } from "./schema";
 import { withColumnPercents } from "./tables";
 
@@ -117,18 +118,18 @@ const cleanCell = (cell: HTMLTableCellElement) => {
  * cleanLinks checks links and images with the rules markdown links get, so
  * HTML can't bring in what markdown would drop (e.g. javascript: links)
  */
-const cleanLinks = (table: HTMLTableElement, links: LinkRules) => {
+export const cleanLinks = (root: ParentNode, links: LinkRules) => {
   const check = (url: string | null): string | null => {
     if (url === null) return null;
     const normalized = links.normalizeLink(url.trim());
     return links.validateLink(normalized) ? normalized : null;
   };
-  for (const link of table.querySelectorAll("a")) {
+  for (const link of root.querySelectorAll("a")) {
     const href = check(link.getAttribute("href"));
     if (href) link.setAttribute("href", href);
     else link.removeAttribute("href");
   }
-  for (const image of table.querySelectorAll("img")) {
+  for (const image of root.querySelectorAll("img")) {
     const src = check(image.getAttribute("src"));
     if (src) image.setAttribute("src", src);
     else image.remove();
@@ -228,33 +229,73 @@ const colgroupPercents = (table: HTMLTableElement): number[] | null => {
 };
 
 /**
- * parseHtmlTable reads the HTML of a single table, as Blank writes a table a
- * pipe table can't hold. Returns null if the HTML is anything but exactly one
- * table, e.g. with text after it, or if there's no DOM to read it with.
+ * parseOne reads HTML that is exactly one element `accept` takes, e.g. a
+ * table, into the node of the schema it stands for, or null if it's anything
+ * else or there's no DOM to read it with. `prepare` cleans the element first.
  */
-export const parseHtmlTable = (html: string, links: LinkRules): Node | null => {
+const parseOne = (
+  html: string,
+  accept: (element: Element) => boolean,
+  prepare: (element: Element) => void,
+): Node | null => {
   if (typeof DOMParser === "undefined") return null;
   const dom = new DOMParser().parseFromString(html, "text/html");
   const content = [...dom.body.childNodes].filter(
     (node) => node.nodeType !== 3 /* text */ || node.textContent?.trim(),
   );
-  const [table] = content;
-  if (content.length !== 1 || table.nodeName !== "TABLE") return null;
-  // Blank's own column widths; tables pasted or imported from elsewhere size
-  // to their content, see normalizeTableHtml
-  const percents = colgroupPercents(table as HTMLTableElement);
-  normalizeTableHtml(table as HTMLTableElement, links);
+  const [element] = content;
+  if (content.length !== 1 || !(element instanceof Element)) return null;
+  if (!accept(element)) return null;
+  prepare(element);
   try {
     const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
     const node = parsed.firstChild;
-    if (parsed.childCount !== 1 || node?.type !== schema.nodes.table) {
-      return null;
-    }
+    if (parsed.childCount !== 1 || !node) return null;
     node.check();
-    return percents?.length === TableMap.get(node).width
-      ? withColumnPercents(node, percents)
-      : node;
+    // only blocks at the top keep an alignment, see ./alignment.ts
+    return withoutNestedAlignment(parsed).firstChild;
   } catch {
     return null;
   }
+};
+
+/**
+ * parseHtmlTable reads the HTML of a single table, as Blank writes a table a
+ * pipe table can't hold. Returns null if the HTML is anything but exactly one
+ * table, e.g. with text after it, or if there's no DOM to read it with.
+ */
+export const parseHtmlTable = (html: string, links: LinkRules): Node | null => {
+  // Blank's own column widths; tables pasted or imported from elsewhere size
+  // to their content, see normalizeTableHtml
+  let percents: number[] | null = null;
+  const node = parseOne(
+    html,
+    (element) => element.nodeName === "TABLE",
+    (table) => {
+      percents = colgroupPercents(table as HTMLTableElement);
+      normalizeTableHtml(table as HTMLTableElement, links);
+    },
+  );
+  if (node?.type !== schema.nodes.table) return null;
+  const widths = percents as number[] | null;
+  return widths?.length === TableMap.get(node).width
+    ? withColumnPercents(node, widths)
+    : node;
+};
+
+/**
+ * parseHtmlBlock reads the HTML of a single paragraph or heading on one line,
+ * as `<p align="center">…</p>` from other apps, with the links checked as
+ * markdown's are. Returns null for anything else.
+ */
+export const parseHtmlBlock = (html: string, links: LinkRules): Node | null => {
+  const node = parseOne(
+    html,
+    (element) => /^(P|H[1-6])$/.test(element.nodeName),
+    (element) => cleanLinks(element, links),
+  );
+  return node?.type === schema.nodes.paragraph ||
+    node?.type === schema.nodes.heading
+    ? node
+    : null;
 };

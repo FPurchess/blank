@@ -480,6 +480,7 @@ mod tests {
                 width,
                 height: width,
                 alt: "a cat".into(),
+                align: None,
             },
             ..paragraph(0, "")
         };
@@ -505,6 +506,54 @@ mod tests {
             .page_ops(0, false)
             .iter()
             .all(|op| !matches!(op, Op::Glyphs { .. })));
+    }
+
+    #[test]
+    fn aligns_an_image_like_its_paragraph() {
+        let x_of = |align: Option<&str>| {
+            let image = Item {
+                content: Content::Image {
+                    pos: 0,
+                    src: "a.png".into(),
+                    width: 100.0,
+                    height: 50.0,
+                    alt: String::new(),
+                    align: align.map(String::from),
+                },
+                ..paragraph(0, "")
+            };
+            engine(vec![image])
+                .page_ops(0, false)
+                .iter()
+                .find_map(|op| match op {
+                    Op::Image { x, .. } => Some(*x),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let (left, center, right) = (x_of(None), x_of(Some("center")), x_of(Some("right")));
+        assert!(right - left > 100.0, "{left} {right}");
+        assert!(((center - left) * 2.0 - (right - left)).abs() < 0.5);
+    }
+
+    #[test]
+    fn aligns_a_paragraph_and_keeps_the_caret_on_its_text() {
+        let caret_x = |align: Option<&str>| {
+            let mut item = paragraph(1, "Hi");
+            if let Content::Text(text) = &mut item.content {
+                text.align = align.map(String::from);
+            }
+            engine(vec![item]).caret(1, false).unwrap().1
+        };
+        let (left, center, right) = (
+            caret_x(None),
+            caret_x(Some("center")),
+            caret_x(Some("right")),
+        );
+        assert!(center > left + 100.0, "{left} {center}");
+        assert!(right > center + 100.0, "{center} {right}");
+        // justify leaves a paragraph's only line as it is
+        assert_eq!(caret_x(Some("justify")), left);
     }
 
     #[test]

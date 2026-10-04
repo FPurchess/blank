@@ -20,6 +20,7 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, spans: Vec<Span>) -> 
             listed: level > 0,
             hint: None,
             picture: false,
+            align: None,
         }),
         indent: 0.0,
         before: if level > 0 { 16.0 } else { 0.0 },
@@ -192,6 +193,7 @@ fn more_of_the_sample(mut pos: u32) -> Vec<Item> {
             width: 120.0,
             height: 80.0,
             alt: "a red pixel".into(),
+            align: None,
         },
         ..text_item(0, "", "p", 0, vec![])
     });
@@ -430,6 +432,41 @@ fn the_pdf_holds_a_grid() {
     engine.set_settings(settings());
     engine.set_items(sample_with_grid());
     compare(&mut engine, "grid");
+}
+
+/// paragraphs and a heading in every alignment, the justified ones long
+/// enough to wrap
+fn aligned_text() -> Vec<Item> {
+    let long = "Justified text spreads the words of every line but the last one to the full width of the column, so its right edge is as straight as its left edge, which a long enough paragraph shows.";
+    let mut pos = 0;
+    [
+        ("center", "h1", 1, "A centered heading"),
+        ("center", "p", 0, "A centered paragraph."),
+        ("right", "p", 0, "A paragraph set to the right."),
+        ("justify", "p", 0, long),
+        ("justify", "p", 0, long),
+    ]
+    .into_iter()
+    .map(|(align, style, level, text)| {
+        let mut item = text_item(pos + 1, text, style, level, vec![]);
+        if let Content::Text(text) = &mut item.content {
+            text.align = Some(align.into());
+        }
+        pos += text.encode_utf16().count() as u32 + 2;
+        item
+    })
+    .collect()
+}
+
+#[test]
+fn the_pdf_holds_aligned_text() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(settings());
+    engine.set_items(aligned_text());
+    // centered and right-aligned text starts well inside the column
+    let first = engine.words().into_iter().next().unwrap();
+    assert!(first.left > settings().margins.left + 50.0, "{first:?}");
+    compare(&mut engine, "aligned");
 }
 
 /// the sample with a table of contents of its headings before it
@@ -763,6 +800,7 @@ fn pdf_is_tagged() {
             width: 0.0,
             height: 0.0,
             alt: "a map of the town".into(),
+            align: None,
         },
         ..text_item(0, "", "p", 0, vec![])
     });

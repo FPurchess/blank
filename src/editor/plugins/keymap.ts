@@ -2,9 +2,12 @@ import { keymap as _keymap, keydownHandler } from "prosemirror-keymap";
 import { undo, redo } from "prosemirror-history";
 import {
   baseKeymap,
-  setBlockType,
-  toggleMark,
   chainCommands,
+  createParagraphNear,
+  liftEmptyBlock,
+  newlineInCode,
+  splitBlockAs,
+  toggleMark,
   wrapIn,
 } from "prosemirror-commands";
 import {
@@ -13,7 +16,7 @@ import {
   wrapInList,
   splitListItem,
 } from "prosemirror-schema-list";
-import { fieldAt, schema } from "../../markdown";
+import { alignOf, fieldAt, schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
@@ -45,12 +48,15 @@ import {
 
 import * as exporters from "../../exporters";
 import { CommandIdentifier, getKeyBinding } from "../../config";
+import type { Node } from "prosemirror-model";
 import { Command } from "prosemirror-state";
 import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
+import { alignText } from "../commands/align";
+import { setTextblock } from "../commands/setTextblock";
 
 export { normalizeBinding };
 
@@ -73,12 +79,12 @@ const outsideForms =
     !fieldAt(state.selection.$from) && command(state, dispatch, view);
 
 const heading = (level: number) =>
-  outsideCells(setBlockType(schema.nodes.heading, { level }));
+  outsideCells(setTextblock(schema.nodes.heading, { level }));
 
 const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.UNDO]: undo,
   [CommandIdentifier.REDO]: redo,
-  [CommandIdentifier.BLOCKTYPE_PARAGRAPH]: setBlockType(schema.nodes.paragraph),
+  [CommandIdentifier.BLOCKTYPE_PARAGRAPH]: setTextblock(schema.nodes.paragraph),
   [CommandIdentifier.BLOCKTYPE_HEADING1]: heading(1),
   [CommandIdentifier.BLOCKTYPE_HEADING2]: heading(2),
   [CommandIdentifier.BLOCKTYPE_HEADING3]: heading(3),
@@ -114,6 +120,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.FORMAT_CODE]: toggleMark(schema.marks.code),
   [CommandIdentifier.FORMAT_LINK]: editLink(),
   [CommandIdentifier.FORMAT_BLOCKQUOTE]: wrapIn(schema.nodes.blockquote),
+  [CommandIdentifier.FORMAT_ALIGN_LEFT]: alignText("left"),
+  [CommandIdentifier.FORMAT_ALIGN_CENTER]: alignText("center"),
+  [CommandIdentifier.FORMAT_ALIGN_RIGHT]: alignText("right"),
+  [CommandIdentifier.FORMAT_ALIGN_JUSTIFY]: alignText("justify"),
   [CommandIdentifier.FILE_NEW]: newFile(),
   [CommandIdentifier.FILE_SAVE]: saveFile(),
   [CommandIdentifier.FILE_SAVE_AS]: saveFile({ force: true }),
@@ -237,15 +247,32 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
 export const commandKeys = (ids: readonly CommandIdentifier[]) =>
   keydownHandler(bindingsOf(ids));
 
+/**
+ * keepAlignment makes the paragraph Enter starts at the end of an aligned
+ * paragraph or heading aligned like it; splitting one in the middle keeps the
+ * alignment on both halves anyway
+ */
+const keepAlignment = (node: Node, atEnd: boolean) => {
+  const align = alignOf(node);
+  return atEnd && align
+    ? { type: schema.nodes.paragraph, attrs: { align } }
+    : null;
+};
+
 export const keymap = () =>
   _keymap({
     ...baseKeymap,
 
     ...bindCommands(),
 
+    // baseKeymap's Enter, but a paragraph after an aligned block, made at
+    // its end, is aligned like it, as in Word
     Enter: chainCommands(
       splitListItem(schema.nodes.list_item),
-      baseKeymap.Enter,
+      newlineInCode,
+      createParagraphNear,
+      liftEmptyBlock,
+      splitBlockAs(keepAlignment),
     ),
     "Shift-Enter": insertNode(schema.nodes.hard_break),
   });

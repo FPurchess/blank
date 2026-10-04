@@ -23,6 +23,10 @@ export interface EngineSpan {
   link?: string;
 }
 
+// how a paragraph or heading at the top of the document is aligned; left
+// isn't sent (see src/markdown/alignment.ts)
+export type EngineAlign = "center" | "right" | "justify";
+
 export interface EngineText {
   kind: "text";
   pos: number;
@@ -39,6 +43,7 @@ export interface EngineText {
   hint?: string;
   // the hint stands for a picture to come: drawn in a box of a picture's size
   picture?: boolean;
+  align?: EngineAlign;
 }
 
 // an entry of a table of contents: a heading's level and text
@@ -108,6 +113,8 @@ export type Content =
       width: number;
       height: number;
       alt: string;
+      // the alignment of the paragraph it stands in
+      align?: EngineAlign;
     }
   | {
       kind: "table";

@@ -237,6 +237,31 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "quote",
     aliases: ["blockquote", "citation"],
   },
+  // the labels of the table's alignment actions too
+  [C.FORMAT_ALIGN_LEFT]: {
+    group: "Format",
+    label: "Align left",
+    icon: "align-left",
+    aliases: ["alignment", "left"],
+  },
+  [C.FORMAT_ALIGN_CENTER]: {
+    group: "Format",
+    label: "Center",
+    icon: "align-center",
+    aliases: ["alignment", "centre", "middle"],
+  },
+  [C.FORMAT_ALIGN_RIGHT]: {
+    group: "Format",
+    label: "Align right",
+    icon: "align-right",
+    aliases: ["alignment", "right"],
+  },
+  [C.FORMAT_ALIGN_JUSTIFY]: {
+    group: "Format",
+    label: "Justify",
+    icon: "align-justify",
+    aliases: ["alignment", "justified", "block"],
+  },
   [C.FORMAT_INDENT]: {
     group: "Format",
     label: "Indent",

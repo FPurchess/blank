@@ -10,16 +10,51 @@ import { ATOMS, extraArgs, formatAtom } from "./blocks/atoms";
 import { formDefinition } from "./blocks/definitions";
 import { writeEmbed } from "./blocks/embeds";
 import { fieldSpec, isEmptyField } from "./blocks/forms";
+import { alignOf } from "./alignment";
 import { schema } from "./schema";
 import { gfmBlocker, gfmLines, htmlLines } from "./tables";
 
 const { nodes, marks } = defaultMarkdownSerializer;
 
-// `<br>`, `<table` and `<!--` typed as text are escaped, so they stay text on
-// reopen, e.g. a line `<!-- pagebreak -->` that would become a page break
-const HTML_START = /<(?=\/?(?:br|table)\b|!--)/gi;
+// the HTML Blank reads typed as text is escaped, so it stays text on reopen,
+// e.g. a line `<!-- pagebreak -->` that would become a page break, or a
+// `<div align="center">` that would align what follows: `<br>`, `<table`,
+// `<!--`, the tags of aligned blocks and underlines
+const HTML_TAGS = String.raw`<(?=\/?(?:br|table|div|p|h[1-6]|u|ins)\b|!--)`;
+const HTML_START = new RegExp(HTML_TAGS, "gi");
 // pipes too, in a paragraph that could otherwise turn into a table
-const HTML_START_OR_PIPE = /<(?=\/?(?:br|table)\b|!--)|\|/gi;
+const HTML_START_OR_PIPE = new RegExp(`${HTML_TAGS}|\\|`, "gi");
+
+type NodeWriter = (
+  state: MarkdownSerializerState,
+  node: Node,
+  parent: Node,
+  index: number,
+) => void;
+
+/**
+ * aligned writes a paragraph or heading at the top of the document inside a
+ * `<div align="…">`, which GitHub shows aligned too, with blank lines inside
+ * so the markdown in it stays markdown; blocks aligned alike in a row share
+ * one (see ./alignment.ts)
+ */
+const aligned =
+  (write: NodeWriter): NodeWriter =>
+  (state, node, parent, index) => {
+    const align = parent.type === schema.topNodeType ? alignOf(node) : null;
+    if (!align) return write(state, node, parent, index);
+    const sibling = (at: number) =>
+      at >= 0 && at < parent.childCount ? alignOf(parent.child(at)) : null;
+    if (sibling(index - 1) !== align) {
+      state.write(`<div align="${align}">`);
+      state.closeBlock(node);
+    }
+    write(state, node, parent, index);
+    if (sibling(index + 1) !== align) {
+      state.write("</div>");
+      state.closeBlock(node);
+    }
+  };
 
 /**
  * cellSerializer writes the content of a pipe table cell, with line breaks as
@@ -58,7 +93,7 @@ const hasHardBreak = (node: Node) => {
 export const markdownSerializer = new MarkdownSerializer(
   {
     ...nodes,
-    paragraph(state, node, parent, index) {
+    paragraph: aligned((state, node, parent, index) => {
       // an empty paragraph at the start, like the one Blank keeps before a
       // table there, would be a blank line at the top of the file
       if (index === 0 && node.childCount === 0 && parent.type.name === "doc") {
@@ -73,7 +108,8 @@ export const markdownSerializer = new MarkdownSerializer(
       }
       nodes.paragraph(state, node, parent, index);
       options.escapeExtraCharacters = escaped;
-    },
+    }),
+    heading: aligned(nodes.heading),
     horizontal_rule(state, node, parent, index) {
       // a file that starts with `---` would open with the text up to the next
       // `---` as its frontmatter, so a rule on top is written as `***`
