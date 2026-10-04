@@ -1,13 +1,14 @@
 //! Laying out a table: its caption, then its rows with the cells in the
 //! grid of their columns.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use parley::Alignment;
 
 use super::{CellImage, Deco, Laid, Marked, Role, TableCell, Unit};
 use crate::fonts::Fonts;
-use crate::model::{CellBlock, Text};
+use crate::model::{CellBlock, Text, TextKind};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
 use crate::text::TextBox;
 
@@ -38,9 +39,8 @@ struct PlacedCell {
     extras: Range<usize>,
     /// its quote bars and images, from the top of its row
     decos: Vec<Deco>,
-    /// its images: their positions, alt texts and places, from the top of
-    /// its row
-    images: Vec<(u32, String, f32, f32, f32, f32)>,
+    /// its images, from the top of its row
+    images: Vec<PlacedImage>,
     /// its list markers, with the block each marks
     markers: Vec<(Marked, usize)>,
     /// the alt texts of its images that aren't loaded, by their positions
@@ -49,12 +49,38 @@ struct PlacedCell {
     height: f32,
 }
 
+/// an image in a cell: its position, its alt text and where it is
+#[derive(Clone)]
+struct PlacedImage {
+    pos: u32,
+    alt: String,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+impl PlacedImage {
+    /// the image as the unit `unit` of its table draws it
+    fn in_unit(&self, unit: usize) -> CellImage {
+        CellImage {
+            pos: self.pos,
+            alt: self.alt.clone(),
+            unit,
+            x: self.x,
+            y: self.y,
+            w: self.w,
+            h: self.h,
+        }
+    }
+}
+
 /// a list marker, right-aligned before `x`, its first baseline at `baseline`
-fn marker_box(fonts: &mut Fonts, marker: &str, style: &str, x: f32, baseline: f32) -> TextBox {
+fn marker_box(fonts: &mut Fonts, marker: &str, style: TextKind, x: f32, baseline: f32) -> TextBox {
     let text = Text {
         pos: 0,
         text: marker.to_string(),
-        style: style.to_string(),
+        style,
         ..Default::default()
     };
     let mut marked = TextBox::new(fonts, &text, 100.0, Alignment::Start);
@@ -81,6 +107,166 @@ fn bar_decos(bars: &[f32], next: Option<&CellBlock>, left: f32, y: f32, height: 
             role: Role::Text,
         })
         .collect()
+}
+
+/// lays out a cell, given its row and column and the columns and rows it
+/// spans, where its columns start and how wide its text is, from the top of
+/// its row; `room` is how tall a page's text is, which an image in it never
+/// is taller than
+fn lay_out_cell(
+    fonts: &mut Fonts,
+    cell: &crate::model::Cell,
+    (row, col, colspan, rowspan): (usize, usize, usize, usize),
+    (x, inner): (f32, f32),
+    room: f32,
+    texts: &mut Vec<TextBox>,
+    extras: &mut Vec<(TextBox, Role)>,
+) -> PlacedCell {
+    let alignment = match cell.align.as_deref() {
+        Some("center") => Alignment::Center,
+        Some("right") => Alignment::Right,
+        _ => Alignment::Start,
+    };
+    let first = texts.len();
+    let first_extra = extras.len();
+    let left = x + CELL_PADDING_X;
+    let mut decos = vec![];
+    let mut images = vec![];
+    let mut markers = vec![];
+    let mut alts = vec![];
+    let mut y = CELL_PADDING_Y;
+    let blocks = cell.blocks();
+    for (block_index, block) in blocks.iter().enumerate() {
+        if block_index > 0 {
+            y += CELL_PARAGRAPH_GAP;
+        }
+        match block {
+            CellBlock::Text(block) => {
+                let mut paragraph = block.text.clone();
+                if cell.header && paragraph.style == TextKind::P {
+                    paragraph.style = TextKind::Th;
+                }
+                let indent = block.indent.clamp(0.0, (inner - 10.0).max(0.0));
+                let mut boxed =
+                    TextBox::new(fonts, &paragraph, (inner - indent).max(10.0), alignment);
+                boxed.x = left + indent;
+                boxed.y = y;
+                if let Some(marker) = &block.marker {
+                    // on the baseline of the first line
+                    let baseline = y + boxed.lines().first().map_or(0.0, |line| line.baseline);
+                    let marked = marker_box(fonts, marker, paragraph.style, boxed.x, baseline);
+                    markers.push((Marked::Text(texts.len()), extras.len()));
+                    extras.push((marked, Role::Text));
+                }
+                let height = boxed.height();
+                // a code block on its fill, as outside a table
+                if paragraph.style == TextKind::Code {
+                    decos.push(Deco::Rect {
+                        x: boxed.x - 4.0,
+                        y,
+                        w: boxed.width + 8.0,
+                        h: height,
+                        role: Role::CodeFill,
+                    });
+                }
+                decos.extend(bar_decos(
+                    &block.bars,
+                    blocks.get(block_index + 1),
+                    left,
+                    y,
+                    height,
+                ));
+                y += height;
+                texts.push(boxed);
+            }
+            CellBlock::Image {
+                pos,
+                src,
+                width: image_width,
+                height: image_height,
+                alt,
+                indent,
+                marker,
+                bars,
+            } => {
+                let indent = indent.clamp(0.0, (inner - 10.0).max(0.0));
+                let x = left + indent;
+                let room_x = (inner - indent).max(10.0);
+                let top = y;
+                if *image_width > 0.0 && *image_height > 0.0 {
+                    // never wider than the cell, nor taller than a
+                    // page, as a row's slices don't cut it
+                    let scale = (room_x / image_width)
+                        .min((room - 2.0 * CELL_PADDING_Y) / image_height)
+                        .min(1.0);
+                    let (w, h) = (image_width * scale, image_height * scale);
+                    decos.push(Deco::Image {
+                        src: src.clone(),
+                        alt: alt.clone(),
+                        x,
+                        y,
+                        w,
+                        h,
+                    });
+                    images.push(PlacedImage {
+                        pos: *pos,
+                        alt: alt.clone(),
+                        x,
+                        y,
+                        w,
+                        h,
+                    });
+                    y += h;
+                } else {
+                    // until it is loaded: its alt text, or its src
+                    let text = Text {
+                        pos: 0,
+                        text: if alt.is_empty() {
+                            src.clone()
+                        } else {
+                            alt.clone()
+                        },
+                        style: TextKind::Alt,
+                        ..Default::default()
+                    };
+                    let mut label = TextBox::new(fonts, &text, room_x, Alignment::Start);
+                    label.x = x;
+                    label.y = y;
+                    y += label.height();
+                    alts.push((*pos, extras.len()));
+                    extras.push((label, Role::Hint));
+                }
+                // a marker at its top, as before a top-level image
+                if let Some(marker) = marker {
+                    let mut marked = marker_box(fonts, marker, TextKind::P, x, top);
+                    marked.y = top;
+                    markers.push((Marked::Image(*pos), extras.len()));
+                    extras.push((marked, Role::Text));
+                }
+                decos.extend(bar_decos(
+                    bars,
+                    blocks.get(block_index + 1),
+                    left,
+                    top,
+                    y - top,
+                ));
+            }
+        }
+    }
+    PlacedCell {
+        row,
+        col,
+        colspan,
+        rowspan,
+        header: cell.header,
+        texts: first..texts.len(),
+        extras: first_extra..extras.len(),
+        decos,
+        images,
+        markers,
+        alts,
+        height: y + CELL_PADDING_Y,
+    }
 }
 
 /// lays out a table: its caption, then its rows with the cells in the grid
@@ -126,7 +312,7 @@ pub(super) fn table_units(
         let text = Text {
             pos: 0,
             text: caption.to_string(),
-            style: "caption".into(),
+            style: TextKind::Caption,
             ..Default::default()
         };
         let mut boxed = TextBox::new(fonts, &text, width, Alignment::Start);
@@ -151,146 +337,15 @@ pub(super) fn table_units(
             let rowspan = (cell.rowspan.max(1) as usize).min(rows.len() - row_index);
             let x = edge(col);
             let inner = (edge(col + colspan) - x - 2.0 * CELL_PADDING_X).max(10.0);
-            let alignment = match cell.align.as_deref() {
-                Some("center") => Alignment::Center,
-                Some("right") => Alignment::Right,
-                _ => Alignment::Start,
-            };
-            let first = texts.len();
-            let first_extra = extras.len();
-            let left = x + CELL_PADDING_X;
-            let mut decos = vec![];
-            let mut images = vec![];
-            let mut markers = vec![];
-            let mut alts = vec![];
-            let mut y = CELL_PADDING_Y;
-            let blocks = cell.blocks();
-            for (block_index, block) in blocks.iter().enumerate() {
-                if block_index > 0 {
-                    y += CELL_PARAGRAPH_GAP;
-                }
-                match block {
-                    CellBlock::Text(block) => {
-                        let mut paragraph = block.text.clone();
-                        if cell.header && paragraph.style == "p" {
-                            paragraph.style = "th".into();
-                        }
-                        let indent = block.indent.clamp(0.0, (inner - 10.0).max(0.0));
-                        let mut boxed =
-                            TextBox::new(fonts, &paragraph, (inner - indent).max(10.0), alignment);
-                        boxed.x = left + indent;
-                        boxed.y = y;
-                        if let Some(marker) = &block.marker {
-                            // on the baseline of the first line
-                            let baseline =
-                                y + boxed.lines().first().map_or(0.0, |line| line.baseline);
-                            let marked =
-                                marker_box(fonts, marker, &paragraph.style, boxed.x, baseline);
-                            markers.push((Marked::Text(texts.len()), extras.len()));
-                            extras.push((marked, Role::Text));
-                        }
-                        let height = boxed.height();
-                        // a code block on its fill, as outside a table
-                        if paragraph.style == "code" {
-                            decos.push(Deco::Rect {
-                                x: boxed.x - 4.0,
-                                y,
-                                w: boxed.width + 8.0,
-                                h: height,
-                                role: Role::CodeFill,
-                            });
-                        }
-                        decos.extend(bar_decos(
-                            &block.bars,
-                            blocks.get(block_index + 1),
-                            left,
-                            y,
-                            height,
-                        ));
-                        y += height;
-                        texts.push(boxed);
-                    }
-                    CellBlock::Image {
-                        pos,
-                        src,
-                        width: image_width,
-                        height: image_height,
-                        alt,
-                        indent,
-                        marker,
-                        bars,
-                    } => {
-                        let indent = indent.clamp(0.0, (inner - 10.0).max(0.0));
-                        let x = left + indent;
-                        let room_x = (inner - indent).max(10.0);
-                        let top = y;
-                        if *image_width > 0.0 && *image_height > 0.0 {
-                            // never wider than the cell, nor taller than a
-                            // page, as a row's slices don't cut it
-                            let scale = (room_x / image_width)
-                                .min((room - 2.0 * CELL_PADDING_Y) / image_height)
-                                .min(1.0);
-                            let (w, h) = (image_width * scale, image_height * scale);
-                            decos.push(Deco::Image {
-                                src: src.clone(),
-                                alt: alt.clone(),
-                                x,
-                                y,
-                                w,
-                                h,
-                            });
-                            images.push((*pos, alt.clone(), x, y, w, h));
-                            y += h;
-                        } else {
-                            // until it is loaded: its alt text, or its src
-                            let text = Text {
-                                pos: 0,
-                                text: if alt.is_empty() {
-                                    src.clone()
-                                } else {
-                                    alt.clone()
-                                },
-                                style: "alt".into(),
-                                ..Default::default()
-                            };
-                            let mut label = TextBox::new(fonts, &text, room_x, Alignment::Start);
-                            label.x = x;
-                            label.y = y;
-                            y += label.height();
-                            alts.push((*pos, extras.len()));
-                            extras.push((label, Role::Hint));
-                        }
-                        // a marker at its top, as before a top-level image
-                        if let Some(marker) = marker {
-                            let mut marked = marker_box(fonts, marker, "p", x, top);
-                            marked.y = top;
-                            markers.push((Marked::Image(*pos), extras.len()));
-                            extras.push((marked, Role::Text));
-                        }
-                        decos.extend(bar_decos(
-                            bars,
-                            blocks.get(block_index + 1),
-                            left,
-                            top,
-                            y - top,
-                        ));
-                    }
-                }
-            }
-            cells.push(PlacedCell {
-                row: row_index,
-                col,
-                colspan,
-                rowspan,
-                header: cell.header,
-                texts: first..texts.len(),
-                extras: first_extra..extras.len(),
-                decos,
-                images,
-                markers,
-                alts,
-                height: y + CELL_PADDING_Y,
-            });
+            cells.push(lay_out_cell(
+                fonts,
+                cell,
+                (row_index, col, colspan, rowspan),
+                (x, inner),
+                room,
+                &mut texts,
+                &mut extras,
+            ));
         }
     }
 
@@ -320,7 +375,7 @@ pub(super) fn table_units(
         }
         cell.decos = cell.decos.iter().map(|deco| deco.moved(0.0, top)).collect();
         for image in &mut cell.images {
-            image.3 += top;
+            image.y += top;
         }
     }
     let mut cell_images = vec![];
@@ -340,84 +395,46 @@ pub(super) fn table_units(
             left
         }
     };
-    // the groups of rows that merged cells join
+    // the groups of rows that merged cells join: the cells are in the order
+    // of their rows, so a group's cells follow each other
+    debug_assert!(cells.windows(2).all(|pair| pair[0].row <= pair[1].row));
     let mut start = 0;
     while start < rows.len() {
+        let first = cells.partition_point(|cell| cell.row < start);
         let mut end = start + 1;
-        let mut index = 0;
-        while index < cells.len() {
-            let cell = &cells[index];
-            if cell.row >= start && cell.row < end && cell.row + cell.rowspan > end {
-                end = cell.row + cell.rowspan;
-                index = 0;
-                continue;
+        for cell in &cells[first..] {
+            if cell.row >= end {
+                break;
             }
-            index += 1;
+            end = end.max(cell.row + cell.rowspan);
         }
-        let group: Vec<&PlacedCell> = cells
-            .iter()
-            .filter(|cell| cell.row >= start && cell.row < end)
-            .collect();
-        let mut decos = vec![];
-        for cell in &group {
-            let (x, w) = (
-                edge(cell.col),
-                edge(cell.col + cell.colspan) - edge(cell.col),
-            );
-            let (y0, y1) = (tops[cell.row], tops[cell.row + cell.rowspan]);
-            if cell.header {
-                decos.push(Deco::Rect {
-                    x,
-                    y: y0,
-                    w,
-                    h: y1 - y0,
-                    role: Role::HeaderFill,
-                });
-            }
-            if cell.col > 0 {
-                decos.push(Deco::Rect {
-                    x,
-                    y: y0,
-                    w: TABLE_LINE,
-                    h: y1 - y0,
-                    role: Role::TableLine,
-                });
-            }
-            let header_line = header_rows > 0 && cell.row + cell.rowspan == header_rows;
-            let thickness = if header_line { HEADER_LINE } else { TABLE_LINE };
-            decos.push(Deco::Rect {
-                x,
-                y: y1 - thickness,
-                w,
-                h: thickness,
-                role: if header_line {
-                    Role::HeaderLine
-                } else {
-                    Role::TableLine
-                },
-            });
-        }
-        let group_texts = group
-            .iter()
-            .map(|cell| cell.texts.clone())
-            .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
-            .unwrap_or(0..0);
-        let group_extras = group
-            .iter()
-            .map(|cell| cell.extras.clone())
-            .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end))
-            .unwrap_or(0..0);
-        // the quote bars and images of the cells, over their fills and lines
+        let group = &cells[first..cells.partition_point(|cell| cell.row < end)];
+        // the cells' fills and lines, then their quote bars and images over
+        // them
+        let mut decos = group_decos(group, &edge, &tops, header_rows);
         decos.extend(group.iter().flat_map(|cell| cell.decos.iter().cloned()));
-        let group_images: Vec<(u32, String, f32, f32, f32, f32)> = group
-            .iter()
-            .flat_map(|cell| cell.images.iter().cloned())
-            .collect();
         let header = end <= header_rows;
-        let row_edges: Vec<(usize, f32, f32)> = (start..end)
-            .map(|row| (row, tops[row], tops[row + 1]))
-            .collect();
-        let (y0, y1) = (tops[start], tops[end]);
+        let laid = Group {
+            texts: match (group.first(), group.last()) {
+                (Some(first), Some(last)) => first.texts.start..last.texts.end,
+                _ => 0..0,
+            },
+            extras: match (group.first(), group.last()) {
+                (Some(first), Some(last)) => first.extras.start..last.extras.end,
+                _ => 0..0,
+            },
+            images: group
+                .iter()
+                .flat_map(|cell| cell.images.iter().cloned())
+                .collect(),
+            decos,
+            rows: (start..end)
+                .map(|row| (row, tops[row], tops[row + 1]))
+                .collect(),
+            header,
+            top: tops[start],
+            bottom: tops[end],
+        };
         // the room the group has: on the pages the table goes on, that is
         // under its header rows, which repeat above it
         // and the first body row also under the caption, which stays with it
@@ -426,103 +443,36 @@ pub(super) fn table_units(
         } else {
             slice_room(start == header_rows)
         };
-        if room <= 0.0 || y1 - y0 <= row_room + 0.01 {
-            for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
-                cell_images.push(CellImage {
-                    pos,
-                    alt,
-                    unit: units.len(),
-                    x,
-                    y,
-                    w,
-                    h,
-                });
-            }
+        if room <= 0.0 || laid.bottom - laid.top <= row_room + 0.01 {
+            cell_images.extend(laid.images.iter().map(|image| image.in_unit(units.len())));
             units.push(Unit {
-                top: y0,
-                height: y1 - y0,
+                top: laid.top,
+                height: laid.bottom - laid.top,
                 header,
-                texts: group_texts,
-                extras: group_extras,
-                rows: row_edges,
+                texts: laid.texts,
+                extras: laid.extras,
+                rows: laid.rows,
                 // the header rows stay with the first row
                 keep_next: header,
-                decos,
+                decos: laid.decos,
                 ..Default::default()
             });
         } else {
-            // taller than a page: sliced between each of its lines, so the
-            // row starts on the page it comes to and fills the pages after.
-            // An image, and the lines of alt texts, aren't cut either.
-            let line_spans = |boxed: &TextBox| {
-                boxed
-                    .lines()
-                    .iter()
-                    .map(|line| (boxed.y + line.top, boxed.y + line.bottom))
-                    .collect::<Vec<_>>()
-            };
-            let lines: Vec<(f32, f32)> = group_texts
-                .clone()
-                .flat_map(|index| line_spans(&texts[index]))
-                .chain(
-                    group_extras
-                        .clone()
-                        .filter(|&index| extras[index].1 == Role::Hint)
-                        .flat_map(|index| line_spans(&extras[index].0)),
-                )
-                .chain(group_images.iter().map(|&(_, _, _, y, _, h)| (y, y + h)))
-                .collect();
-            let cuts = allowed_cuts(&lines, y1);
-            let mut next_cut = 0;
-            let mut from = y0;
-            while from < y1 - 0.01 {
-                let limit = from + slice_room(from == y0);
-                // the first cut after `from`, if the slice has room for it
-                while cuts.get(next_cut).is_some_and(|cut| *cut <= from + 0.01) {
-                    next_cut += 1;
-                }
-                let to = match cuts.get(next_cut) {
-                    Some(&cut) if cut <= limit + 0.01 => cut,
-                    _ => limit,
-                };
-                // always forward: where a slice can't move on, e.g. past the
-                // precision of f32, the rest of the row is the last slice
-                let to = if to > from { to } else { y1 };
-                for (pos, alt, x, y, w, h) in group_images.iter().cloned() {
-                    if y >= from - 0.01 && y < to - 0.01 {
-                        cell_images.push(CellImage {
-                            pos,
-                            alt,
-                            unit: units.len(),
-                            x,
-                            y,
-                            w,
-                            h,
-                        });
-                    }
-                }
-                units.push(Unit {
-                    top: from,
-                    height: to - from,
-                    header,
-                    texts: group_texts.clone(),
-                    extras: group_extras.clone(),
-                    clip: Some((from, to)),
-                    rows: row_edges
-                        .iter()
-                        .filter(|(_, top, bottom)| *bottom > from && *top < to)
-                        .map(|(row, top, bottom)| (*row, top.max(from), bottom.min(to)))
-                        .collect(),
-                    decos: decos
-                        .iter()
-                        .filter_map(|deco| clipped(deco, from, to))
-                        .collect(),
-                    ..Default::default()
-                });
-                from = to;
-            }
+            slice_group(
+                &laid,
+                &texts,
+                &extras,
+                slice_room,
+                &mut units,
+                &mut cell_images,
+            );
         }
         start = end;
+    }
+    // where each image is among the table's, by its position
+    let mut image_index = HashMap::new();
+    for (index, image) in cell_images.iter().enumerate() {
+        image_index.entry(image.pos).or_insert(index);
     }
     let cells = cells
         .iter()
@@ -536,7 +486,7 @@ pub(super) fn table_units(
             images: cell
                 .images
                 .iter()
-                .filter_map(|image| cell_images.iter().position(|known| known.pos == image.0))
+                .filter_map(|image| image_index.get(&image.pos).copied())
                 .collect(),
             markers: cell.markers.clone(),
             alts: cell.alts.clone(),
@@ -551,6 +501,155 @@ pub(super) fn table_units(
         cell_images,
         cells,
         ..Default::default()
+    }
+}
+
+/// rows that merged cells join, as laid out, from the top of the table
+struct Group {
+    texts: Range<usize>,
+    extras: Range<usize>,
+    images: Vec<PlacedImage>,
+    /// its cells' fills and lines, quote bars and images
+    decos: Vec<Deco>,
+    /// each row, with its top and bottom
+    rows: Vec<(usize, f32, f32)>,
+    /// whether it is header rows
+    header: bool,
+    top: f32,
+    bottom: f32,
+}
+
+/// the fills and lines of the cells of rows that merged cells join: a fill
+/// for header cells, a line left of each cell but the first, and one under
+/// each, stronger under the last header row
+fn group_decos(
+    group: &[PlacedCell],
+    edge: &impl Fn(usize) -> f32,
+    tops: &[f32],
+    header_rows: usize,
+) -> Vec<Deco> {
+    let mut decos = vec![];
+    for cell in group {
+        let (x, w) = (
+            edge(cell.col),
+            edge(cell.col + cell.colspan) - edge(cell.col),
+        );
+        let (y0, y1) = (tops[cell.row], tops[cell.row + cell.rowspan]);
+        if cell.header {
+            decos.push(Deco::Rect {
+                x,
+                y: y0,
+                w,
+                h: y1 - y0,
+                role: Role::HeaderFill,
+            });
+        }
+        if cell.col > 0 {
+            decos.push(Deco::Rect {
+                x,
+                y: y0,
+                w: TABLE_LINE,
+                h: y1 - y0,
+                role: Role::TableLine,
+            });
+        }
+        let header_line = header_rows > 0 && cell.row + cell.rowspan == header_rows;
+        let thickness = if header_line { HEADER_LINE } else { TABLE_LINE };
+        decos.push(Deco::Rect {
+            x,
+            y: y1 - thickness,
+            w,
+            h: thickness,
+            role: if header_line {
+                Role::HeaderLine
+            } else {
+                Role::TableLine
+            },
+        });
+    }
+    decos
+}
+
+/// slices rows taller than a page between each of their lines, so the rows
+/// start on the page they come to and fill the pages after. An image, and
+/// the lines of alt texts, aren't cut either. `slice_room` gives the room
+/// of the first slice or of another.
+fn slice_group(
+    group: &Group,
+    texts: &[TextBox],
+    extras: &[(TextBox, Role)],
+    slice_room: impl Fn(bool) -> f32,
+    units: &mut Vec<Unit>,
+    cell_images: &mut Vec<CellImage>,
+) {
+    let line_spans = |boxed: &TextBox| {
+        boxed
+            .lines()
+            .iter()
+            .map(|line| (boxed.y + line.top, boxed.y + line.bottom))
+            .collect::<Vec<_>>()
+    };
+    let lines: Vec<(f32, f32)> = group
+        .texts
+        .clone()
+        .flat_map(|index| line_spans(&texts[index]))
+        .chain(
+            group
+                .extras
+                .clone()
+                .filter(|&index| extras[index].1 == Role::Hint)
+                .flat_map(|index| line_spans(&extras[index].0)),
+        )
+        .chain(
+            group
+                .images
+                .iter()
+                .map(|image| (image.y, image.y + image.h)),
+        )
+        .collect();
+    let (y0, y1) = (group.top, group.bottom);
+    let cuts = allowed_cuts(&lines, y1);
+    let mut next_cut = 0;
+    let mut from = y0;
+    while from < y1 - 0.01 {
+        let limit = from + slice_room(from == y0);
+        // the first cut after `from`, if the slice has room for it
+        while cuts.get(next_cut).is_some_and(|cut| *cut <= from + 0.01) {
+            next_cut += 1;
+        }
+        let to = match cuts.get(next_cut) {
+            Some(&cut) if cut <= limit + 0.01 => cut,
+            _ => limit,
+        };
+        // always forward: where a slice can't move on, e.g. past the
+        // precision of f32, the rest of the row is the last slice
+        let to = if to > from { to } else { y1 };
+        for image in &group.images {
+            if image.y >= from - 0.01 && image.y < to - 0.01 {
+                cell_images.push(image.in_unit(units.len()));
+            }
+        }
+        units.push(Unit {
+            top: from,
+            height: to - from,
+            header: group.header,
+            texts: group.texts.clone(),
+            extras: group.extras.clone(),
+            clip: Some((from, to)),
+            rows: group
+                .rows
+                .iter()
+                .filter(|(_, top, bottom)| *bottom > from && *top < to)
+                .map(|(row, top, bottom)| (*row, top.max(from), bottom.min(to)))
+                .collect(),
+            decos: group
+                .decos
+                .iter()
+                .filter_map(|deco| clipped(deco, from, to))
+                .collect(),
+            ..Default::default()
+        });
+        from = to;
     }
 }
 
@@ -748,7 +847,7 @@ mod tests {
         assert_eq!(grid.rows.len(), 3);
         // at the bottom of a page, the caption moves on with the table
         let settings = engine.settings.clone();
-        let line = crate::style::text_style("p").line;
+        let line = crate::style::text_style(crate::model::TextKind::P).line;
         let fill = ((settings.content_bottom() - settings.content_top()) / line) as usize - 3;
         let mut items: Vec<Item> = (0..fill)
             .map(|index| paragraph(index as u32 * 3 + 1, "x"))

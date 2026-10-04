@@ -78,7 +78,7 @@ pub struct LineInfo {
 impl TextBox {
     /// lays out `text` in `width` points
     pub fn new(fonts: &mut Fonts, text: &Text, width: f32, alignment: Alignment) -> TextBox {
-        let style = text_style(&text.style);
+        let style = text_style(text.style);
         let len = utf16_len(&text.text);
         let laid_text = if text.text.is_empty() {
             " ".to_string()

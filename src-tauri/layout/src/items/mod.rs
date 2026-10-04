@@ -8,7 +8,7 @@ use std::ops::Range;
 use parley::Alignment;
 
 use crate::fonts::Fonts;
-use crate::model::{Content, Item, Text};
+use crate::model::{Content, Item, Text, TextKind};
 use crate::style::{MARKER_GAP, RULE};
 use crate::text::TextBox;
 
@@ -245,7 +245,7 @@ impl Laid {
                         } else {
                             alt.clone()
                         },
-                        style: "alt".into(),
+                        style: TextKind::Alt,
                         ..Default::default()
                     };
                     let mut label = TextBox::new(fonts, &text, inner, Alignment::Start);
@@ -316,7 +316,7 @@ impl Laid {
 fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
     let mut boxed = TextBox::new(fonts, text, width, Alignment::Start);
     boxed.x = indent;
-    let code = text.style == "code";
+    let code = text.style == TextKind::Code;
     let units = boxed
         .lines()
         .iter()

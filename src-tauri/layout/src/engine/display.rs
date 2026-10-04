@@ -7,7 +7,7 @@ use super::Engine;
 use crate::bands::{BAND_DISTANCE, BAND_LINE};
 use crate::fonts::{Fonts, INK_CODE};
 use crate::items::{Deco, Role};
-use crate::model::{Content, Text};
+use crate::model::{Content, Text, TextKind};
 use crate::style::BAR;
 use crate::text::{GlyphRun, TextBox};
 
@@ -277,7 +277,7 @@ impl Engine {
             let text = Text {
                 pos: 0,
                 text: text.clone(),
-                style: "band".into(),
+                style: TextKind::Band,
                 ..Default::default()
             };
             let boxed = TextBox::new(fonts, &text, width, alignments[slot]);

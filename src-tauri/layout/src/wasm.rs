@@ -464,21 +464,32 @@ impl LayoutEngine {
     #[cfg(feature = "test-hooks")]
     #[wasm_bindgen(js_name = textStyles)]
     pub fn text_styles(&self) -> Vec<f32> {
+        use crate::model::TextKind;
         use crate::style::{text_style, NATURAL};
-        ["p", "h1", "h2", "h3", "h4", "h5", "h6", "code", "caption"]
-            .into_iter()
-            .flat_map(|name| {
-                let style = text_style(name);
-                [
-                    style.size,
-                    style.line / (style.size * NATURAL),
-                    style.weight,
-                    f32::from(u8::from(style.italic)),
-                    style.tracking,
-                    f32::from(u8::from(style.mono)),
-                ]
-            })
-            .collect()
+        [
+            TextKind::P,
+            TextKind::H1,
+            TextKind::H2,
+            TextKind::H3,
+            TextKind::H4,
+            TextKind::H5,
+            TextKind::H6,
+            TextKind::Code,
+            TextKind::Caption,
+        ]
+        .into_iter()
+        .flat_map(|kind| {
+            let style = text_style(kind);
+            [
+                style.size,
+                style.line / (style.size * NATURAL),
+                style.weight,
+                f32::from(u8::from(style.italic)),
+                style.tracking,
+                f32::from(u8::from(style.mono)),
+            ]
+        })
+        .collect()
     }
 
     /// the size, distance from the edge and line of the headers and footers,

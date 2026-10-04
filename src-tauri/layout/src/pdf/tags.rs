@@ -15,7 +15,7 @@ use krilla::tagging::{
 
 use crate::engine::{Engine, Part};
 use crate::items::{Laid, Marked, TableCell};
-use crate::model::Content;
+use crate::model::{Content, TextKind};
 
 /// the marked content drawn for each part of the document, in the order it
 /// was drawn
@@ -227,7 +227,9 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             let children = text_nodes(ids, index, 0);
             let node = match heading_level(text.level) {
                 Some(level) => group(Tag::Hn(level, Some(text.text.clone())), children),
-                None if text.style == "code" => group(Tag::P, vec![group(Tag::Code, children)]),
+                None if text.style == TextKind::Code => {
+                    group(Tag::P, vec![group(Tag::Code, children)])
+                }
                 None => group(Tag::P, children),
             };
             Some(node)
