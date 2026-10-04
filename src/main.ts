@@ -2,7 +2,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { bootConfig } from "./config";
 import { bootState } from "./state";
-import { bootStorage } from "./storage";
+import { bootStorage, exposeStorage } from "./storage";
 import { bootEditor } from "./editor";
 import {
   bootEngine,
@@ -46,6 +46,7 @@ const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
     if (testHooks) {
       exposePerf();
       exposeEngineHooks();
+      exposeStorage();
     }
     // the page view's layout engine loads while the rest boots, and the
     // editor lays out its document once it's there (see pageSync). Without

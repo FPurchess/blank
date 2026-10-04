@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { bootConfig } from "./config";
-import { bootStorage } from "./storage";
+import { bootStorage, exposeStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
 import { bootEngine, exposeEngineHooks } from "./engine/engine";
@@ -16,7 +16,7 @@ import { createTestHandle, doc, p } from "./test/editor";
 import { mockCliArgs } from "./test/tauri";
 
 vi.mock("./config", () => ({ bootConfig: vi.fn() }));
-vi.mock("./storage", () => ({ bootStorage: vi.fn() }));
+vi.mock("./storage", () => ({ bootStorage: vi.fn(), exposeStorage: vi.fn() }));
 vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
 vi.mock("./engine/engine", () => ({
@@ -132,6 +132,7 @@ describe("main", () => {
 
     expect(exposeGeometry).toHaveBeenCalledWith(editor.view);
     expect(exposeEngineHooks).toHaveBeenCalled();
+    expect(exposeStorage).toHaveBeenCalled();
     expect("blankPageViewPerf" in window).toBe(true);
   });
 
@@ -146,6 +147,7 @@ describe("main", () => {
     expect(bootUI).toHaveBeenCalled();
     expect(exposeGeometry).not.toHaveBeenCalled();
     expect(exposeEngineHooks).not.toHaveBeenCalled();
+    expect(exposeStorage).not.toHaveBeenCalled();
     expect("blankPageViewPerf" in window).toBe(false);
     vi.unstubAllEnvs();
   });

@@ -1,7 +1,10 @@
 name: E2E
 
 on:
+  # a pull request runs on every push to it, so other branches don't run
+  # twice; main still runs after each merge
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

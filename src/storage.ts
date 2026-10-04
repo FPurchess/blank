@@ -37,6 +37,8 @@ let latestPath: string | null = null;
 let latestImportedFrom: string | null = null;
 let pending = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
+// the settings being written, which flush waits for too
+const settling = new Set<Promise<void>>();
 
 /**
  * write stores the latest path and document together, so the stored path
@@ -71,10 +73,22 @@ const schedule = () => {
 
 /**
  * flush writes pending changes right away
- * @returns a promise that settles once they are stored
+ * @returns a promise that settles once they and the settings changed before
+ * are stored
  */
 export const flush = (): Promise<void> =>
-  pending ? write() : Promise.resolve();
+  Promise.all([pending ? write() : undefined, ...settling]).then(
+    () => undefined,
+  );
+
+/**
+ * exposeStorage lets E2E tests store what is pending before they restart
+ * the app, as closing its window does (see onCloseRequested below), through
+ * `window.blankFlushStorage`
+ */
+export const exposeStorage = () => {
+  Object.assign(window, { blankFlushStorage: flush });
+};
 
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -86,7 +100,11 @@ const persist = <T>(ref: Readonly<Ref<T>>, key: string) =>
   watch(
     ref,
     (value) => {
-      localforage.setItem(key, value).catch(console.warn);
+      const stored = localforage
+        .setItem(key, value)
+        .then(() => undefined, console.warn)
+        .finally(() => settling.delete(stored));
+      settling.add(stored);
     },
     { flush: "sync" },
   );
