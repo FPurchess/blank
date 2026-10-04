@@ -23,7 +23,7 @@ import {
   focusBlocksSearch,
   tocPopover,
 } from "../../state";
-import { blockName } from "../../markdown/blocks/names";
+import { blockName, isContentBlock } from "../../markdown/blocks/names";
 import { topBlockAt } from "../../markdown/topBlock";
 import { embedTypes, type EmbedType } from "../../embeds/registry";
 import { type Form, loadForms } from "../../forms/library";
@@ -81,15 +81,21 @@ const formChoice = ({ id, definition }: Form): Choice =>
 /**
  * embedChoice offers an embed of a type a plugin brought
  */
-export const embedChoice = (type: EmbedType): Choice => ({
+const embedChoice = (type: EmbedType): Choice => ({
   id: type.type,
   group: "drawings",
   label: type.name,
   description: type.description ?? "",
-  insert: (view, at) =>
-    void makeEmbed(type).then(
-      (embed) => embed && insertTopBlock(view, embed, undefined, at),
-    ),
+  insert: (view, at) => {
+    // the document may change while the type's editor is open
+    const start = view.state.doc;
+    void makeEmbed(type).then((embed) => {
+      if (!embed) return;
+      const { doc } = view.state;
+      const still = at !== undefined && doc.eq(start) ? at : undefined;
+      insertTopBlock(view, embed, undefined, still);
+    });
+  },
 });
 
 /**
@@ -250,7 +256,7 @@ export const pasteTopBlocks = (view: EditorView, slice: Slice) => {
   const { $from } = view.state.selection;
   let holds = false;
   slice.content.forEach((node) => {
-    if (node.type.isInGroup("top_block")) holds = true;
+    if (isContentBlock(node)) holds = true;
   });
   if (!holds || $from.depth <= 1) return false;
   const at = topBlockEnd(view.state.doc, $from.pos);
@@ -262,7 +268,7 @@ export const pasteTopBlocks = (view: EditorView, slice: Slice) => {
  * selectedToc returns the table of contents the selection is on, with its
  * position, or null
  */
-export const selectedToc = (state: EditorState) => {
+const selectedToc = (state: EditorState) => {
   const { selection } = state;
   return selection instanceof NodeSelection &&
     selection.node.type === schema.nodes.toc
@@ -290,9 +296,12 @@ export const editToc = (): Command => (state, dispatch, view) => {
   // the table of contents still where the settings opened it
   const at = (state: EditorState) =>
     state.doc.nodeAt(pos)?.type === schema.nodes.toc ? pos : null;
+  // nowhere to open them while it isn't shown, e.g. before the first
+  // layout; Enter still does nothing else to it
   const box = boxOnCaretPage(view, pos, node.nodeSize);
+  if (!box) return true;
   tocPopover.value = {
-    anchor: box ?? { left: 0, top: 0, bottom: 0, right: 0 },
+    anchor: box,
     depth: node.attrs.depth as number,
     title: node.attrs.title as string,
     apply: (depth, title) => {

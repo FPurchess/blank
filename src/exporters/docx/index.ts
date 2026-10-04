@@ -273,9 +273,7 @@ class Serializer {
       case "heading": {
         // a listed heading is a bookmark the tables of contents link to
         const bookmark =
-          this.tocs.numbers.length > 0 &&
-          position === TOP &&
-          isListed(node, true)
+          this.tocs.numbers.length > 0 && position === TOP && isListed(node)
             ? bookmarkOf(++this.listedCount)
             : null;
         const children = this.inline(node);

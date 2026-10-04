@@ -10,12 +10,12 @@ export const headingText = (node: Node): string =>
 
 /**
  * isListed tells whether a heading is one of the document's headings, which
- * the outline, the PDF's bookmarks and tables of contents list: one where
- * headings count (`place`, at the top of the document or in a form's field,
- * not in a quote or a list), with text
+ * the outline, the PDF's bookmarks and tables of contents list, where it
+ * stands where headings count (at the top of the document or in a form's
+ * field, not in a quote or a list): one with text
  */
-export const isListed = (node: Node, place: boolean): boolean =>
-  place && node.type.name === "heading" && headingText(node) !== "";
+export const isListed = (node: Node): boolean =>
+  node.type.name === "heading" && headingText(node) !== "";
 
 /**
  * forEachHeading calls `f` with every heading where headings count: at the
@@ -57,7 +57,7 @@ export const listedHeadings = (doc: Node, depth = 6): ListedHeading[] => {
   const found: ListedHeading[] = [];
   forEachHeading(doc, (node, pos) => {
     const level = node.attrs.level as number;
-    if (isListed(node, true) && level <= depth) {
+    if (isListed(node) && level <= depth) {
       found.push({ level, text: headingText(node), pos });
     }
   });

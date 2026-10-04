@@ -6,6 +6,7 @@ import { gapAt } from "../engine/geometry";
 import { schema } from "../markdown";
 import { pageDropGap } from "../state";
 import { doc, p } from "../test/editor";
+import { box } from "../test/embeds";
 import { pageMove } from "./pageMove";
 import { moveCandidate, movesBlock } from "./pagePointer";
 
@@ -96,6 +97,32 @@ describe("moving a selected block on the pages", () => {
     expect(pageDropGap.value).toBe(3);
     move.up(pointer(20));
     expect(view.state.doc.child(1).type.name).toBe("toc");
+  });
+
+  it("gives a copy of an embed an id of its own", () => {
+    const embed = schema.nodes.embed.create({
+      type: "org.blank.test/box@1",
+      id: "k3x9",
+      svg: box("red"),
+    });
+    const state = EditorState.create({
+      schema,
+      doc: doc(p("a"), embed, p("b"), p("c")),
+    });
+    view.updateState(
+      state.apply(state.tr.setSelection(NodeSelection.create(state.doc, 3))),
+    );
+    const move = moveOn();
+    move.down(pointer(3));
+    move.move(pointer(60));
+    move.up(pointer(60, { ctrlKey: true }));
+    const ids: string[] = [];
+    view.state.doc.forEach((node) => {
+      if (node.type.name === "embed") ids.push(node.attrs.id as string);
+    });
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).toBe("k3x9");
+    expect(ids[1]).not.toBe("k3x9");
   });
 
   it("is cancelled off the pages and by Esc", () => {

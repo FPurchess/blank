@@ -220,7 +220,7 @@ const toField =
               true,
             )
           : Selection.findFrom(
-              state.doc.resolve(entry(at.form.child(target), pos)),
+              state.doc.resolve(fieldEntry(at.form.child(target), pos)),
               1,
               true,
             );
@@ -231,11 +231,11 @@ const toField =
   };
 
 /**
- * entry returns where the cursor goes into a field that starts at `pos`: its
- * start, or the first cell under a table's header row, which holds the
- * definition's columns
+ * fieldEntry returns where the cursor goes into a field that starts at
+ * `pos`: its start, or the first cell under a table's header row, which
+ * holds the definition's columns
  */
-const entry = (field: Node, pos: number) => {
+export const fieldEntry = (field: Node, pos: number) => {
   const table = field.firstChild;
   if (table?.type !== schema.nodes.table || table.childCount < 2)
     return pos + 1;

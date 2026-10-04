@@ -2,7 +2,7 @@ import type { EditorView } from "prosemirror-view";
 import { watch } from "vue";
 
 import { engineless } from "../../engine/engine";
-import { blockBoxes, caretPage } from "../../engine/geometry";
+import { blockBoxes, caretPage, type PageBlock } from "../../engine/geometry";
 import { pageLayoutState, pageViewport } from "../../state";
 
 /**
@@ -31,7 +31,11 @@ export const followLayout = (publish: () => void) => {
  * page the cursor is on, or on its first page, as the screen shows it, e.g.
  * for a toolbar over it
  */
-export const boxOnCaretPage = (view: EditorView, pos: number, size: number) => {
+export const boxOnCaretPage = (
+  view: EditorView,
+  pos: number,
+  size: number,
+): PageBlock | null => {
   const boxes = blockBoxes(pos, pos + size);
   const page = caretPage(view.state.selection.head);
   return boxes.find((box) => box.page === page) ?? boxes[0] ?? null;

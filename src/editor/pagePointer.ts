@@ -14,6 +14,7 @@ import { gapAt } from "../engine/geometry";
 import { topBlockAt } from "../markdown/topBlock";
 import { pageDropCaret, pageDropGap } from "../state";
 import { pageDrop } from "./commands/pageDrop";
+import { apartFrom } from "./plugins/embeds";
 import { pasteText } from "./plugins/tables/clipboard";
 
 // What the pointer does on the painted pages, told to the editor's plugins.
@@ -191,9 +192,11 @@ export const showBlockDropAt = (
 export const dropMoved = (view: EditorView, pos: number, copy: boolean) => {
   pageDropCaret.value = null;
   pageDropGap.value = null;
-  const { selection } = view.state;
+  const { selection, doc } = view.state;
+  // a copy of an embed gets an id of its own
+  const content = selection.content();
   return pageDrop(
-    selection.content(),
+    copy ? apartFrom(content, doc) : content,
     pos,
     copy ? null : { from: selection.from, to: selection.to },
   )(view.state, view.dispatch);

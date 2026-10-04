@@ -2,7 +2,8 @@ import { hasOwnRules } from "../editor/plugins/autocomplete/languages/lookup";
 import { basename } from "../paths";
 import { languageName } from "../spellcheck/service";
 import type { SpellcheckStatus } from "../spellcheck/types";
-import type { Heading, MenuItem, PageViewMode } from "../state";
+import type { ListedHeading } from "../markdown/headings";
+import type { MenuItem, PageViewMode } from "../state";
 
 // What the bars at the top and bottom of the window say (TopBar.vue,
 // BottomBar.vue and the items in it).
@@ -71,7 +72,7 @@ export const viewLabel = (view: PageViewMode) =>
  */
 export const firstHeadings = (
   pages: number,
-  headings: readonly Heading[],
+  headings: readonly ListedHeading[],
   pageOf: (pos: number) => number | null,
 ) => {
   const found: string[] = Array.from({ length: pages }, () => "");

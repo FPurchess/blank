@@ -12,14 +12,20 @@ import type { EditorView } from "prosemirror-view";
 import { fieldAt } from "../../markdown";
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
 import { blockToolbar, type ToolbarItem } from "../../state";
-import { editBlock, removeTopBlock } from "../commands/contentBlocks";
+import {
+  editBlock,
+  pasteTopBlocks,
+  removeTopBlock,
+} from "../commands/contentBlocks";
 import { boxOnCaretPage, followLayout } from "./followLayout";
+import { fieldEntry } from "./forms";
 
 // The toolbar of a content block, for the mouse: over a form while the
 // cursor is in one, and over a table of contents or an embed while it is
 // selected, as a click selects it. It removes the block, and edits a table
 // of contents or an embed whose type Blank has, as Enter does. A table in a
-// form has its own toolbar, which goes first.
+// form has its own toolbar, which goes first. The plugin also pastes content
+// blocks where they can stand.
 
 /**
  * blockAt returns the content block the toolbar is for, with its name, or
@@ -49,20 +55,21 @@ const ICONS: Record<string, string> = {
 };
 
 /**
- * enterForm puts the cursor into the first field of the selected form
+ * enterForm puts the cursor into the first field of the selected form, as
+ * Tab enters a field
  */
-export const enterForm: Command = (state, dispatch) => {
+const enterForm: Command = (state, dispatch) => {
   const { selection } = state;
   if (
     !(selection instanceof NodeSelection) ||
-    selection.node.type.name !== "form_block"
+    selection.node.type.name !== "form_block" ||
+    selection.node.childCount === 0
   )
     return false;
-  dispatch?.(
-    state.tr
-      .setSelection(Selection.near(state.doc.resolve(selection.from + 1)))
-      .scrollIntoView(),
-  );
+  const at = fieldEntry(selection.node.child(0), selection.from + 1);
+  const inside = Selection.findFrom(state.doc.resolve(at), 1, true);
+  if (!inside) return false;
+  dispatch?.(state.tr.setSelection(inside).scrollIntoView());
   return true;
 };
 
@@ -77,8 +84,10 @@ export const blockTools = () => {
     view: EditorView,
     pos: number,
     name: string,
+    selected: boolean,
   ): ToolbarItem[] => [
-    // a table of contents, and an embed whose type Blank has
+    // a table of contents, and an embed whose type Blank has, which are
+    // selected then
     ...(editBlock()(view.state)
       ? [
           {
@@ -98,7 +107,9 @@ export const blockTools = () => {
       label: `Remove ${name}`,
       tip: "Remove block",
       icon: "trash",
-      key: "Backspace",
+      // Backspace removes a selected block; in a form's field, it deletes
+      // text
+      ...(selected ? { key: "Backspace" } : {}),
       enabled: true,
       run: () => {
         removeTopBlock(view, pos);
@@ -137,7 +148,7 @@ export const blockTools = () => {
         node: block.node,
         pos: block.pos,
         selected,
-        items: items(view, block.pos, block.name),
+        items: items(view, block.pos, block.name, selected),
       };
     }
     const { left, top, bottom, right } = box;
@@ -151,6 +162,9 @@ export const blockTools = () => {
 
   return new Plugin({
     props: {
+      // content blocks pasted into a table, list or quote go after it, at
+      // the top of the document
+      handlePaste: (view, _event, slice) => pasteTopBlocks(view, slice),
       // Enter edits the selected block, or goes into a selected form
       handleKeyDown: (view, event) =>
         event.key === "Enter" &&

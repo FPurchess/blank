@@ -12,7 +12,7 @@ export const DEPTH_OPTIONS: Option<number>[] = [1, 2, 3, 4, 5, 6].map(
 );
 
 // the title a table of contents gets back when its field is left empty
-export const DEFAULT_TITLE = "Contents";
+const DEFAULT_TITLE = "Contents";
 
 /**
  * titleOf returns the title the field `value` gives a table of contents

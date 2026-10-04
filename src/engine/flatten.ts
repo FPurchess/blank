@@ -801,9 +801,10 @@ export const flattenBlocks = (
     const runs = pieces(node, pos);
     // a listed heading is one entry of the bookmarks and tables of
     // contents, on its first piece of text
-    const listedPiece = isListed(node, context.listed)
-      ? runs.findIndex((piece) => !piece.image)
-      : -1;
+    const listedPiece =
+      context.listed && isListed(node)
+        ? runs.findIndex((piece) => !piece.image)
+        : -1;
     runs.forEach((piece, index) => {
       const pieceSpace = {
         before: index === 0 ? space.before : 0,

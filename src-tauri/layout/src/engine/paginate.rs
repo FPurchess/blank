@@ -583,7 +583,7 @@ impl Paginator<'_> {
     }
 
     /// whether an item starts a page of its own: one that says so, e.g. a
-    /// form whose template does, or a heading of a level `new_page_before`
+    /// form whose definition does, or a heading of a level `new_page_before`
     /// lists
     fn starts_page(&self, item: &Item) -> bool {
         let level = item.heading_level();

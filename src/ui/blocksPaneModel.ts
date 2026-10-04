@@ -15,7 +15,7 @@ import {
 // in main.scss
 export const BLOCKS_DOCK = 248;
 
-// the tiles of a row
+// the tiles of a row: $tile-columns in main.scss
 export const TILE_COLUMNS = 2;
 
 /**
@@ -62,27 +62,53 @@ export const groupsOf = (
 };
 
 /**
- * tileStep returns the index of the tile a key moves to from `index`, in a
- * grid of `count` tiles in rows of `columns`: ←→ to the one before and
- * after, ↑↓ a row up and down, Home and End to the first and last; null for
- * another key. ↑ in the first row returns -1, for the search above.
+ * tileStep returns the index of the tile a key moves to from `index`,
+ * counted across all groups, whose grids of `sizes` tiles each have rows of
+ * `columns`: ←→ to the one before and after, ↑↓ a row up and down in the
+ * group's grid and on into the group above or below, in the same column as
+ * far as its row has one, Home and End to the first and last; null for
+ * another key. ↑ in the first row of the first group returns -1, for the
+ * search above.
  */
 export const tileStep = (
   key: string,
   index: number,
-  count: number,
+  sizes: readonly number[],
   columns = TILE_COLUMNS,
 ): number | null => {
+  const count = sizes.reduce((sum, size) => sum + size, 0);
   const last = count - 1;
+  // the group of `index`, where it starts, and the tile's place in it
+  let group = 0;
+  let start = 0;
+  while (group < sizes.length - 1 && index >= start + sizes[group]) {
+    start += sizes[group];
+    group++;
+  }
+  const inGroup = index - start;
+  const column = inGroup % columns;
   switch (key) {
     case "ArrowLeft":
       return Math.max(0, index - 1);
     case "ArrowRight":
       return Math.min(last, index + 1);
-    case "ArrowUp":
-      return index - columns;
-    case "ArrowDown":
-      return index + columns <= last ? index + columns : index;
+    case "ArrowUp": {
+      if (inGroup >= columns) return index - columns;
+      if (group === 0) return -1;
+      // the last row of the group above
+      const size = sizes[group - 1];
+      const row = Math.floor((size - 1) / columns) * columns;
+      return start - size + Math.min(row + column, size - 1);
+    }
+    case "ArrowDown": {
+      const size = sizes[group];
+      const lastRow = Math.floor((size - 1) / columns) * columns;
+      if (inGroup < lastRow)
+        return start + Math.min(inGroup + columns, size - 1);
+      if (group === sizes.length - 1) return index;
+      // the first row of the group below
+      return start + size + Math.min(column, sizes[group + 1] - 1);
+    }
     case "Home":
       return 0;
     case "End":

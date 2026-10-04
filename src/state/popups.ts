@@ -38,7 +38,8 @@ export interface ToolbarItem {
   enabled: boolean;
   // for buttons that switch something on and off
   checked?: boolean;
-  // its key in table mode, e.g. "↑"
+  // its key: shown in table mode, e.g. "↑", and on the block toolbar in
+  // its tooltip
   key?: string;
   run(): void;
 }

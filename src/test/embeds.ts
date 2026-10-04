@@ -1,7 +1,7 @@
 import type { EmbedType } from "../embeds/registry";
 
 // A type of embed for the tests, as a plugin would bring one: a box of a
-// colour, its data `{ "color": … }`.
+// color, its data `{ "color": … }`.
 
 export const box = (color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60"><rect width="120" height="60" fill="${color}"/></svg>`;
@@ -13,7 +13,7 @@ export const box = (color: string) =>
 export const boxType = (colors: string[]): EmbedType => ({
   type: "org.blank.test/box@1",
   name: "Box",
-  description: "A box of a colour",
+  description: "A box of a color",
   edit: async () => {
     const color = colors.shift();
     return color

@@ -36,10 +36,27 @@ import {
   readBlocks,
   toggleBlocksPane,
 } from "./contentBlocks";
+import { boxOnCaretPage } from "../plugins/followLayout";
+
+// the pages show every block at the same box, unless a test hides them
+vi.mock("../plugins/followLayout", () => ({
+  boxOnCaretPage: vi.fn(() => ({
+    page: 0,
+    left: 10,
+    top: 20,
+    right: 110,
+    bottom: 60,
+  })),
+}));
 
 const toc = (attrs = {}) => schema.node("toc", attrs);
 
+// the embed type a test registered
+let unregister = () => {};
+
 afterEach(() => {
+  unregister();
+  unregister = () => {};
   blocksPaneOpen.value = false;
   blocksPaneFocused.value = false;
   blocksPaneSearch.value = null;
@@ -144,7 +161,7 @@ describe("the blocks pane", () => {
   });
 
   it("offers the drawings of the types Blank has", async () => {
-    const unregister = registerEmbedType(boxType(["red"]));
+    unregister = registerEmbedType(boxType(["red"]));
     const choices = await read();
     expect(choices[choices.length - 1]).toMatchObject({
       id: "org.blank.test/box@1",
@@ -155,7 +172,24 @@ describe("the blocks pane", () => {
     insertBlock("org.blank.test/box@1")(view.state, view.dispatch, view);
     await flushPromises();
     expect(view.state.doc.child(0).type.name).toBe("embed");
-    unregister();
+  });
+
+  it("drops a drawing where the cursor is once the text changed meanwhile", async () => {
+    unregister = registerEmbedType(boxType(["red"]));
+    await read();
+    const view = createTestView(
+      createState(doc(p("a"), p("b")), { cursor: 2 }),
+    );
+    // dropped between the paragraphs, while its editor is open
+    insertBlock("org.blank.test/box@1", 3)(view.state, view.dispatch, view);
+    view.dispatch(view.state.tr.insertText("xyz", 1));
+    await flushPromises();
+    const names: string[] = [];
+    view.state.doc.forEach((node) => names.push(node.type.name));
+    // after the paragraph the cursor is in, not at the old place, which
+    // is inside the first paragraph now
+    expect(names).toEqual(["paragraph", "embed", "paragraph"]);
+    expect(view.state.doc.child(0).textContent).toBe("xyza");
   });
 
   it("puts in a form with its definition, selected", async () => {
@@ -219,6 +253,19 @@ describe("editToc", () => {
     expect(editToc()(view.state, view.dispatch, view)).toBe(true);
     expect(tocPopover.value).toBeNull();
     expect(close).toHaveBeenCalled();
+  });
+
+  it("opens nothing while the table of contents isn't shown", () => {
+    vi.mocked(boxOnCaretPage).mockReturnValueOnce(null);
+    const view = selected();
+    expect(editToc()(view.state, view.dispatch, view)).toBe(true);
+    expect(tocPopover.value).toBeNull();
+  });
+
+  it("opens below the table of contents", () => {
+    const view = selected();
+    editToc()(view.state, view.dispatch, view);
+    expect(tocPopover.value?.anchor).toMatchObject({ right: 110, bottom: 60 });
   });
 
   it("changes nothing for settings it already has", () => {

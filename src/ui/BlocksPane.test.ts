@@ -28,6 +28,14 @@ const key = (target: Element, key: string, init: KeyboardEventInit = {}) =>
     new KeyboardEvent("keydown", { key, bubbles: true, ...init }),
   );
 
+// jsdom's window is 1024 px wide; a test that narrows it gets it back
+const WIDTH = window.innerWidth;
+const resize = async (width: number) => {
+  window.innerWidth = width;
+  window.dispatchEvent(new Event("resize"));
+  await nextTick();
+};
+
 describe("the blocks pane", () => {
   let dispose = () => {};
   let editor: EditorHandle;
@@ -52,11 +60,12 @@ describe("the blocks pane", () => {
     await nextTick();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     blocksPaneOpen.value = false;
     blockChoices.value = [];
     announcement.value = null;
     dispose();
+    await resize(WIDTH);
   });
 
   it("is a region with a heading, the tiles in their groups", () => {
@@ -94,18 +103,18 @@ describe("the blocks pane", () => {
   });
 
   it("floats over the pages at a narrow window, and goes on a press elsewhere", async () => {
-    const width = window.innerWidth;
-    window.innerWidth = 800;
-    window.dispatchEvent(new Event("resize"));
-    await nextTick();
+    await resize(800);
     expect(pane()!.classList.contains("floating")).toBe(true);
     expect(document.body.classList.contains("blocks-docked")).toBe(false);
     tile("toc").dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(blocksPaneOpen.value).toBe(true);
+    // going while it has the focus, it leaves the focus to the text
+    const focus = vi.spyOn(editor, "focus");
+    search().focus();
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(blocksPaneOpen.value).toBe(false);
-    window.innerWidth = width;
-    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(focus).toHaveBeenCalled();
   });
 
   it("inserts a block where the cursor is on a click, and says so", () => {
@@ -142,16 +151,55 @@ describe("the blocks pane", () => {
     search().focus();
     key(search(), "ArrowDown");
     expect(document.activeElement).toBe(tile("toc"));
-    key(tile("toc"), "ArrowRight");
+    // down into the group below, though the table of contents is alone
+    key(tile("toc"), "ArrowDown");
     expect(document.activeElement).toBe(tile("blank/recipe"));
+    key(tile("blank/recipe"), "ArrowRight");
+    expect(document.activeElement).toBe(tile("user/broken"));
     await nextTick();
     // one tile in the tab order: the current one
-    expect(tiles().map((tile) => tile.tabIndex)).toEqual([-1, 0, -1]);
-    key(tile("blank/recipe"), "ArrowDown");
-    expect(document.activeElement).toBe(tile("blank/recipe"));
-    key(tile("blank/recipe"), "ArrowLeft");
+    expect(tiles().map((tile) => tile.tabIndex)).toEqual([-1, -1, 0]);
+    key(tile("user/broken"), "ArrowUp");
+    expect(document.activeElement).toBe(tile("toc"));
     key(tile("toc"), "ArrowUp");
     expect(document.activeElement).toBe(search());
+  });
+
+  it("starts a new search at its first tile", async () => {
+    search().focus();
+    key(search(), "ArrowDown");
+    key(tile("toc"), "End");
+    await nextTick();
+    expect(tile("user/broken").tabIndex).toBe(0);
+    search().value = "reci";
+    search().dispatchEvent(new Event("input"));
+    await nextTick();
+    expect(tile("blank/recipe").tabIndex).toBe(0);
+    key(search(), "ArrowDown");
+    expect(document.activeElement).toBe(tile("blank/recipe"));
+  });
+
+  it("inserts on a click after a drag that went nowhere", async () => {
+    // a drag that ended without the click that would have come after it
+    const drag = (type: string, x: number, buttons = 1) =>
+      tile("toc").dispatchEvent(
+        Object.assign(new Event(type, { bubbles: true }), {
+          clientX: x,
+          clientY: 10,
+          button: 0,
+          buttons,
+          pointerId: 1,
+        }),
+      );
+    // off the pages: jsdom has no elementFromPoint
+    document.elementFromPoint = () => document.body;
+    drag("pointerdown", 10);
+    drag("pointermove", 60);
+    drag("pointerup", 60, 0);
+    await new Promise((done) => setTimeout(done));
+    tile("toc").click();
+    expect(editor.view.state.doc.child(1).type.name).toBe("toc");
+    delete (document as Partial<Document>).elementFromPoint;
   });
 
   it("inserts the first block found on Enter in the search", () => {

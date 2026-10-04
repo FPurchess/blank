@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Node } from "prosemirror-model";
+import { Fragment, type Node, Slice } from "prosemirror-model";
 import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
-import { createForm, schema } from "../../markdown";
+import {
+  checkDefinition,
+  createForm,
+  type Definition,
+  definitionKey,
+  schema,
+} from "../../markdown";
 import { announcement, blockToolbar, tocPopover } from "../../state";
 import { flushPromises } from "../../test/async";
-import { doc, keyEvent, p } from "../../test/editor";
+import { doc, keyEvent, li, p, ul } from "../../test/editor";
 import { box, boxType } from "../../test/embeds";
 import { registerEmbedType } from "../../embeds/registry";
 import { RECIPE, RECIPE_KEY } from "../../test/forms";
@@ -21,6 +27,8 @@ vi.mock("../../engine/geometry", () => ({
 }));
 
 let view: EditorView;
+// the embed type a test registered
+let unregister = () => {};
 
 // a document with a table of contents and a recipe between paragraphs
 const withBlocks = () =>
@@ -67,6 +75,8 @@ describe("blockTools", () => {
   });
 
   afterEach(() => {
+    unregister();
+    unregister = () => {};
     view.destroy();
     tocPopover.value = null;
   });
@@ -85,6 +95,8 @@ describe("blockTools", () => {
       anchor: { left: 10, top: 20, right: 110, bottom: 60 },
     });
     expect(ids()).toEqual(["block-remove"]);
+    // Backspace deletes text in a field, so the tooltip names no key
+    expect(blockToolbar.value!.items[0].key).toBeUndefined();
     run("block-remove");
     expect(posOf("form_block")).toBe(-1);
     expect(announcement.value?.text).toBe("Recipe removed");
@@ -136,12 +148,11 @@ describe("blockTools", () => {
     select((doc) => NodeSelection.create(doc, posOf("embed")));
     expect(blockToolbar.value?.label).toBe("A red box");
     expect(ids()).toEqual(["block-remove"]);
-    const unregister = registerEmbedType(boxType([]));
+    unregister = registerEmbedType(boxType([]));
     // a new selection of the same embed asks again
     select((doc) => TextSelection.create(doc, 1));
     select((doc) => NodeSelection.create(doc, posOf("embed")));
     expect(ids()).toEqual(["block-edit", "block-remove"]);
-    unregister();
   });
 
   it("edits the selected table of contents or embed on Enter", async () => {
@@ -159,14 +170,13 @@ describe("blockTools", () => {
     // an embed of a type Blank doesn't have: Enter is the editor's
     select((doc) => NodeSelection.create(doc, posOf("embed")));
     expect(enter()).toBeFalsy();
-    const unregister = registerEmbedType(boxType(["blue"]));
+    unregister = registerEmbedType(boxType(["blue"]));
     expect(enter()).toBe(true);
     await flushPromises();
     expect(view.state.doc.nodeAt(posOf("embed"))!.attrs).toMatchObject({
       id: "k3x9",
       svg: box("blue"),
     });
-    unregister();
   });
 
   it("goes into a selected form's first field on Enter or typing", () => {
@@ -184,6 +194,47 @@ describe("blockTools", () => {
     expect(typed).toBe(true);
     expect(posOf("form_block")).toBe(form);
     expect(view.state.selection.$from.parent.textContent).toBe("P");
+  });
+
+  it("enters a form whose first field is a table under its header row", () => {
+    const prices = checkDefinition({
+      id: "user/prices",
+      version: 1,
+      name: "Prices",
+      fields: [
+        {
+          name: "prices",
+          kind: "table",
+          label: "Prices",
+          columns: ["Item", "Price"],
+        },
+      ],
+    }) as Definition;
+    const key = definitionKey(prices);
+    mount(
+      schema.node("doc", { definitions: { [key]: prices } }, [
+        p("a"),
+        createForm(prices, key),
+        p("b"),
+      ]),
+    );
+    select((doc) => NodeSelection.create(doc, posOf("form_block")));
+    view.someProp("handleKeyDown", (f) => f(view, keyEvent("Enter")));
+    const { $from } = view.state.selection;
+    expect($from.node(-1).type.name).toBe("table_cell");
+    // in the row under the header, so typing leaves the columns' names
+    expect($from.index(-3)).toBe(1);
+  });
+
+  it("pastes content blocks after the list the cursor is in", () => {
+    mount(doc(ul(li(p("a"))), p("b")));
+    select((doc) => TextSelection.create(doc, 3));
+    const slice = new Slice(Fragment.from(schema.node("toc")), 0, 0);
+    const pasted = view.someProp("handlePaste", (f) =>
+      f(view, new Event("paste") as ClipboardEvent, slice),
+    );
+    expect(pasted).toBe(true);
+    expect(view.state.doc.child(1).type.name).toBe("toc");
   });
 
   it("leaves a table in a form to the table's toolbar", () => {

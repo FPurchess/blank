@@ -93,7 +93,7 @@ describe("geometry", () => {
     // in the upper half of the intro, before it; in the lower half, after
     expect(gapAt(node, x, intro.top + 1)).toBe(0);
     expect(gapAt(node, x, intro.bottom - 1)).toBe(7);
-    // halfway between the intro and the table, across the intro's width
+    // halfway between the intro and the table, across the width of the block below
     const [table] = blockBoxes(7, 7 + node.child(1).nodeSize);
     const line = gapLine(node, 7)!;
     expect(line.y).toBeCloseTo((intro.bottom + table.top) / 2);

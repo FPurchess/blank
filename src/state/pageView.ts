@@ -72,8 +72,8 @@ export const pageComposition = shallowRef<PageRect[]>([]);
 export const pageDropCaret = shallowRef<PageRect | null>(null);
 
 // where a dragged block would drop, a place between two blocks at the top of
-// the document, which DropLine.vue shows as a line; null while no block is
-// dragged
+// the document, which src/ui/BlockMarks.vue shows as a line; null while no
+// block is dragged
 export const pageDropGap = shallowRef<number | null>(null);
 
 // the content block under the pointer, which the page view outlines with a

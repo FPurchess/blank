@@ -552,6 +552,12 @@ const onHover = (event: MouseEvent) => {
   hoverPicture.value = pictureBoxAt(editor.view.state, pointer);
   hoverBlock(contentBlockAt(editor.view.state.doc, pointer.pos));
 };
+// the pointer left the pages: nothing is under it
+const onLeave = () => {
+  hoverLink.value = null;
+  hoverPicture.value = false;
+  hoverBlock(null);
+};
 // the content block under the pointer, which BlockMarks.vue outlines
 const hoverBlock = (block: { from: number; to: number } | null) => {
   const was = pageHoverBlock.value;
@@ -640,11 +646,7 @@ onUnmounted(() => {
     @dragleave="showDropAt(editor.view, null)"
     @drop="onDrop"
     @mousemove="onHover"
-    @mouseleave="
-      hoverLink = null;
-      hoverPicture = false;
-      hoverBlock(null);
-    "
+    @mouseleave="onLeave"
     @contextmenu="onContextMenu"
   >
     <div

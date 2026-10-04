@@ -87,11 +87,17 @@ describe("a form", () => {
   });
 
   it("shows the photo beside the ingredients", async () => {
-    const photo = await caretAt('#editor [data-blank-field="photo"] p');
-    const ingredients = await caretAt(
-      '#editor [data-blank-field="ingredients"] th',
-    );
-    const steps = await caretAt('#editor [data-blank-field="steps"] p');
+    // once the pages show the form
+    const places = async () => ({
+      photo: await caretAt('#editor [data-blank-field="photo"] p'),
+      ingredients: await caretAt('#editor [data-blank-field="ingredients"] th'),
+      steps: await caretAt('#editor [data-blank-field="steps"] p'),
+    });
+    await browser.waitUntil(async () => {
+      const { photo, ingredients, steps } = await places();
+      return !!photo && !!ingredients && !!steps;
+    });
+    const { photo, ingredients, steps } = await places();
     if (!photo || !ingredients || !steps) throw new Error("not on the pages");
     // side by side, from the same top; the steps below, across the page
     expect(ingredients.left).toBeGreaterThan(photo.left + 100);
@@ -126,13 +132,17 @@ describe("a form", () => {
   });
 
   it("is saved with its definition, and back after a restart", async () => {
+    // off the form Escape selected, onto the paragraph after it
     await type(Key.ArrowDown);
     await pressMod("s");
-    await browser.waitUntil(
-      () =>
+    await browser
+      .waitUntil(() =>
         fs.readFileSync(file, "utf8").includes("<!-- /blank:definitions -->"),
-      { timeoutMsg: `not saved: ${fs.readFileSync(file, "utf8")}` },
-    );
+      )
+      .catch(() => {
+        // the file then, not when the wait began
+        throw new Error(`not saved: ${fs.readFileSync(file, "utf8")}`);
+      });
     const saved = fs.readFileSync(file, "utf8");
     expect(saved).toContain('<!-- blank:form@1 def="blank/recipe@2#');
     expect(saved).toContain("| 200 g");

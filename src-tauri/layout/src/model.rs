@@ -460,7 +460,7 @@ pub struct Item {
     /// whether the quote bars reach down to the next item
     #[serde(default, rename = "barsContinue")]
     pub bars_continue: bool,
-    /// whether it starts a new page, e.g. a form whose template says so
+    /// whether it starts a new page, e.g. a form whose definition says so
     #[serde(default, rename = "pageStart")]
     pub page_start: bool,
     /// the column of a grid it stands in, if it does; its indent and bars

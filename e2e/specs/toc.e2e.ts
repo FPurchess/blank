@@ -14,7 +14,7 @@ import {
 } from "../helpers.ts";
 
 // A table of contents: inserted from the blocks pane, its page numbers on
-// the pages, following a heading as it is renamed, its dialog on Enter, and
+// the pages, following a heading as it is renamed, its settings on Enter, and
 // saved as its marker line.
 
 const file = path.join(
@@ -76,10 +76,12 @@ describe("a table of contents", () => {
     await pressMod(Key.Alt, "b");
     await expect($("#blocks-pane")).not.toBeExisting();
     expect(await entries()).toEqual(["one", "two"]);
-    await browser.waitUntil(
-      async () => JSON.stringify(await numbers()) === '[["1","2"]]',
-      { timeoutMsg: `the numbers are ${JSON.stringify(await numbers())}` },
-    );
+    await browser
+      .waitUntil(async () => JSON.stringify(await numbers()) === '[["1","2"]]')
+      .catch(async () => {
+        // the numbers then, not when the wait began
+        throw new Error(`the numbers are ${JSON.stringify(await numbers())}`);
+      });
   });
 
   it("follows a heading as it is renamed", async () => {
@@ -92,22 +94,12 @@ describe("a table of contents", () => {
   });
 
   it("opens its settings on Enter once selected, which apply at once", async () => {
-    // the table of contents is still there after `step`
-    const kept = async (step: string) => {
-      const blocks = await browser.execute(() =>
-        window.blankGeometry.topBlocks().map((block) => block.type),
-      );
-      if (!blocks.includes("toc"))
-        throw new Error(`gone after ${step}: ${blocks.join(", ")}`);
-    };
     // from the paragraph above it, down onto it
     await clickInto("#editor p");
     await type(Key.ArrowDown);
-    await kept("the arrow down");
     await type(Key.Enter);
     await expect($("#toc-popover")).toBeDisplayed();
     await expect($("#toc-popover-depth")).toBeFocused();
-    await kept("Enter");
     // only the headings 1: WebKitWebDriver's selectByIndex fires no change
     // event, so the choice is made as the select makes it
     await browser.execute(() => {
@@ -116,11 +108,15 @@ describe("a table of contents", () => {
       select.value = "1";
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    await kept("the change of depth");
-
     await type(Key.Escape);
     await expect($("#toc-popover")).not.toBeExisting();
-    await kept("Escape");
+    // Esc closes them and nothing more: the rest of its press never reaches
+    // the selected table of contents as typing
+    expect(
+      await browser.execute(() =>
+        window.blankGeometry.topBlocks().map((block) => block.type),
+      ),
+    ).toContain("toc");
   });
 
   it("is saved as one line, and back after a restart", async () => {

@@ -57,17 +57,17 @@ const userForms = async (): Promise<Form[]> => {
       }
     }
     // two files of one name in other letters, like Recipe.yml and
-    // recipe.yaml, would be one id
-    const seen = new Set<string>();
+    // recipe.yaml, would be one id: the first keeps it, and the others,
+    // which can't be used, get ids of their own, so each stays apart
+    const seen = new Map<string, number>();
     return forms
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((form) => {
-        if (!seen.has(form.id)) {
-          seen.add(form.id);
-          return form;
-        }
+        const count = seen.get(form.id) ?? 0;
+        seen.set(form.id, count + 1);
+        if (count === 0) return form;
         const definition = `another file of the forms folder has the name ${form.id.slice("user/".length)}`;
-        return { ...form, definition };
+        return { id: `${form.id}~${count + 1}`, definition };
       });
   } catch (error) {
     console.warn("failed to read the forms", error);

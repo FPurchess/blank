@@ -2,6 +2,7 @@ import type { Node, ResolvedPos } from "prosemirror-model";
 import { findTable, TableMap } from "prosemirror-tables";
 
 import { schema } from "../../../markdown";
+import { isContentBlock } from "../../../markdown/blocks/names";
 
 /**
  * isCell tells whether `node` is a table cell or header cell
@@ -60,7 +61,7 @@ export const tableAround = ($pos: ResolvedPos): TableAt | undefined => {
  * src/markdown/blocks/rules.ts), which the cursor can only select
  */
 export const standsApart = (node: Node) =>
-  node.type === schema.nodes.table || node.type.isInGroup("top_block");
+  node.type === schema.nodes.table || isContentBlock(node);
 
 /**
  * keepsParagraphAfter tells whether Blank keeps a paragraph after the child

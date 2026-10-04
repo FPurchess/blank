@@ -46,22 +46,40 @@ describe("groupsOf", () => {
 
 describe("tileStep", () => {
   it("moves along the rows of two tiles", () => {
-    expect(tileStep("ArrowRight", 0, 5)).toBe(1);
-    expect(tileStep("ArrowRight", 4, 5)).toBe(4);
-    expect(tileStep("ArrowLeft", 0, 5)).toBe(0);
-    expect(tileStep("ArrowDown", 1, 5)).toBe(3);
-    expect(tileStep("ArrowDown", 3, 5)).toBe(3);
-    expect(tileStep("ArrowUp", 3, 5)).toBe(1);
-    expect(tileStep("Home", 3, 5)).toBe(0);
-    expect(tileStep("End", 0, 5)).toBe(4);
+    expect(tileStep("ArrowRight", 0, [5])).toBe(1);
+    expect(tileStep("ArrowRight", 4, [5])).toBe(4);
+    expect(tileStep("ArrowLeft", 0, [5])).toBe(0);
+    expect(tileStep("ArrowDown", 1, [5])).toBe(3);
+    expect(tileStep("ArrowUp", 3, [5])).toBe(1);
+    expect(tileStep("Home", 3, [5])).toBe(0);
+    expect(tileStep("End", 0, [5])).toBe(4);
   });
 
-  it("goes up to the search from the first row", () => {
-    expect(tileStep("ArrowUp", 1, 5)).toBeLessThan(0);
+  it("goes down to the last tile of a shorter last row, and stays there", () => {
+    expect(tileStep("ArrowDown", 3, [5])).toBe(4);
+    expect(tileStep("ArrowDown", 4, [5])).toBe(4);
+  });
+
+  it("goes on into the group below and above, in the same column", () => {
+    // the table of contents alone, then three forms
+    const sizes = [1, 3];
+    expect(tileStep("ArrowDown", 0, sizes)).toBe(1);
+    expect(tileStep("ArrowUp", 1, sizes)).toBe(0);
+    // from the second column, into a group whose row has one
+    expect(tileStep("ArrowUp", 2, sizes)).toBe(0);
+    expect(tileStep("ArrowDown", 2, [3, 2])).toBe(3);
+    expect(tileStep("ArrowDown", 1, [2, 2])).toBe(3);
+    expect(tileStep("ArrowUp", 4, [3, 2])).toBe(2);
+    expect(tileStep("ArrowUp", 3, [3, 2])).toBe(2);
+  });
+
+  it("goes up to the search from the first row of the first group", () => {
+    expect(tileStep("ArrowUp", 1, [5])).toBeLessThan(0);
+    expect(tileStep("ArrowUp", 0, [1, 3])).toBeLessThan(0);
   });
 
   it("leaves other keys alone", () => {
-    expect(tileStep("a", 1, 5)).toBeNull();
+    expect(tileStep("a", 1, [5])).toBeNull();
   });
 });
 

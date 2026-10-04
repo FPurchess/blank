@@ -53,9 +53,11 @@ describe("loadForms", () => {
     );
     const [first, second] = (await loadForms()).slice(1);
     expect(first.definition).toMatchObject({ id: "user/note" });
-    expect(second.definition).toBe(
-      "another file of the forms folder has the name note",
-    );
+    // an id of its own, so the one that can be used stays apart from it
+    expect(second).toEqual({
+      id: "user/note~2",
+      definition: "another file of the forms folder has the name note",
+    });
   });
 
   it("does without the folder when it can't be read", async () => {

@@ -3,8 +3,8 @@ import { keydownHandler } from "prosemirror-keymap";
 import {
   computed,
   nextTick,
+  onBeforeUnmount,
   onMounted,
-  onUnmounted,
   shallowRef,
   useTemplateRef,
   watch,
@@ -50,11 +50,16 @@ const query = shallowRef("");
 
 const groups = computed(() => groupsOf(blockChoices.value, query.value));
 const tiles = computed(() => groups.value.flatMap(({ choices }) => choices));
-// the tile in the tab order, by its index in `tiles`
-const current = shallowRef(0);
-const currentId = computed(
-  () => tiles.value[Math.min(current.value, tiles.value.length - 1)]?.id,
+const sizes = computed(() => groups.value.map(({ choices }) => choices.length));
+// the tile in the tab order, by its id; the first one shown while it isn't
+const chosen = shallowRef<string | null>(null);
+const currentId = computed(() =>
+  tiles.value.some(({ id }) => id === chosen.value)
+    ? chosen.value
+    : tiles.value[0]?.id,
 );
+// a new search starts again at its first tile
+watch(query, () => (chosen.value = null));
 
 const windowWidth = useWindowWidth();
 const docked = computed(() => windowWidth.value >= OUTLINE_BREAKPOINT);
@@ -64,10 +69,7 @@ useBodyClass("blocks-docked", () => docked.value);
 useDismiss(
   () => [root.value],
   () => {
-    if (!docked.value) {
-      blocksPaneOpen.value = false;
-      blocksPaneFocused.value = false;
-    }
+    if (!docked.value) blocksPaneOpen.value = false;
   },
 );
 
@@ -94,14 +96,19 @@ const onFocusOut = (event: FocusEvent) => {
   if (!root.value?.contains(event.relatedTarget as Node | null))
     blocksPaneFocused.value = false;
 };
-onUnmounted(() => (blocksPaneFocused.value = false));
+// going while it has the focus, the pane leaves it to the text, not to the
+// body, where typing would go nowhere
+onBeforeUnmount(() => {
+  if (root.value?.contains(document.activeElement)) editor.focus();
+  blocksPaneFocused.value = false;
+});
 
 const tileButtons = () => [
   ...(root.value?.querySelectorAll<HTMLElement>(".tile") ?? []),
 ];
 
 const focusTile = (index: number) => {
-  current.value = index;
+  chosen.value = tiles.value[index]?.id ?? null;
   tileButtons()[index]?.focus();
 };
 
@@ -139,7 +146,12 @@ const onKeyDown = (event: KeyboardEvent) => {
 const onSearchKey = (event: KeyboardEvent) => {
   if (event.key === "ArrowDown" && tiles.value.length > 0) {
     event.preventDefault();
-    focusTile(Math.min(current.value, tiles.value.length - 1));
+    focusTile(
+      Math.max(
+        0,
+        tiles.value.findIndex(({ id }) => id === currentId.value),
+      ),
+    );
   } else if (event.key === "Enter") {
     event.preventDefault();
     const first = tiles.value.find((tile) => !tile.disabled);
@@ -154,7 +166,7 @@ const onTileKey = (event: KeyboardEvent) => {
   const tile = tileOf(event);
   if (!tile) return;
   const index = tileButtons().indexOf(tile);
-  const next = tileStep(event.key, index, tiles.value.length);
+  const next = tileStep(event.key, index, sizes.value);
   if (next === null) return;
   event.preventDefault();
   if (next < 0) search.value?.focus();
@@ -171,16 +183,19 @@ const drag = tileDrag({
 listenOnWindow("keydown", (event) => {
   if (event.key === "Escape" && drag.dragging) drag.cancel();
 });
-// the click that ends a drag inserts nothing more
+// the click that ends a drag inserts nothing more: it comes right after
+// the release, if it comes at all, so the flag lasts until the next task
 let dragged = false;
 
 const onPointerDown = (event: PointerEvent) => {
+  dragged = false;
   const tile = tileOf(event);
   if (tile && tile.getAttribute("aria-disabled") !== "true")
     drag.down(event, tile.dataset.block!);
 };
 const onPointerUp = (event: PointerEvent) => {
   dragged = drag.up(event);
+  if (dragged) setTimeout(() => (dragged = false));
 };
 const onClick = (event: MouseEvent) => {
   const tile = tileOf(event);
@@ -189,7 +204,7 @@ const onClick = (event: MouseEvent) => {
     return;
   }
   if (!tile) return;
-  current.value = tileButtons().indexOf(tile);
+  chosen.value = tile.dataset.block!;
   insert(tile.dataset.block!);
 };
 
@@ -204,7 +219,6 @@ const onMouseDown = (event: MouseEvent) => {
   <section
     id="blocks-pane"
     ref="root"
-    class="side-pane"
     :class="{ docked, floating: !docked }"
     aria-labelledby="blocks-pane-title"
     @focusin="onFocusIn"

@@ -77,11 +77,11 @@ describe("arguments", () => {
     const marker = {
       name: "form",
       format: 1,
-      args: { template: "blank/recipe@2", def: "9f3c1a2b" },
+      args: { def: "blank/recipe@2#9f3c1a2b", note: "kept" },
     };
-    const line = formatMarker(marker, ["template", "def"]);
+    const line = formatMarker(marker, ["def", "note"]);
     expect(line).toBe(
-      '<!-- blank:form@1 template="blank/recipe@2" def="9f3c1a2b" -->',
+      '<!-- blank:form@1 def="blank/recipe@2#9f3c1a2b" note="kept" -->',
     );
     expect(parseMarker(line)).toEqual({ close: false, ...marker });
     expect(closeMarker("form")).toBe("<!-- /blank:form -->");

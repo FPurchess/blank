@@ -1,4 +1,5 @@
 import type { Node } from "prosemirror-model";
+import { isHistoryTransaction } from "prosemirror-history";
 import { Plugin, PluginKey, type Transaction } from "prosemirror-state";
 
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
@@ -18,7 +19,7 @@ const key = new PluginKey<readonly string[]>("blockRemovals");
 const says = (tr: Transaction) =>
   tr.docChanged &&
   tr.getMeta("uiEvent") !== "drop" &&
-  !tr.getMeta("history$") &&
+  !isHistoryTransaction(tr) &&
   tr.getMeta("addToHistory") !== false;
 
 /**
@@ -26,7 +27,7 @@ const says = (tr: Transaction) =>
  * removed: those whose range it deleted, without a block of the same kind
  * in its place (as when a table of contents' settings change it)
  */
-export const removedBlocks = (doc: Node, tr: Transaction): string[] => {
+const removedBlocks = (doc: Node, tr: Transaction): string[] => {
   const names: string[] = [];
   doc.forEach((node, pos) => {
     if (!isContentBlock(node)) return;

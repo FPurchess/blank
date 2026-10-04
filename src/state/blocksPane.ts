@@ -34,13 +34,11 @@ export const blockChoices = shallowRef<readonly BlockChoice[]>([]);
 
 // asks the pane to put the focus into its search: a new object each time,
 // so asking twice does it twice
-export const blocksPaneSearch = shallowRef<{ id: number } | null>(null);
-
-let asked = 0;
+export const blocksPaneSearch = shallowRef<object | null>(null);
 
 /**
  * focusBlocksSearch asks the pane to put the focus into its search
  */
 export const focusBlocksSearch = () => {
-  blocksPaneSearch.value = { id: ++asked };
+  blocksPaneSearch.value = {};
 };

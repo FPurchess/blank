@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { scrollToHeading } from "../../engine/geometry";
 import { schema } from "../../markdown";
-import { headings, headingsOf, tocPopover } from "../../state";
+import { listedHeadings } from "../../markdown/headings";
+import { headings, tocPopover } from "../../state";
 import { doc, h } from "../../test/editor";
 import { PAGE_PRESS, type PagePointer } from "../pagePointer";
 import { followEntry, toc } from "./toc";
@@ -21,7 +22,7 @@ const contents = (depth = 2) =>
 const mount = (
   node = doc(contents(), h(1, "One"), h(3, "Deep"), h(2, "Two")),
 ) => {
-  headings.value = headingsOf(node);
+  headings.value = listedHeadings(node);
   const view = new EditorView(document.createElement("div"), {
     state: EditorState.create({ schema, doc: node, plugins: [toc()] }),
   });
@@ -92,7 +93,7 @@ describe("toc plugin", () => {
     // and follows them as they change: the headings plugin publishes them
     const rename = (tr: Transaction) => {
       view!.dispatch(tr);
-      headings.value = headingsOf(view!.state.doc);
+      headings.value = listedHeadings(view!.state.doc);
     };
     rename(view.state.tr.insertText("ly", 5));
     expect([...nav.querySelectorAll("li")].map((li) => li.textContent)).toEqual(

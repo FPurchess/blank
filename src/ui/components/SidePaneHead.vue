@@ -22,7 +22,6 @@ const emit = defineEmits<{ hide: [] }>();
   <header class="side-pane-head">
     <h2 :id="titleId" class="side-pane-title">{{ title }}</h2>
     <IconButton
-      class="side-pane-hide"
       :icon="hideIcon"
       :label="hideLabel"
       :command="command"

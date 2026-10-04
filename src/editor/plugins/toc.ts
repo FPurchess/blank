@@ -6,7 +6,6 @@ import { watch } from "vue";
 import { scrollToHeading } from "../../engine/geometry";
 import { listedHeadings } from "../../markdown/headings";
 import { headings } from "../../state";
-import { pasteTopBlocks } from "../commands/contentBlocks";
 import { PAGE_PRESS, type PagePointerEvent } from "../pagePointer";
 import { hasOpenModifier } from "./openLink";
 
@@ -15,9 +14,8 @@ import { hasOpenModifier } from "./openLink";
 // there (see src-tauri/layout/src/engine/display.rs, TOC_LINK). This plugin
 // follows them on Ctrl+Click (Cmd+Click on macOS), as links open, and shows
 // it in the editor's own DOM as a list of the headings: what screen readers
-// read, and what shows without the engine. It also pastes content blocks at
-// the top of the document. Enter on a selected one opens its dialog (see
-// ./blockTools.ts).
+// read, and what shows without the engine. Enter on a selected one opens
+// its settings (see ./blockTools.ts).
 
 // the start of an entry's link, followed by the entry's number, as the
 // engine writes it (TOC_LINK in src-tauri/layout/src/engine/display.rs)
@@ -122,13 +120,12 @@ class TocView implements NodeView {
 }
 
 /**
- * toc follows the entries of tables of contents and opens their dialog, see
- * the comment on top
+ * toc follows the entries of tables of contents and shows them in the
+ * editor's DOM, see the comment on top
  */
 export const toc = () =>
   new Plugin({
     props: {
-      handlePaste: (view, _event, slice) => pasteTopBlocks(view, slice),
       // an entry clicked in the editor's own DOM, without the engine
       handleClick: (view, _pos, event) => {
         if (event.button !== 0 || !hasOpenModifier(event)) return false;

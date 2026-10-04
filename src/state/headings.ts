@@ -11,16 +11,9 @@ import { type ListedHeading, listedHeadings } from "../markdown/headings";
 // whenever they change, and read by the outline (src/ui/DocumentOutline.vue)
 // and the status bar.
 
-export type Heading = ListedHeading;
+export const headings = shallowRef<readonly ListedHeading[]>([]);
 
-export const headings = shallowRef<readonly Heading[]>([]);
-
-/**
- * headingsOf returns the headings of `doc` (see listedHeadings), in order
- */
-export const headingsOf = (doc: Node): Heading[] => listedHeadings(doc);
-
-const same = (a: readonly Heading[], b: readonly Heading[]) =>
+const same = (a: readonly ListedHeading[], b: readonly ListedHeading[]) =>
   a.length === b.length &&
   a.every(
     (heading, index) =>
@@ -34,6 +27,6 @@ const same = (a: readonly Heading[], b: readonly Heading[]) =>
  * so typing in a paragraph after the last heading notifies no one
  */
 export const publishHeadings = (doc: Node) => {
-  const next = headingsOf(doc);
+  const next = listedHeadings(doc);
   if (!same(next, headings.value)) headings.value = next;
 };

@@ -1648,13 +1648,16 @@ body.band-editing #outline {
 
 // the blocks pane's width, BLOCKS_DOCK in src/ui/blocksPaneModel.ts
 $blocks-dock: 248px;
+// the tiles of a row, TILE_COLUMNS there
+$tile-columns: 2;
 
 #blocks-pane {
   @include side-pane(left);
   top: $top-bar-height;
   bottom: $status-height;
-  // above the bars and the outline, below the toolbars, dialogs and menus
-  z-index: 3;
+  // between the bars, above the outline, the table handles and the
+  // toolbars it floats over, below the dialogs and the menus
+  z-index: 6;
   width: $blocks-dock;
   font-size: 0.85rem;
 }
@@ -1696,7 +1699,6 @@ body.without-engine.blocks-docked {
     min-width: 0;
     padding: 0;
     border: 0;
-    outline: none;
     font: inherit;
     color: var(--color);
     background: none;
@@ -1704,11 +1706,6 @@ body.without-engine.blocks-docked {
     &::placeholder {
       color: var(--muted);
     }
-  }
-
-  &:focus-within {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
   }
 }
 
@@ -1730,7 +1727,7 @@ body.without-engine.blocks-docked {
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat($tile-columns, minmax(0, 1fr));
   gap: var(--s2);
 }
 

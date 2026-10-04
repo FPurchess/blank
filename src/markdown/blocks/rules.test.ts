@@ -17,7 +17,7 @@ describe("content blocks Blank can't show", () => {
     const markdown = [
       "# Recipes",
       '<!-- blank:toc@9 depth="3" title="Contents" -->',
-      '<!-- blank:form@1 template="blank/recipe@2" def="9f3c1a2b" -->',
+      '<!-- blank:form@1 def="blank/recipe@2#9f3c1a2b" -->',
       "",
       '<!-- blank:field name="title" -->',
       "# Pancakes",

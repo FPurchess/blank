@@ -81,7 +81,7 @@ describe("a letter", () => {
     fs.writeFileSync(path.join(forms, "letter.yaml"), LETTER);
   });
 
-  it("is put in from the blocks pane, on a page of its own", async () => {
+  it("is put in from the blocks pane", async () => {
     await clickInto("#editor p");
     await type(Key.End);
     await type(Key.Enter);
