@@ -674,12 +674,11 @@ describe("band strips", () => {
       const header = edge("header").querySelector<HTMLElement>(".band-line")!;
       const footer = edge("footer").querySelector<HTMLElement>(".band-line")!;
       expect(header.getAttribute("role")).toBe("button");
-      expect(header.title).toBe(
-        `Edit the header (${formatShortcut("Mod-Alt-h")})`,
-      );
-      expect(footer.title).toBe(
-        `Edit the footer (${formatShortcut("Mod-Alt-f")})`,
-      );
+      // its tooltip (src/ui/tooltipModel.ts)
+      expect(header.dataset.tip).toBe("Edit the header");
+      expect(header.dataset.tipKey).toBe(formatShortcut("Mod-Alt-h"));
+      expect(footer.dataset.tip).toBe("Edit the footer");
+      expect(footer.dataset.tipKey).toBe(formatShortcut("Mod-Alt-f"));
 
       const press = new MouseEvent("mousedown", {
         bubbles: true,

@@ -1,0 +1,246 @@
+// The controls' looks and states (see .claude/rules/design.md), built from
+// the tokens of _tokens.scss: mixins that the existing selectors include, and
+// classes only for what a component uses.
+
+// hover and press only show while a control can be used
+$enabled: ':not(:disabled, [aria-disabled="true"])';
+// the share of the desk's color in a tooltip's shortcut, over the ink (see
+// src/scss/themes.test.ts)
+$tip-key: 75%;
+
+// The states every control shares: under the pointer, pressed, on and
+// disabled; the focus ring is the global one below. `$on: fill` shows a
+// control that is on with a soft fill and its icon in the accent, `$on: text`
+// only turns its text to the accent (status items).
+@mixin states($on: fill) {
+  &#{$enabled}:hover {
+    background: var(--hover);
+  }
+
+  &#{$enabled}:active {
+    background: var(--pressed);
+  }
+
+  &[aria-pressed="true"],
+  &[aria-checked="true"] {
+    @if $on == fill {
+      background: var(--on-fill);
+      color: var(--on-ink);
+    } @else {
+      color: var(--on-text);
+      font-weight: var(--on-weight);
+    }
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.38;
+    background: none;
+  }
+}
+
+// a button that shows only an icon, its box the size it can be hit
+@mixin icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  min-width: var(--control);
+  height: var(--control);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  font: inherit;
+  color: inherit;
+  background: none;
+  @include states;
+}
+
+// a button with text: always with a box, a border or a fill
+@mixin text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  box-sizing: border-box;
+  height: var(--control);
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  font: inherit;
+  color: inherit;
+  background: none;
+  white-space: nowrap;
+  @include states;
+}
+
+// the one button of a surface that does what it's for (Save, Insert, Apply)
+@mixin text-button-primary {
+  border-color: transparent;
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-weight: 500;
+
+  &#{$enabled}:hover,
+  &#{$enabled}:active {
+    background: var(--accent-hover);
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    background: var(--accent);
+  }
+}
+
+// a text button in a bar, without its border until the pointer is over it
+@mixin text-button-quiet {
+  border-color: transparent;
+}
+
+// an item of the status bar: small muted text, an icon at 14px; on, only its
+// text turns to the accent
+@mixin status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: var(--status-item);
+  padding: 0 var(--s2);
+  border: 0;
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: var(--ui-small);
+  line-height: 16px;
+  color: var(--muted);
+  background: none;
+  white-space: nowrap;
+  @include states($on: text);
+
+  &#{$enabled}:hover {
+    color: var(--color);
+  }
+
+  .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  &.icon-only {
+    justify-content: center;
+    width: var(--status-item);
+    padding: 0;
+  }
+}
+
+// the one depth cue: what floats over the window (menus, toolbars, pickers)
+@mixin popover {
+  color: var(--color);
+  background-color: var(--background-color);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  box-shadow: 0 8px 24px var(--popover-shadow);
+}
+
+// a line between groups of controls
+@mixin separator {
+  align-self: stretch;
+  width: 1px;
+  background: var(--line);
+}
+
+// a shortcut written next to a name
+@mixin shortcut {
+  font: 500 11px / 16px var(--font-family);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.icon-button {
+  @include icon-button;
+}
+
+.status-item {
+  @include status-item;
+}
+
+// a line icon of src/icons.ts (IconGlyph); the stroke's width comes from the
+// icon, heavier for the icons of dots
+.icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  &.large {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// the tooltip of the control under the pointer (src/ui/UiTooltip.vue): its
+// name and shortcut, in the desk's color on ink. Above the menus (20)
+.tooltip {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 4px var(--s2);
+  border-radius: var(--r-control);
+  font-size: var(--ui-small);
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--desk-color);
+  background: var(--ink-fill);
+  pointer-events: none;
+  animation: tip-in var(--fade-in) var(--ease);
+
+  kbd {
+    @include shortcut;
+    color: color-mix(in srgb, var(--desk-color) $tip-key, var(--color));
+  }
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+// What acts on a click shows the hand, a text field the text cursor, and
+// what's disabled the arrow. These come before main.scss's own rules, so a
+// more particular cursor there (the grips, the pages) still wins.
+button,
+a[href],
+select,
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"],
+[role="option"],
+[role="radio"],
+[role="switch"] {
+  cursor: pointer;
+}
+
+input:not([type="button"], [type="checkbox"], [type="radio"], :disabled),
+textarea:not(:disabled) {
+  cursor: text;
+}
+
+:disabled,
+[aria-disabled="true"] {
+  cursor: default;
+}
+
+// the ring of keyboard focus. main.scss's `outline: none` on the editors and
+// the menu has the same weight, and wins because it comes later
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

@@ -20,11 +20,15 @@ export const place = (element: HTMLElement, anchor: Anchor, side?: DOMRect) => {
     const above = anchor.top - height - 2;
     top = !side && above >= MARGIN ? above : bottom - height;
   }
-  left = Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
-  top = Math.max(MARGIN, top);
-  element.style.left = `${left}px`;
-  element.style.top = `${top}px`;
+  element.style.left = `${inWindow(left, width)}px`;
+  element.style.top = `${Math.max(MARGIN, top)}px`;
 };
+
+/**
+ * inWindow moves `left` so that `width` from it fits across the window
+ */
+const inWindow = (left: number, width: number) =>
+  Math.max(MARGIN, Math.min(left, window.innerWidth - MARGIN - width));
 
 // the space between the toolbar and the table, which leaves room for the
 // handles on the table's top edge (src/ui/TableHandles.vue), and the
@@ -55,4 +59,22 @@ export const placeToolbar = (element: HTMLElement, anchor: ToolbarAnchor) => {
   );
   element.style.left = `${left}px`;
   element.style.top = `${top}px`;
+};
+
+// the space between a tooltip and its control
+const TIP_GAP = 6;
+// a control this wide, like a band's line, has its tooltip at the pointer
+const TIP_WIDE = 160;
+
+/**
+ * placeTip puts a tooltip above its control, centered on it, or below it
+ * where the top bar leaves no room; on a wide control, at the pointer's `x`
+ */
+export const placeTip = (element: HTMLElement, target: DOMRect, x: number) => {
+  const { width, height } = element.getBoundingClientRect();
+  const center = target.width > TIP_WIDE ? x : target.left + target.width / 2;
+  const above = target.top - TIP_GAP - height;
+  const top = above >= TOOLBAR_TOP ? above : target.bottom + TIP_GAP;
+  element.style.left = `${inWindow(center - width / 2, width)}px`;
+  element.style.top = `${Math.min(top, window.innerHeight - MARGIN - height)}px`;
 };

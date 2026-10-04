@@ -20,6 +20,7 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TopBar from "./TopBar.vue";
+import UiTooltip from "./UiTooltip.vue";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
 // part is keyed by what makes it the same: a dialog by its request, so each
@@ -56,4 +57,5 @@ import TopBar from "./TopBar.vue";
     :key="keyOf(contextMenu.close)"
     :request="contextMenu"
   />
+  <UiTooltip />
 </template>

@@ -17,7 +17,7 @@ const items: MenuItem[] = [
   { id: "loading", label: "Loading…", disabled: true },
   { id: "add", label: "Add" },
   "separator",
-  { id: "all", label: "Change All" },
+  { id: "all", label: "Change all" },
   { id: "again", label: "Again" },
 ];
 

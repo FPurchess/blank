@@ -21,11 +21,11 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | Module | Holds |
 |---|---|
 | `document.ts` | `path`, `importedFrom`, `transaction` (every editor transaction), `textContent` (50 ms after the last one) |
-| `appearance.ts` | `themes`, `theme`, `isTheme` |
+| `appearance.ts` | `themes`, `theme`, `isTheme`, and `colorMode` (accent or mono, see `design.md`) |
 | `language.ts` | `language`, `languagePicker` |
 | `spellcheck.ts` | `spellcheck`, `spellcheckStatus`, `spellchecker` |
 | `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and of the open header or footer strip (`bandEditor`), and `focusTakingDialogs`, those of them that take the focus |
-| `popups.ts` | `tablePicker`, `tableToolbar`, `tableHandles` (with `Point`, `Span`), `contextMenu`, `MenuItem`, `Anchor` |
+| `popups.ts` | `tablePicker`, `tableToolbar`, `tableHandles` (with `Point`, `Span`), `contextMenu`, `MenuItem`, `Anchor`, and `tooltipsSuppressed` (keeps the controls' tooltips hidden) |
 | `messages.ts` | `announcement` and `spellcheckMessage`, written through `announce()` and `flashSpellcheckMessage()`; `bootMessages()` clears each after a moment |
 | `page.ts` | `frontmatter` (of the document, notifying only when it changes), `pageLayout` (its `resolveLayout` over `config`'s defaults, resolved again only when either changes) and `pageFields` (what the placeholders of headers and footers show, the same object while they stay the same) |
 | `pageView.ts` | the page view: `pageView` (the view chosen), `pageLayoutState` (the pages as laid out), `pageCaret`, `pageSelection`, `pageHeadBox` (where the selection's head is painted, with its affinity, e.g. for the IME), `pageDropCaret` (where dragged text would drop), `engineMissing` (true once the editor shows the text itself), `pagePosition`, `pageScrollRequest`, and `pageViewport` (where the view is and how far it scrolled, for `src/engine/geometry.ts`; written at most once per frame, and only when it changed) |
@@ -44,7 +44,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 - **Side effects are `watch`ers started by a `boot…()` function, never at import time.** A boot runs in `bootScope()` (`src/scope.ts`), a Vue effect scope that collects its watchers and computeds. Cleanups register with `onScopeDispose` (elements to remove, timers), and window listeners go through `listenOnWindow`. The boot returns the scope's `dispose`, which stops all of it, including boots it started; calling it twice does nothing. Don't keep lists of stop functions by hand. A boot with a single watcher may return that watcher's stop handle (`bootAppearance`, `bootSpellcheck`). Storage and the editor boot once per app and don't return one (`bootEditor` returns the editor handle instead). `bootState()` (in `main.ts`, first) starts the theme on `document.body`, `textContent`, and the clearing of messages after a moment.
 - **Watchers run after the writes of a tick (Vue's default flush), unless code relies on their effect right after the write; then they use `{ flush: "sync" }`.** The default batches: `bootSpellcheck` loads one dictionary when spell check and the language change together, and `textContent`'s debounce starts one timer however many transactions a tick had. Sync, and why:
   - storage (`src/storage.ts`): each change marks the document pending at once, so closing the window right after it still writes it (`flush` on close);
-  - the theme on `document.body` (`bootAppearance`), before the first paint;
+  - the theme and color mode on `document.body` (`bootAppearance`), before the first paint;
   - the plugin views (`plugins/images.ts`, `plugins/spellcheck.ts`, `plugins/pageView.ts`) and `followLayout` (`plugins/tables/followLayout.ts`), which dispatch, measure or publish while the editor's state they follow is current;
   - the message timers (`bootMessages`), which restart on every message.
 

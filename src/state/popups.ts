@@ -137,3 +137,7 @@ export interface ContextMenuRequest {
 // request with the same `close` updates the open menu, e.g. once the
 // suggestions are known.
 export const contextMenu = shallowRef<ContextMenuRequest | null>(null);
+
+// tooltipsSuppressed keeps the tooltips of controls (src/ui/UiTooltip.vue)
+// hidden, e.g. while focus mode has faded the controls out
+export const tooltipsSuppressed = shallowRef(false);

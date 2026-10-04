@@ -14,6 +14,16 @@ const modifierAliases: { [alias: string]: string } = {
 const knownModifier = /^(mod|s|shift|a|alt|c|ctrl|control|m|meta|cmd)$/i;
 
 /**
+ * splitBinding splits a key binding into its modifiers and its key, as
+ * prosemirror-keymap does, so "Mod--" is the minus key
+ */
+const splitBinding = (binding: string) => {
+  const parts = binding.split(/-(?!$)/);
+  const key = parts.pop() as string;
+  return { modifiers: parts, key };
+};
+
+/**
  * normalizeBinding maps modifier aliases such as `Option` or `Command` to the
  * names prosemirror-keymap understands
  * @param binding key binding like "Command-Shift-s"
@@ -21,9 +31,7 @@ const knownModifier = /^(mod|s|shift|a|alt|c|ctrl|control|m|meta|cmd)$/i;
  */
 export const normalizeBinding = (binding: string): string | undefined => {
   if (typeof binding !== "string" || binding === "") return;
-  // split like prosemirror-keymap does, so "Mod--" binds the minus key
-  const parts = binding.split(/-(?!$)/);
-  const key = parts.pop() as string;
+  const { modifiers: parts, key } = splitBinding(binding);
   const modifiers: string[] = [];
   for (const part of parts) {
     const modifier = modifierAliases[part.toLowerCase()] ?? part;
@@ -45,8 +53,7 @@ export const tableKeyBinding = () =>
  * shows it: "⇧⌘Z" on macOS, "Ctrl+Shift+Z" elsewhere
  */
 export const formatShortcut = (binding: string) => {
-  const parts = binding.split(/-(?!$)/);
-  const key = parts.pop()!;
+  const { modifiers: parts, key } = splitBinding(binding);
   const mac = isMac();
   const names: Record<string, [string, string]> = {
     Mod: ["⌘", "Ctrl"],
@@ -61,4 +68,42 @@ export const formatShortcut = (binding: string) => {
     .map((part) => names[part]?.[mac ? 0 : 1] ?? part);
   const name = key.length === 1 ? key.toUpperCase() : key;
   return mac ? modifiers.join("") + name : [...modifiers, name].join("+");
+};
+
+/**
+ * commandShortcut returns the key bound to `command`, as the platform shows
+ * it, for tooltips and hints
+ */
+export const commandShortcut = (command: CommandIdentifier) =>
+  formatShortcut(getKeyBinding(command));
+
+// the names aria-keyshortcuts gives the modifiers, by the names a binding may
+// use; Mod is Meta on macOS, Control elsewhere
+const ariaModifiers: Record<string, string> = {
+  shift: "Shift",
+  s: "Shift",
+  alt: "Alt",
+  a: "Alt",
+  ctrl: "Control",
+  control: "Control",
+  c: "Control",
+  meta: "Meta",
+  cmd: "Meta",
+  m: "Meta",
+};
+
+/**
+ * ariaShortcut returns a key binding as aria-keyshortcuts writes it, e.g.
+ * "Control+Shift+Z" for "Mod-Shift-z", or undefined if it can't be used
+ */
+export const ariaShortcut = (binding: string) => {
+  const normalized = normalizeBinding(binding);
+  if (normalized === undefined) return;
+  const { modifiers, key } = splitBinding(normalized);
+  const names = modifiers.map((modifier) => {
+    const name = modifier.toLowerCase();
+    if (name === "mod") return isMac() ? "Meta" : "Control";
+    return ariaModifiers[name];
+  });
+  return [...names, key.length === 1 ? key.toUpperCase() : key].join("+");
 };

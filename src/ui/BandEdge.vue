@@ -6,8 +6,9 @@ import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
 import type { Band, DocumentFields } from "../layout/bands";
 import { SLOTS, type Slots } from "../layout/settings";
-import { editBandShortcut } from "./bandStripsModel";
+import { bandCommand } from "./bandStripsModel";
 import SlotText from "./SlotText.vue";
+import { tipAttrs } from "./tooltipModel";
 
 // A header or footer at rest, pinned to the top or bottom of the window: a
 // faint line of what it says, or the hints to add it, which show while the
@@ -22,8 +23,12 @@ const props = defineProps<{
 }>();
 
 const editor = useEditor();
-const title = computed(
-  () => `Edit the ${props.band} (${editBandShortcut(props.band)})`,
+// its tooltip: what a click does, with the shortcut that does the same
+const tip = computed(() =>
+  tipAttrs({
+    name: `Edit the ${props.band}`,
+    command: bandCommand(props.band),
+  }),
 );
 // the strip takes the focus itself
 const open = (insert?: string) =>
@@ -42,7 +47,7 @@ const open = (insert?: string) =>
         v-if="slots"
         class="band-line"
         role="button"
-        :title="title"
+        v-bind="tip"
         @mousedown.prevent
         @click="open()"
       >

@@ -10,9 +10,14 @@ import {
   luminance,
   mix,
   parseColor,
+  type Mode,
   scssNumber,
+  themeColor,
   themeVariables,
 } from "./contrast";
+
+// the share of the desk's color in a tooltip's shortcut, over the ink
+const TIP_KEY = scssNumber("_controls.scss", "tip-key") / 100;
 
 // what each theme shows the page view in, as the theme files set it
 const colorsOf = (theme: string) => {
@@ -108,13 +113,92 @@ describe("the desk and the sheets", () => {
     const { variables, background, color } = colorsOf(theme);
     // a shade off the paper; in dark themes darker, not lighter
     expect(luminance(color("desk-color"))).toBeLessThan(luminance(background));
-    for (const name of ["sheet-edge", "sheet-shadow"]) {
+    for (const name of ["sheet-edge", "sheet-shadow", "popover-shadow"]) {
       const [r, g, b] = /rgba\((\d+), (\d+), (\d+),/
         .exec(variables[name])!
         .slice(1)
         .map(Number);
       expect([r, g, b]).toEqual([0, 0, 0]);
     }
+  });
+});
+
+describe("the controls' colors", () => {
+  const modes: Mode[] = ["accent", "mono"];
+  const cases = themes.flatMap((theme) =>
+    modes.map((mode) => [theme, mode] as const),
+  );
+  // the grounds controls stand on: the desk around the pages, and the paper
+  // of the pages, menus and dialogs
+  const grounds = (theme: string, mode: Mode) => {
+    const color = themeColor(theme, mode);
+    const desk = color("desk-color", [0, 0, 0]);
+    const paper = color("background-color", [0, 0, 0]);
+    return { color, desk, paper };
+  };
+
+  it.each(cases)(
+    "read as text where they're secondary in %s, %s",
+    (theme, mode) => {
+      const { color, desk, paper } = grounds(theme, mode);
+      expect(contrast(color("muted", desk), desk)).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(color("muted-on-paper", paper), paper),
+      ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it.each(cases)(
+    "show the accent, the focus ring and borders in %s, %s",
+    (theme, mode) => {
+      const { color, desk, paper } = grounds(theme, mode);
+      for (const ground of [desk, paper]) {
+        expect(
+          contrast(color("accent", ground), ground),
+        ).toBeGreaterThanOrEqual(3);
+        expect(contrast(color("focus", ground), ground)).toBeGreaterThanOrEqual(
+          3,
+        );
+      }
+      expect(contrast(color("line-strong", desk), desk)).toBeGreaterThanOrEqual(
+        3,
+      );
+    },
+  );
+
+  it.each(cases)("write on the accent in %s, %s", (theme, mode) => {
+    const { color, desk } = grounds(theme, mode);
+    const accent = color("accent", desk);
+    const hover = color("accent-hover", desk);
+    expect(
+      contrast(color("accent-ink", accent), accent),
+    ).toBeGreaterThanOrEqual(4.5);
+    // the primary button under the pointer: still legible, and visibly
+    // different from at rest
+    expect(contrast(color("accent-ink", hover), hover)).toBeGreaterThanOrEqual(
+      4.5,
+    );
+    expect(contrast(hover, accent)).toBeGreaterThan(1.1);
+  });
+
+  it.each(cases)("show what's on in %s, %s", (theme, mode) => {
+    const { color, desk, paper } = grounds(theme, mode);
+    for (const ground of [desk, paper]) {
+      // an icon button's fill and icon, and a status item's text
+      const fill = color("on-fill", ground);
+      expect(contrast(color("on-ink", fill), fill)).toBeGreaterThanOrEqual(3);
+      expect(contrast(color("on-text", ground), ground)).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
+  });
+
+  it.each(cases)("write tooltips legibly in %s, %s", (theme, mode) => {
+    const { color, desk } = grounds(theme, mode);
+    // the desk's color on solid ink, and the shortcut in it a little fainter
+    const ink = color("ink-fill", desk);
+    expect(contrast(desk, ink)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(mix(desk, ink, TIP_KEY), ink)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

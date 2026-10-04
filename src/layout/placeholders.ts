@@ -182,6 +182,6 @@ export const emptyBandNotice = (
   );
   const notice = `The ${band} is empty on this page: ${list}.`;
   return fields.includes("author")
-    ? `${notice} Add an author under Edit as Text in Page Setup (${pageSetup}).`
+    ? `${notice} Add an author under Edit as text in the page setup (${pageSetup}).`
     : notice;
 };

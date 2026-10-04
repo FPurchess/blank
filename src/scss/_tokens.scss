@@ -1,0 +1,78 @@
+// The tokens the UI is built from (see .claude/rules/design.md): colors
+// derived from each theme's ink, paper, desk and accent, and the sizes, radii
+// and timings every control shares.
+//
+// They are declared where the themes set their colors, on the body
+// ([data-theme]) and on :root, because a property holding var() resolves on
+// the element that declares it: declared on :root alone, the body would
+// inherit what :root's light colors give. src/scss/themes.test.ts reads the
+// percentages below, so the contrast tests check what the CSS mixes.
+:root,
+[data-theme] {
+  // secondary text, on the desk and on the paper
+  --muted: color-mix(in srgb, var(--color) 78%, var(--desk-color));
+  --muted-on-paper: color-mix(
+    in srgb,
+    var(--color) 78%,
+    var(--background-color)
+  );
+  // lines that only divide, and the borders of fields and buttons
+  --line: color-mix(in srgb, var(--color) 14%, transparent);
+  --line-strong: color-mix(in srgb, var(--color) 56%, transparent);
+  // a control under the pointer and while it's pressed
+  --hover: color-mix(in srgb, var(--color) 8%, transparent);
+  --pressed: color-mix(in srgb, var(--color) 14%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  // the primary button under the pointer: the accent a step toward the text
+  // on it, which also works in mono
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--accent-ink));
+  --focus: var(--accent);
+  // a control that is on: its fill and its icon, or for a status item only
+  // its text
+  --on-fill: var(--accent-soft);
+  --on-ink: var(--accent);
+  --on-text: var(--accent);
+  --on-weight: 400;
+  // solid ink for backgrounds, since the ink is translucent in Dark: a list
+  // of layers, so it only works in `background`, not `background-color`
+  --ink-fill: linear-gradient(var(--color), var(--color)), var(--desk-color);
+
+  // the 8px grid, with 4 for fine steps
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s8: 48px;
+  // controls, the small text of status items and tooltips, and the radii of
+  // controls, of what floats and of dialogs
+  --control: 28px;
+  --row: 32px;
+  --status-item: 24px;
+  --ui-small: 12px;
+  --r-control: 6px;
+  --r-pop: 8px;
+  --r-dialog: 12px;
+  // motion is only feedback; prefers-reduced-motion sets these to 0 (in the
+  // reduced-motion block of main.scss)
+  --fade-in: 100ms;
+  --fade-out: 150ms;
+  --chrome-in: 300ms;
+  --chrome-out: 700ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-soft: cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+// monochrome: what can be clicked or is on is ink, and what stands on a fill
+// of ink has the desk's color. src/state/appearance.ts sets data-color on the
+// body, next to data-theme, so var(--color) is the theme's here.
+[data-color="mono"] {
+  --accent: var(--color);
+  --accent-ink: var(--desk-color);
+  --accent-soft: color-mix(in srgb, var(--color) 12%, transparent);
+  --on-fill: var(--ink-fill);
+  --on-ink: var(--desk-color);
+  --on-text: var(--color);
+  --on-weight: 500;
+}

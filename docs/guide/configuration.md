@@ -76,7 +76,7 @@ The words you add to the dictionary are kept next to `blank.json`, in the `dicti
 
 ## Page setup {#page-setup}
 
-`layout.page` is the [page setup](./pages) of documents that don't have their own. **Make This My Default** in the page setup writes it for you:
+`layout.page` is the [page setup](./pages) of documents that don't have their own. **Make this my default** in the page setup writes it for you:
 
 ```json
 {
@@ -90,4 +90,4 @@ The words you add to the dictionary are kept next to `blank.json`, in the `dicti
 }
 ```
 
-It takes the same settings as the [properties of a file](./pages#frontmatter). The default `size` is `auto`, the paper of your region. Headers and footers belong to each document, so **Make This My Default** leaves them out. To number the pages of every document, add them here yourself, e.g. `"footer": { "center": "{page}" }`.
+It takes the same settings as the [properties of a file](./pages#frontmatter). The default `size` is `auto`, the paper of your region. Headers and footers belong to each document, so **Make this my default** leaves them out. To number the pages of every document, add them here yourself, e.g. `"footer": { "center": "{page}" }`.

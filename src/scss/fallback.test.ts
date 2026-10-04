@@ -1,5 +1,6 @@
-import { compileAsync } from "sass-embedded";
 import { describe, expect, it } from "vitest";
+
+import { compileMain } from "./compiled";
 
 // DejaVu Sans fills in the characters IBM Plex Sans lacks, and the webview
 // loads it only for those: its faces carry the generated unicode-range.
@@ -11,10 +12,7 @@ const ranges = (range: string) =>
 
 describe("the fallback font", () => {
   it("loads DejaVu Sans only for characters IBM Plex Sans lacks", async () => {
-    const { css } = await compileAsync("src/scss/main.scss", {
-      loadPaths: ["src/scss"],
-      style: "compressed",
-    });
+    const css = await compileMain();
     const faces = [...css.matchAll(/@font-face\{([^}]*)\}/g)].map(
       ([, body]) => body,
     );

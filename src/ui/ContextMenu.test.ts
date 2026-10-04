@@ -52,7 +52,7 @@ const items = (): MenuItem[] => [
   { id: "wrong", label: "wrong", run: () => runs.push("wrong") },
   {
     id: "all",
-    label: "Change All",
+    label: "Change all",
     children: [
       { id: "all:wrong", label: "wrong", run: () => runs.push("all:wrong") },
       { id: "all:wring", label: "wring", run: () => runs.push("all:wring") },
@@ -60,10 +60,10 @@ const items = (): MenuItem[] => [
   },
   "separator",
   { id: "loading", label: "Loading…", disabled: true },
-  { id: "add", label: "Add to Dictionary", run: () => runs.push("add") },
+  { id: "add", label: "Add to dictionary", run: () => runs.push("add") },
   {
     id: "edit",
-    label: "Edit in Dictionary…",
+    label: "Edit in dictionary…",
     edit: { value: "blank", submit: (value) => runs.push(`edit:${value}`) },
   },
   {

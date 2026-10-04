@@ -21,11 +21,11 @@ Point at the dashes to see all your headings, and click one to scroll straight t
 
 <img class="shot" src="/screenshots/outline.gif" alt="Pointing at the dashes on the right shows the headings of the document; a click on one scrolls to it, and Mod Alt O opens and closes the list" />
 
-To keep the outline open, click the dashes or press `Mod` `Alt` `O`. On a window at least 1000 pixels wide, the list stays beside your pages, and they move over a little if they need the room. On a smaller window it floats over the pages until you click a heading or somewhere else. `Mod` `Alt` `O` or the × at the top of the list puts it away again, and Blank remembers whether you keep it open.
+To keep the outline open, click the dashes or press `Mod` `Alt` `O`. On a window at least 1000 pixels wide, the list stays beside your pages, and they move over a little if they need the room. On a smaller window it floats over the pages until you click a heading or somewhere else. `Mod` `Alt` `O` or the × at the top of the list puts it away again, and Blank remembers whether you keep it open. Rest the pointer on the dashes or the × to see the shortcut.
 
 ## Page setup {#page-setup}
 
-Press `Mod` `Alt` `U`, click the paper in the bar at the bottom (e.g. _A4 (portrait)_), or choose **Page Setup…** from the menu (right-click or `Shift` `F10`).
+Press `Mod` `Alt` `U`, click the paper in the bar at the bottom (e.g. _A4 (portrait)_), or choose **Page setup…** from the menu (right-click or `Shift` `F10`).
 
 ![The page setup dialog with the paper, orientation and margins, and a picture of the page](/screenshots/page-setup.png)
 
@@ -104,13 +104,13 @@ page:
 
 You can write these yourself too. `new-page-before` lists the heading levels that start a new page. `header` and `footer` have a `left`, `center` and `right` of one line each, in which `{page}` is the page number, `{pages}` the number of pages, `{title}` and `{author}` come from the properties, `{chapter}` is the chapter of the page, `{date}` the date of the export and `{file}` the name of the file; write <code v-pre>{{</code> for a brace of your own. `first-page` is `plain` for none on the first page, or its own `header` and `footer`, and `even-pages` has the `header` and `footer` of even pages. `number-style` is `1`, `i` or `I`, and `start-number: 0` numbers the pages from 0, e.g. to leave the title page uncounted. `size` is `a3`, `a4`, `a5`, `b5`, `letter`, `legal`, `auto` for the paper of your region, or a size like `170mm x 240mm`. `margins` is one length for all four sides, or `top`, `right`, `bottom` and `left` on their own lines. Lengths are written with their unit: `mm`, `cm`, `in` or `pt`.
 
-The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 (landscape)_, and a click on it opens the page setup. **Edit as Text** in the dialog shows all properties of the file, to change the ones the dialog has no settings for.
+The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 (landscape)_, and a click on it opens the page setup. **Edit as text** in the dialog shows all properties of the file, to change the ones the dialog has no settings for.
 
 If a setting can't be used, say a paper size Blank doesn't know, the export uses your default for it and tells you so.
 
 ## Your defaults {#defaults}
 
-**Make This My Default** in the page setup keeps the settings for every document that doesn't have its own. Blank saves them in [`blank.json`](./configuration#page-setup).
+**Make this my default** in the page setup keeps the settings for every document that doesn't have its own. Blank saves them in [`blank.json`](./configuration#page-setup).
 
 ## Page setup and Word {#word}
 

@@ -150,7 +150,7 @@ describe("spell check", () => {
 
   it("adds a word to the dictionary, which lasts", async () => {
     await rightClick("Thiss");
-    await item("Add to Dictionary").click();
+    await item("Add to dictionary").click();
 
     await expectFlagged("wrng anothr");
 
@@ -163,18 +163,18 @@ describe("spell check", () => {
 
   it("removes a word from the dictionary", async () => {
     await contextMenuOn("Thiss");
-    await item("Remove from Dictionary").click();
+    await item("Remove from dictionary").click();
 
     await expectFlagged("Thiss wrng anothr");
   });
 
   it("edits a word in the dictionary", async () => {
     await rightClick("Thiss");
-    await item("Add to Dictionary").click();
+    await item("Add to dictionary").click();
     await expectFlagged("wrng anothr");
 
     await contextMenuOn("Thiss");
-    await item("Edit in Dictionary…").click();
+    await item("Edit in dictionary…").click();
     const input = await $("#context-menu input");
     await expect(input).toHaveValue("Thiss");
     // the word is selected, so typing replaces it
@@ -204,7 +204,7 @@ describe("spell check", () => {
     await browser.keys([Key.Shift, Key.F10]);
 
     await expect(menu()).toBeDisplayed();
-    await expect(item("Select All")).toBeDisplayed();
+    await expect(item("Select all")).toBeDisplayed();
     await type(Key.Escape);
   });
 
@@ -214,7 +214,7 @@ describe("spell check", () => {
     await expectFlagged("Wrng wrng");
 
     await rightClick("wrng");
-    await item("Ignore All").click();
+    await item("Ignore all").click();
     await expectFlagged("");
 
     await pressMod("n");
@@ -234,7 +234,7 @@ describe("spell check", () => {
 
   it("cuts, copies and pastes from the menu", async () => {
     await contextMenuOn("und");
-    await item("Select All").click();
+    await item("Select all").click();
     await contextMenuOn("und");
     await item("Copy").click();
 
@@ -247,7 +247,7 @@ describe("spell check", () => {
 
   it("turns off from the menu", async () => {
     await rightClick("unnd");
-    await item("Disable Spell Check").click();
+    await item("Disable spell check").click();
 
     await expect(status()).not.toBeDisplayed();
     await expect(errors()).toBeElementsArrayOfSize(0);

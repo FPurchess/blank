@@ -295,6 +295,7 @@ export const tableActions = (
   commandAction(deleteTable, {
     id: "table-delete",
     group: "table",
+    icon: "trash",
     label: () => "Delete table",
     key: { code: "Backspace", mod: true, label: isMac() ? "⌘⌫" : "Ctrl ⌫" },
     done: () => "Table deleted",

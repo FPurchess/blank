@@ -5,6 +5,7 @@ import { deleteSelection, selectAll } from "prosemirror-commands";
 import { redo, redoDepth, undo, undoDepth } from "prosemirror-history";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
+import { commandLabel } from "../../commandList";
 import { CommandIdentifier, getKeyBinding } from "../../config";
 import {
   type MenuItem,
@@ -28,6 +29,21 @@ import {
   occurrences,
 } from "../plugins/spellcheck";
 import { openPageSetup } from "../commands/pageSetup";
+
+/**
+ * commandItem returns the item of a command, named and with the key as the
+ * command list and the keymap have them
+ */
+const commandItem = (
+  id: string,
+  command: CommandIdentifier,
+  item: Omit<Exclude<MenuItem, "separator">, "id" | "label" | "shortcut">,
+): MenuItem => ({
+  id,
+  label: commandLabel(command),
+  shortcut: getKeyBinding(command),
+  ...item,
+});
 
 // suggestions shown for a misspelled word at most
 export const MAX_SUGGESTIONS = 5;
@@ -134,7 +150,7 @@ const suggestionItems = (
   if (shown?.length) {
     items.push({
       id: "change-all",
-      label: "Change All",
+      label: "Change all",
       children: shown.map((suggestion) => ({
         id: `change-all:${suggestion}`,
         label: suggestion,
@@ -147,14 +163,14 @@ const suggestionItems = (
     "separator",
     {
       id: "ignore-all",
-      label: "Ignore All",
+      label: "Ignore all",
       run: run(view, (view) =>
         view.dispatch(ignoreAll(view.state, misspelling.word)),
       ),
     },
     {
       id: "add",
-      label: "Add to Dictionary",
+      label: "Add to dictionary",
       run: run(view, () => checker.addWord(misspelling.word)),
     },
   );
@@ -170,12 +186,12 @@ const userWordItems = (
   return [
     {
       id: "remove",
-      label: "Remove from Dictionary",
+      label: "Remove from dictionary",
       run: () => void checker.removeWord(userWord.entry).catch(console.warn),
     },
     {
       id: "edit",
-      label: "Edit in Dictionary…",
+      label: "Edit in dictionary…",
       edit: {
         value: userWord.entry,
         submit: (word) => {
@@ -192,20 +208,14 @@ const editItems = (view: EditorView): MenuItem[] => {
   const { state } = view;
   const empty = state.selection.empty;
   return [
-    {
-      id: "undo",
-      label: "Undo",
-      shortcut: getKeyBinding(CommandIdentifier.UNDO),
+    commandItem("undo", CommandIdentifier.UNDO, {
       disabled: undoDepth(state) === 0,
       run: run(view, (view) => undo(view.state, view.dispatch)),
-    },
-    {
-      id: "redo",
-      label: "Redo",
-      shortcut: getKeyBinding(CommandIdentifier.REDO),
+    }),
+    commandItem("redo", CommandIdentifier.REDO, {
       disabled: redoDepth(state) === 0,
       run: run(view, (view) => redo(view.state, view.dispatch)),
-    },
+    }),
     "separator",
     {
       id: "cut",
@@ -229,7 +239,7 @@ const editItems = (view: EditorView): MenuItem[] => {
     },
     {
       id: "paste-plain",
-      label: "Paste as Plain Text",
+      label: "Paste as plain text",
       run: run(view, (view) => paste(view, true)),
     },
     {
@@ -240,7 +250,7 @@ const editItems = (view: EditorView): MenuItem[] => {
     },
     {
       id: "select-all",
-      label: "Select All",
+      label: "Select all",
       shortcut: "Mod-a",
       run: run(view, (view) => selectAll(view.state, view.dispatch)),
     },
@@ -253,7 +263,7 @@ const spellcheckItems = (): MenuItem[] => {
     return [
       {
         id: "enable",
-        label: "Enable Spell Check",
+        label: "Enable spell check",
         shortcut,
         run: () => (spellcheck.value = true),
       },
@@ -270,13 +280,13 @@ const spellcheckItems = (): MenuItem[] => {
   } else if (state === "error") {
     items.push({
       id: "retry",
-      label: "Retry Download",
+      label: "Retry download",
       run: () => void update(),
     });
   }
   items.push({
     id: "disable",
-    label: "Disable Spell Check",
+    label: "Disable spell check",
     shortcut,
     run: () => (spellcheck.value = false),
   });
@@ -342,12 +352,9 @@ export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {
     "separator",
     ...tableItems(view),
     "separator",
-    {
-      id: "page-setup",
-      label: "Page Setup…",
-      shortcut: getKeyBinding(CommandIdentifier.PAGE_SETUP),
+    commandItem("page-setup", CommandIdentifier.PAGE_SETUP, {
       run: run(view, openPageSetup),
-    },
+    }),
     ...spellcheckItems(),
   ];
 };

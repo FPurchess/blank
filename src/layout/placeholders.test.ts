@@ -142,7 +142,7 @@ describe("emptyBandNotice", () => {
         "Ctrl+Alt+U",
       ),
     ).toBe(
-      "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as Text in Page Setup (Ctrl+Alt+U).",
+      "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as text in the page setup (Ctrl+Alt+U).",
     );
     expect(
       emptyBandNotice(

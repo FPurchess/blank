@@ -117,7 +117,7 @@ describe("command.editBand", () => {
       header: { ...NO_SLOTS, left: "{author}", right: "{chapter}" },
     });
     expect(announcement.value?.text).toMatch(
-      /^The header is empty on this page: no author is set and the document has no chapter heading yet\. Add an author under Edit as Text in Page Setup \(.+\)\.$/,
+      /^The header is empty on this page: no author is set and the document has no chapter heading yet\. Add an author under Edit as text in the page setup \(.+\)\.$/,
     );
   });
 

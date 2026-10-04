@@ -1,5 +1,7 @@
 @use "reset";
 @use "themes/index";
+// first, so main.scss's own rules override its global ones
+@use "controls" as *;
 @use "typography";
 
 html {
@@ -348,18 +350,21 @@ body {
 
   button {
     padding: 4px 12px;
-    cursor: pointer;
 
     &:disabled {
-      opacity: 0.4;
-      cursor: default;
+      opacity: 0.38;
     }
   }
 
-  input:focus,
-  button:focus {
-    outline: 2px solid var(--color);
-    outline-offset: 1px;
+  // the buttons that close the dialog, and the one next to a field: the one
+  // that does what the dialog is for is filled with the accent
+  .actions button,
+  .row button {
+    @include text-button;
+  }
+
+  .actions button[type="submit"] {
+    @include text-button-primary;
   }
 }
 
@@ -445,11 +450,6 @@ body {
     border: 1px solid var(--color);
     border-radius: 3px;
     resize: vertical;
-
-    &:focus {
-      outline: 2px solid var(--color);
-      outline-offset: 1px;
-    }
   }
 
   .thumbnail {
@@ -507,7 +507,7 @@ body {
   .actions {
     flex-wrap: wrap;
 
-    // "Edit as Text" on the left, away from Apply
+    // "Edit as text" on the left, away from Apply
     button:first-child {
       margin-right: auto;
     }
@@ -986,11 +986,7 @@ $strip-height: 90px;
   gap: 2px;
   padding: 3px;
   font-size: 0.8rem;
-  color: var(--color);
-  background-color: var(--background-color);
-  border: 1px solid color-mix(in srgb, var(--color) 25%, transparent);
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  @include popover;
   user-select: none;
 
   &[hidden] {
@@ -1005,50 +1001,13 @@ $strip-height: 90px;
   }
 
   .separator {
-    align-self: stretch;
-    width: 1px;
+    @include separator;
     margin: 5px 3px;
-    background: color-mix(in srgb, var(--color) 20%, transparent);
   }
 
-  button {
+  // the badge of its key in table mode hangs from the button's corner
+  .icon-button {
     position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 5px;
-    border: 0;
-    border-radius: 5px;
-    font: inherit;
-    color: inherit;
-    background: none;
-    cursor: pointer;
-
-    &:hover {
-      background: color-mix(in srgb, var(--color) 10%, transparent);
-    }
-
-    &[aria-pressed="true"] {
-      background: color-mix(in srgb, var(--color) 16%, transparent);
-    }
-
-    &[aria-disabled="true"] {
-      opacity: 0.35;
-      background: none;
-      cursor: default;
-    }
-  }
-
-  .icon {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 
   // table mode shows the key of each button as a badge on its corner, so the
@@ -1076,7 +1035,7 @@ $strip-height: 90px;
     white-space: nowrap;
     color: var(--color);
     background: var(--background-color);
-    border: 1px solid color-mix(in srgb, var(--color) 45%, transparent);
+    border: 1px solid var(--line-strong);
     border-radius: 3px;
   }
 
@@ -1105,11 +1064,7 @@ $strip-height: 90px;
   z-index: 20;
   padding: 8px 10px;
   font-size: 0.85rem;
-  color: var(--color);
-  background-color: var(--background-color);
-  border: 1px solid var(--color);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  @include popover;
   user-select: none;
 
   .grid {
@@ -1166,11 +1121,7 @@ $strip-height: 90px;
   padding: 4px 0;
   box-sizing: border-box;
   font-size: 0.85rem;
-  color: var(--color);
-  background-color: var(--background-color);
-  border: 1px solid var(--color);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  @include popover;
   user-select: none;
   outline: none;
 
@@ -1181,7 +1132,6 @@ $strip-height: 90px;
     align-items: baseline;
     gap: 24px;
     padding: 3px 12px;
-    cursor: default;
     outline: none;
 
     &:focus {
@@ -1190,7 +1140,7 @@ $strip-height: 90px;
     }
 
     &[aria-disabled="true"] {
-      opacity: 0.5;
+      opacity: 0.38;
     }
 
     .label {
@@ -1679,32 +1629,10 @@ body.outline-docked.outline-desk {
 }
 
 .outline-collapse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: inherit;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
   opacity: $faint-text-opacity;
 
   &:hover {
     opacity: 1;
-    background-color: color-mix(in srgb, var(--color) 12%, transparent);
-  }
-
-  .icon {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 }
 
@@ -1872,6 +1800,16 @@ body.band-editing #outline {
 // with the system asking for less motion, the caret stays still, and the
 // strips, hints and the faded pages change at once
 @media (prefers-reduced-motion: reduce) {
+  // the timings of src/scss/_tokens.scss
+  :root,
+  [data-theme] {
+    --fade-in: 0ms;
+    --fade-out: 0ms;
+    --chrome-in: 0ms;
+    --chrome-out: 0ms;
+  }
+
+  .tooltip,
   .page-caret,
   .band-editor,
   .band-editor.footer {

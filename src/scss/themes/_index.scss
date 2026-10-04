@@ -4,6 +4,8 @@
 @use "red";
 @use "green";
 @use "blue";
+// after the themes, which it derives from
+@use "../tokens";
 
 body {
   color: var(--color);

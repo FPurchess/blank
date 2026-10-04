@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 
-import { CommandIdentifier, getKeyBinding } from "../config";
-import { formatShortcut } from "../editor/keyBindings";
+import { CommandIdentifier } from "../config";
 import {
   scrollState,
   scrollTops,
@@ -22,9 +21,10 @@ import {
   pageViewport,
   toggleOutline,
 } from "../state";
-import IconGlyph from "./components/IconGlyph.vue";
+import IconButton from "./components/IconButton.vue";
 import { useBodyClass } from "./composables/useBodyClass";
 import OutlineEntry from "./OutlineEntry.vue";
+import { tipAttrs } from "./tooltipModel";
 import {
   freeRight,
   OUTLINE_DOCK,
@@ -185,9 +185,11 @@ onUnmounted(() => {
   if (scrolled !== undefined) cancelAnimationFrame(scrolled);
 });
 
-const shortcut = computed(() =>
-  formatShortcut(getKeyBinding(CommandIdentifier.VIEW_OUTLINE)),
-);
+// the dashes and the ×, with the shortcut that shows and hides the outline
+const dashesTip = tipAttrs({
+  name: "Outline",
+  command: CommandIdentifier.VIEW_OUTLINE,
+});
 </script>
 
 <template>
@@ -204,7 +206,7 @@ const shortcut = computed(() =>
     <div
       v-if="place === 'dashes'"
       class="outline-dashes"
-      :title="`Outline (${shortcut})`"
+      v-bind="dashesTip"
       @mouseenter="peekIn"
       @mouseleave="peekOut"
       @click="toggleOutline(windowWidth)"
@@ -227,16 +229,14 @@ const shortcut = computed(() =>
     >
       <div v-if="open || outlinePeek === 'sticky'" class="outline-head">
         <span class="outline-title">Outline</span>
-        <button
+        <IconButton
           class="outline-collapse"
-          type="button"
-          tabindex="-1"
-          :aria-label="`Hide outline (${shortcut})`"
-          :title="`Hide outline (${shortcut})`"
+          icon="x"
+          label="Hide outline"
+          :command="CommandIdentifier.VIEW_OUTLINE"
+          :focusable="false"
           @click="collapse"
-        >
-          <IconGlyph name="close" />
-        </button>
+        />
       </div>
       <OutlineEntry
         v-for="(entry, index) in entries"

@@ -8,7 +8,7 @@ paths:
 
 # Vue components
 
-All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `bootEditor` and only mounts the app (`bootApp`, `src/ui/mount.ts`) into `#ui-app` inside `uiRoot()` (`#ui`, appended to the body after the editor, so the UI paints above the hidden editor and takes its clicks), and keeps the webview's own context menu away (`src/nativeMenu.ts`). `src/ui/App.vue` lists every part, one line each. Shared state is in `state.md`, the editor's side in `editor-boundary.md`, tests in `ui-testing.md`.
+All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `bootEditor` and only mounts the app (`bootApp`, `src/ui/mount.ts`) into `#ui-app` inside `uiRoot()` (`#ui`, appended to the body after the editor, so the UI paints above the hidden editor and takes its clicks), and keeps the webview's own context menu away (`src/nativeMenu.ts`). `src/ui/App.vue` lists every part, one line each. Shared state is in `state.md`, the editor's side in `editor-boundary.md`, tests in `ui-testing.md`, and how controls look and behave (tokens, states, tooltips, the command list, icons) in `design.md`.
 
 ## How components are written
 
@@ -18,8 +18,8 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 - **Props down, callbacks in the state's requests up.** A component gets the state it shows as props, named after what it is: `state` for state it follows (`TableToolbar`, `TablePicker`), `request` for a request it serves (`ContextMenu`), and acts through the callbacks in that state (`item.run()`, `caption.submit()`) or through `useEditor()`.
 - **Vapor mode is not used.** Vue 3.6's Vapor is still a release candidate, and our keyed lists depend on the fixes it keeps getting. Components use the regular renderer.
 - **No Pinia and no homegrown framework** (decided with the maintainer when the UI moved to Vue; don't reopen it without asking). Central state modules (`state.md`) and `useEditor()` cover what a store would.
-- **Composables only once a second place needs them.** So far: `useBodyClass` (the strips' classes on the body). The focus trap lives in `BaseDialog.vue`, which every dialog uses; roving focus is `OptionGroup.vue`, while the context menu keeps its own (it skips disabled items, opens submenus and has typeahead); popups place themselves with `place()` in `onMounted`/`onUpdated`, which a composable would only wrap. `CaptionField.vue` and `MenuEditField.vue` stay apart from `TextField.vue`: their values come back as props while the user types, so they set them once.
-- **Editor code never imports a UI module.** Helpers both sides need live outside `src/ui/`: `formatShortcut` (`src/editor/keyBindings.ts`), the table picker's sizes (`src/editor/commands/table/pickerSize.ts`), `place` and `placeToolbar` (`src/popup.ts`).
+- **Composables only once a second place needs them.** So far: `useBodyClass` (the strips' classes on the body). `IconButton.vue` came with its second place (the table toolbar and the outline's ×). The focus trap lives in `BaseDialog.vue`, which every dialog uses; roving focus is `OptionGroup.vue`, while the context menu keeps its own (it skips disabled items, opens submenus and has typeahead); popups place themselves with `place()` in `onMounted`/`onUpdated`, which a composable would only wrap. `CaptionField.vue` and `MenuEditField.vue` stay apart from `TextField.vue`: their values come back as props while the user types, so they set them once.
+- **Editor code never imports a UI module.** Helpers both sides need live outside `src/ui/`: `formatShortcut`, `commandShortcut` and `ariaShortcut` (`src/editor/keyBindings.ts`), the command list's labels (`src/commandList.ts`), the table picker's sizes (`src/editor/commands/table/pickerSize.ts`), `place`, `placeToolbar` and `placeTip` (`src/popup.ts`).
 
 ## Rendering rules
 
@@ -34,7 +34,7 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 - **What the keys move between** is found with `shownIn(root, selectors)` (`src/dom.ts`), which leaves out what's inside `[hidden]`: the dialog's Tab trap, the page setup's ↑↓ and the strips' Tab use it.
 - **Everything renders through `App.vue`**, into `#ui-app` inside `#ui`, never into `document.body` directly: `#ui` comes after the editor, which is what lets the UI paint above it and take its clicks. Classes on the body come from `useBodyClass`.
 - **Keep every id, class, role, `data-*` and aria attribute** that E2E, the docs shots and the tests use.
-- **Stacking:** `#ui` comes after `.ProseMirror`. The z-index layers are set in `src/scss/main.scss` (e.g. the page view 1, the bottom bar and the outline 2, table handles 4, toolbar 5, band edges 5 (first in `App.vue`, so the toolbar paints above them), the open band strip 8, dialog backdrop 10, picker and menus 20); keep a new part in line with them, below the backdrop unless it is a modal or a menu. `#page-view` (`PageView.vue`) is fixed over the whole window at 1, above the hidden editor and below everything else; its page canvases (`PageFrame.vue`), marks and overlay (`PageOverlay.vue`: caret, selection, composition) are positioned inside it and have no z-index of their own.
+- **Stacking:** `#ui` comes after `.ProseMirror`. The z-index layers are set in `src/scss/main.scss` (e.g. the page view 1, the bottom bar and the outline 2, table handles 4, toolbar 5, band edges 5 (first in `App.vue`, so the toolbar paints above them), the open band strip 8, dialog backdrop 10, picker and menus 20, the tooltip 30); keep a new part in line with them, below the backdrop unless it is a modal or a menu. `#page-view` (`PageView.vue`) is fixed over the whole window at 1, above the hidden editor and below everything else; its page canvases (`PageFrame.vue`), marks and overlay (`PageOverlay.vue`: caret, selection, composition) are positioned inside it and have no z-index of their own.
 
 ## Components
 
@@ -54,6 +54,8 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 | `BandStrips.vue`, `BandEdge.vue`, `BandEditor.vue`, `SlotField.vue`, `SlotText.vue` | the header and footer strips: both edges and the open strip, one edge at rest, the open strip (its logic in `src/bandStrip.ts`), a slot's ProseMirror editor, a slot as it prints; constants and `shownAtRest` in `bandStripsModel.ts` |
 | `composables/useBodyClass.ts` | a class on the body while a condition holds, taken away when the component goes |
 | `TableHandles.vue` | the mouse handles of the table under the mouse: grips, the "+", the column lines, the edges and the drag previews, where they go and what a drag does in `tableHandlesModel.ts` |
-| `components/IconGlyph.vue` | an icon of `src/icons.ts` |
+| `components/IconGlyph.vue` | an icon of `src/icons.ts`, 16px or `size="large"` 20px |
+| `components/IconButton.vue` | a button that shows only an icon: its label for screen readers and the tooltip, a command's shortcut, `pressed`, `disabled` (aria-disabled), `focusable` |
+| `UiTooltip.vue` | the shared tooltip of controls, mounted once; what it shows and when in `tooltipModel.ts` (`tipAttrs`, `watchTips`), its timer in `hoverIntent.ts` |
 
 Add reusable components to `src/ui/components/` when a second place needs them, not before: `BaseDialog` and `TextField` came with the second dialog. A new part of the UI is a component in `src/ui/`, a line in `App.vue` (keyed by what makes it the same), and its logic in a `…Model.ts` next to it.

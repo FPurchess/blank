@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { iconPath } from "../../icons";
+import { iconPath, iconStroke } from "../../icons";
 
 // An icon of src/icons.ts, hidden from screen readers: whatever shows it is
-// labelled itself.
-defineProps<{ name: string }>();
+// labelled itself. 16px, or 20px where it's `large`.
+defineProps<{ name: string; size?: "large" }>();
 </script>
 
 <template>
-  <svg class="icon" viewBox="0 0 20 20" aria-hidden="true">
+  <svg
+    class="icon"
+    :class="size"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    :stroke-width="iconStroke(name)"
+  >
     <path :d="iconPath(name)" />
   </svg>
 </template>

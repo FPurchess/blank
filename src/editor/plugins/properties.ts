@@ -8,7 +8,7 @@ import { openPageSetup } from "../commands/pageSetup";
 // Shows a quiet line above the text of a document that has frontmatter, so
 // the properties Blank keeps for it (see src/markdown/frontmatter.ts) aren't
 // hidden: e.g. "The Lighthouse · by Ada · tags". Clicking it opens the page
-// setup, where "Edit as Text" shows them all.
+// setup, where "Edit as text" shows them all.
 
 export const PROPERTIES_CLASS = "doc-properties";
 

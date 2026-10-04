@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { placeToolbar } from "./popup";
+import { placeTip, placeToolbar } from "./popup";
 
 // jsdom's window is 1024 × 768
 const toolbar = (width = 200, height = 30) => {
@@ -68,5 +68,46 @@ describe("placeToolbar", () => {
     placeToolbar(element, table(300, 500));
 
     expect(measure).toHaveBeenCalled();
+  });
+});
+
+describe("placeTip", () => {
+  const box = (left: number, top: number, width: number, height = 28) =>
+    ({
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+    }) as DOMRect;
+
+  it("puts the tooltip above its control, centered on it", () => {
+    const element = toolbar(80, 24);
+    placeTip(element, box(500, 400, 28), 0);
+
+    expect(element.style.left).toBe(`${514 - 40}px`);
+    expect(element.style.top).toBe(`${400 - 6 - 24}px`);
+  });
+
+  it("puts it below where the top bar leaves no room", () => {
+    const element = toolbar(80, 24);
+    placeTip(element, box(500, 40, 28), 0);
+
+    expect(element.style.top).toBe(`${68 + 6}px`);
+  });
+
+  it("puts it at the pointer on a wide control", () => {
+    const element = toolbar(80, 24);
+    placeTip(element, box(100, 400, 600), 300);
+
+    expect(element.style.left).toBe("260px");
+  });
+
+  it("keeps it in the window", () => {
+    const element = toolbar(80, 24);
+    placeTip(element, box(1010, 400, 14), 0);
+
+    expect(element.style.left).toBe(`${1024 - 4 - 80}px`);
   });
 });
