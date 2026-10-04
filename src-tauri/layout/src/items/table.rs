@@ -109,10 +109,10 @@ fn bar_decos(bars: &[f32], next: Option<&CellBlock>, left: f32, y: f32, height: 
         .collect()
 }
 
-/// lays out a cell in its columns, from the top of its row
-/// * `at` - its row and column, and the columns and rows it spans
-/// * `place` - where its columns start, and the width of its text
-/// * `room` - how tall a page's text is, which an image never is taller than
+/// lays out a cell, given its row and column and the columns and rows it
+/// spans, where its columns start and how wide its text is, from the top of
+/// its row; `room` is how tall a page's text is, which an image in it never
+/// is taller than
 fn lay_out_cell(
     fonts: &mut Fonts,
     cell: &crate::model::Cell,
@@ -572,8 +572,8 @@ fn group_decos(
 
 /// slices rows taller than a page between each of their lines, so the rows
 /// start on the page they come to and fill the pages after. An image, and
-/// the lines of alt texts, aren't cut either.
-/// * `slice_room` - the room of a slice, the first one's or another's
+/// the lines of alt texts, aren't cut either. `slice_room` gives the room
+/// of the first slice or of another.
 fn slice_group(
     group: &Group,
     texts: &[TextBox],

@@ -160,9 +160,9 @@ impl Engine {
 
     /// puts the pages paginated again in place of the old ones from `from`:
     /// up to the old page they settled on, whose pages and fragments stay
-    /// after them, moved by what the new ones changed, or else all of them
-    /// @returns where the fragments that stay started before, and how far
-    /// they moved
+    /// after them, moved by what the new ones changed, or else all of them.
+    /// Returns where the fragments that stay started before, and how far
+    /// they moved.
     fn splice_pages(
         &mut self,
         from: usize,
@@ -266,8 +266,8 @@ impl Engine {
     /// again (`repaginated`, from `from`) keep the old page's where they show
     /// the same, the moved ones keep theirs, and the rest get new ones, as
     /// all do without a change. Band texts are written again on the pages
-    /// paginated again, or on all (`all_bands`).
-    /// @returns the pages whose bodies and bands changed
+    /// paginated again, or on all (`all_bands`). Returns the pages whose
+    /// bodies and bands changed.
     fn assign_versions(
         &mut self,
         changed: bool,
