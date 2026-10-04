@@ -8,6 +8,7 @@ import { transaction, uiTakesFocus } from "../state";
 import {
   alignmentGuard,
   autocomplete,
+  pastedLinks,
   blockRemovals,
   blockTools,
   contextMenu,
@@ -79,6 +80,7 @@ export const bootEditor = async () => {
         properties(),
         tableGuard(),
         alignmentGuard(),
+        pastedLinks(),
         tableView(),
         tableHandles(),
         // before tableEditing, whose paste it wraps

@@ -64,6 +64,7 @@ const marked = schema.node("paragraph", null, [
   schema.text("bold ", [schema.marks.strong.create()]),
   schema.text("italic ", [schema.marks.em.create()]),
   schema.text("code ", [schema.marks.code.create()]),
+  schema.text("underlined ", [schema.marks.underline.create()]),
   schema.text("link", [
     schema.marks.link.create({ href: "https://example.org" }),
   ]),

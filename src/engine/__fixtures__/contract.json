@@ -18,7 +18,7 @@
     {
       "kind": "text",
       "pos": 10,
-      "text": "bold italic code link",
+      "text": "bold italic code underlined link",
       "spans": [
         {
           "from": 0,
@@ -37,7 +37,12 @@
         },
         {
           "from": 17,
-          "to": 21,
+          "to": 28,
+          "underline": true
+        },
+        {
+          "from": 28,
+          "to": 32,
           "link": "https://example.org"
         }
       ],
@@ -52,7 +57,7 @@
     },
     {
       "kind": "text",
-      "pos": 34,
+      "pos": 45,
       "text": "quoted",
       "spans": [],
       "style": "p",
@@ -68,7 +73,7 @@
     },
     {
       "kind": "text",
-      "pos": 42,
+      "pos": 53,
       "text": "more quoted",
       "spans": [],
       "style": "p",
@@ -84,7 +89,7 @@
     },
     {
       "kind": "text",
-      "pos": 58,
+      "pos": 69,
       "text": "first",
       "spans": [],
       "style": "p",
@@ -99,7 +104,7 @@
     },
     {
       "kind": "break",
-      "pos": 64,
+      "pos": 75,
       "indent": 18,
       "before": 2,
       "after": 10,
@@ -108,7 +113,7 @@
     },
     {
       "kind": "text",
-      "pos": 70,
+      "pos": 81,
       "text": "item",
       "spans": [],
       "style": "p",
@@ -123,7 +128,7 @@
     },
     {
       "kind": "image",
-      "pos": 78,
+      "pos": 89,
       "src": "top.png",
       "width": 120,
       "height": 80,
@@ -136,7 +141,7 @@
     },
     {
       "kind": "text",
-      "pos": 81,
+      "pos": 92,
       "text": "centered",
       "spans": [],
       "style": "p",
@@ -151,7 +156,7 @@
     },
     {
       "kind": "text",
-      "pos": 91,
+      "pos": 102,
       "text": "to the right",
       "spans": [],
       "style": "h2",
@@ -167,7 +172,7 @@
     },
     {
       "kind": "image",
-      "pos": 105,
+      "pos": 116,
       "src": "centered.png",
       "width": 120,
       "height": 80,
@@ -181,7 +186,7 @@
     },
     {
       "kind": "text",
-      "pos": 108,
+      "pos": 119,
       "text": "code",
       "spans": [],
       "style": "code",
@@ -195,7 +200,7 @@
     },
     {
       "kind": "rule",
-      "pos": 113,
+      "pos": 124,
       "indent": 0,
       "before": 14,
       "after": 30,
@@ -204,8 +209,8 @@
     },
     {
       "kind": "table",
-      "pos": 114,
-      "end": 193,
+      "pos": 125,
+      "end": 204,
       "rows": [
         {
           "header": true,
@@ -214,7 +219,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 118,
+                  "pos": 129,
                   "text": "left",
                   "spans": [],
                   "style": "p",
@@ -232,7 +237,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 126,
+                  "pos": 137,
                   "text": "right",
                   "spans": [],
                   "style": "p",
@@ -255,7 +260,7 @@
               "paragraphs": [
                 {
                   "kind": "text",
-                  "pos": 137,
+                  "pos": 148,
                   "text": "wide",
                   "spans": [],
                   "style": "p",
@@ -278,7 +283,7 @@
               "blocks": [
                 {
                   "kind": "text",
-                  "pos": 147,
+                  "pos": 158,
                   "text": "code in a cell",
                   "spans": [],
                   "style": "code",
@@ -289,7 +294,7 @@
                 },
                 {
                   "kind": "text",
-                  "pos": 165,
+                  "pos": 176,
                   "text": "a list",
                   "spans": [],
                   "style": "p",
@@ -310,7 +315,7 @@
               "blocks": [
                 {
                   "kind": "image",
-                  "pos": 177,
+                  "pos": 188,
                   "src": "cell.png",
                   "width": 120,
                   "height": 80,
@@ -320,7 +325,7 @@
                 },
                 {
                   "kind": "text",
-                  "pos": 181,
+                  "pos": 192,
                   "text": "a quote",
                   "spans": [],
                   "style": "p",
@@ -353,7 +358,7 @@
     },
     {
       "kind": "toc",
-      "pos": 193,
+      "pos": 204,
       "title": "Contents",
       "depth": 2,
       "entries": [
@@ -374,7 +379,7 @@
     },
     {
       "kind": "boxed",
-      "pos": 194,
+      "pos": 205,
       "label": "Blank can't show this block (chart@3) and keeps it as it is",
       "indent": 0,
       "before": 0,
@@ -384,7 +389,7 @@
     },
     {
       "kind": "image",
-      "pos": 195,
+      "pos": 206,
       "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2260%22%2F%3E",
       "width": 170.07874015748033,
       "height": 113.38582677165354,
@@ -397,7 +402,7 @@
     },
     {
       "kind": "text",
-      "pos": 199,
+      "pos": 210,
       "text": "Ann Example",
       "spans": [],
       "style": "p",
@@ -418,7 +423,7 @@
     },
     {
       "kind": "text",
-      "pos": 212,
+      "pos": 223,
       "text": "Long Street 12",
       "spans": [],
       "style": "p",
@@ -437,7 +442,7 @@
     },
     {
       "kind": "text",
-      "pos": 230,
+      "pos": 241,
       "text": "Bea · Hill Road 3",
       "spans": [],
       "style": "small",
@@ -457,7 +462,7 @@
     },
     {
       "kind": "text",
-      "pos": 251,
+      "pos": 262,
       "text": "",
       "spans": [],
       "style": "h1",
@@ -473,7 +478,7 @@
     },
     {
       "kind": "text",
-      "pos": 255,
+      "pos": 266,
       "text": "",
       "spans": [],
       "style": "p",
@@ -504,7 +509,7 @@
     },
     {
       "kind": "text",
-      "pos": 259,
+      "pos": 270,
       "text": "a note",
       "spans": [],
       "style": "p",

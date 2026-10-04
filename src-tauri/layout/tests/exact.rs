@@ -469,6 +469,53 @@ fn the_pdf_holds_aligned_text() {
     compare(&mut engine, "aligned");
 }
 
+/// how many paths a PDF draws, in its uncompressed content (krilla writes a
+/// rectangle as a path of lines)
+fn paths(pdf: &[u8], name: &str) -> Option<usize> {
+    let path = std::env::temp_dir().join(format!("blank-layout-{name}.pdf"));
+    let plain = std::env::temp_dir().join(format!("blank-layout-{name}-qdf.pdf"));
+    std::fs::write(&path, pdf).unwrap();
+    run(
+        "qpdf",
+        &[
+            "--qdf",
+            "--object-streams=disable",
+            path.to_str().unwrap(),
+            plain.to_str().unwrap(),
+        ],
+    )?;
+    let bytes = std::fs::read(plain).unwrap();
+    Some(
+        String::from_utf8_lossy(&bytes)
+            .lines()
+            .filter(|line| line.contains(" m ") && line.ends_with(" l"))
+            .count(),
+    )
+}
+
+#[test]
+fn the_pdf_underlines_underlined_text() {
+    let pdf = |underline: bool| {
+        let span = Span {
+            from: 5,
+            to: 10,
+            underline,
+            ..Default::default()
+        };
+        let mut engine = Engine::new(repository_fonts());
+        engine.set_settings(settings());
+        engine.set_items(vec![text_item(1, "Some words here.", "p", 0, vec![span])]);
+        pdf_of(&mut engine)
+    };
+    let (Some(plain), Some(underlined)) =
+        (paths(&pdf(false), "plain"), paths(&pdf(true), "underlined"))
+    else {
+        eprintln!("qpdf is missing, skipping the check");
+        return;
+    };
+    assert_eq!(underlined, plain + 1);
+}
+
 /// the sample with a table of contents of its headings before it
 fn sample_with_toc() -> Vec<Item> {
     use blank_layout::model::TocEntry;

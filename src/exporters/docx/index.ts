@@ -19,7 +19,7 @@ import {
 import { pageGeometry } from "../../layout/resolve";
 import { alignOf, frontmatterOf } from "../../markdown";
 import { listStart } from "../../markdown/lists";
-import type { Alignment, NodeName } from "../../markdown/schema";
+import type { Alignment, MarkName, NodeName } from "../../markdown/schema";
 import type { TextAlignment } from "../../markdown/alignment";
 import {
   isListed,
@@ -854,6 +854,7 @@ class Serializer {
           text: node.text ?? "",
           bold: hasMark(node, "strong") || undefined,
           italics: hasMark(node, "em") || undefined,
+          underline: hasMark(node, "underline") ? {} : undefined,
           style: code ? STYLE.inlineCode : linked ? STYLE.hyperlink : undefined,
         });
       }
@@ -906,7 +907,7 @@ const indentOf = (position: Position) =>
   QUOTE_INDENT * position.quotes +
   (position.level >= 0 ? LIST_INDENT * (position.level + 1) : 0);
 
-const hasMark = (node: Node, name: string) =>
+const hasMark = (node: Node, name: MarkName) =>
   node.marks.some((mark: Mark) => mark.type.name === name);
 
 // the href of a linked text node; links to anchors have nothing to point to

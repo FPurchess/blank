@@ -20,6 +20,7 @@ export interface EngineSpan {
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
+  underline?: boolean;
   link?: string;
 }
 

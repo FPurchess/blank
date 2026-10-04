@@ -1,6 +1,7 @@
 import { schema as base } from "prosemirror-markdown";
 import {
   type AttributeSpec,
+  type MarkSpec,
   type Node,
   NodeSpec,
   Schema,
@@ -315,6 +316,23 @@ const nodes = base.spec.nodes
     table_header: cells.table_header,
   });
 
+// underlined text, written <u>…</u> in markdown (see ./tokenizer.ts)
+const underline: MarkSpec = {
+  parseDOM: [
+    { tag: "u" },
+    { tag: "ins" },
+    {
+      style: "text-decoration",
+      getAttrs: (value) => (/\bunderline\b/.test(value) ? null : false),
+    },
+    {
+      style: "text-decoration-line",
+      getAttrs: (value) => (/\bunderline\b/.test(value) ? null : false),
+    },
+  ],
+  toDOM: () => ["u", 0],
+};
+
 // Blank's markdown schema: the prosemirror-markdown schema with the table
 // nodes of prosemirror-tables, whose doc also keeps the file's frontmatter
 // (the YAML block at its top) as it was written, or null if the file has
@@ -328,7 +346,9 @@ export const schema = new Schema({
       all.update(name, { ...all.get(name), group: "block field_content" }),
     nodes,
   ),
-  marks: base.spec.marks,
+  // before code, which prosemirror-markdown's serializer takes as the last
+  // mark of a text
+  marks: base.spec.marks.addBefore("code", "underline", underline),
 });
 
 // the names of the schema's nodes and marks, which code that handles every
@@ -360,7 +380,13 @@ export const NODE_NAMES = [
   "unknown_block",
 ] as const;
 export type NodeName = (typeof NODE_NAMES)[number];
-export const MARK_NAMES = ["em", "strong", "link", "code"] as const;
+export const MARK_NAMES = [
+  "em",
+  "strong",
+  "link",
+  "underline",
+  "code",
+] as const;
 export type MarkName = (typeof MARK_NAMES)[number];
 
 /**

@@ -17,6 +17,8 @@ pub struct Span {
     #[serde(default)]
     pub code: bool,
     #[serde(default)]
+    pub underline: bool,
+    #[serde(default)]
     pub link: Option<String>,
 }
 

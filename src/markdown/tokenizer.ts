@@ -21,6 +21,81 @@ const htmlBreak = (state: StateInline, silent: boolean): boolean => {
   return true;
 };
 
+/**
+ * underlined pushes `underline_open`, the inline tokens between `from` and
+ * `to` and `underline_close`, and goes on at `end`
+ */
+const underlined = (
+  state: StateInline,
+  from: number,
+  to: number,
+  end: number,
+) => {
+  const max = state.posMax;
+  state.push("underline_open", "u", 1);
+  state.pos = from;
+  state.posMax = to;
+  state.md.inline.tokenize(state);
+  state.push("underline_close", "u", -1);
+  state.posMax = max;
+  state.pos = end;
+};
+
+const UNDERLINE_OPEN = /^<(u|ins)>/i;
+
+/**
+ * htmlUnderline reads `<u>…</u>` and `<ins>…</ins>`, as Blank writes
+ * underlined text, with markdown inside. A tag without its closing tag in
+ * the same paragraph stays text, like any other HTML, as `html` is off.
+ */
+const htmlUnderline = (state: StateInline, silent: boolean): boolean => {
+  if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
+  const open = UNDERLINE_OPEN.exec(state.src.slice(state.pos, state.pos + 5));
+  if (!open) return false;
+  const close = `</${open[1].toLowerCase()}>`;
+  const start = state.pos;
+  const from = start + open[0].length;
+  // the closing tag outside code spans and the like, which skipToken steps
+  // over, as markdown-it finds the end of a link's text
+  state.pos = from;
+  let to = -1;
+  while (state.pos < state.posMax) {
+    if (
+      state.src.slice(state.pos, state.pos + close.length).toLowerCase() ===
+      close
+    ) {
+      to = state.pos;
+      break;
+    }
+    state.md.inline.skipToken(state);
+  }
+  state.pos = start;
+  if (to < 0) return false;
+  if (!silent) underlined(state, from, to, to + close.length);
+  else state.pos = to + close.length;
+  return true;
+};
+
+const UNDERLINE_CLASS = /^\{\s*\.(underline|ul)\s*\}/;
+
+/**
+ * bracketUnderline reads pandoc's underlined spans, `[text]{.underline}` and
+ * `[text]{.ul}`
+ */
+const bracketUnderline = (state: StateInline, silent: boolean): boolean => {
+  if (state.src.charCodeAt(state.pos) !== 0x5b /* [ */) return false;
+  const labelEnd = state.md.helpers.parseLinkLabel(state, state.pos, false);
+  if (labelEnd < 0) return false;
+  const attrs = UNDERLINE_CLASS.exec(
+    state.src.slice(labelEnd + 1, state.posMax),
+  );
+  if (!attrs) return false;
+  const end = labelEnd + 1 + attrs[0].length;
+  if (!silent) underlined(state, state.pos + 1, labelEnd, end);
+  else state.pos = end;
+  return true;
+};
+
 const reTableTag = /<(\/?)table(?=[\s>]|$)/gi;
 
 /**
@@ -242,6 +317,8 @@ export const tokenizer = MarkdownIt("commonmark", { html: false }).enable(
   "table",
 );
 tokenizer.inline.ruler.before("html_inline", "html_break", htmlBreak);
+tokenizer.inline.ruler.before("html_inline", "html_underline", htmlUnderline);
+tokenizer.inline.ruler.before("link", "bracket_underline", bracketUnderline);
 tokenizer.block.ruler.before("html_block", "html_table", htmlTable, {
   alt: ["paragraph", "reference", "blockquote"],
 });

@@ -17,6 +17,7 @@ import {
   withoutNestedAlignment,
 } from "../../markdown";
 import { mapTables, withColumnAlignment } from "../../markdown/tables";
+import { withoutLinkUnderline } from "../../markdown/marks";
 import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
 import { type WordLayout, pageChanges } from "./layout";
 import { type WordProperties, prepareDocx } from "./prepare";
@@ -162,8 +163,11 @@ export const importDocx = async (
   const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
   // only blocks at the top keep an alignment (src/markdown/alignment.ts), and
   // a column the alignment its body cells agree on, as markdown aligns
+  // and links aren't underlined, which Word does with a style
   const body = withoutNestedAlignment(
-    parsed.copy(mapTables(parsed.content, withColumnAlignment)),
+    parsed.copy(
+      withoutLinkUnderline(mapTables(parsed.content, withColumnAlignment)),
+    ),
   );
   const { frontmatter, page } = frontmatterOf(
     properties,

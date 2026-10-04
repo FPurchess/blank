@@ -582,6 +582,21 @@ describe("importers.docx", () => {
       ).toBe("| a   |   b |\n| --- | --: |\n| c   |   d |");
     });
 
+    it("keeps underlined text, and leaves links without it", async () => {
+      expect(
+        await roundTrip("plain <u>under</u> [link](https://example.org)"),
+      ).toBe("plain <u>under</u> [link](https://example.org)");
+      // Word underlines a link a user underlined by hand too
+      const bytes = await rewriteDocx(
+        await exportDocx("[link](https://example.org)"),
+        "word/document.xml",
+        (xml) => xml!.replace(/<w:rPr>/g, '<w:rPr><w:u w:val="single"/>'),
+      );
+      expect((await toMarkdown(bytes)).markdown).toBe(
+        "[link](https://example.org)",
+      );
+    });
+
     it("keeps the alignment of paragraphs and headings", async () => {
       const aligned = [
         '<div align="center">\n\n# Title\n\nCentered.\n\n</div>',

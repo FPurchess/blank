@@ -1264,3 +1264,19 @@ describe("exporter.docx alignment", () => {
     expect(all(settings, "doNotExpandShiftReturn")).toHaveLength(1);
   });
 });
+
+describe("exporter.docx underline", () => {
+  it("underlines underlined runs", async () => {
+    const exported = await exportMarkdown("plain <u>under</u>");
+    const runs = all(await exported.xml("word/document.xml"), "r").map((r) => [
+      all(r, "t")
+        .map((t) => t.textContent)
+        .join(""),
+      attr(child(r, "u"), "val"),
+    ]);
+    expect(runs).toEqual([
+      ["plain ", null],
+      ["under", "single"],
+    ]);
+  });
+});

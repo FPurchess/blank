@@ -5,7 +5,7 @@ use parley::Alignment;
 
 use super::Engine;
 use crate::bands::{BAND_DISTANCE, BAND_LINE};
-use crate::fonts::{Fonts, INK_CODE};
+use crate::fonts::{Fonts, INK_CODE, INK_UNDERLINE};
 use crate::items::{leaders, Deco, Role};
 use crate::model::{Content, Text, TextKind};
 use crate::style::BAR;
@@ -434,7 +434,9 @@ fn push_text_ops(
                 y: run.baseline + offset,
                 w: run.width,
                 h: thickness,
-                role: if role == Role::Text {
+                // a link's underline is softer than the text, an underline
+                // the text's own, also on a link
+                role: if role == Role::Text && run.ink & INK_UNDERLINE == 0 {
                     Role::LinkLine
                 } else {
                     role
@@ -554,6 +556,37 @@ mod tests {
         assert!(right > center + 100.0, "{center} {right}");
         // justify leaves a paragraph's only line as it is
         assert_eq!(caret_x(Some("justify")), left);
+    }
+
+    #[test]
+    fn underlines_text_in_its_ink_and_links_softer() {
+        let lines = |underline: bool, link: bool| {
+            let mut item = paragraph(1, "word");
+            if let Content::Text(text) = &mut item.content {
+                text.spans = vec![crate::model::Span {
+                    from: 0,
+                    to: 4,
+                    underline,
+                    link: link.then(|| "https://example.org".into()),
+                    ..Default::default()
+                }];
+            }
+            engine(vec![item])
+                .page_ops(0, false)
+                .iter()
+                .filter_map(|op| match op {
+                    Op::Rect { role, .. } if matches!(role, Role::Text | Role::LinkLine) => {
+                        Some(*role)
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(lines(true, false), [Role::Text]);
+        assert_eq!(lines(false, true), [Role::LinkLine]);
+        // one line under an underlined link, in the text's ink
+        assert_eq!(lines(true, true), [Role::Text]);
+        assert!(lines(false, false).is_empty());
     }
 
     #[test]

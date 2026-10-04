@@ -1,4 +1,5 @@
 export { alignmentGuard } from "./alignment";
+export { pastedLinks } from "./pastedLinks";
 export { default as autocomplete } from "./autocomplete";
 export { default as images } from "./images";
 export { contextMenuPlugin as contextMenu } from "./contextMenu";

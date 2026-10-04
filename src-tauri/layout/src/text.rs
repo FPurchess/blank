@@ -8,7 +8,7 @@ use parley::{
     OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
 };
 
-use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE};
+use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE, INK_UNDERLINE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
 use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE};
 
@@ -59,7 +59,8 @@ pub struct GlyphRun {
     pub size: f32,
     pub ink: Ink,
     pub glyphs: Vec<Glyph>,
-    /// the underline of a link: its offset below the baseline and thickness
+    /// the underline of a link or of underlined text: its offset below the
+    /// baseline and thickness
     pub underline: Option<(f32, f32)>,
     pub baseline: f32,
     pub x: f32,
@@ -600,6 +601,10 @@ fn push_span(
     }
     if span.code {
         ink |= INK_CODE;
+    }
+    if span.underline {
+        builder.push(StyleProperty::Underline(true), range.clone());
+        ink |= INK_UNDERLINE;
     }
     if ink != 0 {
         builder.push(StyleProperty::Brush(ink), range);

@@ -133,15 +133,19 @@ const spanOf = (
     if (mark.type.name === "strong") span.bold = true;
     else if (mark.type.name === "em") span.italic = true;
     else if (mark.type.name === "code") span.code = true;
+    else if (mark.type.name === "underline") span.underline = true;
     else if (mark.type.name === "link") span.link = mark.attrs.href as string;
   }
-  return span.bold || span.italic || span.code || span.link ? span : null;
+  return span.bold || span.italic || span.code || span.underline || span.link
+    ? span
+    : null;
 };
 
 const sameMarks = (a: EngineSpan, b: EngineSpan) =>
   !!a.bold === !!b.bold &&
   !!a.italic === !!b.italic &&
   !!a.code === !!b.code &&
+  !!a.underline === !!b.underline &&
   a.link === b.link;
 
 const styleOf = (node: Node): TextStyle => {

@@ -14,7 +14,19 @@ import { alignOf } from "./alignment";
 import { schema } from "./schema";
 import { gfmBlocker, gfmLines, htmlLines } from "./tables";
 
-const { nodes, marks } = defaultMarkdownSerializer;
+const { nodes } = defaultMarkdownSerializer;
+
+// the marks as markdown writes them, and underlines as HTML, which
+// tokenizer.ts reads back
+const marks = {
+  ...defaultMarkdownSerializer.marks,
+  underline: {
+    open: "<u>",
+    close: "</u>",
+    mixable: true,
+    expelEnclosingWhitespace: true,
+  },
+};
 
 // the HTML Blank reads typed as text is escaped, so it stays text on reopen,
 // e.g. a line `<!-- pagebreak -->` that would become a page break, or a

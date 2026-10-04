@@ -13,9 +13,11 @@ use skrifa::raw::TableProvider;
 use skrifa::{FontRef, GlyphId, MetadataProvider};
 
 /// what a glyph run is painted with, packed into the brush of Parley: the
-/// link it belongs to (1-based, 0 for none) and whether it is code
+/// link it belongs to (1-based, 0 for none), whether it is code and whether
+/// it is underlined (a link's underline is drawn as the link's)
 pub type Ink = u32;
 pub const INK_CODE: Ink = 1 << 16;
+pub const INK_UNDERLINE: Ink = 1 << 17;
 
 pub fn ink_link(ink: Ink) -> Option<usize> {
     let link = (ink & 0xffff) as usize;

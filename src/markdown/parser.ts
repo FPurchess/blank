@@ -51,6 +51,7 @@ export const markdownParser = new MarkdownParser(
         align: blockAlign(token),
       }),
     },
+    underline: { mark: "underline" },
     table: { block: "table" },
     thead: { ignore: true },
     tbody: { ignore: true },

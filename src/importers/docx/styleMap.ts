@@ -92,6 +92,8 @@ export const STYLE_MAP = [
     ([align, style]) =>
       `r.${style} => span.${alignClass(align as WordAlignment)}`,
   ),
+  // underlined runs; links' underlines go in importDocx
+  "u => u",
   // renders comments, only to count them (see cleanup.ts)
   "comment-reference => sup",
 ];
