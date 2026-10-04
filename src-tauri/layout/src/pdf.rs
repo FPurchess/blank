@@ -43,16 +43,20 @@ pub struct Info {
     pub date: String,
 }
 
+/// the number the ASCII digits of `text` at `range` write, if they all are
+/// digits
+fn digits<T: std::str::FromStr>(text: &str, range: std::ops::Range<usize>) -> Option<T> {
+    let part = text.get(range)?;
+    if !part.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    part.parse().ok()
+}
+
 /// reads an ISO 8601 date and time (`YYYY-MM-DDTHH:MM:SS`, optionally with
 /// fractions of a second, and `Z` or an offset `±HH:MM`)
 fn parse_date(text: &str) -> Option<DateTime> {
-    let number = |range: std::ops::Range<usize>| -> Option<u16> {
-        let digits = text.get(range)?;
-        if !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-            return None;
-        }
-        digits.parse().ok()
-    };
+    let number = |range| digits::<u16>(text, range);
     let bytes = text.as_bytes();
     let separators = [(4, b'-'), (7, b'-'), (10, b'T'), (13, b':'), (16, b':')];
     if separators.iter().any(|&(at, byte)| {
@@ -98,14 +102,7 @@ fn parse_date(text: &str) -> Option<DateTime> {
     if offset.len() != 5 || offset.as_bytes()[2] != b':' {
         return None;
     }
-    let digits = |range: std::ops::Range<usize>| -> Option<u8> {
-        let part = offset.get(range)?;
-        if !part.bytes().all(|byte| byte.is_ascii_digit()) {
-            return None;
-        }
-        part.parse().ok()
-    };
-    let (hours, minutes) = (digits(0..2)?, digits(3..5)?);
+    let (hours, minutes): (u8, u8) = (digits(offset, 0..2)?, digits(offset, 3..5)?);
     if hours > 23 || minutes > 59 {
         return None;
     }
@@ -144,6 +141,25 @@ fn fill(role: Role) -> Fill {
         opacity: NormalizedF32::ONE,
         rule: Default::default(),
     }
+}
+
+/// what a part of a page that isn't text of the document is, as an
+/// artifact: its decorations, headers and footers, and the header rows a
+/// table repeats; None for the text, which is tagged
+fn artifact_of(part: Part) -> Option<ArtifactType> {
+    match part {
+        Part::Decoration => Some(ArtifactType::Other),
+        Part::Band { footer: false } => Some(ArtifactType::Header),
+        Part::Band { footer: true } => Some(ArtifactType::Footer),
+        Part::Repeat => Some(ArtifactType::PaginationOther),
+        _ => None,
+    }
+}
+
+/// a rectangle on the page, at least a hundredth of a point wide and tall,
+/// so a hairline still shows; None where it can't be one
+fn page_rect(x: f32, y: f32, w: f32, h: f32) -> Option<Rect> {
+    Rect::from_xywh(x, y, w.max(0.01), h.max(0.01))
 }
 
 /// The missing glyph (0) stands for every character a font doesn't have,
@@ -561,27 +577,15 @@ fn attempt(
                 }
                 // what isn't content of the document is an artifact, and the
                 // rest is tagged, for the structure to hold it
-                let tag = match part {
-                    Part::Decoration => {
-                        ContentTag::Artifact(Artifact::new(ArtifactType::Other, None))
-                    }
-                    Part::Band { footer: false } => {
-                        ContentTag::Artifact(Artifact::new(ArtifactType::Header, None))
-                    }
-                    Part::Band { footer: true } => {
-                        ContentTag::Artifact(Artifact::new(ArtifactType::Footer, None))
-                    }
-                    Part::Repeat => {
-                        ContentTag::Artifact(Artifact::new(ArtifactType::PaginationOther, None))
-                    }
-                    _ => ContentTag::Span(SpanTag::empty()),
+                let artifact = artifact_of(part);
+                let tag = match artifact {
+                    Some(kind) => ContentTag::Artifact(Artifact::new(kind, None)),
+                    None => ContentTag::Span(SpanTag::empty()),
                 };
                 // what can't be drawn is left out before its tag opens: a
                 // tagged section must be closed on every path
                 let drawable = match &op {
-                    Op::Rect { x, y, w, h, .. } => {
-                        Rect::from_xywh(*x, *y, w.max(0.01), h.max(0.01)).is_some()
-                    }
+                    Op::Rect { x, y, w, h, .. } => page_rect(*x, *y, *w, *h).is_some(),
                     Op::Glyphs { run, .. } => fonts.get(run.font).is_some(),
                     _ => true,
                 };
@@ -589,13 +593,13 @@ fn attempt(
                     continue;
                 }
                 let id = surface.start_tagged(tag);
-                if !matches!(part, Part::Decoration | Part::Band { .. } | Part::Repeat) {
+                if artifact.is_none() {
                     order += 1;
                     ids.entry(part).or_default().push((order, id));
                 }
                 match op {
                     Op::Rect { x, y, w, h, role } => {
-                        let rect = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01));
+                        let rect = page_rect(x, y, w, h);
                         let mut builder = PathBuilder::new();
                         if let Some(rect) = rect {
                             builder.push_rect(rect);
@@ -657,7 +661,7 @@ fn attempt(
             surface.finish();
         }
         for (href, x, y, w, h, part) in links {
-            if let Some(rect) = Rect::from_xywh(x, y, w.max(0.01), h.max(0.01)) {
+            if let Some(rect) = page_rect(x, y, w, h) {
                 let target = Target::Action(Action::Link(LinkAction::new(href.clone())));
                 let annotation =
                     Annotation::new_link(LinkAnnotation::new(rect, target), Some(href));

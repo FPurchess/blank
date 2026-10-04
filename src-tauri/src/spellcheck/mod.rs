@@ -66,25 +66,22 @@ pub struct Status {
 
 #[tauri::command]
 pub fn spellcheck_status(app: AppHandle, tag: String) -> Result<Status> {
-    let Ok((tag, entry)) = entry(&tag) else {
-        return Ok(Status {
-            available: false,
-            installed: false,
-            outdated: false,
-        });
+    let (available, installed, outdated) = match entry(&tag) {
+        Err(_) => (false, false, false),
+        Ok((_, entry)) if entry.bundled => (true, true, false),
+        Ok((tag, entry)) => {
+            let installed = store::installed(&root(&app)?, tag);
+            (
+                true,
+                installed.is_some(),
+                installed.is_some_and(|version| version != entry.version),
+            )
+        }
     };
-    if entry.bundled {
-        return Ok(Status {
-            available: true,
-            installed: true,
-            outdated: false,
-        });
-    }
-    let installed = store::installed(&root(&app)?, tag);
     Ok(Status {
-        available: true,
-        installed: installed.is_some(),
-        outdated: installed.is_some_and(|version| version != entry.version),
+        available,
+        installed,
+        outdated,
     })
 }
 
@@ -166,36 +163,42 @@ pub fn spellcheck_unload(state: State<'_, SpellState>) {
     *state.speller.write().unwrap() = None;
 }
 
-// async and on a blocking thread, so a dictionary that is being rebuilt, e.g.
-// after removing a word, never blocks the window
-#[tauri::command]
-pub async fn spellcheck_check(
+/// runs `ask` on the loaded dictionary, async and on a blocking thread, so a
+/// dictionary that is being rebuilt, e.g. after removing a word, never blocks
+/// the window
+async fn ask_speller<T: Send + 'static>(
     state: State<'_, SpellState>,
-    words: Vec<String>,
-) -> Result<Vec<bool>> {
+    ask: impl FnOnce(&Speller) -> T + Send + 'static,
+) -> Result<T> {
     let speller = state.speller.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let speller = speller.read().unwrap();
-        let speller = speller.as_ref().ok_or("NotLoaded")?;
-        Ok(words.iter().map(|word| speller.dict.check(word)).collect())
+        Ok(ask(speller.as_ref().ok_or("NotLoaded")?))
     })
     .await
     .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
+pub async fn spellcheck_check(
+    state: State<'_, SpellState>,
+    words: Vec<String>,
+) -> Result<Vec<bool>> {
+    ask_speller(state, move |speller| {
+        words.iter().map(|word| speller.dict.check(word)).collect()
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn spellcheck_suggest(state: State<'_, SpellState>, word: String) -> Result<Vec<String>> {
-    let speller = state.speller.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let speller = speller.read().unwrap();
-        let speller = speller.as_ref().ok_or("NotLoaded")?;
+    ask_speller(state, move |speller| {
         let mut suggestions = vec![];
         speller.dict.suggest(&word, &mut suggestions);
         suggestions.truncate(MAX_SUGGESTIONS);
-        Ok(suggestions)
+        suggestions
     })
     .await
-    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
