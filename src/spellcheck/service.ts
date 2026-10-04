@@ -2,6 +2,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { watch } from "vue";
 
 import { language, spellcheck, spellchecker, spellcheckStatus } from "../state";
+import { errorMessage } from "../errors";
 import * as ipc from "./ipc";
 import type { Spellchecker } from "./types";
 import { dictionaryKey, forms, readWords, writeWords } from "./userDictionary";
@@ -19,9 +20,6 @@ export const languageName = (tag: string) => {
     return tag;
   }
 };
-
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
 
 /**
  * matchCase returns `suggestion` in the case of `word`: in capitals if the

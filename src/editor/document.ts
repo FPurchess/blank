@@ -16,6 +16,7 @@ import {
 } from "../storage";
 import { basename, extname } from "../paths";
 import { errorMessage } from "../errors";
+import { UNREADABLE_EXTENSIONS, WORD_EXTENSIONS } from "../formats";
 
 import welcomeMessage from "./welcome.md?raw";
 
@@ -74,10 +75,6 @@ export const restoreDocument = async (
   return applyDocument(state, doc, await getPathfromStorage());
 };
 
-// Word documents, which are imported into an untitled markdown document
-export const WORD_EXTENSIONS = ["docx", "docm", "dotx", "dotm"];
-// document formats Blank can't read, which aren't markdown either
-export const UNREADABLE_EXTENSIONS = ["doc", "odt", "rtf", "pages"];
 // Word documents larger than this are refused
 export const MAX_WORD_BYTES = 50 * 1024 * 1024;
 
@@ -138,10 +135,17 @@ export const readDocumentFromFile = async (
   silent = false,
 ): Promise<EditorState | undefined> => {
   if (!path) return;
+  // logs why a file can't be opened, and tells the user unless `silent`
+  const report = (log: string, message: string) => {
+    console.error(log);
+    if (!silent) sendNotification(message);
+  };
   const resolvedPath = await tauriPath.resolve(path);
   if (!(await exists(resolvedPath))) {
-    console.error(`File does not exist: ${resolvedPath}`);
-    if (!silent) sendNotification(`File not found: ${resolvedPath}`);
+    report(
+      `File does not exist: ${resolvedPath}`,
+      `File not found: ${resolvedPath}`,
+    );
     return;
   }
 
@@ -150,12 +154,10 @@ export const readDocumentFromFile = async (
     return importWordDocument(state, resolvedPath, silent);
   }
   if (UNREADABLE_EXTENSIONS.includes(extension)) {
-    console.error(`Can't read .${extension} files: ${resolvedPath}`);
-    if (!silent) {
-      sendNotification(
-        `Blank can't read .${extension} files. Save it as .docx and open that.`,
-      );
-    }
+    report(
+      `Can't read .${extension} files: ${resolvedPath}`,
+      `Blank can't read .${extension} files. Save it as .docx and open that.`,
+    );
     return;
   }
 
@@ -164,8 +166,8 @@ export const readDocumentFromFile = async (
     const content = await readTextFile(resolvedPath);
     doc = parseMarkdown(content);
   } catch (err) {
-    console.error(`Failed to read file: ${errorMessage(err)}`);
-    if (!silent) sendNotification(`Failed to read file: ${errorMessage(err)}`);
+    const message = `Failed to read file: ${errorMessage(err)}`;
+    report(message, message);
     return;
   }
   if (doc) {

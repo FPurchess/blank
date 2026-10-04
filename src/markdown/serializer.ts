@@ -41,11 +41,9 @@ const cellText = (cell: Node): string =>
     .replace(/\|/g, "\\|");
 
 const hasHardBreak = (node: Node) => {
-  let found = false;
-  node.forEach((child) => {
-    if (child.type.name === "hard_break") found = true;
-  });
-  return found;
+  for (let index = 0; index < node.childCount; index++)
+    if (node.child(index).type.name === "hard_break") return true;
+  return false;
 };
 
 /**

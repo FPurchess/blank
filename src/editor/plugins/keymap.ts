@@ -42,6 +42,7 @@ import { CommandIdentifier, getKeyBinding } from "../../config";
 import { Command } from "prosemirror-state";
 import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
+import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 
 export { normalizeBinding };
@@ -101,10 +102,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.FILE_SAVE_AS]: saveFile({ force: true }),
   [CommandIdentifier.FILE_OPEN]: openFile(),
   [CommandIdentifier.EXPORT_PDF]: exportAs("PDF-Export", exporters.toPDF, [
-    { name: "PDF-File", extensions: ["pdf"] },
+    PDF_FILTER,
   ]),
   [CommandIdentifier.EXPORT_DOCX]: exportAs("Word-Export", exporters.toDOCX, [
-    { name: "Word Document", extensions: ["docx"] },
+    WORD_FILTER,
   ]),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
@@ -125,26 +126,23 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
  */
 const bindCommands = () => {
   const invalid: string[] = [];
-  const bindings = Object.keys(commandMap).reduce(
-    (acc: { [key: string]: Command }, key: string) => {
-      const binding = getKeyBinding(key as CommandIdentifier);
-      const normalized = normalizeBinding(binding);
-      if (normalized === undefined) {
-        invalid.push(`${key}: ${binding}`);
-        return acc;
-      }
-      const command = commandMap[key as CommandIdentifier];
-      acc[normalized] = command;
-      // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
-      // on Windows, where the keymap can't fall back to the key code
-      if (/(^|-)shift-/i.test(normalized) && /-[a-z]$/.test(normalized)) {
-        acc[normalized.slice(0, -1) + normalized.slice(-1).toUpperCase()] ??=
-          command;
-      }
-      return acc;
-    },
-    {},
-  );
+  const bindings: Record<string, Command> = {};
+  const commands = Object.entries(commandMap) as [CommandIdentifier, Command][];
+  for (const [key, command] of commands) {
+    const binding = getKeyBinding(key);
+    const normalized = normalizeBinding(binding);
+    if (normalized === undefined) {
+      invalid.push(`${key}: ${binding}`);
+      continue;
+    }
+    bindings[normalized] = command;
+    // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
+    // on Windows, where the keymap can't fall back to the key code
+    if (/(^|-)shift-/i.test(normalized) && /-[a-z]$/.test(normalized)) {
+      bindings[normalized.slice(0, -1) + normalized.slice(-1).toUpperCase()] ??=
+        command;
+    }
+  }
   if (invalid.length > 0) {
     console.warn("ignored invalid key bindings", invalid);
     sendNotification(

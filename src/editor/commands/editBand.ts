@@ -22,6 +22,7 @@ import {
   pagePosition,
   path,
 } from "../../state";
+import { frontmatterOf } from "../../markdown";
 import { formatShortcut } from "../keyBindings";
 import { writePage } from "./frontmatter";
 
@@ -52,7 +53,7 @@ const chapterOf = (doc: EditorView["state"]["doc"]) => {
 const tellIfEmpty = (view: EditorView, band: Band) => {
   const { doc } = view.state;
   const { layout } = resolveLayout(
-    doc.attrs.frontmatter as string | null,
+    frontmatterOf(doc),
     config.value.layout.page,
   );
   const fields = documentFields(doc, path.value);
@@ -91,7 +92,7 @@ export const openBand = (view: EditorView, band: Band, insert?: string) => {
   const locale = systemLocale();
   const defaults = config.value.layout.page;
   const { settings } = resolveLayout(
-    view.state.doc.attrs.frontmatter as string | null,
+    frontmatterOf(view.state.doc),
     defaults,
     locale,
   );

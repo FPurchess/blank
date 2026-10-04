@@ -2,7 +2,7 @@ import { Plugin } from "prosemirror-state";
 import type { Node } from "prosemirror-model";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
 
-import { propertiesOf, readFrontmatter } from "../../markdown";
+import { frontmatterOf, propertiesOf, readFrontmatter } from "../../markdown";
 import { openPageSetup } from "../commands/pageSetup";
 
 // Shows a quiet line above the text of a document that has frontmatter, so
@@ -61,7 +61,7 @@ const render = (summary: string) => (view: EditorView) => {
 };
 
 const decorate = (doc: Node) => {
-  const summary = summarize(doc.attrs.frontmatter as string | null);
+  const summary = summarize(frontmatterOf(doc));
   if (summary === null) return DecorationSet.empty;
   return DecorationSet.create(doc, [
     Decoration.widget(0, render(summary), {

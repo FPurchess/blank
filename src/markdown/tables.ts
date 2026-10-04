@@ -27,6 +27,13 @@ const BLOCKERS: GfmBlocker[] = [
 ];
 
 /**
+ * cellAt returns the offset in `map`'s table of the cell that covers `row`
+ * and `col`, as TableMap counts them
+ */
+export const cellAt = (map: TableMap, row: number, col: number) =>
+  map.map[row * map.width + col];
+
+/**
  * roundPercent rounds a percentage to a tenth, as the file keeps it
  */
 export const roundPercent = (value: number) => Math.round(value * 10) / 10;

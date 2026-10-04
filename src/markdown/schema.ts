@@ -90,6 +90,33 @@ export const schema = new Schema({
   marks: base.spec.marks,
 });
 
+// the names of the schema's nodes and marks, which code that handles every
+// kind of node lists in full (e.g. the Word export's `block`), so a new one
+// fails the type check there until it is handled; schema.test.ts checks
+// them against the schema
+export const NODE_NAMES = [
+  "doc",
+  "paragraph",
+  "blockquote",
+  "horizontal_rule",
+  "heading",
+  "code_block",
+  "ordered_list",
+  "bullet_list",
+  "list_item",
+  "text",
+  "page_break",
+  "image",
+  "hard_break",
+  "table",
+  "table_row",
+  "table_cell",
+  "table_header",
+] as const;
+export type NodeName = (typeof NODE_NAMES)[number];
+export const MARK_NAMES = ["em", "strong", "link", "code"] as const;
+export type MarkName = (typeof MARK_NAMES)[number];
+
 /**
  * isHeaderCell tells whether `node` is a header cell
  */

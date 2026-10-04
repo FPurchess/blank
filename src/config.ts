@@ -273,39 +273,56 @@ const mergeKeymap = (user: unknown, problems: string[]): Config["keymap"] => {
 };
 
 /**
+ * mergeFlat takes the user's settings of a section whose type matches the
+ * default and keeps the defaults for the rest. Settings it doesn't know are
+ * unused, so they're simply skipped; `skip` lists those the caller merges.
+ * @param name the section, for the problems
+ */
+const mergeFlat = <T extends object>(
+  name: string,
+  defaults: T,
+  user: unknown,
+  problems: string[],
+  skip: readonly string[] = [],
+): T => {
+  const merged = { ...defaults };
+  if (user === undefined) return merged;
+  if (!isRecord(user)) {
+    problems.push(name);
+    return merged;
+  }
+  for (const [key, value] of Object.entries(user)) {
+    if (skip.includes(key) || !Object.hasOwn(defaults, key)) continue;
+    if (typeof value !== typeof (defaults as Record<string, unknown>)[key]) {
+      problems.push(`${name}.${key}`);
+      continue;
+    }
+    (merged as Record<string, unknown>)[key] = value;
+  }
+  return merged;
+};
+
+/**
  * mergeAutocorrect takes the user's autocorrect settings whose type matches
- * the default and keeps the defaults for the rest
+ * the default and keeps the defaults for the rest, and merges the user's
+ * replacements into the defaults
  */
 const mergeAutocorrect = (
   user: unknown,
   problems: string[],
 ): AutocorrectConfig => {
   const defaults = defaultConfig.autocorrect;
-  const autocorrect = { ...defaults };
-  if (user !== undefined && !isRecord(user)) {
-    problems.push("autocorrect");
-    return autocorrect;
+  const autocorrect = mergeFlat("autocorrect", defaults, user, problems, [
+    "replace",
+  ]);
+  // a section that isn't an object keeps the default replacements
+  if (user === undefined || isRecord(user)) {
+    autocorrect.replace = mergeReplacements(
+      defaults.replace,
+      isRecord(user) ? user.replace : undefined,
+      problems,
+    );
   }
-  const settings = user ?? {};
-  for (const [key, value] of Object.entries(settings)) {
-    // unknown settings are unused, so they're simply skipped
-    if (
-      key === "replace" ||
-      !Object.prototype.hasOwnProperty.call(defaults, key)
-    )
-      continue;
-    const defaultValue = defaults[key as keyof AutocorrectConfig];
-    if (typeof value !== typeof defaultValue) {
-      problems.push(`autocorrect.${key}`);
-      continue;
-    }
-    (autocorrect as Record<string, unknown>)[key] = value;
-  }
-  autocorrect.replace = mergeReplacements(
-    defaults.replace,
-    settings.replace,
-    problems,
-  );
   return autocorrect;
 };
 
@@ -313,28 +330,8 @@ const mergeAutocorrect = (
  * mergeSpellcheck takes the user's spell check settings whose type matches the
  * default and keeps the defaults for the rest
  */
-const mergeSpellcheck = (
-  user: unknown,
-  problems: string[],
-): SpellcheckConfig => {
-  const defaults = defaultConfig.spellcheck;
-  const spellcheck = { ...defaults };
-  if (user === undefined) return spellcheck;
-  if (!isRecord(user)) {
-    problems.push("spellcheck");
-    return spellcheck;
-  }
-  for (const [key, value] of Object.entries(user)) {
-    // unknown settings are unused, so they're simply skipped
-    if (!Object.prototype.hasOwnProperty.call(defaults, key)) continue;
-    if (typeof value !== typeof defaults[key as keyof SpellcheckConfig]) {
-      problems.push(`spellcheck.${key}`);
-      continue;
-    }
-    (spellcheck as Record<string, unknown>)[key] = value;
-  }
-  return spellcheck;
-};
+const mergeSpellcheck = (user: unknown, problems: string[]) =>
+  mergeFlat("spellcheck", defaultConfig.spellcheck, user, problems);
 
 /**
  * mergeEditor takes the user's editor settings that are valid and keeps the

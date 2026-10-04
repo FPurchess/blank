@@ -14,7 +14,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { headerRowCount, schema, tokenizer } from "../../../markdown";
 import { normalizeTableHtml } from "../../../markdown/html";
-import { withColumnAlignment } from "../../../markdown/tables";
+import { cellAt, withColumnAlignment } from "../../../markdown/tables";
 import {
   cellPos,
   hasHeaderColumn,
@@ -151,7 +151,7 @@ export const tsvOf = (slice: Slice): string | null => {
   const map = TableMap.get(node);
   const rows = Array.from({ length: map.height }, (_, r) =>
     Array.from({ length: map.width }, (_, c) => {
-      const offset = map.map[r * map.width + c];
+      const offset = cellAt(map, r, c);
       const { top, left } = map.findCell(offset);
       return top === r && left === c ? cellText(node.nodeAt(offset)!) : "";
     }),

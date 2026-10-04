@@ -5,6 +5,10 @@ import type JSZip from "jszip";
 // WordprocessingML, the namespace of document.xml, styles.xml and the others
 export const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
+// the parts of a .docx that more than one reader reads
+export const DOCUMENT_PART = "word/document.xml";
+export const SETTINGS_PART = "word/settings.xml";
+
 /**
  * parsePart parses an XML part of the package
  * @returns the part, or null if it is missing or broken

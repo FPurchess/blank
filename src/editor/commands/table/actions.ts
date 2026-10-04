@@ -3,6 +3,7 @@ import { isInTable, selectedRect } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
 
 import type { Alignment } from "../../../markdown";
+import { cellAt } from "../../../markdown/tables";
 import { language } from "../../../state";
 import { isMac } from "../../plugins/openLink";
 import {
@@ -77,17 +78,42 @@ const columns = (state: EditorState) => {
 };
 
 /**
+ * changed describes what an action did to `n` rows or columns, e.g. "A row
+ * added" or "3 columns deleted"
+ */
+const changed = (n: number, one: string, many: string, verb: string) =>
+  `${capitalize(count(n, one, many))} ${verb}`;
+
+// an action as written below: its icon is named like it unless given, and
+// the toolbar shows it unless `toolbar` is false
+type ActionSpec = Omit<TableAction, "icon" | "toolbar"> & {
+  icon?: string;
+  toolbar?: false;
+};
+
+const withDefaults = ({
+  icon,
+  toolbar,
+  ...action
+}: ActionSpec): TableAction => ({
+  ...action,
+  icon: icon ?? action.id,
+  toolbar: toolbar ?? true,
+});
+
+/**
  * commandAction makes an action of `command`: it applies when the command
  * does, and runs it
  */
 const commandAction = (
   command: Command,
-  action: Omit<TableAction, "enabled" | "run">,
-): TableAction => ({
-  ...action,
-  enabled: (state) => command(state),
-  run: (view) => command(view.state, view.dispatch, view),
-});
+  action: Omit<ActionSpec, "enabled" | "run">,
+): TableAction =>
+  withDefaults({
+    ...action,
+    enabled: (state) => command(state),
+    run: (view) => command(view.state, view.dispatch, view),
+  });
 
 /**
  * aligned tells whether the selected columns are aligned `align`
@@ -107,14 +133,12 @@ const alignAction = (align: Alignment, code: string) =>
     id: `align-${align}`,
     group: "align",
     label: () => ALIGNMENTS[align].label,
-    icon: `align-${align}`,
     key: { code, label: code.slice(-1) },
-    toolbar: true,
     checked: aligned(align),
     done: (state) =>
       aligned(align)(state)
         ? "Alignment reset"
-        : `${capitalize(count(columns(state), "column", "columns"))} ${ALIGNMENTS[align].done}`,
+        : changed(columns(state), "column", "columns", ALIGNMENTS[align].done),
   });
 
 /**
@@ -125,7 +149,7 @@ const sortedBy = (state: EditorState) => {
   const { body, values } = sortColumn(rect)!;
   const { descending } = sortOrder(values, language.value);
   const header = body
-    ? rect.table.nodeAt(rect.map.map[rect.left])!.textContent.trim()
+    ? rect.table.nodeAt(cellAt(rect.map, 0, rect.left))!.textContent.trim()
     : "";
   const name = header || `column ${rect.left + 1}`;
   return `Sorted by ${name}, ${descending ? "descending" : "ascending"}`;
@@ -142,64 +166,48 @@ export const tableActions = (
     id: "row-above",
     group: "rows",
     label: () => "Insert row above",
-    icon: "row-above",
     key: { code: "ArrowUp", label: "↑" },
-    toolbar: true,
-    done: (state) => `${capitalize(count(rows(state), "row", "rows"))} added`,
+    done: (state) => changed(rows(state), "row", "rows", "added"),
   }),
   commandAction(addRows("below"), {
     id: "row-below",
     group: "rows",
     label: () => "Insert row below",
-    icon: "row-below",
     key: { code: "ArrowDown", label: "↓" },
-    toolbar: true,
-    done: (state) => `${capitalize(count(rows(state), "row", "rows"))} added`,
+    done: (state) => changed(rows(state), "row", "rows", "added"),
   }),
   commandAction(deleteRows, {
     id: "row-delete",
     group: "rows",
     label: (state) => (rows(state) > 1 ? "Delete rows" : "Delete row"),
-    icon: "row-delete",
     key: { code: "Backspace", label: "⌫" },
-    toolbar: true,
-    done: (state) => `${capitalize(count(rows(state), "row", "rows"))} deleted`,
+    done: (state) => changed(rows(state), "row", "rows", "deleted"),
   }),
   commandAction(addColumns("left"), {
     id: "column-left",
     group: "columns",
     label: () => "Insert column left",
-    icon: "column-left",
     key: { code: "ArrowLeft", label: "←" },
-    toolbar: true,
-    done: (state) =>
-      `${capitalize(count(columns(state), "column", "columns"))} added`,
+    done: (state) => changed(columns(state), "column", "columns", "added"),
   }),
   commandAction(addColumns("right"), {
     id: "column-right",
     group: "columns",
     label: () => "Insert column right",
-    icon: "column-right",
     key: { code: "ArrowRight", label: "→" },
-    toolbar: true,
-    done: (state) =>
-      `${capitalize(count(columns(state), "column", "columns"))} added`,
+    done: (state) => changed(columns(state), "column", "columns", "added"),
   }),
   commandAction(deleteColumns, {
     id: "column-delete",
     group: "columns",
     label: (state) => (columns(state) > 1 ? "Delete columns" : "Delete column"),
-    icon: "column-delete",
     key: { code: "Backspace", shift: true, label: "⇧⌫" },
-    toolbar: true,
-    done: (state) =>
-      `${capitalize(count(columns(state), "column", "columns"))} deleted`,
+    done: (state) => changed(columns(state), "column", "columns", "deleted"),
   }),
   commandAction(moveRows(-1), {
     id: "row-up",
     group: "move",
     label: () => "Move row up",
-    icon: "row-up",
     key: { code: "ArrowUp", shift: true, label: "⇧↑" },
     toolbar: false,
     done: () => "Moved up",
@@ -208,7 +216,6 @@ export const tableActions = (
     id: "row-down",
     group: "move",
     label: () => "Move row down",
-    icon: "row-down",
     key: { code: "ArrowDown", shift: true, label: "⇧↓" },
     toolbar: false,
     done: () => "Moved down",
@@ -217,7 +224,6 @@ export const tableActions = (
     id: "column-back",
     group: "move",
     label: () => "Move column left",
-    icon: "column-back",
     key: { code: "ArrowLeft", shift: true, label: "⇧←" },
     toolbar: false,
     done: () => "Moved left",
@@ -226,7 +232,6 @@ export const tableActions = (
     id: "column-forward",
     group: "move",
     label: () => "Move column right",
-    icon: "column-forward",
     key: { code: "ArrowRight", shift: true, label: "⇧→" },
     toolbar: false,
     done: () => "Moved right",
@@ -238,27 +243,21 @@ export const tableActions = (
     id: "sort",
     group: "content",
     label: () => "Sort by this column",
-    icon: "sort",
     key: { code: "KeyS", label: "S" },
-    toolbar: true,
     done: sortedBy,
   }),
   commandAction(mergeOrSplit, {
     id: "merge",
     group: "content",
     label: (state) => (canMerge(state) ? "Merge cells" : "Split cell"),
-    icon: "merge",
     key: { code: "KeyM", label: "M" },
-    toolbar: true,
     done: (state) => (canMerge(state) ? "Cells merged" : "Cell split"),
   }),
   commandAction(toggleHeaderRow, {
     id: "header-row",
     group: "table",
     label: () => "Header row",
-    icon: "header-row",
     key: { code: "KeyH", label: "H" },
-    toolbar: true,
     checked: (state) => isInTable(state) && hasHeaderRow(selectedRect(state)),
     done: (state) =>
       hasHeaderRow(selectedRect(state)) ? "Header row off" : "Header row on",
@@ -267,9 +266,7 @@ export const tableActions = (
     id: "header-column",
     group: "table",
     label: () => "Header column",
-    icon: "header-column",
     key: { code: "KeyH", shift: true, label: "⇧H" },
-    toolbar: true,
     checked: (state) =>
       isInTable(state) && hasHeaderColumn(selectedRect(state)),
     done: (state) =>
@@ -277,22 +274,19 @@ export const tableActions = (
         ? "Header column off"
         : "Header column on",
   }),
-  {
+  withDefaults({
     id: "caption",
     group: "table",
     label: () => "Caption…",
-    icon: "caption",
     key: { code: "KeyT", label: "T" },
-    toolbar: true,
     enabled: isInTable,
     done: () => "",
     run: editCaption,
-  },
+  }),
   commandAction(resetColumnWidths, {
     id: "widths-reset",
     group: "table",
     label: () => "Reset column widths",
-    icon: "widths-reset",
     key: { code: "KeyW", label: "W" },
     // a double click on a column line in the table does it
     toolbar: false,
@@ -302,9 +296,7 @@ export const tableActions = (
     id: "table-delete",
     group: "table",
     label: () => "Delete table",
-    icon: "table-delete",
     key: { code: "Backspace", mod: true, label: isMac() ? "⌘⌫" : "Ctrl ⌫" },
-    toolbar: true,
     done: () => "Table deleted",
   }),
 ];

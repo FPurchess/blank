@@ -1,3 +1,4 @@
+import { chainCommands } from "prosemirror-commands";
 import { keydownHandler } from "prosemirror-keymap";
 import type { ResolvedPos } from "prosemirror-model";
 import {
@@ -274,8 +275,7 @@ export const tableKeys = () =>
         ArrowUp: leaveTable("up"),
         ArrowRight: leaveTable("right"),
         ArrowLeft: leaveTable("left"),
-        Backspace: (state, dispatch, view) =>
-          clearCells(state, dispatch, view) || backspace(state, dispatch, view),
+        Backspace: chainCommands(clearCells, backspace),
         Delete: clearCells,
         "Mod-Backspace": clearCells,
         "Mod-Delete": clearCells,

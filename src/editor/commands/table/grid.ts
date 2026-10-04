@@ -2,6 +2,7 @@ import type { Node } from "prosemirror-model";
 import type { Command } from "prosemirror-state";
 import { TableMap } from "prosemirror-tables";
 
+import { cellAt } from "../../../markdown/tables";
 import { addColumns, addRows } from "./insert";
 import { moveColumns, moveRows } from "./move";
 import { repeated, selectIn, sequence, tableAt } from "./rect";
@@ -93,7 +94,7 @@ export const smallestSize = (table: Node) => {
   let rows = 1;
   for (let row = 0; row < map.height; row++) {
     for (let col = 0; col < map.width; col++) {
-      if (!isEmptyCell(table.nodeAt(map.map[row * map.width + col])!)) {
+      if (!isEmptyCell(table.nodeAt(cellAt(map, row, col))!)) {
         cols = Math.max(cols, col + 1);
         rows = Math.max(rows, row + 1);
       }

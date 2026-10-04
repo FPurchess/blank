@@ -5,14 +5,10 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { readDocumentFromFile } from "../document";
 import { errorMessage } from "../../errors";
+import { OPEN_FILTERS } from "../../formats";
 
 const defaultOpenDialogOptions = {
-  // the first filter is the one Linux dialogs start with
-  filters: [
-    { name: "Documents", extensions: ["md", "docx"] },
-    { name: "Markdown", extensions: ["md"] },
-    { name: "Word Document", extensions: ["docx"] },
-  ],
+  filters: OPEN_FILTERS,
 };
 
 export default (): Command => (_state, _dispatch, view) => {

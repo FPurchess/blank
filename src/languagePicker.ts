@@ -1,4 +1,4 @@
-import { language, languagePicker } from "./state";
+import { language, languagePicker, type LanguagePickerState } from "./state";
 import { isoCodes } from "./editor/plugins/autocomplete/languages/iso639-1";
 import { supportedLanguages } from "./editor/plugins/autocomplete/languages";
 import { dictionaryTags, hasDictionary } from "./spellcheck/catalog";
@@ -22,6 +22,11 @@ export const pickerLanguages = (): string[] =>
     ]),
   ].sort();
 
+// changes some of what the picker shows
+const patch = (change: Partial<LanguagePickerState>) => {
+  languagePicker.value = { ...languagePicker.value, ...change };
+};
+
 // a tag without its hyphens and in lowercase, as it is typed: "dech"
 const typed = (tag: string) => tag.toLowerCase().replaceAll("-", "");
 
@@ -41,12 +46,11 @@ export const openPicker = () => {
  * closePicker closes the language picker without choosing a language
  */
 export const closePicker = () => {
-  languagePicker.value = {
-    ...languagePicker.value,
+  patch({
     open: false,
     buffer: "",
     invalid: false,
-  };
+  });
 };
 
 /**
@@ -56,24 +60,22 @@ export const move = (offset: number) => {
   const languages = pickerLanguages();
   const index = languages.indexOf(languagePicker.value.selected);
   const next = (index + offset + languages.length) % languages.length;
-  languagePicker.value = {
-    ...languagePicker.value,
+  patch({
     selected: languages[next],
     buffer: "",
     invalid: false,
-  };
+  });
 };
 
 /**
  * select selects `code`, e.g. when it was clicked
  */
 export const select = (code: string) => {
-  languagePicker.value = {
-    ...languagePicker.value,
+  patch({
     selected: code,
     buffer: "",
     invalid: false,
-  };
+  });
 };
 
 /**
@@ -86,15 +88,14 @@ export const typeChar = (char: string) => {
   const buffer = languagePicker.value.buffer + char.toLowerCase();
   const letters = typed(buffer);
   const reject = () => {
-    languagePicker.value = {
-      ...languagePicker.value,
+    patch({
       buffer: "",
       invalid: true,
-    };
+    });
   };
 
   if (letters.length < 2) {
-    languagePicker.value = { ...languagePicker.value, buffer, invalid: false };
+    patch({ buffer, invalid: false });
     return;
   }
   if (!isoCodes.has(letters.slice(0, 2))) return reject();
@@ -110,23 +111,21 @@ export const typeChar = (char: string) => {
   );
   if (!exact && !longer) return reject();
 
-  languagePicker.value = {
-    ...languagePicker.value,
+  patch({
     selected: exact ?? languagePicker.value.selected,
     buffer: longer ? buffer : "",
     invalid: false,
-  };
+  });
 };
 
 /**
  * backspace removes the last typed letter
  */
 export const backspace = () => {
-  languagePicker.value = {
-    ...languagePicker.value,
+  patch({
     buffer: languagePicker.value.buffer.slice(0, -1),
     invalid: false,
-  };
+  });
 };
 
 /**

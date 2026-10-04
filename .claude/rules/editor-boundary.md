@@ -45,6 +45,6 @@ Code outside components (plugins, storage, commands) can't inject. It uses `src/
 
 ## Focus
 
-- The editor's blur handler (`editor/index.ts`) takes the focus back after 100 ms, unless `uiTakesFocus` (`src/state/focus.ts`) says a part of the UI holds it. A new dialog, menu or field that takes the focus must be added there, or the editor steals it back.
+- The editor's blur handler (`editor/index.ts`) takes the focus back after 100 ms, unless `uiTakesFocus` (`src/state/focus.ts`) says a part of the UI holds it. A new dialog that takes the focus must be added to `focusTakingDialogs` (`src/state/dialogs.ts`), and a new menu or field to `uiTakesFocus` itself, or the editor steals it back.
 - Pickers and toolbars never take the focus: their buttons have `tabindex="-1"`, and the element prevents `mousedown` (except in the caption field). Keep it that way for anything the editor's keys control.
 - Closing a dialog sets its state to null first and then lets the callback call `view.focus()`. So `uiTakesFocus` is already false when the editor takes the focus, and Vue removes the dialog's DOM on the next tick, after the focus has moved.

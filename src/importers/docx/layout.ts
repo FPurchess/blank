@@ -9,14 +9,20 @@ import {
   portrait,
 } from "../../layout/settings";
 import { readBands } from "./bands";
-import { child, isOn, parsePart, val, W } from "./xml";
+import {
+  child,
+  DOCUMENT_PART,
+  isOn,
+  parsePart,
+  SETTINGS_PART,
+  val,
+  W,
+} from "./xml";
 
 // Reads the page setup of a Word document, which mammoth leaves out: the
 // paper, orientation, margins, header and footer of its first section, and
 // the headings that start a new page.
 
-const DOCUMENT = "word/document.xml";
-const SETTINGS = "word/settings.xml";
 const STYLES = "word/styles.xml";
 
 // Word measures pages in twentieths of a point
@@ -105,7 +111,7 @@ const headingBreaks = (styles: Document | null) => {
  * readWordLayout reads the page setup of a Word document
  */
 export const readWordLayout = async (zip: JSZip): Promise<WordLayout> => {
-  const doc = await parsePart(zip, DOCUMENT);
+  const doc = await parsePart(zip, DOCUMENT_PART);
   const all = doc ? sections(doc) : [];
   if (all.length === 0) return { warnings: [] };
 
@@ -119,13 +125,17 @@ export const readWordLayout = async (zip: JSZip): Promise<WordLayout> => {
   if (points(val(child(first, "pgMar"), "gutter"))) {
     warnings.push("the binding margin was left out");
   }
-  const settings = await parsePart(zip, SETTINGS);
+  const settings = await parsePart(zip, SETTINGS_PART);
   if (isOn(settings?.getElementsByTagNameNS(W, "mirrorMargins")[0])) {
     warnings.push("mirrored margins became the same on every page");
   }
   const page = readPage(first);
   if (!page) return { warnings };
-  const { warnings: bandWarnings, ...bands } = await readBands(zip, first);
+  const { warnings: bandWarnings, ...bands } = await readBands(
+    zip,
+    first,
+    settings,
+  );
   return {
     page: {
       ...page,

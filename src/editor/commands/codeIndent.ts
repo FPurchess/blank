@@ -14,6 +14,12 @@ import { config } from "../../config";
 // own kind of indentation, tabs or spaces; a line without one takes the
 // block's. With only a cursor, Tab inserts one step at it.
 
+// the tab stops after and before `column`, which are `size` apart
+const nextStop = (column: number, size: number) =>
+  (Math.floor(column / size) + 1) * size;
+const previousStop = (column: number, size: number) =>
+  (Math.ceil(column / size) - 1) * size;
+
 /**
  * columnOf returns the visible column after `text`, the start of a line:
  * a tab reaches the next tab stop
@@ -21,8 +27,7 @@ import { config } from "../../config";
 export const columnOf = (text: string, size: number) => {
   let column = 0;
   for (const char of text)
-    column =
-      char === "\t" ? (Math.floor(column / size) + 1) * size : column + 1;
+    column = char === "\t" ? nextStop(column, size) : column + 1;
   return column;
 };
 
@@ -87,7 +92,7 @@ const shiftCode =
       const column = columnOf(before, size);
       const step = tabsFor(leading(lines[line]))
         ? "\t"
-        : " ".repeat((Math.floor(column / size) + 1) * size - column);
+        : " ".repeat(nextStop(column, size) - column);
       tr.insertText(step, selection.from);
     } else {
       const first = lineAt(starts, fromOffset);
@@ -102,13 +107,10 @@ const shiftCode =
         let target: number;
         if (direction === 1) {
           if (line.length === 0) continue;
-          target = (Math.floor(column / size) + 1) * size;
+          target = nextStop(column, size);
         } else {
           if (column === 0) continue;
-          target =
-            column % size === 0
-              ? column - size
-              : Math.floor(column / size) * size;
+          target = previousStop(column, size);
         }
         const from = start + starts[index];
         tr.insertText(

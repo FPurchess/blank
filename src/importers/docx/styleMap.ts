@@ -1,3 +1,4 @@
+import { STYLE_NAMES } from "../../exporters/docx/styleNames";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 
 // How the styles of Word, LibreOffice, pandoc and Blank's own Word export
@@ -28,29 +29,49 @@ export const STYLE_MAP = [
   "p[style-name='Subtitle'] => h2:fresh",
   ...paragraphs(
     // Word and Blank, Word, pandoc, LibreOffice and its older name
-    ["Quote", "Intense Quote", "Block Text", "Block Quotation", "Quotations"],
+    [
+      STYLE_NAMES.quote,
+      "Intense Quote",
+      "Block Text",
+      "Block Quotation",
+      "Quotations",
+    ],
     "blockquote > p:fresh",
   ),
   ...paragraphs(
     // Blank, pandoc, LibreOffice, Word
-    ["Code Block", "Source Code", "Preformatted Text", "HTML Preformatted"],
+    [
+      STYLE_NAMES.codeBlock,
+      "Source Code",
+      "Preformatted Text",
+      "HTML Preformatted",
+    ],
     "pre:separator('\\n')",
   ),
   ...runs(
     // Blank, pandoc, LibreOffice (two spellings), Word
-    ["Inline Code", "Verbatim Char", "Source_Text", "Source Text", "HTML Code"],
+    [
+      STYLE_NAMES.inlineCode,
+      "Verbatim Char",
+      "Source_Text",
+      "Source Text",
+      "HTML Code",
+    ],
     "code",
   ),
   // Blank and LibreOffice
-  ...paragraphs(["Horizontal Line"], `p.${HORIZONTAL_LINE_CLASS}:fresh`),
+  ...paragraphs(
+    [STYLE_NAMES.horizontalLine],
+    `p.${HORIZONTAL_LINE_CLASS}:fresh`,
+  ),
   // table captions: Word and Blank, pandoc, LibreOffice. cleanup.ts makes the
   // one next to a table its caption.
   ...paragraphs(
-    ["Caption", "Table Caption", "Table"],
+    [STYLE_NAMES.caption, "Table Caption", "Table"],
     `p.${CAPTION_CLASS}:fresh`,
   ),
   // Blank and LibreOffice
-  ...paragraphs(["Table Heading"], `p.${TABLE_HEADING_CLASS}:fresh`),
+  ...paragraphs([STYLE_NAMES.tableHeading], `p.${TABLE_HEADING_CLASS}:fresh`),
   // matched by the style's id, since it is in no styles.xml
   `p.${PAGE_BREAK_STYLE} => p.${PAGE_BREAK_CLASS}:fresh`,
   // renders comments, only to count them (see cleanup.ts)

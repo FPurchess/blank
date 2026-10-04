@@ -10,7 +10,7 @@ import {
 } from "../../layout/settings";
 import { escape, type Field } from "../../layout/tokens";
 import { WORD_FIELDS, WORD_NUMBER_FORMATS } from "../../exporters/docx/fields";
-import { child, children, isOn, parsePart, val, W } from "./xml";
+import { child, children, isOn, parsePart, SETTINGS_PART, val, W } from "./xml";
 
 // Reads the headers and footers of a Word document's first section, which
 // mammoth leaves out, into Blank's slots: the text before the first tab on
@@ -224,6 +224,8 @@ const isEmpty = (slots: Slots) => SLOTS.every((slot) => !slots[slot]);
 export const readBands = async (
   zip: JSZip,
   sectPr: Element,
+  // word/settings.xml, when the caller read it already
+  settingsPart?: Document | null,
 ): Promise<WordBands> => {
   const warnings = new Set<string>();
   const relationships = await parsePart(zip, RELATIONSHIPS);
@@ -263,7 +265,10 @@ export const readBands = async (
     firstPage =
       isEmpty(first.header) && isEmpty(first.footer) ? "plain" : first;
   }
-  const settings = await parsePart(zip, "word/settings.xml");
+  const settings =
+    settingsPart === undefined
+      ? await parsePart(zip, SETTINGS_PART)
+      : settingsPart;
   const evenPages = isOn(
     settings?.getElementsByTagNameNS(W, "evenAndOddHeaders")[0],
   )

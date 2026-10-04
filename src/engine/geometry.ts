@@ -20,6 +20,7 @@ import {
   type PageBox,
   type PageEngine,
 } from "./engine";
+import { cellAt } from "../markdown/tables";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
@@ -209,7 +210,7 @@ const shownTable = (view: EditorView, pos: number): TableGeometry | null => {
   for (let column = 0; column < map.width; column++) {
     let left = columns[column - 1] ?? whole.left;
     for (let row = 0; row < map.height; row++) {
-      const offset = map.map[row * map.width + column];
+      const offset = cellAt(map, row, column);
       if (map.findCell(offset).left !== column) continue;
       const cell = view.nodeDOM(start + offset);
       if (cell instanceof Element) left = cell.getBoundingClientRect().left;

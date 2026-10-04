@@ -1,5 +1,5 @@
 import type { Node, ResolvedPos } from "prosemirror-model";
-import { TableMap } from "prosemirror-tables";
+import { findTable, TableMap } from "prosemirror-tables";
 
 import { schema } from "../../../markdown";
 
@@ -50,18 +50,8 @@ export interface TableAt {
  * tableAround returns the innermost table around `$pos`, if any
  */
 export const tableAround = ($pos: ResolvedPos): TableAt | undefined => {
-  for (let depth = $pos.depth; depth > 0; depth--) {
-    const node = $pos.node(depth);
-    if (node.type !== schema.nodes.table) continue;
-    return {
-      node,
-      pos: $pos.before(depth),
-      start: $pos.start(depth),
-      map: TableMap.get(node),
-      depth,
-    };
-  }
-  return undefined;
+  const table = findTable($pos);
+  return table ? { ...table, map: TableMap.get(table.node) } : undefined;
 };
 
 /**

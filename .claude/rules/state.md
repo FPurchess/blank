@@ -24,7 +24,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | `appearance.ts` | `themes`, `theme`, `isTheme` |
 | `language.ts` | `language`, `languagePicker` |
 | `spellcheck.ts` | `spellcheck`, `spellcheckStatus`, `spellchecker` |
-| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and of the open header or footer strip (`bandEditor`) |
+| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`) and of the open header or footer strip (`bandEditor`), and `focusTakingDialogs`, those of them that take the focus |
 | `popups.ts` | `tablePicker`, `tableToolbar`, `tableHandles` (with `Point`, `Span`), `contextMenu`, `MenuItem`, `Anchor` |
 | `messages.ts` | `announcement` and `spellcheckMessage`, written through `announce()` and `flashSpellcheckMessage()`; `bootMessages()` clears each after a moment |
 | `page.ts` | `frontmatter` (of the document, notifying only when it changes), `pageLayout` (its `resolveLayout` over `config`'s defaults, resolved again only when either changes) and `pageFields` (what the placeholders of headers and footers show, the same object while they stay the same) |
@@ -50,5 +50,5 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 
 1. Add a `shallowRef` (with a comment on what it holds and when it's null) to the module of its domain, or a new module that `index.ts` re-exports.
 2. If it has rules (events, invariants), write it only through a function next to it.
-3. If a part of the UI takes the focus while it's open, add it to `uiTakesFocus` in `focus.ts`.
+3. If a part of the UI takes the focus while it's open, add it to `focusTakingDialogs` in `dialogs.ts` (a dialog) or to `uiTakesFocus` in `focus.ts` (anything else).
 4. Test the module next to it (`src/state/<domain>.test.ts`).

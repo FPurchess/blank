@@ -9,6 +9,8 @@ import {
   HEADING_BEFORE,
   ITEM_SPACE,
 } from "../../layout/spacing";
+import { BULLETS } from "../../markdown/lists";
+import { STYLE_NAMES } from "./styleNames";
 import { WORD_NUMBER_FORMATS } from "./fields";
 import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
@@ -117,16 +119,13 @@ export const pageProperties = ({
     footer: twips(BAND.distance),
     gutter: 0,
   },
-  ...(startNumber === 1 && numberStyle === "1"
-    ? {}
-    : {
-        pageNumbers: {
-          ...(startNumber === 1 ? {} : { start: startNumber }),
-          ...(numberStyle === "1"
-            ? {}
-            : { formatType: WORD_NUMBER_FORMATS[numberStyle] }),
-        },
-      }),
+  // docx writes an empty <w:pgNumType/> for the defaults
+  pageNumbers: {
+    ...(startNumber === 1 ? {} : { start: startNumber }),
+    ...(numberStyle === "1"
+      ? {}
+      : { formatType: WORD_NUMBER_FORMATS[numberStyle] }),
+  },
 });
 
 // Only the regular face of IBM Plex Sans is embedded, so the large headings
@@ -228,7 +227,7 @@ export const STYLES: IStylesOptions = {
     {
       // Word's own name, so it shows up as its built-in quote style
       id: STYLE.quote,
-      name: "Quote",
+      name: STYLE_NAMES.quote,
       basedOn: "Normal",
       next: "Normal",
       quickFormat: true,
@@ -239,7 +238,7 @@ export const STYLES: IStylesOptions = {
     },
     {
       id: STYLE.codeBlock,
-      name: "Code Block",
+      name: STYLE_NAMES.codeBlock,
       basedOn: "Normal",
       quickFormat: true,
       run: { font: CODE_FONT, size: halfPoints(10) },
@@ -252,7 +251,7 @@ export const STYLES: IStylesOptions = {
       // Word's own name, so it shows up as its built-in caption style; a step
       // down on the scale, like the caption in the editor
       id: STYLE.caption,
-      name: "Caption",
+      name: STYLE_NAMES.caption,
       basedOn: "Normal",
       next: "Normal",
       quickFormat: true,
@@ -262,14 +261,14 @@ export const STYLES: IStylesOptions = {
     {
       // the text of header cells, named like LibreOffice's style for it
       id: STYLE.tableHeading,
-      name: "Table Heading",
+      name: STYLE_NAMES.tableHeading,
       basedOn: "Normal",
       run: { bold: true },
     },
     {
       // also the name LibreOffice gives its horizontal line style
       id: STYLE.horizontalLine,
-      name: "Horizontal Line",
+      name: STYLE_NAMES.horizontalLine,
       basedOn: "Normal",
       next: "Normal",
       paragraph: {
@@ -282,7 +281,7 @@ export const STYLES: IStylesOptions = {
   characterStyles: [
     {
       id: STYLE.inlineCode,
-      name: "Inline Code",
+      name: STYLE_NAMES.inlineCode,
       quickFormat: true,
       run: { font: CODE_FONT, shading: codeShading },
     },
@@ -310,7 +309,6 @@ export const stylesFor = (newPageBefore: number[]): IStylesOptions => {
   return { ...STYLES, default: { ...STYLES.default, ...headings } };
 };
 
-const BULLETS = ["•", "◦", "▪"];
 const LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 const levelIndent = (level: number) => ({

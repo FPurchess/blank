@@ -2,7 +2,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { type PageChanges, writePageSettings } from "../../layout/settings";
 import type { Unit } from "../../layout/units";
-import { updateFrontmatter } from "../../markdown";
+import { frontmatterOf, updateFrontmatter } from "../../markdown";
 
 /**
  * setFrontmatter replaces the frontmatter of the document as one undo step,
@@ -22,8 +22,7 @@ export const setFrontmatter = (view: EditorView, next: string | null) => {
 export const writePage = (view: EditorView, changes: PageChanges, unit: Unit) =>
   setFrontmatter(
     view,
-    updateFrontmatter(
-      view.state.doc.attrs.frontmatter as string | null,
-      (document) => writePageSettings(document, changes, unit),
+    updateFrontmatter(frontmatterOf(view.state.doc), (document) =>
+      writePageSettings(document, changes, unit),
     ),
   );
