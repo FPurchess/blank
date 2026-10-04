@@ -2,6 +2,8 @@
 //! the PDF had them since pdfmake wrote it, whose line height was
 //! a factor of IBM Plex Sans' natural 1.3 em.
 
+use crate::model::TextKind;
+
 /// IBM Plex Sans' ascender plus descender, in em
 pub const NATURAL: f32 = 1.3;
 pub const BODY: f32 = 11.0;
@@ -33,25 +35,25 @@ pub const REGULAR: f32 = 400.0;
 pub const MEDIUM: f32 = 500.0;
 pub const BOLD: f32 = 700.0;
 
-/// the style of a textblock by its name, see Text::style
-pub fn text_style(name: &str) -> TextStyle {
-    match name {
-        "h1" => style(21.5, 0.92, MEDIUM, false, -0.4),
-        "h2" => style(17.0, 0.96, MEDIUM, false, -0.2),
-        "h3" => style(13.75, 1.0, MEDIUM, false, 0.0),
-        "h4" => style(BODY, 1.12, BOLD, false, 0.0),
-        "h5" => style(BODY, 1.12, BOLD, true, 0.0),
-        "h6" => style(BODY, 1.12, REGULAR, true, 0.0),
-        "alt" => style(BODY, 1.12, REGULAR, true, 0.0),
-        "caption" => style(BODY / 1.25, 1.12, REGULAR, true, 0.0),
-        "th" => style(BODY, 1.12, BOLD, false, 0.0),
+/// the style of a textblock, see Text::style
+pub fn text_style(kind: TextKind) -> TextStyle {
+    match kind {
+        TextKind::H1 => style(21.5, 0.92, MEDIUM, false, -0.4),
+        TextKind::H2 => style(17.0, 0.96, MEDIUM, false, -0.2),
+        TextKind::H3 => style(13.75, 1.0, MEDIUM, false, 0.0),
+        TextKind::H4 => style(BODY, 1.12, BOLD, false, 0.0),
+        TextKind::H5 => style(BODY, 1.12, BOLD, true, 0.0),
+        TextKind::H6 => style(BODY, 1.12, REGULAR, true, 0.0),
+        TextKind::Alt => style(BODY, 1.12, REGULAR, true, 0.0),
+        TextKind::Caption => style(BODY / 1.25, 1.12, REGULAR, true, 0.0),
+        TextKind::Th => style(BODY, 1.12, BOLD, false, 0.0),
         // code blocks in IBM Plex Mono, a step smaller, on the body's lines
-        "code" => TextStyle {
+        TextKind::Code => TextStyle {
             mono: true,
             ..style(CODE_SIZE, BODY * 1.12 / CODE_SIZE, REGULAR, false, 0.0)
         },
-        "band" => style(crate::bands::BAND_SIZE, 1.0, REGULAR, false, 0.0),
-        _ => style(BODY, 1.12, REGULAR, false, 0.0),
+        TextKind::Band => style(crate::bands::BAND_SIZE, 1.0, REGULAR, false, 0.0),
+        TextKind::P | TextKind::Other => style(BODY, 1.12, REGULAR, false, 0.0),
     }
 }
 

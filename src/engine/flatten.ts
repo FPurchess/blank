@@ -15,6 +15,7 @@ import type {
   EngineItem,
   EngineSpan,
   EngineText,
+  TextStyle,
 } from "./types";
 
 // Flattens a ProseMirror document into the items the layout engine lays out
@@ -115,8 +116,9 @@ const sameMarks = (a: EngineSpan, b: EngineSpan) =>
   !!a.code === !!b.code &&
   a.link === b.link;
 
-const styleOf = (node: Node) => {
-  if (node.type.name === "heading") return `h${node.attrs.level as number}`;
+const styleOf = (node: Node): TextStyle => {
+  if (node.type.name === "heading")
+    return `h${node.attrs.level as 1 | 2 | 3 | 4 | 5 | 6}`;
   if (node.type.name === "code_block") return "code";
   return "p";
 };

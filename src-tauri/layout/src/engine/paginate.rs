@@ -661,8 +661,8 @@ mod tests {
     fn keeps_headings_with_the_next_block() {
         let settings = Settings::default();
         let room = settings.content_bottom() - settings.content_top();
-        let heading_height = crate::style::text_style("h3").line;
-        let line = crate::style::text_style("p").line;
+        let heading_height = crate::style::text_style(crate::model::TextKind::H3).line;
+        let line = crate::style::text_style(crate::model::TextKind::P).line;
         // a first paragraph whose space below leaves `spare` points under a
         // heading at the bottom of the page
         let place = |spare: f32| {
@@ -827,7 +827,7 @@ mod tests {
         // then a page break: the break stays on the first page
         let settings = Settings::default();
         let room = settings.content_bottom() - settings.content_top();
-        let line = crate::style::text_style("p").line;
+        let line = crate::style::text_style(crate::model::TextKind::P).line;
         let mut first = paragraph(1, "x");
         first.after = room - line + 10.0;
         let engine = engine(vec![first, page_break(4), paragraph(6, "next")]);
@@ -859,8 +859,8 @@ mod tests {
         use crate::model::Row;
         let settings = Settings::default();
         let room = settings.content_bottom() - settings.content_top();
-        let heading_height = crate::style::text_style("h3").line;
-        let line = crate::style::text_style("p").line;
+        let heading_height = crate::style::text_style(crate::model::TextKind::H3).line;
+        let line = crate::style::text_style(crate::model::TextKind::P).line;
         // under the heading, room for the table's caption, but not for its
         // header row and first row as well
         let spare = 30.0;

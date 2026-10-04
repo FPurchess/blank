@@ -26,7 +26,7 @@ pub fn heading(pos: u32, level: u8, text: &str) -> Item {
         content: Content::Text(Text {
             pos,
             text: text.into(),
-            style: format!("h{level}"),
+            style: format!("h{level}").into(),
             level,
             top: true,
             ..Default::default()

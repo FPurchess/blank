@@ -8,7 +8,7 @@ use parley::Alignment;
 
 use super::{CellImage, Deco, Laid, Marked, Role, TableCell, Unit};
 use crate::fonts::Fonts;
-use crate::model::{CellBlock, Text};
+use crate::model::{CellBlock, Text, TextKind};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
 use crate::text::TextBox;
 
@@ -76,11 +76,11 @@ impl PlacedImage {
 }
 
 /// a list marker, right-aligned before `x`, its first baseline at `baseline`
-fn marker_box(fonts: &mut Fonts, marker: &str, style: &str, x: f32, baseline: f32) -> TextBox {
+fn marker_box(fonts: &mut Fonts, marker: &str, style: TextKind, x: f32, baseline: f32) -> TextBox {
     let text = Text {
         pos: 0,
         text: marker.to_string(),
-        style: style.to_string(),
+        style,
         ..Default::default()
     };
     let mut marked = TextBox::new(fonts, &text, 100.0, Alignment::Start);
@@ -143,8 +143,8 @@ fn lay_out_cell(
         match block {
             CellBlock::Text(block) => {
                 let mut paragraph = block.text.clone();
-                if cell.header && paragraph.style == "p" {
-                    paragraph.style = "th".into();
+                if cell.header && paragraph.style == TextKind::P {
+                    paragraph.style = TextKind::Th;
                 }
                 let indent = block.indent.clamp(0.0, (inner - 10.0).max(0.0));
                 let mut boxed =
@@ -154,13 +154,13 @@ fn lay_out_cell(
                 if let Some(marker) = &block.marker {
                     // on the baseline of the first line
                     let baseline = y + boxed.lines().first().map_or(0.0, |line| line.baseline);
-                    let marked = marker_box(fonts, marker, &paragraph.style, boxed.x, baseline);
+                    let marked = marker_box(fonts, marker, paragraph.style, boxed.x, baseline);
                     markers.push((Marked::Text(texts.len()), extras.len()));
                     extras.push((marked, Role::Text));
                 }
                 let height = boxed.height();
                 // a code block on its fill, as outside a table
-                if paragraph.style == "code" {
+                if paragraph.style == TextKind::Code {
                     decos.push(Deco::Rect {
                         x: boxed.x - 4.0,
                         y,
@@ -226,7 +226,7 @@ fn lay_out_cell(
                         } else {
                             alt.clone()
                         },
-                        style: "alt".into(),
+                        style: TextKind::Alt,
                         ..Default::default()
                     };
                     let mut label = TextBox::new(fonts, &text, room_x, Alignment::Start);
@@ -238,7 +238,7 @@ fn lay_out_cell(
                 }
                 // a marker at its top, as before a top-level image
                 if let Some(marker) = marker {
-                    let mut marked = marker_box(fonts, marker, "p", x, top);
+                    let mut marked = marker_box(fonts, marker, TextKind::P, x, top);
                     marked.y = top;
                     markers.push((Marked::Image(*pos), extras.len()));
                     extras.push((marked, Role::Text));
@@ -312,7 +312,7 @@ pub(super) fn table_units(
         let text = Text {
             pos: 0,
             text: caption.to_string(),
-            style: "caption".into(),
+            style: TextKind::Caption,
             ..Default::default()
         };
         let mut boxed = TextBox::new(fonts, &text, width, Alignment::Start);
@@ -847,7 +847,7 @@ mod tests {
         assert_eq!(grid.rows.len(), 3);
         // at the bottom of a page, the caption moves on with the table
         let settings = engine.settings.clone();
-        let line = crate::style::text_style("p").line;
+        let line = crate::style::text_style(crate::model::TextKind::P).line;
         let fill = ((settings.content_bottom() - settings.content_top()) / line) as usize - 3;
         let mut items: Vec<Item> = (0..fill)
             .map(|index| paragraph(index as u32 * 3 + 1, "x"))

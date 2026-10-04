@@ -23,7 +23,7 @@ use parley::Alignment;
 use crate::engine::{Engine, Op, Part};
 use crate::fonts::{Fonts, INSTANCE_BASE};
 use crate::items::Role;
-use crate::model::Text;
+use crate::model::{Text, TextKind};
 use crate::text::{Glyph, TextBox};
 
 mod tags;
@@ -508,7 +508,7 @@ fn paint_alt(
     let text = Text {
         pos: 0,
         text: alt.to_string(),
-        style: "alt".into(),
+        style: TextKind::Alt,
         ..Default::default()
     };
     let boxed = TextBox::new(engine_fonts, &text, w.max(20.0), Alignment::Start);

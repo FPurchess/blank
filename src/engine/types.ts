@@ -1,5 +1,9 @@
 // The items the layout engine takes, see src-tauri/layout/src/model.rs.
 
+// the styles the engine sets text in (TextKind in model.rs): a paragraph,
+// a heading, or code
+export type TextStyle = "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "code";
+
 export interface EngineSpan {
   from: number;
   to: number;
@@ -14,7 +18,7 @@ export interface EngineText {
   pos: number;
   text: string;
   spans: EngineSpan[];
-  style: string;
+  style: TextStyle;
   level: number;
   top: boolean;
 }

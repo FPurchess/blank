@@ -30,9 +30,9 @@ pub struct Text {
     pub text: String,
     #[serde(default)]
     pub spans: Vec<Span>,
-    /// the text style, see style.rs: p, h1…h6, code, caption, th
+    /// the text style, see style.rs
     #[serde(default = "paragraph")]
-    pub style: String,
+    pub style: TextKind,
     /// the heading level, 0 for none
     #[serde(default)]
     pub level: u8,
@@ -42,8 +42,85 @@ pub struct Text {
     pub top: bool,
 }
 
-fn paragraph() -> String {
-    "p".into()
+fn paragraph() -> TextKind {
+    TextKind::P
+}
+
+/// The style of a textblock, see style.rs: what the webview sends (p, h1 to
+/// h6, code) and what the engine sets itself (th for a header cell's
+/// paragraphs, caption, alt for what stands for an image, band). It is read
+/// from its name, and any other name is body text, as `Other`.
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+#[serde(from = "String", into = "String")]
+pub enum TextKind {
+    P,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+    Code,
+    Th,
+    Caption,
+    Alt,
+    Band,
+    #[default]
+    Other,
+}
+
+impl TextKind {
+    /// its name, as the webview writes it
+    pub fn name(self) -> &'static str {
+        match self {
+            TextKind::P => "p",
+            TextKind::H1 => "h1",
+            TextKind::H2 => "h2",
+            TextKind::H3 => "h3",
+            TextKind::H4 => "h4",
+            TextKind::H5 => "h5",
+            TextKind::H6 => "h6",
+            TextKind::Code => "code",
+            TextKind::Th => "th",
+            TextKind::Caption => "caption",
+            TextKind::Alt => "alt",
+            TextKind::Band => "band",
+            TextKind::Other => "",
+        }
+    }
+}
+
+impl From<&str> for TextKind {
+    fn from(name: &str) -> TextKind {
+        match name {
+            "p" => TextKind::P,
+            "h1" => TextKind::H1,
+            "h2" => TextKind::H2,
+            "h3" => TextKind::H3,
+            "h4" => TextKind::H4,
+            "h5" => TextKind::H5,
+            "h6" => TextKind::H6,
+            "code" => TextKind::Code,
+            "th" => TextKind::Th,
+            "caption" => TextKind::Caption,
+            "alt" => TextKind::Alt,
+            "band" => TextKind::Band,
+            _ => TextKind::Other,
+        }
+    }
+}
+
+impl From<String> for TextKind {
+    fn from(name: String) -> TextKind {
+        name.as_str().into()
+    }
+}
+
+impl From<TextKind> for String {
+    fn from(kind: TextKind) -> String {
+        kind.name().into()
+    }
 }
 
 /// A textblock in a table cell, with where it stands in the cell: in a
@@ -641,7 +718,7 @@ mod tests {
             (first.text.pos, first.indent, first.marker.as_deref()),
             (3, 18.0, Some("•"))
         );
-        assert_eq!(first.text.style, "p");
+        assert_eq!(first.text.style, TextKind::P);
         assert!(matches!(&blocks[2], CellBlock::Image { pos: 15, width, .. } if *width == 40.0));
         // the paragraphs of a cell without blocks are its blocks
         let plain = rows[0].cells[1].blocks();
@@ -694,6 +771,32 @@ mod tests {
             }
             _ => {}
         }
+    }
+
+    #[test]
+    fn reads_text_styles_by_their_names() {
+        let style = |json: &str| serde_json::from_str::<Text>(json).unwrap().style;
+        assert_eq!(style(r#"{"pos":0,"text":"a","style":"h2"}"#), TextKind::H2);
+        assert_eq!(
+            style(r#"{"pos":0,"text":"a","style":"code"}"#),
+            TextKind::Code
+        );
+        // without a style, a paragraph
+        assert_eq!(style(r#"{"pos":0,"text":"a"}"#), TextKind::P);
+        // one Blank doesn't know is body text, as before
+        assert_eq!(
+            style(r#"{"pos":0,"text":"a","style":"h7"}"#),
+            TextKind::Other
+        );
+        assert_eq!(style(r#"{"pos":0,"text":"a","style":""}"#), TextKind::Other);
+        assert_eq!(Text::default().style, TextKind::Other);
+        for name in ["p", "h1", "h6", "code", "th", "caption", "alt", "band"] {
+            assert_eq!(TextKind::from(name).name(), name);
+        }
+        assert_eq!(
+            crate::style::text_style(TextKind::Other),
+            crate::style::text_style(TextKind::P)
+        );
     }
 
     #[test]
