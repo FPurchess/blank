@@ -8,8 +8,7 @@ import {
   useTemplateRef,
 } from "vue";
 
-import { imageDialog, type ImageDialogRequest } from "../state";
-import { closeDialog } from "./closeDialog";
+import { closeDialog, imageDialog, type ImageDialogRequest } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import TextField from "./components/TextField.vue";
 import {

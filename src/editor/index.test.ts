@@ -11,7 +11,6 @@ import {
   pageSetup,
   transaction,
 } from "../state";
-import { mockCliArgs } from "../test/tauri";
 import { bootEditor } from ".";
 import { pageSetup as openPageSetup } from "./commands";
 import type { EditorHandle } from "./handle";
@@ -23,7 +22,6 @@ describe("bootEditor", () => {
 
   beforeEach(async () => {
     await localforage.clear();
-    mockCliArgs();
     transaction.value = null;
     linkDialog.value = null;
     imageDialog.value = null;
@@ -151,7 +149,6 @@ describe("bootEditor", () => {
 describe("the editor's first focus", () => {
   beforeEach(async () => {
     await localforage.clear();
-    mockCliArgs();
     transaction.value = null;
   });
   afterEach(() => {

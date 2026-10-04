@@ -12,7 +12,9 @@ export type PerfKind =
   // editor under the caret
   | "scroll"
   | "render"
-  | "align";
+  | "align"
+  // showing another tab
+  | "switch";
 
 const LIMIT = 500;
 const samples: Record<PerfKind, number[]> = {
@@ -23,6 +25,7 @@ const samples: Record<PerfKind, number[]> = {
   scroll: [],
   render: [],
   align: [],
+  switch: [],
 };
 
 /**
@@ -50,15 +53,9 @@ export const timed = <T>(kind: PerfKind, run: () => T): T => {
  * perfSamples returns the samples, and clears them with `clear`
  */
 export const perfSamples = (clear = false) => {
-  const copy = {
-    dispatch: [...samples.dispatch],
-    layout: [...samples.layout],
-    caret: [...samples.caret],
-    paint: [...samples.paint],
-    scroll: [...samples.scroll],
-    render: [...samples.render],
-    align: [...samples.align],
-  };
+  const copy = Object.fromEntries(
+    Object.entries(samples).map(([kind, list]) => [kind, [...list]]),
+  ) as Record<PerfKind, number[]>;
   if (clear) for (const list of Object.values(samples)) list.length = 0;
   return copy;
 };

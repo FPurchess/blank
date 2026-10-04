@@ -51,10 +51,17 @@ describe("the reference blank.json", () => {
 describe("the shortcuts in the docs", () => {
   const shortcuts = read("docs/guide/shortcuts.md");
 
+  // keys the docs spell out, as `Page Up`
+  const KEY_NAMES: Record<string, string> = {
+    PageUp: "Page Up",
+    PageDown: "Page Down",
+  };
+
   // "Mod-Shift-s" is written `Mod` `Shift` `S` there
   const keycaps = (binding: string) =>
     binding
       .split("-")
+      .map((key) => KEY_NAMES[key] ?? key)
       .map((key) => `\`${key.length === 1 ? key.toUpperCase() : key}\``)
       .join(" ");
 

@@ -129,6 +129,8 @@ describe("language chooser", () => {
     expect(ids).toEqual([
       "ui-stats",
       "ui-announcement",
+      // what only screen readers hear, e.g. which tab is shown
+      "ui-announcement-spoken",
       // the page in view, read out when it changes, not shown; the page
       // number itself needs the pages, which these tests don't lay out
       "ui-page-spoken",
@@ -442,6 +444,19 @@ describe("announcement", () => {
     announcement.value = null;
     await nextTick();
     expect(uiAnnouncement().textContent).toBe("");
+  });
+
+  it("reads out a quiet one without showing it", async () => {
+    const spoken = () =>
+      document.querySelector<HTMLElement>("#ui-announcement-spoken")!;
+    expect(spoken().getAttribute("role")).toBe("status");
+
+    announce("notes, tab 2 of 3", { quiet: true });
+    await nextTick();
+
+    expect(uiAnnouncement().textContent).toBe("");
+    expect(spoken().textContent).toBe("notes, tab 2 of 3");
+    expect(spoken().classList).toContain("visually-hidden");
   });
 
   it("sits next to the counter, before the items on the right", () => {

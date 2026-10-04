@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, watch } from "vue";
 
 import { setPageEngine } from "../engine/engine";
-import { frameLayout } from "../engine/frames";
+import { frameLayout, viewAnchor } from "../engine/frames";
 import { documentFields } from "../layout/bands";
 import {
   bandEditor,
@@ -33,7 +33,6 @@ import { laidOutState, layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import { hasBand } from "../layout/placeholders";
 import { bootApp } from "./mount";
-import { viewAnchor } from "./pageViewModel";
 import { READING_LINE } from "./readingLine";
 import { alignHiddenEditor } from "../editor/hidden";
 

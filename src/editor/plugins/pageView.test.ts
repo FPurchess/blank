@@ -63,9 +63,23 @@ import { box } from "../../test/embeds";
 import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
-import { applyDocument } from "../document";
+import { documentState, showDocument } from "../document";
 import * as flattening from "../../engine/flatten";
 import { tableGrid } from "../../exporters/table";
+
+/**
+ * shown returns the state of `doc`, published as the shown document, as a
+ * tab's is before the view gets it; from `file` if given
+ */
+const shown = (
+  base: Parameters<typeof documentState>[0],
+  doc: Parameters<typeof documentState>[1],
+  file?: string,
+) => {
+  const next = documentState(base, doc);
+  showDocument(next, { path: file ?? path.value, importedFrom: null });
+  return next;
+};
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.";
@@ -612,7 +626,7 @@ describe("images on the pages", () => {
     mounted.view.destroy();
   });
 
-  it("loads the images of another document again", () => {
+  it("keeps the images loaded when another tab shows", () => {
     const image = schema.node("image", { src: "img.png", alt: "a cat" });
     path.value = "/docs/report.md";
     const mounted = mount(
@@ -620,14 +634,12 @@ describe("images on the pages", () => {
     );
     loads[0].load();
     expect(loadedImages.value.size).toBe(1);
-    // opened: the same src may be another picture, or changed on disk
+    // the tabs share the images, whose URLs are absolute
     mounted.view.updateState(
-      applyDocument(
-        mounted.view.state,
-        doc(schema.node("paragraph", null, image)),
-      ),
+      shown(mounted.view.state, doc(schema.node("paragraph", null, image))),
     );
-    expect(loads).toHaveLength(2);
+    expect(loads).toHaveLength(1);
+    expect(loadedImages.value.size).toBe(1);
     mounted.view.destroy();
   });
 
@@ -775,7 +787,7 @@ describe("opening another document", () => {
     const flattened = vi.spyOn(flattening, "flattenBlocks");
     const opened = doc(p("the new document"));
 
-    const next = applyDocument(mounted.view.state, opened, "/docs/new.md");
+    const next = shown(mounted.view.state, opened, "/docs/new.md");
     expect(flattened).not.toHaveBeenCalled();
 
     mounted.view.updateState(next);
@@ -816,7 +828,7 @@ describe("the kept widths of a table", () => {
       },
     );
     // the new document starts with the cursor in its table
-    mounted.view.updateState(applyDocument(mounted.view.state, second));
+    mounted.view.updateState(shown(mounted.view.state, second));
     into(6);
 
     const tables = sent.filter((item) => item.kind === "table");
@@ -1041,8 +1053,7 @@ describe("the pages after many real edits", () => {
 
       for (let step = 1; step <= 300; step++) {
         // another document now and then, as opening one does
-        if (step % 100 === 0)
-          view.updateState(applyDocument(view.state, start()));
+        if (step % 100 === 0) view.updateState(shown(view.state, start()));
         else edits[Math.floor(next() * edits.length)]();
         expectFresh(step);
       }

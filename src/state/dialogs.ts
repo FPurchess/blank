@@ -1,4 +1,4 @@
-import { shallowRef } from "vue";
+import { type ShallowRef, shallowRef } from "vue";
 
 import type { Band, DocumentFields } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
@@ -79,6 +79,11 @@ export interface BandEditorRequest {
 // while none is open
 export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 
+// bandEditorDone closes the open header or footer strip and keeps what was
+// typed, as a click outside it does, e.g. before another tab shows; set by
+// the strip while it is open
+export const bandEditorDone = shallowRef<(() => void) | null>(null);
+
 export interface TocPopoverRequest {
   // the button or block it opens below, at its right end
   anchor: BoxAnchor;
@@ -95,6 +100,18 @@ export interface TocPopoverRequest {
 // or null while they are closed
 export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
 
+export interface UnsavedDialogRequest {
+  // the tab's name, e.g. "notes"
+  label: string;
+  save(): void;
+  discard(): void;
+  cancel(): void;
+}
+
+// unsavedDialog holds the request of the open question whether to save a
+// tab's changes before it closes, or null while none is asked
+export const unsavedDialog = shallowRef<UnsavedDialogRequest | null>(null);
+
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
 // dialog goes here too
@@ -104,4 +121,20 @@ export const focusTakingDialogs = [
   pageSetup,
   bandEditor,
   tocPopover,
+  unsavedDialog,
 ] as const;
+
+/**
+ * closeDialog closes the dialog of `requests`, then runs `callback`, which
+ * does what the user chose and gives the editor the focus back. In this
+ * order, uiTakesFocus is already false when the editor takes the focus, and a
+ * callback that opens a new request isn't closed right after. Vue removes the
+ * dialog's DOM on the next tick.
+ */
+export const closeDialog = (
+  requests: ShallowRef<unknown>,
+  callback: () => void,
+) => {
+  requests.value = null;
+  callback();
+};

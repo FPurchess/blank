@@ -18,6 +18,7 @@ export * from "./page";
 export * from "./pageView";
 export * from "./popups";
 export * from "./spellcheck";
+export * from "./tabs";
 
 /**
  * bootState starts what the state keeps up to date by itself: the theme on

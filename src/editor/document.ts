@@ -1,79 +1,66 @@
 import { path as tauriPath } from "@tauri-apps/api";
-import { getMatches } from "@tauri-apps/plugin-cli";
 import { exists, readFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
-import { parseMarkdown } from "../markdown";
+import { parseMarkdown, schema } from "../markdown";
 import { Node } from "prosemirror-model";
 
 import { path as _path, importedFrom, transaction } from "../state";
-import {
-  getDocumentFromStorage,
-  getImportedFromStorage,
-  getPathfromStorage,
-} from "../storage";
 import { basename, extname } from "../paths";
 import { errorMessage } from "../errors";
 import { UNREADABLE_EXTENSIONS, WORD_EXTENSIONS } from "../formats";
 
 import welcomeMessage from "./welcome.md?raw";
 
+// Where a document comes from: its markdown file (`path`), or the Word
+// document an untitled document was imported from (`importedFrom`)
+export interface DocumentFile {
+  path: string | null;
+  importedFrom: string | null;
+}
+
+// A document as read from a file, before it is shown
+export interface LoadedDocument extends DocumentFile {
+  doc: Node;
+}
+
 /**
- * Applies a new document to the editor state. It builds a fresh state with the
- * same plugins, so the undo history starts empty and undo can't revert the
- * loaded document.
- * @param state The current EditorState
- * @param doc The new document to set
- * @param path path to the document (optional)
- * @returns the new EditorState
+ * documentState builds the editor state of `doc`, with the plugins of `base`.
+ * The undo history starts empty, so undo can't revert the loaded document.
  */
-export function applyDocument(
-  state: EditorState,
-  doc: Node,
-  path?: string | null,
-): EditorState {
+export const documentState = (base: EditorState, doc: Node): EditorState => {
   const created = EditorState.create({
-    schema: state.schema,
+    schema: base.schema,
     doc,
-    plugins: state.plugins,
+    plugins: base.plugins,
   });
   // plugins that keep the document in shape, like the paragraphs the table
   // guard keeps next to tables, do it right away, not with the first click,
   // which would then land where the content has moved to
-  const next = created.apply(created.tr);
-  // storage persists the transaction's doc and the UI renders it; the page
-  // view lays the document out once the editor has it, not the old one with
-  // the new path (see pageSync)
-  transaction.value = next.tr;
-  if (path) _path.value = path;
-  return next;
-}
-
-/**
- * sets the welcome document to the editor state
- * @param state The EditorState to mutate
- * @returns the new EditorState
- */
-export const setDefaultDocument = (state: EditorState): EditorState => {
-  const doc = parseMarkdown(welcomeMessage);
-  return applyDocument(state, doc);
+  return created.apply(created.tr);
 };
 
 /**
- * restores the document from storage if it exists
- * @param state The EditorState to mutate
- * @returns the new EditorState
+ * showDocument publishes `state` and where it comes from as the document,
+ * before the view gets it: storage persists the transaction's doc, and the
+ * page view lays the document out with the path of its images (see pageSync)
  */
-export const restoreDocument = async (
-  state: EditorState,
-): Promise<EditorState | undefined> => {
-  const doc = await getDocumentFromStorage();
-  if (!doc) return;
-  importedFrom.value = (await getImportedFromStorage()) ?? null;
-  return applyDocument(state, doc, await getPathfromStorage());
+export const showDocument = (state: EditorState, file: DocumentFile) => {
+  transaction.value = state.tr;
+  _path.value = file.path;
+  importedFrom.value = file.importedFrom;
 };
+
+/**
+ * emptyDocument returns a document with one empty paragraph
+ */
+export const emptyDocument = (): Node => schema.topNodeType.createAndFill()!;
+
+/**
+ * welcomeDocument returns the document Blank starts with the first time
+ */
+export const welcomeDocument = (): Node => parseMarkdown(welcomeMessage);
 
 // Word documents larger than this are refused
 export const MAX_WORD_BYTES = 50 * 1024 * 1024;
@@ -83,10 +70,9 @@ export const MAX_WORD_BYTES = 50 * 1024 * 1024;
  * document. The Word document itself is never written to.
  */
 const importWordDocument = async (
-  state: EditorState,
   path: string,
   silent: boolean,
-): Promise<EditorState | undefined> => {
+): Promise<LoadedDocument | undefined> => {
   const name = basename(path);
   const fail = (reason: string) => {
     console.error(`Failed to import ${path}: ${reason}`);
@@ -106,10 +92,6 @@ const importWordDocument = async (
     return;
   }
 
-  const newState = applyDocument(state, result.doc);
-  // applyDocument keeps the current path, which saving would overwrite
-  _path.value = null;
-  importedFrom.value = path;
   if (!silent) {
     sendNotification(
       [
@@ -119,27 +101,27 @@ const importWordDocument = async (
       ].join(". "),
     );
   }
-  return newState;
+  // untitled, so saving can't overwrite the Word document
+  return { doc: result.doc, path: null, importedFrom: path };
 };
 
 /**
- * reads a document from a given file path: a markdown file, or a Word
- * document that is imported
- * @param state The EditorState to mutate
- * @param path file path to load the document from
- * @returns the new EditorState
+ * readDocument reads the document at `path`: a markdown file, or a Word
+ * document that is imported into an untitled one
+ * @param silent whether to leave failures out of the notifications
+ * @returns the document, or undefined when it can't be read
  */
-export const readDocumentFromFile = async (
-  state: EditorState,
+export const readDocument = async (
   path: string,
   silent = false,
-): Promise<EditorState | undefined> => {
+): Promise<LoadedDocument | undefined> => {
   if (!path) return;
   // logs why a file can't be opened, and tells the user unless `silent`
   const report = (log: string, message: string) => {
     console.error(log);
     if (!silent) sendNotification(message);
   };
+  // the resolved path keeps working when Blank is started from another directory
   const resolvedPath = await tauriPath.resolve(path);
   if (!(await exists(resolvedPath))) {
     report(
@@ -151,7 +133,7 @@ export const readDocumentFromFile = async (
 
   const extension = extname(resolvedPath);
   if (WORD_EXTENSIONS.includes(extension)) {
-    return importWordDocument(state, resolvedPath, silent);
+    return importWordDocument(resolvedPath, silent);
   }
   if (UNREADABLE_EXTENSIONS.includes(extension)) {
     report(
@@ -161,90 +143,11 @@ export const readDocumentFromFile = async (
     return;
   }
 
-  let doc: Node | undefined;
   try {
-    const content = await readTextFile(resolvedPath);
-    doc = parseMarkdown(content);
+    const doc = parseMarkdown(await readTextFile(resolvedPath));
+    return { doc, path: resolvedPath, importedFrom: null };
   } catch (err) {
     const message = `Failed to read file: ${errorMessage(err)}`;
     report(message, message);
-    return;
   }
-  if (doc) {
-    importedFrom.value = null;
-    // the resolved path keeps working when Blank is started from another directory
-    return applyDocument(state, doc, resolvedPath);
-  }
-};
-
-/**
- * reads a document from the CLI arguments
- * @param state EditorState to mutate
- * @returns the new EditorState
- */
-export const readDocumentFromCliArgs = async (
-  state: EditorState,
-): Promise<EditorState | undefined> => {
-  let matches: Awaited<ReturnType<typeof getMatches>>;
-  try {
-    matches = await getMatches();
-  } catch (error) {
-    // e.g. more than one file or an unknown flag was passed
-    console.error("failed to read the command-line arguments", error);
-    sendNotification(
-      `Blank opens one file at a time, so the command-line arguments were ignored: ${errorMessage(error)}`,
-    );
-    return;
-  }
-  const filePath = matches.args?.path?.value as string | undefined;
-  if (filePath) return readDocumentFromFile(state, filePath);
-};
-
-/**
- * backupStoredDocument copies the raw stored document to `doc-backup`, so
- * autosave can't overwrite the only copy of a document that can't be restored
- */
-const backupStoredDocument = async (): Promise<boolean> => {
-  try {
-    const raw = await localforage.getItem("doc");
-    if (raw === null) return false;
-    await localforage.setItem("doc-backup", raw);
-    return true;
-  } catch (error) {
-    console.error("failed to back up the stored document", error);
-    return false;
-  }
-};
-
-/**
- * apply initial documents by either opening the file passed via command-line argument,
- * restoring it from storage or setting the default document. A source that
- * fails is skipped, so the editor always gets a document.
- * @param state EditorState to mutate
- * @returns the new EditorState
- */
-export const applyInitialDocument = async (
-  state: EditorState,
-): Promise<EditorState> => {
-  try {
-    const fromCli = await readDocumentFromCliArgs(state);
-    if (fromCli) return fromCli;
-  } catch (error) {
-    console.error("failed to open the file from the command line", error);
-    sendNotification(`Failed to open file: ${errorMessage(error)}`);
-  }
-
-  try {
-    const restored = await restoreDocument(state);
-    if (restored) return restored;
-  } catch (error) {
-    console.error("failed to restore the stored document", error);
-    const backedUp = await backupStoredDocument();
-    const kept = backedUp ? ' A copy was kept as "doc-backup".' : "";
-    sendNotification(
-      `Your last document couldn't be restored, so Blank starts with the welcome document.${kept} ${errorMessage(error)}`,
-    );
-  }
-
-  return setDefaultDocument(state);
 };

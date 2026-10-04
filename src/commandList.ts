@@ -10,6 +10,7 @@ import { CommandIdentifier, CommandIdentifier as C } from "./config";
 // the groups, in the order menus and the list of shortcuts show them
 export const commandGroups = [
   "File",
+  "Tabs",
   "Export",
   "Edit",
   "Insert",
@@ -58,6 +59,42 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Save as…",
     icon: "save",
     aliases: ["rename", "copy"],
+  },
+  [C.TAB_CLOSE]: {
+    group: "Tabs",
+    label: "Close tab",
+    icon: "x",
+    aliases: ["close", "document", "file"],
+  },
+  [C.TAB_NEXT]: {
+    group: "Tabs",
+    label: "Next tab",
+    icon: "chevron-right",
+    aliases: ["switch", "document"],
+  },
+  [C.TAB_PREVIOUS]: {
+    group: "Tabs",
+    label: "Previous tab",
+    icon: "chevron-left",
+    aliases: ["switch", "document"],
+  },
+  [C.TAB_REOPEN]: {
+    group: "Tabs",
+    label: "Reopen closed tab",
+    icon: "undo",
+    aliases: ["restore", "closed", "again"],
+  },
+  [C.TAB_MOVE_LEFT]: {
+    group: "Tabs",
+    label: "Move tab left",
+    icon: "column-back",
+    aliases: ["reorder"],
+  },
+  [C.TAB_MOVE_RIGHT]: {
+    group: "Tabs",
+    label: "Move tab right",
+    icon: "column-forward",
+    aliases: ["reorder"],
   },
   [C.EXPORT_PDF]: {
     group: "Export",
@@ -235,6 +272,18 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Outline",
     icon: "outline",
     aliases: ["headings", "toc", "navigation"],
+  },
+  [C.VIEW_FOCUS_NEXT]: {
+    group: "View",
+    label: "Next part of the window",
+    icon: "focus",
+    aliases: ["focus", "tabs", "toolbar", "keyboard", "f6"],
+  },
+  [C.VIEW_FOCUS_PREVIOUS]: {
+    group: "View",
+    label: "Previous part of the window",
+    icon: "focus",
+    aliases: ["focus", "tabs", "toolbar", "keyboard", "f6"],
   },
   [C.VIEW_PAGES]: {
     group: "View",

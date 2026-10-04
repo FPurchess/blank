@@ -1,4 +1,4 @@
-import { keymap as _keymap } from "prosemirror-keymap";
+import { keymap as _keymap, keydownHandler } from "prosemirror-keymap";
 import { undo, redo } from "prosemirror-history";
 import {
   baseKeymap,
@@ -17,8 +17,13 @@ import { fieldAt, schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
+  closeTab,
+  cycleTabs,
+  moveFocus,
+  moveTab,
   newFile,
   openFile,
+  reopenTab,
   saveFile,
   exportAs,
   cycleTheme,
@@ -113,6 +118,12 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.FILE_SAVE]: saveFile(),
   [CommandIdentifier.FILE_SAVE_AS]: saveFile({ force: true }),
   [CommandIdentifier.FILE_OPEN]: openFile(),
+  [CommandIdentifier.TAB_CLOSE]: closeTab(),
+  [CommandIdentifier.TAB_NEXT]: cycleTabs(1),
+  [CommandIdentifier.TAB_PREVIOUS]: cycleTabs(-1),
+  [CommandIdentifier.TAB_REOPEN]: reopenTab(),
+  [CommandIdentifier.TAB_MOVE_LEFT]: moveTab(-1),
+  [CommandIdentifier.TAB_MOVE_RIGHT]: moveTab(1),
   [CommandIdentifier.EXPORT_PDF]: exportAs("PDF-Export", exporters.toPDF, [
     PDF_FILTER,
   ]),
@@ -130,24 +141,36 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
   [CommandIdentifier.VIEW_PAGES]: togglePageView(),
   [CommandIdentifier.VIEW_OUTLINE]: showOutline(),
+  [CommandIdentifier.VIEW_FOCUS_NEXT]: moveFocus(1),
+  [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: moveFocus(-1),
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
 };
 
+// keys that run a command besides its own, which can't be changed in
+// blank.json: they go to it unless another command has them
+const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
+  [CommandIdentifier.TAB_NEXT]: ["Ctrl-PageDown"],
+  [CommandIdentifier.TAB_PREVIOUS]: ["Ctrl-PageUp"],
+};
+
 /**
- * bindCommands binds every command to its configured key. Bindings that
- * can't be used are skipped and reported once.
+ * bindingsOf binds the commands `ids` to their configured keys, and then to
+ * their fixed keys (see FIXED_KEYS). Bindings that can't be used are added
+ * to `invalid`.
  */
-const bindCommands = () => {
-  const invalid: string[] = [];
+const bindingsOf = (
+  ids: readonly CommandIdentifier[],
+  invalid: string[] = [],
+) => {
   const bindings: Record<string, Command> = {};
-  const commands = Object.entries(commandMap) as [CommandIdentifier, Command][];
-  for (const [key, command] of commands) {
-    const binding = getKeyBinding(key);
+  for (const id of ids) {
+    const binding = getKeyBinding(id);
     const normalized = normalizeBinding(binding);
     if (normalized === undefined) {
-      invalid.push(`${key}: ${binding}`);
+      invalid.push(`${id}: ${binding}`);
       continue;
     }
+    const command = commandMap[id];
     bindings[normalized] = command;
     // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
     // on Windows, where the keymap can't fall back to the key code
@@ -156,6 +179,24 @@ const bindCommands = () => {
         command;
     }
   }
+  for (const id of ids) {
+    for (const key of FIXED_KEYS[id] ?? []) {
+      bindings[normalizeBinding(key)!] ??= commandMap[id];
+    }
+  }
+  return bindings;
+};
+
+/**
+ * bindCommands binds every command to its configured key. Bindings that
+ * can't be used are skipped and reported once.
+ */
+const bindCommands = () => {
+  const invalid: string[] = [];
+  const bindings = bindingsOf(
+    Object.keys(commandMap) as CommandIdentifier[],
+    invalid,
+  );
   if (invalid.length > 0) {
     console.warn("ignored invalid key bindings", invalid);
     sendNotification(
@@ -164,6 +205,30 @@ const bindCommands = () => {
   }
   return bindings;
 };
+
+// the commands that work wherever the focus is in the window, not only in
+// the editor: the files, the tabs, and moving between the parts
+export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
+  CommandIdentifier.FILE_NEW,
+  CommandIdentifier.FILE_OPEN,
+  CommandIdentifier.FILE_SAVE,
+  CommandIdentifier.FILE_SAVE_AS,
+  CommandIdentifier.TAB_CLOSE,
+  CommandIdentifier.TAB_NEXT,
+  CommandIdentifier.TAB_PREVIOUS,
+  CommandIdentifier.TAB_REOPEN,
+  CommandIdentifier.TAB_MOVE_LEFT,
+  CommandIdentifier.TAB_MOVE_RIGHT,
+  CommandIdentifier.VIEW_FOCUS_NEXT,
+  CommandIdentifier.VIEW_FOCUS_PREVIOUS,
+];
+
+/**
+ * commandKeys returns a keydown handler that runs the commands `ids` on
+ * their keys, e.g. for keys pressed outside the editor
+ */
+export const commandKeys = (ids: readonly CommandIdentifier[]) =>
+  keydownHandler(bindingsOf(ids));
 
 export const keymap = () =>
   _keymap({

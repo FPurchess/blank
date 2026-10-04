@@ -41,9 +41,10 @@
       "args": [
         {
           "name": "path",
-          "description": "The file path to open",
+          "description": "The files to open, each in a tab",
           "index": 1,
           "takesValue": true,
+          "multiple": true,
           "required": false
         }
       ]
@@ -60,6 +61,26 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown document",
+        "description": "Markdown document",
+        "role": "Editor",
+        "rank": "Default",
+        "mimeType": "text/markdown",
+        "contentTypes": ["net.daringfireball.markdown"]
+      },
+      {
+        "ext": ["docx"],
+        "name": "Word document",
+        "description": "Word document, which Blank imports",
+        "role": "Editor",
+        "rank": "Alternate",
+        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "contentTypes": ["org.openxmlformats.wordprocessingml.document"]
+      }
     ],
     "macOS": {
       "signingIdentity": "-",

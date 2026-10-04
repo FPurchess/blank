@@ -2,8 +2,7 @@
 import { onMounted, onUpdated, shallowRef, useTemplateRef } from "vue";
 
 import { place } from "../popup";
-import { tocPopover, type TocPopoverRequest } from "../state";
-import { closeDialog } from "./closeDialog";
+import { closeDialog, tocPopover, type TocPopoverRequest } from "../state";
 import { useDismiss } from "./composables/useDismiss";
 import {
   anchorOf,

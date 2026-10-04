@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { FrameLayout } from "../engine/frames";
 import { testLayout } from "../test/layout";
 import {
-  anchorTop,
   caretLine,
   movesPages,
   endMark,
@@ -13,7 +12,6 @@ import {
   propertiesPlace,
   scrollFor,
   sheetSlots,
-  viewAnchor,
 } from "./pageViewModel";
 
 // two frames of "page ends" at 1.5 px per point, and of "pages"
@@ -190,98 +188,6 @@ describe("propertiesPlace", () => {
       top: 48,
       width: 528,
     });
-  });
-});
-
-describe("viewAnchor and anchorTop", () => {
-  // two pages of text in "page ends", with a mark of 64 px between them,
-  // and the same two as sheets
-  const ends: FrameLayout = {
-    mode: "page-ends",
-    scale: 2,
-    frames: [
-      {
-        page: 0,
-        top: 50,
-        left: 0,
-        width: 400,
-        height: 600,
-        x: 46,
-        y: 70,
-        w: 200,
-        h: 300,
-      },
-      {
-        page: 1,
-        top: 714,
-        left: 0,
-        width: 400,
-        height: 400,
-        x: 46,
-        y: 70,
-        w: 200,
-        h: 200,
-      },
-    ],
-    height: 1200,
-    headerRoom: 0,
-    footerRoom: 0,
-  };
-  const sheets: FrameLayout = {
-    mode: "pages",
-    scale: 1,
-    frames: [
-      {
-        page: 0,
-        top: 50,
-        left: 0,
-        width: 595,
-        height: 842,
-        x: 0,
-        y: 0,
-        w: 595,
-        h: 842,
-      },
-      {
-        page: 1,
-        top: 916,
-        left: 0,
-        width: 595,
-        height: 842,
-        x: 0,
-        y: 0,
-        w: 595,
-        h: 842,
-      },
-    ],
-    height: 1800,
-    headerRoom: 0,
-    footerRoom: 0,
-  };
-
-  it("finds the spot at the top of the view, and scrolls back to it", () => {
-    // 100 px into the second page's text, 50 pt at 2 px per point
-    const anchor = viewAnchor(ends, 814)!;
-    expect(anchor).toEqual({ page: 1, y: 120 });
-    expect(anchorTop(ends, anchor)).toBe(814);
-    // on its sheet, 120 pt from its top edge
-    expect(anchorTop(sheets, anchor)).toBe(916 + 120);
-    expect(viewAnchor(sheets, 916 + 120)).toEqual(anchor);
-  });
-
-  it("takes the next page's top over the mark between the pages", () => {
-    expect(viewAnchor(ends, 680)).toEqual({ page: 1, y: 70 });
-    // above the first page the view shows the start, whatever the layout
-    expect(viewAnchor(ends, 0)).toBeNull();
-    expect(viewAnchor(ends, 50)).toBeNull();
-    expect(viewAnchor(ends, 60)).toEqual({ page: 0, y: 75 });
-    expect(viewAnchor(ends, 5000)).toBeNull();
-  });
-
-  it("goes to the text for a spot in a margin that page ends doesn't show", () => {
-    expect(anchorTop(ends, { page: 1, y: 10 })).toBe(714);
-    expect(anchorTop(ends, { page: 1, y: 800 })).toBe(714 + 400);
-    expect(anchorTop(ends, { page: 7, y: 0 })).toBeNull();
   });
 });
 

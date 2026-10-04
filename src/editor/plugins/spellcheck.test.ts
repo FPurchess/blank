@@ -7,7 +7,6 @@ import { schema } from "../../markdown";
 import { doc, p } from "../../test/editor";
 import { spellchecker } from "../../state";
 import type { Spellchecker } from "../../spellcheck/types";
-import newFile from "../commands/newFile";
 import {
   ignoreAll,
   misspellingAt,
@@ -181,7 +180,7 @@ describe("plugin.spellcheck", () => {
     expect(flagged()).toEqual(["knwon", "wel"]);
   });
 
-  it("ignores a word everywhere until the document is replaced", async () => {
+  it("ignores a word everywhere in its document", async () => {
     setup(doc(p("wrng and Wrng")));
     spellchecker.value = fakeChecker().checker;
     await settle();
@@ -192,11 +191,6 @@ describe("plugin.spellcheck", () => {
     typeAt(" wrng ");
     await settle();
     expect(flagged()).toEqual([]);
-
-    newFile()(view.state, view.dispatch);
-    typeAt("wrng ", 1);
-    await settle();
-    expect(flagged()).toEqual(["wrng"]);
   });
 
   it("checks everything again for a new spell checker", async () => {

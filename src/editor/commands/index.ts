@@ -1,9 +1,18 @@
 export { default as exportAs } from "./exportAs";
 export { default as insertBlock } from "./insertBlock";
 export { default as insertNode } from "./insertNode";
-export { default as newFile } from "./newFile";
-export { default as openFile } from "./openFile";
-export { default as saveFile } from "./saveFile";
+export {
+  closeOtherTabs,
+  closeTab,
+  closeTabsToRight,
+  cycleTabs,
+  moveTab,
+  newFile,
+  openFile,
+  reopenTab,
+  saveFile,
+  selectTab,
+} from "./tabs";
 export { default as cycleTheme } from "./cycleTheme";
 export { default as chooseLanguage } from "./chooseLanguage";
 export { default as editLink } from "./editLink";
@@ -15,3 +24,4 @@ export { editBand } from "./editBand";
 export { togglePageView } from "./pageView";
 export { showOutline } from "./outline";
 export { showWordCount } from "./wordCount";
+export { moveFocus } from "./focus";

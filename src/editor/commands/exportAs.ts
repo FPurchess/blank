@@ -59,6 +59,8 @@ export default (
       return true;
     }
 
+    // the document's file now, before another tab may show
+    const docPath = path.value;
     (async () => {
       const dest = await save({
         filters,
@@ -82,7 +84,7 @@ export default (
         config.value.layout.page,
       );
       const { contents, warnings, pages } = await exporter(state, {
-        docPath: path.value,
+        docPath,
         layout,
       });
       await writeFile(dest, contents);

@@ -1,12 +1,12 @@
 # Keyboard shortcuts
 
-`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux. All shortcuts except the line break and `Mod` + Click can be [changed](./configuration#keyboard-shortcuts).
+`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux. All shortcuts except the line break, `Mod` + Click and `Ctrl` `Page Up` / `Page Down` can be [changed](./configuration#keyboard-shortcuts).
 
 ## Files
 
 | Command                                     | Shortcut          |
 | ------------------------------------------- | ----------------- |
-| New file                                    | `Mod` `N`         |
+| New document                                | `Mod` `N`         |
 | Open file                                   | `Mod` `O`         |
 | Save                                        | `Mod` `S`         |
 | Save as                                     | `Mod` `Shift` `S` |
@@ -20,6 +20,19 @@
 | [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`   |
 | Cycle themes                                | `Mod` `Alt` `T`   |
 | Choose language                             | `Mod` `Alt` `L`   |
+
+## Tabs
+
+| Command                              | Shortcut                                  |
+| ------------------------------------ | ----------------------------------------- |
+| [Next tab](./writing#tabs)           | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
+| Previous tab                         | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
+| Close tab                            | `Mod` `W`                                 |
+| Reopen the tab closed last           | `Mod` `Shift` `T`                         |
+| Move tab left                        | `Ctrl` `Shift` `Page Up`                  |
+| Move tab right                       | `Ctrl` `Shift` `Page Down`                |
+| Go to the tabs, and back to the text | `F6`                                      |
+| The other way round                  | `Shift` `F6`                              |
 
 ## Editing
 
