@@ -80,7 +80,7 @@ For the GitHub release:
 - **Require `engine` for merging into `main`.** The ruleset "CI must pass on
   main" requires `test`, the three `test-tauri` builds and `e2e`. `engine`
   (the wasm freshness check, the engine's tests and the notices) runs on every
-  push and pull request, and `publish.yml` and `make release` require it, but
+  change of a pull request and every push to `main`, and `publish.yml` and `make release` require it, but
   a pull request can merge without it.
 - **The macOS minimum (decided):** 12.0 (Monterey), which ships with Safari
   15, whose WebKit compiles the engine's wasm (bulk memory, reference types,
