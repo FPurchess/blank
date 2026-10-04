@@ -1,50 +1,117 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  countOf,
+  firstHeadings,
   languageLabel,
   optionLabel,
+  pageMenuItems,
   pickerWindow,
   spellcheckLabel,
   titleOf,
+  viewLabel,
 } from "./statusBarModel";
 
 describe("titleOf", () => {
   it("names the file, an imported Word document, or Untitled", () => {
-    expect(titleOf("/docs/a.md", "/docs/a.docx")).toBe("» /docs/a.md");
-    expect(titleOf(null, "/docs/a.docx")).toBe("» a.docx (imported)");
-    expect(titleOf(null, null)).toBe("» Untitled");
-  });
-});
-
-describe("countOf", () => {
-  it("counts words and chars, none in an empty document", () => {
-    expect(countOf("")).toBe("0 words 0 chars");
-    expect(countOf("one two")).toBe("2 words 7 chars");
+    expect(titleOf("/docs/a.md", "/docs/a.docx")).toBe("/docs/a.md");
+    expect(titleOf(null, "/docs/a.docx")).toBe("a.docx (imported)");
+    expect(titleOf(null, null)).toBe("Untitled");
   });
 
-  it("counts words separated by a line break or a tab", () => {
-    expect(countOf("one\ntwo\tthree")).toBe("3 words 13 chars");
+  it("names the file only by its name, if asked", () => {
+    expect(titleOf("/docs/a.md", null, "name")).toBe("a.md");
+    expect(titleOf(null, "/docs/a.docx", "name")).toBe("a.docx (imported)");
   });
 });
 
 describe("spellcheckLabel", () => {
-  it("shows a message instead of the status, without a tooltip", () => {
+  it("shows a message instead of the status", () => {
     expect(spellcheckLabel({ state: "ready", tag: "de" }, "Done")).toEqual({
       text: "Done",
-      title: "",
+      tip: undefined,
     });
   });
 
-  it("says how to turn it off, and nothing while it's off", () => {
+  it("says whether it's on, and leaves the tooltip to the command", () => {
     expect(spellcheckLabel({ state: "ready", tag: "de" }, null)).toEqual({
       text: "Spelling",
-      title: "Checking German spelling, click to turn spell check off",
+      tip: undefined,
     });
     expect(spellcheckLabel({ state: "off", tag: "de" }, null)).toEqual({
-      text: "",
-      title: "",
+      text: "Spelling off",
+      tip: undefined,
     });
+  });
+
+  it("names what happens to the dictionary while it isn't ready", () => {
+    expect(spellcheckLabel({ state: "loading", tag: "de" }, null).tip).toBe(
+      "Spelling: loading German",
+    );
+    expect(spellcheckLabel({ state: "unavailable", tag: "de" }, null).tip).toBe(
+      "Spelling: no German dictionary",
+    );
+    expect(
+      spellcheckLabel({ state: "error", tag: "de", message: "Broken" }, null),
+    ).toEqual({ text: "Spelling failed", tip: "Spelling: Broken" });
+    expect(
+      spellcheckLabel({ state: "error", tag: "de" }, null).tip,
+    ).toBeUndefined();
+  });
+});
+
+describe("viewLabel", () => {
+  it("names the view shown and what a click does", () => {
+    expect(viewLabel("pages")).toEqual({
+      tip: "View: pages",
+      aria: "View: pages. Switch to page ends",
+    });
+    expect(viewLabel("page-ends")).toEqual({
+      tip: "View: page ends",
+      aria: "View: page ends. Switch to pages",
+    });
+  });
+});
+
+describe("firstHeadings", () => {
+  const heading = (text: string, pos: number) => ({ level: 1, text, pos });
+  // the headings at 0 and 10 are on the first page, 20 on the third
+  const pageOf = (pos: number) =>
+    pos < 15 ? 0 : pos === 30 ? null : pos === 40 ? 9 : 2;
+
+  it("finds the first heading with text on each page", () => {
+    expect(
+      firstHeadings(
+        3,
+        [
+          heading("", 0),
+          heading("One", 5),
+          heading("Two", 10),
+          heading("Three", 20),
+        ],
+        pageOf,
+      ),
+    ).toEqual(["One", "", "Three"]);
+  });
+
+  it("skips headings that aren't laid out or are past the pages", () => {
+    expect(
+      firstHeadings(2, [heading("Gone", 30), heading("Far", 40)], pageOf),
+    ).toEqual(["", ""]);
+  });
+});
+
+describe("pageMenuItems", () => {
+  it("lists the pages with their headings, going to the one chosen", () => {
+    const went: number[] = [];
+    const items = pageMenuItems(["Intro", ""], (page) => went.push(page));
+    expect(items).toMatchObject([
+      { id: "page:1", label: "Page 1", icon: "page", detail: "Intro" },
+      { id: "page:2", label: "Page 2", icon: "page" },
+    ]);
+    expect(items[1]).not.toHaveProperty("detail");
+    const second = items[1];
+    if (second !== "separator") second.run?.();
+    expect(went).toEqual([2]);
   });
 });
 

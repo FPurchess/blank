@@ -3,6 +3,7 @@
 // first, so main.scss's own rules override its global ones
 @use "controls" as *;
 @use "typography";
+@use "statusbar" as *;
 
 html {
   overflow-y: auto;
@@ -15,43 +16,18 @@ body {
   width: 100%;
 }
 
-#ui-top,
-#ui-bottom {
+#ui-top {
   opacity: 0.3;
   position: fixed;
   // above the page view
   z-index: 2;
-  padding: 12px 24px;
-  font-size: 0.9rem;
-  user-select: none;
-  box-sizing: border-box;
-}
-
-#ui-top {
   top: 0;
   left: 0;
+  padding: 12px 24px;
+  font-size: 0.9rem;
   text-align: start;
-}
-
-#ui-bottom {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 24px;
-  pointer-events: none;
-}
-
-// the right of the bar: the page number, the paper, spell check and
-// language
-#ui-page-number {
-  order: 1;
-  margin-left: auto;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  user-select: none;
+  box-sizing: border-box;
 }
 
 // read out by screen readers, not shown
@@ -62,69 +38,6 @@ body {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-#ui-page,
-#ui-spellcheck,
-#ui-language {
-  order: 2;
-}
-
-#ui-bottom:has(#ui-page-number) #ui-page {
-  margin-left: 0;
-}
-
-#ui-page {
-  pointer-events: auto;
-  cursor: pointer;
-  margin-left: auto;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-#ui-spellcheck {
-  pointer-events: auto;
-  cursor: pointer;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-
-  &[hidden] {
-    display: none;
-  }
-}
-
-#ui-announcement {
-  font-size: 0.8rem;
-}
-
-#ui-language {
-  pointer-events: auto;
-  cursor: pointer;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-
-  &.open {
-    cursor: default;
-  }
-
-  &.invalid {
-    text-decoration: line-through;
-  }
-
-  .option {
-    padding: 0 0.25em;
-    cursor: pointer;
-  }
-
-  .selected {
-    font-weight: bold;
-    text-decoration: underline;
-  }
-
-  .more,
-  .buffer {
-    padding: 0 0.25em;
-  }
 }
 
 .ProseMirror {
@@ -530,7 +443,9 @@ body {
 // the header and footer strips, see src/ui/BandStrips.vue: pinned below the top
 // bar and above the bottom bar, lined up with the text column
 $band-height: 28px;
-$bar-height: 44px;
+// the top bar (TOP_BAR_HEIGHT in src/chrome.ts, like $band-height); the
+// status bar below has its own height, $status-height
+$top-bar-height: 44px;
 
 .band-edge,
 .band-editor {
@@ -543,11 +458,11 @@ $bar-height: 44px;
   user-select: none;
 
   &.header {
-    top: $bar-height;
+    top: $top-bar-height;
   }
 
   &.footer {
-    bottom: $bar-height;
+    bottom: $status-height;
   }
 
   &[hidden] {
@@ -601,15 +516,16 @@ $faint-text-opacity: 0.6;
   }
 }
 
-// where there is none, a hint shows in the middle of the top or bottom bar
-// while the mouse is near; only its buttons take clicks
+// where there is none, a hint shows while the mouse is near: in the middle of
+// the top bar, and just above the status bar, whose items fill the bottom
+// row; only its buttons take clicks, and only while it shows
 .band-edge.empty {
   &.header {
     top: 0;
   }
 
   &.footer {
-    bottom: 0;
+    bottom: $status-height;
   }
 
   .band-inner {
@@ -621,18 +537,25 @@ $faint-text-opacity: 0.6;
   display: flex;
   justify-content: center;
   gap: 12px;
-  height: $bar-height;
+  height: $top-bar-height;
   align-items: center;
   opacity: 0;
   transition: opacity 150ms;
 
+  .footer & {
+    height: $band-height;
+  }
+
   body.near-top .header &,
   body.near-bottom .footer & {
     opacity: 0.6;
+
+    button {
+      pointer-events: auto;
+    }
   }
 
   button {
-    pointer-events: auto;
     font: inherit;
     font-size: 0.75rem;
     color: inherit;
@@ -1151,6 +1074,22 @@ $strip-height: 90px;
       opacity: 0.6;
     }
 
+    // a hint after the label, e.g. the first heading on a page
+    .detail {
+      max-width: 22ch;
+      // clip, not hidden: WebKit's WebDriver reads hidden overflow as empty
+      overflow: clip;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      opacity: 0.7;
+    }
+
+    // an icon before the label, e.g. the page icon of the page menu
+    .icon {
+      align-self: center;
+      margin-right: -12px;
+    }
+
     .check {
       width: 1em;
       margin-right: -16px;
@@ -1204,6 +1143,9 @@ body:not(.without-engine) #editor {
 // if the layout engine can't load, the editor shows the text itself, as
 // before the page view
 body.without-engine {
+  // the text scrolls up out from under the status bar
+  padding-bottom: $status-height;
+
   #editor {
     position: static;
     width: auto;
@@ -1221,7 +1163,8 @@ body.without-engine {
 
 #page-view {
   position: fixed;
-  inset: 0;
+  // above the status bar, which would cover the last lines and the caret
+  inset: 0 0 $status-height;
   z-index: 1;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1578,8 +1521,8 @@ body.outline-docked.outline-desk {
 // dashes
 .outline-list {
   position: fixed;
-  top: $bar-height;
-  bottom: $bar-height;
+  top: $top-bar-height;
+  bottom: $status-height;
   box-sizing: border-box;
   width: $outline-width;
   overflow-y: auto;
@@ -1598,7 +1541,7 @@ body.outline-docked.outline-desk {
   &.peek {
     top: 50%;
     bottom: auto;
-    max-height: calc(100vh - #{2 * $bar-height});
+    max-height: calc(100vh - #{$top-bar-height + $status-height});
     right: calc(
       #{$outline-gap + $outline-dashes + 8px} + var(--scrollbar, 0px)
     );
@@ -1806,6 +1749,7 @@ body.band-editing #outline {
   }
 
   .tooltip,
+  .word-count-card,
   .page-caret,
   .band-editor,
   .band-editor.footer {

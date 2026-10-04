@@ -1,0 +1,141 @@
+// The status bar at the bottom of the window (src/ui/BottomBar.vue): a row of
+// status items (_controls.scss) on the desk, each 24 px high (WCAG 2.5.8's
+// minimum target), with a line above it.
+@use "controls" as *;
+
+// the height of the bar, which the page view, the outline and the footer
+// strip stay above (STATUS_HEIGHT in src/chrome.ts)
+$status-height: 32px;
+
+#ui-bottom {
+  position: fixed;
+  // above the page view
+  z-index: 2;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: $status-height;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--s2);
+  font-size: var(--ui-small);
+  line-height: 16px;
+  color: var(--muted);
+  background-color: var(--desk-color);
+  border-top: 1px solid var(--line);
+  user-select: none;
+}
+
+// what pushes the items after it to the right end
+.status-grow {
+  flex: 1;
+  min-width: var(--s2);
+}
+
+.status-sep {
+  @include separator;
+  align-self: center;
+  height: 16px;
+  margin: 0 var(--s1);
+}
+
+// items only shown where the window is wide enough
+.status-wide {
+  display: contents;
+
+  @media (max-width: 860px) {
+    display: none;
+  }
+}
+
+// clip, not hidden: WebKit's WebDriver reads the text of an element that
+// hides its overflow as empty
+#ui-announcement {
+  min-width: 0;
+  padding-left: var(--s2);
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// the language picker, open in place of the language
+#ui-language {
+  display: inline-flex;
+
+  .picker {
+    display: inline-flex;
+    align-items: center;
+    height: var(--status-item);
+    padding: 0 var(--s1);
+    color: var(--color);
+  }
+
+  &.invalid .picker {
+    text-decoration: line-through;
+  }
+
+  .option {
+    padding: 0 var(--s1);
+  }
+
+  .selected {
+    font-weight: 500;
+    text-decoration: underline;
+  }
+
+  .more,
+  .buffer {
+    padding: 0 var(--s1);
+  }
+}
+
+// the details of the word count, above it
+.word-count-card {
+  @include popover;
+  position: fixed;
+  z-index: 20;
+  width: 240px;
+  padding: var(--s2) 10px;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 18px;
+  user-select: none;
+  animation: word-count-card-in var(--fade-in) var(--ease);
+
+  .name {
+    @include group-label;
+    padding-bottom: 6px;
+    overflow: clip;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  dl {
+    margin: 0;
+  }
+
+  dl > div {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--s1) 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  dt {
+    color: var(--muted);
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 500;
+  }
+}
+
+@keyframes word-count-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

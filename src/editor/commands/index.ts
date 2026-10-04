@@ -14,3 +14,4 @@ export { default as pageSetup } from "./pageSetup";
 export { editBand } from "./editBand";
 export { togglePageView } from "./pageView";
 export { showOutline } from "./outline";
+export { showWordCount } from "./wordCount";

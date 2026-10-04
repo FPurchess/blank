@@ -231,12 +231,14 @@ watch(
 
 onMounted(focusCurrent);
 
-// what closes the menu while it's open: a press or a scroll outside it, but
-// for the scroll the menu's own opening caused
-const { contains } = useDismiss(() => [container.value], close, {
-  resize: true,
-  blur: true,
-});
+// what closes the menu while it's open: a press or a scroll outside it and
+// the button that opened it, whose own click closes it, but for the scroll
+// the menu's own opening caused
+const { contains } = useDismiss(
+  () => [container.value, props.request.owner],
+  close,
+  { resize: true, blur: true },
+);
 listenOnWindow(
   "scroll",
   (event) => {

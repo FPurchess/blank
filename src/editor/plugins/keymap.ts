@@ -34,6 +34,7 @@ import {
   pageSetup,
   editBand,
   showOutline,
+  showWordCount,
   togglePageView,
 } from "../commands";
 
@@ -118,6 +119,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
   [CommandIdentifier.VIEW_PAGES]: togglePageView(),
   [CommandIdentifier.VIEW_OUTLINE]: showOutline(),
+  [CommandIdentifier.TOOLS_STATS]: showWordCount(),
 };
 
 /**

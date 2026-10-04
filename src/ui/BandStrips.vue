@@ -6,7 +6,7 @@ import { listenOnWindow } from "../scope";
 import { bandEditor, engineMissing, pageFields, pageLayout } from "../state";
 import BandEdge from "./BandEdge.vue";
 import BandEditor from "./BandEditor.vue";
-import { BANDS, NEAR_EDGE, shownAtRest } from "./bandStripsModel";
+import { BANDS, BAR_CONTROLS, nearEdge, shownAtRest } from "./bandStripsModel";
 import { useBodyClass } from "./composables/useBodyClass";
 import { keyOf } from "./keyOf";
 
@@ -53,12 +53,11 @@ const near = shallowRef<"top" | "bottom" | null>(null);
 useBodyClass("near-top", () => near.value === "top");
 useBodyClass("near-bottom", () => near.value === "bottom");
 listenOnWindow("mousemove", (event) => {
-  near.value =
-    event.clientY < NEAR_EDGE
-      ? "top"
-      : event.clientY > window.innerHeight - NEAR_EDGE
-        ? "bottom"
-        : null;
+  near.value = nearEdge(
+    event.clientY,
+    window.innerHeight,
+    event.target instanceof Element && !!event.target.closest(BAR_CONTROLS),
+  );
 });
 listenOnWindow("mouseout", (event) => {
   if (event.relatedTarget === null) near.value = null;

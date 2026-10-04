@@ -59,4 +59,20 @@ Your documents are plain markdown files: `Mod` `S` saves, `Mod` `O` opens, also 
 
 ## The status bar
 
-The top of the window shows the open file, _Untitled_, or the [Word document](./files#open-word-documents) an untitled document was imported from. The bottom shows the word and character count, [spell check](./spelling) while it is on, and the [language](./autocorrect#language).
+The top of the window shows the open file, _Untitled_, or the [Word document](./files#open-word-documents) an untitled document was imported from.
+
+The bar at the bottom shows where you are and what's switched on. Click any item in it; rest the mouse on one to see its name and shortcut.
+
+<img class="shot" src="/screenshots/status-bar.gif" alt="The mouse rests on the word count and a card with the words, characters, pages and reading time opens; then a click on the view button switches from page ends to pages" />
+
+| Item            | What it shows                                                          | Click it to                                                                                                         | Keys                                     |
+| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| _348 words_     | how many words the document has                                        | see the details: characters, pages, reading time and the words you selected. Resting the mouse on it opens them too | `Mod` `Alt` `C`                          |
+| _Page 2 of 5_   | the page you're looking at                                             | jump to another page, listed with the first heading on each                                                         |                                          |
+| _A4 (portrait)_ | the [paper](./pages#page-setup)                                        | open the page setup                                                                                                 | `Mod` `Alt` `U`                          |
+| _EN_            | the [language](./autocorrect#language)                                 | choose another one                                                                                                  | `Mod` `Alt` `L`                          |
+| _Spelling_      | whether [spell check](./spelling) is on (_Spelling off_ when it isn't) | turn spell check on or off                                                                                          | `Mod` `Alt` `S`                          |
+| ‹ ›             | while spell check is on and the window is wide enough                  | go to the previous or next misspelled word                                                                          | `Mod` `Alt` `Shift` `N`, `Mod` `Alt` `N` |
+| the view        | [pages or page ends](./pages#on-the-screen), whichever you're in       | switch to the other                                                                                                 | `Mod` `Alt` `V`                          |
+
+Next to the word count, the bar tells you for a moment what just happened, like _2 rows added_, and screen readers read it out. The details of the word count close as soon as you type on; with `Mod` `Alt` `C`, screen readers read them out as well.

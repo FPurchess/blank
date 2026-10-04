@@ -117,7 +117,7 @@ describe("spell check", () => {
   it("is off by default", async () => {
     await type("Thiss is wrng ");
 
-    await expect(status()).not.toBeDisplayed();
+    await expect(status()).toHaveText("Spelling off");
     await expect(errors()).toBeElementsArrayOfSize(0);
   });
 
@@ -249,7 +249,7 @@ describe("spell check", () => {
     await rightClick("unnd");
     await item("Disable spell check").click();
 
-    await expect(status()).not.toBeDisplayed();
+    await expect(status()).toHaveText("Spelling off");
     await expect(errors()).toBeElementsArrayOfSize(0);
   });
 

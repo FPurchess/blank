@@ -24,7 +24,7 @@ import {
   h,
 } from "../test/editor";
 import { formatShortcut } from "../editor/keyBindings";
-import { NEAR_EDGE } from "./bandStripsModel";
+import { NEAR_BOTTOM, NEAR_TOP } from "./bandStripsModel";
 import { flushPromises } from "../test/async";
 import { bootApp } from "./mount";
 
@@ -81,11 +81,14 @@ const applied = (request: BandEditorRequest) =>
   vi.mocked(request.apply).mock.calls[0][0];
 
 // runs the item of the open menu that reads `label`
+// runs an item of the open menu as ContextMenu.vue does: it closes first
 const choose = async (label: string) => {
-  const item = contextMenu.value!.items.find(
+  const menu = contextMenu.value!;
+  const item = menu.items.find(
     (item): item is Exclude<MenuItem, "separator"> =>
       item !== "separator" && item.label === label,
   )!;
+  menu.close();
   if (item.edit) item.edit.submit(item.edit.value);
   else item.run?.();
   await settle();
@@ -231,6 +234,16 @@ describe("band strips", () => {
       );
       await settle();
       expect(document.body.classList).toContain("near-bottom");
+
+      // but not on the status bar's controls
+      document.getElementById("ui-stats")!.dispatchEvent(
+        new MouseEvent("mousemove", {
+          bubbles: true,
+          clientY: window.innerHeight - 10,
+        }),
+      );
+      await settle();
+      expect(document.body.classList).not.toContain("near-bottom");
     });
 
     it("only renders again when what it shows changes", async () => {
@@ -328,9 +341,10 @@ describe("band strips", () => {
       const request = await open({ band: "footer" });
 
       await click(button("# Page number ▾"));
-      const menu = contextMenu.value!;
       expect(
-        menu.items.map((item) => (item === "separator" ? "-" : item.label)),
+        contextMenu.value!.items.map((item) =>
+          item === "separator" ? "-" : item.label,
+        ),
       ).toEqual([
         "3",
         "Page 3",
@@ -344,7 +358,6 @@ describe("band strips", () => {
         "Start At 1…",
       ]);
       await choose("Page 3 of 12");
-      menu.close();
       expect(contextMenu.value).toBeNull();
       await click(button("Done"));
 
@@ -359,6 +372,7 @@ describe("band strips", () => {
 
       await click(button("# Page number ▾"));
       expect((await choose("1, 2, 3")).checked).toBe(true);
+      await click(button("# Page number ▾"));
       await choose("i, ii, iii");
       await click(button("# Page number ▾"));
       expect(contextMenu.value!.items[0]).toMatchObject({ label: "iii" });
@@ -372,6 +386,18 @@ describe("band strips", () => {
         numberStyle: "i",
         startNumber: 5,
       });
+    });
+
+    it("closes a menu on a second click on its button", async () => {
+      await open();
+      const first = button("First Page ▾");
+
+      await click(first);
+      expect(contextMenu.value?.owner).toBe(first);
+      expect(first.getAttribute("aria-expanded")).toBe("true");
+      await click(first);
+      expect(contextMenu.value).toBeNull();
+      expect(first.getAttribute("aria-expanded")).toBe("false");
     });
 
     describe("the first page", () => {
@@ -664,9 +690,28 @@ describe("band strips", () => {
       expect(document.body.classList).toContain("near-top");
       expect(document.body.classList).not.toContain("near-bottom");
 
-      window.dispatchEvent(new MouseEvent("mousemove", { clientY: NEAR_EDGE }));
+      window.dispatchEvent(new MouseEvent("mousemove", { clientY: NEAR_TOP }));
       await settle();
       expect(document.body.classList).not.toContain("near-top");
+
+      // the status bar and the hint just above it
+      window.dispatchEvent(
+        new MouseEvent("mousemove", {
+          clientY: window.innerHeight - NEAR_BOTTOM + 1,
+        }),
+      );
+      await settle();
+      expect(document.body.classList).toContain("near-bottom");
+
+      // but not on the status bar's controls
+      document.getElementById("ui-stats")!.dispatchEvent(
+        new MouseEvent("mousemove", {
+          bubbles: true,
+          clientY: window.innerHeight - 10,
+        }),
+      );
+      await settle();
+      expect(document.body.classList).not.toContain("near-bottom");
     });
 
     it("titles the line at rest with its shortcut and keeps the focus", async () => {
