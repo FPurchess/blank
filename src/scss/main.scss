@@ -1651,8 +1651,8 @@ $blocks-dock: 248px;
 
 #blocks-pane {
   @include side-pane(left);
-  top: $bar-height;
-  bottom: $bar-height;
+  top: $top-bar-height;
+  bottom: $status-height;
   // above the bars and the outline, below the toolbars, dialogs and menus
   z-index: 3;
   width: $blocks-dock;
