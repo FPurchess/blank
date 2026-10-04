@@ -124,12 +124,6 @@ export class PageMarksMemo {
     this.pages.set(page, { version, signature, marks });
     return marks;
   }
-
-  // forgets the pages from `count` on, e.g. after the document got shorter
-  forgetFrom(count: number) {
-    for (const page of this.pages.keys())
-      if (page >= count) this.pages.delete(page);
-  }
 }
 
 /**

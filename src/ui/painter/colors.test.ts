@@ -50,8 +50,8 @@ describe("the colours on paper", () => {
     // footers (BAND in src/layout/bands.ts), lighter than their 50% on screen
     expect([0, 7, 8].map(pdf)).toEqual(["#000000", "#000000", "#000000"]);
     expect(pdf(1)).toBe("#666666");
-    // an image that isn't loaded yet, drawn like a table line
-    expect(pdf(6)).toBe(pdf(TABLE_LINE));
+    // 6 is no longer used
+    expect(engine.raw.roleColor(6)).toBeUndefined();
     expect(engine.raw.roleColor(9)).toBeUndefined();
   });
 });

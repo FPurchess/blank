@@ -15,7 +15,7 @@ export const ROLE_OPACITY = [
   0.2, // table lines
   0.55, // the line under the header rows
   0.06, // header cells
-  0.15, // an image that isn't loaded yet
+  0.15, // 6: no longer used, see Role
   0.5, // the underline of a link, softer than the text as in the editor
   0.6, // the alt text of an image that isn't loaded
 ];

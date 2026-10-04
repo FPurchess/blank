@@ -11,6 +11,11 @@ export class LayoutEngine {
     addFont(bytes: Uint8Array, family: string): void;
     addImage(src: string, bytes: Uint8Array, jpeg: boolean): void;
     /**
+     * the size, distance from the edge and line of the headers and footers,
+     * which the page view repeats; for tests
+     */
+    bandMetrics(): Float32Array;
+    /**
      * each page's header and footer change with its band version
      */
     bandVersions(): Uint32Array;
@@ -34,10 +39,14 @@ export class LayoutEngine {
      */
     boxes(from: number, to: number): Float32Array;
     /**
+     * the names of Blank's font files, in the order the webview loads
+     * them; for tests
+     */
+    bundledFontFiles(): string[];
+    /**
      * page, x, y and height of the caret at a position, or nothing
      */
     caret(pos: number, after: boolean): Float32Array;
-    clearImages(): void;
     /**
      * how many font files the engine has, each once, in the order they
      * came: the ones it was made with, then the ones `addFont` added
@@ -143,6 +152,13 @@ export class LayoutEngine {
      * placed on a page; nothing for no table
      */
     tableGrid(pos: number): Float32Array;
+    /**
+     * the styles text is set in, which the Word styles repeat: for each of
+     * p, h1 to h6, code and caption its size, its line height as a factor of
+     * the font's natural one, weight, slant (1 for italic), tracking and
+     * whether it is monospaced; for tests
+     */
+    textStyles(): Float32Array;
     unitsPerEm(font: number): number;
     /**
      * several updates at once, `[[start, delete, items, shift], …]` in
@@ -195,13 +211,14 @@ export interface InitOutput {
     readonly __wbg_layoutengine_free: (a: number, b: number) => void;
     readonly layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly layoutengine_bandMetrics: (a: number) => [number, number];
     readonly layoutengine_bandVersions: (a: number) => [number, number];
     readonly layoutengine_bands: (a: number, b: number) => [number, number];
     readonly layoutengine_bodyVersions: (a: number) => [number, number];
     readonly layoutengine_bottoms: (a: number) => [number, number];
     readonly layoutengine_boxes: (a: number, b: number, c: number) => [number, number];
+    readonly layoutengine_bundledFontFiles: (a: number) => [number, number];
     readonly layoutengine_caret: (a: number, b: number, c: number) => [number, number];
-    readonly layoutengine_clearImages: (a: number) => void;
     readonly layoutengine_fontFile: (a: number, b: number) => [number, number];
     readonly layoutengine_fontFileCount: (a: number) => number;
     readonly layoutengine_fontFileFamily: (a: number, b: number) => [number, number];
@@ -224,6 +241,7 @@ export interface InitOutput {
     readonly layoutengine_setSettings: (a: number, b: number, c: number) => [number, number, number, number];
     readonly layoutengine_stats: (a: number) => [number, number];
     readonly layoutengine_tableGrid: (a: number, b: number) => [number, number];
+    readonly layoutengine_textStyles: (a: number) => [number, number];
     readonly layoutengine_unitsPerEm: (a: number, b: number) => number;
     readonly layoutengine_update: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly layoutengine_updateMany: (a: number, b: number, c: number) => [number, number, number, number];
@@ -237,6 +255,7 @@ export interface InitOutput {
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_drop_slice: (a: number, b: number) => void;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }

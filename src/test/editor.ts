@@ -160,15 +160,3 @@ export const typeText = (view: EditorView, plugin: Plugin, text: string) => {
     if (!handled) view.dispatch(deflt());
   }
 };
-
-/**
- * setEditorDomText renders a `.ProseMirror` element with `content`, which is
- * what commands like `exportAs` read. Returns the element.
- */
-export const setEditorDomText = (content: string) => {
-  const element = document.createElement("div");
-  element.className = "ProseMirror";
-  element.textContent = content;
-  document.body.appendChild(element);
-  return element;
-};

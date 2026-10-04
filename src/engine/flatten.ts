@@ -1,6 +1,13 @@
 import type { Mark, Node } from "prosemirror-model";
 
 import { tableGrid } from "../exporters/table";
+import {
+  BLOCK_AFTER,
+  HEADING_AFTER,
+  HEADING_AFTER_HEADING,
+  HEADING_BEFORE,
+  ITEM_SPACE,
+} from "../layout/spacing";
 import type {
   Content,
   EngineCellBlock,
@@ -15,13 +22,6 @@ import type {
 // around it: margins that add up instead of collapsing, as the PDF had them
 // since pdfmake wrote it.
 
-// space below a paragraph, above and below a heading
-const BLOCK_AFTER = 8;
-const HEADING_BEFORE = 16;
-const HEADING_AFTER = 5;
-const HEADING_AFTER_HEADING = 4;
-// list items, and the blocks after the first in an item
-const ITEM_SPACE = 2;
 // a horizontal rule has 2em around it
 const RULE_BEFORE = 14;
 const RULE_AFTER = 22;

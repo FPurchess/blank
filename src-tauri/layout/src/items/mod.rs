@@ -24,7 +24,7 @@ pub enum Role {
     TableLine = 3,
     HeaderLine = 4,
     HeaderFill = 5,
-    Placeholder = 6,
+    // 6 is no longer used; ROLE_OPACITY keeps its place
     /// the underline of a link
     LinkLine = 7,
     /// what stands for an image that isn't loaded: its alt text
@@ -41,7 +41,6 @@ impl Role {
             Role::TableLine,
             Role::HeaderLine,
             Role::HeaderFill,
-            Role::Placeholder,
             Role::LinkLine,
             Role::Hint,
         ]

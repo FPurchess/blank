@@ -2,6 +2,13 @@ import type { ILevelsOptions, IStylesOptions } from "docx";
 
 import { type Layout } from "../../layout/resolve";
 import { BAND } from "../../layout/bands";
+import {
+  BLOCK_AFTER,
+  HEADING_AFTER,
+  HEADING_AFTER_HEADING,
+  HEADING_BEFORE,
+  ITEM_SPACE,
+} from "../../layout/spacing";
 import { WORD_NUMBER_FORMATS } from "./fields";
 import { TABLE_COLORS, TABLE_LINES, TABLE_PADDING } from "../table";
 
@@ -28,15 +35,13 @@ const halfPoints = (points: number) => Math.round(points * 2);
 // src-tauri/layout/src/style.rs)
 const line = (pdfLineHeight: number) => Math.round(pdfLineHeight * 1.3 * 240);
 
-// the space between blocks, like BLOCK_MARGIN in the PDF
-export const BLOCK_SPACING = twips(8);
-// like HEADING_MARGIN in the PDF
-const HEADING_SPACING_BEFORE = twips(16);
-const HEADING_SPACING_AFTER = twips(5);
-// like HEADING_AFTER_HEADING_MARGIN_TOP in the PDF
-export const HEADING_AFTER_HEADING_SPACING = twips(4);
-// the space between the items of a tight list, like the PDF's list_item margin
-export const LIST_ITEM_SPACING = twips(2);
+// the space around blocks, as on the pages (src/layout/spacing.ts)
+export const BLOCK_SPACING = twips(BLOCK_AFTER);
+const HEADING_SPACING_BEFORE = twips(HEADING_BEFORE);
+const HEADING_SPACING_AFTER = twips(HEADING_AFTER);
+export const HEADING_AFTER_HEADING_SPACING = twips(HEADING_AFTER_HEADING);
+// the space between the items of a tight list
+export const LIST_ITEM_SPACING = twips(ITEM_SPACE);
 
 // each list level indents by this much, the bullet or number hangs into it
 export const LIST_INDENT = 720;

@@ -28,8 +28,6 @@ use crate::text::{Glyph, TextBox};
 
 mod tags;
 
-pub use tags::outline_entries;
-
 /// an image's file, by its src
 pub struct ImageData {
     pub bytes: Vec<u8>,
@@ -129,7 +127,7 @@ pub(crate) fn paper_rgb(role: Role) -> (u8, u8, u8) {
         Role::Text | Role::LinkLine | Role::Hint => (0, 0, 0),
         Role::Band => (0x66, 0x66, 0x66),
         Role::CodeFill => (0xef, 0xf0, 0xf1),
-        Role::TableLine | Role::Placeholder => (0xd1, 0xd4, 0xd6),
+        Role::TableLine => (0xd1, 0xd4, 0xd6),
         Role::HeaderLine => (0x82, 0x89, 0x8e),
         Role::HeaderFill => (0xf1, 0xf2, 0xf3),
     }

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { themes } from "../state/appearance";
@@ -24,6 +27,14 @@ const colorsOf = (theme: string) => {
 };
 
 describe("the themes", () => {
+  it.each(themes)("have a partial that the themes use: %s", (theme) => {
+    const partials = resolve(import.meta.dirname, "themes");
+    expect(existsSync(resolve(partials, `_${theme}.scss`))).toBe(true);
+    expect(readFileSync(resolve(partials, "_index.scss"), "utf8")).toMatch(
+      new RegExp(`^@use "${theme}";$`, "m"),
+    );
+  });
+
   it.each(themes)("show the selection on the pages in %s", (theme) => {
     const { background, text, color } = colorsOf(theme);
     const selected = color("selection-color");

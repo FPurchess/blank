@@ -284,10 +284,6 @@ const spellcheckItems = (): MenuItem[] => {
 };
 
 /**
- * buildMenu returns the context menu items for `target`: the spelling items,
- * the editing items the system menus have, then the spell check toggle
- */
-/**
  * tableItems returns the Table submenu with the actions of the table toolbar
  * in a table, and the item that inserts a table elsewhere
  */
@@ -329,6 +325,10 @@ export const tableMenu = (view: EditorView): MenuItem[] => {
   );
 };
 
+/**
+ * buildMenu returns the context menu items for `target`: the spelling items,
+ * the editing items the system menus have, then the spell check toggle
+ */
 export const buildMenu = (view: EditorView, target: MenuTarget): MenuItem[] => {
   const checker = spellchecker.value;
   const spelling = [
