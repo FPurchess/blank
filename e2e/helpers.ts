@@ -76,6 +76,20 @@ export const restartApp = async (
 };
 
 /**
+ * untilPainted returns the box `find` gives once it gives one: the pages are
+ * laid out a moment after the editor has the text, e.g. after a start
+ */
+const untilPainted = async (what: string, find: () => Promise<Box | null>) => {
+  let box = null as Box | null;
+  await browser.waitUntil(async () => (box = await find()) !== null, {
+    timeout: 5000,
+    interval: 100,
+    timeoutMsg: `${what} isn't painted on the pages`,
+  });
+  return box!;
+};
+
+/**
  * clicks where the pages show the end of the text of the editor's element at
  * `selector` (the `index`th match, from the end if negative), as a click
  * right of its last line does,
@@ -86,29 +100,33 @@ export const clickInto = async (
   index = 0,
   button: 0 | 1 | 2 = 0,
 ) => {
-  const box = await browser.executeAsync(
-    (selector: string, index: number, done: (box: Box | null) => void) => {
-      const geometry = window.blankGeometry;
-      const all = document.querySelectorAll(selector);
-      // from the end for a negative index
-      const element = all[index < 0 ? all.length + index : index];
-      if (!element) return done(null);
-      const pos = geometry.endOf(element);
-      const view = document.getElementById("page-view")!;
-      const caret = geometry.caretBox(pos);
-      if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
-        view.scrollTop += caret.top - view.clientHeight / 2;
-        // the view measures a scroll once a frame
-        return requestAnimationFrame(() =>
-          requestAnimationFrame(() => done(geometry.caretBox(pos))),
-        );
-      }
-      done(caret);
-    },
-    selector,
-    index,
+  const box = await untilPainted(`${selector}`, () =>
+    browser.executeAsync(
+      (selector: string, index: number, done: (box: Box | null) => void) => {
+        const geometry = window.blankGeometry;
+        const all = document.querySelectorAll(selector);
+        // from the end for a negative index
+        const element = all[index < 0 ? all.length + index : index];
+        if (!element) return done(null);
+        const pos = geometry.endOf(element);
+        const view = document.getElementById("page-view")!;
+        const caret = geometry.caretBox(pos);
+        if (
+          caret &&
+          (caret.top < 80 || caret.bottom > view.clientHeight - 80)
+        ) {
+          view.scrollTop += caret.top - view.clientHeight / 2;
+          // the view measures a scroll once a frame
+          return requestAnimationFrame(() =>
+            requestAnimationFrame(() => done(geometry.caretBox(pos))),
+          );
+        }
+        done(caret);
+      },
+      selector,
+      index,
+    ),
   );
-  if (!box) throw new Error(`${selector} isn't painted on the pages`);
   await clickAt(box.left, (box.top + box.bottom) / 2, button);
 };
 
@@ -181,35 +199,37 @@ export const focusEditor = async () => {
  * the caret before its `offset`th character, in viewport px, scrolling it
  * into view first
  */
-export const textBox = async (text: string, offset = 0, index = 0) => {
-  const box = await browser.executeAsync(
-    (
-      text: string,
-      offset: number,
-      index: number,
-      done: (box: Box | null) => void,
-    ) => {
-      const geometry = window.blankGeometry;
-      const pos = geometry.find(text, index);
-      if (pos < 0) return done(null);
-      const view = document.getElementById("page-view")!;
-      const caret = geometry.caretBox(pos + offset);
-      if (caret && (caret.top < 80 || caret.bottom > view.clientHeight - 80)) {
-        view.scrollTop += caret.top - view.clientHeight / 2;
-        // the view measures a scroll once a frame
-        return requestAnimationFrame(() =>
-          requestAnimationFrame(() => done(geometry.caretBox(pos + offset))),
-        );
-      }
-      done(caret);
-    },
-    text,
-    offset,
-    index,
+export const textBox = (text: string, offset = 0, index = 0) =>
+  untilPainted(`"${text}"`, () =>
+    browser.executeAsync(
+      (
+        text: string,
+        offset: number,
+        index: number,
+        done: (box: Box | null) => void,
+      ) => {
+        const geometry = window.blankGeometry;
+        const pos = geometry.find(text, index);
+        if (pos < 0) return done(null);
+        const view = document.getElementById("page-view")!;
+        const caret = geometry.caretBox(pos + offset);
+        if (
+          caret &&
+          (caret.top < 80 || caret.bottom > view.clientHeight - 80)
+        ) {
+          view.scrollTop += caret.top - view.clientHeight / 2;
+          // the view measures a scroll once a frame
+          return requestAnimationFrame(() =>
+            requestAnimationFrame(() => done(geometry.caretBox(pos + offset))),
+          );
+        }
+        done(caret);
+      },
+      text,
+      offset,
+      index,
+    ),
   );
-  if (!box) throw new Error(`"${text}" isn't painted on the pages`);
-  return box;
-};
 
 /**
  * pointAt returns a point on the `offset`th character of `text` as painted,

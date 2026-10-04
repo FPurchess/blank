@@ -8,7 +8,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { doc, docWithFrontmatter, h, p } from "./test/editor";
-import { flushPromises } from "./test/async";
+import { deferred, flushPromises } from "./test/async";
 
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
 
@@ -347,6 +347,28 @@ describe("storage", () => {
       await flush();
 
       expect(setItem).not.toHaveBeenCalled();
+    });
+
+    it("flush waits for the settings changed before it", async () => {
+      const { pageView, flush } = await bootFresh();
+      const written = deferred();
+      const setItem = localforage.setItem.bind(localforage);
+      vi.spyOn(localforage, "setItem").mockImplementation(
+        async (key, value) => {
+          await written.promise;
+          return setItem(key, value);
+        },
+      );
+      let flushed = false;
+
+      pageView.value = "pages";
+      const flushing = flush().then(() => (flushed = true));
+      await flushPromises();
+      expect(flushed).toBe(false);
+
+      written.resolve();
+      await flushing;
+      expect(await localforage.getItem("pageView")).toBe("pages");
     });
 
     it("stores pending changes when the window closes", async () => {
