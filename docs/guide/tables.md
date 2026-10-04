@@ -2,7 +2,7 @@
 
 Tables in Blank work like the rest of your writing: you type, press `Tab` to go to the next cell, and the table grows as you need it. The columns stay put while you type, and nothing is ever lost by a key pressed at the wrong time. Your tables are saved as plain markdown tables that GitHub, Obsidian, Typora and pandoc show as tables too.
 
-<img class="shot" src="/screenshots/table-insert.gif" alt="Mod T opens a grid, the arrow keys make it four columns wide, Enter inserts the table, Tab fills it cell by cell and the arrow key leads out of it" />
+<Shot src="table-insert.gif" alt="Mod T opens a grid, the arrow keys make it four columns wide, Enter inserts the table, Tab fills it cell by cell and the arrow key leads out of it" />
 
 ## Make a table {#make}
 
@@ -18,7 +18,7 @@ There are three ways:
 
   The line becomes a table with that header and an empty row, and the cursor waits in the first cell. Changed your mind? `Mod` `Z` gives you back the line as you typed it.
 
-  <img class="shot" src="/screenshots/table-header.gif" alt="Typing | Name | Role | and Enter turns the line into a table, which Tab then fills" />
+  <Shot src="table-header.gif" alt="Typing | Name | Role | and Enter turns the line into a table, which Tab then fills" />
 
 - **Paste one** from a spreadsheet, a web page or Word, see [Copy and paste](#clipboard).
 
@@ -39,7 +39,7 @@ The first row is the header. It's bold and tinted, and screen readers announce i
 
 A cell is a small page of its own. Bold, italic, code, links and images all work in it, and so do several paragraphs, lists, quotes and code blocks. Only headings, tables and horizontal lines stay outside cells.
 
-<img class="shot" src="/screenshots/table-cells.gif" alt="Enter starts a second line in a cell; Shift and the left arrow select two cells, which Backspace clears" />
+<Shot src="table-cells.gif" alt="Enter starts a second line in a cell; Shift and the left arrow select two cells, which Backspace clears" />
 
 - **Enter** starts a new line in the cell.
 - **Enter on an empty line** turns it into a new paragraph.
@@ -63,7 +63,7 @@ To delete a table, click the bin on its toolbar, or press `Mod` `A` twice in it 
 
 While the cursor is in a table, a small toolbar sits above its right end. It adds and deletes rows and columns, aligns columns, sorts, merges cells, switches the header row and a header column on and off, and sets the caption. Everything on it works on what you've selected: with three rows selected, _Insert row below_ adds three rows, and _Align right_ aligns every selected column. Rest the pointer on a button to see what it does.
 
-<img class="shot" src="/screenshots/table-mode.gif" alt="Mod T shows a key on every button of the table toolbar; the down arrow adds a row, S sorts by the column, R aligns it right, and Esc ends table mode" />
+<Shot src="table-mode.gif" alt="Mod T shows a key on every button of the table toolbar; the down arrow adds a row, S sorts by the column, R aligns it right, and Esc ends table mode" />
 
 **From the keyboard:** press `Mod` `T` in a table. Every button of the toolbar shows its key, and the keys work until you press `Esc` or `Mod` `T` again:
 
@@ -95,7 +95,7 @@ A few things good to know:
 
 Move the mouse over a table and it shows handles right where you need them. They step aside while you type.
 
-<img class="shot" src="/screenshots/table-mouse.gif" alt="Dragging the handle of the Kiwis row moves it to the top; the + between two rows inserts one, which gets filled; dragging the line between two columns widens the first; dragging the bottom edge adds two rows" />
+<Shot src="table-mouse.gif" alt="Dragging the handle of the Kiwis row moves it to the top; the + between two rows inserts one, which gets filled; dragging the line between two columns widens the first; dragging the bottom edge adds two rows" />
 
 - **Move rows and columns:** grab the handle on the left edge of a row, or on the top edge of a column, and drag it where it should go. A line shows where it lands. With several rows selected, dragging one of their handles moves them all.
 - **Select them:** click a handle. The row or column gets selected and the table menu opens right there, to delete it, align it, sort by it and more.
@@ -109,7 +109,7 @@ Move the mouse over a table and it shows handles right where you need them. They
 
 Tables move between Blank and your spreadsheet in both directions.
 
-<img class="shot" src="/screenshots/table-paste.gif" alt="Mod V pastes cells copied from a spreadsheet as a table; with the cursor in the table, Mod V pastes two more rows, and the table grows to take them" />
+<Shot src="table-paste.gif" alt="Mod V pastes cells copied from a spreadsheet as a table; with the cursor in the table, Mod V pastes two more rows, and the table grows to take them" />
 
 - **Paste cells** you copied in LibreOffice Calc, Excel, Google Sheets or Numbers, or a table from a web page or Word, and you get a table. Its first row becomes the header. A column keeps its alignment when all its cells agree, like numbers aligned right.
 - **Paste into a table**, and the cells fill from the cursor, or fill the cells you selected. The table grows when they need more room. The pasted cells fit in where they land: header cells in the header row, plain cells below it.

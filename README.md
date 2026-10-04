@@ -14,7 +14,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/demo.gif" alt="Someone starts writing in Blank: a heading, “A great start”, a few lines about the blank page, the word “uncertain” erased and replaced with “possible”, and a closing line in italics, before the page turns dark" width="800">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/screenshots/demo-dark.gif">
+    <img src="docs/public/screenshots/demo.gif" alt="Someone starts writing in Blank: a heading, “A great start”, a few lines about the blank page, the word “uncertain” erased and replaced with “possible”, and a closing line in italics; then focus mode lets the bars fade while the last line is typed" width="800">
+  </picture>
 </p>
 
 Every piece of writing begins the same way: an empty page, a blinking cursor, and the quiet question of what comes next.

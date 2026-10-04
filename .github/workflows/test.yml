@@ -17,6 +17,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # the base of a pull request, for the screenshots check below
+          fetch-depth: 2
+
+      # the E2E workflow captures the docs screenshots on main and proposes them in a PR from
+      # bot/screenshots; a pull request that commits them would undo the changes of others. On a
+      # pull request, HEAD is the merge commit and HEAD^1 the base.
+      - name: leave the screenshots to CI
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only HEAD^1 HEAD -- docs/public/screenshots | grep -q .; then
+            echo "::error::docs/public/screenshots is captured on main and proposed in the screenshots PR; drop it from this PR: git checkout origin/main -- docs/public/screenshots"
+            exit 1
+          fi
+
       - uses: oven-sh/setup-bun@v2
 
       - name: setup node

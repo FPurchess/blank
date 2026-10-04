@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Fails unless the `engine` check (.github/workflows/test.yml) passed on a
 # commit: it tests the layout engine and checks that the committed wasm is
-# what its sources build. make release runs it on origin/main.
+# what its sources build. make release runs it on origin/main. Commits that
+# change only the docs screenshots are passed over (scripts/code-commit.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-sha="${1:?usage: check-engine-ci.sh <commit>}"
+sha=$(scripts/code-commit.sh "${1:?usage: check-engine-ci.sh <commit>}")
 fail() { echo "error: $*" >&2; exit 1; }
 
 command -v gh >/dev/null || fail "gh is missing, it checks the engine check on GitHub (https://cli.github.com)"

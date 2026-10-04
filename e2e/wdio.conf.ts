@@ -98,6 +98,16 @@ export const config: WebdriverIO.Config = {
       .basename(profileDir)
       .replace(/\W/g, "_");
     expectingExit = false;
+    // a caret that doesn't blink, for the docs shots: WebKitGTK blinks it on
+    // a timer, which their frames would catch at random (wdio.shots.conf.ts)
+    if (process.env.E2E_STEADY_CARET) {
+      const gtk = path.join(profileDir, "config", "gtk-3.0");
+      fs.mkdirSync(gtk, { recursive: true });
+      fs.writeFileSync(
+        path.join(gtk, "settings.ini"),
+        "[Settings]\ngtk-cursor-blink = false\n",
+      );
+    }
 
     const mirrorUrl = await startMirror();
     tauriDriver = spawn(
@@ -185,7 +195,11 @@ async function cacheMirroredDictionary() {
           `https://cdn.jsdelivr.net/npm/${pkg}@${version}/${file}`,
         );
         if (!response.ok) throw new Error(`${response.status}`);
-        fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()));
+        // under another name first: the docs shots run several of these at
+        // once (scripts/docs-shots.sh), and none may read half a file
+        const partial = `${target}.${process.pid}`;
+        fs.writeFileSync(partial, Buffer.from(await response.arrayBuffer()));
+        fs.renameSync(partial, target);
         break;
       } catch (error) {
         if (attempt === 3)

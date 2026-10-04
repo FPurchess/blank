@@ -2,11 +2,13 @@
 
 Blank shows your text as it will look, not as markdown syntax, and on the lines and pages it will have on paper (see [Pages](./pages#on-the-screen)). You format with [keyboard shortcuts](./shortcuts), by typing markdown, which Blank turns into formatting as you go, or with the toolbar at the top when you'd rather point and click.
 
-<img class="shot" src="/screenshots/theme-light.png" alt="A document in Blank's light theme" />
+<Shot src="writing.gif" alt="Typing # and a title makes a heading; quotes curl and two hyphens become a dash; **slow** turns bold and *quiet* italic; a hyphen starts a list and > a quote, while the toolbar shows the style at the cursor" />
 
 ## The toolbar {#toolbar}
 
 The second row at the top of the window has everything to format your text, and shows how the text at the cursor is set: Bold lights up in bold text, the list you're in is pressed, and the style menu says _Heading 2_ while you're in one.
+
+<Shot src="toolbar.png" alt="The toolbar above a centered heading: the style menu says Text for the line below it, and the button for centered text is pressed" />
 
 From left to right: undo and redo; the style menu (text, headings 1–6, quote and code block, each shown in its own style); bold, italic, underline, code and link; bulleted and numbered lists, quote, outdent and indent; the four alignments; and **Insert** for an image, a table, a horizontal line or a page break. Clicking a button leaves your cursor and selection where they were, so you can go on typing. Hover over a button to see its shortcut.
 
@@ -109,7 +111,7 @@ The top of the window shows the open file, _Untitled_, or the [Word document](./
 
 The bar at the bottom shows where you are and what's switched on. Click any item in it; rest the mouse on one to see its name and shortcut.
 
-<img class="shot" src="/screenshots/status-bar.gif" alt="The mouse rests on the word count and a card with the words, characters, pages and reading time opens; then a click on the view button switches from page ends to pages" />
+<Shot src="status-bar.gif" alt="The mouse rests on the word count and a card with the words, characters, pages and reading time opens; then a click on the view button switches from page ends to pages" />
 
 | Item          | What it shows                                                          | Click it to                                                                                                         | Keys                                     |
 | ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
@@ -127,6 +129,8 @@ Next to the word count, the bar tells you for a moment what just happened, like 
 ## Focus mode
 
 When you want only the page, turn on focus mode with `Mod` `Shift` `F` or the last button of the status bar. Nothing changes at first. As soon as you type, the tabs, the toolbar, the panes, the outline and the status bar fade out, slowly, and the page stays exactly where it was. Move the mouse and they're back at once.
+
+<Shot src="focus-mode.gif" alt="Mod Shift F turns on focus mode; as the typing starts, the tabs, the toolbar and the status bar fade out and only the page stays; a move of the mouse brings them back, and Esc leaves focus mode" />
 
 - The bars also fade once the mouse has rested for 3 seconds. Choose 10 seconds, or only when typing, in the [settings](./settings#appearance).
 - They never fade while the mouse is on one of them, or while a menu, a dialog or the header and footer strip is open.

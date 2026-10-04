@@ -59,7 +59,7 @@
     <display_length compare="ge">768</display_length>
   </requires>
 
-  <!-- pinned to a commit, as app stores require; refresh after `make docs-screenshots` -->
+  <!-- pinned to a commit, as app stores require; point it to a newer commit of main that changed the screenshots -->
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/FPurchess/blank/478f12e9f7f4afda52f944eed278867a952fcbce/docs/public/screenshots/theme-light.png</image>

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { bootAppearance, colorMode, theme } from "./appearance";
+import {
+  bootAppearance,
+  colorMode,
+  exposeAppearance,
+  theme,
+} from "./appearance";
 
 describe("appearance", () => {
   let dispose = () => {};
@@ -43,5 +48,17 @@ describe("appearance", () => {
     colorMode.value = "mono";
     expect(document.body.dataset.color).toBe("mono");
     expect(document.body.dataset.theme).toBe("light");
+  });
+
+  it("lets the debug hook switch to a theme, and ignores what isn't one", () => {
+    exposeAppearance();
+    const { blankSetTheme } = window as unknown as {
+      blankSetTheme: (name: unknown) => void;
+    };
+
+    blankSetTheme("dark");
+    expect(theme.value).toBe("dark");
+    blankSetTheme("purple");
+    expect(theme.value).toBe("dark");
   });
 });

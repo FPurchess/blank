@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { withBase } from "vitepress";
+import { computed } from "vue";
+import { useData, withBase } from "vitepress";
+
+// the demo in the site's theme, light or dark (see Shot.vue)
+const { isDark } = useData();
+const src = computed(() =>
+  withBase(
+    isDark.value ? "/screenshots/demo-dark.gif" : "/screenshots/demo.gif",
+  ),
+);
 </script>
 
 <template>
@@ -10,10 +19,10 @@ import { withBase } from "vitepress";
         <strong>Blank</strong>
       </div>
       <img
-        :src="withBase('/screenshots/demo.gif')"
+        :src="src"
         width="800"
         height="400"
-        alt="Someone starts writing in Blank: a heading, “A great start”, a few lines about the blank page, the word “uncertain” erased and replaced with “possible”, and a closing line in italics, before the page turns dark"
+        alt="Someone starts writing in Blank: a heading, “A great start”, a few lines about the blank page, the word “uncertain” erased and replaced with “possible”, and a closing line in italics; then focus mode lets the bars fade while the last line is typed"
       />
     </div>
   </div>
@@ -29,7 +38,7 @@ import { withBase } from "vitepress";
   overflow: hidden;
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
-  background: #fff;
+  background: var(--vp-c-bg);
   box-shadow: var(--vp-shadow-5);
 }
 .bar {

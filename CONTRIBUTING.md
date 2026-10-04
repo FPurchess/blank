@@ -25,7 +25,7 @@ Set `E2E_SKIP_BUILD=1` to reuse an existing debug build. Set `E2E_PORT` to run o
 
 ## Documentation
 
-The website at [blank-writer.xyz](https://blank-writer.xyz/) lives in [`docs/`](https://github.com/FPurchess/blank/tree/main/docs) and is built with [VitePress](https://vitepress.dev/). Preview it with `make docs-dev`. If your change is visible to users, update the matching page in `docs/guide/`. After UI changes, regenerate the screenshots with `make docs-screenshots` (Linux, same prerequisites as the end-to-end tests).
+The website at [blank-writer.xyz](https://blank-writer.xyz/) lives in [`docs/`](https://github.com/FPurchess/blank/tree/main/docs) and is built with [VitePress](https://vitepress.dev/). Preview it with `make docs-dev`. If your change is visible to users, update the matching page in `docs/guide/`. The screenshots and GIFs come from the scripts in [`e2e/shots/`](https://github.com/FPurchess/blank/tree/main/e2e/shots): change those, not the images. CI captures them after the merge and proposes the changed ones in a pull request of their own. `make docs-shot NAME="<title of the shot>"` previews one locally (Linux, same prerequisites as the end-to-end tests).
 
 ## Recommended IDE setup
 

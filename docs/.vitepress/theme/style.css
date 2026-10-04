@@ -60,6 +60,14 @@
   border-radius: 8px;
   box-shadow: var(--vp-shadow-2);
 }
+/* the light or the dark picture of <Shot>, as the site is */
+.shot-dark,
+.dark .shot-light {
+  display: none;
+}
+.dark .shot-dark {
+  display: block;
+}
 /* home: the app icon on a soft glow, as in the app's own palette */
 :root {
   --vp-home-hero-image-background-image: radial-gradient(

@@ -41,14 +41,14 @@ features:
     linkText: Files and formats
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>'
     title: Light for mornings, dark for nights
-    details: Six calm themes, from paper white to deep black. Switch with a shortcut, whenever the light changes.
+    details: Six calm themes, from paper white to deep black. Switch in the settings or with a shortcut, whenever the light changes.
     link: /guide/themes
     linkText: See the themes
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>'
     title: Yours to adjust
-    details: Rebind the shortcuts, turn off the corrections you don’t want and add your own replacements.
-    link: /guide/configuration
-    linkText: Configuration
+    details: Change any shortcut, turn off the corrections you don’t want and add your own replacements, in the settings.
+    link: /guide/settings
+    linkText: Settings
 ---
 
 <div class="home-block home-themes">
