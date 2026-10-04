@@ -108,6 +108,10 @@ export type MenuItem =
   | {
       id: string;
       label: string;
+      // a muted hint after the label, e.g. the first heading on a page
+      detail?: string;
+      // the name of an icon before the label, see src/icons.ts
+      icon?: string;
       // the key binding, e.g. "Mod-z"
       shortcut?: string;
       disabled?: boolean;
@@ -131,6 +135,11 @@ export interface ContextMenuRequest {
   keyboard: boolean;
   // returns the focus to the editor
   close(): void;
+  // the button that opened the menu, e.g. "Page N of M" in the bottom bar or,
+  // later, the main menu's: a press on it isn't outside the menu, so its click
+  // can close the menu instead of the press closing it and the click opening
+  // it again
+  owner?: Element;
 }
 
 // contextMenu holds the open context menu, or null while it is closed. A new
@@ -141,3 +150,7 @@ export const contextMenu = shallowRef<ContextMenuRequest | null>(null);
 // tooltipsSuppressed keeps the tooltips of controls (src/ui/UiTooltip.vue)
 // hidden, e.g. while focus mode has faded the controls out
 export const tooltipsSuppressed = shallowRef(false);
+
+// whether the word count card shows (src/ui/WordCountCard.vue): opened by the
+// pointer resting on the word count, a click on it, or the Word count command
+export const wordCountCard = shallowRef(false);

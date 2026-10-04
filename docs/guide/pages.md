@@ -11,7 +11,7 @@ Blank shows your text the way it prints: every line and every page ends on the s
 
 <img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
 
-Blank remembers your choice. The bar at the bottom tells you which page you're looking at, like _Page 3 of 12_, and counts along as you scroll. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
+Blank remembers your choice. The button at the right end of the bar at the bottom switches between the two views too: its icon shows the view you're in. Next to it, the bar tells you which page you're looking at, like _Page 3 of 12_, and counts along as you scroll; click it to jump to another page, listed with the first heading on each. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
 
 ## Find your way with the outline {#outline}
 

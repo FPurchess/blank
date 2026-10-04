@@ -78,29 +78,37 @@ describe("top bar and counter", () => {
 
   describe("counter", () => {
     it("starts at zero", async () => {
-      expect(uiStats()?.textContent).toBe("0 words 0 chars");
+      expect(uiStats()?.textContent).toBe("0 words");
     });
 
-    it("counts the words and chars of the text content", async () => {
+    it("counts the words of the text content", async () => {
       textContent.value = "one two three four";
       await nextTick();
-      expect(uiStats()?.textContent).toBe("4 words 18 chars");
+      expect(uiStats()?.textContent).toBe("4 words");
 
       textContent.value = "";
       await nextTick();
-      expect(uiStats()?.textContent).toBe("0 words 0 chars");
+      expect(uiStats()?.textContent).toBe("0 words");
     });
 
-    it("counts pipes as words and chars", async () => {
+    it("counts pipes as words", async () => {
       textContent.value = "a || b";
       await nextTick();
-      expect(uiStats()?.textContent).toBe("3 words 6 chars");
+      expect(uiStats()?.textContent).toBe("3 words");
     });
 
-    it("counts the words of several lines", async () => {
-      textContent.value = "roses are red violets are blue";
+    it("separates thousands", async () => {
+      textContent.value = "word ".repeat(1498);
       await nextTick();
-      expect(uiStats()?.textContent).toBe("6 words 30 chars");
+      expect(uiStats()?.textContent).toBe("1,498 words");
+    });
+
+    it("is a button that keeps the focus in the editor", () => {
+      expect(uiStats()?.tagName).toBe("BUTTON");
+      expect(uiStats()?.tabIndex).toBe(-1);
+      const event = new MouseEvent("mousedown", { cancelable: true });
+      uiStats()!.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
     });
   });
 });
@@ -113,17 +121,21 @@ describe("language chooser", () => {
     dispose = bootApp(createTestHandle());
   });
 
-  it("sits right of the counter and the spell check status in the footer", () => {
-    const footer = document.querySelector("#ui-bottom")!;
+  it("sits between the paper and spell check", () => {
+    const ids = [...document.querySelectorAll("#ui-bottom [id]")].map(
+      (element) => element.id,
+    );
 
-    expect([...footer.children].map((child) => child.id)).toEqual([
+    expect(ids).toEqual([
       "ui-stats",
       "ui-announcement",
-      // the page of the caret, read out when it changes, not shown
+      // the page in view, read out when it changes, not shown; the page
+      // number itself needs the pages, which these tests don't lay out
       "ui-page-spoken",
       "ui-page",
-      "ui-spellcheck",
       "ui-language",
+      "ui-spellcheck",
+      "ui-view",
     ]);
   });
 
@@ -189,7 +201,7 @@ describe("language chooser", () => {
   });
 
   it("opens on click and chooses a clicked language", async () => {
-    uiLanguage()!.click();
+    uiLanguage()!.querySelector("button")!.click();
     await nextTick();
     expect(languagePicker.value.open).toBe(true);
 
@@ -204,11 +216,19 @@ describe("language chooser", () => {
     expect(uiLanguage()?.textContent).toBe("DE-CH");
   });
 
-  it("keeps the focus in the editor when clicked", () => {
+  it("keeps the focus in the editor when clicked", async () => {
     const event = new MouseEvent("mousedown", { cancelable: true });
-    uiLanguage()!.dispatchEvent(event);
-
+    uiLanguage()!.querySelector("button")!.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
+
+    openPicker();
+    await nextTick();
+    const inPicker = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    uiLanguage()!.querySelector(".option")!.dispatchEvent(inPicker);
+    expect(inPicker.defaultPrevented).toBe(true);
   });
 
   it("keeps the selection and the typed letters when the open picker is clicked", async () => {
@@ -224,8 +244,11 @@ describe("language chooser", () => {
     expect(languagePicker.value).toEqual(before);
   });
 
-  it("says what a click on it does", () => {
-    expect(uiLanguage()?.title).toBe("Choose language");
+  it("is named with its shortcut", () => {
+    expect(uiLanguage()?.querySelector("button")?.dataset).toMatchObject({
+      tip: "Language",
+      tipKey: formatShortcut("Mod-Alt-l"),
+    });
   });
 });
 
@@ -247,8 +270,13 @@ describe("page button", () => {
   it("shows the paper of the region and its orientation", () => {
     // jsdom's locale is en-US
     expect(uiPage().textContent).toBe("Letter (portrait)");
-    expect(uiPage().getAttribute("role")).toBe("button");
-    expect(uiPage().title).toBe(`Page setup (${formatShortcut("Mod-Alt-u")})`);
+    expect(uiPage().tagName).toBe("BUTTON");
+    expect(uiPage().querySelector("svg")).not.toBeNull();
+    expect(uiPage().dataset).toMatchObject({
+      tip: "Page setup…",
+      tipKey: formatShortcut("Mod-Alt-u"),
+    });
+    expect(uiPage().hasAttribute("title")).toBe(false);
   });
 
   it("follows the page setup of the document", async () => {
@@ -319,35 +347,39 @@ describe("spell check status", () => {
   });
 
   it.each([
-    [{ state: "off" }, "", ""],
-    [{ state: "loading" }, "Spelling …", "Loading the German dictionary"],
+    [{ state: "off" }, "Spelling off", "Spell check"],
+    [{ state: "loading" }, "Spelling …", "Spelling: loading German"],
     [
       { state: "downloading", progress: 0.42 },
       "Spelling 42 %",
-      "Downloading the German dictionary",
+      "Spelling: downloading German",
     ],
+    [{ state: "downloading" }, "Spelling 0 %", "Spelling: downloading German"],
+    [{ state: "ready" }, "Spelling", "Spell check"],
+    [{ state: "unavailable" }, "No spelling", "Spelling: no German dictionary"],
     [
-      { state: "downloading" },
-      "Spelling 0 %",
-      "Downloading the German dictionary",
+      { state: "error", message: "offline" },
+      "Spelling failed",
+      "Spelling: offline",
     ],
-    [{ state: "ready" }, "Spelling", "Checking German spelling"],
-    [
-      { state: "unavailable" },
-      "No spelling",
-      "No spell check dictionary for German",
-    ],
-    [{ state: "error", message: "offline" }, "Spelling failed", "offline"],
-    [{ state: "error" }, "Spelling failed", ""],
-  ] as const)("shows %j", async (status, text, title) => {
+    [{ state: "error" }, "Spelling failed", "Spell check"],
+  ] as const)("shows %j", async (status, text, tip) => {
     spellcheckStatus.value = { tag: "de", ...status };
     await nextTick();
 
     expect(uiSpellcheck().textContent).toBe(text);
-    expect(uiSpellcheck().hidden).toBe(text === "");
-    expect(uiSpellcheck().title).toBe(
-      title && `${title}, click to turn spell check off`,
-    );
+    expect(uiSpellcheck().hidden).toBe(false);
+    expect(uiSpellcheck().dataset).toMatchObject({
+      tip,
+      tipKey: formatShortcut("Mod-Alt-s"),
+    });
+  });
+
+  it("is pressed while spell check is on", async () => {
+    expect(uiSpellcheck().getAttribute("aria-pressed")).toBe("false");
+    spellcheck.value = true;
+    await nextTick();
+    expect(uiSpellcheck().getAttribute("aria-pressed")).toBe("true");
   });
 
   it("turns spell check on and off when clicked", async () => {

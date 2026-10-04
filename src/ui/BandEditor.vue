@@ -28,15 +28,11 @@ import {
 import { shownIn } from "../dom";
 import { SLOTS } from "../layout/settings";
 import type { SlotEditor } from "../slotEditor";
-import {
-  type BandEditorRequest,
-  bandEditor,
-  contextMenu,
-  type MenuItem,
-} from "../state";
+import { type BandEditorRequest, bandEditor } from "../state";
 import { INSERTS } from "./bandStripsModel";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
+import { useMenuButton } from "./composables/useMenuButton";
 import SlotField from "./SlotField.vue";
 
 // The open header or footer strip, at the top or bottom of the window: which
@@ -108,31 +104,19 @@ const change = async (next: (current: Strip) => Strip) => {
 // is clicked
 const insert = (text: string) => editors[active].insert(text);
 
-// opens a menu below or above the button pressed, which gives the slot the
-// focus back when it closes
-const menu = (event: MouseEvent, items: MenuItem[]) => {
-  const anchor = event.currentTarget as HTMLElement;
-  const rect = anchor.getBoundingClientRect();
-  const close = () => {
-    if (contextMenu.value?.close === close) contextMenu.value = null;
-    editors[active].focus();
-  };
-  contextMenu.value = {
-    items,
-    anchor: { left: rect.left, top: rect.top, bottom: rect.bottom },
-    keyboard: document.activeElement === anchor,
-    close,
-  };
-};
+// the menus of the buttons, which give the slot the focus back when they
+// close, and close on a second click
+const firstPageButton = useMenuButton(() => editors[active].focus());
+const pageNumberButton = useMenuButton(() => editors[active].focus());
 const openFirstPageMenu = (event: MouseEvent) =>
-  menu(
+  firstPageButton.toggle(
     event,
     firstPageMenu(strip.value, (choice) =>
       change((current) => chooseFirstPage(current, choice)),
     ),
   );
 const openPageNumberMenu = (event: MouseEvent) =>
-  menu(
+  pageNumberButton.toggle(
     event,
     pageNumberMenu(strip.value, fields, {
       insert,
@@ -229,6 +213,7 @@ onMounted(() => {
         <button
           type="button"
           aria-haspopup="menu"
+          :aria-expanded="firstPageButton.isOpen.value"
           @mousedown.prevent
           @click="openFirstPageMenu"
         >
@@ -260,6 +245,7 @@ onMounted(() => {
         <button
           type="button"
           aria-haspopup="menu"
+          :aria-expanded="pageNumberButton.isOpen.value"
           @mousedown.prevent
           @click="openPageNumberMenu"
         >

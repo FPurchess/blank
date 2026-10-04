@@ -1,3 +1,4 @@
+import { BAND_HEIGHT, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { CommandIdentifier } from "../config";
 import { type Band, hasText, variantsOf } from "../layout/bands";
 import { FIELD_NAMES } from "../layout/placeholders";
@@ -15,8 +16,25 @@ export const INSERTS = (
 ).map((field) => ({ label: FIELD_NAMES[field], text: `{${field}}` }));
 
 // how near the top or bottom of the window the mouse shows the hints to add
-// a band: the height of the bars, $bar-height in main.scss
-export const NEAR_EDGE = 44;
+// a band: on the top bar, and on the status bar or the hint just above it
+export const NEAR_TOP = TOP_BAR_HEIGHT;
+export const NEAR_BOTTOM = STATUS_HEIGHT + BAND_HEIGHT;
+
+// the status bar's controls and the word count's card, over which the hint
+// at the bottom stays away: it's for the bar's empty room and just above it
+export const BAR_CONTROLS = ".status-item, #ui-language, #word-count-card";
+
+/**
+ * nearEdge returns the edge whose hint the mouse at `y` shows, in a window
+ * `height` high: the top one on the top bar, the bottom one on the status bar
+ * or just above it, unless it's on one of the bar's controls
+ */
+export const nearEdge = (y: number, height: number, onControl: boolean) =>
+  y < NEAR_TOP
+    ? "top"
+    : y > height - NEAR_BOTTOM && !onControl
+      ? "bottom"
+      : null;
 
 /**
  * shownAtRest returns the band to show at an edge: that of every page, or

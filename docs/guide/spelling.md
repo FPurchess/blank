@@ -6,13 +6,13 @@ Blank can underline the words it doesn't know with a wavy line, so a typo never 
 
 ## Turn it on
 
-Press `Mod` `Alt` `S`, or right-click anywhere in the text and choose **Enable spell check**. Press the shortcut again, or click **Spelling** at the bottom right, to turn it off. Blank remembers your choice.
+Click **Spelling off** at the bottom right, press `Mod` `Alt` `S`, or right-click anywhere in the text and choose **Enable spell check**. Click **Spelling** or press the shortcut again to turn it off. Blank remembers your choice.
 
 Blank checks the [language shown at the bottom right](./autocorrect#language). A word is checked once you finish it, so nothing is underlined while you are still typing it.
 
 ## Fix a word
 
-Right-click a word with a wavy line, or press `Mod` `Alt` `N` to jump to the next one, and choose what to do:
+Right-click a word with a wavy line, or jump to the next one with `Mod` `Alt` `N` or the › next to **Spelling** at the bottom (‹ and `Mod` `Alt` `Shift` `N` go back), and choose what to do:
 
 | Menu item                     | What it does                                                                       |
 | ----------------------------- | ---------------------------------------------------------------------------------- |

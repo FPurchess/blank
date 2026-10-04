@@ -4,6 +4,7 @@ import { computed, onMounted, onUpdated, useTemplateRef } from "vue";
 import { formatShortcut } from "../editor/keyBindings";
 import { place } from "../popup";
 import type { Anchor, MenuItem } from "../state";
+import IconGlyph from "./components/IconGlyph.vue";
 import MenuEditField from "./MenuEditField.vue";
 import { hasChecks, isEntry, roleOf } from "./menuModel";
 
@@ -100,7 +101,9 @@ defineExpose({
           <span v-if="checks" class="check" aria-hidden="true">{{
             item.checked ? "✓" : ""
           }}</span>
+          <IconGlyph v-if="item.icon" :name="item.icon" />
           <span class="label">{{ item.label }}</span>
+          <span v-if="item.detail" class="detail">{{ item.detail }}</span>
           <kbd v-if="item.shortcut">{{ formatShortcut(item.shortcut) }}</kbd>
           <span v-if="item.children" class="more" aria-hidden="true">›</span>
         </template>

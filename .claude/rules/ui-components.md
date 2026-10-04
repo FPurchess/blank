@@ -32,7 +32,7 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 - **Presses keep the focus where it is** (in the editor, or in a menu) with `preventDefault` on `mousedown`, except in text fields: `(event.target as Element).closest("input, textarea")`, as `TableToolbar.vue` and `MenuList.vue` do.
 - **Focus after rendering.** A component that moves the focus does it once its DOM exists, in `onMounted` or in `nextTick` after changing its state (`ContextMenu.vue`'s `focusCurrent`). Listeners that only matter while it's open go through `listenOnWindow` in its setup, which removes them when it unmounts.
 - **What the keys move between** is found with `shownIn(root, selectors)` (`src/dom.ts`), which leaves out what's inside `[hidden]`: the dialog's Tab trap, the page setup's ↑↓ and the strips' Tab use it.
-- **Everything renders through `App.vue`**, into `#ui-app` inside `#ui`, never into `document.body` directly: `#ui` comes after the editor, which is what lets the UI paint above it and take its clicks. Classes on the body come from `useBodyClass`.
+- **Everything renders through `App.vue`**, into `#ui-app` inside `#ui`, never into `document.body` directly: `#ui` comes after the editor, which is what lets the UI paint above it and take its clicks. A popup of a bar item, whose bar is a stacking context of its own, goes there with `<Teleport to="#ui-app">` (the word count's card). Classes on the body come from `useBodyClass`.
 - **Keep every id, class, role, `data-*` and aria attribute** that E2E, the docs shots and the tests use.
 - **Stacking:** `#ui` comes after `.ProseMirror`. The z-index layers are set in `src/scss/main.scss` (e.g. the page view 1, the bottom bar and the outline 2, table handles 4, toolbar 5, band edges 5 (first in `App.vue`, so the toolbar paints above them), the open band strip 8, dialog backdrop 10, picker and menus 20, the tooltip 30); keep a new part in line with them, below the backdrop unless it is a modal or a menu. `#page-view` (`PageView.vue`) is fixed over the whole window at 1, above the hidden editor and below everything else; its page canvases (`PageFrame.vue`), marks and overlay (`PageOverlay.vue`: caret, selection, composition) are positioned inside it and have no z-index of their own.
 
@@ -41,7 +41,9 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 | Component | What |
 |---|---|
 | `App.vue` | the Vue part of the UI |
-| `TopBar.vue`, `BottomBar.vue`, `PageButton.vue`, `SpellcheckStatus.vue`, `LanguageChooser.vue` | the bars at the top and bottom of the window and the items on the right of the bottom one, their text in `statusBarModel.ts`. Each item is its own component, so typing only updates the counter |
+| `TopBar.vue`, `BottomBar.vue` | the bar at the top of the window, and the status bar at the bottom, their text in `statusBarModel.ts` |
+| `StatusItem.vue` | an item of the status bar: a button with an optional icon that never takes the focus, its tooltip naming its command's shortcut. Every item below is one |
+| `WordCount.vue`, `WordCountCard.vue`, `PageStatus.vue`, `PageButton.vue`, `LanguageChooser.vue`, `SpellcheckStatus.vue`, `MisspellingButtons.vue`, `ViewButton.vue` | the status bar's items, each its own component, so typing only updates the word count. The word count's card opens after the pointer rests on it (`hoverIntent.ts`) or with the Word count command, and counts with `src/wordCount.ts`, which the command shares. "Page N of M" opens its menu of pages as a `contextMenu` request with `owner`, so its own click closes it again; a menu button of the main menu does the same |
 | `TableToolbar.vue`, `ToolbarButton.vue`, `CaptionField.vue` | the table toolbar |
 | `TablePicker.vue` | the size picker for a new table |
 | `ContextMenu.vue`, `MenuList.vue`, `MenuEditField.vue` | the context menu: the open levels and the focus, one level, an item being edited |

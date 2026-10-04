@@ -17,6 +17,7 @@ import {
   hoverEdge,
   pressShift,
 } from "../helpers.ts";
+import { STATUS_HEIGHT } from "../../src/chrome.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(
@@ -65,6 +66,13 @@ const typeChar = (char: string) => {
     ? type(char)
     : pressShift(char.toLowerCase());
 };
+
+// the window (800 × 600), and the strip at its bottom every GIF keeps: the
+// status bar and the keycaps above it
+const WINDOW_HEIGHT = 600;
+const BOTTOM_STRIP = 80;
+// a GIF of the whole window
+const FULL = WINDOW_HEIGHT - BOTTOM_STRIP;
 
 /**
  * Recorder films typing as a GIF: a frame after every key, each shown for as long as a
@@ -216,6 +224,23 @@ class Recorder {
     await this.click(seconds);
   }
 
+  /** move the mouse onto `element` and rest there until `shown` shows */
+  async restOn(
+    element: ReturnType<typeof $>,
+    shown: ReturnType<typeof $>,
+    seconds = 2,
+  ) {
+    const { x, y } = await element.getLocation();
+    const { width, height } = await element.getSize();
+    await this.moveTo(
+      { x: Math.round(x + width / 2), y: Math.round(y + height / 2) },
+      0.6,
+    );
+    await this.frame(0.3);
+    await expect(shown).toBeDisplayed();
+    await this.frame(seconds);
+  }
+
   /** move the mouse onto the top or bottom bar, which shows the hints there */
   async hover(edge: "top" | "bottom", seconds = 0.8) {
     const height = await browser.execute(() => window.innerHeight);
@@ -232,7 +257,7 @@ class Recorder {
    * write the GIF, with the frame durations from above. It shows the top
    * `height` pixels of the window and the status bar below them.
    */
-  save(gif: string, height = 345) {
+  save(gif: string, height = WINDOW_HEIGHT - BOTTOM_STRIP - 200) {
     const list = path.join(this.dir, "frames.txt");
     const entries = this.frames.map(
       ({ file, duration }) => `file '${file}'\nduration ${duration.toFixed(3)}`,
@@ -259,8 +284,9 @@ class Recorder {
         ...[
           "-vf",
           // a shorter window: the writing area on top, the status bar (fixed to the bottom
-          // of the window in the app) below it, without the empty page in between
-          `split[t][b];[t]crop=800:${height}:0:0[top];[b]crop=800:55:0:545[bar];[top][bar]vstack,` +
+          // of the window in the app) and the keycaps just above it below, without the
+          // empty page in between
+          `split[t][b];[t]crop=800:${height}:0:0[top];[b]crop=800:${BOTTOM_STRIP}:0:${WINDOW_HEIGHT - BOTTOM_STRIP}[bar];[top][bar]vstack,` +
             "split[c][d];[c]palettegen=max_colors=64:stats_mode=full[p];[d][p]paletteuse=dither=none",
         ],
         ...["-fps_mode", "vfr", gif],
@@ -336,45 +362,50 @@ const showPointer = (at: Point | null, pressed = false) =>
 
 /** shows `keys` in the shortcut overlay, or hides it for no keys */
 const showKeys = (keys: string[]) =>
-  browser.execute((labels: string[]) => {
-    let overlay = document.getElementById("shots-keys");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "shots-keys";
-      Object.assign(overlay.style, {
-        position: "fixed",
-        left: "50%",
-        bottom: "9px",
-        transform: "translateX(-50%)",
-        display: "flex",
-        gap: "6px",
-        padding: "6px 10px",
-        borderRadius: "12px",
-        // readable on the light and the dark themes
-        background: "rgba(38, 50, 60, 0.78)",
-        border: "1px solid rgba(255, 255, 255, 0.28)",
-        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.18)",
-        font: "500 14px/1 'IBM Plex Sans', sans-serif",
-        color: "#fff",
-        zIndex: "1000",
-      });
-      document.body.appendChild(overlay);
-    }
-    overlay.replaceChildren(
-      ...labels.map((label) => {
-        const key = document.createElement("span");
-        key.textContent = label;
-        Object.assign(key.style, {
-          padding: "4px 8px",
-          borderRadius: "6px",
-          background: "rgba(255, 255, 255, 0.16)",
-          border: "1px solid rgba(255, 255, 255, 0.22)",
+  browser.execute(
+    (labels: string[], STATUS_HEIGHT: number) => {
+      let overlay = document.getElementById("shots-keys");
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "shots-keys";
+        Object.assign(overlay.style, {
+          position: "fixed",
+          left: "50%",
+          // just above the status bar, so it covers none of its items
+          bottom: `${STATUS_HEIGHT + 6}px`,
+          transform: "translateX(-50%)",
+          display: "flex",
+          gap: "6px",
+          padding: "6px 10px",
+          borderRadius: "12px",
+          // readable on the light and the dark themes
+          background: "rgba(38, 50, 60, 0.78)",
+          border: "1px solid rgba(255, 255, 255, 0.28)",
+          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.18)",
+          font: "500 14px/1 'IBM Plex Sans', sans-serif",
+          color: "#fff",
+          zIndex: "1000",
         });
-        return key;
-      }),
-    );
-    overlay.style.display = labels.length ? "flex" : "none";
-  }, keys.map(keyLabel));
+        document.body.appendChild(overlay);
+      }
+      overlay.replaceChildren(
+        ...labels.map((label) => {
+          const key = document.createElement("span");
+          key.textContent = label;
+          Object.assign(key.style, {
+            padding: "4px 8px",
+            borderRadius: "6px",
+            background: "rgba(255, 255, 255, 0.16)",
+            border: "1px solid rgba(255, 255, 255, 0.22)",
+          });
+          return key;
+        }),
+      );
+      overlay.style.display = labels.length ? "flex" : "none";
+    },
+    keys.map(keyLabel),
+    STATUS_HEIGHT,
+  );
 
 /** hides the cursor while the body has `shots-no-caret` */
 const addCaretStyle = () =>
@@ -492,7 +523,7 @@ describe("docs screenshots", () => {
     await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.8);
     await film.type("The next morning, the sea was calm.");
     await film.pause(2.5);
-    film.save(path.join(outDir, "header-footer.gif"), 545);
+    film.save(path.join(outDir, "header-footer.gif"), FULL);
   });
 
   it("records different even pages", async () => {
@@ -516,7 +547,7 @@ describe("docs screenshots", () => {
     await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.8);
     await film.type("The next morning, the sea was calm.");
     await film.pause(2);
-    film.save(path.join(outDir, "even-pages.gif"), 545);
+    film.save(path.join(outDir, "even-pages.gif"), FULL);
   });
 
   it("records switching between page ends and pages", async () => {
@@ -530,7 +561,29 @@ describe("docs screenshots", () => {
     await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1.8);
     await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1.6);
     await film.pause(1);
-    film.save(path.join(outDir, "page-views.gif"), 545);
+    film.save(path.join(outDir, "page-views.gif"), FULL);
+  });
+
+  it("records the status bar", async () => {
+    const film = await filmNew();
+    await film.type("The lighthouse keeper wrote every evening.");
+    await film.enter(0.3);
+    await film.type("He counted the ships, and the words.");
+    await film.shortcut(["Mod", "Enter"], () => pressMod(Key.Enter), 0.6);
+    await film.type("The next page starts here.");
+    await film.pause(0.6);
+    // the details of the word count, after resting on it
+    await film.restOn($("#ui-stats"), $("#word-count-card"), 2.4);
+    // the view, by mouse and by keys
+    await film.clickOn($("#ui-view"), 1.6, 0.8);
+    await expect($("#word-count-card")).not.toExist();
+    await film.clickOn($("#ui-view"), 1.2, 0.3);
+    // back into the text, away from the hints near the bar
+    await film.moveTo({ x: 400, y: 300 }, 0.5);
+    await film.hidePointer();
+    await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1.6);
+    await film.shortcut(["Mod", "Alt", "V"], () => pressMod(Key.Alt, "v"), 1);
+    film.save(path.join(outDir, "status-bar.gif"), FULL);
   });
 
   it("records the outline", async () => {
@@ -585,7 +638,7 @@ describe("docs screenshots", () => {
     await film.shortcut(["Mod", "Alt", "O"], () => pressMod(Key.Alt, "o"), 1.8);
     await film.shortcut(["Mod", "Alt", "O"], () => pressMod(Key.Alt, "o"), 1);
     await film.pause(0.6);
-    film.save(path.join(outDir, "outline.gif"), 545);
+    film.save(path.join(outDir, "outline.gif"), FULL);
   });
 
   it("captures a page break", async () => {
@@ -648,7 +701,7 @@ describe("docs screenshots", () => {
     await film.press("↓", Key.ArrowDown, 0.8);
     await film.type("Prices are per piece.");
     await film.pause(2.5);
-    film.save(path.join(outDir, "table-insert.gif"), 420);
+    film.save(path.join(outDir, "table-insert.gif"), 395);
   });
 
   it("records typing a table header", async () => {
@@ -661,7 +714,7 @@ describe("docs screenshots", () => {
       await film.type(text);
     }
     await film.pause(2.5);
-    film.save(path.join(outDir, "table-header.gif"), 300);
+    film.save(path.join(outDir, "table-header.gif"), 275);
   });
 
   it("records writing in cells", async () => {
@@ -684,7 +737,7 @@ describe("docs screenshots", () => {
     await film.shortcut(["Shift", "←"], () => pressShift(Key.ArrowLeft), 0.9);
     await film.press("Backspace", Key.Backspace, 1);
     await film.pause(2);
-    film.save(path.join(outDir, "table-cells.gif"), 360);
+    film.save(path.join(outDir, "table-cells.gif"), 335);
   });
 
   it("records table mode", async () => {
@@ -710,7 +763,7 @@ describe("docs screenshots", () => {
     await film.press("R", "r", 1.2);
     await film.press("Esc", Key.Escape, 0.8);
     await film.pause(2);
-    film.save(path.join(outDir, "table-mode.gif"), 360);
+    film.save(path.join(outDir, "table-mode.gif"), 335);
   });
 
   it("records pasting cells from a spreadsheet", async () => {
@@ -744,7 +797,7 @@ describe("docs screenshots", () => {
       1.6,
     );
     await film.pause(2);
-    film.save(path.join(outDir, "table-paste.gif"), 360);
+    film.save(path.join(outDir, "table-paste.gif"), 335);
   });
 
   it("records changing a table with the mouse", async () => {
@@ -816,7 +869,7 @@ describe("docs screenshots", () => {
     await film.hidePointer();
     await film.pause(2);
     await browser.releaseActions();
-    film.save(path.join(outDir, "table-mouse.gif"), 440);
+    film.save(path.join(outDir, "table-mouse.gif"), 415);
   });
 
   it("records the writing demo", async () => {

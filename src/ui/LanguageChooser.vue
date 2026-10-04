@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import { CommandIdentifier } from "../config";
 import {
   confirm,
   openPicker,
@@ -8,6 +9,7 @@ import {
   select,
 } from "../languagePicker";
 import { language, languagePicker } from "../state";
+import StatusItem from "./StatusItem.vue";
 import { languageLabel, optionLabel, pickerWindow } from "./statusBarModel";
 
 // The language in the bottom bar, which opens the language picker. The
@@ -30,31 +32,41 @@ const choose = (code: string) => {
 </script>
 
 <template>
-  <span
+  <div
     id="ui-language"
-    title="Choose language"
     :class="{ open: languagePicker.open, invalid: languagePicker.invalid }"
-    @mousedown.prevent
-    @click="open"
   >
-    <template v-if="!languagePicker.open">{{
-      languageLabel(language)
-    }}</template>
-    <template v-else>
+    <StatusItem
+      v-if="!languagePicker.open"
+      icon="globe"
+      :command="CommandIdentifier.LANGUAGE_CHOOSE"
+      @click="open"
+      >{{ languageLabel(language) }}</StatusItem
+    >
+    <!-- the picker: the editor's keys move through it, and a click on a
+    language chooses it -->
+    <span
+      v-else
+      class="picker"
+      role="listbox"
+      aria-label="Language"
+      @mousedown.prevent
+    >
       <span class="more">‹</span>
-      <!-- .stop: the chooser itself would open the picker again -->
       <span
         v-for="code in shown"
         :key="code"
         class="option"
+        role="option"
+        :aria-selected="code === languagePicker.selected"
         :class="{ selected: code === languagePicker.selected }"
-        @click.stop="choose(code)"
+        @click="choose(code)"
         >{{ optionLabel(code) }}</span
       >
       <span class="more">›</span>
       <span v-if="languagePicker.buffer" class="buffer"
         >{{ languagePicker.buffer }}_</span
       >
-    </template>
-  </span>
+    </span>
+  </div>
 </template>

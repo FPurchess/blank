@@ -89,7 +89,7 @@ A few things good to know:
 - **Sorting** keeps the header row on top and puts empty cells last. Numbers sort by their value, also with a decimal comma like _1,5_ in German, dates by their day, and text the way your language sorts it, _item 9_ before _item 10_.
 - **Rows move below the header** and a header column stays first. Deleting the header row makes the row below it the header.
 - **Merged cells** keep everything they held. Splitting a cell leaves its content in the first cell.
-- The status bar says what happened, like _2 rows added_, and screen readers read it out.
+- The status bar at the bottom says what happened, next to the word count, like _2 rows added_, and screen readers read it out.
 
 ## Change a table with the mouse {#mouse}
 

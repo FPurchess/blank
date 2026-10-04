@@ -18,14 +18,14 @@ describe("editing", () => {
 
     await expectEditorText("#editor", "");
     await expect($("#ui-top")).toHaveText("» Untitled");
-    await expect($("#ui-stats")).toHaveText("0 words 0 chars");
+    await expect($("#ui-stats")).toHaveText("0 words");
   });
 
-  it("counts words and chars while typing", async () => {
+  it("counts the words while typing", async () => {
     await type("Hello world");
 
     await expectEditorText("#editor p", "Hello world");
-    await expect($("#ui-stats")).toHaveText("2 words 11 chars");
+    await expect($("#ui-stats")).toHaveText("2 words");
   });
 
   it("autocompletes arrows", async () => {

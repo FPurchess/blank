@@ -52,8 +52,8 @@ describe("launch", () => {
     await expect($("#ui-top")).toHaveText("» Untitled");
   });
 
-  it("counts words and chars", async () => {
-    await expect($("#ui-stats")).toHaveText(/^[1-9]\d* words \d+ chars$/);
+  it("counts the words", async () => {
+    await expect($("#ui-stats")).toHaveText(/^[1-9][\d,]* words$/);
   });
 
   it("uses the default theme", async () => {

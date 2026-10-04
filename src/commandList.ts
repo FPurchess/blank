@@ -266,6 +266,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "chevron-left",
     aliases: ["spelling", "error"],
   },
+  [C.TOOLS_STATS]: {
+    group: "Tools",
+    label: "Word count",
+    icon: "info",
+    aliases: ["statistics", "characters", "reading", "time"],
+  },
 };
 
 const byId = Object.fromEntries(

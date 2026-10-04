@@ -38,7 +38,8 @@
     "edit.header": "Mod-Alt-h",
     "edit.footer": "Mod-Alt-f",
     "view.pages": "Mod-Alt-v",
-    "view.outline": "Mod-Alt-o"
+    "view.outline": "Mod-Alt-o",
+    "tools.stats": "Mod-Alt-c"
   },
   "autocorrect": {
     "arrows": true,
