@@ -58,7 +58,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - on (`aria-pressed`/`aria-checked="true"`): `--on-fill` with the icon in `--on-ink`, or for status items `$on: text`;
   - disabled: opacity 0.38.
 - **Keyboard focus** is the global 2px `--focus` ring with a 2px offset, on `:focus-visible` only. Don't add `:focus` outlines. Bars, pickers and toolbars never take the editor's focus (`editor-boundary.md`).
-- **Text buttons always have a box,** a border or a fill. One primary per surface: the dialogs' submit button.
+- **Text buttons always have a box,** a border or a fill. One primary per surface: the dialogs' submit button, filled with the accent made solid over the desk (`solid()` in `_controls.scss`), so it's solid ink in mono.
 - **The one depth cue:** `popover` (a 1px `--line` border, the `--r-pop` radius, one shadow), only on what floats (menus, toolbars, pickers).
 - **The pointer:**
   - The global rule gives the hand to buttons, links and the roles button, tab, menuitem*, option, radio and switch. Text fields get the text cursor, and anything `:disabled`/`aria-disabled` the arrow.

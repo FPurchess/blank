@@ -75,20 +75,26 @@ $tip-key: 75%;
 }
 
 // the one button of a surface that does what it's for (Save, Insert, Apply)
+// solid `$color` for a background: over the desk's color, as --ink-fill, so
+// the accent is solid where it's the ink (mono), translucent in Dark
+@function solid($color) {
+  @return linear-gradient($color, $color), var(--desk-color);
+}
+
 @mixin text-button-primary {
   border-color: transparent;
   color: var(--accent-ink);
-  background: var(--accent);
+  background: solid(var(--accent));
   font-weight: 500;
 
   &#{$enabled}:hover,
   &#{$enabled}:active {
-    background: var(--accent-hover);
+    background: solid(var(--accent-hover));
   }
 
   &:disabled,
   &[aria-disabled="true"] {
-    background: var(--accent);
+    background: solid(var(--accent));
   }
 }
 
