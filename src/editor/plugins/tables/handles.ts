@@ -167,7 +167,7 @@ const selectedSpans = (view: EditorView, tableStart: number) => {
  * its rows and columns select them, open the table menu and move them, the
  * "+" between them inserts one, the lines between columns resize them and
  * the table's edges add and drop rows and columns. The handles show while
- * the mouse moves and hide while typing; src/tableHandles.ts renders them.
+ * the mouse moves and hide while typing; src/ui/TableHandles.vue renders them.
  */
 export const tableHandles = () => {
   let pointer: Point | null = null;

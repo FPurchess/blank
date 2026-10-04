@@ -228,9 +228,9 @@ export const update = async () => {
  * @returns dispose, which stops following spellcheck and language
  */
 export const bootSpellcheck = () => {
-  const stop = watch([spellcheck, language], () => void update(), {
-    flush: "sync",
-  });
+  // after the writes of a tick, so turning it on and choosing a language at
+  // once loads one dictionary, not first the old language's
+  const stop = watch([spellcheck, language], () => void update());
   void update();
   return stop;
 };

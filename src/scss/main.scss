@@ -527,7 +527,7 @@ body {
   }
 }
 
-// the header and footer strips, see src/bandStrips.ts: pinned below the top
+// the header and footer strips, see src/ui/BandStrips.vue: pinned below the top
 // bar and above the bottom bar, lined up with the text column
 $band-height: 28px;
 $bar-height: 44px;
@@ -840,9 +840,9 @@ $strip-height: 90px;
   word-wrap: break-word;
 }
 
-// the handles of the table under the mouse, see src/tableHandles.ts: they sit
-// on the table's edges and lines, drawn in the text colour so they suit
-// every theme
+// the handles of the table under the mouse, see src/ui/TableHandles.vue:
+// they sit on the table's edges and lines, drawn in the text colour so they
+// suit every theme
 .table-handles {
   position: fixed;
   inset: 0;

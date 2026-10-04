@@ -65,17 +65,15 @@ describe("ui", () => {
     expect(document.getElementById("ui-app")).toBeNull();
   });
 
-  it("puts the Vue app after the header and footer strips and before the table handles", () => {
-    // the table toolbar in the app and the strips share a z-index, so the
-    // later one paints on top
-    const ids = [...document.querySelectorAll("#ui > [id]")].map((e) => e.id);
-
-    expect(ids.indexOf("band-header")).toBeGreaterThan(-1);
-    expect(ids.indexOf("band-header")).toBeLessThan(ids.indexOf("ui-app"));
-    expect(ids.indexOf("ui-app")).toBeLessThan(ids.indexOf("table-handles"));
-    expect(
-      document.querySelector("#ui-app > #ui-top + #ui-bottom"),
-    ).not.toBeNull();
+  it("puts the header and footer strips first in the app", () => {
+    // the table toolbar and the strips share a z-index, so the later one
+    // paints on top: the strips come before everything else
+    const app = [...document.querySelectorAll("#ui-app > [id]")].map(
+      (e) => e.id,
+    );
+    expect(app.slice(0, 2)).toEqual(["band-header", "band-footer"]);
+    expect(app).toContain("table-handles");
+    expect(app.indexOf("ui-top")).toBeLessThan(app.indexOf("ui-bottom"));
   });
 
   it("removes the UI and stops rendering when disposed", () => {

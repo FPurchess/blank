@@ -1,5 +1,3 @@
-import { CommandIdentifier, getKeyBinding } from "../config";
-import { formatShortcut } from "../editor/keyBindings";
 import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
 import {
   BAND,
@@ -13,6 +11,7 @@ import type { Layout } from "../layout/resolve";
 import { SLOTS } from "../layout/settings";
 import { segments } from "../layout/tokens";
 import type { PageLayoutState } from "../state/pageView";
+import { editBandShortcut } from "./bandStripsModel";
 
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
@@ -194,13 +193,7 @@ export const sheetSlots = (
  * opens its strip on a double click
  */
 export const bandTitle = (band: Band) =>
-  `Double-click to edit the ${band} (${formatShortcut(
-    getKeyBinding(
-      band === "header"
-        ? CommandIdentifier.EDIT_HEADER
-        : CommandIdentifier.EDIT_FOOTER,
-    ),
-  )})`;
+  `Double-click to edit the ${band} (${editBandShortcut(band)})`;
 
 // a spot on a page, in points from its top edge, e.g. the one at the top of
 // the view

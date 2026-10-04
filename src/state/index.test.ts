@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
+import { nextTick } from "vue";
 
 import { schema } from "../markdown";
 import {
@@ -20,13 +21,15 @@ describe("bootState", () => {
     textContent.value = "";
   });
 
-  it("applies the theme, follows the text and clears messages until disposed", () => {
+  it("applies the theme, follows the text and clears messages until disposed", async () => {
     vi.useFakeTimers();
     const dispose = bootState();
     theme.value = "dark";
     const state = EditorState.create({ schema });
     transaction.value = state.tr.insertText("hello");
     announce("A row added");
+    // the text follows once the tick's writes are done
+    await nextTick();
     vi.runAllTimers();
 
     expect(document.body.dataset.theme).toBe("dark");
@@ -37,6 +40,7 @@ describe("bootState", () => {
     theme.value = "red";
     transaction.value = state.tr.insertText("bye");
     announce("A row added");
+    await nextTick();
     vi.runAllTimers();
     expect(document.body.dataset.theme).toBe("dark");
     expect(textContent.value).toBe("hello");

@@ -212,6 +212,19 @@ describe("spellcheck service", () => {
       language.value = "de";
       await vi.waitFor(() => expect(spellchecker.value?.tag).toBe("de"));
     });
+
+    it("asks once when spell check and the language change together", async () => {
+      stops.push(bootSpellcheck());
+      await flushPromises();
+      vi.mocked(ipc.status).mockClear();
+
+      spellcheck.value = true;
+      language.value = "de";
+      await vi.waitFor(() => expect(spellchecker.value?.tag).toBe("de"));
+
+      expect(ipc.status).toHaveBeenCalledTimes(1);
+      expect(ipc.status).toHaveBeenCalledWith("de");
+    });
   });
 
   describe("checking", () => {

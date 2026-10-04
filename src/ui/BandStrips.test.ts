@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bootBandStrips } from "./bandStrips";
 import {
   type BandSettings,
   bandSettings,
@@ -8,7 +7,7 @@ import {
   NO_BANDS,
   NO_SLOTS,
   type Slots,
-} from "./layout/settings";
+} from "../layout/settings";
 import {
   bandEditor,
   type BandEditorRequest,
@@ -16,21 +15,34 @@ import {
   engineMissing,
   type MenuItem,
   transaction,
-} from "./state";
-import type { EditorHandle } from "./editor/handle";
+} from "../state";
+import type { EditorHandle } from "../editor/handle";
 import {
   createState,
   createTestHandle,
   docWithFrontmatter,
   h,
-} from "./test/editor";
+} from "../test/editor";
+import { formatShortcut } from "../editor/keyBindings";
+import { NEAR_EDGE } from "./bandStripsModel";
+import { flushPromises } from "../test/async";
+import { bootApp } from "./mount";
 
 const fields = { title: "Report", author: "Ada", date: "1 May", file: "" };
 
-const publish = (frontmatter: string) => {
+// lets Vue render, and a strip focus its slot after showing other pages
+const settle = () => flushPromises();
+
+const publish = async (frontmatter: string) => {
   transaction.value = createState(
     docWithFrontmatter(frontmatter, h(1, "Report")),
   ).tr;
+  await settle();
+};
+
+const click = async (element: HTMLElement) => {
+  element.click();
+  await settle();
 };
 
 const edge = (band: string) =>
@@ -38,12 +50,12 @@ const edge = (band: string) =>
 const strip = () => document.querySelector<HTMLElement>("#band-editor");
 const button = (label: string) =>
   [...(strip()?.querySelectorAll("button") ?? [])].find(
-    (b) => b.textContent === label,
+    (b) => b.textContent?.trim() === label,
   )!;
 const slot = (name: string) =>
   strip()!.querySelector<HTMLElement>(`.slot.${name} .ProseMirror`)!;
 
-const open = ({
+const open = async ({
   band = "header",
   bands = {},
   insert,
@@ -60,6 +72,7 @@ const open = ({
     apply: vi.fn(),
   };
   bandEditor.value = request;
+  await settle();
   return request;
 };
 
@@ -68,15 +81,22 @@ const applied = (request: BandEditorRequest) =>
   vi.mocked(request.apply).mock.calls[0][0];
 
 // runs the item of the open menu that reads `label`
-const choose = (label: string) => {
+const choose = async (label: string) => {
   const item = contextMenu.value!.items.find(
     (item): item is Exclude<MenuItem, "separator"> =>
       item !== "separator" && item.label === label,
   )!;
   if (item.edit) item.edit.submit(item.edit.value);
   else item.run?.();
+  await settle();
   return item;
 };
+
+// the hints of an edge, by what they read
+const hints = (band: string) =>
+  [...edge(band).querySelectorAll("button")].map((hint) =>
+    hint.textContent?.trim(),
+  );
 
 const tabs = () =>
   [...strip()!.querySelectorAll<HTMLElement>("[role=tab]")].filter(
@@ -95,7 +115,7 @@ describe("band strips", () => {
     contextMenu.value = null;
     transaction.value = null;
     editor = createTestHandle();
-    dispose = bootBandStrips(editor);
+    dispose = bootApp(editor);
   });
 
   afterEach(() => {
@@ -105,15 +125,17 @@ describe("band strips", () => {
   });
 
   describe("at rest", () => {
-    it("offers to add a header and a footer with page numbers", () => {
+    it("offers to add a header and a footer with page numbers", async () => {
       expect(edge("header").classList).toContain("empty");
-      expect(edge("header").textContent).toBe("+ Header");
-      expect(edge("footer").textContent).toBe("+ Footer# Page numbers");
+      expect(hints("header")).toEqual(["+ Header"]);
+      expect(hints("footer")).toEqual(["+ Footer", "# Page numbers"]);
       expect(document.body.classList).not.toContain("has-header");
     });
 
-    it("shows the header as it reads, and makes room for it", () => {
-      publish('page:\n  header: { left: "{title}", right: "Page {page}" }');
+    it("shows the header as it reads, and makes room for it", async () => {
+      await publish(
+        'page:\n  header: { left: "{title}", right: "Page {page}" }',
+      );
 
       const line = edge("header").querySelector(".band-line")!;
       expect([...line.children].map((part) => part.textContent)).toEqual([
@@ -130,95 +152,100 @@ describe("band strips", () => {
       expect(edge("footer").hidden).toBe(false);
     });
 
-    it("shows the header at the edge when there are no pages to show it", () => {
+    it("shows the header at the edge when there are no pages to show it", async () => {
       // without the layout engine from the start, the editor shows the text
       // itself
-      dispose();
-      document.body.classList.add("without-engine");
+      engineMissing.value = true;
       try {
-        dispose = bootBandStrips(editor);
-        publish('page:\n  header: { left: "{title}" }');
+        await publish('page:\n  header: { left: "{title}" }');
         expect(edge("header").hidden).toBe(false);
         expect(edge("header").querySelector(".band-line")!.textContent).toBe(
           "Report",
         );
         // it hides while its strip is open
-        open();
+        await open();
         expect(edge("header").hidden).toBe(true);
       } finally {
-        document.body.classList.remove("without-engine");
+        engineMissing.value = false;
       }
     });
 
-    it("shows the header at the edge once the engine fails", () => {
-      publish('page:\n  header: { left: "{title}" }');
+    it("shows the header at the edge once the engine fails", async () => {
+      await publish('page:\n  header: { left: "{title}" }');
       expect(edge("header").hidden).toBe(true);
       try {
         engineMissing.value = true;
+        await settle();
         expect(edge("header").hidden).toBe(false);
       } finally {
         engineMissing.value = false;
       }
+      await settle();
       expect(edge("header").hidden).toBe(true);
     });
 
-    it("shows a band only the first or even pages have", () => {
-      publish('page:\n  first-page:\n    header: { left: "ACME" }');
+    it("shows a band only the first or even pages have", async () => {
+      await publish('page:\n  first-page:\n    header: { left: "ACME" }');
 
       expect(edge("header").classList).not.toContain("empty");
       expect(edge("header").textContent).toBe("ACME");
       expect(document.body.classList).toContain("has-header");
     });
 
-    it("opens the strip of a band when its line or hint is clicked", () => {
-      publish('page:\n  footer: { center: "{page}" }');
+    it("opens the strip of a band when its line or hint is clicked", async () => {
+      await publish('page:\n  footer: { center: "{page}" }');
 
-      edge("footer").querySelector<HTMLElement>(".band-line")!.click();
+      await click(edge("footer").querySelector<HTMLElement>(".band-line")!);
       expect(bandEditor.value).toMatchObject({ band: "footer" });
       expect(strip()?.classList).toContain("footer");
-      button("Done").click();
+      await click(button("Done"));
 
-      [...edge("header").querySelectorAll("button")][0].click();
+      await click([...edge("header").querySelectorAll("button")][0]);
       expect(bandEditor.value).toMatchObject({ band: "header" });
     });
 
-    it("shows the hints while the mouse is near an edge", () => {
+    it("shows the hints while the mouse is near an edge", async () => {
       window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+      await settle();
       expect(document.body.classList).toContain("near-top");
 
       window.dispatchEvent(
         new MouseEvent("mousemove", { clientY: window.innerHeight - 10 }),
       );
+      await settle();
       expect(document.body.classList).toContain("near-bottom");
       expect(document.body.classList).not.toContain("near-top");
 
       // out of the window: onto nothing of the page
       window.dispatchEvent(new MouseEvent("mouseout", { relatedTarget: null }));
+      await settle();
       expect(document.body.classList).not.toContain("near-bottom");
 
       // within the page, the hint stays
       window.dispatchEvent(
         new MouseEvent("mousemove", { clientY: window.innerHeight - 10 }),
       );
+      await settle();
       window.dispatchEvent(
         new MouseEvent("mouseout", { relatedTarget: document.body }),
       );
+      await settle();
       expect(document.body.classList).toContain("near-bottom");
     });
 
-    it("only renders again when what it shows changes", () => {
-      publish('page:\n  header: { left: "x" }');
+    it("only renders again when what it shows changes", async () => {
+      await publish('page:\n  header: { left: "x" }');
       const line = edge("header").querySelector(".band-line");
 
-      publish('page:\n  header: { left: "x" }');
+      await publish('page:\n  header: { left: "x" }');
 
       expect(edge("header").querySelector(".band-line")).toBe(line);
     });
   });
 
   describe("editing", () => {
-    it("opens the strip with the band's slots, and fades the text", () => {
-      open({
+    it("opens the strip with the band's slots, and fades the text", async () => {
+      await open({
         bands: { header: { left: "{title}", center: "", right: "draft" } },
       });
 
@@ -235,8 +262,8 @@ describe("band strips", () => {
       expect(document.activeElement).toBe(slot("center"));
     });
 
-    it("opens on the pages whose band the edge shows", () => {
-      open({
+    it("opens on the pages whose band the edge shows", async () => {
+      await open({
         bands: {
           firstPage: { ...NO_BANDS, header: { ...NO_SLOTS, left: "ACME" } },
         },
@@ -246,19 +273,19 @@ describe("band strips", () => {
       expect(slot("left").textContent).toBe("ACME");
     });
 
-    it("says when the first page has none", () => {
-      open({ bands: { firstPage: "plain" } });
+    it("says when the first page has none", async () => {
+      await open({ bands: { firstPage: "plain" } });
 
       expect(strip()!.querySelector(".band-label")!.textContent).toBe(
         "Header · every page but the first",
       );
     });
 
-    it("keeps what was edited with Done", () => {
-      const request = open({ band: "footer" });
+    it("keeps what was edited with Done", async () => {
+      const request = await open({ band: "footer" });
 
-      button("Title").click();
-      button("Done").click();
+      await click(button("Title"));
+      await click(button("Done"));
 
       expect(applied(request)).toEqual({
         ...bandSettings(DEFAULT_PAGE),
@@ -269,13 +296,14 @@ describe("band strips", () => {
       expect(document.body.classList).not.toContain("band-editing");
     });
 
-    it("inserts into the slot last in use", () => {
-      const request = open();
+    it("inserts into the slot last in use", async () => {
+      const request = await open();
 
       slot("left").focus();
       slot("left").dispatchEvent(new FocusEvent("focus"));
-      button("Chapter").click();
-      button("Done").click();
+      await settle();
+      await click(button("Chapter"));
+      await click(button("Done"));
 
       expect(applied(request).header).toEqual({
         ...NO_SLOTS,
@@ -287,19 +315,19 @@ describe("band strips", () => {
       ["Author", "{author}"],
       ["Date", "{date}"],
       ["File", "{file}"],
-    ])("inserts the %s", (label, placeholder) => {
-      const request = open();
+    ])("inserts the %s", async (label, placeholder) => {
+      const request = await open();
 
-      button(label).click();
-      button("Done").click();
+      await click(button(label));
+      await click(button("Done"));
 
       expect(applied(request).header.center).toBe(placeholder);
     });
 
-    it("offers the page numbers as they read, and inserts the chosen one", () => {
-      const request = open({ band: "footer" });
+    it("offers the page numbers as they read, and inserts the chosen one", async () => {
+      const request = await open({ band: "footer" });
 
-      button("# Page number ▾").click();
+      await click(button("# Page number ▾"));
       const menu = contextMenu.value!;
       expect(
         menu.items.map((item) => (item === "separator" ? "-" : item.label)),
@@ -315,10 +343,10 @@ describe("band strips", () => {
         "-",
         "Start At 1…",
       ]);
-      choose("Page 3 of 12");
+      await choose("Page 3 of 12");
       menu.close();
       expect(contextMenu.value).toBeNull();
-      button("Done").click();
+      await click(button("Done"));
 
       expect(applied(request).footer).toEqual({
         ...NO_SLOTS,
@@ -326,19 +354,19 @@ describe("band strips", () => {
       });
     });
 
-    it("sets the numbering and the first number in the page number menu", () => {
-      const request = open({ band: "footer" });
+    it("sets the numbering and the first number in the page number menu", async () => {
+      const request = await open({ band: "footer" });
 
-      button("# Page number ▾").click();
-      expect(choose("1, 2, 3").checked).toBe(true);
-      choose("i, ii, iii");
-      button("# Page number ▾").click();
+      await click(button("# Page number ▾"));
+      expect((await choose("1, 2, 3")).checked).toBe(true);
+      await choose("i, ii, iii");
+      await click(button("# Page number ▾"));
       expect(contextMenu.value!.items[0]).toMatchObject({ label: "iii" });
-      const start = choose("Start At 1…");
+      const start = await choose("Start At 1…");
       start.edit!.submit(" 5 ");
-      button("# Page number ▾").click();
-      choose("Start At 5…").edit!.submit("-1");
-      button("Done").click();
+      await click(button("# Page number ▾"));
+      (await choose("Start At 5…")).edit!.submit("-1");
+      await click(button("Done"));
 
       expect(applied(request)).toMatchObject({
         numberStyle: "i",
@@ -347,26 +375,26 @@ describe("band strips", () => {
     });
 
     describe("the first page", () => {
-      it("leaves it without a header and footer", () => {
-        const request = open();
+      it("leaves it without a header and footer", async () => {
+        const request = await open();
 
-        button("First Page ▾").click();
-        expect(choose("Like the Other Pages").checked).toBe(true);
-        button("First Page ▾").click();
-        choose("None");
-        button("Done").click();
+        await click(button("First Page ▾"));
+        expect((await choose("Like the Other Pages")).checked).toBe(true);
+        await click(button("First Page ▾"));
+        await choose("None");
+        await click(button("Done"));
 
         expect(applied(request).firstPage).toBe("plain");
       });
 
-      it("gives it its own, on a tab of its own", () => {
-        const request = open({
+      it("gives it its own, on a tab of its own", async () => {
+        const request = await open({
           bands: { header: { ...NO_SLOTS, right: "{page}" } },
         });
 
-        button("First Page ▾").click();
-        choose("Its Own");
-        expect(tabs().map((tab) => tab.textContent)).toEqual([
+        await click(button("First Page ▾"));
+        await choose("Its Own");
+        expect(tabs().map((tab) => tab.textContent?.trim())).toEqual([
           "First Page",
           "Other Pages",
         ]);
@@ -374,11 +402,11 @@ describe("band strips", () => {
         expect(strip()!.querySelector(".band-label")!.textContent).toBe(
           "Header",
         );
-        button("Title").click();
+        await click(button("Title"));
         // the other pages keep theirs
-        tabs()[1].click();
+        await click(tabs()[1]);
         expect(slot("right").textContent).toBe("page");
-        button("Done").click();
+        await click(button("Done"));
 
         expect(applied(request)).toMatchObject({
           header: { ...NO_SLOTS, right: "{page}" },
@@ -389,32 +417,32 @@ describe("band strips", () => {
         });
       });
 
-      it("keeps the other band of its own, and is plain without text", () => {
+      it("keeps the other band of its own, and is plain without text", async () => {
         const letterhead = {
           ...NO_BANDS,
           footer: { ...NO_SLOTS, left: "ACME" },
         };
-        const kept = open({ bands: { firstPage: letterhead } });
-        button("Done").click();
+        const kept = await open({ bands: { firstPage: letterhead } });
+        await click(button("Done"));
         expect(applied(kept).firstPage).toEqual(letterhead);
 
-        const empty = open({ bands: { firstPage: "same" } });
-        button("First Page ▾").click();
-        choose("Its Own");
-        button("Done").click();
+        const empty = await open({ bands: { firstPage: "same" } });
+        await click(button("First Page ▾"));
+        await choose("Its Own");
+        await click(button("Done"));
         expect(applied(empty).firstPage).toBe("plain");
       });
 
-      it("goes back to the other pages when it has none of its own", () => {
-        open({
+      it("goes back to the other pages when it has none of its own", async () => {
+        await open({
           bands: {
             firstPage: { ...NO_BANDS, header: { ...NO_SLOTS, left: "x" } },
           },
         });
-        tabs()[0].click();
+        await click(tabs()[0]);
 
-        button("First Page ▾").click();
-        choose("None");
+        await click(button("First Page ▾"));
+        await choose("None");
 
         expect(tabs()).toEqual([]);
         expect(slot("left").textContent).toBe("");
@@ -422,23 +450,23 @@ describe("band strips", () => {
     });
 
     describe("even pages", () => {
-      it("start as the odd pages mirrored, on a tab of their own", () => {
-        const request = open({
+      it("start as the odd pages mirrored, on a tab of their own", async () => {
+        const request = await open({
           bands: { header: { ...NO_SLOTS, left: "{title}", right: "{page}" } },
         });
 
-        button("Odd & Even Pages").click();
+        await click(button("Odd & Even Pages"));
 
         expect(button("Odd & Even Pages").getAttribute("aria-pressed")).toBe(
           "true",
         );
-        expect(tabs().map((tab) => tab.textContent)).toEqual([
+        expect(tabs().map((tab) => tab.textContent?.trim())).toEqual([
           "Odd Pages",
           "Even Pages",
         ]);
         expect(slot("left").textContent).toBe("page");
         expect(slot("right").textContent).toBe("Report");
-        button("Done").click();
+        await click(button("Done"));
 
         expect(applied(request).evenPages).toEqual({
           header: { ...NO_SLOTS, left: "{page}", right: "{title}" },
@@ -446,9 +474,9 @@ describe("band strips", () => {
         });
       });
 
-      it("mirror the odd pages again on request", () => {
+      it("mirror the odd pages again on request", async () => {
         const even = { ...NO_BANDS, header: { ...NO_SLOTS, center: "x" } };
-        const request = open({
+        const request = await open({
           bands: {
             header: { ...NO_SLOTS, left: "a" },
             evenPages: even,
@@ -456,10 +484,10 @@ describe("band strips", () => {
         });
         expect(button("Mirror Odd Pages").hidden).toBe(true);
 
-        tabs()[1].click();
+        await click(tabs()[1]);
         expect(button("Mirror Odd Pages").hidden).toBe(false);
-        button("Mirror Odd Pages").click();
-        button("Done").click();
+        await click(button("Mirror Odd Pages"));
+        await click(button("Done"));
 
         expect(applied(request).evenPages!.header).toEqual({
           ...NO_SLOTS,
@@ -467,24 +495,24 @@ describe("band strips", () => {
         });
       });
 
-      it("are the same as the others once turned off", () => {
-        const request = open({ bands: { evenPages: NO_BANDS } });
-        tabs()[1].click();
+      it("are the same as the others once turned off", async () => {
+        const request = await open({ bands: { evenPages: NO_BANDS } });
+        await click(tabs()[1]);
 
-        button("Odd & Even Pages").click();
+        await click(button("Odd & Even Pages"));
 
         expect(tabs()).toEqual([]);
-        button("Done").click();
+        await click(button("Done"));
         expect(applied(request).evenPages).toBeNull();
       });
 
-      it("share the tabs with a first page of its own", () => {
-        open({ bands: { firstPage: NO_BANDS, evenPages: NO_BANDS } });
+      it("share the tabs with a first page of its own", async () => {
+        await open({ bands: { firstPage: NO_BANDS, evenPages: NO_BANDS } });
 
-        button("First Page ▾").click();
-        choose("Its Own");
+        await click(button("First Page ▾"));
+        await choose("Its Own");
 
-        expect(tabs().map((tab) => tab.textContent)).toEqual([
+        expect(tabs().map((tab) => tab.textContent?.trim())).toEqual([
           "First Page",
           "Odd Pages",
           "Even Pages",
@@ -492,16 +520,16 @@ describe("band strips", () => {
       });
     });
 
-    it("stops listening for clicks outside once it is closed", () => {
+    it("stops listening for clicks outside once it is closed", async () => {
       const add = vi.spyOn(window, "addEventListener");
       const remove = vi.spyOn(window, "removeEventListener");
       const mousedown = (spy: typeof add) =>
         spy.mock.calls.filter(([type]) => type === "mousedown");
 
-      open();
-      button("Done").click();
-      open({ band: "footer" });
-      button("Done").click();
+      await open();
+      await click(button("Done"));
+      await open({ band: "footer" });
+      await click(button("Done"));
 
       expect(mousedown(add)).toHaveLength(2);
       expect(mousedown(remove)).toEqual(mousedown(add));
@@ -509,19 +537,22 @@ describe("band strips", () => {
       remove.mockRestore();
     });
 
-    it("keeps what was edited when the text is clicked", () => {
-      const request = open({ bands: { header: { ...NO_SLOTS, left: "x" } } });
+    it("keeps what was edited when the text is clicked", async () => {
+      const request = await open({
+        bands: { header: { ...NO_SLOTS, left: "x" } },
+      });
 
       document.body.dispatchEvent(
         new MouseEvent("mousedown", { bubbles: true }),
       );
+      await settle();
 
       expect(applied(request).header).toEqual({ ...NO_SLOTS, left: "x" });
       expect(strip()).toBeNull();
     });
 
-    it("stays open for clicks on itself and its menu, submenus included", () => {
-      const request = open();
+    it("stays open for clicks on itself and its menu, submenus included", async () => {
+      const request = await open();
       // the context menu's levels, as src/ui/ContextMenu.vue renders them
       const menus = document.createElement("div");
       menus.className = "context-menus";
@@ -535,14 +566,17 @@ describe("band strips", () => {
       slot("left").dispatchEvent(
         new MouseEvent("mousedown", { bubbles: true }),
       );
+      await settle();
       menu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      await settle();
       submenu.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      await settle();
 
       expect(request.apply).not.toHaveBeenCalled();
     });
 
-    it("removes the band from every page", () => {
-      const request = open({
+    it("removes the band from every page", async () => {
+      const request = await open({
         bands: {
           header: { left: "a", center: "b", right: "c" },
           firstPage: { header: { ...NO_SLOTS, left: "d" }, footer: NO_SLOTS },
@@ -550,7 +584,7 @@ describe("band strips", () => {
         },
       });
 
-      button("Remove").click();
+      await click(button("Remove"));
 
       expect(applied(request)).toMatchObject({
         header: NO_SLOTS,
@@ -559,19 +593,20 @@ describe("band strips", () => {
       });
     });
 
-    it("moves between the slots and buttons with Tab", () => {
-      open();
+    it("moves between the slots and buttons with Tab", async () => {
+      await open();
       slot("right").focus();
 
       slot("right").dispatchEvent(
         new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
       );
+      await settle();
 
       expect(document.activeElement).toBe(button("# Page number ▾"));
     });
 
-    it("goes around from the last button to the first, and back", () => {
-      open();
+    it("goes around from the last button to the first, and back", async () => {
+      await open();
       const key = (target: HTMLElement, shiftKey = false) =>
         target.dispatchEvent(
           new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true }),
@@ -585,53 +620,184 @@ describe("band strips", () => {
       expect(document.activeElement).toBe(button("Done"));
     });
 
-    it("is done with Esc on a button too", () => {
-      const request = open({ bands: { header: { ...NO_SLOTS, left: "x" } } });
+    it("is done with Esc on a button too", async () => {
+      const request = await open({
+        bands: { header: { ...NO_SLOTS, left: "x" } },
+      });
       button("Title").focus();
 
       button("Title").dispatchEvent(
         new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
       );
+      await settle();
 
       expect(strip()).toBeNull();
       expect(applied(request).header).toEqual({ ...NO_SLOTS, left: "x" });
     });
 
-    it("numbers the pages from the footer hint, through the editor", () => {
-      [...edge("footer").querySelectorAll("button")][1].click();
+    it("numbers the pages from the footer hint, through the editor", async () => {
+      await click([...edge("footer").querySelectorAll("button")][1]);
       expect(bandEditor.value).toMatchObject({
         band: "footer",
         insert: "{page}",
       });
 
-      button("Done").click();
+      await click(button("Done"));
 
       expect(editor.view.state.doc.attrs.frontmatter).toBe(
         'page:\n  footer: {center: "{page}"}',
       );
     });
   });
+
+  describe("names, titles and focus", () => {
+    it("shows the placeholders of a footer without a header", async () => {
+      await publish('page:\n  footer: { left: "{title}" }');
+      expect(edge("footer").querySelector(".band-line")!.textContent).toBe(
+        "Report",
+      );
+    });
+
+    it("shows only the hint of the edge the mouse is near", async () => {
+      window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+      await settle();
+      expect(document.body.classList).toContain("near-top");
+      expect(document.body.classList).not.toContain("near-bottom");
+
+      window.dispatchEvent(new MouseEvent("mousemove", { clientY: NEAR_EDGE }));
+      await settle();
+      expect(document.body.classList).not.toContain("near-top");
+    });
+
+    it("titles the line at rest with its shortcut and keeps the focus", async () => {
+      await publish('page:\n  header: { left: "a" }\n  footer: { left: "b" }');
+      const header = edge("header").querySelector<HTMLElement>(".band-line")!;
+      const footer = edge("footer").querySelector<HTMLElement>(".band-line")!;
+      expect(header.getAttribute("role")).toBe("button");
+      expect(header.title).toBe(
+        `Edit the header (${formatShortcut("Mod-Alt-h")})`,
+      );
+      expect(footer.title).toBe(
+        `Edit the footer (${formatShortcut("Mod-Alt-f")})`,
+      );
+
+      const press = new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+      });
+      header.dispatchEvent(press);
+      expect(press.defaultPrevented).toBe(true);
+    });
+
+    it("leaves the hints out of the tab order", () => {
+      const hints = [
+        ...document.querySelectorAll<HTMLElement>(".band-hint button"),
+      ];
+      expect(hints).toHaveLength(3);
+      expect(hints.every((hint) => hint.tabIndex === -1)).toBe(true);
+    });
+
+    it("leaves the editor unfocused when the line opens the strip", async () => {
+      await publish('page:\n  header: { left: "a" }');
+      const focus = vi.spyOn(editor.view, "focus");
+      await click(edge("header").querySelector<HTMLElement>(".band-line")!);
+      expect(bandEditor.value).toMatchObject({ band: "header" });
+      expect(focus).not.toHaveBeenCalled();
+    });
+
+    it("shows the page number at rest as a named chip", async () => {
+      engineMissing.value = true;
+      try {
+        await publish('page:\n  header: { right: "Page {page}" }');
+        const chip =
+          edge("header").querySelector<HTMLElement>(".band-line .chip")!;
+        expect(chip.dataset.field).toBe("page");
+        expect(chip.title).toBe("Page number");
+        expect(chip.textContent).toBe("page");
+      } finally {
+        engineMissing.value = false;
+      }
+    });
+
+    it("opens a new strip for another request while one is open", async () => {
+      await open();
+      await open({ band: "footer" });
+      expect(strip()!.classList).toContain("footer");
+      expect(strip()!.classList).not.toContain("header");
+    });
+
+    it("names the strip, its slots and its Remove button", async () => {
+      await open({ band: "footer" });
+      expect(strip()!.getAttribute("aria-label")).toBe("Footer");
+      expect(button("Remove").title).toBe("Remove the footer");
+      expect(
+        [...strip()!.querySelectorAll<HTMLElement>(".slot")].map(
+          (place) => place.dataset.placeholder,
+        ),
+      ).toEqual(["Left", "Center", "Right"]);
+    });
+
+    it("destroys the slot editors it replaces", async () => {
+      await open();
+      const place = slot("center").parentElement!;
+      await click(button("Odd & Even Pages"));
+      expect(place.isConnected).toBe(false);
+      expect(place.querySelector(".ProseMirror")).toBeNull();
+    });
+
+    it("keeps what was typed only once", async () => {
+      const opened = await open();
+      slot("center").dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+      document.body.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true }),
+      );
+      await settle();
+      expect(opened.apply).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens the menus for the keyboard when their button has the focus", async () => {
+      await open({ band: "footer" });
+      await click(button("# Page number ▾"));
+      expect(contextMenu.value!.keyboard).toBe(false);
+      contextMenu.value = null;
+
+      button("First Page ▾").focus();
+      await click(button("First Page ▾"));
+      expect(contextMenu.value!.keyboard).toBe(true);
+    });
+
+    it("gives the slot the focus back when its menu closes", async () => {
+      await open({ band: "footer" });
+      await click(button("# Page number ▾"));
+      const { close } = contextMenu.value!;
+      button("Done").focus();
+
+      close();
+      expect(contextMenu.value).toBeNull();
+      expect(document.activeElement).toBe(slot("center"));
+
+      await click(button("# Page number ▾"));
+      const other = { ...contextMenu.value!, close: () => {} };
+      contextMenu.value = other;
+      close();
+      expect(contextMenu.value).toBe(other);
+    });
+  });
 });
 
-describe("bootBandStrips", () => {
-  it("replaces the strips of an earlier boot", () => {
-    document.body.innerHTML = "";
-    bootBandStrips(createTestHandle());
-    const dispose = bootBandStrips(createTestHandle());
-
-    expect(document.querySelectorAll("#band-header")).toHaveLength(1);
-    dispose();
-    expect(document.querySelector(".band-edge")).toBeNull();
-  });
-
-  it("takes the strips, their editor and the body's classes away again", () => {
+describe("band strips in the app", () => {
+  it("go with the app: the strips, their editor and the body's classes", async () => {
     document.elementFromPoint = () => null;
     document.body.innerHTML = "";
     transaction.value = null;
-    const dispose = bootBandStrips(createTestHandle());
-    publish('page:\n  header: { left: "x" }');
-    const request = open();
-    document.body.classList.add("near-top");
+    const dispose = bootApp(createTestHandle());
+    await publish('page:\n  header: { left: "x" }');
+    const request = await open();
+    window.dispatchEvent(new MouseEvent("mousemove", { clientY: 10 }));
+    await settle();
+    expect(document.body.classList).toContain("near-top");
 
     dispose();
 
@@ -643,8 +809,7 @@ describe("bootBandStrips", () => {
     document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(request.apply).not.toHaveBeenCalled();
     // the strips no longer follow the document
-    publish('page:\n  footer: { left: "y" }');
+    await publish('page:\n  footer: { left: "y" }');
     expect(document.querySelector(".band-edge")).toBeNull();
-    bandEditor.value = null;
   });
 });
