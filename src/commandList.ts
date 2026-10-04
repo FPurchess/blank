@@ -103,6 +103,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "page-break",
     aliases: ["new", "page"],
   },
+  [C.INSERT_BLOCK]: {
+    group: "Insert",
+    label: "Insert a block",
+    icon: "blocks",
+    aliases: ["table of contents", "toc", "form", "recipe", "drawing", "embed"],
+  },
   [C.BLOCKTYPE_PARAGRAPH]: {
     group: "Format",
     label: "Text",
