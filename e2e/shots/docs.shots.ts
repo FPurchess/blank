@@ -641,6 +641,78 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "outline.gif"), FULL);
   });
 
+  it("records a table of contents", async () => {
+    const film = await filmNew();
+    // the block picker, and a table of contents still without headings
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1.4);
+    await film.press("Enter", Key.Enter, 1.2);
+    // the story, each chapter on a page of its own: the entries come
+    const paragraph =
+      "<p>The keeper climbed the stairs every evening, lit the lamp and wrote down the weather, the ships and the wind.</p>";
+    const story = [
+      ["h1", "The lighthouse"],
+      ["h2", "The keeper"],
+      ["h2", "The lamp"],
+      ["h1", "The storm"],
+      ["h2", "The ship"],
+      ["h1", "The morning"],
+    ]
+      .map(
+        ([tag, title], index) =>
+          (tag === "h1" && index > 0 ? '<hr data-page-break="">' : "") +
+          `<${tag}>${title}</${tag}>` +
+          paragraph.repeat(2),
+      )
+      .join("");
+    await paste({ "text/html": story });
+    await browser.execute(() => {
+      document.querySelector("#page-view")!.scrollTop = 0;
+    });
+    await film.pause(1.6);
+    // a heading renamed, and its entry follows
+    await film.clickInto("#editor h1", 0.4);
+    await film.hidePointer();
+    await film.type(" at the cape");
+    await film.pause(2.2);
+    film.save(path.join(outDir, "toc.gif"), 545);
+  });
+
+  it("records filling in a form", async () => {
+    const film = await filmNew();
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1);
+    await film.press("↓", Key.ArrowDown, 0.6);
+    await film.press("Enter", Key.Enter, 1.4);
+    await film.type("Pancakes");
+    await film.press("Tab", Key.Tab, 0.6);
+    await film.press("Tab", Key.Tab, 0.6);
+    await film.type("200 g");
+    await film.press("Tab", Key.Tab, 0.4);
+    await film.type("flour");
+    await film.press("Tab", Key.Tab, 0.6);
+    await film.type("Whisk the flour with the milk and the eggs.");
+    await film.pause(2.2);
+    film.save(path.join(outDir, "form.gif"), 545);
+  });
+
+  it("records writing a letter", async () => {
+    const film = await filmNew();
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1);
+    await film.press("↓", Key.ArrowDown, 0.4);
+    await film.press("↓", Key.ArrowDown, 0.6);
+    await film.press("Enter", Key.Enter, 1.4);
+    await film.type("Bea Sender · Hill Road 3 · 54321 Village");
+    await film.press("Tab", Key.Tab, 0.5);
+    await film.type("Ann Example");
+    await film.press("Tab", Key.Tab, 0.5);
+    await film.type("2 October");
+    await film.press("Tab", Key.Tab, 0.5);
+    await film.type("Our meeting");
+    await film.press("Tab", Key.Tab, 0.5);
+    await film.type("Dear Ann, thank you for the meeting.");
+    await film.pause(2.2);
+    film.save(path.join(outDir, "letter.gif"), 545);
+  });
+
   it("captures a page break", async () => {
     await pressMod("n");
     await type("the end of the first chapter.");

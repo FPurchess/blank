@@ -1,5 +1,10 @@
 import type { Mark, Node } from "prosemirror-model";
 
+import { fieldSpec, formDefinition, isEmptyField, placesOf } from "../markdown";
+import { isListed, listedHeadings } from "../markdown/headings";
+import { parseLength } from "../layout/units";
+import { unknownLabel } from "../markdown/blocks/unknown";
+import { embedLabel, embedSrc } from "../markdown/blocks/embeds";
 import { tableGrid } from "../exporters/table";
 import {
   BLOCK_AFTER,
@@ -12,10 +17,13 @@ import { listMarker } from "../markdown/lists";
 import type {
   Content,
   EngineCellBlock,
+  EngineColumn,
+  EngineFrame,
   EngineItem,
   EngineSpan,
   EngineText,
   TextStyle,
+  TocEntry,
 } from "./types";
 
 // Flattens a ProseMirror document into the items the layout engine lays out
@@ -52,7 +60,17 @@ interface Context {
   // item in the same quotes
   quotes: number[];
   depth: number;
+  // a block at the top of the document, which starts pages and chapters
   top: boolean;
+  // where headings are the document's (isListed): at its top and in forms
+  listed: boolean;
+  // what an empty textblock here says, a form's field's placeholder, and
+  // whether it stands for a picture to come (an image field's)
+  hint?: string;
+  picture?: boolean;
+  // the column of a grid or the frame it stands in
+  column?: EngineColumn;
+  frame?: EngineFrame;
 }
 
 /**
@@ -148,10 +166,62 @@ const textOf = (
   children: readonly Node[],
   pos: number,
   top: boolean,
+  listed = false,
 ): EngineText => {
   const { text, spans } = spansOf(children);
   const level = node.type.name === "heading" ? (node.attrs.level as number) : 0;
-  return { kind: "text", pos, text, spans, style: styleOf(node), level, top };
+  return {
+    kind: "text",
+    pos,
+    text,
+    spans,
+    style: styleOf(node),
+    level,
+    top,
+    ...(listed ? { listed } : {}),
+  };
+};
+
+/**
+ * tocEntries returns the entries of a table of contents to `depth`: the
+ * listed headings up to that level, as the engine counts them
+ */
+export const tocEntries = (doc: Node, depth: number): TocEntry[] =>
+  listedHeadings(doc, depth).map(({ level, text }) => ({ level, text }));
+
+/**
+ * entriesKey tells entries of tables of contents apart by their levels and
+ * texts
+ */
+const entriesKey = (entries: readonly TocEntry[]) =>
+  entries.map((entry) => `${entry.level}${entry.text}`).join("\n");
+
+/**
+ * headingsSignature tells the listed headings of `doc` apart from others by
+ * their levels and texts, not their positions: what tables of contents
+ * depend on, besides themselves
+ */
+export const headingsSignature = (doc: Node): string =>
+  entriesKey(tocEntries(doc, 6));
+
+/**
+ * spaceOf returns the space above and below a block at the top of the
+ * document, or in a form, after `previous`
+ */
+const spaceOf = (node: Node, previous: Node | null, first: boolean): Space => {
+  const heading = node.type.name === "heading";
+  const before =
+    first || !heading
+      ? 0
+      : previous?.type.name === "heading"
+        ? HEADING_AFTER_HEADING
+        : HEADING_BEFORE;
+  const after = heading
+    ? HEADING_AFTER
+    : node.type.name === "page_break"
+      ? 0
+      : BLOCK_AFTER;
+  return { before, after };
 };
 
 /**
@@ -375,6 +445,8 @@ export const flattenBlocks = (
       bars: context.bars,
       barsContinue: barsContinue(index),
       ...(extra.marker ? { marker: extra.marker } : {}),
+      ...(context.column ? { column: context.column } : {}),
+      ...(context.frame ? { frame: context.frame } : {}),
     });
     const key = [
       context.indent,
@@ -383,6 +455,11 @@ export const flattenBlocks = (
       context.bars.join(" "),
       extra.marker ?? "",
       context.top ? 1 : 0,
+      context.listed ? 1 : 0,
+      context.hint ?? "",
+      context.picture ? 1 : 0,
+      context.column ? JSON.stringify(context.column) : "",
+      context.frame ? JSON.stringify(context.frame) : "",
       extra.key ?? "",
     ].join("|");
     records.push({ node, pos, key, build: item });
@@ -420,6 +497,65 @@ export const flattenBlocks = (
       );
       return;
     }
+    if (name === "toc") {
+      const depth = node.attrs.depth as number;
+      const entries = tocEntries(doc, depth);
+      push(
+        node,
+        pos,
+        context,
+        space,
+        () => ({
+          kind: "toc",
+          pos,
+          title: node.attrs.title as string,
+          depth,
+          entries,
+        }),
+        // laid out again when the headings it lists change, see
+        // headingsSignature
+        {
+          key: entriesKey(entries),
+        },
+      );
+      return;
+    }
+    if (name === "form_block") {
+      form(node, pos, context, space);
+      return;
+    }
+    if (name === "embed") {
+      // its drawing, as an image: as wide as it says, as high as that
+      // makes it; 0 by 0 until it is loaded
+      const src = embedSrc(node);
+      const size = sizes(src);
+      const width = size ? (parseLength(node.attrs.width) ?? size.width) : 0;
+      const height = size?.width ? (size.height * width) / size.width : 0;
+      push(
+        node,
+        pos,
+        context,
+        space,
+        () => ({
+          kind: "image",
+          pos,
+          src,
+          width: height ? width : 0,
+          height,
+          alt: embedLabel(node),
+        }),
+        { key: height ? `${width}x${height}` : "?" },
+      );
+      return;
+    }
+    if (name === "unknown_block") {
+      push(node, pos, context, space, () => ({
+        kind: "boxed",
+        pos,
+        label: unknownLabel(node.attrs.raw as string),
+      }));
+      return;
+    }
     if (name === "table") {
       const widths = frozen?.pos === pos ? frozen.widths : undefined;
       // the sizes of its images, which come once they're loaded
@@ -446,6 +582,9 @@ export const flattenBlocks = (
         bars: [...context.bars, context.indent],
         quotes: [...context.quotes, pos],
         top: false,
+        listed: false,
+        hint: undefined,
+        picture: undefined,
       };
       children(
         node,
@@ -463,6 +602,9 @@ export const flattenBlocks = (
         indent: context.indent + LIST_INDENT,
         depth: context.depth + 1,
         top: false,
+        listed: false,
+        hint: undefined,
+        picture: undefined,
       };
       node.forEach((item, offset, index) => {
         const first = index === 0;
@@ -522,6 +664,117 @@ export const flattenBlocks = (
     });
   };
 
+  // a form: its fields' blocks one after the other, as at the top of the
+  // document, or in the frames and in the columns of grids where its
+  // template's layout puts them. An empty field says its placeholder, and
+  // the form starts a new page if its template says so.
+  const form = (node: Node, pos: number, context: Context, space: Space) => {
+    const definition = formDefinition(doc, node);
+    const places = placesOf(definition?.layout);
+    const start = records.length;
+    let previous: Node | null = null;
+    // the block before the band of a grid the fields are in, which each of
+    // its columns starts after
+    let beforeBand: Node | null = null;
+    // the records that start a band or a frame, and the first in the flow
+    const starts: { index: number; of: "column" | "frame" }[] = [];
+    let flowStart = -1;
+    node.forEach((field, fieldOffset, fieldIndex) => {
+      const spec = fieldSpec(definition, field);
+      const fieldPos = pos + 1 + fieldOffset;
+      const place = places.get(field.attrs.name as string);
+      const placeBefore =
+        fieldIndex > 0
+          ? places.get(node.child(fieldIndex - 1).attrs.name as string)
+          : undefined;
+      const grid = place?.kind === "grid" ? place : undefined;
+      const frame = place?.kind === "frame" ? place : undefined;
+      const gridBefore = placeBefore?.kind === "grid" ? placeBefore : undefined;
+      const frameBefore =
+        placeBefore?.kind === "frame" ? placeBefore : undefined;
+      if (grid && gridBefore?.band !== grid.band) {
+        beforeBand = previous;
+        starts.push({ index: records.length, of: "column" });
+      }
+      // a column starts where its band does
+      if (grid && gridBefore?.column !== grid.column) previous = beforeBand;
+      // a frame starts at its top, the flow after the frames at the top of
+      // the page
+      if (frame && frameBefore?.frame !== frame.frame) {
+        previous = null;
+        starts.push({ index: records.length, of: "frame" });
+      }
+      if (!frame && flowStart < 0) {
+        flowStart = records.length;
+        if (frameBefore) previous = null;
+      }
+      const column: EngineColumn | undefined = grid && {
+        index: grid.column,
+        tracks: grid.tracks,
+        gap: grid.gap,
+      };
+      const framed: EngineFrame | undefined = frame && {
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+      };
+      // a field's blocks stand as at the top of the document: its headings
+      // start pages and chapters, as in Word, except in a grid's column or
+      // a frame
+      const inner: Context = {
+        ...context,
+        top: context.top && !column && !framed,
+        hint: isEmptyField(field, spec) ? spec?.placeholder : undefined,
+        picture: spec?.kind === "image",
+        column,
+        frame: framed,
+      };
+      field.forEach((child, childOffset, childIndex) => {
+        const own = spaceOf(child, previous, false);
+        const first = fieldIndex === 0 && childIndex === 0;
+        const last =
+          fieldIndex === node.childCount - 1 &&
+          childIndex === field.childCount - 1;
+        block(child, fieldPos + 1 + childOffset, inner, {
+          before: first ? space.before + own.before : own.before,
+          after: last ? space.after : own.after,
+        });
+        previous = child;
+      });
+    });
+    // the first item of each band and frame says so, the first in the
+    // flow where it starts at the highest, and the form's first item
+    // whether it starts a new page
+    const patch = (
+      index: number,
+      change: (item: EngineItem) => EngineItem,
+      key: string,
+    ) => {
+      const record = records[index];
+      if (!record) return;
+      const build = record.build;
+      record.build = () => change(build());
+      record.key += `|${key}`;
+    };
+    for (const { index, of } of starts) {
+      patch(
+        index,
+        (item) => {
+          const placed = item[of];
+          return placed ? { ...item, [of]: { ...placed, start: true } } : item;
+        },
+        `${of} start`,
+      );
+    }
+    const flowTop = parseLength(definition?.flowTop);
+    if (flowTop && flowStart >= 0) {
+      patch(flowStart, (item) => ({ ...item, flowTop }), `flow ${flowTop}`);
+    }
+    if (definition?.newPage) {
+      patch(start, (item) => ({ ...item, pageStart: true }), "new page");
+    }
+  };
+
   // a textblock, split around its images, which stand on lines of their own
   const textblock = (
     node: Node,
@@ -531,6 +784,11 @@ export const flattenBlocks = (
     marker?: string,
   ) => {
     const runs = pieces(node, pos);
+    // a listed heading is one entry of the bookmarks and tables of
+    // contents, on its first piece of text
+    const listedPiece = isListed(node, context.listed)
+      ? runs.findIndex((piece) => !piece.image)
+      : -1;
     runs.forEach((piece, index) => {
       const pieceSpace = {
         before: index === 0 ? space.before : 0,
@@ -560,13 +818,30 @@ export const flattenBlocks = (
         piece.pos,
         context,
         pieceSpace,
-        () => textOf(node, piece.children, piece.pos, context.top),
+        () => ({
+          ...textOf(
+            node,
+            piece.children,
+            piece.pos,
+            context.top,
+            index === listedPiece,
+          ),
+          ...(context.hint ? { hint: context.hint } : {}),
+          ...(context.hint && context.picture ? { picture: true } : {}),
+        }),
         { marker: pieceMarker, key: runs.length > 1 ? `piece${index}` : "" },
       );
     });
   };
 
-  const top: Context = { indent: 0, bars: [], quotes: [], depth: 0, top: true };
+  const top: Context = {
+    indent: 0,
+    bars: [],
+    quotes: [],
+    depth: 0,
+    top: true,
+    listed: true,
+  };
   const blocks: FlatRecord[][] = [];
   let previous: Node | null = from > 0 ? doc.child(from - 1) : null;
   let offset = 0;
@@ -574,22 +849,8 @@ export const flattenBlocks = (
     offset += doc.child(index).nodeSize;
   for (let index = from; index < to; index++) {
     const node = doc.child(index);
-    const heading = node.type.name === "heading";
-    const before =
-      index === 0
-        ? 0
-        : heading
-          ? previous?.type.name === "heading"
-            ? HEADING_AFTER_HEADING
-            : HEADING_BEFORE
-          : 0;
-    const after = heading
-      ? HEADING_AFTER
-      : node.type.name === "page_break"
-        ? 0
-        : BLOCK_AFTER;
     const first = records.length;
-    block(node, offset, top, { before, after });
+    block(node, offset, top, spaceOf(node, previous, index === 0));
     // whether an item's quote bars reach down to the next item is known only
     // once its block is done, and it must be in the key, or an edit that
     // ends or extends a quote would keep the item above it as it was; a

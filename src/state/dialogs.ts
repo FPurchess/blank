@@ -78,6 +78,40 @@ export interface BandEditorRequest {
 // while none is open
 export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 
+export interface BlockChoice {
+  id: string;
+  label: string;
+  // what it is, in a few words, or why it can't be inserted
+  description: string;
+  // a template whose file can't be used
+  disabled?: boolean;
+}
+
+export interface BlockPickerRequest {
+  // the content blocks that can be inserted, see
+  // src/editor/commands/contentBlocks.ts
+  choices: readonly BlockChoice[];
+  pick(id: string): void;
+  cancel(): void;
+}
+
+// blockPicker holds the request of the open block picker, or null while it
+// is closed
+export const blockPicker = shallowRef<BlockPickerRequest | null>(null);
+
+export interface TocDialogRequest {
+  // the headings it lists, 1 to 6 levels deep
+  depth: number;
+  title: string;
+  submit(depth: number, title: string): void;
+  remove(): void;
+  cancel(): void;
+}
+
+// tocDialog holds the request of the open dialog of a table of contents, or
+// null while it is closed
+export const tocDialog = shallowRef<TocDialogRequest | null>(null);
+
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
 // dialog goes here too
@@ -86,4 +120,6 @@ export const focusTakingDialogs = [
   imageDialog,
   pageSetup,
   bandEditor,
+  blockPicker,
+  tocDialog,
 ] as const;

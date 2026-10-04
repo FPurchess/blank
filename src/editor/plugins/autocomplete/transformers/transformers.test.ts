@@ -25,6 +25,7 @@ import horizontal_rule from "./horizontal_rule";
 import ordered_list from "./ordered_list";
 import page_break from "./page_break";
 import table from "./table";
+import toc from "./toc";
 
 /**
  * runTransformer places the cursor at the end of top-level block `index`
@@ -266,10 +267,33 @@ describe("transformer.page_break", () => {
   });
 });
 
+describe("transformer.toc", () => {
+  it.each(["[toc]", "[TOC]", "[[_TOC_]]"])(
+    "activates on Enter for %j",
+    (text) => {
+      expect(toc.trigger).toBe("enter");
+      expect(toc.activate(text)).toBe(true);
+    },
+  );
+
+  it.each(["toc", "[toc", "[ toc ]", "a [toc]"])("ignores %j", (text) => {
+    expect(toc.activate(text)).toBeUndefined();
+  });
+
+  it("leaves a list item alone, as a table of contents stands on top", () => {
+    const node = doc(ul(li(p("[toc]"))));
+    const { view, result } = runTransformer(toc, node, 0, "[toc]");
+
+    expect(result).toBe(false);
+    expect(view.state.doc).toBe(node);
+  });
+});
+
 // a whole line that becomes a node of its own
 describe.each([
   { transformer: horizontal_rule, text: "---", type: "horizontal_rule" },
   { transformer: page_break, text: "+++", type: "page_break" },
+  { transformer: toc, text: "[toc]", type: "toc" },
 ])("transformer.$type", ({ transformer, text, type }) => {
   it.each(positions(p(text)))(
     "replaces the $position block with the node and an empty paragraph",

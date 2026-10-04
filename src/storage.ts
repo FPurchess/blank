@@ -21,7 +21,7 @@ import {
   detectLanguage,
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
-import { schema } from "./markdown";
+import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({
@@ -203,10 +203,40 @@ export const bootStorage = async () => {
   }
 };
 
+interface StoredNode {
+  type: string;
+  content?: StoredNode[];
+}
+
+/**
+ * restorable makes a document a newer Blank stored one this Blank can open: a
+ * block at its top of a type this Blank doesn't know becomes a content block
+ * it can't show, which keeps the block's JSON, so nothing of it is lost
+ */
+export const restorable = (stored: unknown): unknown => {
+  const doc = stored as StoredNode | null;
+  if (!doc || !Array.isArray(doc.content)) return stored;
+  if (doc.content.every((node) => node.type in schema.nodes)) return stored;
+  return {
+    ...doc,
+    content: doc.content.map((node) => {
+      if (node.type in schema.nodes) return node;
+      const json = JSON.stringify(node, null, 2);
+      const fence = fenceFor(json);
+      const raw = [
+        formatMarker({ name: "stored", format: 1, args: { type: node.type } }),
+        `${fence}json\n${json}\n${fence}`,
+        closeMarker("stored"),
+      ].join("\n\n");
+      return { type: "unknown_block", attrs: { raw } };
+    }),
+  };
+};
+
 export const getDocumentFromStorage = async (): Promise<Node | undefined> => {
   if (!storageAvailable) return;
   const node = await localforage.getItem("doc");
-  return node === null ? undefined : Node.fromJSON(schema, node);
+  return node === null ? undefined : Node.fromJSON(schema, restorable(node));
 };
 
 export const getPathfromStorage = async () =>

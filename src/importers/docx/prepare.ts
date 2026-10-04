@@ -4,6 +4,10 @@ import { FRONTMATTER_PROPERTY } from "../../exporters/docx/properties";
 import { readWordLayout, type WordLayout } from "./layout";
 import { normalizeNumbering } from "./numbering";
 import { markPageBreaks } from "./pageBreaks";
+import { markTocs } from "./toc";
+import { markForms, readDefinitions } from "./forms";
+import { markEmbeds, readEmbeds } from "./embeds";
+import type { Definitions } from "../../markdown";
 import { parsePart } from "./xml";
 
 // Reads what mammoth leaves out of a .docx and rewrites what it would get
@@ -59,6 +63,8 @@ export interface PreparedDocx {
   bytes: Uint8Array;
   properties: WordProperties;
   layout: WordLayout;
+  // the definitions of the forms in it, by their key
+  definitions: Definitions;
 }
 
 /**
@@ -72,14 +78,20 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   // read before the rewrites, which split paragraphs with their properties
   const properties = await readWordProperties(zip);
   const layout = await readWordLayout(zip);
+  const definitions = await readDefinitions(zip);
+  const embeds = await markEmbeds(zip, await readEmbeds(zip));
+  // before the page breaks, which split paragraphs a field may span
+  const tocs = await markTocs(zip);
+  const forms = await markForms(zip, definitions);
   const numbering = await normalizeNumbering(zip);
   const pageBreaks = await markPageBreaks(zip);
   return {
     bytes:
-      numbering || pageBreaks
+      tocs || forms || embeds || numbering || pageBreaks
         ? await zip.generateAsync({ type: "uint8array" })
         : bytes,
     properties,
     layout,
+    definitions,
   };
 };

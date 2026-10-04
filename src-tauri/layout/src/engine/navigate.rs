@@ -22,18 +22,33 @@ impl Engine {
         Some(index - 1)
     }
 
+    /// the fragments of an item, in order: one run, but for an item in a
+    /// column of a grid that goes on over a page, whose fragments there
+    /// come after the other columns' on the page before
+    pub(super) fn frags_of(&self, item: usize) -> impl Iterator<Item = usize> + '_ {
+        let first = self
+            .first_frag
+            .get(item)
+            .copied()
+            .filter(|&first| first != usize::MAX);
+        first.into_iter().flat_map(move |first| {
+            (first..self.frags.len())
+                .take_while(move |&index| {
+                    let frag = self.frags[index];
+                    frag.item == item
+                        || frag.repeat
+                        || self.items[item].beside(&self.items[frag.item])
+                })
+                .filter(move |&index| self.frags[index].item == item)
+        })
+    }
+
     /// the fragment of an item's unit
     pub(super) fn frag_of(&self, item: usize, unit: usize) -> Option<usize> {
-        let first = *self.first_frag.get(item)?;
-        if first == usize::MAX {
-            return None;
-        }
-        (first..self.frags.len())
-            .take_while(|&index| self.frags[index].item == item || self.frags[index].repeat)
-            .find(|&index| {
-                let frag = self.frags[index];
-                frag.item == item && frag.unit == unit && !frag.repeat
-            })
+        self.frags_of(item).find(|&index| {
+            let frag = self.frags[index];
+            frag.unit == unit && !frag.repeat
+        })
     }
 
     pub(super) fn unit_of_text(&self, item: usize, text: usize, line: usize) -> usize {
@@ -100,16 +115,11 @@ impl Engine {
                 let frag = self.frags[frag_index];
                 let unit = &self.laid[item].units[0];
                 let at_end = pos >= self.items[item].to();
-                let width = self.settings.content_width();
+                let (start, end) = self.items[item].text_edges(&self.settings);
                 let height = unit.height.max(12.0);
                 Some((
                     self.page_of_frag(frag_index),
-                    self.settings.margins.left
-                        + if at_end {
-                            width
-                        } else {
-                            self.items[item].indent
-                        },
+                    self.settings.margins.left + if at_end { end } else { start },
                     frag.y,
                     height,
                 ))
@@ -125,13 +135,23 @@ impl Engine {
             .unwrap_or(0..0)
     }
 
-    /// the fragment on a page nearest to a height
-    fn frag_near(&self, page: usize, y: f32) -> Option<usize> {
+    /// the fragment on a page nearest to a point: to its height, and across
+    /// for the columns of a grid and frames, which stand beside others
+    fn frag_near(&self, page: usize, x: f32, y: f32) -> Option<usize> {
         let mut best: Option<(usize, f32)> = None;
         for index in self.frags_on(page) {
             let frag = self.frags[index];
             let unit = &self.laid[frag.item].units[frag.unit];
-            let distance = gap(y, frag.y, unit.height);
+            let item = &self.items[frag.item];
+            // and across for the columns of a grid and frames, which stand
+            // beside others
+            let dx = if item.placed() {
+                let (left, right) = item.edges(&self.settings);
+                gap(x, self.settings.margins.left + left, right - left)
+            } else {
+                0.0
+            };
+            let distance = gap(y, frag.y, unit.height) + dx;
             if best.is_none_or(|(_, least)| distance < least) {
                 best = Some((index, distance));
             }
@@ -175,7 +195,7 @@ impl Engine {
         if !(x.is_finite() && y.is_finite()) {
             return None;
         }
-        let frag_index = self.frag_near(page, y)?;
+        let frag_index = self.frag_near(page, x, y)?;
         Some((frag_index, self.box_near(frag_index, x, y)))
     }
 
@@ -243,6 +263,20 @@ impl Engine {
             let unit = &self.laid[frag.item].units[frag.unit];
             if frag.repeat || (unit.height == 0.0 && unit.texts.is_empty()) {
                 continue;
+            }
+            // in a grid, the caret stays in its column, and goes into the
+            // column under the goal
+            let candidate = &self.items[frag.item];
+            if candidate.beside(&self.items[item]) {
+                continue;
+            }
+            if let Some(column) = &candidate.column {
+                let entering = self.items[item].band() != Some(column.band);
+                let width = self.settings.content_width();
+                let under = column.at(goal - self.settings.margins.left, width);
+                if entering && column.index != under {
+                    continue;
+                }
             }
             if unit.texts.is_empty() {
                 // a table's caption isn't text to move through, and the

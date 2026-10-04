@@ -1,4 +1,6 @@
-import { tokenizer } from "../../markdown";
+import { DOMSerializer } from "prosemirror-model";
+
+import { parseMarker, readAtom, schema, tokenizer } from "../../markdown";
 import { normalizeTableHtml, rename } from "../../markdown/html";
 import { isSavableUrl } from "../../url";
 import {
@@ -6,6 +8,9 @@ import {
   HORIZONTAL_LINE_CLASS,
   PAGE_BREAK_CLASS,
   TABLE_HEADING_CLASS,
+  TOC_CLASS,
+  EMBED_CLASS,
+  FORM_CLASS,
 } from "./styleMap";
 
 // Turns the HTML mammoth makes of a .docx into HTML the markdown schema can
@@ -196,6 +201,69 @@ const emptyParagraphs = (doc: Document) => {
 };
 
 /**
+ * tocs turns the marker paragraphs of tables of contents (see toc.ts) into
+ * the element the schema reads one from. Before `links`: the entries of a
+ * table of contents are gone by then, and with them their links to the
+ * headings' bookmarks, which `links` would unwrap.
+ */
+const tocs = (doc: Document) => {
+  const serializer = DOMSerializer.fromSchema(schema);
+  doc.querySelectorAll(`p.${TOC_CLASS}`).forEach((paragraph) => {
+    const atom = readAtom(paragraph.textContent ?? "");
+    if (atom) {
+      const node = schema.nodes[atom.node].create(atom.attrs);
+      paragraph.replaceWith(serializer.serializeNode(node, { document: doc }));
+    } else {
+      paragraph.remove();
+    }
+  });
+};
+
+/**
+ * forms turns the marker paragraphs of forms (see forms.ts) into the
+ * elements the schema reads a form and its fields from, holding what came
+ * between them. Before `links`, as `tocs`.
+ */
+const forms = (doc: Document) => {
+  let form: HTMLElement | null = null;
+  let field: HTMLElement | null = null;
+  for (const node of [...doc.body.children]) {
+    if (!node.classList.contains(FORM_CLASS)) {
+      // what a field holds
+      field?.append(node);
+      continue;
+    }
+    const marker = parseMarker((node.textContent ?? "").trim());
+    if (marker?.name === "form" && !marker.close) {
+      form = doc.createElement("section");
+      form.dataset.blankForm = marker.args.def ?? "";
+      node.replaceWith(form);
+      field = null;
+    } else if (marker?.name === "field" && form) {
+      field = doc.createElement("div");
+      field.dataset.blankField = marker.args.name ?? "";
+      form.append(field);
+      node.remove();
+    } else {
+      form = field = null;
+      node.remove();
+    }
+  }
+};
+
+/**
+ * embeds turns the marker paragraphs of embeds (see embeds.ts) into the
+ * figures the schema reads embeds from, which check what they hold
+ */
+const embeds = (doc: Document) => {
+  for (const node of [...doc.querySelectorAll(`p.${EMBED_CLASS}`)]) {
+    const figure = doc.createElement("figure");
+    figure.dataset.blankEmbed = node.textContent ?? "";
+    node.replaceWith(figure);
+  }
+};
+
+/**
  * tightLists marks lists whose items are single paragraphs as tight, which
  * mammoth doesn't. Otherwise every imported list would be loose, with blank
  * lines between its items in the markdown.
@@ -214,6 +282,9 @@ const tightLists = (doc: Document) => {
  * @returns what had to change, for the warnings shown after the import
  */
 export const cleanup = (doc: Document): CleanupReport => {
+  tocs(doc);
+  forms(doc);
+  embeds(doc);
   codeLineBreaks(doc);
   const commentCount = comments(doc);
   const footnoteCount = footnotes(doc);

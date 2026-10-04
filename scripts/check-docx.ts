@@ -21,8 +21,11 @@ if (!input) {
   process.exit(2);
 }
 
-// the markdown parser reads HTML tables with the DOM, which bun doesn't have
-globalThis.DOMParser = new JSDOM().window.DOMParser;
+// the markdown parser reads HTML tables with the DOM, and the Word export's
+// fixes rewrite its XML with it, which bun doesn't have
+const { window } = new JSDOM();
+globalThis.DOMParser = window.DOMParser;
+globalThis.XMLSerializer = window.XMLSerializer;
 
 // the Word export fetches the fonts it embeds by their `?url` import, which
 // bun resolves to the file's path; fetch can't load a path, so read it

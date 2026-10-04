@@ -15,6 +15,7 @@
     "insert.image": "Mod-Alt-i",
     "insert.table": "Mod-t",
     "insert.page_break": "Mod-Enter",
+    "insert.block": "Mod-Alt-b",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",

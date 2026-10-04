@@ -12,6 +12,7 @@ import {
   readProperties,
   schema,
   setProperties,
+  settleForms,
   updateFrontmatter,
 } from "../../markdown";
 import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
@@ -115,7 +116,12 @@ export const importDocx = async (
   // refuses what isn't a Word document, or unpacks to too much
   readZipDirectory(bytes);
   const { default: mammoth } = await import("mammoth");
-  const { bytes: docx, properties, layout } = await prepareDocx(bytes);
+  const {
+    bytes: docx,
+    properties,
+    layout,
+    definitions,
+  } = await prepareDocx(bytes);
 
   const { value: html, messages } = await mammoth.convertToHtml(
     // the browser build of mammoth reads `arrayBuffer`, the Node build (in
@@ -158,7 +164,10 @@ export const importDocx = async (
     body,
     defaults,
   );
-  const doc = body.type.create({ frontmatter }, body.content);
+  // the forms as their definitions say, whatever a Word user did to them
+  const doc = settleForms(
+    body.type.create({ frontmatter, definitions }, body.content),
+  );
 
   const errors = messages
     .filter((message) => message.type === "error")

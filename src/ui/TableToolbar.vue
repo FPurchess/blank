@@ -41,7 +41,7 @@ const keepFocus = (event: MouseEvent) => {
   <div
     id="table-toolbar"
     ref="root"
-    class="table-toolbar"
+    class="toolbar table-toolbar"
     :class="{ keys: state.keys }"
     role="toolbar"
     aria-label="Table"

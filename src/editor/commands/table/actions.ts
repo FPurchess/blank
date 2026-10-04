@@ -297,6 +297,7 @@ export const tableActions = (
     group: "table",
     icon: "trash",
     label: () => "Delete table",
+    icon: "trash",
     key: { code: "Backspace", mod: true, label: isMac() ? "⌘⌫" : "Ctrl ⌫" },
     done: () => "Table deleted",
   }),

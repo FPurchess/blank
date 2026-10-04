@@ -281,30 +281,8 @@ body {
   }
 }
 
-// the page setup dialog, see src/ui/PageSetupDialog.vue
-.dialog.page-setup {
-  max-width: min(640px, calc(100% - 32px));
-
-  // the rules below set a display, which would show what is hidden
-  [hidden] {
-    display: none !important;
-  }
-
-  .body {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
-  }
-
-  .settings,
-  .text-editor {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-  }
-
+// a row of options in a dialog, see src/ui/components/OptionGroup.vue
+.dialog {
   .setting {
     display: flex;
     flex-direction: column;
@@ -334,6 +312,61 @@ body {
         opacity: 1;
       }
     }
+  }
+}
+
+// the block picker, see src/ui/BlockPicker.vue: a list of the blocks
+.dialog.block-picker {
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 6px 10px;
+    text-align: left;
+    border-color: transparent;
+
+    &:hover,
+    &:focus {
+      border-color: var(--color);
+    }
+
+    .description {
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+  }
+}
+
+// the page setup dialog, see src/ui/PageSetupDialog.vue
+.dialog.page-setup {
+  max-width: min(640px, calc(100% - 32px));
+
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
+  .body {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .settings,
+  .text-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
   }
 
   .custom {
@@ -893,8 +926,9 @@ $strip-height: 90px;
   }
 }
 
-// the toolbar of the table the cursor is in, see src/ui/TableToolbar.vue
-.table-toolbar {
+// the toolbars of the table the cursor is in (src/ui/TableToolbar.vue) and of
+// the content block it is in or on (src/ui/BlockToolbar.vue)
+.toolbar {
   position: fixed;
   // below .dialog-backdrop, so a dialog covers it
   z-index: 5;
@@ -1699,9 +1733,12 @@ body.band-editing #outline {
   }
 }
 
-// Ctrl (Cmd) + click opens the link under the pointer
+// Ctrl (Cmd) + click opens the link under the pointer, and a click on the
+// box of an empty image field the image dialog
 #page-view.follow-links,
-#page-view.follow-links .page-frame {
+#page-view.follow-links .page-frame,
+#page-view.on-picture,
+#page-view.on-picture .page-frame {
   cursor: pointer;
 }
 

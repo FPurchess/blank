@@ -480,6 +480,25 @@ export class LayoutEngine {
         return v1;
     }
     /**
+     * the page numbers of the entries of the table of contents at `pos`,
+     * as JSON (an array of strings, "" for an entry whose heading isn't
+     * there), or "null" for none
+     * @param {number} pos
+     * @returns {string}
+     */
+    tocNumbers(pos) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_tocNumbers(this.__wbg_ptr, pos);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * @param {number} font
      * @returns {number}
      */

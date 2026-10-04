@@ -1,11 +1,13 @@
 import type {
+  IFrameOptions,
   IParagraphOptions,
   ParagraphChild,
   INumberingOptions,
   Paragraph,
   Table,
+  TableOfContents,
 } from "docx";
-import type { Mark, Node } from "prosemirror-model";
+import type { Attrs, Mark, Node } from "prosemirror-model";
 
 import { type exporterFunc } from "../../exporters";
 import { fitBox } from "../../images/fit";
@@ -18,7 +20,29 @@ import { pageGeometry } from "../../layout/resolve";
 import { frontmatterOf } from "../../markdown";
 import { listStart } from "../../markdown/lists";
 import type { NodeName } from "../../markdown/schema";
-import { POINTS_PER_PIXEL } from "../../layout/units";
+import {
+  isListed,
+  type ListedHeading,
+  listedHeadings,
+} from "../../markdown/headings";
+import { unknownWarning } from "../../markdown/blocks/unknown";
+import { embedLabel, embedSrc } from "../../markdown/blocks/embeds";
+import {
+  definitionOf,
+  type Definitions,
+  docDefinitions,
+  type FieldDefinition,
+  fieldSpec,
+  type FramePlace,
+  type GridPlace,
+  isEmptyField,
+  type Place,
+  placesOf,
+  trackWidths,
+  usedDefinitions,
+} from "../../markdown";
+import { pageEngine } from "../../engine/engine";
+import { parseLength, POINTS_PER_PIXEL } from "../../layout/units";
 import {
   cellShare,
   hasTallRows,
@@ -29,6 +53,15 @@ import {
 import { documentFields } from "../../layout/bands";
 import { bandSections } from "./bands";
 import { fixPackage } from "./fixups";
+import {
+  type Control,
+  CONTROL_CLOSE,
+  CONTROL_OPEN,
+  embedTag,
+  fieldTag,
+  formTag,
+  GRID_TAG,
+} from "./forms";
 import { FRONTMATTER_PROPERTY } from "./properties";
 import {
   BLOCK_SPACING,
@@ -40,7 +73,9 @@ import {
   QUOTE_BORDER,
   QUOTE_INDENT,
   STYLE,
+  GRID_BORDERS,
   TABLE_BORDERS,
+  TOC_NAME,
   TABLE_CELL_MARGINS,
   TABLE_HEADER_BORDER,
   TABLE_HEADER_SHADING,
@@ -81,11 +116,44 @@ interface Position {
 
 const TOP: Position = { quotes: 0, inQuote: false, level: -1 };
 
-// a paragraph, or a table, which is a block of its own in Word
-type Block = IParagraphOptions | Table;
+// a paragraph, or what docx builds as a block of its own: a table, a table
+// of contents
+type Block = IParagraphOptions | Table | TableOfContents;
+
+// what the export knows of the tables of contents, in the order they come:
+// the page numbers of their entries as Blank laid them out, null where it
+// didn't; and the listed headings, which their entries link to
+interface TocContext {
+  numbers: (readonly string[] | null)[];
+  headings: ListedHeading[];
+}
+
+// the bookmark of the n-th listed heading, counted from 1
+const bookmarkOf = (n: number) => `_BlankToc${n}`;
 
 // Word measures images in pixels, and tables in twentieths of a point
 const twipsToPixels = (twips: number) => twips / 20 / POINTS_PER_PIXEL;
+
+/**
+ * tocClass returns docx's table of contents with the page numbers' tab stop
+ * at the right edge of the text, `width` twips: docx sets it for A4 with its
+ * default margins
+ */
+const tocClass = (docx: Docx, width: number) => {
+  // docx declares the method private, and calls it from its constructor
+  const Base = docx.TableOfContents as unknown as new (
+    ...args: ConstructorParameters<typeof docx.TableOfContents>
+  ) => object;
+  return class extends Base {
+    getTabStopsForLevel(level: number) {
+      return [
+        // docx's own, which clears Word's default tab of the style
+        { type: "clear", position: width + 1 - (level - 1) * 240 },
+        { type: "right", position: width, leader: "dot" },
+      ];
+    }
+  };
+};
 
 class Serializer {
   // the ordered list starts that need a numbering definition
@@ -93,8 +161,14 @@ class Serializer {
   // each list gets its own numbering instance, so it counts from its start
   private instances = 0;
   private imageCount = 0;
-  // the width of the text, in twentieths of a point
+  // the tables of contents and listed headings written so far
+  private tocCount = 0;
+  private listedCount = 0;
+  // the width of the text, or of the column of a grid being written, in
+  // twentieths of a point
   private contentWidth: number;
+  // where the text starts from the page's top edge, in twips
+  private contentTop: number;
   // the largest image that fits the page, or the cell being serialized, in
   // pixels at 96 dpi like Word
   private maxImageWidth: number;
@@ -103,10 +177,15 @@ class Serializer {
   constructor(
     private docx: Docx,
     private images: Map<string, PreparedImage>,
-    // the room for the text on the page, in points
-    content: { width: number; height: number },
+    // the room for the text on the page, and where it starts from the
+    // page's top edge, in points
+    content: { width: number; height: number; top?: number },
+    private tocs: TocContext = { numbers: [], headings: [] },
+    // the definitions of the document's forms, by their key
+    private definitions: Definitions = {},
   ) {
     this.contentWidth = twips(content.width);
+    this.contentTop = twips(content.top ?? 0);
     this.maxImageWidth = content.width / POINTS_PER_PIXEL;
     this.maxImageHeight = content.height / POINTS_PER_PIXEL;
   }
@@ -132,8 +211,15 @@ class Serializer {
     return left ? { indent: { left } } : {};
   }
 
-  isTable(block: Block): block is Table {
-    return block instanceof this.docx.Table;
+  /**
+   * isBuilt tells whether a block is one docx built: a table or a table of
+   * contents, which take no paragraph options
+   */
+  isBuilt(block: Block): block is Table | TableOfContents {
+    return (
+      block instanceof this.docx.Table ||
+      block instanceof this.docx.TableOfContents
+    );
   }
 
   /**
@@ -169,7 +255,7 @@ class Serializer {
       const converted = this.block(node, position);
       if (pageBreak && converted.length) {
         const [first] = converted;
-        if (this.isTable(first)) blocks.push(newPage());
+        if (this.isBuilt(first)) blocks.push(newPage());
         else converted[0] = { ...first, pageBreakBefore: true };
         pageBreak = false;
       }
@@ -184,18 +270,29 @@ class Serializer {
     const name = node.type.name as NodeName;
 
     switch (name) {
-      case "heading":
+      case "heading": {
+        // a listed heading is a bookmark the tables of contents link to
+        const bookmark =
+          this.tocs.numbers.length > 0 &&
+          position === TOP &&
+          isListed(node, true)
+            ? bookmarkOf(++this.listedCount)
+            : null;
+        const children = this.inline(node);
         return [
           {
             heading:
               HeadingLevel[
                 `HEADING_${node.attrs.level as 1 | 2 | 3 | 4 | 5 | 6}`
               ],
-            children: this.inline(node),
+            children: bookmark
+              ? [new this.docx.Bookmark({ id: bookmark, children })]
+              : children,
             ...this.decoration(position, false),
             ...this.indent(position),
           },
         ];
+      }
 
       case "paragraph":
         return [
@@ -236,14 +333,26 @@ class Serializer {
       case "table":
         return this.table(node, position);
 
-      // blocks() turns page breaks into "page break before"; the others are
-      // never blocks of their own, but written by the block they are in
+      case "toc":
+        return this.toc(node);
+
+      case "form_block":
+        return this.form(node);
+
+      case "embed":
+        return this.embed(node);
+
+      // blocks() turns page breaks into "page break before"; Word gets
+      // nothing of a block Blank can't show (see unknownWarning); the others
+      // are never blocks of their own, but written by the block they are in
       case "page_break":
+      case "unknown_block":
       case "doc":
       case "list_item":
       case "table_row":
       case "table_cell":
       case "table_header":
+      case "form_field":
       case "text":
       case "image":
       case "hard_break":
@@ -255,6 +364,289 @@ class Serializer {
         return unhandled;
       }
     }
+  }
+
+  /**
+   * toc writes a table of contents as Word's own: its title, then a TOC field
+   * of the headings up to its depth, linked to them, with the entries and
+   * page numbers Blank laid out as its result. Word shows them until the
+   * field is updated, which numbers the pages as Word lays them out.
+   */
+  private toc(node: Node): Block[] {
+    const depth = node.attrs.depth as number;
+    const title = node.attrs.title as string;
+    const numbers = this.tocs.numbers[this.tocCount++] ?? null;
+    const entries = this.tocs.headings
+      .map((heading, index) => ({
+        ...heading,
+        bookmark: bookmarkOf(index + 1),
+      }))
+      .filter((heading) => heading.level <= depth)
+      .map(({ level, text, bookmark }, entry) => {
+        const page = numbers?.[entry];
+        return {
+          title: text,
+          level,
+          href: bookmark,
+          // a roman number is text, which docx writes as it is
+          ...(page ? { page: page as unknown as number } : {}),
+        };
+      });
+    const Toc = tocClass(this.docx, this.contentWidth);
+    const toc = new Toc(TOC_NAME, {
+      hyperlink: true,
+      headingStyleRange: `1-${depth}`,
+      cachedEntries: entries,
+      // Word shows these entries as they are, without asking to update
+      beginDirty: false,
+    }) as unknown as TableOfContents;
+    return title
+      ? [
+          { style: STYLE.tocHeading, children: [new this.docx.TextRun(title)] },
+          toc,
+        ]
+      : [toc];
+  }
+
+  /**
+   * form writes a form as Word's content controls (see ./forms.ts): one for
+   * the form, which starts a new page if its template says so, holding one
+   * for each field, which says its placeholder while it's empty. Without
+   * its definition, a form is the blocks it holds.
+   */
+  private form(node: Node): Block[] {
+    const def = node.attrs.def as string;
+    const definition = definitionOf(this.definitions, def);
+    const places = placesOf(definition?.layout);
+    const flowTop = parseLength(definition?.flowTop);
+    const blocks: Block[] = [];
+    // the columns of the band of a grid being written
+    let band: { place: GridPlace; columns: Block[][] } | null = null;
+    const flush = () => {
+      if (band) blocks.push(...this.grid(band.place, band.columns));
+      band = null;
+    };
+    let flowing = false;
+    node.forEach((field) => {
+      const spec = fieldSpec(definition, field);
+      const place = definition && spec ? places.get(spec.name) : undefined;
+      const grid = place?.kind === "grid" ? place : undefined;
+      if (band && band.place.band !== grid?.band) flush();
+      let written = this.field(field, spec, place);
+      // the first field in the flow starts where its template says, below
+      // its frames
+      if (place?.kind !== "frame" && !flowing) {
+        flowing = true;
+        if (flowTop) written = this.startAt(written, flowTop);
+      }
+      if (grid) {
+        band ??= { place: grid, columns: grid.tracks.map(() => []) };
+        band.columns[grid.column].push(...written);
+      } else blocks.push(...written);
+    });
+    flush();
+    if (!definition) return blocks;
+    const form = this.control({
+      tag: formTag(def),
+      alias: definition.name,
+      group: true,
+    });
+    return [
+      definition.newPage ? { ...form, pageBreakBefore: true } : form,
+      ...blocks,
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * startAt returns `blocks` with the first paragraph that isn't a marker
+   * starting `top` points below the page's top edge, on a page it starts
+   */
+  private startAt(blocks: Block[], top: number): Block[] {
+    const first = blocks.findIndex(
+      (block) => !this.isBuilt(block) && block.style !== CONTROL_OPEN,
+    );
+    if (first < 0) return blocks;
+    const block = blocks[first] as IParagraphOptions;
+    const before = Math.max(0, twips(top) - this.contentTop);
+    return blocks.map((other, index) =>
+      index === first
+        ? { ...block, spacing: { ...block.spacing, before } }
+        : other,
+    );
+  }
+
+  /**
+   * field writes a field of a form: its blocks in a content control named
+   * by its label, which says its placeholder while it's empty; in the
+   * column of a grid at `place`, with images that fit it. Without its
+   * definition, a field is its blocks.
+   */
+  private field(field: Node, spec?: FieldDefinition, place?: Place): Block[] {
+    // in a column or a frame, its tables and images are as wide as it is
+    const outer = [this.contentWidth, this.maxImageWidth];
+    if (place) {
+      this.contentWidth =
+        place.kind === "grid"
+          ? this.columnWidths(place)[place.column]
+          : twips(place.width);
+      this.maxImageWidth = twipsToPixels(this.contentWidth);
+    }
+    const built = this.blocks(field, TOP);
+    [this.contentWidth, this.maxImageWidth] = outer;
+    // in a frame, every paragraph is: Word draws them in one
+    const frame = place?.kind === "frame" ? this.frameOf(place) : undefined;
+    const content = frame
+      ? built.map((block) =>
+          this.isBuilt(block) ? block : { ...block, frame },
+        )
+      : built;
+    if (!spec) return content;
+    const placeholder =
+      isEmptyField(field, spec) &&
+      !!spec.placeholder &&
+      !this.isBuilt(content[0]);
+    if (placeholder) {
+      content[0] = {
+        ...content[0],
+        children: [
+          new this.docx.TextRun({
+            text: spec.placeholder,
+            style: STYLE.placeholder,
+          }),
+        ],
+      };
+    }
+    return [
+      this.control({
+        tag: fieldTag(spec.name),
+        alias: spec.label,
+        placeholder,
+      }),
+      ...content,
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * frameOf returns the frame of Word's paragraphs at `place`, on the page
+   */
+  private frameOf(place: FramePlace): IFrameOptions {
+    const { FrameAnchorType, HeightRule } = this.docx;
+    return {
+      type: "absolute",
+      position: { x: twips(place.x), y: twips(place.y) },
+      width: twips(place.width),
+      height: twips(place.height),
+      rule: place.height ? HeightRule.ATLEAST : HeightRule.AUTO,
+      anchor: {
+        horizontal: FrameAnchorType.PAGE,
+        vertical: FrameAnchorType.PAGE,
+      },
+    };
+  }
+
+  /**
+   * columnWidths returns the widths of the columns of the band of a grid at
+   * `place`, in twips, as the layout engine works them out
+   */
+  private columnWidths(place: GridPlace) {
+    return trackWidths(place.tracks, twips(place.gap), this.contentWidth).map(
+      Math.round,
+    );
+  }
+
+  /**
+   * grid writes the band of a grid, the columns side by side, as a table
+   * without lines of one row, in a content control the import knows it by:
+   * Word has no columns that end where a block does
+   */
+  private grid(place: GridPlace, columns: Block[][]): Block[] {
+    const {
+      Paragraph,
+      Table,
+      TableRow,
+      TableCell,
+      TableLayoutType,
+      WidthType,
+    } = this.docx;
+    const gap = twips(place.gap);
+    const widths = this.columnWidths(place);
+    const last = columns.length - 1;
+    // the room between columns, half on each side of it
+    const margins = (index: number) => ({
+      top: 0,
+      bottom: 0,
+      left: index > 0 ? Math.round(gap / 2) : 0,
+      right: index < last ? Math.round(gap / 2) : 0,
+    });
+    // a cell is as wide as its column and its margins
+    const outer = widths.map((width, index) => {
+      const { left, right } = margins(index);
+      return width + left + right;
+    });
+    const cells = columns.map(
+      (blocks, index) =>
+        new TableCell({
+          // a cell ends with a paragraph, which the import leaves out
+          children: [
+            ...blocks.map((block) =>
+              this.isBuilt(block) ? block : new Paragraph(block),
+            ),
+            new Paragraph({}),
+          ],
+          width: { size: outer[index], type: WidthType.DXA },
+          margins: margins(index),
+        }),
+    );
+    const table = new Table({
+      rows: [new TableRow({ children: cells })],
+      width: { size: this.contentWidth, type: WidthType.DXA },
+      columnWidths: outer,
+      layout: TableLayoutType.FIXED,
+      borders: GRID_BORDERS,
+    });
+    return [
+      this.control({ tag: GRID_TAG, alias: "Grid" }),
+      table,
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * embed writes an embed as a picture of its drawing, at the width it
+   * says, in a content control the import knows it by (see ./forms.ts)
+   */
+  private embed(node: Node): Block[] {
+    const label = embedLabel(node);
+    const image = this.images.get(embedSrc(node));
+    const points = parseLength(node.attrs.width);
+    // as wide as it says, in pixels, as tall as its drawing has it then
+    const wanted =
+      image && points
+        ? {
+            width: points / POINTS_PER_PIXEL,
+            height: (image.height * points) / POINTS_PER_PIXEL / image.width,
+          }
+        : image;
+    const picture = image
+      ? this.picture(image, wanted!, label)
+      : new this.docx.TextRun({ text: label, italics: true });
+    return [
+      this.control({ tag: embedTag(node.attrs.id as string), alias: label }),
+      { children: [picture] },
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * control returns the marker paragraph where a content control opens
+   */
+  private control(control: Control): Block {
+    return {
+      style: CONTROL_OPEN,
+      children: [new this.docx.TextRun(JSON.stringify(control))],
+    };
   }
 
   private list(node: Node, position: Position): Block[] {
@@ -297,7 +689,7 @@ class Serializer {
     });
     // a list is spaced from the next block like a paragraph, also when it is tight
     const last = blocks[blocks.length - 1];
-    if (position.level < 0 && last && !this.isTable(last)) {
+    if (position.level < 0 && last && !this.isBuilt(last)) {
       blocks[blocks.length - 1] = {
         ...last,
         spacing: { ...last.spacing, after: BLOCK_SPACING },
@@ -380,7 +772,7 @@ class Serializer {
 
     const align = cell.node.attrs.align as "left" | "center" | "right" | null;
     return blocks.map((block, index) =>
-      this.isTable(block)
+      this.isBuilt(block)
         ? block
         : new this.docx.Paragraph({
             ...block,
@@ -443,25 +835,38 @@ class Serializer {
   }
 
   private image(node: Node): ParagraphChild {
-    const { ImageRun, TextRun } = this.docx;
     const src = node.attrs.src as string;
     const alt = node.attrs.alt as string | null;
     const title = node.attrs.title as string | null;
     const image = this.images.get(src);
-    if (!image) return new TextRun({ text: alt || src, italics: true });
+    if (!image)
+      return new this.docx.TextRun({ text: alt || src, italics: true });
+    return this.picture(image, image, alt ?? "", title ?? "");
+  }
 
-    const size = fitBox(image, this.maxImageWidth, this.maxImageHeight);
-    return new ImageRun({
+  /**
+   * picture returns `image` as Word's picture, `size` (in pixels) fitted to
+   * the page or the cell being written, with what it shows for screen
+   * readers
+   */
+  private picture(
+    image: PreparedImage,
+    size: { width: number; height: number },
+    description: string,
+    title = "",
+  ): ParagraphChild {
+    const fitted = fitBox(size, this.maxImageWidth, this.maxImageHeight);
+    return new this.docx.ImageRun({
       type: IMAGE_TYPES[image.mime as keyof typeof IMAGE_TYPES],
       data: image.bytes,
       transformation: {
-        width: Math.round(size.width),
-        height: Math.round(size.height),
+        width: Math.round(fitted.width),
+        height: Math.round(fitted.height),
       },
       altText: {
         name: `image-${++this.imageCount}`,
-        description: alt ?? "",
-        title: title ?? "",
+        description,
+        title,
       },
     });
   }
@@ -491,22 +896,64 @@ const linkOf = (node: Node) => {
  * block and the space before the next one. A table has no space after it, so
  * the block after a table gets it before.
  */
-const spaceTopLevel = (blocks: Block[], serializer: Serializer) =>
-  blocks.map((block, index) => {
-    if (serializer.isTable(block)) return block;
-    const previous = blocks[index - 1];
+const spaceTopLevel = (blocks: Block[], serializer: Serializer) => {
+  // the markers of content controls go, and paragraphs in frames stand
+  // outside the flow, so neither is the previous block
+  const aside = (block: Block) =>
+    !serializer.isBuilt(block) &&
+    (block.style === CONTROL_OPEN ||
+      block.style === CONTROL_CLOSE ||
+      !!block.frame);
+  let previous: Block | undefined;
+  return blocks.map((block) => {
+    if (aside(block)) return block;
+    const last = previous;
+    previous = block;
+    // a block placed on its page keeps its space, see startAt
+    if (serializer.isBuilt(block) || block.spacing?.before !== undefined) {
+      return block;
+    }
     const before =
-      index === 0
+      last === undefined
         ? 0
-        : serializer.isTable(previous)
+        : serializer.isBuilt(last)
           ? BLOCK_SPACING
-          : block.heading && previous.heading
+          : block.heading && last.heading
             ? HEADING_AFTER_HEADING_SPACING
             : undefined;
     return before === undefined
       ? block
       : { ...block, spacing: { ...block.spacing, before } };
   });
+};
+
+/**
+ * embedsOf returns the attributes of the embeds of `doc`, by their ids
+ */
+const embedsOf = (doc: Node) => {
+  const embeds: Record<string, Attrs> = {};
+  doc.forEach((node) => {
+    if (node.type.name === "embed")
+      embeds[node.attrs.id as string] = node.attrs;
+  });
+  return embeds;
+};
+
+/**
+ * tocContext returns what the export needs of the tables of contents of
+ * `doc`: their page numbers, from the page view's engine, which lays the
+ * rest of a long document out first; and the listed headings, if there is a
+ * table of contents at all
+ */
+const tocContext = (doc: Node): TocContext => {
+  const numbers: TocContext["numbers"] = [];
+  doc.forEach((node, pos) => {
+    if (node.type.name !== "toc") return;
+    pageEngine?.finish();
+    numbers.push(pageEngine?.tocNumbers(pos) ?? null);
+  });
+  return { numbers, headings: numbers.length ? listedHeadings(doc) : [] };
+};
 
 const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const docx = await import("docx");
@@ -515,11 +962,14 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
     prepareImages(state.doc, docPath, [...EMBEDDABLE]),
   ]);
 
-  const { contentWidth, contentHeight } = pageGeometry(layout);
-  const serializer = new Serializer(docx, images, {
-    width: contentWidth,
-    height: contentHeight,
-  });
+  const { contentWidth, contentHeight, margins } = pageGeometry(layout);
+  const serializer = new Serializer(
+    docx,
+    images,
+    { width: contentWidth, height: contentHeight, top: margins.top },
+    tocContext(state.doc),
+    docDefinitions(state.doc),
+  );
   const blocks = spaceTopLevel(serializer.blocks(state.doc, TOP), serializer);
 
   const frontmatter = frontmatterOf(state.doc);
@@ -562,7 +1012,7 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
         },
         ...bands,
         children: blocks.map((block) =>
-          serializer.isTable(block) ? block : new docx.Paragraph(block),
+          serializer.isBuilt(block) ? block : new docx.Paragraph(block),
         ),
       },
     ],
@@ -570,8 +1020,17 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
 
   const contents = await docx.Packer.pack(document, "uint8array");
   return {
-    contents: await fixPackage(contents),
-    warnings: failureWarning(failures),
+    contents: await fixPackage(contents, {
+      definitions: usedDefinitions(state.doc),
+      embeds: embedsOf(state.doc),
+    }),
+    warnings: [
+      ...failureWarning(failures),
+      ...unknownWarning(state.doc, {
+        one: "was left out",
+        more: "were left out",
+      }),
+    ],
   };
 };
 

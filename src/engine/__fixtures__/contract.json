@@ -8,6 +8,7 @@
       "style": "h1",
       "level": 1,
       "top": true,
+      "listed": true,
       "indent": 0,
       "before": 0,
       "after": 5,
@@ -304,6 +305,161 @@
       "after": 8,
       "bars": [],
       "barsContinue": false
+    },
+    {
+      "kind": "toc",
+      "pos": 166,
+      "title": "Contents",
+      "depth": 2,
+      "entries": [
+        {
+          "level": 1,
+          "text": "Chapter"
+        }
+      ],
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "boxed",
+      "pos": 167,
+      "label": "Blank can't show this block (chart@3) and keeps it as it is",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "image",
+      "pos": 168,
+      "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%2260%22%2F%3E",
+      "width": 170.07874015748033,
+      "height": 113.38582677165354,
+      "alt": "A sketch",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 172,
+      "text": "Ann Example",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false,
+      "frame": {
+        "x": 56.69291338582678,
+        "y": 127.55905511811025,
+        "width": 240.9448818897638,
+        "start": true
+      },
+      "pageStart": true
+    },
+    {
+      "kind": "text",
+      "pos": 185,
+      "text": "Long Street 12",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false,
+      "frame": {
+        "x": 56.69291338582678,
+        "y": 127.55905511811025,
+        "width": 240.9448818897638
+      }
+    },
+    {
+      "kind": "text",
+      "pos": 203,
+      "text": "",
+      "spans": [],
+      "style": "h1",
+      "level": 1,
+      "top": true,
+      "hint": "A title",
+      "indent": 0,
+      "before": 16,
+      "after": 5,
+      "bars": [],
+      "barsContinue": false,
+      "flowTop": 255.1181102362205
+    },
+    {
+      "kind": "text",
+      "pos": 207,
+      "text": "",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "hint": "A photo",
+      "picture": true,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false,
+      "column": {
+        "index": 0,
+        "tracks": [
+          {
+            "pt": 113.38582677165356,
+            "fr": 0
+          },
+          {
+            "pt": 0,
+            "fr": 1
+          }
+        ],
+        "gap": 17.007874015748033,
+        "start": true
+      }
+    },
+    {
+      "kind": "text",
+      "pos": 211,
+      "text": "a note",
+      "spans": [],
+      "style": "p",
+      "level": 0,
+      "top": false,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false,
+      "column": {
+        "index": 1,
+        "tracks": [
+          {
+            "pt": 113.38582677165356,
+            "fr": 0
+          },
+          {
+            "pt": 0,
+            "fr": 1
+          }
+        ],
+        "gap": 17.007874015748033
+      }
     }
   ],
   "settings": {

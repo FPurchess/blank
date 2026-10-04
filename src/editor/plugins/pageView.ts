@@ -48,7 +48,7 @@ import { displaySrc } from "./images";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { tableGrid } from "../../exporters/table";
-import type { FrozenWidths } from "../../engine/flatten";
+import { type FrozenWidths, headingsSignature } from "../../engine/flatten";
 import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
@@ -226,6 +226,27 @@ export const frozenWidths = (
   return { pos: table.pos, widths: tableGrid(table.node).widths };
 };
 
+// the headings each engine's tables of contents listed when it last laid
+// them out, see tocBlocks
+const listedHeadings = new WeakMap<PageEngine, string>();
+
+/**
+ * tocBlocks returns the tables of contents of `doc` to lay out again: all of
+ * them when the headings they list changed since `engine` last laid them out,
+ * as they depend on blocks other than themselves, else none
+ */
+const tocBlocks = (engine: PageEngine, doc: Node): number[] => {
+  const tocs: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    if (block.type.name === "toc") tocs.push(index);
+  });
+  if (tocs.length === 0) return tocs;
+  const signature = headingsSignature(doc);
+  if (listedHeadings.get(engine) === signature) return [];
+  listedHeadings.set(engine, signature);
+  return tocs;
+};
+
 /**
  * sync hands the engine what changed in the document, and the page
  * @param blocks top-level blocks to flatten again, e.g. once their image
@@ -248,7 +269,7 @@ const sync = (
   const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
-    blocks,
+    blocks: [...new Set([...blocks, ...tocBlocks(engine, state.doc)])],
     changes: tracked?.from
       ? { from: tracked.from, ranges: tracked.ranges }
       : null,

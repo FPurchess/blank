@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import {
+  blockPicker,
+  blockToolbar,
   contextMenu,
   imageDialog,
   linkDialog,
   pageSetup,
   tablePicker,
   tableToolbar,
+  tocDialog,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
+import BlockPicker from "./BlockPicker.vue";
+import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
@@ -19,6 +24,7 @@ import PageView from "./PageView.vue";
 import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
+import TocDialog from "./TocDialog.vue";
 import TopBar from "./TopBar.vue";
 import UiTooltip from "./UiTooltip.vue";
 
@@ -35,6 +41,7 @@ import UiTooltip from "./UiTooltip.vue";
   <BottomBar />
   <DocumentOutline />
   <TableHandles />
+  <BlockToolbar v-if="blockToolbar" :state="blockToolbar" />
   <TableToolbar v-if="tableToolbar" :state="tableToolbar" />
   <TablePicker v-if="tablePicker" :state="tablePicker" />
   <LinkDialog
@@ -52,6 +59,12 @@ import UiTooltip from "./UiTooltip.vue";
     :key="keyOf(pageSetup)"
     :request="pageSetup"
   />
+  <BlockPicker
+    v-if="blockPicker"
+    :key="keyOf(blockPicker)"
+    :request="blockPicker"
+  />
+  <TocDialog v-if="tocDialog" :key="keyOf(tocDialog)" :request="tocDialog" />
   <ContextMenu
     v-if="contextMenu"
     :key="keyOf(contextMenu.close)"

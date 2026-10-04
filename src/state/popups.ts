@@ -22,19 +22,24 @@ export interface TablePickerState {
 // tablePicker is the open picker for the size of a new table, or null
 export const tablePicker = shallowRef<TablePickerState | null>(null);
 
-export interface TableToolbarItem {
+// a button of a toolbar
+export interface ToolbarItem {
   id: string;
   label: string;
   // the name of its icon, see src/icons.ts
   icon: string;
-  // its key in table mode, e.g. "↑"
-  key: string;
-  // buttons of one group sit together
-  group: string;
   enabled: boolean;
   // for buttons that switch something on and off
   checked?: boolean;
+  // its key in table mode, e.g. "↑"
+  key?: string;
   run(): void;
+}
+
+export interface TableToolbarItem extends ToolbarItem {
+  key: string;
+  // buttons of one group sit together
+  group: string;
 }
 
 export interface TableToolbarState {
@@ -53,6 +58,18 @@ export interface TableToolbarState {
 
 // tableToolbar is the toolbar of the table the cursor is in, or null
 export const tableToolbar = shallowRef<TableToolbarState | null>(null);
+
+export interface BlockToolbarState {
+  // the box of the block, in viewport coordinates, which the toolbar sits on
+  anchor: { left: number; top: number; bottom: number; right: number };
+  // what the block is, e.g. "Recipe", for screen readers
+  label: string;
+  items: ToolbarItem[];
+}
+
+// blockToolbar is the toolbar of the content block the cursor is in (a
+// form) or on (a table of contents), or null
+export const blockToolbar = shallowRef<BlockToolbarState | null>(null);
 
 // a point in the window, in viewport coordinates, e.g. where the mouse is
 export interface Point {

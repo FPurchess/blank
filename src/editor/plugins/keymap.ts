@@ -13,7 +13,7 @@ import {
   wrapInList,
   splitListItem,
 } from "prosemirror-schema-list";
-import { schema } from "../../markdown";
+import { fieldAt, schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import {
@@ -45,6 +45,7 @@ import { inCell } from "./tables/util";
 import { normalizeBinding } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
+import { chooseBlock } from "../commands/contentBlocks";
 
 export { normalizeBinding };
 
@@ -56,6 +57,15 @@ const outsideCells =
   (command: Command): Command =>
   (state, dispatch, view) =>
     !inCell(state.selection.$from) && command(state, dispatch, view);
+
+/**
+ * outsideForms runs `command` only outside forms, whose fields can't hold
+ * page breaks
+ */
+const outsideForms =
+  (command: Command): Command =>
+  (state, dispatch, view) =>
+    !fieldAt(state.selection.$from) && command(state, dispatch, view);
 
 const heading = (level: number) =>
   outsideCells(setBlockType(schema.nodes.heading, { level }));
@@ -81,9 +91,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   ),
   [CommandIdentifier.INSERT_IMAGE]: editImage(),
   [CommandIdentifier.INSERT_TABLE]: tableKey(),
-  [CommandIdentifier.INSERT_PAGE_BREAK]: outsideCells(
-    insertBlock(schema.nodes.page_break),
+  [CommandIdentifier.INSERT_PAGE_BREAK]: outsideForms(
+    outsideCells(insertBlock(schema.nodes.page_break)),
   ),
+  [CommandIdentifier.INSERT_BLOCK]: chooseBlock(),
   // the lines of a code block first, then list items
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
     indentCode,

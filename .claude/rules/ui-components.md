@@ -52,6 +52,8 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 | `components/BaseDialog.vue` | a modal dialog: backdrop, titled form (`formClass` for its own styles), Esc and backdrop cancel, Tab kept inside, `actions` slot for its buttons |
 | `components/TextField.vue` | a labelled text field with an optional hint, `v-model`, and a slot for a button next to it |
 | `components/OptionGroup.vue` | a labelled row of option buttons with one in the tab order: a radio group for a value, toggle buttons for a list of values (`v-model`); ←→ Home End move, the logic in `optionGroupModel.ts` |
+| `BlockPicker.vue` | the block picker (`Mod-Alt-b`): the content blocks to insert, ↑↓ between them |
+| `TocDialog.vue` | the dialog of a table of contents: its depth (an `OptionGroup`, `tocDialogModel.ts`) and title |
 | `DocumentOutline.vue`, `OutlineEntry.vue` | the outline: the headings as dashes at the right edge, the list floating over the pages or open beside them, one entry; where it shows in `outlineModel.ts`, which heading it marks in `readingLine.ts` (shared with the page counter in `PageStatus.vue`) |
 | `BandStrips.vue`, `BandEdge.vue`, `BandEditor.vue`, `SlotField.vue`, `SlotText.vue` | the header and footer strips: both edges and the open strip, one edge at rest, the open strip (its logic in `src/bandStrip.ts`), a slot's ProseMirror editor, a slot as it prints; constants and `shownAtRest` in `bandStripsModel.ts` |
 | `composables/useBodyClass.ts` | a class on the body while a condition holds, taken away when the component goes |

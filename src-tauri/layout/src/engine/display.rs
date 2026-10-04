@@ -6,7 +6,7 @@ use parley::Alignment;
 use super::Engine;
 use crate::bands::{BAND_DISTANCE, BAND_LINE};
 use crate::fonts::{Fonts, INK_CODE};
-use crate::items::{Deco, Role};
+use crate::items::{leaders, Deco, Role};
 use crate::model::{Content, Text, TextKind};
 use crate::style::BAR;
 use crate::text::{GlyphRun, TextBox};
@@ -77,12 +77,24 @@ pub enum Part {
         text: usize,
         link: usize,
     },
+    /// the page number of a table of contents' entry
+    TocNumber { item: usize, entry: usize },
+    /// the link of a table of contents' entry to its heading
+    TocLink { item: usize, entry: usize },
+    /// what only the screen shows, as what an empty table of contents will
+    /// hold or the placeholder of an empty field: the PDF leaves it out
+    Hint { item: usize },
     /// the header or the footer of the page
     Band { footer: bool },
     /// a table's header rows, repeated on a page the table goes on: they
     /// are in the structure once, where they first are
     Repeat,
 }
+
+/// the start of the link of a table of contents' entry, followed by the
+/// entry's number: the PDF makes it a link to the heading, and the editor
+/// scrolls to it
+pub const TOC_LINK: &str = "#toc:";
 
 impl Engine {
     /// what a page shows: its text, decorations, images, links and, with
@@ -139,7 +151,13 @@ impl Engine {
                             }),
                         _ => Part::Image { item: frag.item },
                     },
-                    Deco::Rect { .. } => Part::Decoration,
+                    // the box of a picture to come is the screen's only
+                    Deco::Rect { .. } => match &item.content {
+                        Content::Text(text) if text.picture && text.text.is_empty() => {
+                            Part::Hint { item: frag.item }
+                        }
+                        _ => Part::Decoration,
+                    },
                 };
                 let part = if frag.repeat && part != Part::Decoration {
                     Part::Repeat
@@ -152,15 +170,19 @@ impl Engine {
             if !item.bars.is_empty() {
                 let mut height = unit.height;
                 let last_unit = frag.unit + 1 == laid.units.len();
-                if index + 1 < range.end {
-                    let next = self.frags[index + 1];
+                // not to another column of a grid, which stands beside it
+                let next = (index + 1 < range.end)
+                    .then(|| self.frags[index + 1])
+                    .filter(|next| !item.beside(&self.items[next.item]));
+                if let Some(next) = next {
                     if !last_unit || item.bars_continue {
                         height = next.y - frag.y;
                     }
                 }
+                let column = item.edges(&self.settings).0;
                 for bar in &item.bars {
                     let op = Op::Rect {
-                        x: left + bar,
+                        x: left + column + bar,
                         y: frag.y,
                         w: BAR,
                         h: height,
@@ -175,13 +197,19 @@ impl Engine {
                     push_text_ops(&mut ops, &self.fonts, marker, 0, dx, dy, Role::Text, part);
                 }
                 if let Some(label) = &laid.label {
-                    // a table's caption is text; an image's alt text a hint
-                    let role = if matches!(item.content, Content::Table { .. }) {
-                        Role::Text
-                    } else {
-                        Role::Hint
+                    // a table's caption and a table of contents' title
+                    // are text; an image's alt text a hint
+                    let role =
+                        if matches!(item.content, Content::Table { .. } | Content::Toc { .. }) {
+                            Role::Text
+                        } else {
+                            Role::Hint
+                        };
+                    // what an empty text says is the screen's only
+                    let part = match item.content {
+                        Content::Text(_) => Part::Hint { item: frag.item },
+                        _ => Part::Label { item: frag.item },
                     };
-                    let part = Part::Label { item: frag.item };
                     for line in 0..label.line_count() {
                         push_text_ops(&mut ops, &self.fonts, label, line, dx, dy, role, part);
                     }
@@ -209,11 +237,51 @@ impl Engine {
                     }
                 }
             }
-            // the list markers and alt texts in a table's cells
+            // a table of contents' page number and the link to its heading
+            // a table of contents' entry: its page number, the dots up to
+            // it and its link to the heading, once the heading is placed
+            let entry = laid.toc.as_ref().and_then(|toc| {
+                let entry = toc.entry_at(frag.unit)?;
+                let label = self.toc_labels(frag.item)?.get(entry)?;
+                let boxed = self.number_box(label, toc.entries[entry].style)?;
+                Some((toc, entry, boxed))
+            });
+            if let Some((toc, entry, boxed)) = entry {
+                let line = &toc.entries[entry];
+                let baseline = boxed.lines().first().map_or(0.0, |info| info.baseline);
+                // the number's left, in the item's coordinates
+                let left = toc.x + toc.width - boxed.layout.width();
+                for dot in leaders(line, left) {
+                    ops.push((deco_op(dot.moved(dx, dy)), Part::Decoration));
+                }
+                let (x, y) = (dx + left - boxed.x, dy + line.baseline - baseline - boxed.y);
+                let part = Part::TocNumber {
+                    item: frag.item,
+                    entry,
+                };
+                push_text_ops(&mut ops, &self.fonts, boxed, 0, x, y, Role::Text, part);
+                let start = laid.extras.get(entry).map_or(toc.x, |(text, _)| text.x);
+                let link = Op::Link {
+                    href: format!("{TOC_LINK}{entry}"),
+                    x: dx + start,
+                    y: frag.y,
+                    w: toc.x + toc.width - start,
+                    h: unit.height,
+                };
+                let part = Part::TocLink {
+                    item: frag.item,
+                    entry,
+                };
+                ops.push((link, part));
+            }
+            // the list markers and alt texts in a table's cells, and the
+            // entries of a table of contents, or what an empty one will hold
             for extra in unit.extras.clone() {
                 let (boxed, role) = &laid.extras[extra];
                 let part = if frag.repeat {
                     Part::Repeat
+                } else if laid.toc.is_some() && *role == Role::Hint {
+                    Part::Hint { item: frag.item }
                 } else {
                     Part::Extra {
                         item: frag.item,
@@ -437,6 +505,122 @@ mod tests {
             .page_ops(0, false)
             .iter()
             .all(|op| !matches!(op, Op::Glyphs { .. })));
+    }
+
+    #[test]
+    fn shows_a_boxed_item_as_its_label_in_an_outline() {
+        let boxed = Item {
+            content: Content::Boxed {
+                pos: 1,
+                label: "Block Blank can't show".into(),
+            },
+            ..paragraph(0, "")
+        };
+        let mut engine = engine(vec![paragraph(3, "after"), boxed.clone()]);
+        engine.set_items(vec![boxed, paragraph(3, "after")]);
+        let ops = engine.page_ops(0, false);
+        let hint = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs {
+                    role: Role::Hint,
+                    run,
+                    text,
+                } => Some(text[run.glyphs[0].start as usize..].to_string()),
+                _ => None,
+            })
+            .unwrap();
+        assert!(hint.starts_with("Block"));
+        let outline = ops
+            .iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Op::Rect {
+                        role: Role::TableLine,
+                        ..
+                    }
+                )
+            })
+            .count();
+        assert_eq!(outline, 4);
+        // the label isn't text of the document: the item stands for one
+        // position, like a rule
+        assert!(engine.laid[0].texts.is_empty());
+        assert_eq!((engine.items[0].from(), engine.items[0].to()), (1, 2));
+        assert!(engine.laid[0].units[0].height > 16.0);
+    }
+
+    #[test]
+    fn says_what_an_empty_text_holds_on_the_screen_only() {
+        let mut empty = paragraph(1, "");
+        if let Content::Text(text) = &mut empty.content {
+            text.hint = Some("Recipe name".into());
+        }
+        let engine = engine(vec![empty]);
+        let hint: Vec<Part> = engine
+            .body_parts(0)
+            .into_iter()
+            .filter_map(|(op, part)| match op {
+                Op::Glyphs {
+                    role: Role::Hint, ..
+                } => Some(part),
+                _ => None,
+            })
+            .collect();
+        assert!(!hint.is_empty());
+        assert!(hint.iter().all(|part| *part == Part::Hint { item: 0 }));
+        // the caret is in the empty text, not in the hint
+        assert!(engine.laid[0].texts[0].empty());
+        // a hint that wraps takes the room it needs
+        let mut long = paragraph(1, "");
+        if let Content::Text(text) = &mut long.content {
+            text.hint = Some("word ".repeat(80));
+        }
+        let wrapped = super::super::test_support::engine(vec![long]);
+        let label = wrapped.laid[0].label.as_ref().unwrap();
+        assert!(label.line_count() > 1);
+        assert!(wrapped.laid[0].units[0].height >= label.height());
+        // a text that isn't empty says nothing more
+        let mut typed = paragraph(1, "Pancakes");
+        if let Content::Text(text) = &mut typed.content {
+            text.hint = Some("Recipe name".into());
+        }
+        assert!(super::super::test_support::engine(vec![typed]).laid[0]
+            .label
+            .is_none());
+    }
+
+    #[test]
+    fn shows_a_picture_to_come_as_a_box_on_the_screen_only() {
+        let mut empty = paragraph(1, "");
+        if let Content::Text(text) = &mut empty.content {
+            text.hint = Some("A photo of it".into());
+            text.picture = true;
+        }
+        let engine = engine(vec![empty]);
+        let width = engine.settings.content_width();
+        let laid = &engine.laid[0];
+        // as high as a picture would be, what it says in its middle
+        let height = laid.units[0].height;
+        assert!((height - (width * 0.6).min(220.0)).abs() < 0.01);
+        let label = laid.label.as_ref().unwrap();
+        assert!((label.y + label.height() / 2.0 - height / 2.0).abs() < 0.01);
+        let boxes: Vec<Part> = engine
+            .body_parts(0)
+            .into_iter()
+            .filter_map(|(op, part)| match op {
+                Op::Rect {
+                    role: Role::Placeholder,
+                    h,
+                    ..
+                } if (h - height).abs() < 0.01 => Some(part),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(boxes, vec![Part::Hint { item: 0 }]);
+        // the caret is in the empty text, at the box's top
+        assert!(laid.texts[0].empty());
     }
 
     #[test]

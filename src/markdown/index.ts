@@ -1,5 +1,8 @@
 import type { Node } from "prosemirror-model";
 
+import { definitionsSection, usedDefinitions } from "./blocks/definitions";
+import { settleForms } from "./blocks/forms";
+import type { BlocksEnv } from "./blocks/rules";
 import {
   frontmatterOf,
   joinFrontmatter,
@@ -24,6 +27,43 @@ export {
   updateFrontmatter,
 } from "./frontmatter";
 
+export {
+  closeMarker,
+  fenceFor,
+  formatMarker,
+  parseMarker,
+} from "./blocks/args";
+export { formatAtom, readAtom } from "./blocks/atoms";
+export {
+  createForm,
+  fieldAt,
+  fieldSpec,
+  fitForm,
+  formBlocks,
+  isEmptyField,
+  settleForms,
+} from "./blocks/forms";
+export {
+  checkDefinition,
+  type Definition,
+  definitionKey,
+  definitionOf,
+  type Definitions,
+  docDefinitions,
+  type FieldDefinition,
+  formDefinition,
+  readDefinition,
+  readDefinitionList,
+  usedDefinitions,
+  writeDefinitionList,
+} from "./blocks/definitions";
+export {
+  type FramePlace,
+  type GridPlace,
+  type Place,
+  placesOf,
+  trackWidths,
+} from "./blocks/layout";
 export { markdownParser } from "./parser";
 export { markdownSerializer } from "./serializer";
 export { tokenizer } from "./tokenizer";
@@ -35,15 +75,35 @@ export { tokenizer } from "./tokenizer";
  */
 export const parseMarkdown = (text: string): Node => {
   const { frontmatter, body } = splitFrontmatter(text);
-  const doc = markdownParser.parse(body);
-  return doc.type.create({ frontmatter }, doc.content);
+  const env: BlocksEnv = {};
+  const doc = markdownParser.parse(body, env);
+  // its forms as their definitions say, e.g. an empty title as a heading
+  return settleForms(
+    doc.type.create(
+      {
+        frontmatter,
+        definitions: env.blankDefinitions ?? {},
+        rawDefinitions: env.blankRawDefinitions ?? [],
+      },
+      doc.content,
+    ),
+  );
 };
 
 /**
  * serializeMarkdown writes a document as a markdown file, with its frontmatter
+ * and the definitions of its forms at its end
  */
-export const serializeMarkdown = (doc: Node): string =>
-  joinFrontmatter(frontmatterOf(doc), markdownSerializer.serialize(doc));
+export const serializeMarkdown = (doc: Node): string => {
+  const blocks = [
+    markdownSerializer.serialize(doc),
+    definitionsSection(
+      usedDefinitions(doc),
+      doc.attrs.rawDefinitions as readonly string[],
+    ),
+  ].filter(Boolean);
+  return joinFrontmatter(frontmatterOf(doc), blocks.join("\n\n"));
+};
 
 /**
  * firstHeading returns the text of the first heading, or "" if there is none

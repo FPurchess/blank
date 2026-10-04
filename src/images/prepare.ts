@@ -1,5 +1,6 @@
 import type { Node } from "prosemirror-model";
 
+import { embedLabel, embedSrc } from "../markdown/blocks/embeds";
 import { decodeSize, rasterize } from "./codec";
 import { loadImage } from "./load";
 import { type ImageMime, type Size, jpegOrientation, probeSize } from "./mime";
@@ -50,7 +51,8 @@ const prepare = async (
 };
 
 /**
- * prepareImages loads every image of `doc` for an export, converting formats
+ * prepareImages loads every image of `doc`, and the drawings of its embeds
+ * (by their embedSrc), for an export, converting formats
  * the export can't embed into PNG (or JPEG for photos)
  * @param doc the document to export
  * @param docPath path of the document, for relative images
@@ -61,21 +63,27 @@ export const prepareImages = async (
   docPath: string | null,
   accepted: ImageMime[],
 ): Promise<PreparedImages> => {
-  const nodes = new Map<string, Node>();
+  // the images, and the drawings of embeds, which are shown as images; with
+  // what stands for each where it fails
+  const nodes = new Map<string, string>();
   doc.descendants((node) => {
-    if (node.type.name === "image") nodes.set(node.attrs.src as string, node);
+    if (node.type.name === "image") {
+      const src = node.attrs.src as string;
+      nodes.set(src, (node.attrs.alt as string | null) || src);
+    }
+    if (node.type.name === "embed") nodes.set(embedSrc(node), embedLabel(node));
   });
 
   const images = new Map<string, PreparedImage>();
   const failures: string[] = [];
   await Promise.all(
-    [...nodes].map(async ([src, node]) => {
+    [...nodes].map(async ([src, label]) => {
       const image = await prepare(src, docPath, accepted).catch((err) => {
         console.warn(`failed to convert image ${src}`, err);
         return null;
       });
       if (image) images.set(src, image);
-      else failures.push((node.attrs.alt as string | null) || src);
+      else failures.push(label);
     }),
   );
   return { images, failures };

@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::engine::{Changes, Engine, Hit, Op};
 use crate::fonts::{split_files, Fonts};
-use crate::model::{Item, Settings};
+use crate::model::{Content, Item, Settings};
 use crate::pdf::{self, ImageData, Info, Warning};
 
 #[wasm_bindgen]
@@ -420,6 +420,22 @@ impl LayoutEngine {
         match self.engine.page_span(page as usize) {
             Some((from, to)) => vec![from, to],
             None => vec![],
+        }
+    }
+
+    /// the page numbers of the entries of the table of contents at `pos`,
+    /// as JSON (an array of strings, "" for an entry whose heading isn't
+    /// there), or "null" for none
+    #[wasm_bindgen(js_name = tocNumbers)]
+    pub fn toc_numbers(&self, pos: u32) -> String {
+        let item = self
+            .engine
+            .items
+            .iter()
+            .position(|item| matches!(item.content, Content::Toc { .. }) && item.from() == pos);
+        match item.and_then(|item| self.engine.toc_labels(item)) {
+            Some(labels) => serde_json::to_string(labels).unwrap_or_else(|_| "null".into()),
+            None => "null".into(),
         }
     }
 

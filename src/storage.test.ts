@@ -490,3 +490,29 @@ describe("storage", () => {
     expect(warn).toHaveBeenCalledWith(error);
   });
 });
+
+describe("restorable", () => {
+  it("keeps a block of a type a newer Blank stored as a block it can't show", async () => {
+    const { restorable } = await import("./storage");
+    const stored = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "a" }] },
+        { type: "future_block", attrs: { kind: "x" } },
+      ],
+    };
+    const node = Node.fromJSON(schema, restorable(stored));
+    expect(node.childCount).toBe(2);
+    const raw = node.child(1).attrs.raw as string;
+    expect(raw.split("\n")[0]).toBe(
+      '<!-- blank:stored@1 type="future_block" -->',
+    );
+    expect(raw).toContain('"kind": "x"');
+  });
+
+  it("leaves a document it can open alone", async () => {
+    const { restorable } = await import("./storage");
+    const stored = doc(p("a")).toJSON();
+    expect(restorable(stored)).toBe(stored);
+  });
+});

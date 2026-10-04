@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { schema } from "../../markdown";
 import { importedFrom, path } from "../../state";
 import {
   createState,
@@ -36,6 +37,19 @@ describe("command.newFile", () => {
     newFile()(view.state, view.dispatch);
 
     expect(view.state.doc.attrs.frontmatter).toBeNull();
+  });
+
+  it("forgets the definitions of the old document's forms", () => {
+    const old = schema.nodes.doc.create(
+      { definitions: { "user/a@1#00000000": {} }, rawDefinitions: ["a: 1"] },
+      schema.node("paragraph"),
+    );
+    const view = createTestView(createState(old));
+
+    newFile()(view.state, view.dispatch);
+
+    expect(view.state.doc.attrs.rawDefinitions).toEqual([]);
+    expect(view.state.doc.attrs.definitions).toEqual({});
   });
 
   it("changes nothing without dispatch", () => {

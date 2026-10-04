@@ -680,6 +680,67 @@ describe("laying out a keystroke", () => {
   });
 });
 
+describe("a table of contents on the pages", () => {
+  let destroy = () => {};
+  afterEach(() => {
+    destroy();
+    hidePages();
+  });
+
+  const toc = () => schema.node("toc", { depth: 2 });
+  // the entries of the table of contents the engine was last sent
+  let sent: string[] = [];
+  const watchEntries = () => {
+    sent = [];
+    const flatten = flattening.flattenBlocks;
+    vi.spyOn(flattening, "flattenBlocks").mockImplementation((...args) => {
+      const blocks = flatten(...args);
+      for (const record of blocks.flat()) {
+        const item = record.build();
+        if (item.kind === "toc") sent = item.entries.map((entry) => entry.text);
+      }
+      return blocks;
+    });
+  };
+  const entries = () => sent;
+
+  it("follows its headings as they are edited elsewhere", () => {
+    const engine = showPages();
+    watchEntries();
+    const mounted = mount(
+      doc(p("x"), toc(), h(1, "One"), p(LONG), h(2, "Two")),
+    );
+    destroy = () => mounted.pluginView.destroy?.();
+    expect(entries()).toEqual(["One", "Two"]);
+    expect(engine.tocNumbers(3)).toEqual(["1", "1"]);
+    const { view } = mounted;
+    // typing in a heading after it
+    const two = view.state.doc.content.size - 1;
+    view.dispatch(view.state.tr.insertText(" more", two));
+    expect(entries()).toEqual(["One", "Two more"]);
+    // a new heading
+    view.dispatch(
+      view.state.tr.insert(
+        view.state.doc.content.size,
+        schema.node("heading", { level: 1 }, schema.text("Three")),
+      ),
+    );
+    expect(entries()).toEqual(["One", "Two more", "Three"]);
+  });
+
+  it("isn't laid out again for typing that changes no heading", () => {
+    const engine = showPages();
+    const mounted = mount(doc(p("x"), toc(), h(1, "One"), p(LONG)));
+    destroy = () => mounted.pluginView.destroy?.();
+    const laid = vi.spyOn(engine, "sync");
+    const flattened = vi.spyOn(flattening, "flattenBlocks");
+    mounted.view.dispatch(mounted.view.state.tr.insertText("typed ", 1));
+    expect(laid).toHaveBeenCalledOnce();
+    const blocks = flattened.mock.calls.map(([, from, to]) => [from, to]);
+    expect(blocks).toEqual([[0, 1]]);
+  });
+});
+
 describe("opening another document", () => {
   afterEach(() => {
     hidePages();

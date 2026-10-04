@@ -1,7 +1,9 @@
+import type { EditorView } from "prosemirror-view";
 import { watch } from "vue";
 
-import { engineless } from "../../../engine/engine";
-import { pageLayoutState, pageViewport } from "../../../state";
+import { engineless } from "../../engine/engine";
+import { blockBoxes, caretPage } from "../../engine/geometry";
+import { pageLayoutState, pageViewport } from "../../state";
 
 /**
  * followLayout calls `publish` again whenever the page view scrolled,
@@ -22,4 +24,15 @@ export const followLayout = (publish: () => void) => {
     stop();
     window.removeEventListener("scroll", scrolled, true);
   };
+};
+
+/**
+ * boxOnCaretPage returns the box of the block at `pos`, `size` long, on the
+ * page the cursor is on, or on its first page, as the screen shows it, e.g.
+ * for a toolbar over it
+ */
+export const boxOnCaretPage = (view: EditorView, pos: number, size: number) => {
+  const boxes = blockBoxes(pos, pos + size);
+  const page = caretPage(view.state.selection.head);
+  return boxes.find((box) => box.page === page) ?? boxes[0] ?? null;
 };

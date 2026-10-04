@@ -13,6 +13,7 @@ import {
 
 import { alignHiddenEditor } from "../editor/hidden";
 import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
+import { pictureBoxAt } from "../editor/plugins/forms";
 import {
   dropExternal,
   hasPrimarySelection,
@@ -533,10 +534,15 @@ const onDrop = (event: DragEvent) => {
 // the pointer shows a hand then, and the link's url and hint as a tooltip
 const hoverLink = shallowRef<string | null>(null);
 const opening = shallowRef(false);
+// whether the pointer is on the box of an empty image field, which a click
+// fills, see pictureBoxAt
+const hoverPicture = shallowRef(false);
 const onHover = (event: MouseEvent) => {
   opening.value = hasOpenModifier(event);
   if (anchor !== null) return;
-  hoverLink.value = pointerAt(event).link;
+  const pointer = pointerAt(event);
+  hoverLink.value = pointer.link;
+  hoverPicture.value = pictureBoxAt(editor.view.state, pointer);
 };
 const onModifier = (event: KeyboardEvent) => {
   opening.value = hasOpenModifier(event);
@@ -603,7 +609,10 @@ onUnmounted(() => {
     id="page-view"
     ref="scroller"
     aria-hidden="true"
-    :class="[pageView, { 'follow-links': hoverLink && opening }]"
+    :class="[
+      pageView,
+      { 'follow-links': hoverLink && opening, 'on-picture': hoverPicture },
+    ]"
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
@@ -617,7 +626,10 @@ onUnmounted(() => {
     @dragleave="showDropAt(editor.view, null)"
     @drop="onDrop"
     @mousemove="onHover"
-    @mouseleave="hoverLink = null"
+    @mouseleave="
+      hoverLink = null;
+      hoverPicture = false;
+    "
     @contextmenu="onContextMenu"
   >
     <div

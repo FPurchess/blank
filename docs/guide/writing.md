@@ -16,6 +16,7 @@ At the start of an empty line, type one of these to turn the line into a block:
 | `>`                         | Space | Blockquote                        |
 | `---` `***` `___`           | Enter | Horizontal line                   |
 | `+++`                       | Enter | [Page break](./pages#page-breaks) |
+| `[toc]`                     | Enter | [Table of contents](./blocks#toc) |
 | ` ``` ` or ` ```lang `      | Enter | Code block                        |
 | `\| Name \| Qty \|`         | Enter | Table                             |
 
@@ -28,6 +29,10 @@ Code is set in IBM Plex Mono. `Mod` + Click on a link opens it in your browser. 
 ## Code blocks {#code}
 
 Type ` ``` ` and Enter at the start of a line to start a code block. In it, `Tab` and `Shift` `Tab` work as in a code editor: select some lines and `Tab` indents all of them by 4 spaces, `Shift` `Tab` outdents them, and the same lines stay selected, so you can press again to go further. Each line moves to the next or the previous step of 4, so a line indented by 6 spaces outdents to 4, not 2, and lines without indentation stay where they are. Without a selection, `Tab` puts in spaces up to the next step, and `Shift` `Tab` outdents the line the cursor is on. Code indented with tabs keeps its tabs. Each press is one step for `Mod` `Z`. Prefer 2 spaces? Set it in [blank.json](./configuration#code-blocks).
+
+## Blocks
+
+Press `Mod` `Alt` `B` to put a block into your document that Blank fills in for you, such as a table of contents. See [Blocks](./blocks).
 
 ## Tables
 

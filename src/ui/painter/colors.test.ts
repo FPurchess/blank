@@ -17,6 +17,7 @@ const CODE_FILL = 2;
 const TABLE_LINE = 3;
 const HEADER_LINE = 4;
 const HEADER_FILL = 5;
+const PLACEHOLDER = 6;
 
 describe("the colours on paper", () => {
   const engine = testEngine();
@@ -32,7 +33,13 @@ describe("the colours on paper", () => {
   });
 
   it("give the PDF the colours the pages show", () => {
-    for (const role of [CODE_FILL, TABLE_LINE, HEADER_LINE, HEADER_FILL])
+    for (const role of [
+      CODE_FILL,
+      TABLE_LINE,
+      HEADER_LINE,
+      HEADER_FILL,
+      PLACEHOLDER,
+    ])
       expect(pdf(role), `role ${role}`).toBe(onPaper(ROLE_OPACITY[role]));
   });
 
@@ -50,8 +57,6 @@ describe("the colours on paper", () => {
     // footers (BAND in src/layout/bands.ts), lighter than their 50% on screen
     expect([0, 7, 8].map(pdf)).toEqual(["#000000", "#000000", "#000000"]);
     expect(pdf(1)).toBe("#666666");
-    // 6 is no longer used
-    expect(engine.raw.roleColor(6)).toBeUndefined();
     expect(engine.raw.roleColor(9)).toBeUndefined();
   });
 });

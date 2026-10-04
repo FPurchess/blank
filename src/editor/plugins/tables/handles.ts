@@ -40,7 +40,7 @@ import {
 } from "../../commands/table/rect";
 import { setColumnWidths } from "../../commands/table/widths";
 import { openTableMenu } from "../contextMenu";
-import { followLayout } from "./followLayout";
+import { followLayout } from "../followLayout";
 import { reporting } from "./tools";
 
 // how far around a table the mouse still shows its handles, which sit on and

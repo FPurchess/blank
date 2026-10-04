@@ -494,6 +494,11 @@ export const scrollState = (): {
   };
 };
 
+// The line the view is read at: where the outline and a table of contents
+// put a heading they scroll to, so many pixels below the top of the view, as
+// on Notion (64 px below its 44 px bar).
+export const READING_LINE = 108;
+
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
  * top of the view, as far as the view scrolls, without moving the selection
@@ -544,6 +549,16 @@ export const exposeGeometry = (view: EditorView) => {
       find: (text: string, index = 0) => findText(doc(), text, index),
       // whether the engine is still laying out the rest of a long document
       laying: () => pageEngine?.laying ?? false,
+      // the page numbers each table of contents shows, in order
+      tocNumbers: () => {
+        const numbers: (string[] | null)[] = [];
+        doc().forEach((node, pos) => {
+          if (node.type.name === "toc") {
+            numbers.push(pageEngine?.tocNumbers(pos) ?? null);
+          }
+        });
+        return numbers;
+      },
     },
   });
 };

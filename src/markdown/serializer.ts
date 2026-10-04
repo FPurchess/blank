@@ -5,6 +5,11 @@ import {
 } from "prosemirror-markdown";
 import type { Node } from "prosemirror-model";
 
+import { closeMarker, formatMarker } from "./blocks/args";
+import { ATOMS, extraArgs, formatAtom } from "./blocks/atoms";
+import { formDefinition } from "./blocks/definitions";
+import { writeEmbed } from "./blocks/embeds";
+import { fieldSpec, isEmptyField } from "./blocks/forms";
 import { schema } from "./schema";
 import { gfmBlocker, gfmLines, htmlLines } from "./tables";
 
@@ -81,6 +86,44 @@ export const markdownSerializer = new MarkdownSerializer(
     },
     page_break(state, node) {
       state.write("<!-- pagebreak -->");
+      state.closeBlock(node);
+    },
+    ...Object.fromEntries(
+      Object.entries(ATOMS).map(([name, atom]) => [
+        atom.node,
+        (state: MarkdownSerializerState, node: Node) => {
+          state.write(formatAtom(name, node.attrs));
+          state.closeBlock(node);
+        },
+      ]),
+    ),
+    // a form: its marker, each field's marker and content, the closing
+    // marker; its definition goes to the definitions section (./index.ts)
+    form_block(state, node, parent) {
+      const { def, extra } = node.attrs;
+      const args = { def: def as string, ...extraArgs(extra, ["def"]) };
+      state.write(formatMarker({ name: "form", format: 1, args }, ["def"]));
+      state.closeBlock(node);
+      node.forEach((field) => {
+        const name = field.attrs.name as string;
+        state.write(
+          formatMarker({ name: "field", format: null, args: { name } }),
+        );
+        state.closeBlock(field);
+        // an empty field is written as nothing
+        const spec = fieldSpec(formDefinition(parent, node), field);
+        if (!isEmptyField(field, spec)) state.renderContent(field);
+      });
+      state.write(closeMarker("form"));
+      state.closeBlock(node);
+    },
+    embed(state, node) {
+      state.text(writeEmbed(node.attrs), false);
+      state.closeBlock(node);
+    },
+    unknown_block(state, node) {
+      // as it was read, unescaped
+      state.text(node.attrs.raw as string, false);
       state.closeBlock(node);
     },
     table(state: MarkdownSerializerState, node: Node) {

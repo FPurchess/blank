@@ -840,6 +840,16 @@ export class PageEngine {
     });
   }
 
+  // the page numbers of the entries of the table of contents at `pos`, ""
+  // for an entry whose heading isn't there, or null for no table of
+  // contents there
+  tocNumbers(pos: number): string[] | null {
+    return this.call(null, () => {
+      const numbers = JSON.parse(this.raw.tocNumbers(pos)) as unknown;
+      return Array.isArray(numbers) ? (numbers as string[]) : null;
+    });
+  }
+
   hit(page: number, x: number, y: number) {
     return this.call(null, () => toHit(this.raw.hit(page, x, y)));
   }

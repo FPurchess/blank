@@ -1,6 +1,7 @@
 import { defaultMarkdownParser, MarkdownParser } from "prosemirror-markdown";
 import type { Attrs, Node, NodeType } from "prosemirror-model";
 
+import { ATOMS } from "./blocks/atoms";
 import { alignment, schema } from "./schema";
 import { tokenizer } from "./tokenizer";
 
@@ -40,6 +41,31 @@ export const markdownParser = new MarkdownParser(
     th: { block: "table_header", getAttrs: cellAttrs },
     td: { block: "table_cell", getAttrs: cellAttrs },
     page_break: { node: "page_break" },
+    ...Object.fromEntries(
+      Object.values(ATOMS).map((atom) => [
+        atom.node,
+        {
+          node: atom.node,
+          getAttrs: (token: { meta: { attrs: Attrs } }) => token.meta.attrs,
+        },
+      ]),
+    ),
+    embed: {
+      node: "embed",
+      getAttrs: (token: { meta: { attrs: Attrs } }) => token.meta.attrs,
+    },
+    form_block: {
+      block: "form_block",
+      getAttrs: (token: { meta: { attrs: Attrs } }) => token.meta.attrs,
+    },
+    form_field: {
+      block: "form_field",
+      getAttrs: (token: { meta: { attrs: Attrs } }) => token.meta.attrs,
+    },
+    unknown_block: {
+      node: "unknown_block",
+      getAttrs: (token) => ({ raw: (token.meta as { raw: string }).raw }),
+    },
   },
 );
 

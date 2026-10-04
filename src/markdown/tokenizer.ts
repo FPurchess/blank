@@ -4,6 +4,7 @@ import MarkdownIt, {
   type StateInline,
 } from "markdown-it";
 
+import { blankBlocks, blankMarker } from "./blocks/rules";
 import { parseHtmlTable } from "./html";
 
 /**
@@ -118,7 +119,8 @@ const cellParagraphs = (state: StateCore) => {
 
 /**
  * tokenizer is the markdown-it instance Blank reads markdown with: CommonMark
- * with GFM pipe tables, `<br>` line breaks, HTML tables and page breaks
+ * with GFM pipe tables, `<br>` line breaks, HTML tables, page breaks and the
+ * markers of content blocks (see ./blocks/rules.ts)
  */
 export const tokenizer = MarkdownIt("commonmark", { html: false }).enable(
   "table",
@@ -130,4 +132,10 @@ tokenizer.block.ruler.before("html_block", "html_table", htmlTable, {
 tokenizer.block.ruler.before("paragraph", "page_break", pageBreak, {
   alt: ["paragraph", "reference", "blockquote"],
 });
+// first, so that no other rule reads a marker line as something else, e.g. as
+// a heading underlined by a `---` below it
+tokenizer.block.ruler.before("table", "blank_marker", blankMarker, {
+  alt: ["paragraph", "reference", "blockquote"],
+});
 tokenizer.core.ruler.after("block", "cell_paragraphs", cellParagraphs);
+tokenizer.core.ruler.after("block", "blank_blocks", blankBlocks);

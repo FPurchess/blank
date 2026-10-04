@@ -7,6 +7,7 @@ use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
 use krilla::configure::{Archival, ConfigurationBuilder, ValidationError, Validators};
+use krilla::destination::XyzDestination;
 use krilla::error::KrillaError;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
@@ -127,6 +128,7 @@ pub(crate) fn paper_rgb(role: Role) -> (u8, u8, u8) {
         Role::TableLine => (0xd1, 0xd4, 0xd6),
         Role::HeaderLine => (0x82, 0x89, 0x8e),
         Role::HeaderFill => (0xf1, 0xf2, 0xf3),
+        Role::Placeholder => (0xdd, 0xdf, 0xe0),
     }
 }
 
@@ -588,6 +590,8 @@ fn attempt(
             }
         }
     }
+    // where the entries of tables of contents link to
+    let listed = engine.listed_headings();
     for (page_index, ops) in pages.into_iter().enumerate() {
         let settings = PageSettings::from_wh(width, height)
             .ok_or_else(|| Failed::Other("the page has no size".into()))?;
@@ -601,6 +605,9 @@ fn attempt(
                 }
             }
             for (op, part) in ops {
+                if matches!(part, Part::Hint { .. }) {
+                    continue;
+                }
                 if let Op::Link { href, x, y, w, h } = op {
                     links.push((href, x, y, w, h, part));
                     continue;
@@ -677,9 +684,37 @@ fn attempt(
         }
         for (href, x, y, w, h, part) in links {
             if let Some(rect) = page_rect(x, y, w, h) {
-                let target = Target::Action(Action::Link(LinkAction::new(href.clone())));
-                let annotation =
-                    Annotation::new_link(LinkAnnotation::new(rect, target), Some(href));
+                let target = match part {
+                    // to the heading of a table of contents' entry, on its
+                    // page; none for a heading that isn't there
+                    Part::TocLink { item, entry } => {
+                        match engine.toc_target(item, entry, &listed) {
+                            Some((page, top)) => Target::Destination(
+                                XyzDestination::new(
+                                    page,
+                                    Point::from_xy(engine.settings.margins.left, top),
+                                )
+                                .into(),
+                            ),
+                            None => continue,
+                        }
+                    }
+                    _ => Target::Action(Action::Link(LinkAction::new(href.clone()))),
+                };
+                // what the link says: where it goes, or a table of
+                // contents' entry
+                let alt = match (part, &target) {
+                    (Part::TocLink { item, entry }, Target::Destination(_)) => {
+                        match &engine.items[item].content {
+                            crate::model::Content::Toc { entries, .. } => {
+                                entries.get(entry).map_or(href, |entry| entry.text.clone())
+                            }
+                            _ => href,
+                        }
+                    }
+                    _ => href,
+                };
+                let annotation = Annotation::new_link(LinkAnnotation::new(rect, target), Some(alt));
                 // a repeated row's links are artifacts' too: only the
                 // first ones are in the structure
                 if part == Part::Repeat {

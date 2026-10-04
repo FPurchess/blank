@@ -3,7 +3,9 @@
 exports[`markdown > parses the welcome document 1`] = `
 {
   "attrs": {
+    "definitions": {},
     "frontmatter": null,
+    "rawDefinitions": [],
   },
   "content": [
     {

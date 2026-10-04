@@ -1,9 +1,9 @@
-// The line the view is read at: where the outline puts a heading it
-// scrolls to, so many pixels below the top of the view, as on Notion (64 px
-// below its 44 px bar). What is at or above it is what the view shows: the
-// outline marks the section of the heading there, and the bottom bar counts
-// the page there.
-export const READING_LINE = 108;
+// The line the view is read at (READING_LINE, see src/engine/geometry.ts):
+// what is at or above it is what the view shows. The outline marks the
+// section of the heading there, and the bottom bar counts the page there.
+import { READING_LINE } from "../engine/geometry";
+
+export { READING_LINE };
 
 /**
  * sectionAt returns which of `tops` the view shows the section of: the last

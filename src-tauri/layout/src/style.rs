@@ -39,7 +39,8 @@ pub const BOLD: f32 = 700.0;
 pub fn text_style(kind: TextKind) -> TextStyle {
     match kind {
         TextKind::H1 => style(21.5, 0.92, MEDIUM, false, -0.4),
-        TextKind::H2 => style(17.0, 0.96, MEDIUM, false, -0.2),
+        // a table of contents' title looks like a heading 2
+        TextKind::H2 | TextKind::TocTitle => style(17.0, 0.96, MEDIUM, false, -0.2),
         TextKind::H3 => style(13.75, 1.0, MEDIUM, false, 0.0),
         TextKind::H4 => style(BODY, 1.12, BOLD, false, 0.0),
         TextKind::H5 => style(BODY, 1.12, BOLD, true, 0.0),
@@ -53,6 +54,9 @@ pub fn text_style(kind: TextKind) -> TextStyle {
             ..style(CODE_SIZE, BODY * 1.12 / CODE_SIZE, REGULAR, false, 0.0)
         },
         TextKind::Band => style(crate::bands::BAND_SIZE, 1.0, REGULAR, false, 0.0),
+        // the entries of headings 1 in a table of contents, a little
+        // stronger than the others
+        TextKind::Toc1 => style(BODY, 1.12, MEDIUM, false, 0.0),
         TextKind::P | TextKind::Other => style(BODY, 1.12, REGULAR, false, 0.0),
     }
 }

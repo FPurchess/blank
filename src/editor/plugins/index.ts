@@ -17,3 +17,7 @@ export {
   tableView,
 } from "./tables";
 export { headings } from "./headings";
+export { toc } from "./toc";
+export { forms } from "./forms";
+export { blockTools } from "./blockTools";
+export { embeds } from "./embeds";

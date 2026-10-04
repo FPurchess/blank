@@ -1,0 +1,40 @@
+# A letter on a page of its own, laid out for a window envelope as DIN 5008
+# (form B) says: the return address and the address in the window, the
+# details beside it, then the subject and the text. See
+# docs/guide/blocks.md for what a template can say.
+version: 1
+name: Letter
+description: A letter whose address shows in a window envelope (DIN 5008)
+newPage: true
+flowTop: 98.5mm
+fields:
+  - name: sender
+    kind: text
+    label: Return address
+    placeholder: Your name · Street 1 · 12345 Town
+  - name: recipient
+    kind: rich
+    label: Address
+    placeholder: Who it goes to, with their address
+  - name: details
+    kind: rich
+    label: Details
+    placeholder: The date, your reference
+  - name: subject
+    kind: text
+    style: h3
+    label: Subject
+    placeholder: What it is about
+  - name: body
+    kind: rich
+    label: Letter
+    placeholder: Dear …
+layout:
+  - frame: { x: 20mm, y: 45mm, width: 85mm, height: 17.7mm }
+    field: sender
+  - frame: { x: 20mm, y: 62.7mm, width: 85mm, height: 27.3mm }
+    field: recipient
+  - frame: { x: 125mm, y: 50mm, width: 75mm, height: 40mm }
+    field: details
+  - field: subject
+  - field: body
