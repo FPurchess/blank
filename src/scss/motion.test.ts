@@ -1,5 +1,6 @@
-import { compileAsync } from "sass-embedded";
 import { describe, expect, it } from "vitest";
+
+import { compileMain } from "./compiled";
 
 // What moves on its own, the blinking caret and the strips that fade in,
 // keeps still when the system asks for less motion: every rule that
@@ -15,10 +16,7 @@ const rulesOf = (css: string) =>
 
 describe("reduced motion", () => {
   it("stills every animation and transition", async () => {
-    const { css } = await compileAsync("src/scss/main.scss", {
-      loadPaths: ["src/scss"],
-      style: "compressed",
-    });
+    const css = await compileMain();
     const block =
       /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{(.*?\})\}/s.exec(css);
     expect(block).not.toBeNull();

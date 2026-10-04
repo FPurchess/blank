@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { bootAppearance, theme } from "./appearance";
+import { bootAppearance, colorMode, theme } from "./appearance";
 
 describe("appearance", () => {
   let dispose = () => {};
@@ -8,6 +8,7 @@ describe("appearance", () => {
   afterEach(() => {
     dispose();
     theme.value = "light";
+    colorMode.value = "accent";
   });
 
   it("applies the theme to the document body right away", () => {
@@ -33,5 +34,14 @@ describe("appearance", () => {
 
     theme.value = "blue";
     expect(document.body.dataset.theme).toBe("green");
+  });
+
+  it("applies the color mode next to the theme", () => {
+    dispose = bootAppearance();
+    expect(document.body.dataset.color).toBe("accent");
+
+    colorMode.value = "mono";
+    expect(document.body.dataset.color).toBe("mono");
+    expect(document.body.dataset.theme).toBe("light");
   });
 });

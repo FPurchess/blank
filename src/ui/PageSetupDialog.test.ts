@@ -275,7 +275,7 @@ describe("pageSetup dialog", () => {
     const request = await openDialog();
 
     await click(option("paper", "A5"));
-    await click(button("Make This My Default"));
+    await click(button("Make this my default"));
 
     expect(request.makeDefault).toHaveBeenCalledWith({
       ...DEFAULT_PAGE,
@@ -311,12 +311,12 @@ describe("pageSetup dialog", () => {
     it("edits the whole frontmatter", async () => {
       const request = await openDialog({ frontmatter: "title: Hi" });
 
-      await click(button("Edit as Text"));
+      await click(button("Edit as text"));
       const text =
         document.querySelector<HTMLTextAreaElement>("#page-setup-text")!;
       expect(text.value).toBe("title: Hi");
       expect(document.activeElement).toBe(text);
-      expect(button("Make This My Default").hidden).toBe(true);
+      expect(button("Make this my default").hidden).toBe(true);
       expect(dialog()!.querySelector<HTMLElement>(".hint")!.hidden).toBe(true);
 
       text.value = "title: Bye";
@@ -333,7 +333,7 @@ describe("pageSetup dialog", () => {
         applyText: vi.fn(() => "Nested mappings are not allowed"),
       });
 
-      await click(button("Edit as Text"));
+      await click(button("Edit as text"));
       await submit();
 
       expect(dialog()).not.toBeNull();
@@ -417,7 +417,7 @@ describe("pageSetup dialog", () => {
     await openDialog({
       applyText: vi.fn(() => "Nested mappings are not allowed"),
     });
-    await click(button("Edit as Text"));
+    await click(button("Edit as text"));
     await submit();
     expect(errors().hidden).toBe(false);
 
@@ -485,7 +485,7 @@ describe("pageSetup dialog", () => {
     await click(option("paper", "Custom…"));
     await type("paper-width", "wide");
 
-    expect(button("Make This My Default").disabled).toBe(true);
+    expect(button("Make this my default").disabled).toBe(true);
   });
 
   // even while the rows hold something wrong
@@ -494,7 +494,7 @@ describe("pageSetup dialog", () => {
     await click(option("paper", "Custom…"));
     await type("paper-width", "wide");
 
-    await click(button("Edit as Text"));
+    await click(button("Edit as text"));
 
     expect(dialog()!.querySelector<HTMLElement>(".settings")!.hidden).toBe(
       true,
@@ -502,7 +502,7 @@ describe("pageSetup dialog", () => {
     expect(dialog()!.querySelector<HTMLElement>(".thumbnail")!.hidden).toBe(
       true,
     );
-    expect(button("Edit as Text").hidden).toBe(true);
+    expect(button("Edit as text").hidden).toBe(true);
     expect(button("Apply").disabled).toBe(false);
     expect(errors().hidden).toBe(true);
   });

@@ -61,7 +61,7 @@ To delete a table, click the bin on its toolbar, or press `Mod` `A` twice in it 
 
 ## Change a table {#change}
 
-While the cursor is in a table, a small toolbar sits above its right end. It adds and deletes rows and columns, aligns columns, sorts, merges cells, switches the header row and a header column on and off, and sets the caption. Everything on it works on what you've selected: with three rows selected, _Insert row below_ adds three rows, and _Align right_ aligns every selected column.
+While the cursor is in a table, a small toolbar sits above its right end. It adds and deletes rows and columns, aligns columns, sorts, merges cells, switches the header row and a header column on and off, and sets the caption. Everything on it works on what you've selected: with three rows selected, _Insert row below_ adds three rows, and _Align right_ aligns every selected column. Rest the pointer on a button to see what it does.
 
 <img class="shot" src="/screenshots/table-mode.gif" alt="Mod T shows a key on every button of the table toolbar; the down arrow adds a row, S sorts by the column, R aligns it right, and Esc ends table mode" />
 
@@ -114,7 +114,7 @@ Tables move between Blank and your spreadsheet in both directions.
 - **Paste cells** you copied in LibreOffice Calc, Excel, Google Sheets or Numbers, or a table from a web page or Word, and you get a table. Its first row becomes the header. A column keeps its alignment when all its cells agree, like numbers aligned right.
 - **Paste into a table**, and the cells fill from the cursor, or fill the cells you selected. The table grows when they need more room. The pasted cells fit in where they land: header cells in the header row, plain cells below it.
 - **Copy cells**, selected with `Shift` + arrows or `Mod` `A`, and paste them into a spreadsheet: every cell lands in its own cell there.
-- **Paste as Plain Text** in the right-click menu keeps copied cells as text.
+- **Paste as plain text** in the right-click menu keeps copied cells as text.
 
 Tables pasted from elsewhere get their widths from their content, like any other table.
 

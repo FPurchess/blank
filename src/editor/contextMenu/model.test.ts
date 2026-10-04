@@ -85,7 +85,7 @@ describe("contextMenu model", () => {
       const item = find(buildMenu(view, {}), "page-setup");
 
       expect(item).toMatchObject({
-        label: "Page Setup…",
+        label: "Page setup…",
         shortcut: "Mod-Alt-u",
       });
       item.run?.();

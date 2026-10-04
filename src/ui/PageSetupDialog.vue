@@ -230,7 +230,7 @@ const submit = () => {
     </p>
     <template #actions>
       <button type="button" :hidden="asText" @click="editAsText">
-        Edit as Text
+        Edit as text
       </button>
       <button
         type="button"
@@ -238,7 +238,7 @@ const submit = () => {
         :disabled="blocked"
         @click="makeDefault"
       >
-        Make This My Default
+        Make this my default
       </button>
       <button type="submit" :disabled="blocked">Apply</button>
       <button type="button" @click="close(request.cancel)">Cancel</button>

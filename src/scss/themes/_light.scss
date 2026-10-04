@@ -14,6 +14,12 @@
   --desk-color: #eff0f1;
   --sheet-edge: rgba(0, 0, 0, 0.1);
   --sheet-shadow: rgba(0, 0, 0, 0.06);
+  // what can be clicked or is switched on, and text on it (see
+  // src/scss/themes.test.ts and .claude/rules/design.md)
+  --accent: #2a5bd7;
+  --accent-ink: #ffffff;
+  // the one shadow of what floats over the window: menus, toolbars, tooltips
+  --popover-shadow: rgba(0, 0, 0, 0.14);
   --color-inverted: #fff;
   --background-inverted: #666;
   --font-family:

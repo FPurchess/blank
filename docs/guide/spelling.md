@@ -6,7 +6,7 @@ Blank can underline the words it doesn't know with a wavy line, so a typo never 
 
 ## Turn it on
 
-Press `Mod` `Alt` `S`, or right-click anywhere in the text and choose **Enable Spell Check**. Press the shortcut again, or click **Spelling** at the bottom right, to turn it off. Blank remembers your choice.
+Press `Mod` `Alt` `S`, or right-click anywhere in the text and choose **Enable spell check**. Press the shortcut again, or click **Spelling** at the bottom right, to turn it off. Blank remembers your choice.
 
 Blank checks the [language shown at the bottom right](./autocorrect#language). A word is checked once you finish it, so nothing is underlined while you are still typing it.
 
@@ -17,16 +17,16 @@ Right-click a word with a wavy line, or press `Mod` `Alt` `N` to jump to the nex
 | Menu item                     | What it does                                                                       |
 | ----------------------------- | ---------------------------------------------------------------------------------- |
 | A suggestion                  | Replaces the word. Capitals are kept, so _Teh_ becomes _The_. `Mod` `Z` undoes it. |
-| **Change All** ▸ a suggestion | Replaces the word everywhere in the document, in one step you can undo.            |
-| **Ignore All**                | Stops underlining the word in this document until you open or start another one.   |
-| **Add to Dictionary**         | Accepts the word from now on, in every document.                                   |
+| **Change all** ▸ a suggestion | Replaces the word everywhere in the document, in one step you can undo.            |
+| **Ignore all**                | Stops underlining the word in this document until you open or start another one.   |
+| **Add to dictionary**         | Accepts the word from now on, in every document.                                   |
 
 Right-click a word you added to change your mind:
 
 | Menu item                  | What it does                                                           |
 | -------------------------- | ---------------------------------------------------------------------- |
-| **Remove from Dictionary** | Underlines the word again.                                             |
-| **Edit in Dictionary…**    | Lets you correct the word you added, e.g. _Kubernets_ to _Kubernetes_. |
+| **Remove from dictionary** | Underlines the word again.                                             |
+| **Edit in dictionary…**    | Lets you correct the word you added, e.g. _Kubernets_ to _Kubernetes_. |
 
 The menu also has the usual editing commands: undo and redo, cut, copy, paste, paste as plain text, delete and select all. Without the page view, hold `Shift` while you right-click for the system's own menu, with its input methods and emoji. On your pages, `Shift` and a right-click opens Blank's menu too.
 

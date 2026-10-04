@@ -94,7 +94,8 @@ describe("the outline", () => {
       "outline-dash level-2",
       "outline-dash level-3",
     ]);
-    expect(dashes()?.title).toBe("Outline (Ctrl+Alt+O)");
+    expect(dashes()?.dataset.tip).toBe("Outline");
+    expect(dashes()?.dataset.tipKey).toBe("Ctrl+Alt+O");
     expect(list()).toBeNull();
   });
 
@@ -150,7 +151,11 @@ describe("the outline", () => {
 
     // the pointer over the open list opens no peek, which would stay
     list()!.dispatchEvent(new MouseEvent("mouseenter"));
-    document.querySelector<HTMLElement>(".outline-collapse")!.click();
+    const collapse = document.querySelector<HTMLElement>(".outline-collapse")!;
+    expect(collapse.getAttribute("aria-label")).toBe("Hide outline");
+    expect(collapse.getAttribute("aria-keyshortcuts")).toBe("Control+Alt+O");
+    expect(collapse.tabIndex).toBe(-1);
+    collapse.click();
     await nextTick();
     expect(outlinePinned.value).toBe(false);
     expect(outlinePeek.value).toBeNull();

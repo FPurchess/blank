@@ -1,7 +1,7 @@
 import type { Command } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-import { CommandIdentifier, config, getKeyBinding } from "../../config";
+import { CommandIdentifier, config } from "../../config";
 import { pageEngine } from "../../engine/engine";
 import {
   type Band,
@@ -23,7 +23,7 @@ import {
   path,
 } from "../../state";
 import { frontmatterOf } from "../../markdown";
-import { formatShortcut } from "../keyBindings";
+import { commandShortcut } from "../keyBindings";
 import { writePage } from "./frontmatter";
 
 /**
@@ -76,7 +76,7 @@ const tellIfEmpty = (view: EditorView, band: Band) => {
     band,
     band === "header" ? slots.slice(0, 3) : slots.slice(3, 6),
     chapter !== null,
-    formatShortcut(getKeyBinding(CommandIdentifier.PAGE_SETUP)),
+    commandShortcut(CommandIdentifier.PAGE_SETUP),
   );
   if (notice) announce(notice);
 };

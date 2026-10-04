@@ -44,7 +44,7 @@ describe("page setup", () => {
     await expect(checked("paper")).toBeFocused();
     await expect(checked("orientation")).toHaveText("Portrait");
     await expect(checked("margins")).toHaveText("Normal");
-    // what "Custom…" and "Edit as Text" show stays hidden until then
+    // what "Custom…" and "Edit as text" show stays hidden until then
     await expect($("#page-setup-text")).not.toBeDisplayed();
     await expect($("#page-setup-margins-top")).not.toBeDisplayed();
   });

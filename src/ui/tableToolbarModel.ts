@@ -1,5 +1,5 @@
-import { CommandIdentifier, getKeyBinding } from "../config";
-import { formatShortcut } from "../editor/keyBindings";
+import { CommandIdentifier } from "../config";
+import { commandShortcut } from "../editor/keyBindings";
 import { separated } from "../separated";
 import type { TableToolbarItem } from "../state";
 
@@ -26,6 +26,6 @@ export const itemLabel = (item: TableToolbarItem, keys: boolean) =>
  * tableModeHint explains the keys of table mode
  */
 export const tableModeHint = () =>
-  `Shift+arrows move rows and columns · Esc or ${formatShortcut(
-    getKeyBinding(CommandIdentifier.INSERT_TABLE),
+  `Shift+arrows move rows and columns · Esc or ${commandShortcut(
+    CommandIdentifier.INSERT_TABLE,
   )}: done`;

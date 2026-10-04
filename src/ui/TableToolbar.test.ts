@@ -80,7 +80,9 @@ describe("table toolbar", () => {
       "separator",
     );
     expect(button("x").getAttribute("aria-label")).toBe("Label x");
-    expect(button("x").title).toBe("Label x");
+    // the shared tooltip names it (src/ui/tooltipModel.ts)
+    expect(button("x").dataset.tip).toBe("Label x");
+    expect(button("x").hasAttribute("title")).toBe(false);
     expect(button("x").type).toBe("button");
     expect(
       button("x").querySelector("svg.icon path")!.getAttribute("d"),
@@ -168,12 +170,15 @@ describe("table toolbar", () => {
     expect(toolbar().classList.contains("table-toolbar")).toBe(true);
     expect(button("x").querySelector("kbd")!.textContent).toBe("X");
     expect(button("x").getAttribute("aria-label")).toBe("Label x (X)");
+    // its tooltip shows the key too, which only table mode has
+    expect(button("x").dataset.tipKey).toBe("X");
     expect(toolbar().querySelector(".hint")!.textContent).toBe(
       "Shift+arrows move rows and columns · Esc or Ctrl+T: done",
     );
 
     await show({ keys: false });
     expect(toolbar().classList.contains("keys")).toBe(false);
+    expect(button("x").hasAttribute("data-tip-key")).toBe(false);
   });
 
   it("sits above the table and hides while the table is out of view", async () => {

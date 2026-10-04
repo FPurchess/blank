@@ -81,3 +81,68 @@ export const scssNumber = (file: string, name: string) => {
   if (!found) throw new Error(`$${name} isn't set in ${file}`);
   return Number(found[1]);
 };
+
+// whether what's on shows in the theme's accent or in its ink, as
+// src/state/appearance.ts's colorMode
+export type Mode = "accent" | "mono";
+
+/**
+ * tokenValues returns the custom properties src/scss/_tokens.scss sets, as
+ * written, in the mode's block over the main one
+ */
+export const tokenValues = (mode: Mode) => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, "_tokens.scss"),
+    "utf8",
+  );
+  const [main, mono] = source.split('[data-color="mono"]');
+  const read = (block: string) =>
+    Object.fromEntries(
+      [...block.matchAll(/^\s*--([\w-]+):\s*([^;]+);/gm)].map(
+        // on one line, as prettier may wrap a long one
+        ([, name, value]) => [
+          name,
+          value
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/\( /g, "(")
+            .replace(/,? \)/g, ")"),
+        ],
+      ),
+    );
+  return mode === "mono" ? { ...read(main), ...read(mono) } : read(main);
+};
+
+/**
+ * themeColor returns a resolver of the theme's colors and the tokens derived
+ * from them, as painted over `ground`: `var()`, the `color-mix(in srgb, a N%,
+ * b)` of _tokens.scss (over the ground where b is transparent) and the
+ * layered solid ink of --ink-fill
+ */
+export const themeColor = (theme: string, mode: Mode = "accent") => {
+  const values = { ...themeVariables(theme), ...tokenValues(mode) };
+  const color = (name: string, ground: Rgb): Rgb => {
+    const value = values[name];
+    if (value === undefined) throw new Error(`--${name} isn't set`);
+    const reference = /^var\(--([\w-]+)\)$/.exec(value);
+    if (reference) return color(reference[1], ground);
+    const mixed =
+      /^color-mix\(in srgb, var\(--([\w-]+)\) (\d+)%, (?:var\(--([\w-]+)\)|transparent)\)$/.exec(
+        value,
+      );
+    if (mixed) {
+      const [, a, percent, b] = mixed;
+      // painted over the ground it's mixed with, a translucent ink gives
+      // the same as the ink over that ground first
+      const over = b === undefined ? ground : color(b, ground);
+      return mix(color(a, over), over, Number(percent) / 100);
+    }
+    const layered =
+      /^linear-gradient\(var\(--([\w-]+)\), var\(--\1\)\), var\(--([\w-]+)\)$/.exec(
+        value,
+      );
+    if (layered) return color(layered[1], color(layered[2], ground));
+    return parseColor(value, ground);
+  };
+  return color;
+};
