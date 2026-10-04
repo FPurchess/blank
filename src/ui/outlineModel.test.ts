@@ -5,6 +5,7 @@ import { BLOCKS_DOCK, blocksDock } from "./blocksPaneModel";
 import {
   freeRight,
   layoutWidth,
+  listShape,
   OUTLINE_DOCK,
   outlinePlacement,
   wheelPixels,
@@ -120,5 +121,15 @@ describe("the outline beside the blocks pane", () => {
 
   it("lies beside the pages once there is room for both", () => {
     expect(placeAt(1900, true)).toBe("beside");
+  });
+});
+
+describe("listShape", () => {
+  it("shows the open list as a side pane, the rest over the pages", () => {
+    expect(listShape(true, null)).toBe("open");
+    // a peek left over from before it opened doesn't change that
+    expect(listShape(true, "hover")).toBe("open");
+    expect(listShape(false, "sticky")).toBe("floating");
+    expect(listShape(false, "hover")).toBe("peek");
   });
 });

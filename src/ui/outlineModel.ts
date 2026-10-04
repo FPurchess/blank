@@ -2,6 +2,7 @@ import { frameLayout } from "../engine/frames";
 import {
   MIN_HEADINGS,
   OUTLINE_BREAKPOINT,
+  type OutlinePeek,
   type PageLayoutState,
   type PageViewMode,
 } from "../state";
@@ -20,6 +21,19 @@ export const FALLBACK_TEXT_WIDTH = 1200;
 // the list floating over the pages; beside: the list open in the room right
 // of the pages; docked: the list open in room the pages give up for it
 export type OutlinePlacement = "hidden" | "dashes" | "beside" | "docked";
+
+// how the list shows: open beside the pages (a side pane), floating over
+// them after a click or the shortcut on a narrow window (a side pane with a
+// shadow), or peeking while the pointer is on the dashes (a popover)
+export type OutlineShape = "open" | "floating" | "peek";
+
+/**
+ * listShape returns how the list shows
+ * @param open whether it's open beside the pages (beside or docked)
+ * @param peek what opened it over the pages: the pointer or a click
+ */
+export const listShape = (open: boolean, peek: OutlinePeek): OutlineShape =>
+  open ? "open" : peek === "sticky" ? "floating" : "peek";
 
 /**
  * freeRight returns the room right of the text while the outline takes none

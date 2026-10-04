@@ -15,9 +15,9 @@ Blank remembers your choice. The button at the right end of the bar at the botto
 
 ## Find your way with the outline {#outline}
 
-Once your document has two headings, a short dash for each of them sits at the right edge of the window, longer for a heading 1 and shorter for the levels below. The bright one marks the section you're reading.
+Once your document has two headings, a short dash for each of them sits at the right edge of the window, longer for a heading 1 and shorter for the levels below. The dash of the section you're reading is in your accent color.
 
-Point at the dashes to see all your headings, and click one to scroll straight to it. Your cursor stays where you were writing, so you can look something up and keep typing right away.
+Point at the dashes to see all your headings, and click one to scroll straight to it. In the list, a short line in your accent color marks where you are. Your cursor stays where you were writing, so you can look something up and keep typing right away.
 
 <img class="shot" src="/screenshots/outline.gif" alt="Pointing at the dashes on the right shows the headings of the document; a click on one scrolls to it, and Mod Alt O opens and closes the list" />
 
