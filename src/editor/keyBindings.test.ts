@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CommandIdentifier } from "../config";
-import { ariaShortcut, commandShortcut, formatShortcut } from "./keyBindings";
+import {
+  ariaShortcut,
+  commandBinding,
+  commandShortcut,
+  formatShortcut,
+} from "./keyBindings";
 
 describe("formatShortcut", () => {
   const setPlatform = (platform: string) =>
@@ -65,5 +70,11 @@ describe("ariaShortcut", () => {
   it("leaves out a binding that can't be used", () => {
     expect(ariaShortcut("")).toBeUndefined();
     expect(ariaShortcut("Hyper-k")).toBeUndefined();
+  });
+});
+
+describe("commandBinding", () => {
+  it("returns a command's key as the keymap reads it", () => {
+    expect(commandBinding(CommandIdentifier.INSERT_TABLE)).toBe("Mod-t");
   });
 });

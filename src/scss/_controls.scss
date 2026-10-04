@@ -139,13 +139,46 @@ $tip-key: 75%;
   }
 }
 
-// the one depth cue: what floats over the window (menus, toolbars, pickers)
+// the one depth cue: what floats over the window (menus, toolbars, pickers).
+// It's paper, so secondary text in it is muted for the paper (themes.test.ts
+// reads this rule): whatever's inside just uses --muted
 @mixin popover {
+  --muted: var(--muted-on-paper);
   color: var(--color);
   background-color: var(--background-color);
   border: 1px solid var(--line);
   border-radius: var(--r-pop);
   box-shadow: 0 8px 24px var(--popover-shadow);
+}
+
+// a field to type or choose in: an input or a select, on the paper
+@mixin field {
+  box-sizing: border-box;
+  height: var(--control);
+  padding: 0 var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  font: inherit;
+  color: var(--color);
+  background: var(--background-color);
+
+  &::placeholder {
+    color: var(--muted);
+  }
+
+  &:disabled {
+    opacity: 0.38;
+  }
+}
+
+// the name of a group of controls or items, small and in capitals
+@mixin group-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 // a line between groups of controls

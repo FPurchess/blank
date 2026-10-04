@@ -3,7 +3,8 @@ import { Plugin } from "prosemirror-state";
 
 import { tablePicker } from "../../../state";
 import { resizePicker } from "../../commands/table/pickerSize";
-import { tableKeyBinding } from "../../keyBindings";
+import { CommandIdentifier } from "../../../config";
+import { commandBinding } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 
 /**
@@ -12,7 +13,7 @@ import { PAGE_PRESS } from "../../pagePointer";
  */
 export const tablePickerKeys = () => {
   // the binding that opened the picker closes it again
-  const binding = tableKeyBinding();
+  const binding = commandBinding(CommandIdentifier.INSERT_TABLE);
   const toggle = keydownHandler(
     binding
       ? {

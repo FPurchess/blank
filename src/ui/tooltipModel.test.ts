@@ -273,6 +273,23 @@ describe("watchTips", () => {
     expect(button.getAttribute("aria-describedby")).toBe("hint");
   });
 
+  it("doesn't show once the control opened what it controls", async () => {
+    const button = control();
+    over(button);
+    button.setAttribute("aria-expanded", "true");
+    vi.advanceTimersByTime(TIP_DELAY);
+    expect(show).not.toHaveBeenCalled();
+
+    // and goes when it opens it while it shows
+    const other = control({ "data-tip": "Italic" });
+    over(other);
+    vi.advanceTimersByTime(TIP_DELAY);
+    expect(shown().name).toBe("Italic");
+    other.setAttribute("aria-expanded", "true");
+    await Promise.resolve();
+    expect(hide).toHaveBeenCalled();
+  });
+
   it("doesn't show for a control that went away", () => {
     const button = control();
     over(button);

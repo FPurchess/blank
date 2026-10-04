@@ -51,6 +51,8 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `status-item`;
   - `popover`;
   - `separator`;
+  - `field` (an input or select on the paper);
+  - `group-label` (the small capitals naming a group);
   - `shortcut`.
 - **Classes only where a component uses one:** `.icon-button` (`IconButton.vue`) and `.status-item`.
 - **States:**
@@ -59,7 +61,9 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - disabled: opacity 0.38.
 - **Keyboard focus** is the global 2px `--focus` ring with a 2px offset, on `:focus-visible` only. Don't add `:focus` outlines. Bars, pickers and toolbars never take the editor's focus (`editor-boundary.md`).
 - **Text buttons always have a box,** a border or a fill. One primary per surface: the dialogs' submit button, filled with the accent made solid over the desk (`solid()` in `_controls.scss`), so it's solid ink in mono.
-- **The one depth cue:** `popover` (a 1px `--line` border, the `--r-pop` radius, one shadow), only on what floats (menus, toolbars, pickers).
+- **The one depth cue:** `popover` (a 1px `--line` border, the `--r-pop` radius, one shadow), only on what floats (menus, toolbars, pickers). It's paper, so it re-points `--muted` to `--muted-on-paper`: whatever is inside just uses `--muted`. A new surface on the paper does the same, rather than a property of its own.
+- **Closing what a component opened** (a menu, a card, a floating list): `useDismiss(inside, close, options)` (`src/ui/composables/useDismiss.ts`) closes it on a press outside `inside()`, which lists its own elements and what belongs to it (the button that opened it, so a press there toggles), and optionally on Escape, any key, blur or resize. Don't add another window `pointerdown` listener for it.
+- **A command's key for code that handles it itself:** `commandBinding(id)` (`src/editor/keyBindings.ts`), normalized for prosemirror-keymap; `commandShortcut(id)` writes it for people.
 - **The pointer:**
   - The global rule gives the hand to buttons, links and the roles button, tab, menuitem*, option, radio and switch. Text fields get the text cursor, and anything `:disabled`/`aria-disabled` the arrow.
   - Give a clickable element a role rather than its own `cursor` rule.
@@ -70,7 +74,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
 - **Opting in:** a control opts in with `v-bind="tipAttrs({ name, command, key })"`, or through `IconButton`.
   - It sets `data-tip` (the name: the command's label unless given) and `data-tip-key` (the command's shortcut via `commandShortcut`, unless `key` gives one).
   - For a command, it also sets `aria-keyshortcuts`.
-- **Never use `title` on a control.** A tooltip is the name plus the shortcut, never a sentence. Sentences over the pages (link hints, "Double-click to edit…") stay native titles.
+- **Never use `title` on a control.** A tooltip is a name, optionally with its state ("Spelling: loading German"), plus the shortcut, never an instruction ("click for…"). Sentences over the pages (link hints, "Double-click to edit…") stay native titles.
 - **Not moved yet**, each for the part of the redesign that rebuilds it:
   - the bottom bar's items, which keep their `title` and their own `cursor` rules until the status bar;
   - the header and footer strip (`BandEditor.vue`), which keeps its `title`s and its Title Case labels ("First Page ▾", "Odd & Even Pages").

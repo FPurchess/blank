@@ -23,6 +23,7 @@ import {
 } from "../state";
 import IconButton from "./components/IconButton.vue";
 import { useBodyClass } from "./composables/useBodyClass";
+import { useDismiss } from "./composables/useDismiss";
 import OutlineEntry from "./OutlineEntry.vue";
 import { tipAttrs } from "./tooltipModel";
 import {
@@ -122,16 +123,11 @@ watch(windowWidth, (width) => {
 });
 
 // a click elsewhere closes the list a click opened
-listenOnWindow(
-  "pointerdown",
-  (event) => {
-    if (
-      outlinePeek.value === "sticky" &&
-      !root.value?.contains(event.target as Node)
-    )
-      outlinePeek.value = null;
+useDismiss(
+  () => [root.value],
+  () => {
+    if (outlinePeek.value === "sticky") outlinePeek.value = null;
   },
-  true,
 );
 
 let leaving: ReturnType<typeof setTimeout> | undefined;

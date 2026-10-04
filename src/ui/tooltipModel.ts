@@ -119,7 +119,12 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
   let observer: MutationObserver | null = null;
 
   const showTip = () => {
-    const tip = target?.isConnected ? tipOf(target, x) : null;
+    // not once the control has opened what it controls, e.g. a card that
+    // opens on hover before the tooltip would
+    const tip =
+      target?.isConnected && tipTarget(target) === target
+        ? tipOf(target, x)
+        : null;
     // a control whose tooltip went away while it showed
     if (!tip && shown) return close();
     if (!tip || tooltipsSuppressed.value) return;
@@ -133,7 +138,7 @@ export const watchTips = (show: (tip: Tip) => void, hide: () => void) => {
     if (!target || observer) return;
     observer = new MutationObserver(showTip);
     observer.observe(target, {
-      attributeFilter: ["data-tip", "data-tip-key"],
+      attributeFilter: ["data-tip", "data-tip-key", "aria-expanded"],
     });
   };
   const close = () => {
