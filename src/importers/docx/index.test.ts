@@ -278,6 +278,8 @@ describe("importers.docx", () => {
       const markdown = [
         "Intro",
         `<!-- blank:form@1 def="${LETTER_KEY}" -->`,
+        '<!-- blank:field name="sender" -->',
+        "Bea · Hill Road 3",
         '<!-- blank:field name="address" -->',
         "Ann Example\n\nLong Street 12",
         '<!-- blank:field name="date" -->',

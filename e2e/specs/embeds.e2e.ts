@@ -55,8 +55,10 @@ describe("an embed", () => {
     await expect($("#editor figure.embed")).toBeExisting();
     await browser.waitUntil(
       async () => {
+        // the drawing, twice as wide as high, not a line of its alt text
         const box = await embedBox();
-        return !!box && box.bottom - box.top > 20;
+        const ratio = box && (box.right - box.left) / (box.bottom - box.top);
+        return !!ratio && Math.abs(ratio - 2) < 0.1;
       },
       { timeoutMsg: "the embed's drawing isn't on the pages" },
     );

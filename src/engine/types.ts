@@ -2,7 +2,17 @@
 
 // the styles the engine sets text in (TextKind in model.rs): a paragraph,
 // a heading, or code
-export type TextStyle = "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "code";
+export type TextStyle =
+  | "p"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6"
+  | "code"
+  // small print, a form's text field may be in
+  | "small";
 
 export interface EngineSpan {
   from: number;

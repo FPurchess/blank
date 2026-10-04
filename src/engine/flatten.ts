@@ -68,6 +68,9 @@ interface Context {
   // whether it stands for a picture to come (an image field's)
   hint?: string;
   picture?: boolean;
+  // the style of the paragraphs here, which a text field of a form may
+  // have: "small"
+  style?: TextStyle;
   // the column of a grid or the frame it stands in
   column?: EngineColumn;
   frame?: EngineFrame;
@@ -458,6 +461,7 @@ export const flattenBlocks = (
       context.listed ? 1 : 0,
       context.hint ?? "",
       context.picture ? 1 : 0,
+      context.style ?? "",
       context.column ? JSON.stringify(context.column) : "",
       context.frame ? JSON.stringify(context.frame) : "",
       extra.key ?? "",
@@ -585,6 +589,7 @@ export const flattenBlocks = (
         listed: false,
         hint: undefined,
         picture: undefined,
+        style: undefined,
       };
       children(
         node,
@@ -605,6 +610,7 @@ export const flattenBlocks = (
         listed: false,
         hint: undefined,
         picture: undefined,
+        style: undefined,
       };
       node.forEach((item, offset, index) => {
         const first = index === 0;
@@ -726,6 +732,7 @@ export const flattenBlocks = (
         top: context.top && !column && !framed,
         hint: isEmptyField(field, spec) ? spec?.placeholder : undefined,
         picture: spec?.kind === "image",
+        style: spec?.style === "small" ? "small" : undefined,
         column,
         frame: framed,
       };
@@ -735,10 +742,18 @@ export const flattenBlocks = (
         const last =
           fieldIndex === node.childCount - 1 &&
           childIndex === field.childCount - 1;
-        block(child, fieldPos + 1 + childOffset, inner, {
-          before: first ? space.before + own.before : own.before,
-          after: last ? space.after : own.after,
-        });
+        // a frame's blocks stand line by line, like an address's
+        block(
+          child,
+          fieldPos + 1 + childOffset,
+          inner,
+          framed
+            ? { before: 0, after: 0 }
+            : {
+                before: first ? space.before + own.before : own.before,
+                after: last ? space.after : own.after,
+              },
+        );
         previous = child;
       });
     });
@@ -828,6 +843,9 @@ export const flattenBlocks = (
           ),
           ...(context.hint ? { hint: context.hint } : {}),
           ...(context.hint && context.picture ? { picture: true } : {}),
+          ...(context.style && node.type.name === "paragraph"
+            ? { style: context.style }
+            : {}),
         }),
         { marker: pieceMarker, key: runs.length > 1 ? `piece${index}` : "" },
       );

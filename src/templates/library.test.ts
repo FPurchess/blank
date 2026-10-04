@@ -12,16 +12,12 @@ const file = (name: string) =>
 describe("loadTemplates", () => {
   beforeEach(() => mockTauriPath({ appConfigDir: "/config" }));
 
-  it("has Blank's recipe and letter, which are templates", async () => {
+  it("has Blank's recipe, which is a template", async () => {
     vi.mocked(exists).mockResolvedValue(false);
-    const templates = await loadTemplates();
-    expect(templates.map((template) => template.id)).toEqual([
-      "blank/recipe",
-      "blank/letter",
-    ]);
-    for (const { definition } of templates) {
-      expect(typeof definition).not.toBe("string");
-    }
+    const [recipe, ...others] = await loadTemplates();
+    expect(recipe.id).toBe("blank/recipe");
+    expect(typeof recipe.definition).not.toBe("string");
+    expect(others).toEqual([]);
   });
 
   it("reads the user's templates, named after their files", async () => {
@@ -36,7 +32,7 @@ describe("loadTemplates", () => {
         ? "version: 1\nname: Broken\n"
         : "version: 2\nname: Letter\nfields:\n  - {name: to, kind: rich, label: To}\n",
     );
-    const templates = (await loadTemplates()).slice(2);
+    const templates = (await loadTemplates()).slice(1);
     expect(templates.map((template) => template.id)).toEqual([
       "user/broken",
       "user/letter-head",
@@ -57,7 +53,7 @@ describe("loadTemplates", () => {
     vi.mocked(readTextFile).mockResolvedValue(
       "version: 1\nname: Note\nfields:\n  - {name: text, kind: rich, label: Text}\n",
     );
-    const [first, second] = (await loadTemplates()).slice(2);
+    const [first, second] = (await loadTemplates()).slice(1);
     expect(first.definition).toMatchObject({ id: "user/note" });
     expect(second.definition).toBe(
       "another file of the templates folder has the name note",
@@ -67,6 +63,6 @@ describe("loadTemplates", () => {
   it("does without the folder when it can't be read", async () => {
     vi.mocked(exists).mockRejectedValue(new Error("denied"));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await loadTemplates()).toHaveLength(2);
+    expect(await loadTemplates()).toHaveLength(1);
   });
 });

@@ -79,6 +79,7 @@ const FORM = checkDefinition({
   flowTop: "90mm",
   fields: [
     { name: "address", kind: "rich", label: "Address" },
+    { name: "sender", kind: "text", style: "small", label: "From" },
     {
       name: "title",
       kind: "text",
@@ -91,6 +92,7 @@ const FORM = checkDefinition({
   ],
   layout: [
     { frame: { x: "20mm", y: "45mm", width: "85mm" }, field: "address" },
+    { frame: { x: "20mm", y: "40mm", width: "85mm" }, field: "sender" },
     { field: "title" },
     {
       grid: { columns: ["40mm", "1fr"] },
@@ -107,9 +109,10 @@ const form = () => {
   return empty.copy(
     Fragment.fromArray([
       fill(0, p("Ann Example"), p("Long Street 12")),
-      empty.child(1),
+      fill(1, p("Bea · Hill Road 3")),
       empty.child(2),
-      fill(3, p("a note")),
+      empty.child(3),
+      fill(4, p("a note")),
     ]),
   );
 };

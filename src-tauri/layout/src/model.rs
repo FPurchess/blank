@@ -86,6 +86,8 @@ pub enum TextKind {
     Code,
     Th,
     Caption,
+    /// small print, e.g. a letter's return address
+    Small,
     Alt,
     Band,
     /// a table of contents' title, and the entries of its headings 1
@@ -109,6 +111,7 @@ impl TextKind {
             TextKind::Code => "code",
             TextKind::Th => "th",
             TextKind::Caption => "caption",
+            TextKind::Small => "small",
             TextKind::Alt => "alt",
             TextKind::Band => "band",
             TextKind::TocTitle => "toc-title",
@@ -131,6 +134,7 @@ impl From<&str> for TextKind {
             "code" => TextKind::Code,
             "th" => TextKind::Th,
             "caption" => TextKind::Caption,
+            "small" => TextKind::Small,
             "alt" => TextKind::Alt,
             "band" => TextKind::Band,
             "toc-title" => TextKind::TocTitle,

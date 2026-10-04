@@ -47,6 +47,7 @@ import { summarize } from "./properties";
 import { displaySrc } from "./images";
 import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
+import { embedSrc } from "../../markdown/blocks/embeds";
 import { tableGrid } from "../../exporters/table";
 import { type FrozenWidths, headingsSignature } from "../../engine/flatten";
 import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
@@ -287,19 +288,21 @@ const sync = (
 };
 
 /**
- * imageBlocks returns the top-level blocks of `doc` with an image from one
- * of `urls`
+ * imageBlocks returns the top-level blocks of `doc` with an image, or an
+ * embed's drawing, from one of `urls`
  */
 const imageBlocks = (doc: Node, urls: ReadonlySet<string>) => {
+  const loaded = (src: string) => {
+    const url = displaySrc(src, path.value);
+    return url !== null && urls.has(url);
+  };
   const blocks: number[] = [];
   doc.forEach((block, _offset, index) => {
-    let found = false;
+    // an embed is shown as the image of its drawing
+    let found = block.type.name === "embed" && loaded(embedSrc(block));
     block.descendants((node) => {
       if (found) return false;
-      if (node.type.name === "image") {
-        const url = displaySrc(node.attrs.src as string, path.value);
-        found = url !== null && urls.has(url);
-      }
+      if (node.type.name === "image") found = loaded(node.attrs.src as string);
       return !found;
     });
     if (found) blocks.push(index);

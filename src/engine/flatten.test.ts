@@ -241,23 +241,26 @@ describe("flatten", () => {
     const form = createForm(LETTER, LETTER_KEY);
     const filled = form.copy(
       form.content.replaceChild(
-        0,
-        form.child(0).copy(Fragment.fromArray([p("Ann"), p("Street 1")])),
+        1,
+        form.child(1).copy(Fragment.fromArray([p("Ann"), p("Street 1")])),
       ),
     );
     const node = schema.node("doc", { definitions: { [LETTER_KEY]: LETTER } }, [
       p("intro"),
       filled,
     ]);
-    const [, ann, street, date, body] = items(node);
+    const [, sender, ann, street, date, body] = items(node);
+    // small print where the template says
+    expect(sender).toMatchObject({ style: "small" });
     const mm = 72 / 25.4;
     // the first of each frame says so; the form starts a new page
+    expect(sender).toMatchObject({ pageStart: true, frame: { start: true } });
     expect(ann).toMatchObject({
-      pageStart: true,
       frame: { start: true, x: 20 * mm, y: 45 * mm, width: 85 * mm },
     });
     expect(street.frame).toEqual({ x: 20 * mm, y: 45 * mm, width: 85 * mm });
-    expect(street.before).toBe(ann.before);
+    // line by line, as an address
+    expect([ann.after, street.before]).toEqual([0, 0]);
     expect(date).toMatchObject({ frame: { start: true, x: 125 * mm } });
     // the text starts below them, at the top of its own flow
     expect(body).toMatchObject({ flowTop: 100 * mm, before: 0 });

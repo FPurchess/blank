@@ -494,13 +494,21 @@ class Serializer {
     }
     const built = this.blocks(field, TOP);
     [this.contentWidth, this.maxImageWidth] = outer;
-    // in a frame, every paragraph is: Word draws them in one
+    // in a frame, every paragraph is, one line after the other: Word draws
+    // them in one; and a field of small print in its style
     const frame = place?.kind === "frame" ? this.frameOf(place) : undefined;
-    const content = frame
-      ? built.map((block) =>
-          this.isBuilt(block) ? block : { ...block, frame },
-        )
-      : built;
+    const small = spec?.style === "small";
+    const content = built.map((block) =>
+      this.isBuilt(block)
+        ? block
+        : {
+            ...block,
+            ...(small ? { style: STYLE.small } : {}),
+            ...(frame
+              ? { frame, spacing: { ...block.spacing, before: 0, after: 0 } }
+              : {}),
+          },
+    );
     if (!spec) return content;
     const placeholder =
       isEmptyField(field, spec) &&

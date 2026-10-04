@@ -62,11 +62,16 @@ export const LETTER = checkDefinition({
   newPage: true,
   flowTop: "100mm",
   fields: [
+    { name: "sender", kind: "text", style: "small", label: "From" },
     { name: "address", kind: "rich", label: "Address" },
     { name: "date", kind: "text", label: "Date", placeholder: "The date" },
     { name: "body", kind: "rich", label: "Letter" },
   ],
   layout: [
+    {
+      frame: { x: "25mm", y: "58mm", width: "80mm" },
+      field: "sender",
+    },
     {
       frame: { x: "20mm", y: "45mm", width: "85mm", height: "45mm" },
       field: "address",

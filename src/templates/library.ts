@@ -2,7 +2,6 @@ import { path } from "@tauri-apps/api";
 import { exists, readDir, readTextFile } from "@tauri-apps/plugin-fs";
 
 import { type Definition, readDefinition } from "../markdown";
-import letter from "./letter.yaml?raw";
 import recipe from "./recipe.yaml?raw";
 
 // The templates forms are placed from: Blank's own (blank/…), and the user's
@@ -16,7 +15,7 @@ export interface Template {
   definition: Definition | string;
 }
 
-const BUILT_IN: Record<string, string> = { recipe, letter };
+const BUILT_IN: Record<string, string> = { recipe };
 
 /**
  * templatesDir returns the folder of the user's templates

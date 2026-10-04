@@ -694,25 +694,6 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "form.gif"), 545);
   });
 
-  it("records writing a letter", async () => {
-    const film = await filmNew();
-    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 1);
-    await film.press("↓", Key.ArrowDown, 0.4);
-    await film.press("↓", Key.ArrowDown, 0.6);
-    await film.press("Enter", Key.Enter, 1.4);
-    await film.type("Bea Sender · Hill Road 3 · 54321 Village");
-    await film.press("Tab", Key.Tab, 0.5);
-    await film.type("Ann Example");
-    await film.press("Tab", Key.Tab, 0.5);
-    await film.type("2 October");
-    await film.press("Tab", Key.Tab, 0.5);
-    await film.type("Our meeting");
-    await film.press("Tab", Key.Tab, 0.5);
-    await film.type("Dear Ann, thank you for the meeting.");
-    await film.pause(2.2);
-    film.save(path.join(outDir, "letter.gif"), 545);
-  });
-
   it("captures a page break", async () => {
     await pressMod("n");
     await type("the end of the first chapter.");

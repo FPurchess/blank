@@ -22,7 +22,7 @@ export interface FieldDefinition {
   label: string;
   // what the field says while it's empty
   placeholder?: string;
-  // a text field's style: p, or h1 to h6
+  // a text field's style: p, small (small print), or h1 to h6
   style?: string;
   // a table field's columns, its header row
   columns?: string[];
@@ -45,7 +45,17 @@ export interface Definition {
 }
 
 const KINDS: readonly string[] = ["text", "rich", "image", "table"];
-const STYLES: readonly string[] = ["p", "h1", "h2", "h3", "h4", "h5", "h6"];
+// a text field's style: a paragraph, in small print, or a heading
+const STYLES: readonly string[] = [
+  "p",
+  "small",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+];
 const MAX_FIELDS = 32;
 const MAX_COLUMNS = 8;
 const MAX_TEXT = 200;

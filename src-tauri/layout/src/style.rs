@@ -47,6 +47,8 @@ pub fn text_style(kind: TextKind) -> TextStyle {
         TextKind::H6 => style(BODY, 1.12, REGULAR, true, 0.0),
         TextKind::Alt => style(BODY, 1.12, REGULAR, true, 0.0),
         TextKind::Caption => style(BODY / 1.25, 1.12, REGULAR, true, 0.0),
+        // small print, e.g. a letter's return address, a step down
+        TextKind::Small => style(BODY / 1.25, 1.12, REGULAR, false, 0.0),
         TextKind::Th => style(BODY, 1.12, BOLD, false, 0.0),
         // code blocks in IBM Plex Mono, a step smaller, on the body's lines
         TextKind::Code => TextStyle {

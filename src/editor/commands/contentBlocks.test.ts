@@ -82,7 +82,6 @@ describe("chooseBlock", () => {
     expect(picker.choices.map((choice) => choice.id)).toEqual([
       "toc",
       "blank/recipe",
-      "blank/letter",
     ]);
     picker.pick("toc");
     expect(view.state.doc.child(0).type.name).toBe("toc");

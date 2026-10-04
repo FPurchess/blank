@@ -397,6 +397,10 @@ describe("exporter.docx", () => {
       expect(attr(frame, "w")).toBe(mm(75));
       expect(attr(frame, "hAnchor")).toBe("page");
       expect(attr(frame, "vAnchor")).toBe("page");
+      // the address line by line, the return address in small print
+      const sender = written.find(({ style }) => style === "Small");
+      expect(sender).toBeDefined();
+      expect(attr(child(date.p, "spacing"), "after")).toBe("0");
       // the letter's text starts 100mm below the page's top edge
       const body = written[written.indexOf(date) + 1];
       expect(child(body.p, "framePr")).toBeUndefined();

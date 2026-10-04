@@ -58,6 +58,8 @@ import { hidePages, pageOf, showPages, testEngine } from "../../test/engine";
 import { random } from "../../test/random";
 import { caretBox } from "../../engine/geometry";
 import { forgetImages, loadedImages } from "../../engine/images";
+import { embedSrc } from "../../markdown/blocks/embeds";
+import { box } from "../../test/embeds";
 import { perfSamples } from "../../engine/perf";
 import { pageSelect, pageSelectRange } from "../commands/pageSelect";
 import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
@@ -588,6 +590,25 @@ describe("images on the pages", () => {
     // 300 × 150 px at 96 dpi
     expect(shown[3]).toBeCloseTo(225);
     expect(shown[4]).toBeCloseTo(112.5);
+    mounted.view.destroy();
+  });
+
+  it("shows an embed's drawing once it's loaded", () => {
+    const embed = schema.nodes.embed.create({
+      type: "org.blank.test/box@1",
+      id: "k3x9",
+      alt: "A red box",
+      svg: box("red"),
+    });
+    const mounted = mount(doc(p("text"), embed));
+    const shownImages = () =>
+      pageEngine!.bodyDisplay(0, pageLayoutState.value!.bodyVersions[0]).i;
+    expect(shownImages()).toEqual([]);
+    expect(loads).toHaveLength(1);
+    loads[0].load();
+    const [shown] = shownImages();
+    expect(shown[0]).toBe(embedSrc(embed));
+    expect(shown[3]).toBeCloseTo(225);
     mounted.view.destroy();
   });
 

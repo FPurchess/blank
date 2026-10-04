@@ -32,7 +32,7 @@ A document can hold content of another app, such as a diagram of draw.io or a sk
 
 ## Forms {#forms}
 
-A form is a block of fields to fill in, laid out the same every time: a recipe with its name, a photo beside the ingredients, and the steps; or a letter whose address shows in the window of an envelope. Blank comes with both; you can [write your own forms](#your-own-forms) too.
+A form is a block of fields to fill in, laid out the same every time: a recipe with its name, a photo beside the ingredients, and the steps. Blank comes with the recipe; you can [write your own forms](#your-own-forms) too.
 
 <img class="shot" src="/screenshots/form.gif" alt="Mod Alt B, the arrow down and Enter put in a recipe; Tab goes from its name to the photo, the ingredients beside it and the steps below, each filled in" />
 
@@ -44,13 +44,7 @@ A form is a block of fields to fill in, laid out the same every time: a recipe w
 
 Headings in a form are headings of your document: the outline shows them, a table of contents lists them, and so do the PDF's bookmarks. A cookbook of recipes gets a table of contents of its recipes. When your [page setup](./pages#chapters) starts headings on a new page, it starts those in forms there too, except in a column beside another.
 
-### A letter {#letter}
-
-The letter is laid out for a window envelope, as the German standard DIN 5008 has it: your return address and the address stand where the envelope's window shows them, the date and your reference beside them, and the subject and your text below, from 98.5 mm down. It starts on a page of its own.
-
-<img class="shot" src="/screenshots/letter.gif" alt="Mod Alt B, the arrow down twice and Enter put in a letter; Tab goes from the return address to the address, the date, the subject and the text, each filled in" />
-
-**In Word**, a form becomes Word's own content controls, one for the form and one for each field, named after it. Word users fill them in, but can't take them apart, and an empty field shows its placeholder, as Word's own do. Fields side by side stand in the cells of a table without lines, and a letter's address in Word's frames. Blank opens such a document as forms again, with what was written in Word.
+**In Word**, a form becomes Word's own content controls, one for the form and one for each field, named after it. Word users fill them in, but can't take them apart, and an empty field shows its placeholder, as Word's own do. Fields side by side stand in the cells of a table without lines, and fields at a place of the page in Word's frames. Blank opens such a document as forms again, with what was written in Word.
 
 **In the file**, a form is its fields between lines like `<!-- blank:form@1 def="blank/recipe@2#…" -->` and `<!-- blank:field name="title" -->`, which other markdown apps don't show. At the end of the file, Blank keeps a copy of each form's template, so the file opens the same everywhere, however the template changes later.
 
@@ -95,7 +89,7 @@ Each field has a `name` (lowercase letters, digits and dashes), a `label` and a 
 
 | Kind    | It holds                                                                 |
 | ------- | ------------------------------------------------------------------------ |
-| `text`  | one line; `style` sets it as `p` (the default) or a heading `h1` to `h6` |
+| `text`  | one line; `style` sets it as `p` (the default), `small` print or a heading `h1` to `h6` |
 | `image` | a picture, which `Mod` `Alt` `I` puts in                                 |
 | `table` | a table, which starts with the `columns` you list (up to 8)              |
 | `rich`  | anything: paragraphs, lists, quotes, code, tables                        |
@@ -140,4 +134,4 @@ layout:
 ```
 
 - **`x` and `y`** are measured from the page's left and top edges, **`width`** is how wide the frame is, and **`height`** how high it is at least: a frame grows when its field holds more.
-- A frame holds one field, which can't be a table.
+- A frame holds one field, which can't be a table. Its lines stand one below the other without space between them, as an address's do.

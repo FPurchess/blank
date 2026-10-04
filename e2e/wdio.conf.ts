@@ -88,6 +88,8 @@ export const config: WebdriverIO.Config = {
   // and config (keymap) from the developer's real ones and from other spec files.
   beforeSession: async () => {
     profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-"));
+    // for the specs, which run in this process, see appConfigDir in helpers.ts
+    process.env.BLANK_E2E_CONFIG = path.join(profileDir, "config");
     expectingExit = false;
 
     const mirrorUrl = await startMirror();

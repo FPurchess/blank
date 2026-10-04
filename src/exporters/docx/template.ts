@@ -183,6 +183,7 @@ export const STYLE = {
   inlineCode: "InlineCode",
   hyperlink: "Hyperlink",
   caption: "Caption",
+  small: "Small",
   tableHeading: "TableHeading",
   tocHeading: "TOCHeading",
   placeholder: "PlaceholderText",
@@ -274,6 +275,15 @@ export const STYLES: IStylesOptions = {
       quickFormat: true,
       run: { size: halfPoints(BODY_SIZE / 1.25), italics: true },
       paragraph: { keepNext: true, spacing: { after: twips(4) } },
+    },
+    {
+      // small print, e.g. a letter's return address: a step down, like the
+      // style "small" of the pages
+      id: STYLE.small,
+      name: "Small",
+      basedOn: "Normal",
+      quickFormat: true,
+      run: { size: halfPoints(BODY_SIZE / 1.25) },
     },
     {
       // the text of header cells, named like LibreOffice's style for it
