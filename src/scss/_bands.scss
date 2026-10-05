@@ -107,7 +107,7 @@ body.band-editing.without-engine #editor {
 
 // the header or footer being edited
 #band-editor {
-  font-size: 13px;
+  font-size: var(--ui);
   line-height: 20px;
   color: var(--color);
 
