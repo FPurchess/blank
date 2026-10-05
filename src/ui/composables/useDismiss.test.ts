@@ -32,6 +32,32 @@ describe("useDismiss", () => {
     document.body.replaceChildren();
   });
 
+  it("stays open for a press on a scrollbar outside", () => {
+    // a view that scrolls, 100 px wide but for its 15 px scrollbar
+    const view = document.createElement("div");
+    document.body.append(view);
+    Object.defineProperties(view, {
+      clientWidth: { value: 85 },
+      clientHeight: { value: 300 },
+      scrollHeight: { value: 2000 },
+      scrollWidth: { value: 85 },
+    });
+    const pressAt = (offsetX: number) => {
+      const event = new PointerEvent("pointerdown", { bubbles: true });
+      Object.defineProperties(event, {
+        offsetX: { value: offsetX },
+        offsetY: { value: 10 },
+      });
+      view.dispatchEvent(event);
+    };
+    start();
+    pressAt(90);
+    expect(close).not.toHaveBeenCalled();
+    // its content is outside
+    pressAt(40);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("closes on a press outside, not inside or on what it belongs to", () => {
     start();
     press(popup.firstChild!);
