@@ -1,24 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { TOP_BAR_HEIGHT } from "../chrome";
-import { NEAR_BOTTOM, NEAR_TOP, nearEdge } from "./bandStripsModel";
+import { fitsInView, INSERTS } from "./bandStripsModel";
 
-describe("nearEdge", () => {
-  it("shows the top hint just below the top area, never on it", () => {
-    expect(nearEdge(0, 600, false)).toBeNull();
-    expect(nearEdge(TOP_BAR_HEIGHT - 1, 600, false)).toBeNull();
-    expect(nearEdge(TOP_BAR_HEIGHT, 600, false)).toBe("top");
-    expect(nearEdge(NEAR_TOP - 1, 600, false)).toBe("top");
-    expect(nearEdge(NEAR_TOP, 600, false)).toBeNull();
+describe("INSERTS", () => {
+  it("names the placeholders as the pages do, with a tooltip each", () => {
+    expect(INSERTS.map(({ label, tip, text }) => [label, tip, text])).toEqual([
+      ["Title", "Insert the title", "{title}"],
+      ["Author", "Insert the author", "{author}"],
+      ["Chapter", "Insert the chapter", "{chapter}"],
+      ["Date", "Insert the date", "{date}"],
+      ["File", "Insert the file name", "{file}"],
+    ]);
+  });
+});
+
+describe("fitsInView", () => {
+  const view = { left: 0, top: 80, width: 1000, height: 720 };
+  const band = (top: number) => ({ left: 0, top, width: 600, height: 20 });
+
+  it("needs room for the strip above a footer", () => {
+    expect(fitsInView(band(500), "footer", view, 200)).toBe(true);
+    expect(fitsInView(band(250), "footer", view, 200)).toBe(false);
   });
 
-  it("shows the bottom hint on the status bar and just above it", () => {
-    expect(nearEdge(600 - NEAR_BOTTOM, 600, false)).toBeNull();
-    expect(nearEdge(600 - NEAR_BOTTOM + 1, 600, false)).toBe("bottom");
-    expect(nearEdge(599, 600, false)).toBe("bottom");
+  it("needs room for the strip below a header", () => {
+    expect(fitsInView(band(500), "header", view, 200)).toBe(true);
+    expect(fitsInView(band(650), "header", view, 200)).toBe(false);
   });
 
-  it("leaves the bottom hint away on the status bar's controls", () => {
-    expect(nearEdge(590, 600, true)).toBeNull();
+  it("needs the band in the view", () => {
+    expect(fitsInView(band(60), "header", view, 0)).toBe(false);
+    expect(fitsInView(band(790), "footer", view, 0)).toBe(false);
   });
 });

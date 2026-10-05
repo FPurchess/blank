@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  bandSummary,
   chooseFirstPage,
+  firstPageLabel,
   firstPageMenu,
   mirror,
   mirrorOddPages,
@@ -10,7 +12,6 @@ import {
   pagesShown,
   removeBand,
   showPages,
-  stripLabel,
   stripSettings,
   tabLabel,
   toggleEvenPages,
@@ -31,7 +32,9 @@ const bands = (settings: Partial<BandSettings> = {}): BandSettings => ({
 });
 const header = { ...NO_SLOTS, left: "{title}", right: "{page}" };
 const letterhead = { ...NO_BANDS, footer: { ...NO_SLOTS, left: "ACME" } };
-const fields = { title: "Report", author: "Ada", date: "1 May", file: "" };
+// the strip as it opens without a page, e.g. without the layout engine
+const open = (band: "header" | "footer", settings: BandSettings) =>
+  openStrip(band, settings, null);
 
 // the items of a menu that aren't separators
 const items = (menu: MenuItem[]) =>
@@ -52,7 +55,7 @@ describe("mirror", () => {
 
 describe("openStrip", () => {
   it("takes the band of each of the pages, and what the pages have", () => {
-    const strip = openStrip(
+    const strip = open(
       "header",
       bands({
         header,
@@ -78,49 +81,70 @@ describe("openStrip", () => {
     });
   });
 
-  it("shows the pages whose band the edge shows", () => {
-    expect(openStrip("footer", bands({ firstPage: letterhead })).pages).toBe(
-      "first",
-    );
-    expect(openStrip("footer", bands({ evenPages: letterhead })).pages).toBe(
+  it("shows the band of the page it opens on", () => {
+    const settings = bands({
+      header,
+      firstPage: letterhead,
+      evenPages: letterhead,
+    });
+    expect(openStrip("footer", settings, 1).pages).toBe("first");
+    expect(openStrip("footer", settings, 2).pages).toBe("even");
+    expect(openStrip("footer", settings, 3).pages).toBe("every");
+    // even by the number the page shows
+    expect(openStrip("footer", { ...settings, startNumber: 2 }, 3).pages).toBe(
       "even",
     );
-    expect(openStrip("header", bands({ firstPage: letterhead })).pages).toBe(
+    // a first page without one edits the others'
+    expect(
+      openStrip("header", bands({ header, firstPage: "plain" }), 1).pages,
+    ).toBe("every");
+    expect(openStrip("header", bands({ header }), 2).pages).toBe("every");
+  });
+
+  it("shows the pages that have text without a page", () => {
+    expect(open("footer", bands({ firstPage: letterhead })).pages).toBe(
+      "first",
+    );
+    expect(open("footer", bands({ evenPages: letterhead })).pages).toBe("even");
+    expect(open("header", bands({ firstPage: letterhead })).pages).toBe(
       "every",
     );
   });
 });
 
-describe("pagesShown, tabLabel and stripLabel", () => {
+describe("pagesShown, tabLabel and bandSummary", () => {
   it("shows no tabs while every page has the same band", () => {
-    const strip = openStrip("header", bands());
+    const strip = open("header", bands());
 
     expect(pagesShown(strip)).toEqual(["every"]);
-    expect(stripLabel(strip)).toBe("Header · every page");
-    expect(stripLabel(chooseFirstPage(strip, "plain"))).toBe(
-      "Header · every page but the first",
+    expect(bandSummary(strip)).toBe("on every page");
+    expect(bandSummary(chooseFirstPage(strip, "plain"))).toBe(
+      "not on the first page",
     );
   });
 
   it("names the tabs of the first, odd and even pages", () => {
-    const own = openStrip("footer", bands({ firstPage: letterhead }));
+    const own = open("footer", bands({ firstPage: letterhead }));
     expect(pagesShown(own).map((pages) => tabLabel(own, pages))).toEqual([
-      "First Page",
-      "Other Pages",
+      "First page",
+      "All pages",
     ]);
-    expect(stripLabel(own)).toBe("Footer");
+    expect(bandSummary(own)).toBe("its own on the first page");
 
     const both = toggleEvenPages(own);
     expect(pagesShown(both).map((pages) => tabLabel(both, pages))).toEqual([
-      "First Page",
-      "Odd Pages",
-      "Even Pages",
+      "First page",
+      "Odd pages",
+      "Even pages",
     ]);
+    expect(bandSummary(both)).toBe(
+      "its own on the first page · odd and even pages differ",
+    );
   });
 });
 
 describe("changing the strip", () => {
-  const strip = openStrip("header", bands({ header }));
+  const strip = open("header", bands({ header }));
 
   it("keeps what the slots of the pages shown hold", () => {
     const changed = withSlots(strip, { ...NO_SLOTS, center: "x" });
@@ -174,7 +198,7 @@ describe("stripSettings", () => {
       firstPage: letterhead,
       evenPages: { ...NO_BANDS, footer: { ...NO_SLOTS, right: "{page}" } },
     });
-    const strip = withSlots(showPages(openStrip("header", initial), "first"), {
+    const strip = withSlots(showPages(open("header", initial), "first"), {
       ...NO_SLOTS,
       left: "Title page",
     });
@@ -190,20 +214,20 @@ describe("stripSettings", () => {
 
   it("makes a first page of its own without text plain", () => {
     const initial = bands();
-    const strip = chooseFirstPage(openStrip("header", initial), "own");
+    const strip = chooseFirstPage(open("header", initial), "own");
     expect(stripSettings(strip, initial).firstPage).toBe("plain");
   });
 
   it("leaves even pages like the others once they have none", () => {
     const initial = bands({ evenPages: letterhead });
-    const strip = toggleEvenPages(openStrip("header", initial));
+    const strip = toggleEvenPages(open("header", initial));
     expect(stripSettings(strip, initial).evenPages).toBeNull();
   });
 
   it("keeps the numbering", () => {
     const initial = bands();
     const strip = {
-      ...openStrip("footer", initial),
+      ...open("footer", initial),
       numberStyle: "I" as const,
     };
     expect(stripSettings(strip, initial)).toMatchObject({ numberStyle: "I" });
@@ -213,15 +237,21 @@ describe("stripSettings", () => {
 describe("firstPageMenu", () => {
   it("checks what the first page has, and chooses", () => {
     const choose = vi.fn();
-    const menu = items(firstPageMenu(openStrip("header", bands()), choose));
+    const menu = items(firstPageMenu(open("header", bands()), choose));
 
     expect(
       menu.map(({ label, checked, radio }) => [label, checked, radio]),
     ).toEqual([
-      ["Like the Other Pages", true, true],
+      ["The same as the others", true, true],
       ["None", false, true],
-      ["Its Own", false, true],
+      ["Its own", false, true],
     ]);
+    expect(firstPageLabel(open("header", bands()))).toBe(
+      "The same as the others",
+    );
+    expect(firstPageLabel(open("header", bands({ firstPage: "plain" })))).toBe(
+      "None",
+    );
     menu[2].run?.();
     expect(choose).toHaveBeenCalledWith("own");
   });
@@ -234,27 +264,27 @@ describe("pageNumberMenu", () => {
     setStartNumber: vi.fn(),
   });
 
-  it("offers the page numbers as they read, in the numbering of the strip", () => {
+  it("offers the page numbers as they read on the first page, in the numbering of the strip", () => {
     const strip = {
-      ...openStrip("footer", bands()),
+      ...open("footer", bands()),
       numberStyle: "i" as const,
     };
     const done = actions();
-    const menu = pageNumberMenu(strip, fields, done);
+    const menu = pageNumberMenu(strip, done);
 
     expect(
       menu.map((item) => (item === "separator" ? "-" : item.label)),
     ).toEqual([
-      "iii",
-      "Page iii",
-      "iii of 12",
-      "Page iii of 12",
+      "i",
+      "Page i",
+      "i of 2",
+      "Page i of 2",
       "-",
       "1, 2, 3",
       "i, ii, iii",
       "I, II, III",
       "-",
-      "Start At 1…",
+      "Start at 1…",
     ]);
     items(menu)[3].run?.();
     expect(done.insert).toHaveBeenCalledWith("Page {page} of {pages}");
@@ -265,9 +295,7 @@ describe("pageNumberMenu", () => {
 
   it("takes a first number of 0 or more, as typed", () => {
     const done = actions();
-    const menu = items(
-      pageNumberMenu(openStrip("footer", bands()), fields, done),
-    );
+    const menu = items(pageNumberMenu(open("footer", bands()), done));
     const start = menu[menu.length - 1];
 
     for (const typed of [" 5 ", "0", "", "-1", "1.5", "x"]) {

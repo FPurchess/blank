@@ -9,7 +9,13 @@ import { changesOf } from "../../layout/choices";
 import { layoutWarnings } from "../../layout/describe";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { resolveLayout } from "../../layout/resolve";
-import { BAND_KEYS, PAGE_KEYS, type PageKey } from "../../layout/settings";
+import {
+  BAND_KEYS,
+  PAGE_KEYS,
+  type PageChanges,
+  type PageKey,
+  REMOVE,
+} from "../../layout/settings";
 import { frontmatterOf, readFrontmatter } from "../../markdown";
 import { activeTabId, announce, pageSetup } from "../../state";
 import { changeTab } from "../tabs";
@@ -53,7 +59,9 @@ export const openPageSetup = (view: EditorView) => {
       saveDefaultPage({ ...defaults, ...Object.fromEntries(shown) }, unit)
         .then(() => {
           // the document follows the new default instead of its own settings
-          const own = Object.fromEntries(DIALOG_KEYS.map((key) => [key, null]));
+          const own = Object.fromEntries(
+            DIALOG_KEYS.map((key) => [key, REMOVE]),
+          ) as PageChanges;
           // without tabs, as in tests of other modules, the view's document
           if (tab === null) writePage(view, own, unit);
           else void changeTab(tab, (state) => pageTr(state, own, unit));

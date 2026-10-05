@@ -27,11 +27,7 @@ import {
   tabLabels,
   type,
 } from "../helpers.ts";
-import {
-  BAND_HEIGHT,
-  STATUS_HEIGHT,
-  TOP_BAR_HEIGHT,
-} from "../../src/chrome.ts";
+import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../../src/chrome.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 // CI captures into SHOTS_DIR and proposes the images in a PR; local runs go
@@ -52,9 +48,10 @@ const BOTTOM_STRIP = 80;
 // a GIF of the whole window
 export const FULL = WINDOW_HEIGHT - BOTTOM_STRIP;
 // how much lower the first page starts than when the crops below were set: 24
-// px below the top area (VIEW_TOP), where it once started 56 px below the
+// px below the top area (VIEW_TOP) and 52 px below that, the room "page ends"
+// keeps for its header (HEADER_ROOM), where it once started 56 px below the
 // window's top
-export const SHIFT = TOP_BAR_HEIGHT + 24 - 56;
+export const SHIFT = TOP_BAR_HEIGHT + 24 + 52 - 56;
 // the demo's crop: the writing area and the status bar, 800 × 400
 const DEMO = WINDOW_HEIGHT - BOTTOM_STRIP - 200 + SHIFT;
 
@@ -478,11 +475,14 @@ export class Recorder {
     await this.frame(seconds);
   }
 
-  /** move the mouse onto the top or bottom bar, which shows the hints there */
-  async hover(edge: "top" | "bottom", seconds = 0.8) {
-    const height = await browser.execute(() => window.innerHeight);
-    const y = edge === "top" ? TOP_BAR_HEIGHT + BAND_HEIGHT / 2 : height - 20;
-    await this.moveTo({ x: 400, y }, 0.6);
+  /** move the mouse onto `element` and rest there, e.g. to show a hint */
+  async hover(element: ReturnType<typeof $>, seconds = 0.8) {
+    const { x, y } = await element.getLocation();
+    const { width, height } = await element.getSize();
+    await this.moveTo(
+      { x: Math.round(x + width / 2), y: Math.round(y + height / 2) },
+      0.6,
+    );
     await this.frame(seconds);
   }
 
@@ -585,7 +585,7 @@ export const newDocument = async ({
   await expect(strip).not.toExist();
   await pressMod(Key.Alt, "f");
   await strip.$(".slot.right .ProseMirror").click();
-  await strip.$("button=# Page number ▾").click();
+  await strip.$("button=Page number").click();
   await $("#context-menu").$('[data-id="Page {page} of {pages}"]').click();
   await strip.$("button=Done").click();
   await expect(strip).not.toExist();

@@ -1,8 +1,9 @@
 import {
   type Band,
-  type DocumentFields,
+  bandVariant,
   formatNumber,
   hasText,
+  NO_FIELDS,
   NUMBER_PRESETS,
 } from "./layout/bands";
 import {
@@ -54,9 +55,9 @@ export const NUMBER_STYLES: { style: NumberStyle; label: string }[] = [
 
 export const FIRST_PAGE_CHOICES: { choice: FirstPageChoice; label: string }[] =
   [
-    { choice: "same", label: "Like the Other Pages" },
+    { choice: "same", label: "The same as the others" },
     { choice: "plain", label: "None" },
-    { choice: "own", label: "Its Own" },
+    { choice: "own", label: "Its own" },
   ];
 
 /**
@@ -71,10 +72,16 @@ export const mirror = ({ left, center, right }: Slots): Slots => ({
 
 /**
  * openStrip returns the strip of `band` for the settings as they are. It
- * shows the pages whose band the edge of the window shows: those of every
- * page, or else of the first or even pages.
+ * shows the band of `page` (counted from 1): the first page's own, that of
+ * even pages, or that of every page, also on a first page without one.
+ * Without a page, e.g. without the layout engine, it shows that of every
+ * page, or else of the first or even pages, whichever has text.
  */
-export const openStrip = (band: Band, bands: BandSettings): Strip => {
+export const openStrip = (
+  band: Band,
+  bands: BandSettings,
+  page: number | null,
+): Strip => {
   const own = typeof bands.firstPage === "object" ? bands.firstPage : null;
   const slots = {
     every: bands[band],
@@ -84,7 +91,10 @@ export const openStrip = (band: Band, bands: BandSettings): Strip => {
   const firstPage = own ? "own" : (bands.firstPage as FirstPageChoice);
   const evenPages = bands.evenPages !== null;
   let pages: Pages = "every";
-  if (!hasText(slots.every)) {
+  if (page !== null) {
+    const variant = bandVariant(bands, page);
+    if (variant === "first" || variant === "even") pages = variant;
+  } else if (!hasText(slots.every)) {
     if (own && hasText(slots.first)) pages = "first";
     else if (evenPages && hasText(slots.even)) pages = "even";
   }
@@ -106,20 +116,28 @@ export const pagesShown = ({ firstPage, evenPages }: Strip): Pages[] => [
  * tabLabel names the tab of the pages
  */
 export const tabLabel = ({ evenPages }: Strip, pages: Pages) => {
-  if (pages === "first") return "First Page";
-  if (pages === "even") return "Even Pages";
-  return evenPages ? "Odd Pages" : "Other Pages";
+  if (pages === "first") return "First page";
+  if (pages === "even") return "Even pages";
+  return evenPages ? "Odd pages" : "All pages";
 };
 
 /**
- * stripLabel names the strip: the band and, without tabs, its pages
+ * bandSummary says on which pages the band is, beside its name
  */
-export const stripLabel = (strip: Strip) => {
-  if (pagesShown(strip).length > 1) return NAMES[strip.band];
-  return strip.firstPage === "plain"
-    ? `${NAMES[strip.band]} · every page but the first`
-    : `${NAMES[strip.band]} · every page`;
-};
+export const bandSummary = ({ firstPage, evenPages }: Strip) =>
+  [
+    firstPage === "plain" && "not on the first page",
+    firstPage === "own" && "its own on the first page",
+    evenPages && "odd and even pages differ",
+  ]
+    .filter(Boolean)
+    .join(" · ") || "on every page";
+
+/**
+ * firstPageLabel returns what the first page has, as its button shows it
+ */
+export const firstPageLabel = ({ firstPage }: Strip) =>
+  FIRST_PAGE_CHOICES.find(({ choice }) => choice === firstPage)!.label;
 
 /**
  * withSlots keeps what the slots shown hold
@@ -256,13 +274,11 @@ const readStartNumber = (typed: string) => {
 };
 
 /**
- * pageNumberMenu lists the page numbers to insert, as they read, the
- * numbering and the number of the first page
- * @param fields what the other placeholders show
+ * pageNumberMenu lists the page numbers to insert, as they read on the
+ * first of two pages, the numbering and the number of the first page
  */
 export const pageNumberMenu = (
   strip: Strip,
-  fields: DocumentFields,
   actions: {
     insert(text: string): void;
     setNumberStyle(style: NumberStyle): void;
@@ -270,9 +286,9 @@ export const pageNumberMenu = (
   },
 ): MenuItem[] => {
   const sample = {
-    ...fields,
-    page: formatNumber(3, strip.numberStyle),
-    pages: "12",
+    ...NO_FIELDS,
+    page: formatNumber(1, strip.numberStyle),
+    pages: "2",
     chapter: "",
   };
   return [
@@ -292,7 +308,7 @@ export const pageNumberMenu = (
     "separator",
     {
       id: "start-number",
-      label: `Start At ${strip.startNumber}…`,
+      label: `Start at ${strip.startNumber}…`,
       edit: {
         value: String(strip.startNumber),
         submit: (typed) => {

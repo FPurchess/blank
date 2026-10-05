@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BAND_HEIGHT,
   STATUS_HEIGHT,
   TAB_ROW_HEIGHT,
   TOOLBAR_HEIGHT,
@@ -14,7 +13,6 @@ describe("the heights of the bars", () => {
     expect(TAB_ROW_HEIGHT).toBe(scssNumber("_toparea.scss", "tab-row-height"));
     expect(TOOLBAR_HEIGHT).toBe(scssNumber("_toparea.scss", "toolbar-height"));
     expect(STATUS_HEIGHT).toBe(scssNumber("_statusbar.scss", "status-height"));
-    expect(BAND_HEIGHT).toBe(scssNumber("main.scss", "band-height"));
   });
 
   it("make the top area of its two rows", () => {

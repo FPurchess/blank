@@ -467,7 +467,7 @@ const onMouseDown = (event: MouseEvent) => {
     return;
   }
   if (event.button !== 0) return;
-  // a header or footer opens on a double click, and a press on it leaves
+  // a header or footer opens on a click or double click, and a press on it leaves
   // the selection where it is
   if ((event.target as Element).closest?.(BANDS)) return;
   // a press in the selected text may move it, see onPointerDown

@@ -209,6 +209,40 @@ describe("page view", () => {
     bandEditor.value = null;
   });
 
+  it("offers to add a band in a sheet's margin, and outlines one it has", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    pageView.value = "pages";
+    await nextTick();
+    const margin = (band: string) =>
+      frames()[1].querySelector<HTMLElement>(`.page-band.${band}`)!;
+    // no footer yet: its hint, a button with its tooltip, no title
+    const hint = margin("footer").querySelector<HTMLElement>(".band-hint")!;
+    expect(hint.textContent?.trim()).toBe("+ Footer");
+    expect(hint.dataset.tip).toBe("Add a footer");
+    expect(hint.getAttribute("aria-label")).toBe("Add a footer");
+    expect(margin("footer").hasAttribute("title")).toBe(false);
+    hint.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "footer", page: 2 });
+    bandEditor.value = null;
+
+    // a document with a footer: the band, outlined under the pointer, where
+    // the engine sets it in the margin
+    transaction.value = createState(
+      docWithFrontmatter("page:\n  footer: {center: x}", p("")),
+    ).tr;
+    await nextTick();
+    const target = margin("footer").querySelector<HTMLElement>(".band-target")!;
+    expect(target.dataset.tip).toBe("Edit the footer");
+    expect(parseFloat(target.style.width)).toBeGreaterThan(0);
+    expect(parseFloat(target.style.top)).toBeGreaterThan(0);
+    expect(
+      parseFloat(target.style.top) + parseFloat(target.style.height),
+    ).toBeLessThanOrEqual(parseFloat(margin("footer").style.height));
+    // the header has none yet
+    expect(margin("header").querySelector(".band-hint")).not.toBeNull();
+  });
+
   it("opens the strip of a band double-clicked on a sheet or where a page ends", async () => {
     layOut();
     const editor = new EditorView(document.createElement("div"), {
@@ -240,10 +274,11 @@ describe("page view", () => {
     bandEditor.value = null;
     pageView.value = "page-ends";
     await nextTick();
+    // a click on a mark's header opens the next page's
     frames()[0]
       .querySelector<HTMLElement>(".page-end .band.header")!
-      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(bandEditor.value).toMatchObject({ band: "header" });
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "header", page: 2 });
     bandEditor.value = null;
     editor.destroy();
   });
@@ -399,9 +434,9 @@ describe("page view", () => {
     );
     const layout = shown("page-ends");
     expect(layout.footerRoom).toBeGreaterThan(0);
-    // a double click opens the footer's strip
-    lastFooter()!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(bandEditor.value).toMatchObject({ band: "footer" });
+    // a click opens the footer's strip, on its page
+    lastFooter()!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "footer", page: 1 });
     bandEditor.value = null;
     // the sheets show it themselves
     pageView.value = "pages";
@@ -422,8 +457,12 @@ describe("page view", () => {
       header: { left: "", center: "", right: "" },
       footer: { left: "Even", center: "", right: "" },
     };
-    // two pages
+    // two pages, of a document with a footer, which the marks show rather
+    // than offering to add one
     const two = doc(...Array.from({ length: 18 }, () => p(LONG)));
+    transaction.value = createState(
+      docWithFrontmatter("page:\n  footer: {left: Odd}", p("")),
+    ).tr;
     layOutWith(two, { footer, evenPages });
     dispose = bootApp(createTestHandle(createState(two, { cursor: 3 })));
     await nextTick();
@@ -464,8 +503,8 @@ describe("page view", () => {
         (name) => (name as HTMLElement).dataset.field,
       ),
     ).toEqual(["author", "author"]);
-    first.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(bandEditor.value).toMatchObject({ band: "header" });
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "header", page: 1 });
     bandEditor.value = null;
     // on the sheet, over the slots the engine painted
     pageView.value = "pages";

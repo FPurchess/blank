@@ -15,12 +15,14 @@ import type {
 export const VIEW_TOP = 24;
 // the room between a header or footer and the page's text in "page ends"
 export const BAND_GAP = 32;
+// the line of a header or footer in "page ends"
+export const BAND_ROW = 20;
 // room above the first page's text in "page ends" for its header, between
 // the view's top and the first frame: its line, and the gap below it
-export const HEADER_ROOM = 20 + BAND_GAP;
+export const HEADER_ROOM = BAND_ROW + BAND_GAP;
 // room below the last page's text in "page ends" for its footer, which no
 // mark shows there: the gap above it, and its line
-export const FOOTER_ROOM = BAND_GAP + 20;
+export const FOOTER_ROOM = BAND_GAP + BAND_ROW;
 export const VIEW_BOTTOM = 72;
 // between the sheets, and around them
 export const SHEET_GAP = 24;

@@ -1,5 +1,9 @@
-import { commandShortcut } from "../editor/keyBindings";
-import { BLEED, type FrameLayout } from "../engine/frames";
+import {
+  BAND_GAP,
+  BAND_ROW,
+  BLEED,
+  type FrameLayout,
+} from "../engine/frames";
 import {
   BAND,
   type Band,
@@ -12,7 +16,6 @@ import type { Layout } from "../layout/resolve";
 import { SLOTS } from "../layout/settings";
 import { segments } from "../layout/tokens";
 import type { PageLayoutState } from "../state/pageView";
-import { bandCommand } from "./bandStripsModel";
 
 // What the page view shows besides the pages, see src/engine/frames.ts for
 // where they are.
@@ -92,37 +95,100 @@ export const lastFooterPlace = (layout: FrameLayout) => {
   };
 };
 
+// the height of the hint that adds a header or footer
+const HINT_HEIGHT = 24;
+
+/**
+ * edgeHintPlace returns where "page ends" offers to add a header above the
+ * first page's text, or a footer below the last page's, while the document
+ * has none, in the room the desk keeps there: right above the text, or a
+ * gap below it, where the footer would show. The sheets of "pages" offer
+ * it in their margins.
+ */
+export const edgeHintPlace = (layout: FrameLayout, band: Band) => {
+  if (layout.mode === "pages") return null;
+  const frame =
+    band === "header"
+      ? layout.frames[0]
+      : layout.frames[layout.frames.length - 1];
+  if (!frame) return null;
+  const inset = insetOf(layout);
+  return {
+    left: frame.left + inset,
+    top:
+      band === "header"
+        ? Math.max(0, frame.top - HINT_HEIGHT)
+        : frame.top + frame.height + BAND_GAP,
+    width: frame.width - 2 * inset,
+    height: HINT_HEIGHT,
+  };
+};
+
 // a band's line on a sheet, at the natural 1.3 em of IBM Plex Sans, as the
 // layout engine sets it (BAND_LINE in src-tauri/layout/src/bands.rs)
 const BAND_LINE = BAND.size * 1.3;
 
+// a page's size and margins, in points
+type PageSetup = Pick<PageLayoutState, "width" | "height" | "margins">;
+
+// a box in pixels
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * bandBox returns where the engine sets a sheet's header or footer, in
+ * pixels from the sheet's top left corner: as wide as the text, the header
+ * `BAND.distance` below the top edge and the footer as far above the bottom
+ * one, moved down by what the margin leaves beyond that and one band line
+ * (band_boxes in src-tauri/layout/src/engine/display.rs)
+ * @param page the size and margins of the page, in points
+ * @param scale CSS pixels per point
+ */
+export const bandBox = (page: PageSetup, band: Band, scale: number) => {
+  const { margins } = page;
+  const top =
+    band === "header"
+      ? BAND.distance
+      : page.height -
+        margins.bottom +
+        Math.max(0, margins.bottom - BAND.distance - BAND_LINE);
+  return {
+    left: margins.left * scale,
+    top: top * scale,
+    width: (page.width - margins.left - margins.right) * scale,
+    height: BAND_LINE * scale,
+    // the size of its text
+    size: BAND.size * scale,
+  };
+};
+
 /**
  * sheetSlots returns the slots of a sheet's header and footer that name a
  * placeholder that comes out empty, with where the engine sets them on the
- * sheet, in pixels: a third of the text's width each, the header `BAND
- * .distance` below the top edge and the footer as far above the bottom one
- * (band_boxes in src-tauri/layout/src/engine/display.rs). The engine paints
- * their text; the page view names the placeholders over it.
+ * sheet, in pixels: a third of the band's width each (bandBox). The engine
+ * paints their text; the page view names the placeholders over it.
  * @param slots the six slots of the page, see pageBandParts
  * @param page the size and margins of the page, in points
  * @param scale CSS pixels per point
  */
 export const sheetSlots = (
   slots: BandPart[][],
-  page: Pick<PageLayoutState, "width" | "height" | "margins">,
+  page: PageSetup,
   scale: number,
 ) => {
-  const { margins } = page;
-  const width = (page.width - margins.left - margins.right) / 3;
-  const tops = [
-    BAND.distance,
-    page.height -
-      margins.bottom +
-      Math.max(0, margins.bottom - BAND.distance - BAND_LINE),
-  ];
+  const boxes = {
+    header: bandBox(page, "header", scale),
+    footer: bandBox(page, "footer", scale),
+  };
   return slots.flatMap((parts, index) => {
     if (!parts.some((part) => "field" in part)) return [];
     const slot = SLOTS[index % 3];
+    const box = boxes[index < 3 ? "header" : "footer"];
+    const width = box.width / 3;
     return [
       {
         key: index,
@@ -146,23 +212,140 @@ export const sheetSlots = (
         // painted, so their names take its place as the text would; beside
         // painted text, they go where their placeholders are in it
         named: parts.every((part) => "field" in part || !part.text.trim()),
-        left: (margins.left + width * (index % 3)) * scale,
-        top: tops[Math.floor(index / 3)] * scale,
-        width: width * scale,
-        height: BAND_LINE * scale,
-        size: BAND.size * scale,
+        left: box.left + width * (index % 3),
+        top: box.top,
+        width,
+        height: box.height,
+        size: box.size,
       },
     ];
   });
 };
 
+// the size of the text of the bands "page ends" shows, in pixels, at every
+// scale (.page-end in main.scss)
+export const PAGE_END_BAND_SIZE = 11;
+
 /**
- * bandTitle returns the tooltip of a header or footer on the pages, which
- * opens its strip on a double click
+ * bandPlace returns where a page's header or footer is on the desk, and the
+ * sheet or text it belongs to, in pixels: on the sheet in "pages" (bandBox);
+ * in "page ends" the line above or below the page's text, a gap away, as the
+ * marks where pages end and the first page's header and last page's footer
+ * show it, also where the layout keeps no room for one yet
+ * @param page the page, counted from 0
+ * @param box the size and margins of the pages, in points
  */
-export const bandTitle = (band: Band) => {
-  const key = commandShortcut(bandCommand(band));
-  return `Double-click to edit the ${band}${key ? ` (${key})` : ""}`;
+export const bandPlace = (
+  layout: FrameLayout,
+  page: number,
+  band: Band,
+  box: PageSetup,
+): { sheet: Rect; band: Rect & { size: number } } | null => {
+  const frame = layout.frames[page];
+  if (!frame) return null;
+  const sheet = {
+    left: frame.left,
+    top: frame.top,
+    width: frame.width,
+    height: frame.height,
+  };
+  if (layout.mode === "pages") {
+    const placed = bandBox(box, band, layout.scale);
+    return {
+      sheet,
+      band: {
+        ...placed,
+        left: frame.left + placed.left,
+        top: frame.top + placed.top,
+      },
+    };
+  }
+  const inset = insetOf(layout);
+  return {
+    sheet,
+    band: {
+      left: frame.left + inset,
+      top:
+        band === "header"
+          ? Math.max(0, frame.top - BAND_GAP - BAND_ROW)
+          : frame.top + frame.height + BAND_GAP,
+      width: frame.width - 2 * inset,
+      height: BAND_ROW,
+      size: PAGE_END_BAND_SIZE,
+    },
+  };
+};
+
+// how far the strip of a band keeps from it and from the window's edges
+const STRIP_GAP = 8;
+
+/**
+ * stripPlace returns where the strip that edits a band goes in the window:
+ * as wide as the band's sheet but within the window, beside the slots over
+ * the band (slotRowPlace), below a header and above a footer, or on the
+ * other side where the view has no room for it there, and inside the view
+ * @param sheet the sheet and `band` the band, in the window
+ * @param view the page view's box in the window
+ * @param height the strip's height
+ * @param windowWidth the window's width
+ */
+export const stripPlace = ({
+  sheet,
+  band,
+  which,
+  view,
+  height,
+  windowWidth,
+}: {
+  sheet: Rect;
+  band: Rect & { size: number };
+  which: Band;
+  view: Rect;
+  height: number;
+  windowWidth: number;
+}) => {
+  const slots = slotRowPlace(band);
+  const below = slots.top + slots.height + STRIP_GAP;
+  const above = slots.top - height - STRIP_GAP;
+  const highest = view.top + STRIP_GAP;
+  const lowest = view.top + view.height - height - STRIP_GAP;
+  const fitsBelow = below <= lowest;
+  const fitsAbove = above >= highest;
+  const top =
+    which === "header"
+      ? fitsBelow || !fitsAbove
+        ? below
+        : above
+      : fitsAbove || !fitsBelow
+        ? above
+        : below;
+  return {
+    left: Math.max(STRIP_GAP, sheet.left),
+    top: Math.max(highest, Math.min(top, lowest)),
+    width: Math.min(sheet.width, windowWidth - 2 * STRIP_GAP),
+  };
+};
+
+// the least height of a slot being edited, and how far it reaches beyond
+// the band's text on each side
+const SLOT_HEIGHT = 28;
+const SLOT_BLEED = 6;
+
+/**
+ * slotRowPlace returns where the slots that edit a band go: over the band,
+ * a little wider, and at least as high as a control, with its text no
+ * smaller than the controls'
+ * @param band the band in the window, with its text's size
+ */
+export const slotRowPlace = (band: Rect & { size: number }) => {
+  const height = Math.max(SLOT_HEIGHT, band.height);
+  return {
+    left: band.left - SLOT_BLEED,
+    top: band.top + (band.height - height) / 2,
+    width: band.width + 2 * SLOT_BLEED,
+    height,
+    fontSize: Math.max(12, band.size),
+  };
 };
 
 /**

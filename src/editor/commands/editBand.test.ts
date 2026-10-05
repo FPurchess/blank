@@ -1,12 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history, undo } from "prosemirror-history";
 
+import { pageInView } from "../../engine/geometry";
 import { NO_SLOTS } from "../../layout/settings";
 import { announcement, bandEditor } from "../../state";
 import { doc, docWithFrontmatter, h, p } from "../../test/editor";
 import { editBand, openBand } from "./editBand";
+
+vi.mock("../../engine/geometry", async (original) => ({
+  ...(await original<typeof import("../../engine/geometry")>()),
+  pageInView: vi.fn(() => null),
+}));
 
 let view: EditorView;
 
@@ -45,12 +51,24 @@ describe("command.editBand", () => {
 
     expect(request()).toMatchObject({
       band: "header",
+      // without pages, no page
+      page: null,
       bands: {
         header: { ...NO_SLOTS, left: "{title}" },
         firstPage: "plain",
       },
-      fields: { title: "Hi", author: "", file: "" },
     });
+  });
+
+  it("opens on the page in view, or on the page it's given", () => {
+    vi.mocked(pageInView).mockReturnValue(2);
+    mount(doc(p("text")));
+
+    editBand("footer")(view.state, view.dispatch, view);
+    expect(request().page).toBe(3);
+
+    editBand("footer", 5)(view.state, view.dispatch, view);
+    expect(request().page).toBe(5);
   });
 
   it("does nothing without a view", () => {
@@ -119,6 +137,34 @@ describe("command.editBand", () => {
     expect(announcement.value?.text).toMatch(
       /^The header is empty on this page: no author is set and the document has no chapter heading yet\. Add an author to the properties at the top of the file\.$/,
     );
+  });
+
+  it("tells about the page it was edited on", () => {
+    // the first page has a header of its own, which shows; page 2 has the
+    // others', whose author is missing
+    mount(
+      docWithFrontmatter(
+        'page:\n  first-page:\n    header: { left: "ACME" }',
+        p("text"),
+      ),
+    );
+    openBand(view, "header", 2);
+    const strip = request();
+    strip.apply({
+      ...strip.bands,
+      header: { ...NO_SLOTS, left: "{author}" },
+    });
+    expect(announcement.value?.text).toMatch(
+      /^The header is empty on this page: no author is set/,
+    );
+    announcement.value = null;
+    openBand(view, "header", 1);
+    const first = request();
+    first.apply({
+      ...first.bands,
+      header: { ...NO_SLOTS, left: "{author}" },
+    });
+    expect(announcement.value).toBeNull();
   });
 
   it("tells nothing when the band shows something", () => {

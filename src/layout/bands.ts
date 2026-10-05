@@ -52,21 +52,43 @@ export const hasText = (slots: Slots) => SLOTS.some((slot) => slots[slot]);
 export const pageNumber = (layout: Pick<Layout, "startNumber">, page: number) =>
   page + layout.startNumber - 1;
 
+// which header and footer a page has: the first page's own, none, those of
+// even pages or those of every page
+export type BandVariant = "first" | "none" | "even" | "every";
+
 /**
- * bandsOn returns the header and footer of a page: the first page's own or
- * none, those of even pages, or those of every page. Like in Word, a page is
- * even by the number it shows.
+ * bandVariant returns which header and footer a page has: the first page's
+ * own or none, those of even pages, or those of every page. Like in Word, a
+ * page is even by the number it shows.
+ * @param page the page, counted from 1
+ */
+export const bandVariant = (
+  bands: Pick<BandSettings, "firstPage" | "evenPages" | "startNumber">,
+  page: number,
+): BandVariant => {
+  if (page === 1 && bands.firstPage !== "same") {
+    return bands.firstPage === "plain" ? "none" : "first";
+  }
+  if (bands.evenPages && pageNumber(bands, page) % 2 === 0) return "even";
+  return "every";
+};
+
+/**
+ * bandsOn returns the header and footer of a page, see bandVariant
  * @param layout the layout of the document
  * @param page the page, counted from 1
  */
 export const bandsOn = (layout: Layout, page: number): Bands => {
-  if (page === 1 && layout.firstPage !== "same") {
-    return layout.firstPage === "plain" ? NO_BANDS : layout.firstPage;
+  switch (bandVariant(layout, page)) {
+    case "none":
+      return NO_BANDS;
+    case "first":
+      return layout.firstPage as Bands;
+    case "even":
+      return layout.evenPages!;
+    case "every":
+      return { header: layout.header, footer: layout.footer };
   }
-  if (layout.evenPages && pageNumber(layout, page) % 2 === 0) {
-    return layout.evenPages;
-  }
-  return { header: layout.header, footer: layout.footer };
 };
 
 /**

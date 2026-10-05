@@ -4,17 +4,9 @@ import { TextSelection } from "prosemirror-state";
 import {
   chip,
   createSlotEditor,
-  printedParts,
   type SlotEditor,
   slotText,
 } from "./slotEditor";
-
-const fields = {
-  title: "The Lighthouse",
-  author: "",
-  date: "27 September 2026",
-  file: "",
-};
 
 let editor: SlotEditor | undefined;
 
@@ -27,7 +19,7 @@ const keys = () => ({
 const mount = (text: string, handlers = keys()) => {
   const place = document.createElement("div");
   document.body.append(place);
-  editor = createSlotEditor(place, text, fields, handlers);
+  editor = createSlotEditor(place, text, handlers, "Footer, left");
   return { editor, place, handlers };
 };
 
@@ -55,8 +47,14 @@ describe("slot editor", () => {
 
     expect(
       [...place.querySelectorAll(".chip")].map((c) => c.textContent),
-    ).toEqual(["page", "pages"]);
+    ).toEqual(["Page", "Pages"]);
     expect(editor!.text()).toBe("Page {page} of {pages}, {{x}");
+  });
+
+  it("is a text box named for screen readers", () => {
+    mount("");
+    expect(editor!.view.dom.getAttribute("role")).toBe("textbox");
+    expect(editor!.view.dom.getAttribute("aria-label")).toBe("Footer, left");
   });
 
   it("marks an empty slot for its placeholder", () => {
@@ -137,29 +135,15 @@ describe("slotText", () => {
   });
 });
 
-describe("printedParts and chip", () => {
-  it("writes the title and author as text, the page numbers as chips", () => {
-    expect(printedParts("{title} {author}· {page}", fields)).toEqual([
-      { text: "The Lighthouse" },
-      { text: " " },
-      { text: "" },
-      { text: "· " },
-      { field: "page", title: "Page number", text: "page" },
-    ]);
-  });
-
-  it("writes the date and file as text, the chapter as a chip", () => {
-    const parts = printedParts("{date}, {file}, {chapter}", fields);
-
-    expect(parts.map((part) => part.text).join("")).toBe(
-      "27 September 2026, , chapter",
-    );
-    expect(parts.filter((part) => "field" in part)).toHaveLength(1);
-  });
-
-  it("names chips and falls back to their name without a value", () => {
-    expect(chip("author", fields).textContent).toBe("Author");
-    expect(chip("pages", fields).title).toBe("Number of pages");
-    expect(chip("page", fields).dataset.field).toBe("page");
+describe("chip", () => {
+  it("shows a placeholder's name and reads as its longer one", () => {
+    const page = chip("page");
+    expect(page.textContent).toBe("Page");
+    expect(page.dataset.field).toBe("page");
+    expect(page.getAttribute("role")).toBe("img");
+    expect(page.getAttribute("aria-label")).toBe("Page number");
+    expect(page.hasAttribute("title")).toBe(false);
+    expect(chip("title").textContent).toBe("Title");
+    expect(chip("file").getAttribute("aria-label")).toBe("File name");
   });
 });

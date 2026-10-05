@@ -329,8 +329,10 @@ const KEYS = {
     flow: "inner",
     read: readEvenPages,
     same: sameBands,
-    // null is written by removing the key
-    write: (bands: Bands) => writeBands(bands),
+    // none of their own as "same", which says so over a user's default
+    // that has them
+    write: (bands: Bands | null) =>
+      bands === null ? "same" : writeBands(bands),
   },
   numberStyle: {
     name: "number-style",
@@ -442,9 +444,13 @@ export const pageSettingsJSON = (settings: PageSettings, unit: Unit) =>
     ]),
   );
 
+// a change that removes a key of the page setup, so the user's default
+// applies; apart from null, which is a value of some settings, e.g. even
+// pages without their own header and footer
+export const REMOVE = Symbol("remove");
+
 export type PageChanges = {
-  // null removes the key, so the default applies
-  [K in PageKey]?: PageSettings[K] | null;
+  [K in PageKey]?: PageSettings[K] | typeof REMOVE;
 };
 
 // a value as YAML, on one line or with its values on one line each
@@ -472,7 +478,7 @@ const yamlValue = (
  * value already means the change is left as it was written, e.g. "25mm"
  * for 2.5 cm, and an empty `page` is removed.
  * @param document the frontmatter, changed in place
- * @param changes the settings to set, or null to remove
+ * @param changes the settings to set, or REMOVE to remove
  * @param unit the unit to write new lengths in
  * @returns whether the document changed
  */
@@ -491,7 +497,7 @@ export const writePageSettings = (
     const path = ["page", handler(key).name];
     const present = document.hasIn(path);
     if (change === undefined) continue;
-    if (change === null) {
+    if (change === REMOVE) {
       if (present) document.deleteIn(path);
       changed ||= present;
     } else if (!present || !handler(key).same(written[key], change)) {

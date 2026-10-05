@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { READING_LINE } from "../chrome";
+import { READING_LINE } from "./chrome";
 import { sectionAt } from "./readingLine";
 
 describe("sectionAt", () => {

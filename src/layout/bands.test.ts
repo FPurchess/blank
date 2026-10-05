@@ -4,6 +4,7 @@ import { doc, docWithFrontmatter, h, p } from "../test/editor";
 import { testLayout } from "../test/layout";
 import {
   bandsOn,
+  bandVariant,
   documentFields,
   fieldValues,
   fileName,
@@ -54,6 +55,29 @@ describe("bandsOn", () => {
       startNumber: 0,
     });
     expect(bandsOn(layout, 1)).toEqual(NO_BANDS);
+  });
+});
+
+describe("bandVariant", () => {
+  const bands = (settings: Partial<Parameters<typeof bandVariant>[0]>) => ({
+    firstPage: "same" as const,
+    evenPages: null,
+    startNumber: 1,
+    ...settings,
+  });
+
+  it("names which header and footer a page has", () => {
+    expect(bandVariant(bands({}), 1)).toBe("every");
+    expect(bandVariant(bands({ firstPage: "plain" }), 1)).toBe("none");
+    expect(bandVariant(bands({ firstPage: letterhead }), 1)).toBe("first");
+    expect(bandVariant(bands({ firstPage: letterhead }), 3)).toBe("every");
+    expect(bandVariant(bands({ evenPages }), 2)).toBe("even");
+    expect(bandVariant(bands({ evenPages }), 3)).toBe("every");
+  });
+
+  it("counts even pages by the number they show", () => {
+    expect(bandVariant(bands({ evenPages, startNumber: 2 }), 1)).toBe("even");
+    expect(bandVariant(bands({ evenPages, startNumber: 2 }), 2)).toBe("every");
   });
 });
 

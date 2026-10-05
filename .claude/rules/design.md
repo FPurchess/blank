@@ -83,7 +83,6 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - It sets `data-tip` (the name: the command's label unless given) and `data-tip-key` (the command's shortcut via `commandShortcut`, unless `key` gives one).
   - For a command, it also sets `aria-keyshortcuts`.
 - **Never use `title` on a control.** A tooltip is a name, optionally with its state ("Spelling: loading German"), plus the shortcut, never an instruction ("click for…"). Sentences over the pages (link hints, "Double-click to edit…") stay native titles.
-- **Not moved yet:** the header and footer strip (`BandEditor.vue`) keeps its `title`s and its Title Case labels ("First Page ▾", "Odd & Even Pages") until the part of the redesign that rebuilds it.
 - **Behavior:**
   - It shows once the pointer has rested on the control for 400ms with no button held (`hoverIntent.ts`, the timer cards share).
   - It goes at once on leave, press, key, wheel, scroll or blur, and stays away from a control pressed or typed on until the pointer leaves it.

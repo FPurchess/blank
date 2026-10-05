@@ -14,6 +14,7 @@ import {
   type Margins,
   type Orientation,
   type PageChanges,
+  REMOVE,
   type PageSettings,
   portrait,
   sameMargins,
@@ -262,7 +263,7 @@ export const changesOf = (
   return Object.fromEntries(
     differences(before, after, locale).map((key) => [
       key,
-      fromDefaults.includes(key) ? after[key] : null,
+      fromDefaults.includes(key) ? after[key] : REMOVE,
     ]),
   );
 };

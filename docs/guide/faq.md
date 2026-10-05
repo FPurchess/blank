@@ -26,7 +26,7 @@ No. There's no account, and nothing you write leaves your computer. Blank downlo
 
 ## Can I use the mouse?
 
-Yes, though every command also has a key. You can click to place the cursor, select text and drag it somewhere else, double-click a header or footer to change it, and `Mod` + Click a link to open it. The [toolbar](./writing#toolbar) formats and inserts with a click, the [tabs](./writing#tabs) switch, close and move with the mouse, and [tables](./tables) have handles for it too.
+Yes, though every command also has a key. You can click to place the cursor, select text and drag it somewhere else, click a header or footer on the page to change it or point at a margin to add one, and `Mod` + Click a link to open it. The [toolbar](./writing#toolbar) formats and inserts with a click, the [tabs](./writing#tabs) switch, close and move with the mouse, and [tables](./tables) have handles for it too.
 
 On Linux, middle-click pastes as in your other apps: the text you select in Blank is the one a middle click pastes elsewhere, and a middle click in Blank pastes the text you selected last, in Blank or in any other app, right where you click. It comes in as plain text.
 

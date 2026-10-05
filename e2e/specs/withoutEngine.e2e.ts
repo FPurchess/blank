@@ -62,11 +62,26 @@ describe("without the layout engine", () => {
     expect(font).toMatch(/IBM Plex Sans/);
   });
 
-  it("shows the header at the top edge", async () => {
-    await expect($("#band-header")).toBeDisplayed();
-    await expect($("#band-header .band-line")).toHaveText(
-      expect.stringContaining("plain"),
+  it("edits the header at the top edge, with its slots in the strip", async () => {
+    await focusEditor();
+    await pressMod(Key.Alt, "h");
+    const strip = $("#band-editor");
+    await expect(strip).toBeDisplayed();
+    await expect(strip).toHaveElementClass("at-edge");
+    await expect(strip.$(".slot.left .chip")).toHaveText("Title");
+    const [card, slots] = await browser.execute(() =>
+      [".band-card", ".band-slots"].map(
+        (selector) =>
+          document
+            .querySelector(`#band-editor ${selector}`)!
+            .getBoundingClientRect()
+            .toJSON() as { top: number; bottom: number },
+      ),
     );
+    // the slots below the strip's controls, in the same card
+    expect(slots.top).toBeGreaterThanOrEqual(card.bottom - 1);
+    await browser.keys(Key.Escape);
+    await expect(strip).not.toExist();
   });
 
   it("keeps the text in view while typing past the fold", async () => {

@@ -17,6 +17,7 @@ import {
   DEFAULT_PAGE,
   NO_SLOTS,
   type PageSettings,
+  REMOVE,
 } from "./settings";
 import { cm, mm } from "../test/layout";
 
@@ -331,7 +332,24 @@ describe("changesOf", () => {
         }),
         DEFAULT_PAGE,
       ),
-    ).toEqual({ size: null, orientation: null, margins: null });
+    ).toEqual({ size: REMOVE, orientation: REMOVE, margins: REMOVE });
+  });
+
+  it("writes even pages like the others over a default that has their own", () => {
+    const defaults = {
+      ...DEFAULT_PAGE,
+      evenPages: { header: { ...NO_SLOTS, left: "{page}" }, footer: NO_SLOTS },
+    };
+    expect(
+      change(defaults, { ...defaults, evenPages: null }, defaults),
+    ).toEqual({ evenPages: null });
+  });
+
+  it("writes a first page like the others over a default that has none", () => {
+    const defaults: PageSettings = { ...DEFAULT_PAGE, firstPage: "plain" };
+    expect(
+      change(defaults, { ...defaults, firstPage: "same" }, defaults),
+    ).toEqual({ firstPage: "same" });
   });
 
   it("follows the user's defaults", () => {

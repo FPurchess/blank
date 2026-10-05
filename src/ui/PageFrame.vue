@@ -17,10 +17,12 @@ import { imagesLoaded, loadedImage } from "../engine/images";
 import { FIELD_NAMES, pageBandParts } from "../layout/placeholders";
 import { pageFields, pageLayout, pageLayoutState, path, theme } from "../state";
 import BandSlots from "./BandSlots.vue";
+import { shownAtRest } from "./bandStripsModel";
+import BandTarget from "./BandTarget.vue";
 import { layerOf } from "./pageLayer";
 import { shownMarks } from "./pageMarks";
 import { frameRenders, layerDisplay } from "./pageLayers";
-import { bandTitle, endMark, selectedBoxes, sheetSlots } from "./pageViewModel";
+import { bandBox, endMark, selectedBoxes, sheetSlots } from "./pageViewModel";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends, unless it's
@@ -63,9 +65,18 @@ const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
 const selectedCanvas = useTemplateRef<HTMLCanvasElement>("selectedCanvas");
 const editor = useEditor();
 
-// a double click on a header or footer opens its strip, which takes the
-// focus, as in Word; a single one there leaves the text as it is
-const openBand = (band: Band) => editor.run(editBand(band), { focus: false });
+// a double click on a sheet's top or bottom margin opens its header or
+// footer, which takes the focus, as in Word; a single one there leaves the
+// text as it is
+const openBand = (band: Band) =>
+  editor.run(editBand(band, props.page + 1), { focus: false });
+
+// whether the document has a header and a footer: where it has none, the
+// margins and marks offer to add one
+const adding = computed(() => ({
+  header: shownAtRest(pageLayout.value.settings, "header") === undefined,
+  footer: shownAtRest(pageLayout.value.settings, "footer") === undefined,
+}));
 
 // the header and footer margins of a sheet, in pixels, 0 where the page
 // ends show no margins; numbers, so a layout with the same margins renders
@@ -237,17 +248,36 @@ const pageBox = computed(() => {
   const { top, right, bottom, left } = state.margins;
   return [state.width, state.height, top, right, bottom, left].join(",");
 });
-const named = computed(() => {
-  if (!props.sheet || !pageEngine || !pageBox.value) return [];
-  void props.bandVersion;
+const setup = computed(() => {
+  if (!pageBox.value) return null;
   const [width, height, top, right, bottom, left] = pageBox.value
     .split(",")
     .map(Number);
-  return sheetSlots(
-    bandsOf(props.page),
-    { width, height, margins: { top, right, bottom, left } },
-    props.scale,
-  );
+  return { width, height, margins: { top, right, bottom, left } };
+});
+const named = computed(() => {
+  if (!props.sheet || !pageEngine || !setup.value) return [];
+  void props.bandVersion;
+  return sheetSlots(bandsOf(props.page), setup.value, props.scale);
+});
+// where a sheet's header and footer are in their margins, which a click
+// opens, outlined under the pointer
+const px = (value: number) => `${value}px`;
+const targets = computed(() => {
+  if (!props.sheet || !setup.value) return null;
+  const at = (band: Band, margin: number) => {
+    const box = bandBox(setup.value!, band, props.scale);
+    return {
+      left: px(box.left),
+      top: px(box.top - margin),
+      width: px(box.width),
+      height: px(box.height),
+    };
+  };
+  return {
+    header: at("header", 0),
+    footer: at("footer", props.height - marginBottom.value),
+  };
 });
 </script>
 
@@ -286,18 +316,28 @@ const named = computed(() => {
     <template v-if="sheet">
       <div
         class="page-band header"
-        :title="bandTitle('header')"
-        aria-hidden="true"
         :style="{ height: `${marginTop}px` }"
         @dblclick="openBand('header')"
-      />
+      >
+        <BandTarget
+          band="header"
+          :page="page"
+          :adding="adding.header"
+          :style="adding.header ? undefined : targets?.header"
+        />
+      </div>
       <div
         class="page-band footer"
-        :title="bandTitle('footer')"
-        aria-hidden="true"
         :style="{ height: `${marginBottom}px` }"
         @dblclick="openBand('footer')"
-      />
+      >
+        <BandTarget
+          band="footer"
+          :page="page"
+          :adding="adding.footer"
+          :style="adding.footer ? undefined : targets?.footer"
+        />
+      </div>
     </template>
     <div
       v-if="mark"
@@ -305,23 +345,25 @@ const named = computed(() => {
       aria-hidden="true"
       :style="{ '--band-inset': bandInset }"
     >
-      <div
+      <BandTarget
         class="band footer"
-        :title="bandTitle('footer')"
-        @dblclick="openBand('footer')"
+        band="footer"
+        :page="page"
+        :adding="adding.footer"
       >
         <BandSlots :slots="mark.footer" />
-      </div>
+      </BandTarget>
       <div class="line">
         <span v-if="mark.number" class="number">{{ mark.number }}</span>
       </div>
-      <div
+      <BandTarget
         class="band header"
-        :title="bandTitle('header')"
-        @dblclick="openBand('header')"
+        band="header"
+        :page="page + 1"
+        :adding="adding.header"
       >
         <BandSlots :slots="mark.header" />
-      </div>
+      </BandTarget>
     </div>
     <div
       v-for="band in named"

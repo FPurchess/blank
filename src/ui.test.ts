@@ -65,13 +65,11 @@ describe("ui", () => {
     expect(document.getElementById("ui-app")).toBeNull();
   });
 
-  it("puts the header and footer strips first in the app", () => {
-    // the table toolbar and the strips share a z-index, so the later one
-    // paints on top: the strips come before everything else
+  it("puts the bars in the app, and no header or footer being edited", () => {
     const app = [...document.querySelectorAll("#ui-app > [id]")].map(
       (e) => e.id,
     );
-    expect(app.slice(0, 2)).toEqual(["band-header", "band-footer"]);
+    expect(app).not.toContain("band-editor");
     expect(app).toContain("table-handles");
     expect(app.indexOf("ui-top")).toBeLessThan(app.indexOf("ui-bottom"));
   });

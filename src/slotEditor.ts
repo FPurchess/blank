@@ -5,7 +5,7 @@ import { Fragment, type Node, Schema, Slice } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
-import type { DocumentFields } from "./layout/bands";
+import { FIELD_NAMES } from "./layout/placeholders";
 import { escape, type Field, segments } from "./layout/tokens";
 
 // The editor of one slot of a header or footer strip: a line of text with
@@ -36,8 +36,9 @@ export const slotSchema = new Schema({
   },
 });
 
-// what a chip is called, for its tooltip
-const FIELD_NAMES: Record<Field, string> = {
+// what a chip is called for screen readers, a little longer than the name
+// it shows (FIELD_NAMES in src/layout/placeholders.ts), e.g. "Page number"
+const SPOKEN_NAMES: Record<Field, string> = {
   page: "Page number",
   pages: "Number of pages",
   title: "Title",
@@ -47,59 +48,20 @@ const FIELD_NAMES: Record<Field, string> = {
   file: "File name",
 };
 
-// the placeholders that differ from page to page, which read as their name
-const PER_PAGE = new Set<Field>(["page", "pages", "chapter"]);
-
-// what a placeholder shows: its value, or the name of one that differs per
-// page or has no value, e.g. an untitled document's file name
-const shown = (field: Field, fields: DocumentFields) =>
-  PER_PAGE.has(field)
-    ? field
-    : fields[field as keyof DocumentFields] || FIELD_NAMES[field];
-
-// what a slot shows at rest, part by part: text, and chips for the
-// placeholders that differ from page to page
-export type PrintedPart =
-  { text: string } | { field: Field; title: string; text: string };
-
 /**
- * chipOf returns what the chip of a placeholder says and its tooltip: the
- * page numbers by name, the title and author as they read
+ * chip creates the chip of a placeholder in the slot editor: its name, as
+ * the pages name a placeholder that comes out empty
  */
-export const chipOf = (field: Field, fields: DocumentFields) => ({
-  field,
-  title: FIELD_NAMES[field],
-  text: shown(field, fields),
-});
-
-/**
- * chip creates the chip of a placeholder in the slot editor
- */
-export const chip = (field: Field, fields: DocumentFields) => {
-  const { title, text } = chipOf(field, fields);
+export const chip = (field: Field) => {
   const element = document.createElement("span");
   element.className = "chip";
   element.dataset.field = field;
-  element.title = title;
-  element.textContent = text;
+  // a role that takes a name, which a plain span's aria-label isn't
+  element.setAttribute("role", "img");
+  element.setAttribute("aria-label", SPOKEN_NAMES[field]);
+  element.textContent = FIELD_NAMES[field];
   return element;
 };
-
-/**
- * printedParts returns the text of a slot as the edges show it at rest: the
- * placeholders as their values, and those that differ per page as chips
- */
-export const printedParts = (
-  text: string,
-  fields: DocumentFields,
-): PrintedPart[] =>
-  segments(text).map((segment) => {
-    if (typeof segment === "string") return { text: segment };
-    const { field } = segment;
-    return PER_PAGE.has(field)
-      ? chipOf(field, fields)
-      : { text: fields[field as keyof DocumentFields] };
-  });
 
 const nodesOf = (text: string) =>
   segments(text).map((segment) =>
@@ -140,12 +102,13 @@ export interface SlotEditor {
 /**
  * createSlotEditor creates the editor of a slot in `place`
  * @param keys what Tab, Shift+Tab, Enter and Escape do
+ * @param label its name for screen readers, e.g. "Footer, left"
  */
 export const createSlotEditor = (
   place: HTMLElement,
   text: string,
-  fields: DocumentFields,
   keys: SlotKeys,
+  label: string,
 ): SlotEditor => {
   const setEmpty = (doc: Node) => {
     place.dataset.empty = String(doc.childCount === 0);
@@ -167,8 +130,9 @@ export const createSlotEditor = (
         keymap(baseKeymap),
       ],
     }),
+    attributes: { role: "textbox", "aria-label": label },
     nodeViews: {
-      field: (node) => ({ dom: chip(node.attrs.field as Field, fields) }),
+      field: (node) => ({ dom: chip(node.attrs.field as Field) }),
     },
     // one line: pasted text keeps its words, not its lines
     handlePaste: (view, event) => {

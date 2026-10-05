@@ -8,7 +8,7 @@ import {
 } from "../state";
 
 // Where the outline (DocumentOutline.vue) shows; which heading it marks is
-// in readingLine.ts, and how it looks in main.scss.
+// in src/readingLine.ts, and how it looks in main.scss.
 
 // the room the open list takes when it can't lie beside the pages: its
 // width and the gap to the text, $outline-dock in main.scss

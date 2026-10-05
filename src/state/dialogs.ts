@@ -1,6 +1,6 @@
 import { type ShallowRef, shallowRef } from "vue";
 
-import type { Band, DocumentFields } from "../layout/bands";
+import type { Band } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
 import type { BoxAnchor } from "./popups";
@@ -63,13 +63,11 @@ export const pageSetup = shallowRef<PageSetupRequest | null>(null);
 
 export interface BandEditorRequest {
   band: Band;
+  // the page whose band it edits, counted from 1; null without pages, e.g.
+  // without the layout engine
+  page: number | null;
   // the headers, footers and page numbers as they are
   bands: BandSettings;
-  // what the placeholders show
-  fields: DocumentFields;
-  // text with placeholders to put into the center once the strip opens,
-  // e.g. "{page}" for "# Page numbers"
-  insert?: string;
   // keeps what was edited, as one undo step
   apply(bands: BandSettings): void;
 }
