@@ -896,7 +896,7 @@ $strip-height: 88px;
   flex-direction: column;
   gap: 2px;
   padding: 3px;
-  font-size: 0.8rem;
+  @include ui-text;
   @include popover;
   user-select: none;
 
@@ -967,7 +967,7 @@ $strip-height: 88px;
   &.keys .hint {
     display: block;
     padding: 0 6px 2px;
-    font-size: 0.75rem;
+    font-size: var(--ui-small);
     opacity: 0.7;
   }
 
@@ -988,7 +988,7 @@ $strip-height: 88px;
   position: fixed;
   z-index: 20;
   padding: 8px 10px;
-  font-size: 0.85rem;
+  @include ui-text;
   @include popover;
   user-select: none;
 
@@ -1032,7 +1032,7 @@ $strip-height: 88px;
 
   .hint {
     margin-top: 2px;
-    font-size: 0.85em;
+    font-size: var(--ui-small);
     white-space: nowrap;
     opacity: 0.6;
   }
@@ -1045,7 +1045,7 @@ $strip-height: 88px;
   max-width: min(360px, calc(100% - 8px));
   padding: 4px 0;
   box-sizing: border-box;
-  font-size: 0.85rem;
+  @include ui-text;
   @include popover;
   user-select: none;
   outline: none;
@@ -1494,7 +1494,7 @@ body.outline-docked.outline-desk {
   pointer-events: none;
   user-select: none;
   color: var(--color);
-  font-size: 0.8rem;
+  @include ui-text;
 }
 
 // one dash per heading, as long as its level is high, cut off below 400 px
@@ -1596,7 +1596,6 @@ body.outline-docked.outline-desk {
   padding: 4px var(--s2);
   border-radius: var(--r-control);
   color: var(--muted);
-  line-height: 1.35;
   overflow-wrap: anywhere;
   transition:
     color var(--fade-out) var(--ease),
@@ -1633,7 +1632,7 @@ body.outline-docked.outline-desk {
   }
 
   .outline-entry.level-#{$level} {
-    padding-left: 12px * $level;
+    padding-left: calc(var(--s2) + #{14px * ($level - 1)});
   }
 }
 
@@ -1673,7 +1672,6 @@ $tile-columns: 2;
   // toolbars it floats over, below the dialogs and the menus
   z-index: 6;
   width: $blocks-dock;
-  font-size: 0.85rem;
 }
 
 .side-pane-head {
@@ -1818,7 +1816,7 @@ body.without-engine.blocks-docked {
   gap: var(--s1);
   width: 260px;
   padding: var(--s3) var(--s4) var(--s4);
-  font-size: 0.85rem;
+  @include ui-text;
   @include popover;
 
   h2 {
