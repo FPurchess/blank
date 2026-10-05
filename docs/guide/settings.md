@@ -2,8 +2,6 @@
 
 Press `Mod` `,` to open the settings. Everything you change applies at once, in every tab, and stays after a restart: there is nothing to save and no need to start Blank again. Close them with **Close** or `Esc`.
 
-<img class="shot" src="/screenshots/settings.png" alt="The settings, with their sections Appearance, Writing, Spelling, Keyboard shortcuts and About on the left, and the theme cards and focus mode on the right" />
-
 The sections are listed on the left; `↑` and `↓` move between them, and the settings open again on the section you saw last.
 
 ## Appearance

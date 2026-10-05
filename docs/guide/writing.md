@@ -128,8 +128,6 @@ Next to the word count, the bar tells you for a moment what just happened, like 
 
 When you want only the page, turn on focus mode with `Mod` `Shift` `F` or the last button of the status bar. Nothing changes at first. As soon as you type, the tabs, the toolbar, the panes, the outline and the status bar fade out, slowly, and the page stays exactly where it was. Move the mouse and they're back at once.
 
-<img class="shot" src="/screenshots/focus-mode.gif" alt="Focus mode is turned on, a sentence is typed and the bars fade out around the page; a move of the mouse brings them back" />
-
 - The bars also fade once the mouse has rested for 3 seconds. Choose 10 seconds, or only when typing, in the [settings](./settings#appearance).
 - They never fade while the mouse is on one of them, or while a menu, a dialog or the header and footer strip is open.
 - Every shortcut still works while they're hidden, and `F6` brings them back to move through them with the keyboard.
