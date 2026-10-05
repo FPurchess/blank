@@ -29,6 +29,7 @@ import {
   tabLabel,
   tabs,
   tabSwitch,
+  uiTakesFocus,
   unsavedDialog,
   updateTab,
 } from "../state";
@@ -513,15 +514,21 @@ export const openPaths = (files: string[]) =>
   enqueue(() => openPathsNow(files));
 
 /**
- * askToSave asks whether to save the changes of `tab` before it closes
+ * askToSave asks whether to save the changes of `tab` before it closes. The
+ * answer gives the text the focus back, which the question took and which
+ * would go with its dialog, unless another part of the UI holds it then.
  */
 const askToSave = (tab: Tab) =>
   new Promise<"save" | "discard" | "cancel">((resolve) => {
+    const answer = (choice: "save" | "discard" | "cancel") => () => {
+      if (!uiTakesFocus.value) view?.focus();
+      resolve(choice);
+    };
     unsavedDialog.value = {
       label: tabLabel(tab),
-      save: () => resolve("save"),
-      discard: () => resolve("discard"),
-      cancel: () => resolve("cancel"),
+      save: answer("save"),
+      discard: answer("discard"),
+      cancel: answer("cancel"),
     };
   });
 

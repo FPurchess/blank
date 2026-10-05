@@ -14,6 +14,7 @@ import {
   activeTabId,
   announcement,
   bandEditorDone,
+  closeDialog,
   importedFrom,
   linkDialog,
   path,
@@ -565,6 +566,49 @@ describe("closing", () => {
 
     expect(labels()).toEqual([null]);
     expect(writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("gives the text the focus back once the question is answered", async () => {
+    files["/b.md"] = "B";
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    await type("x");
+    const focus = vi.spyOn(view, "focus");
+
+    // as the dialog closes: its request goes first, then the answer
+    const closing = closeTabs(tabs.value.map((tab) => tab.id));
+    await flushPromises();
+    expect(focus).not.toHaveBeenCalled();
+    closeDialog(unsavedDialog, unsavedDialog.value!.discard);
+    await closing;
+
+    expect(focus).toHaveBeenCalledOnce();
+    // every tab closed, a new Untitled is left
+    expect(labels()).toEqual([1]);
+  });
+
+  it("leaves the focus to a part of the UI that holds it", async () => {
+    await boot();
+    await openPaths(["/a.md"]);
+    await type("x");
+    const focus = vi.spyOn(view, "focus");
+
+    const closing = closeTabs([activeTabId.value!]);
+    await flushPromises();
+    // another dialog is open by then
+    linkDialog.value = {
+      url: "",
+      text: "",
+      isEdit: false,
+      submit: () => {},
+      convertToText: () => {},
+      cancel: () => {},
+    };
+    closeDialog(unsavedDialog, unsavedDialog.value!.cancel);
+    await closing;
+
+    expect(focus).not.toHaveBeenCalled();
+    linkDialog.value = null;
   });
 
   it("saves first on Save, and stays open when the save is cancelled", async () => {
