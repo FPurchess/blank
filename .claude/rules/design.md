@@ -54,8 +54,12 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `separator`;
   - `field` (an input or select on the paper);
   - `group-label` (the small capitals naming a group);
-  - `shortcut`.
-- **Classes only where a component uses one:** `.icon-button` (`IconButton.vue`) and `.status-item`.
+  - `shortcut`;
+  - `select-button` (a menu button showing a value, in a box);
+  - `switch` and `switch-on` (a switch's track and knob);
+  - `segmented` (a row of choices as one control: a sunken `--hover` ground, the chosen one raised on the paper in weight 500, the others in ink, since secondary text is too faint on that ground).
+- **Classes only where a component uses one:** `.icon-button` (`IconButton.vue`), `.status-item`, `.menu-button` with `.select` (`MenuButton.vue`), `.switch-row` (`SwitchControl.vue`) and `.segmented` (`SegmentedTabs.vue`).
+- **Shared controls** (`src/ui/components/`): `IconButton`, `MenuButton` for a menu or a select, `SwitchControl` for a setting that is on or off and applies at once, `SegmentedTabs` for switching what a surface shows.
 - **States:**
   - hover `--hover` and pressed `--pressed`, only while enabled;
   - on (`aria-pressed`/`aria-checked="true"`): `--on-fill` with the icon in `--on-ink`, or for status items `$on: text`;

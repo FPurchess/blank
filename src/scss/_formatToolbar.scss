@@ -28,22 +28,14 @@
   }
 }
 
-// a button of the toolbar that opens a menu: its icon or text and an arrow
-.toolbar-menu-button:not(.icon-only) {
-  @include icon-text-button;
+// the style menu's button (a MenuButton select): the selection's style in a
+// box of its own width, so the row doesn't move while the caret does
+.style-select {
+  width: 116px;
 
-  // the style menu's button: the selection's style in a box of its own
-  // width, so the row doesn't move while the caret does
-  &.style-select {
-    justify-content: space-between;
-    width: 116px;
-    padding: 0 6px 0 10px;
-    border: 1px solid var(--line-strong);
-
-    .text {
-      overflow: clip;
-      text-overflow: ellipsis;
-    }
+  .text {
+    overflow: clip;
+    text-overflow: ellipsis;
   }
 }
 
