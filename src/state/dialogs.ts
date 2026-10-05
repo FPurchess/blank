@@ -40,6 +40,13 @@ export interface ImageDialogRequest {
 // imageDialog holds the request of the open image dialog, or null while it is closed
 export const imageDialog = shallowRef<ImageDialogRequest | null>(null);
 
+// what the page setup dialog writes its choices onto: a frontmatter and the
+// page settings it means
+export interface PageBase {
+  frontmatter: string | null;
+  settings: PageSettings;
+}
+
 export interface PageSetupRequest {
   // the page setup of the document, over the user's defaults
   settings: PageSettings;
@@ -50,9 +57,16 @@ export interface PageSetupRequest {
   frontmatter: string | null;
   // what of the document's page setup can't be used
   warnings: string[];
-  apply(settings: PageSettings): void;
+  // applies the settings, written onto `base`, as one undo step
+  apply(settings: PageSettings, base: PageBase): void;
   // returns what is wrong with the frontmatter, or null once it is applied
   applyText(frontmatter: string): string | null;
+  // the frontmatter `base` becomes with the settings written onto it
+  textOf(settings: PageSettings, base: PageBase): string;
+  // the page settings a frontmatter means, or what is wrong with it
+  readText(
+    frontmatter: string,
+  ): { settings: PageSettings; warnings: string[] } | { error: string };
   // makes the settings the user's default for documents without their own
   makeDefault(settings: PageSettings): void;
   cancel(): void;

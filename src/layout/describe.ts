@@ -33,19 +33,13 @@ const layoutPaper = ({ paper }: Layout, unit: Unit) =>
 
 /**
  * describePaper names the paper of a layout, e.g. "A4", "Letter landscape" or
- * "170 × 240 mm"
+ * "170 × 240 mm", everywhere the paper is named: the bottom bar, the page
+ * setup's picture and the export's notification
  */
 export const describePaper = (layout: Layout, unit: Unit = "cm") => {
   const paper = layoutPaper(layout, unit);
   return layout.orientation === "landscape" ? `${paper} landscape` : paper;
 };
-
-/**
- * describePageSize names the paper of a layout with its orientation, e.g.
- * "A4 (portrait)", for the button in the bottom bar
- */
-export const describePageSize = (layout: Layout, unit: Unit) =>
-  `${layoutPaper(layout, unit)} (${layout.orientation})`;
 
 // what a setting that can't be used means to the user
 const SETTING_PROBLEMS: Record<PageKey, string> = {

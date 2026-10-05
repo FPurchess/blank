@@ -275,11 +275,6 @@ describe("page view", () => {
     );
     await restartApp([file]);
     await expect($("#page-view .page-canvas")).toBeExisting();
-    await expect(
-      browser.execute(
-        () => document.querySelector("#page-view .doc-properties")?.textContent,
-      ),
-    ).resolves.toMatch(/^\s*Marks · by Ada\s*$/);
     await expect($("#page-view .page-break-mark")).toBeExisting();
     // spell check in English, off by default
     await pressMod(Key.Alt, "l");
@@ -360,8 +355,8 @@ describe("page view", () => {
     }
     await pressMod(Key.Alt, "v");
     await expect($("#page-view")).toHaveElementClass("page-ends");
-    // the summary opens the page setup
-    await $("#page-view .doc-properties").click();
+    // the paper in the bottom bar opens the page setup
+    await $("#ui-page").click();
     await expect($("#page-setup")).toBeDisplayed();
     await browser.keys(Key.Escape);
     await expect($("#page-setup")).not.toBeExisting();

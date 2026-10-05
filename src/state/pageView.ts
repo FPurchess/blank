@@ -28,9 +28,6 @@ export interface PageLayoutState {
   bandVersions: Uint32Array;
   // where the text of each page ends, from its top edge
   bottoms: Float32Array;
-  // whether the line with the document's properties shows above the first
-  // page (see src/ui/PageProperties.vue), which takes room there
-  properties?: boolean;
   // whether the first page has header text, which "page ends" shows in the
   // room above its first frame
   header?: boolean;

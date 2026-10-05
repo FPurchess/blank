@@ -259,9 +259,9 @@ describe("page button", () => {
     dispose = bootApp(createTestHandle());
   });
 
-  it("shows the paper of the region and its orientation", () => {
+  it("shows the paper of the region", () => {
     // jsdom's locale is en-US
-    expect(uiPage().textContent).toBe("Letter (portrait)");
+    expect(uiPage().textContent).toBe("Letter");
     expect(uiPage().tagName).toBe("BUTTON");
     expect(uiPage().querySelector("svg")).not.toBeNull();
     expect(uiPage().dataset).toMatchObject({
@@ -276,11 +276,11 @@ describe("page button", () => {
       "page:\n  size: a4\n  orientation: landscape",
     );
     await nextTick();
-    expect(uiPage().textContent).toBe("A4 (landscape)");
+    expect(uiPage().textContent).toBe("A4 landscape");
 
     transaction.value = withFrontmatter("page:\n  size: 170mm x 240mm");
     await nextTick();
-    expect(uiPage().textContent).toBe("6.69 × 9.45 in (portrait)");
+    expect(uiPage().textContent).toBe("6.69 × 9.45 in");
   });
 
   it("leaves the label alone while typing keeps the page setup", async () => {
@@ -301,7 +301,7 @@ describe("page button", () => {
         layout: { page: { ...before.layout.page, size: "a5" } },
       };
       await nextTick();
-      expect(uiPage().textContent).toBe("A5 (portrait)");
+      expect(uiPage().textContent).toBe("A5");
     } finally {
       config.value = before;
     }

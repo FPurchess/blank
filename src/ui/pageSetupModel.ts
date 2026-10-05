@@ -4,7 +4,7 @@ import { SIDES } from "../layout/settings";
 
 // What the page setup dialog (PageSetupDialog.vue) shows besides its rows.
 
-interface Field<K> {
+export interface Field<K> {
   key: K;
   label: string;
 }
@@ -30,8 +30,16 @@ export const stopAfter = (
 ) => stops[stops.indexOf(active as HTMLElement) + direction];
 
 /**
- * stopsIn returns the elements ↑↓ move between in `element`: the option of
- * each row that is in the tab order, and the fields that are shown
+ * stopsIn returns the elements ↑↓ move between in `element`: the control of
+ * each row that is in the tab order (the paper's list, the checked option),
+ * and the fields that are shown
  */
 export const stopsIn = (element: HTMLElement) =>
-  shownIn(element, '[data-row] button[tabindex="0"], .custom input');
+  shownIn(element, '[data-row] button:not([tabindex="-1"]), .custom input');
+
+/**
+ * sentence makes a message a sentence, ending in a period unless it ends in
+ * a mark of its own
+ */
+export const sentence = (text: string) =>
+  /[.?!…]$/.test(text) ? text : `${text}.`;

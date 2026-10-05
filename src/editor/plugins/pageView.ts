@@ -19,7 +19,7 @@ import {
   ReplaceStep,
 } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
-import { computed, type EffectScope, effectScope, watch } from "vue";
+import { type EffectScope, effectScope, watch } from "vue";
 
 import {
   pageEngine,
@@ -38,7 +38,6 @@ import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
-import { summarize } from "./properties";
 import { displaySrc } from "./images";
 import { isMac } from "../../platform";
 import { tableAround } from "./tables/util";
@@ -50,7 +49,6 @@ import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
 import {
-  frontmatter,
   language,
   pageCaret,
   pageComposition,
@@ -132,10 +130,6 @@ export const selectionAt = (
   return TextSelection.between(doc.resolve(pos), doc.resolve(pos));
 };
 
-// whether the document's properties show above the first page, read again
-// only when the frontmatter changes
-const hasProperties = computed(() => summarize(frontmatter.value) !== null);
-
 /**
  * publishLayout publishes the pages as the engine laid them out
  */
@@ -151,7 +145,6 @@ const publishLayout = (engine: PageEngine) => {
     bodyVersions: engine.bodyVersions(),
     bandVersions: engine.bandVersions(),
     bottoms: engine.bottoms(),
-    properties: hasProperties.value,
     // whether the first page has a header written and the last a footer,
     // whatever their placeholders come out as, which the page view names
     header: hasBand(layout, 1, "header"),

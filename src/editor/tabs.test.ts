@@ -28,6 +28,7 @@ import { mockTauriPath } from "../test/tauri";
 import {
   activateTab,
   bootTabs,
+  changeTab,
   closeTabs,
   cycleTab,
   moveTab,
@@ -393,6 +394,65 @@ describe("switching", () => {
 
     expect(shown).toEqual(["A"]);
     expect(activeTabId.value).toBe(tabs.value[1].id);
+  });
+});
+
+describe("changing a tab", () => {
+  beforeEach(() => {
+    files["/a.md"] = "A";
+    files["/b.md"] = "B";
+  });
+
+  // appends text to the end of a tab's first paragraph
+  const append = (typed: string) => (state: EditorState) =>
+    state.tr.insertText(typed, state.doc.firstChild!.nodeSize - 1);
+
+  it("changes the shown tab in the view", async () => {
+    await boot();
+    await openPaths(["/a.md"]);
+
+    await changeTab(activeTabId.value!, append(" changed"));
+
+    expect(text()).toBe("A changed");
+    expect(activeTab.value?.unsaved).toBe(true);
+  });
+
+  it("changes a tab that isn't shown, which undoes it once shown", async () => {
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    const a = tabs.value.find((tab) => tab.path === "/a.md")!;
+
+    await changeTab(a.id, append(" changed"));
+
+    expect(text()).toBe("B");
+    expect(tabs.value.find((tab) => tab.id === a.id)?.unsaved).toBe(true);
+    await activateTab(a.id);
+    expect(text()).toBe("A changed");
+    undo(view.state, view.dispatch);
+    expect(text()).toBe("A");
+  });
+
+  it("leaves a closed tab alone", async () => {
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    const a = tabs.value.find((tab) => tab.path === "/a.md")!;
+    await closeTabs([a.id]);
+    const change = vi.fn(append(" changed"));
+
+    await changeTab(a.id, change);
+
+    expect(change).not.toHaveBeenCalled();
+    expect(text()).toBe("B");
+  });
+
+  it("does nothing when nothing changes", async () => {
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    const a = tabs.value.find((tab) => tab.path === "/a.md")!;
+
+    await changeTab(a.id, () => null);
+
+    expect(tabs.value.find((tab) => tab.id === a.id)?.unsaved).toBe(false);
   });
 });
 

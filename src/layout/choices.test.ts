@@ -8,6 +8,9 @@ import {
   type PageChoices,
   paperOptions,
   settingsOf,
+  sizeChoices,
+  turned,
+  typedOrientation,
 } from "./choices";
 import {
   allMargins,
@@ -45,7 +48,10 @@ describe("HEADING_OPTIONS", () => {
     expect(HEADING_OPTIONS.map(({ value }) => value)).toEqual([
       1, 2, 3, 4, 5, 6,
     ]);
-    expect(HEADING_OPTIONS[0].label).toBe("Heading 1");
+    expect(HEADING_OPTIONS[0]).toMatchObject({
+      label: "Heading 1",
+      short: "H1",
+    });
   });
 });
 
@@ -53,8 +59,8 @@ describe("choicesOf", () => {
   it("shows the defaults as the paper of the region and normal margins", () => {
     expect(choicesOf(DEFAULT_PAGE, "de-DE", "cm")).toEqual({
       paper: "auto",
-      width: "21",
-      height: "29.7",
+      width: "210",
+      height: "297",
       orientation: "portrait",
       margins: "normal",
       sides: { top: "2.5", right: "2.5", bottom: "2.5", left: "2.5" },
@@ -83,9 +89,16 @@ describe("choicesOf", () => {
     const other = { width: mm(170), height: mm(240) };
     expect(choicesOf(settings({ size: other }), "de-DE", "cm")).toMatchObject({
       paper: "custom",
-      width: "17",
-      height: "24",
+      width: "170",
+      height: "240",
     });
+  });
+
+  it("shows a custom size as it is turned, in inches where people use them", () => {
+    const size = { width: 432, height: 648 };
+    expect(
+      choicesOf(settings({ size, orientation: "landscape" }), "en-US", "in"),
+    ).toMatchObject({ orientation: "landscape", width: "9", height: "6" });
   });
 
   it("shows other margins as custom, in the unit", () => {
@@ -158,15 +171,15 @@ describe("settingsOf", () => {
     expect(
       of({
         paper: "custom",
-        width: "24",
-        height: "170mm",
+        width: "17cm",
+        height: "240",
         margins: "custom",
         sides: { top: "3", right: "2,5", bottom: "1in", left: "20 mm" },
       }),
     ).toEqual({
       settings: {
         ...DEFAULT_PAGE,
-        size: { width: mm(170), height: cm(24) },
+        size: { width: cm(17), height: mm(240) },
         orientation: "portrait",
         margins: { top: cm(3), right: cm(2.5), bottom: 72, left: mm(20) },
         newPageBefore: [],
@@ -184,12 +197,12 @@ describe("settingsOf", () => {
       }),
     ).toEqual({
       errors: {
-        paper: "Enter the width and height, e.g. 17 and 24",
-        margins: "Enter each margin as a length, e.g. 2.5",
+        paper: "Enter the width and height, e.g. 170 and 240.",
+        margins: "Enter each margin as a length, e.g. 2.5.",
       },
     });
     expect(of({ paper: "custom", height: "" }, "in")).toEqual({
-      errors: { paper: "Enter the width and height, e.g. 6 and 9" },
+      errors: { paper: "Enter the width and height, e.g. 6 and 9." },
     });
   });
 
@@ -201,8 +214,80 @@ describe("settingsOf", () => {
         sides: { ...base.sides, left: "12" },
       }),
     ).toEqual({
-      errors: { margins: "The margins leave no room for the text" },
+      errors: { margins: "The margins leave no room for the text." },
     });
+  });
+
+  it("says when the paper itself is too small for the text", () => {
+    expect(
+      of({ paper: "custom", width: "20", height: "300", margins: "narrow" }),
+    ).toEqual({ errors: { paper: "The paper is too small for the text." } });
+  });
+
+  it("keeps a custom size wider than high as landscape", () => {
+    expect(
+      of({
+        paper: "custom",
+        width: "240",
+        height: "170",
+        orientation: "portrait",
+      }),
+    ).toMatchObject({
+      settings: {
+        size: { width: mm(170), height: mm(240) },
+        orientation: "landscape",
+      },
+    });
+    // a square one keeps the orientation chosen
+    expect(
+      of({
+        paper: "custom",
+        width: "200",
+        height: "200",
+        orientation: "landscape",
+      }),
+    ).toMatchObject({ settings: { orientation: "landscape" } });
+  });
+});
+
+describe("sizeChoices", () => {
+  it("shows a size in the paper's unit, turned", () => {
+    const a4 = { width: mm(210), height: mm(297) };
+    expect(sizeChoices(a4, "portrait", "cm")).toEqual({
+      width: "210",
+      height: "297",
+    });
+    expect(sizeChoices(a4, "landscape", "cm")).toEqual({
+      width: "297",
+      height: "210",
+    });
+    expect(sizeChoices({ width: 612, height: 792 }, "portrait", "in")).toEqual({
+      width: "8.5",
+      height: "11",
+    });
+  });
+});
+
+describe("typedOrientation and turned", () => {
+  const size = (width: string, height: string) => ({ width, height });
+
+  it("tells how a typed size is turned", () => {
+    expect(typedOrientation(size("240", "170"), "cm")).toBe("landscape");
+    expect(typedOrientation(size("17cm", "240"), "cm")).toBe("portrait");
+    expect(typedOrientation(size("200", "200"), "cm")).toBeUndefined();
+    expect(typedOrientation(size("wide", "200"), "cm")).toBeUndefined();
+  });
+
+  it("swaps a typed size that is turned the other way", () => {
+    expect(turned(size("170", "240"), "landscape", "cm")).toEqual(
+      size("240", "170"),
+    );
+    expect(turned(size("170", "240"), "portrait", "cm")).toEqual(
+      size("170", "240"),
+    );
+    expect(turned(size("wide", "240"), "landscape", "cm")).toEqual(
+      size("wide", "240"),
+    );
   });
 });
 

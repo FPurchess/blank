@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MARGIN_FIELDS, stopAfter, stopsIn } from "./pageSetupModel";
+import { MARGIN_FIELDS, sentence, stopAfter, stopsIn } from "./pageSetupModel";
 
 describe("MARGIN_FIELDS", () => {
   it("has a field per side, labelled by it", () => {
@@ -20,12 +20,14 @@ describe("stopsIn", () => {
       <div data-row="a"><button tabindex="-1"></button><button id="a" tabindex="0"></button></div>
       <div class="custom" hidden><input id="gone"></div>
       <div class="custom"><input id="field"></div>
-      <div data-row="b"><button id="b" tabindex="0"></button></div>`;
+      <div data-row="b"><button id="b" tabindex="0"></button></div>
+      <div data-row="c"><button id="list" aria-haspopup="menu"></button></div>`;
 
     expect(stopsIn(element).map((stop) => stop.id)).toEqual([
       "a",
       "field",
       "b",
+      "list",
     ]);
   });
 });
@@ -42,5 +44,15 @@ describe("stopAfter", () => {
 
   it("starts at the first stop from anywhere else", () => {
     expect(stopAfter([a, b], null, 1)).toBe(a);
+  });
+});
+
+describe("sentence", () => {
+  it("ends a message in a period, unless it has its own mark", () => {
+    expect(sentence("The top margin is small")).toBe(
+      "The top margin is small.",
+    );
+    expect(sentence("Done.")).toBe("Done.");
+    expect(sentence("Really?")).toBe("Really?");
   });
 });

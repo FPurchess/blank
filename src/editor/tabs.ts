@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import type { Node } from "prosemirror-model";
-import type { EditorState } from "prosemirror-state";
+import type { EditorState, Transaction } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { onScopeDispose, type Ref, watch } from "vue";
 
@@ -354,6 +354,30 @@ const switchTo = async (id: string) => {
   if (!tab || id === activeTabId.value) return;
   await present(id, await ensureLoaded(tab));
 };
+
+/**
+ * changeTab applies what `change` makes of the state of the tab `id`: in the
+ * view while it is shown, otherwise to the state it keeps, which is stored
+ * and undone like any change once it is shown. A closed tab is left alone.
+ * It waits for the tab changes asked for before, e.g. a switch.
+ */
+export const changeTab = (
+  id: string,
+  change: (state: EditorState) => Transaction | null,
+) =>
+  enqueue(async () => {
+    if (id === activeTabId.value && view) {
+      const tr = change(view.state);
+      if (tr) view.dispatch(tr);
+      return;
+    }
+    const kept = documents.get(id);
+    const tr = kept && change(kept.state);
+    if (!kept || !tr) return;
+    kept.state = kept.state.apply(tr);
+    storeDocument(id, kept.state.doc);
+    refresh(id);
+  });
 
 /**
  * activateTab shows the tab `id`

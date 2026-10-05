@@ -40,13 +40,12 @@ describe("frontmatter", () => {
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   });
 
-  it("shows the properties above the text instead of the YAML", async () => {
-    await expectEditorText(
-      "#editor .doc-properties",
-      "The Lighthouse · by Ada, Grace · tags",
-    );
+  it("keeps the YAML out of the text", async () => {
     await expectEditorText("#editor h1", "Chapter");
     await expect($("#editor hr")).not.toExist();
+    await expect(
+      browser.execute(() => document.querySelector("#editor")?.textContent),
+    ).resolves.not.toContain("Lighthouse");
   });
 
   it("saves the frontmatter unchanged", async () => {
@@ -100,9 +99,15 @@ describe("frontmatter", () => {
     );
     await restartApp();
 
-    await expectEditorText(
-      "#editor .doc-properties",
-      "The Lighthouse · by Ada, Grace · tags",
+    // the properties show as text in the page setup
+    await clickInto("#editor p");
+    await pressMod(Key.Alt, "u");
+    await expect($("#page-setup")).toBeDisplayed();
+    await $("button=Edit as text").click();
+    await expect($("#page-setup-text")).toHaveValue(
+      expect.stringContaining("title: The Lighthouse"),
     );
+    await browser.keys(Key.Escape);
+    await expect($("#page-setup")).not.toExist();
   });
 });
