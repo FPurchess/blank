@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CommandIdentifier as C, config, defaults } from "../../config";
 import {
   assign,
+  keyButton,
+  recordingAction,
   filterCommands,
   isChanged,
   recordedKey,
@@ -271,5 +273,65 @@ describe("the list", () => {
     expect(
       filterCommands("tools spell").every((info) => info.group === "Tools"),
     ).toBe(true);
+  });
+});
+
+describe("recordingAction", () => {
+  it("waits, cancels, says why or assigns", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+    const map = keymap();
+    expect(
+      recordingAction(
+        press("Shift", { shift: true }),
+        C.FILE_SAVE,
+        map,
+        undefined,
+        false,
+      ),
+    ).toEqual({ kind: "wait" });
+    expect(
+      recordingAction(press("Escape"), C.FILE_SAVE, map, undefined, false),
+    ).toEqual({ kind: "cancel" });
+    expect(
+      recordingAction(press("b", {}, 66), C.FILE_SAVE, map, undefined, false),
+    ).toEqual({
+      kind: "say",
+      text: "Use Ctrl or Alt with a key, or an F key.",
+    });
+    expect(
+      recordingAction(
+        press("v", { ctrl: true }, 86),
+        C.FILE_SAVE,
+        map,
+        undefined,
+        false,
+      ),
+    ).toEqual({
+      kind: "say",
+      text: "Ctrl+V pastes everywhere. Choose another.",
+    });
+    expect(
+      recordingAction(press("Backspace"), C.FILE_SAVE, map, undefined, false),
+    ).toHaveProperty("changes", [{ path: ["keymap", "file.save"], value: "" }]);
+    expect(
+      recordingAction(press("F9", {}, 120), C.FILE_SAVE, map, undefined, false),
+    ).toHaveProperty("changes", [
+      { path: ["keymap", "file.save"], value: "F9" },
+    ]);
+  });
+});
+
+describe("keyButton", () => {
+  it("names the key, or asks for the new one", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+    expect(keyButton(C.APP_SETTINGS, "Mod-,", false)).toEqual({
+      text: "Ctrl+,",
+      label: "Settings: Ctrl+,",
+    });
+    expect(keyButton(C.FILE_SAVE, "", false).text).toBe("None");
+    expect(keyButton(C.FILE_SAVE, "Mod-s", true)).toEqual({
+      text: "Press keys…",
+      label: "Press the new keys for Save",
+    });
   });
 });

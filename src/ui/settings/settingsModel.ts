@@ -1,7 +1,12 @@
-import { nextTick, shallowRef } from "vue";
-
-import type { AutocorrectConfig, Config, SettingChanges } from "../../config";
-import { saveSettings } from "../../config";
+import {
+  type AutocorrectConfig,
+  type Config,
+  MAX_INDENT,
+  MIN_INDENT,
+  saveSettings,
+  type SettingChanges,
+  wholeNumberIn,
+} from "../../config";
 import type { Option } from "../../layout/choices";
 import { announce, type SettingsSection, type ThemeName } from "../../state";
 
@@ -18,9 +23,6 @@ export const SECTIONS: { key: SettingsSection; label: string; icon: string }[] =
     { key: "shortcuts", label: "Keyboard shortcuts", icon: "keyboard" },
     { key: "about", label: "About", icon: "info" },
   ];
-
-// the inner pages, which show in place of their section
-export type SettingsPage = "replacements" | "dictionary" | "licenses";
 
 /**
  * save makes `changes` in blank.json and, once they're saved, announces
@@ -177,20 +179,14 @@ export const filterEntries = <T extends { key: string; label?: string }>(
 };
 
 /**
- * useInnerPage keeps which inner page a section shows in its place, and the
- * button that opened it, which gets the focus back when the page goes
+ * parseIndent reads the indent size typed in the settings: a whole number of
+ * spaces from MIN_INDENT to MAX_INDENT, or what is wrong with it
  */
-export const useInnerPage = () => {
-  const page = shallowRef<SettingsPage | null>(null);
-  let opener: HTMLElement | null = null;
-  const open = (name: SettingsPage, event: Event) => {
-    opener = event.currentTarget as HTMLElement;
-    page.value = name;
-  };
-  const back = async () => {
-    page.value = null;
-    await nextTick();
-    opener?.focus();
-  };
-  return { page, open, back };
+export const parseIndent = (
+  typed: string,
+): { size: number } | { error: string } => {
+  const size = Number(typed.trim());
+  return typed.trim() && wholeNumberIn(size, MIN_INDENT, MAX_INDENT)
+    ? { size }
+    : { error: `Enter a whole number from ${MIN_INDENT} to ${MAX_INDENT}.` };
 };

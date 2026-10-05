@@ -148,6 +148,14 @@ describe("watchFocusMode", () => {
     expect(controlsFaded.value).toBe(true);
   });
 
+  it("fades them again once the pointer left the window from one", () => {
+    move(chrome, 0);
+    window.dispatchEvent(new MouseEvent("mouseout", { relatedTarget: null }));
+    type();
+
+    expect(controlsFaded.value).toBe(true);
+  });
+
   it("never fades them while a dialog or menu is open, and brings them back", async () => {
     type();
     linkDialog.value = {} as never;

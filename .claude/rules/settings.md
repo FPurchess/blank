@@ -14,7 +14,7 @@ The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and ever
 
 ## Where a setting lives
 
-- **blank.json** (`src/config.ts`) holds what it held before the dialog existed: the keymap, autocorrect (the groups and `replace`), the spell check flags, `editor.indentSize`, `focusMode.hideAfter` and `layout.page`. It stays the one source of truth for these, and users can still edit it by hand; hand edits need a restart, as before.
+- **blank.json** (`src/config.ts`) holds what it held before the dialog existed: the keymap, autocorrect (the groups and `replace`), the spell check flags, `editor.indentSize`, `focusMode.hideAfter` and `layout.page`. It stays the one source of truth for these, and users can still edit it by hand. Hand edits apply on a restart, or with the next change the dialog saves, which reads the whole file again and reports what it can't use, as the start does.
 - **localforage** (`src/storage.ts`) keeps the theme, the language and spell check on/off, through the refs `theme`, `language` and `spellcheck`, which the dialog assigns directly. They change often from the keyboard and the status bar, and are part of the session, not of the configuration.
 
 ## One writer: `saveSettings`
@@ -23,7 +23,7 @@ The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and ever
   - A change is `{ path, value }`. Without a value, the setting goes back to its default.
   - `changes` may also be a function of the file as read, for a change that builds on it, e.g. the replacements of a language: it never overwrites what was written by hand since Blank started.
 - **What it writes:**
-  - It re-reads the file every time, and refuses (`false`, with a notification unless `notify: false`) to touch a file that isn't a JSON object.
+  - It re-reads the file every time, and refuses to touch a file that isn't a JSON object. Every failure, of the file or of a change, ends in a notification and `false`; `saveDefaultPage` throws it instead, for the page setup to report.
   - It leaves out a value equal to the default (a key binding by `sameBinding`) and prunes objects left empty, so the file holds only what the user changed. Every merge reads `{}` like a missing key.
   - It writes `blank.json.tmp` and renames it.
 - **Order and identity:**
@@ -48,11 +48,11 @@ The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and ever
 - `SettingsDialog.vue` is a `BaseDialog` with a vertical tablist of `SECTIONS` (`settingsModel.ts`, ↑↓ through `useRovingFocus(…, "vertical")`) and a tabpanel.
 - **Height:** it measures `.settings-body` on Appearance once and keeps that height, so it never jumps; longer sections scroll.
 - **Opening:** `settingsSection` (`src/state/settingsDialog.ts`) is the section it opens on again.
-- **Inner pages:** your replacements, your dictionary and the licenses show in place of their section (`useInnerPage`). The section stays mounted but `hidden`, so Back gives the focus back to the button that opened the page. `InnerPage.vue` makes Esc go back instead of closing.
+- **Inner pages:** your replacements, your dictionary and the licenses show in place of their section through `PagedSection.vue`, opened by an `EditRow.vue` (or About's button). The section stays mounted but `hidden`, so Back gives the focus back to the button that opened the page. `InnerPage.vue` makes Esc go back instead of closing. Spelling hands its `dictionaryOf` to the page, so its count follows the page's changes; while spell check loads that dictionary, it can't be changed (`busy`), since the loading checker would save over it.
 - **Licenses:** `LicensesPage.vue` loads the notices only when it opens and draws them a block of `NOTICE_LINES` at a time, one per frame (`chunksOf`, `aboutModel.ts`): drawn at once, the 11,000 lines held the webview up for most of a second.
 - **Enter:** BaseDialog submits on Enter. In a field of the settings, Enter is the field's (`enterInField`), so it never closes the dialog.
 - **Recording:** while a shortcut is recorded, a capture listener on the form takes every key.
-- **Rows** are `SettingRow`s, and a switch is a `SwitchRow` (the row names the switch, and a click on its label switches it). Lists of entries are `EntryList`s, with a filter from `FILTER_FROM` entries on. A change goes through `save(changes, message)`, which announces the message once it's saved.
+- **Rows** are `SettingRow`s, and a switch is a `SwitchRow` (the row names the switch, and a click on its label switches it). Lists of entries are `EntryList`s, with a filter from `FILTER_FROM` entries on, which keep the focus in the dialog when a Remove takes its row; their fields are an `AddRow`. A field whose placeholder names it puts its `TextField` in `.compact`, which hides the label but for screen readers (the `visually-hidden` mixin, `_hidden.scss`). A change goes through `save(changes, message)`, which announces the message once it's saved. The key decisions of recording are `recordingAction` and `keyButton` (`shortcutsModel.ts`), so the component only applies them.
 
 ## Adding a setting
 

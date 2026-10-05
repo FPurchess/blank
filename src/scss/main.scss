@@ -3,6 +3,7 @@
 // first, so main.scss's own rules override its global ones
 @use "controls" as *;
 @use "focusMode" as *;
+@use "hidden" as *;
 @use "typography";
 @use "statusbar" as *;
 @use "toparea" as *;
@@ -23,12 +24,7 @@ body {
 
 // read out by screen readers, not shown
 .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  @include visually-hidden;
 }
 
 .ProseMirror {

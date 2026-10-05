@@ -1,16 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { bindKeys } from "../test/keymap";
 import { CommandIdentifier, config } from "../config";
 import { createState, createTestView, doc, keyEvent, p } from "../test/editor";
 import {
   ariaShortcut,
-  canonicalBinding,
   commandBinding,
   commandKey,
   commandShortcut,
   formatShortcut,
   liveKeys,
-  sameBinding,
 } from "./keyBindings";
 
 describe("formatShortcut", () => {
@@ -90,41 +89,6 @@ describe("commandBinding", () => {
   });
 });
 
-describe("canonicalBinding", () => {
-  it.each([
-    ["Mod-Shift-z", false, "Ctrl-Shift-z"],
-    ["Shift-Mod-Z", false, "Ctrl-Shift-z"],
-    ["Mod-Shift-z", true, "Meta-Shift-z"],
-    ["Command-Option-p", true, "Alt-Meta-p"],
-    ["Ctrl-Alt-Delete", false, "Alt-Ctrl-Delete"],
-    ["Mod-,", false, "Ctrl-,"],
-    ["Mod--", false, "Ctrl--"],
-    ["F6", false, "F6"],
-  ])("writes %s on macOS %s as %s", (binding, mac, canonical) => {
-    expect(canonicalBinding(binding, mac)).toBe(canonical);
-  });
-
-  it.each([[""], ["Hyper-x"]])("has none for %j", (binding) => {
-    expect(canonicalBinding(binding, false)).toBeUndefined();
-  });
-});
-
-describe("sameBinding", () => {
-  it("finds the same key however it's written", () => {
-    expect(sameBinding("Mod-Shift-z", "shift-ctrl-Z", false)).toBe(true);
-    expect(sameBinding("Mod-Tab", "Ctrl-Tab", false)).toBe(true);
-  });
-
-  it("tells Cmd from Ctrl on macOS", () => {
-    expect(sameBinding("Mod-Tab", "Ctrl-Tab", true)).toBe(false);
-    expect(sameBinding("Mod-Tab", "Meta-Tab", true)).toBe(true);
-  });
-
-  it("never matches no key", () => {
-    expect(sameBinding("", "", false)).toBe(false);
-  });
-});
-
 describe("liveKeys", () => {
   const defaults = config.value;
   afterEach(() => {
@@ -146,10 +110,7 @@ describe("liveKeys", () => {
     expect(keys(view(), keyEvent("Mod-s"))).toBe(true);
     expect(build).toHaveBeenCalledOnce();
 
-    config.value = {
-      ...config.value,
-      keymap: { ...config.value.keymap, [CommandIdentifier.FILE_SAVE]: "F9" },
-    };
+    bindKeys({ [CommandIdentifier.FILE_SAVE]: "F9" });
     expect(keys(view(), keyEvent("Mod-s"))).toBe(false);
     expect(keys(view(), keyEvent("F9"))).toBe(true);
     expect(build).toHaveBeenCalledTimes(2);
@@ -160,10 +121,7 @@ describe("liveKeys", () => {
     const keys = commandKey(CommandIdentifier.INSERT_TABLE, run);
 
     expect(keys(view(), keyEvent("Mod-t"))).toBe(true);
-    config.value = {
-      ...config.value,
-      keymap: { ...config.value.keymap, [CommandIdentifier.INSERT_TABLE]: "" },
-    };
+    bindKeys({ [CommandIdentifier.INSERT_TABLE]: "" });
     expect(keys(view(), keyEvent("Mod-t"))).toBe(false);
     expect(run).toHaveBeenCalledOnce();
   });

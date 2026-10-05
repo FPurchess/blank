@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 
 import { config } from "../../config";
 import type { Spellchecker } from "../../spellcheck/types";
-import { spellchecker } from "../../state";
+import { spellcheck, spellchecker, spellcheckStatus } from "../../state";
 import { mockTauriPath, mockTextFiles } from "../../test/tauri";
 import { chunksOf } from "./aboutModel";
 import {
@@ -22,6 +22,7 @@ import {
   autocorrectChange,
   filterEntries,
   hideAfterOptions,
+  parseIndent,
   replacementsSummary,
 } from "./settingsModel";
 
@@ -38,6 +39,16 @@ describe("hideAfterOptions", () => {
     expect(hideAfterOptions(5).map((option) => option.value)).toEqual([
       0, 3, 5, 10,
     ]);
+  });
+});
+
+describe("parseIndent", () => {
+  it("takes a whole number from 1 to 16", () => {
+    expect(parseIndent(" 2 ")).toEqual({ size: 2 });
+    for (const typed of ["", "0", "17", "2.5", "two"])
+      expect(parseIndent(typed)).toEqual({
+        error: "Enter a whole number from 1 to 16.",
+      });
   });
 });
 
@@ -141,6 +152,8 @@ describe("dictionaryOf", () => {
   });
   afterEach(() => {
     spellchecker.value = null;
+    spellcheck.value = false;
+    spellcheckStatus.value = { state: "off", tag: "en" };
   });
 
   it("reads the file while spell check is off", async () => {
@@ -185,9 +198,22 @@ describe("dictionaryOf", () => {
     vi.mocked(read.exists).mockResolvedValue(true);
     await dictionary.load();
 
-    expect(dictionary.readOnly.value).toBe(true);
+    expect(dictionary.unreadable.value).toBe(true);
     await dictionary.add("word");
     expect(read.writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("waits while spell check loads the same dictionary", async () => {
+    spellcheck.value = true;
+    spellcheckStatus.value = { state: "loading", tag: "en-GB" };
+    const dictionary = dictionaryOf("en");
+
+    expect(dictionary.busy.value).toBe(true);
+    await dictionary.add("word");
+    expect(files["/config/dictionaries/en.txt"]).toBe("zebra\nantelope\n");
+
+    spellcheckStatus.value = { state: "loading", tag: "de" };
+    expect(dictionary.busy.value).toBe(false);
   });
 
   it("wants one word that isn't in yet in any form", () => {

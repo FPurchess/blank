@@ -50,7 +50,8 @@ import { CommandIdentifier, getKeyBinding } from "../../config";
 import type { MarkType, Node } from "prosemirror-model";
 import { type Command, Plugin } from "prosemirror-state";
 import { inCell } from "./tables/util";
-import { liveKeys, normalizeBinding, sameBinding } from "../keyBindings";
+import { normalizeBinding, sameBinding } from "../../keyNames";
+import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
@@ -59,8 +60,6 @@ import { toggleList } from "../commands/lists";
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
-
-export { normalizeBinding };
 
 /**
  * outsideCells runs `command` only outside table cells, which can't hold
@@ -249,8 +248,8 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files, the tabs, and moving between the parts (F6, and
-// Alt-F10 to the toolbar)
+// the editor: the files, the tabs, moving between the parts (F6, and Alt-F10
+// to the toolbar), focus mode and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
@@ -265,6 +264,8 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_FOCUS_NEXT,
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
+  CommandIdentifier.VIEW_FOCUS_MODE,
+  CommandIdentifier.APP_SETTINGS,
 ];
 
 /**

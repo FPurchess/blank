@@ -5,7 +5,7 @@ import { focusMode, setFocusMode } from "../../state";
 /**
  * toggleFocusMode turns focus mode on or off, see src/state/focusMode.ts
  */
-export const toggleFocusMode = (): Command => () => {
-  setFocusMode(!focusMode.value);
+export const toggleFocusMode = (): Command => (_state, dispatch) => {
+  if (dispatch) setFocusMode(!focusMode.value);
   return true;
 };

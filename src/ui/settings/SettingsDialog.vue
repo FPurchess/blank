@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, useTemplateRef } from "vue";
+import { nextTick, onMounted, shallowRef, useTemplateRef } from "vue";
 
 import { useEditor } from "../../editor/handle";
 import {
@@ -23,15 +23,18 @@ import WritingSection from "./WritingSection.vue";
 // the right. Every change applies at once, so the only button is Close. The
 // dialog is as tall as Appearance on every section, so it never jumps; longer
 // sections and the inner pages scroll.
-const props = defineProps<{ request: SettingsRequest }>();
+defineProps<{ request: SettingsRequest }>();
 const editor = useEditor();
 
-if (props.request.section) settingsSection.value = props.request.section;
+// the section shown: Appearance at first, to measure it, then the one shown
+// last
+const shown = shallowRef<SettingsSection>("appearance");
 
 const sections = useTemplateRef<HTMLElement>("sections");
 const body = useTemplateRef<HTMLElement>("body");
 
 const show = (key: SettingsSection) => {
+  shown.value = key;
   settingsSection.value = key;
 };
 const { current, onKeydown, follow, focusCurrent } = useRovingFocus(
@@ -49,14 +52,11 @@ const choose = (key: SettingsSection, event: MouseEvent) => {
 const close = () => closeDialog(settingsDialog, () => editor.focus());
 
 onMounted(async () => {
-  // measure Appearance once, and keep every section that tall
-  const shown = settingsSection.value;
-  settingsSection.value = "appearance";
-  await nextTick();
+  // measure Appearance once, and keep every section that tall; it may
+  // shrink in a low window, never grow
   const height = body.value!.offsetHeight;
-  // it may shrink in a low window, never grow
   if (height > 0) body.value!.style.flexBasis = `${height}px`;
-  settingsSection.value = shown;
+  shown.value = settingsSection.value;
   await nextTick();
   focusCurrent();
 });
@@ -85,7 +85,7 @@ onMounted(async () => {
           :key="section.key"
           type="button"
           role="tab"
-          :aria-selected="settingsSection === section.key"
+          :aria-selected="shown === section.key"
           aria-controls="settings-panel"
           :tabindex="index === current ? 0 : -1"
           @click="choose(section.key, $event)"
@@ -98,15 +98,15 @@ onMounted(async () => {
         id="settings-panel"
         class="settings-panel"
         role="tabpanel"
-        :aria-labelledby="`settings-tab-${settingsSection}`"
-        :data-section="settingsSection"
+        :aria-labelledby="`settings-tab-${shown}`"
+        :data-section="shown"
         tabindex="-1"
         @keydown.enter="enterInField"
       >
-        <AppearanceSection v-if="settingsSection === 'appearance'" />
-        <WritingSection v-else-if="settingsSection === 'writing'" />
-        <SpellingSection v-else-if="settingsSection === 'spelling'" />
-        <ShortcutsSection v-else-if="settingsSection === 'shortcuts'" />
+        <AppearanceSection v-if="shown === 'appearance'" />
+        <WritingSection v-else-if="shown === 'writing'" />
+        <SpellingSection v-else-if="shown === 'spelling'" />
+        <ShortcutsSection v-else-if="shown === 'shortcuts'" />
         <AboutSection v-else />
       </div>
     </div>

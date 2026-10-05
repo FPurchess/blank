@@ -4,7 +4,6 @@ import type { Band, DocumentFields } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
 import type { BoxAnchor } from "./popups";
-import type { SettingsSection } from "./settingsDialog";
 
 export interface LinkDialogRequest {
   url: string;
@@ -113,10 +112,8 @@ export interface UnsavedDialogRequest {
 // tab's changes before it closes, or null while none is asked
 export const unsavedDialog = shallowRef<UnsavedDialogRequest | null>(null);
 
-export interface SettingsRequest {
-  // the section to open on, else the one shown last (settingsSection)
-  section?: SettingsSection;
-}
+// the settings open on the section shown last (settingsSection)
+export type SettingsRequest = Record<string, never>;
 
 // settingsDialog holds the request of the open settings dialog, or null while
 // it is closed. It isn't about a document, so closing a tab leaves it open.

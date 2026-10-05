@@ -670,6 +670,43 @@ describe("config", () => {
       expect(config.value.editor.indentSize).toBe(4);
     });
 
+    it("reports a change that fails, and goes on with the next", async () => {
+      expect(
+        await saveSettings(() => {
+          throw new Error("broken");
+        }),
+      ).toBe(false);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Blank couldn't save blank.json: broken",
+      );
+
+      expect(
+        await saveSettings([{ path: ["editor", "indentSize"], value: 2 }]),
+      ).toBe(true);
+    });
+
+    it("applies what was written by hand, and tells what it can't use", async () => {
+      file = JSON.stringify({
+        editor: { indentSize: 99 },
+        keymap: { undo: "F2" },
+      });
+
+      await saveSettings([{ path: ["autocorrect", "dashes"], value: false }]);
+
+      expect(getKeyBinding(CommandIdentifier.UNDO)).toBe("F2");
+      expect(sendNotification).toHaveBeenCalledWith(
+        "Ignored invalid settings in blank.json: editor.indentSize",
+      );
+    });
+
+    it("tells the page setup what went wrong", async () => {
+      vi.mocked(rename).mockRejectedValue(new Error("disk full"));
+
+      await expect(saveDefaultPage(DEFAULT_PAGE, "cm")).rejects.toThrow(
+        "Blank couldn't save blank.json: disk full",
+      );
+    });
+
     it("writes one change after the other", async () => {
       const first = saveSettings([
         { path: ["autocorrect", "dashes"], value: false },

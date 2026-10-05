@@ -7,7 +7,8 @@ import {
   defaults,
   type SettingChange,
 } from "../../config";
-import { formatShortcut, sameBinding } from "../../editor/keyBindings";
+import { formatShortcut } from "../../editor/keyBindings";
+import { sameBinding } from "../../keyNames";
 import { isMac } from "../../platform";
 
 // The keyboard shortcuts of the settings: what a key pressed while recording
@@ -33,7 +34,7 @@ const MODIFIER_KEYS = new Set([
 const F_KEY = /^F([1-9]|1\d|2[0-4])$/;
 
 // what a key pressed while recording means
-export type Recorded =
+type Recorded =
   | { binding: string }
   | { error: string }
   | "cancel"
@@ -150,11 +151,7 @@ export const refusal = (
 /**
  * ownerOf returns the command other than `except` that has `binding`, if any
  */
-export const ownerOf = (
-  binding: string,
-  except: CommandIdentifier,
-  keymap: Keymap,
-) =>
+const ownerOf = (binding: string, except: CommandIdentifier, keymap: Keymap) =>
   (Object.keys(keymap) as CommandIdentifier[]).find(
     (id) => id !== except && sameBinding(keymap[id], binding),
   );
@@ -170,8 +167,9 @@ export type Assigned =
   | { changes: SettingChange[]; message: string }
   | { pending: Pending; message: string };
 
-// the name of a command in a sentence, without the … of a dialog
-const nameOf = (id: CommandIdentifier) => commandLabel(id).replace(/…$/, "");
+// the name of a command in a sentence or a list, without the … of a dialog
+export const commandName = (id: CommandIdentifier) =>
+  commandLabel(id).replace(/…$/, "");
 
 /**
  * shortcutText returns a binding as the settings show it, "None" for no key
@@ -199,8 +197,8 @@ export const assign = (
     value: reset ? undefined : binding,
   };
   const message = reset
-    ? `${nameOf(id)} reset to ${shortcutText(binding)}`
-    : `Shortcut of ${nameOf(id)} set to ${shortcutText(binding)}`;
+    ? `${commandName(id)} reset to ${shortcutText(binding)}`
+    : `Shortcut of ${commandName(id)} set to ${shortcutText(binding)}`;
   const other = binding ? ownerOf(binding, id, keymap) : undefined;
   if (!other) return { changes: [own], message };
   if (
@@ -214,7 +212,7 @@ export const assign = (
     };
   return {
     pending: { id, binding, other },
-    message: `${formatShortcut(binding)} is used by ${nameOf(other)}. Press it again to move it here.`,
+    message: `${formatShortcut(binding)} is used by ${commandName(other)}. Press it again to move it here.`,
   };
 };
 
@@ -233,7 +231,7 @@ export const reset = (
  */
 export const remove = (id: CommandIdentifier) => ({
   changes: [{ path: ["keymap", id], value: "" }] as SettingChange[],
-  message: `Shortcut of ${nameOf(id)} removed`,
+  message: `Shortcut of ${commandName(id)} removed`,
 });
 
 /**
@@ -256,4 +254,53 @@ export const filterCommands = (query: string): readonly CommandInfo[] => {
       .toLowerCase();
     return words.every((word) => text.includes(word));
   });
+};
+
+/**
+ * keyButton returns what the button of a command's key shows and how screen
+ * readers name it, while recording or not
+ */
+export const keyButton = (
+  id: CommandIdentifier,
+  binding: string,
+  recording: boolean,
+) =>
+  recording
+    ? {
+        text: "Press keys…",
+        label: `Press the new keys for ${commandName(id)}`,
+      }
+    : {
+        text: shortcutText(binding),
+        label: `${commandName(id)}: ${shortcutText(binding)}`,
+      };
+
+// what a key pressed while recording does: nothing yet (a modifier), cancel
+// the recording, say why it can't be, or the changes and pending key of
+// assign
+export type RecordingAction =
+  | { kind: "wait" }
+  | { kind: "cancel" }
+  | { kind: "say"; text: string }
+  | Assigned;
+
+/**
+ * recordingAction returns what the key of `event` does while the key of `id`
+ * is recorded, see RecordingAction
+ */
+export const recordingAction = (
+  event: KeyboardEvent,
+  id: CommandIdentifier,
+  keymap: Keymap,
+  pending?: Pending,
+  mac = isMac(),
+): RecordingAction => {
+  const key = recordedKey(event, mac);
+  if (key === undefined) return { kind: "wait" };
+  if (key === "cancel") return { kind: "cancel" };
+  if (key === "remove") return remove(id);
+  if ("error" in key) return { kind: "say", text: key.error };
+  const refused = refusal(key.binding, id, mac);
+  if (refused) return { kind: "say", text: refused };
+  return assign(id, key.binding, keymap, pending);
 };

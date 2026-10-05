@@ -7,7 +7,12 @@ import {
   readWords,
   writeWords,
 } from "../../spellcheck/userDictionary";
-import { announce, spellchecker } from "../../state";
+import {
+  announce,
+  spellcheck,
+  spellchecker,
+  spellcheckStatus,
+} from "../../state";
 import { count } from "./settingsModel";
 
 // Your dictionary in the settings (DictionaryPage.vue): the words of the
@@ -17,8 +22,8 @@ import { count } from "./settingsModel";
 
 /**
  * dictionaryOf returns the personal dictionary of `tag`: its words, sorted,
- * whether it can't be changed (its file couldn't be read, and writing would
- * lose it), and `add` and `remove`. Call `load` to read the file; while the
+ * whether it can't be changed now (`busy`, while spell check loads it) or at
+ * all (`unreadable`), and `add` and `remove`. Call `load` to read the file; while the
  * spell checker runs in the language, the words are its own.
  */
 export const dictionaryOf = (tag: string) => {
@@ -35,7 +40,19 @@ export const dictionaryOf = (tag: string) => {
       a.localeCompare(b),
     ),
   );
-  const readOnly = computed(() => !live.value && saved.value === undefined);
+  // the spell checker is loading this dictionary: what's added to the file
+  // now would be missing from it, and lost when it saves
+  const busy = computed(() => {
+    const { state, tag: loading } = spellcheckStatus.value;
+    return (
+      spellcheck.value &&
+      !live.value &&
+      (state === "loading" || state === "downloading") &&
+      dictionaryKey(loading) === key
+    );
+  });
+  // the file couldn't be read, and writing it would lose what it holds
+  const unreadable = computed(() => !live.value && saved.value === undefined);
 
   const load = async () => {
     saved.value = await readWords(key);
@@ -53,18 +70,20 @@ export const dictionaryOf = (tag: string) => {
   };
 
   const add = async (word: string) => {
+    if (busy.value) return;
     if (live.value) await live.value.addWord(word);
     else if (!(await change((words) => [...words, word]))) return;
     announce(`${word} added to your dictionary`);
   };
   const remove = async (word: string) => {
+    if (busy.value) return;
     if (live.value) await live.value.removeWord(word);
     else if (!(await change((words) => words.filter((w) => w !== word))))
       return;
     announce(`${word} removed from your dictionary`);
   };
 
-  return { words, readOnly, load, add, remove };
+  return { words, busy, unreadable, load, add, remove };
 };
 
 /**

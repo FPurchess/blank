@@ -2,6 +2,7 @@
 // desk's color, the chosen one on the paper, which scrolls. Its rows are the
 // dialogs' setting rows (SettingRow.vue, main.scss).
 @use "controls" as *;
+@use "hidden" as *;
 
 .dialog.settings {
   width: min(720px, calc(100% - 32px));
@@ -117,12 +118,7 @@
     flex-direction: column;
 
     > label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
+      @include visually-hidden;
     }
 
     input,

@@ -15,9 +15,6 @@ const FOLLOW_CLASS = "follow-links";
 // links the default opener permission allows to open (see capabilities)
 const OPENABLE_URL = /^(https?|mailto|tel):/i;
 
-// macOS uses Cmd+Click, since Ctrl+Click is the secondary (right) click there
-export { isMac };
-
 export const hasOpenModifier = (event: {
   metaKey: boolean;
   ctrlKey: boolean;

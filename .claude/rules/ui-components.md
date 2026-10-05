@@ -75,7 +75,7 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 | `TableHandles.vue` | the mouse handles of the table under the mouse: grips, the "+", the column lines, the edges and the drag previews, where they go and what a drag does in `tableHandlesModel.ts` |
 | `components/IconGlyph.vue` | an icon of `src/icons.ts`, 16px or `size="large"` 20px |
 | `components/IconButton.vue` | a button that shows only an icon: its label for screen readers and the tooltip, a command's shortcut, `pressed`, `disabled` (aria-disabled), `focusable` |
-| `settings/SettingsDialog.vue` and the rest of `settings/` | the settings (`Mod-,`): the sections, an inner page in place of its section (`InnerPage.vue`), `SwitchRow.vue` (a setting row with a switch), `EntryList.vue` (a list with Remove and a filter), `ThemeCards.vue`; see `settings.md` |
+| `settings/SettingsDialog.vue` and the rest of `settings/` | the settings (`Mod-,`): the sections, an inner page in place of its section (`InnerPage.vue`), `SwitchRow.vue` (a setting row with a switch), `EditRow.vue` and `PagedSection.vue` (a setting edited on an inner page), `EntryList.vue` and `AddRow.vue` (a list with Remove and a filter, and its fields), `ThemeCards.vue`; see `settings.md` |
 | `FocusModeButton.vue` | focus mode's button at the end of the status bar; see `focus-mode.md` |
 | `UiTooltip.vue` | the shared tooltip of controls, mounted once; what it shows and when in `tooltipModel.ts` (`tipAttrs`, `watchTips`), its timer in `hoverIntent.ts` |
 

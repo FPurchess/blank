@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { bindKeys } from "../../test/keymap";
 import { CommandIdentifier, config } from "../../config";
 
 import { PAGE_PRESS } from "../pagePointer";
@@ -43,10 +44,7 @@ describe("plugin.languagePicker", () => {
 
   it("closes on the key that opens it, also after it changed", () => {
     const { press } = setup();
-    config.value = {
-      ...defaults,
-      keymap: { ...defaults.keymap, [CommandIdentifier.LANGUAGE_CHOOSE]: "F8" },
-    };
+    bindKeys({ [CommandIdentifier.LANGUAGE_CHOOSE]: "F8" });
     openPicker();
 
     expect(press("Mod-Alt-l")).toBe(true);

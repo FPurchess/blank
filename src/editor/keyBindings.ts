@@ -8,10 +8,8 @@ import {
   config,
   getKeyBinding,
 } from "../config";
-import { normalizeBinding, splitBinding } from "../keyNames";
+import { canonicalBinding, normalizeBinding, splitBinding } from "../keyNames";
 import { isMac } from "../platform";
-
-export { canonicalBinding, normalizeBinding, sameBinding } from "../keyNames";
 
 /**
  * commandBinding returns the key bound to `command`, normalized for
@@ -22,7 +20,7 @@ export const commandBinding = (command: CommandIdentifier) =>
   normalizeBinding(getKeyBinding(command));
 
 // a handler of keydown events, as prosemirror-keymap's keydownHandler returns
-export type KeyHandler = (view: EditorView, event: KeyboardEvent) => boolean;
+type KeyHandler = (view: EditorView, event: KeyboardEvent) => boolean;
 
 /**
  * liveKeys returns a keydown handler for the bindings `build` returns from
@@ -84,33 +82,19 @@ export const commandShortcut = (command: CommandIdentifier) => {
   return binding ? formatShortcut(binding) : undefined;
 };
 
-// the names aria-keyshortcuts gives the modifiers, by the names a binding may
-// use; Mod is Meta on macOS, Control elsewhere
-const ariaModifiers: Record<string, string> = {
-  shift: "Shift",
-  s: "Shift",
-  alt: "Alt",
-  a: "Alt",
-  ctrl: "Control",
-  control: "Control",
-  c: "Control",
-  meta: "Meta",
-  cmd: "Meta",
-  m: "Meta",
-};
+// the order aria-keyshortcuts names the modifiers in, as people say them
+const ARIA_ORDER = ["Ctrl", "Alt", "Meta", "Shift"];
 
 /**
  * ariaShortcut returns a key binding as aria-keyshortcuts writes it, e.g.
  * "Control+Shift+Z" for "Mod-Shift-z", or undefined if it can't be used
  */
 export const ariaShortcut = (binding: string) => {
-  const normalized = normalizeBinding(binding);
-  if (normalized === undefined) return;
-  const { modifiers, key } = splitBinding(normalized);
-  const names = modifiers.map((modifier) => {
-    const name = modifier.toLowerCase();
-    if (name === "mod") return isMac() ? "Meta" : "Control";
-    return ariaModifiers[name];
-  });
+  const canonical = canonicalBinding(binding);
+  if (canonical === undefined) return;
+  const { modifiers, key } = splitBinding(canonical);
+  const names = ARIA_ORDER.filter((name) => modifiers.includes(name)).map(
+    (name) => (name === "Ctrl" ? "Control" : name),
+  );
   return [...names, key.length === 1 ? key.toUpperCase() : key].join("+");
 };

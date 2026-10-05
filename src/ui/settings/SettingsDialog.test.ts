@@ -561,6 +561,8 @@ describe("the settings dialog", () => {
 
       expect(written()).toEqual({});
       expect(keyOf(C.FILE_SAVE).textContent?.trim()).toBe("Ctrl+S");
+      // the reset button went, the key keeps the focus in the dialog
+      expect(document.activeElement).toBe(keyOf(C.FILE_SAVE));
     });
 
     it("resets all after asking in place", async () => {
@@ -578,6 +580,7 @@ describe("the settings dialog", () => {
 
       expect(written()).toEqual({});
       expect(button("Reset all").disabled).toBe(true);
+      expect(document.activeElement?.id).toBe("settings-shortcuts-search");
     });
 
     it("finds a command", async () => {

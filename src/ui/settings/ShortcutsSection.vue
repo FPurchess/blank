@@ -8,21 +8,19 @@ import {
   watch,
 } from "vue";
 
-import type { CommandIdentifier } from "../../config";
-import { config, defaults } from "../../config";
+import { type CommandIdentifier, config, defaults } from "../../config";
 import { announce } from "../../state";
 import IconButton from "../components/IconButton.vue";
 import TextField from "../components/TextField.vue";
 import { save } from "./settingsModel";
 import {
-  assign,
   type Assigned,
+  commandName,
   filterCommands,
   isChanged,
+  keyButton,
   type Pending,
-  recordedKey,
-  refusal,
-  remove,
+  recordingAction,
   reset,
   shortcutText,
 } from "./shortcutsModel";
@@ -50,17 +48,20 @@ const message = shallowRef<{ id: CommandIdentifier; text: string } | null>(
 );
 const confirming = shallowRef(false);
 
-const say = (id: CommandIdentifier, text: string) => {
-  message.value = { id, text };
-};
 const stop = () => {
   recording.value = null;
 };
+const focus = async (selector: string) => {
+  await nextTick();
+  root.value?.querySelector<HTMLElement>(selector)?.focus();
+};
+const keyOf = (id: CommandIdentifier) =>
+  `.shortcut[data-command="${id}"] .shortcut-key`;
 
 const apply = async (id: CommandIdentifier, result: Assigned) => {
   if ("pending" in result) {
     pending.value = result.pending;
-    say(id, result.message);
+    message.value = { id, text: result.message };
     return;
   }
   stop();
@@ -74,20 +75,15 @@ const onKey = (event: KeyboardEvent) => {
   if (!id) return;
   event.preventDefault();
   event.stopPropagation();
-  const key = recordedKey(event);
-  if (key === undefined) return;
-  if (key === "cancel") {
+  const action = recordingAction(event, id, keymap.value, pending.value);
+  if (!("kind" in action)) return void apply(id, action);
+  if (action.kind === "say") message.value = { id, text: action.text };
+  if (action.kind === "cancel") {
     stop();
     message.value = null;
     pending.value = undefined;
     announce("Shortcut unchanged");
-    return;
   }
-  if (key === "remove") return void apply(id, remove(id));
-  if ("error" in key) return say(id, key.error);
-  const refused = refusal(key.binding, id);
-  if (refused) return say(id, refused);
-  void apply(id, assign(id, key.binding, keymap.value, pending.value));
 };
 
 // the dialog's keys go to the recording first, so nothing submits, closes or
@@ -107,37 +103,27 @@ const record = (id: CommandIdentifier) => {
   announce("Press the new keys");
 };
 
-const resetKey = (id: CommandIdentifier) => {
+// the reset button goes with the change, so the key gets the focus
+const resetKey = async (id: CommandIdentifier) => {
   stop();
-  void apply(
-    id,
-    reset(
-      id,
-      keymap.value,
-      pending.value?.id === id ? pending.value : undefined,
-    ),
-  );
+  const ask = pending.value?.id === id ? pending.value : undefined;
+  await apply(id, reset(id, keymap.value, ask));
+  await focus(keyOf(id));
 };
 
 const resetAll = async () => {
   confirming.value = false;
   await save([{ path: ["keymap"] }], "All shortcuts reset");
+  await focus("#settings-shortcuts-search");
 };
 const askResetAll = async () => {
   confirming.value = true;
-  await nextTick();
-  root.value?.querySelector<HTMLElement>(".confirm .cancel")?.focus();
+  await focus(".confirm .cancel");
 };
 const cancelResetAll = async () => {
   confirming.value = false;
-  await nextTick();
-  root.value?.querySelector<HTMLElement>(".reset-all")?.focus();
+  await focus(".reset-all");
 };
-
-const keyLabel = (label: string, id: CommandIdentifier) =>
-  recording.value === id
-    ? `Press the new keys for ${label}`
-    : `${label}: ${shortcutText(keymap.value[id])}`;
 </script>
 
 <template>
@@ -181,7 +167,7 @@ const keyLabel = (label: string, id: CommandIdentifier) =>
         :data-command="info.id"
       >
         <span class="shortcut-text">
-          {{ info.label.replace(/…$/, "") }}
+          {{ commandName(info.id) }}
           <small>{{ info.group }}</small>
         </span>
         <button
@@ -191,18 +177,16 @@ const keyLabel = (label: string, id: CommandIdentifier) =>
             recording: recording === info.id,
             none: !keymap[info.id],
           }"
-          :aria-label="keyLabel(info.label.replace(/…$/, ''), info.id)"
+          :aria-label="
+            keyButton(info.id, keymap[info.id], recording === info.id).label
+          "
           :aria-describedby="
             message?.id === info.id ? `shortcut-message-${info.id}` : undefined
           "
           @click="record(info.id)"
           @blur="recording === info.id && stop()"
         >
-          {{
-            recording === info.id
-              ? "Press keys…"
-              : shortcutText(keymap[info.id])
-          }}
+          {{ keyButton(info.id, keymap[info.id], recording === info.id).text }}
         </button>
         <IconButton
           v-if="isChanged(info.id, keymap)"

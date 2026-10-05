@@ -9,6 +9,7 @@ import {
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { shallowRef } from "vue";
 
+import { errorMessage } from "./errors";
 import { sameBinding } from "./keyNames";
 
 import {
@@ -120,8 +121,8 @@ export interface FocusModeConfig {
 }
 
 // the rest times blank.json may set
-export const MIN_HIDE_AFTER = 0;
-export const MAX_HIDE_AFTER = 60;
+const MIN_HIDE_AFTER = 0;
+const MAX_HIDE_AFTER = 60;
 
 export interface LayoutConfig {
   // the page setup of documents that don't have their own
@@ -470,7 +471,7 @@ const mergeLayout = (user: unknown, problems: string[]): LayoutConfig => {
  * mergeConfig reads the settings of blank.json, `user`, over the defaults.
  * Invalid settings keep their default and are listed in `problems`.
  */
-export const mergeConfig = (user: Record<string, unknown>) => {
+const mergeConfig = (user: Record<string, unknown>) => {
   const problems: string[] = [];
   const merged: Config = {
     ...defaultConfig,
@@ -489,18 +490,24 @@ export const mergeConfig = (user: Record<string, unknown>) => {
 };
 
 /**
+ * reportProblems tells the user which settings of blank.json can't be used
+ */
+const reportProblems = (problems: string[]) => {
+  if (problems.length === 0) return;
+  console.warn("ignored invalid settings in blank.json", problems);
+  sendNotification(
+    `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
+  );
+};
+
+/**
  * bootConfig initializes the config. Invalid settings are ignored with a
  * notification, so Blank still starts with the defaults.
  */
 export const bootConfig = async () => {
   const { config: merged, problems } = mergeConfig(await getUserConfig());
   config.value = merged;
-  if (problems.length > 0) {
-    console.warn("ignored invalid settings in blank.json", problems);
-    sendNotification(
-      `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
-    );
-  }
+  reportProblems(problems);
 };
 
 /**
@@ -602,12 +609,6 @@ const applyChange = (
       delete parents[i - 1][path[i - 1]];
 };
 
-export interface SaveOptions {
-  // whether a failure is reported with a notification, as by default; a
-  // caller that reports it itself turns it off
-  notify?: boolean;
-}
-
 // the changes to make, or a function that returns them from what blank.json
 // holds, for a change that builds on it (e.g. adding to a list)
 export type SettingChanges =
@@ -615,47 +616,42 @@ export type SettingChanges =
 
 /**
  * writeSettings makes `changes` in blank.json, see saveSettings
+ * @returns what went wrong, or undefined once they are saved
  */
-const writeSettings = async (changes: SettingChanges, notify: boolean) => {
-  const fail = (message: string, error?: unknown) => {
-    console.error(message, error);
-    if (notify) sendNotification(message);
-    return false;
-  };
+const writeSettings = async (
+  changes: SettingChanges,
+): Promise<string | undefined> => {
   const configFile = await getConfigFile();
   let settings: unknown = {};
   try {
     if (await exists(configFile))
       settings = JSON.parse(await readTextFile(configFile));
   } catch (error) {
-    return fail(
-      "Blank couldn't read blank.json, so it left the file as it is",
-      error,
-    );
+    console.error("failed to read blank.json", error);
+    return "Blank couldn't read blank.json, so it left the file as it is";
   }
   // overwriting would lose what the user wrote
   if (!isRecord(settings))
-    return fail("blank.json holds no settings, so Blank left it as it is");
+    return "blank.json holds no settings, so Blank left it as it is";
 
   for (const change of typeof changes === "function"
     ? changes(settings)
     : changes)
     applyChange(settings, change);
 
-  try {
-    await mkdir(await path.appConfigDir(), { recursive: true });
-    // a new file renamed over the old one, so an interrupted write never
-    // leaves half of it
-    await writeTextFile(
-      `${configFile}.tmp`,
-      `${JSON.stringify(settings, null, 2)}\n`,
-    );
-    await rename(`${configFile}.tmp`, configFile);
-  } catch (error) {
-    return fail(`Blank couldn't save blank.json: ${String(error)}`, error);
-  }
-  config.value = keepUnchanged(config.value, mergeConfig(settings).config);
-  return true;
+  await mkdir(await path.appConfigDir(), { recursive: true });
+  // a new file renamed over the old one, so an interrupted write never leaves
+  // half of it
+  await writeTextFile(
+    `${configFile}.tmp`,
+    `${JSON.stringify(settings, null, 2)}\n`,
+  );
+  await rename(`${configFile}.tmp`, configFile);
+
+  // what was written by hand since the start applies now too
+  const { config: merged, problems } = mergeConfig(settings);
+  reportProblems(problems);
+  config.value = keepUnchanged(config.value, merged);
 };
 
 // the writes of blank.json, one after the other, so fast changes can't
@@ -663,19 +659,32 @@ const writeSettings = async (changes: SettingChanges, notify: boolean) => {
 let writes: Promise<unknown> = Promise.resolve();
 
 /**
+ * write queues `changes` after the writes before
+ * @returns what went wrong, or undefined once they are saved
+ */
+const write = (changes: SettingChanges) => {
+  const written = writes
+    .then(() => writeSettings(changes))
+    .catch((error: unknown) => {
+      console.error("failed to save blank.json", error);
+      return `Blank couldn't save blank.json: ${errorMessage(error)}`;
+    });
+  writes = written;
+  return written;
+};
+
+/**
  * saveSettings makes `changes` in blank.json and applies them at once. The
  * file's other settings stay as they are, and a setting that is the default
  * is left out, so the file keeps only what the user changed. A file that
- * isn't a JSON object is left as it is.
+ * isn't a JSON object is left as it is. What goes wrong is told in a
+ * notification.
  * @returns whether the settings were saved
  */
-export const saveSettings = (
-  changes: SettingChanges,
-  { notify = true }: SaveOptions = {},
-): Promise<boolean> => {
-  const write = writes.then(() => writeSettings(changes, notify));
-  writes = write.catch(() => undefined);
-  return write;
+export const saveSettings = async (changes: SettingChanges) => {
+  const failure = await write(changes);
+  if (failure) sendNotification(failure);
+  return failure === undefined;
 };
 
 /**
@@ -683,12 +692,11 @@ export const saveSettings = (
  * their own, in blank.json. The file's other settings stay as they are.
  * @param page the page setup
  * @param unit the unit to write lengths in
- * @throws if blank.json can't be read or written
+ * @throws if blank.json can't be read or written, with what went wrong
  */
 export const saveDefaultPage = async (page: PageSettings, unit: Unit) => {
-  const saved = await saveSettings(
-    [{ path: ["layout", "page"], value: pageSettingsJSON(page, unit) }],
-    { notify: false },
-  );
-  if (!saved) throw new Error("blank.json holds no settings");
+  const failure = await write([
+    { path: ["layout", "page"], value: pageSettingsJSON(page, unit) },
+  ]);
+  if (failure) throw new Error(failure);
 };

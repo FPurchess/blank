@@ -5,6 +5,7 @@ import { config } from "../../config";
 import { language } from "../../state";
 import SegmentedTabs from "../components/SegmentedTabs.vue";
 import TextField from "../components/TextField.vue";
+import AddRow from "./AddRow.vue";
 import EntryList from "./EntryList.vue";
 import InnerPage from "./InnerPage.vue";
 import {
@@ -16,7 +17,7 @@ import {
   validate,
   withEntry,
 } from "./replacementsModel";
-import { enterInField, save } from "./settingsModel";
+import { save } from "./settingsModel";
 
 // Your replacements: what you type and what it becomes, for every language
 // or for one, added and removed in blank.json at once.
@@ -32,10 +33,9 @@ const error = shallowRef("");
 const typedField = useTemplateRef<InstanceType<typeof TextField>>("typedField");
 
 const add = async () => {
-  const problem = validate(typed.value.trim(), becomes.value);
-  error.value = problem ?? "";
-  if (problem) return;
   const key = typed.value.trim();
+  error.value = validate(key, becomes.value) ?? "";
+  if (error.value) return;
   const old = config.value.autocorrect.replace[scope.value]?.[key];
   const saved = await save(
     withEntry(scope.value, key, becomes.value),
@@ -57,37 +57,35 @@ const remove = (key: string) =>
     @back="emit('back')"
   >
     <SegmentedTabs v-model="scope" class="scope" label="For" :items="choices" />
-    <div class="add-row" @keydown.enter="enterInField($event) && add()">
-      <div class="compact">
-        <TextField
-          id="settings-replace-typed"
-          ref="typedField"
-          v-model="typed"
-          label="Typed"
-          placeholder="Typed"
-          :error-id="error ? 'settings-replace-error' : undefined"
-        />
-      </div>
-      <span class="arrow" aria-hidden="true">→</span>
-      <div class="compact">
-        <TextField
-          id="settings-replace-becomes"
-          v-model="becomes"
-          label="Becomes"
-          placeholder="Becomes"
-          :error-id="error ? 'settings-replace-error' : undefined"
-        />
-      </div>
-      <button type="button" class="add" @click="add">Add</button>
-    </div>
-    <p v-if="error" id="settings-replace-error" class="error" role="alert">
-      {{ error }}
-    </p>
+    <AddRow id="settings-replace" :error="error" @add="add">
+      <template #default="{ errorId }">
+        <div class="compact">
+          <TextField
+            id="settings-replace-typed"
+            ref="typedField"
+            v-model="typed"
+            label="Typed"
+            placeholder="Typed"
+            :error-id="errorId"
+          />
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="compact">
+          <TextField
+            id="settings-replace-becomes"
+            v-model="becomes"
+            label="Becomes"
+            placeholder="Becomes"
+            :error-id="errorId"
+          />
+        </div>
+      </template>
+    </AddRow>
     <EntryList
       id="settings-replacements-list"
+      label="your replacements"
       :entries="entries"
       :empty="noneYet(scope)"
-      filter-label="Filter your replacements"
       :remove-label="(entry) => `Remove the replacement of ${entry.key}`"
       @remove="remove"
     >
@@ -97,7 +95,8 @@ const remove = (key: string) =>
     </EntryList>
     <template #footnote>
       Blank replaces what you typed once the word is complete: when you type a
-      space, punctuation, Tab or Enter after it. Yours come before Blank's own replacements.
+      space, punctuation, Tab or Enter after it. Yours come before Blank's own
+      replacements.
     </template>
   </InnerPage>
 </template>

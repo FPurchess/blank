@@ -16,7 +16,7 @@ import {
 
 // how far the pointer moves before the controls come back, in px: a nudged
 // desk doesn't count
-export const POINTER_TRAVEL = 6;
+const POINTER_TRAVEL = 6;
 
 // keys that change the text besides the characters
 const EDITING_KEYS = new Set(["Enter", "Backspace", "Delete", "Tab"]);
@@ -94,6 +94,10 @@ export const watchFocusMode = () => {
     controlsFaded.value = false;
     restart();
   });
+  // the pointer left the window, maybe from a control
+  listenOnWindow("mouseout", (event) => {
+    if (!event.relatedTarget) onChrome = false;
+  });
   // the focus moving to a control (F6, Alt-F10) brings them back
   listenOnWindow("focusin", (event) => {
     if (
@@ -112,9 +116,6 @@ export const watchFocusMode = () => {
   });
   watch(controlsFaded, (faded) => (tooltipsSuppressed.value = faded), {
     immediate: true,
-  });
-  watch(focusMode, (on) => {
-    if (!on) controlsFaded.value = false;
   });
 
   onScopeDispose(() => clearTimeout(timer));
