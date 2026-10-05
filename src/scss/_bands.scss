@@ -114,8 +114,7 @@ body.band-editing.without-engine #editor {
   z-index: 8;
   overflow: clip;
   pointer-events: none;
-  font-size: var(--ui);
-  line-height: 20px;
+  @include ui-text;
   color: var(--color);
 
   > .band-card,
