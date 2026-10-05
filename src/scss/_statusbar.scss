@@ -2,6 +2,7 @@
 // status items (_controls.scss) on the desk, each 24 px high (WCAG 2.5.8's
 // minimum target), with a line above it.
 @use "controls" as *;
+@use "focusMode" as *;
 
 // the height of the bar, which the page view, the outline and the footer
 // strip stay above (STATUS_HEIGHT in src/chrome.ts)
@@ -26,6 +27,7 @@ $status-height: 32px;
   background-color: var(--desk-color);
   border-top: 1px solid var(--line);
   user-select: none;
+  @include chrome-fade;
 }
 
 // what pushes the items after it to the right end

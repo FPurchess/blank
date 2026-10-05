@@ -2,6 +2,7 @@
 @use "themes/index";
 // first, so main.scss's own rules override its global ones
 @use "controls" as *;
+@use "focusMode" as *;
 @use "typography";
 @use "statusbar" as *;
 @use "toparea" as *;
@@ -955,6 +956,8 @@ $strip-height: 88px;
   @include ui-text;
   @include popover;
   user-select: none;
+  // the context bars hide with the controls in focus mode
+  @include chrome-fade;
 
   &[hidden] {
     display: none;
@@ -1551,6 +1554,7 @@ body.outline-docked.outline-desk {
   user-select: none;
   color: var(--color);
   @include ui-text;
+  @include chrome-fade;
 }
 
 // one dash per heading, as long as its level is high, cut off below 400 px
@@ -1728,6 +1732,13 @@ $tile-columns: 2;
   // toolbars it floats over, below the dialogs and the menus
   z-index: 6;
   width: $blocks-dock;
+  @include chrome-fade;
+}
+
+// the pointer hides over the pages while the controls have faded
+body.controls-faded #page-view,
+body.controls-faded #editor {
+  cursor: none;
 }
 
 .side-pane-head {
@@ -2065,7 +2076,12 @@ body.without-engine.blocks-docked {
   body.band-editing #page-view,
   .outline-dashes,
   .outline-entry,
-  body.band-editing #outline {
+  body.band-editing #outline,
+  #ui-top,
+  #ui-bottom,
+  #outline,
+  #blocks-pane,
+  .toolbar {
     transition: none;
   }
 }

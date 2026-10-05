@@ -17,6 +17,7 @@ import BlocksPane from "./BlocksPane.vue";
 import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
+import FocusMode from "./FocusMode.vue";
 import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
@@ -47,6 +48,7 @@ useWindowCommands();
   <BlockMarks />
   <TopArea />
   <BottomBar />
+  <FocusMode />
   <DocumentOutline />
   <BlocksPane v-if="blocksPaneOpen" />
   <TableHandles />

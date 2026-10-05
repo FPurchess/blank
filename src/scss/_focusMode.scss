@@ -1,0 +1,16 @@
+// Focus mode (src/ui/FocusMode.vue): the controls fade out while the user
+// writes and come back when the mouse moves. Only their opacity changes, so
+// the pages never move; panes keep their room. See
+// .claude/rules/focus-mode.md.
+
+// a control of the window that fades in focus mode: slowly out, quicker back
+// (--chrome-out, --chrome-in), and while faded it takes no pointer
+@mixin chrome-fade {
+  transition: opacity var(--chrome-in) var(--ease-soft);
+
+  body.controls-faded & {
+    opacity: 0;
+    transition-duration: var(--chrome-out);
+    pointer-events: none;
+  }
+}

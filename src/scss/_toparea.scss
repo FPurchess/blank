@@ -3,6 +3,7 @@
 // start below it. The rows bring their own styles (_tabs.scss,
 // _formatToolbar.scss).
 @use "controls" as *;
+@use "focusMode" as *;
 
 // the heights of the rows (TAB_ROW_HEIGHT and TOOLBAR_HEIGHT in src/chrome.ts)
 $tab-row-height: 40px;
@@ -21,6 +22,7 @@ $top-bar-height: $tab-row-height + $toolbar-height;
   background-color: var(--desk-color);
   user-select: none;
   @include ui-text;
+  @include chrome-fade;
 }
 
 .top-row {
