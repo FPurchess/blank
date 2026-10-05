@@ -204,6 +204,11 @@ body {
     font-size: 1.1rem;
   }
 
+  // a sentence that says what the dialog is about
+  .dialog-text {
+    margin: 0 0 12px;
+  }
+
   label {
     font-size: 0.9rem;
     opacity: 0.7;

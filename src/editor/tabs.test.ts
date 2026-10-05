@@ -13,6 +13,7 @@ import {
   activeTab,
   activeTabId,
   announcement,
+  bandEditorDone,
   importedFrom,
   linkDialog,
   path,
@@ -348,6 +349,20 @@ describe("switching", () => {
     expect(cancel).toHaveBeenCalled();
   });
 
+  it("marks a change the leaving tab gets as it leaves as unsaved", async () => {
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    // the header strip keeps what was typed into it as the tab leaves
+    bandEditorDone.value = () => {
+      bandEditorDone.value = null;
+      view.dispatch(view.state.tr.insertText("x", 1));
+    };
+
+    await activateTab(tabs.value[1].id);
+
+    expect(tabs.value[2]).toMatchObject({ path: "/b.md", unsaved: true });
+  });
+
   it("tells screen readers which tab is shown", async () => {
     await boot();
     await openPaths(["/a.md"]);
@@ -427,6 +442,10 @@ describe("unsaved changes", () => {
 
     await saveTab(activeTabId.value!, {});
 
+    expect(labels()).toEqual([null, "/b.md"]);
+    expect(activeTab.value?.untitledNumber).toBeNull();
+    // the tab replaced isn't one to open again
+    await reopenTab();
     expect(labels()).toEqual([null, "/b.md"]);
   });
 });
@@ -522,6 +541,16 @@ describe("closing", () => {
     expect(labels()).toEqual(["/b.md", "/c.md"]);
   });
 
+  it("reopens the file just closed, even when asked right away", async () => {
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+
+    void closeTabs([activeTabId.value!]);
+    await reopenTab();
+
+    expect(labels()).toEqual([null, "/a.md", "/b.md"]);
+  });
+
   it("reopens closed files, the last one first", async () => {
     await boot();
     await openPaths(["/a.md", "/b.md"]);
@@ -541,11 +570,11 @@ describe("moving", () => {
     await openPaths(["/a.md"]);
     const id = activeTabId.value!;
 
-    moveTab(id, -1);
+    await moveTab(id, -1);
     expect(labels()).toEqual(["/a.md", null]);
-    moveTab(id, -1);
+    await moveTab(id, -1);
     expect(labels()).toEqual(["/a.md", null]);
-    moveTab(id, 5);
+    await moveTab(id, 5);
     expect(labels()).toEqual([null, "/a.md"]);
   });
 });

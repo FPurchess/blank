@@ -179,9 +179,16 @@ const bindingsOf = (
         command;
     }
   }
+  // a fixed key yields to any command bound to it, not only to these
+  const configured = new Set(
+    Object.keys(commandMap).map((id) =>
+      normalizeBinding(getKeyBinding(id as CommandIdentifier)),
+    ),
+  );
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
-      bindings[normalizeBinding(key)!] ??= commandMap[id];
+      const normalized = normalizeBinding(key)!;
+      if (!configured.has(normalized)) bindings[normalized] = commandMap[id];
     }
   }
   return bindings;

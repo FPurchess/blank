@@ -46,6 +46,12 @@ describe("the question whether to save", () => {
       ),
     ).toEqual(["Save", "Don't save", "Cancel"]);
     expect(document.activeElement).toBe(button("Save"));
+    // read out with the title
+    const form = dialog()!.querySelector("form")!;
+    expect(
+      document.getElementById(form.getAttribute("aria-describedby")!)
+        ?.textContent,
+    ).toContain("Your changes will be lost");
   });
 
   it.each([

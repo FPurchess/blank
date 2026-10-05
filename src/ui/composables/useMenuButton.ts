@@ -22,23 +22,22 @@ export const useMenuButton = (closed: () => void) => {
   /**
    * openAt opens the menu of `items` for `owner`: at `anchor`, e.g. the
    * pointer, or below or above the owner; from the keyboard, its first item
-   * focused, when `keyboard` is true or the owner has the focus
+   * focused, when the owner has the focus. With `toggles` false, a press on
+   * the owner closes the menu rather than counting as inside it, e.g. for
+   * the menu of a tab, whose click shows the tab.
    */
   const openAt = (
     owner: HTMLElement,
     items: MenuItem[],
-    {
-      anchor,
-      keyboard = document.activeElement === owner,
-    }: { anchor?: Anchor; keyboard?: boolean } = {},
+    { anchor, toggles = true }: { anchor?: Anchor; toggles?: boolean } = {},
   ) => {
     const { left, top, bottom } = owner.getBoundingClientRect();
     contextMenu.value = {
       items,
       anchor: anchor ?? { left, top, bottom },
-      keyboard,
+      keyboard: document.activeElement === owner,
       close,
-      owner,
+      ...(toggles && { owner }),
     };
   };
 

@@ -8,7 +8,6 @@ import {
   listShape,
   OUTLINE_DOCK,
   outlinePlacement,
-  wheelPixels,
 } from "./outlineModel";
 
 // A4 with margins of 2.5 cm, in points
@@ -72,14 +71,6 @@ describe("outlinePlacement", () => {
   it("lies beside the pages where there is room, and docks where there isn't", () => {
     expect(outlinePlacement(2, true, 1000, OUTLINE_DOCK)).toBe("beside");
     expect(outlinePlacement(2, true, 1000, OUTLINE_DOCK - 1)).toBe("docked");
-  });
-});
-
-describe("wheelPixels", () => {
-  it("turns lines and pages into pixels", () => {
-    expect(wheelPixels({ deltaY: 30, deltaMode: 0 }, 600)).toBe(30);
-    expect(wheelPixels({ deltaY: 3, deltaMode: 1 }, 600)).toBe(48);
-    expect(wheelPixels({ deltaY: 1, deltaMode: 2 }, 600)).toBe(600);
   });
 });
 

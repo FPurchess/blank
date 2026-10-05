@@ -62,7 +62,10 @@ pub async fn session_lock<R: Runtime>(
         .map_err(|error| error.to_string())?
         .map_err(|error| error.to_string())?;
     let owned = file.is_some();
-    *held.0.lock().unwrap() = file;
+    // a second ask that lost the race mustn't let go of the lock
+    if owned {
+        *held.0.lock().unwrap() = file;
+    }
     Ok(owned)
 }
 

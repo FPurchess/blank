@@ -41,7 +41,7 @@ const maxWait = 1000;
 
 // A tab as stored in the session: everything but its document, which is
 // stored under `tab:<id>`
-export type StoredTab = Omit<Tab, "id">;
+type StoredTab = Omit<Tab, "id">;
 
 // The open tabs: their order, the active one, and each one's details
 export interface Session {
@@ -70,15 +70,19 @@ const settling = new Set<Promise<void>>();
  * active one's spot in the view now
  */
 const sessionOf = (): Session | null => {
-  const active = activeTabId.value;
-  if (active === null || tabs.value.length === 0) return null;
+  const list = tabs.value;
+  if (list.length === 0) return null;
+  // the first tab, for a moment where the active one is being replaced
+  const active = list.some((tab) => tab.id === activeTabId.value)
+    ? activeTabId.value!
+    : list[0].id;
   const anchor = currentViewAnchor();
   return {
     version: 1,
-    order: tabs.value.map((tab) => tab.id),
+    order: list.map((tab) => tab.id),
     active,
     tabs: Object.fromEntries(
-      tabs.value.map(({ id, ...tab }) => [
+      list.map(({ id, ...tab }) => [
         id,
         id === active && pageLayoutState.value
           ? { ...tab, viewAnchor: anchor }
@@ -91,7 +95,8 @@ const sessionOf = (): Session | null => {
 /**
  * write stores what changed: first the tabs' documents, then the session,
  * then it removes the documents of closed tabs, so the stored session never
- * lists a tab whose document is missing
+ * lists a tab whose document is missing. What fails stays pending for the
+ * next write.
  */
 const write = async () => {
   clearTimeout(timer);
@@ -103,14 +108,26 @@ const write = async () => {
   sessionPending = false;
   const removed = [...removedTabs];
   removedTabs.clear();
-  await Promise.all(
-    docs.map(async ([id, doc]) => {
-      await localforage.setItem(tabKey(id), doc.toJSON());
-      storedDocs.set(id, doc);
-    }),
-  );
-  if (session) await localforage.setItem(SESSION, session);
-  await Promise.all(removed.map((id) => localforage.removeItem(tabKey(id))));
+  try {
+    await Promise.all(
+      docs.map(async ([id, doc]) => {
+        await localforage.setItem(tabKey(id), doc.toJSON());
+        storedDocs.set(id, doc);
+      }),
+    );
+    if (session) await localforage.setItem(SESSION, session);
+    await Promise.all(removed.map((id) => localforage.removeItem(tabKey(id))));
+  } catch (error) {
+    // unless a newer document came meanwhile
+    for (const [id, doc] of docs) {
+      if (!pendingDocs.has(id) && storedDocs.get(id) !== doc)
+        pendingDocs.set(id, doc);
+    }
+    for (const id of removed) removedTabs.add(id);
+    sessionPending ||= session !== null;
+    pending = true;
+    throw error;
+  }
 };
 
 /**
@@ -290,8 +307,8 @@ export const bootStorage = async () => {
   // storage must never keep the window open
   try {
     await getCurrentWindow().onCloseRequested(async () => {
-      // with where the view is now
-      if (sessionKept) sessionPending = true;
+      // with where the view is now, even if only that changed
+      if (sessionKept) sessionPending = pending = true;
       await Promise.race([flush(), timeout(maxWait)]).catch(console.warn);
     });
   } catch (err) {
@@ -335,7 +352,6 @@ const isSession = (value: unknown): value is Session => {
     session?.version === 1 &&
     Array.isArray(session.order) &&
     session.order.length > 0 &&
-    session.order.includes(session.active) &&
     session.order.every((id) => typeof session.tabs?.[id] === "object")
   );
 };
@@ -350,16 +366,21 @@ const migrate = async (): Promise<Session | null> => {
   const doc = await localforage.getItem("doc");
   if (doc === null) return null;
   const id = crypto.randomUUID();
+  const tab = {
+    path: (await localforage.getItem<string | null>("path")) ?? null,
+    importedFrom:
+      (await localforage.getItem<string | null>("importedFrom")) ?? null,
+  };
   const session: Session = {
     version: 1,
     order: [id],
     active: id,
     tabs: {
       [id]: {
-        path: (await localforage.getItem<string | null>("path")) ?? null,
-        importedFrom:
-          (await localforage.getItem<string | null>("importedFrom")) ?? null,
-        untitledNumber: null,
+        ...tab,
+        // an untitled one is numbered, as new ones are
+        untitledNumber:
+          tab.path === null && tab.importedFrom === null ? 1 : null,
         unsaved: true,
         viewAnchor: null,
       },
@@ -380,9 +401,20 @@ const migrate = async (): Promise<Session | null> => {
 export const loadSession = async (): Promise<Session | null> => {
   if (!sessionKept) return null;
   const stored = await localforage.getItem(SESSION);
-  if (isSession(stored)) return stored;
-  if (stored !== null) console.warn("ignoring an invalid session", stored);
-  return migrate();
+  if (isSession(stored)) {
+    const active = stored.order.includes(stored.active)
+      ? stored.active
+      : stored.order[0];
+    return { ...stored, active };
+  }
+  if (stored === null) return migrate();
+  // e.g. one a newer Blank wrote: kept, so going back to it loses nothing
+  console.warn("ignoring a session this Blank can't read", stored);
+  await localforage.setItem("session-backup", stored).catch(console.warn);
+  sendNotification(
+    'Your last tabs couldn\'t be restored, so Blank starts afresh. They were kept as "session-backup".',
+  );
+  return null;
 };
 
 /**

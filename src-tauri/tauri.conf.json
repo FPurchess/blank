@@ -76,7 +76,7 @@
         "ext": ["docx"],
         "name": "Word document",
         "description": "Word document, which Blank imports",
-        "role": "Editor",
+        "role": "Viewer",
         "rank": "Alternate",
         "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "contentTypes": ["org.openxmlformats.wordprocessingml.document"]

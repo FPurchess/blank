@@ -4,7 +4,8 @@ import { cycleFocus } from "../../state";
 
 /**
  * moveFocus moves the focus to the next part of the window, or the previous
- * one for -1: the editor, the tab row, and the bars after it (F6)
+ * one for -1 (F6): the editor, then the parts that registered a focus stop,
+ * e.g. the tab row (see cycleFocus)
  */
 export const moveFocus =
   (direction: 1 | -1): Command =>

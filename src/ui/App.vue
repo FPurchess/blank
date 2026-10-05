@@ -30,10 +30,14 @@ import TocPopover from "./TocPopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
+import { useWindowCommands } from "./composables/useWindowCommands";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
 // part is keyed by what makes it the same: a dialog by its request, so each
 // request gets a dialog of its own.
+
+// the window's commands work wherever the focus is, not only in the editor
+useWindowCommands();
 </script>
 
 <template>

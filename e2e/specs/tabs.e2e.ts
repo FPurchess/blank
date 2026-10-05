@@ -79,9 +79,8 @@ describe("tabs", () => {
   it("keeps every tab and what wasn't saved across a restart", async () => {
     await pressMod("n");
     await type("not saved yet");
-    // stored at most a second after a change, see src/storage.ts
-    await browser.pause(2000);
 
+    // which stores what is pending, as closing the window does
     await restartApp();
 
     expect(await tabLabels()).toEqual(["Welcome", "two", "one", "Untitled"]);

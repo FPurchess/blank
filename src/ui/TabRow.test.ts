@@ -40,6 +40,8 @@ const labels = () =>
 /**
  * spy replaces the command `name` with one that only notes what it was asked
  */
+const closing = () => vi.spyOn(tabActions, "closeTabs").mockResolvedValue();
+
 const spy = <K extends keyof typeof commands>(name: K) => {
   const run = vi.fn();
   vi.spyOn(commands, name).mockImplementation(((...args: unknown[]) => {
@@ -98,17 +100,32 @@ describe("the tab row", () => {
 
   it("shows a tab on a click, and closes one on its ×", () => {
     const select = spy("selectTab");
-    const close = spy("closeTab");
+    const close = closing();
 
     tabElement("b").querySelector<HTMLElement>(".tab-label")!.click();
     tabElement("c").querySelector<HTMLElement>(".tab-close")!.click();
 
     expect(select).toHaveBeenCalledWith("b");
-    expect(close).toHaveBeenCalledWith("c");
+    expect(close).toHaveBeenCalledWith(["c"]);
+  });
+
+  it("closes one tab for a quick double click on ×, and opens none", () => {
+    const close = closing();
+    const create = spy("newFile");
+    const closeMark = tabElement("c").querySelector<HTMLElement>(".tab-close")!;
+
+    closeMark.click();
+    closeMark.click();
+    document
+      .querySelector(".tab-row-spare")!
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("closes a tab on a middle click let go on it", () => {
-    const close = spy("closeTab");
+    const close = closing();
     const middle = (type: string, id: string) =>
       tabElement(id).dispatchEvent(
         new MouseEvent(type, { button: 1, bubbles: true }),
@@ -124,7 +141,7 @@ describe("the tab row", () => {
 
     down("b");
     middle("mouseup", "b");
-    expect(close).toHaveBeenCalledWith("b");
+    expect(close).toHaveBeenCalledWith(["b"]);
   });
 
   it("opens a new tab with + and a double click on its empty part", () => {
@@ -141,6 +158,17 @@ describe("the tab row", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it("shows a name with markup as text, and says a tab is unsaved", async () => {
+    tabs.value = [tab("a", { path: "/tmp/<img src=x>.md", unsaved: true })];
+    await nextTick();
+
+    expect(labels()).toEqual(["<img src=x>"]);
+    expect(tabElement("a").querySelector(".tab-label")!.children).toHaveLength(
+      0,
+    );
+    expect(tabElement("a").textContent).toContain(", unsaved changes");
+  });
+
   it("follows the tabs as they change", async () => {
     tabs.value = [tab("a", { unsaved: true }), tab("d")];
     activeTabId.value = "d";
@@ -149,6 +177,18 @@ describe("the tab row", () => {
     expect(labels()).toEqual(["a", "d"]);
     expect(tabElement("a").classList).toContain("unsaved");
     expect(tabElement("d").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("names the keys only in the shown tab's menu", () => {
+    tabElement("b").dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+    );
+
+    const items = contextMenu.value!.items.filter(
+      (item) => item !== "separator",
+    );
+    expect(items.every((item) => item.shortcut === undefined)).toBe(true);
+    expect(contextMenu.value?.owner).toBeUndefined();
   });
 
   it("opens a tab's menu on a right click", () => {
@@ -217,12 +257,12 @@ describe("the tab row's keys", () => {
   });
 
   it("closes with Delete, opens the menu with Shift+F10 and leaves with Esc", () => {
-    const close = spy("closeTab");
+    const close = closing();
     const focus = vi.spyOn(handle.view, "focus");
     tabElement("a").focus();
 
     press("a", "Delete");
-    expect(close).toHaveBeenCalledWith("a");
+    expect(close).toHaveBeenCalledWith(["a"]);
 
     press("a", "F10", true);
     expect(contextMenu.value?.keyboard).toBe(true);
@@ -230,6 +270,55 @@ describe("the tab row's keys", () => {
 
     press("a", "Escape");
     expect(focus).toHaveBeenCalled();
+  });
+
+  it("keeps the focus in the row after Delete closed the focused tab", async () => {
+    vi.spyOn(tabActions, "closeTabs").mockImplementation(async () => {
+      tabs.value = tabs.value.slice(1);
+      activeTabId.value = "b";
+    });
+    tabElement("a").focus();
+
+    press("a", "Delete");
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(tabElement("b")),
+    );
+  });
+
+  it("leaves arrows with Ctrl to the window's commands", () => {
+    tabElement("a").focus();
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    tabElement("a").dispatchEvent(event);
+
+    expect(document.activeElement).toBe(tabElement("a"));
+  });
+
+  it("reorders the tabs by dragging one", () => {
+    const move = vi.spyOn(tabActions, "moveTab").mockResolvedValue();
+    const box = (left: number) =>
+      ({ left, right: left + 100, top: 0, bottom: 30 }) as DOMRect;
+    ["a", "b", "c"].forEach((id, i) =>
+      vi
+        .spyOn(tabElement(id), "getBoundingClientRect")
+        .mockReturnValue(box(i * 100)),
+    );
+    const pointer = (type: string, clientX: number, buttons = 1) =>
+      tabElement("a").dispatchEvent(
+        new PointerEvent(type, { clientX, buttons, button: 0, bubbles: true }),
+      );
+
+    pointer("pointerdown", 50);
+    pointer("pointermove", 180);
+    pointer("pointerup", 180, 0);
+    tabElement("a").click();
+
+    expect(move).toHaveBeenCalledWith("a", 1);
   });
 
   it("runs the window's commands while the focus is in it", () => {

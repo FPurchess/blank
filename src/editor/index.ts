@@ -124,7 +124,6 @@ export const bootEditor = async () => {
   setGeometryView(view);
   const editor = createEditorHandle(view);
   sync = editor.sync;
-  transaction.value = view.state.tr;
   bootTabs(view, editor.handle.state);
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {

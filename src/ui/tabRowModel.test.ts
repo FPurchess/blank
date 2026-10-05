@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { MenuItem, Tab } from "../state";
 import {
   compactBlocks,
-  dragBy,
   middleCloses,
   scrollLeftFor,
   tabKey,
@@ -19,11 +18,32 @@ const tab = (path: string | null): Tab => ({
   viewAnchor: null,
 });
 
+const key = (
+  name: string,
+  modifiers: Partial<
+    Record<"shiftKey" | "ctrlKey" | "altKey" | "metaKey", boolean>
+  > = {},
+) => ({
+  key: name,
+  shiftKey: false,
+  ctrlKey: false,
+  altKey: false,
+  metaKey: false,
+  ...modifiers,
+});
+
 describe("tabKey", () => {
   it("moves the focus with the arrows, Home and End, wrapping around", () => {
-    expect(tabKey("ArrowRight", false, 2, 3)).toEqual({ move: 0 });
-    expect(tabKey("ArrowLeft", false, 0, 3)).toEqual({ move: 2 });
-    expect(tabKey("End", false, 0, 3)).toEqual({ move: 2 });
+    expect(tabKey(key("ArrowRight"), 2, 3)).toEqual({ move: 0 });
+    expect(tabKey(key("ArrowLeft"), 0, 3)).toEqual({ move: 2 });
+    expect(tabKey(key("End"), 0, 3)).toEqual({ move: 2 });
+  });
+
+  it("leaves keys with Ctrl, Alt or Meta to the window's commands", () => {
+    expect(tabKey(key("ArrowRight", { ctrlKey: true }), 0, 3)).toBeNull();
+    expect(tabKey(key("Home", { altKey: true }), 0, 3)).toBeNull();
+    expect(tabKey(key("Enter", { metaKey: true }), 0, 3)).toBeNull();
+    expect(tabKey(key("Delete", { shiftKey: true }), 0, 3)).toBeNull();
   });
 
   it.each([
@@ -35,8 +55,8 @@ describe("tabKey", () => {
     ["Escape", false, "leave"],
     ["F10", false, null],
     ["a", false, null],
-  ] as const)("%s (Shift %s) does %s", (key, shift, action) => {
-    expect(tabKey(key, shift, 0, 3)).toBe(action);
+  ] as const)("%s (Shift %s) does %s", (name, shiftKey, action) => {
+    expect(tabKey(key(name, { shiftKey }), 0, 3)).toBe(action);
   });
 });
 
@@ -50,10 +70,10 @@ describe("middleCloses", () => {
 
 describe("compactBlocks", () => {
   it("drops the name once the tabs overflow, and keeps it off near the limit", () => {
-    expect(compactBlocks(false, true, 0)).toBe(true);
-    expect(compactBlocks(false, false, 10)).toBe(false);
-    expect(compactBlocks(true, false, 40)).toBe(true);
-    expect(compactBlocks(true, false, 200)).toBe(false);
+    expect(compactBlocks(false, true, 0, 50)).toBe(true);
+    expect(compactBlocks(false, false, 10, 50)).toBe(false);
+    expect(compactBlocks(true, false, 60, 50)).toBe(true);
+    expect(compactBlocks(true, false, 70, 50)).toBe(false);
   });
 });
 
@@ -62,18 +82,6 @@ describe("scrollLeftFor", () => {
     expect(scrollLeftFor(500, 100, 0, 300)).toBe(308);
     expect(scrollLeftFor(50, 100, 200, 300)).toBe(42);
     expect(scrollLeftFor(50, 100, 0, 300)).toBeNull();
-  });
-});
-
-describe("dragBy", () => {
-  // three tabs 100 px wide
-  const edges = [0, 100, 200, 300];
-
-  it("moves a tab to the nearest line between the others", () => {
-    expect(dragBy(edges, 0, 40)).toBe(0);
-    expect(dragBy(edges, 0, 190)).toBe(1);
-    expect(dragBy(edges, 0, 290)).toBe(2);
-    expect(dragBy(edges, 2, 10)).toBe(-2);
   });
 });
 
@@ -94,7 +102,7 @@ describe("tabMenu", () => {
 
   it("closes, saves and copies the path of a file's tab", () => {
     const run = actions();
-    const items = tabMenu(tab("/docs/notes.md"), 0, 2, run);
+    const items = tabMenu(tab("/docs/notes.md"), 0, 2, true, run);
 
     expect(ids(items)).toEqual([
       "close",
@@ -115,8 +123,15 @@ describe("tabMenu", () => {
     expect(item(items, "close").shortcut).toBe("Mod-w");
   });
 
+  it("names the keys only on the shown tab's menu, where they act", () => {
+    const items = tabMenu(tab("/notes.md"), 1, 2, false, actions());
+
+    expect(item(items, "close").shortcut).toBeUndefined();
+    expect(item(items, "save").shortcut).toBeUndefined();
+  });
+
   it("has no path to copy for an untitled tab, nor tabs to close beyond it", () => {
-    const items = tabMenu(tab(null), 0, 1, actions());
+    const items = tabMenu(tab(null), 0, 1, true, actions());
 
     expect(ids(items)).not.toContain("copy-path");
     expect(item(items, "close-others").disabled).toBe(true);

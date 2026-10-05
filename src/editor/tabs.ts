@@ -63,6 +63,9 @@ interface TabDocument {
   // the document as last opened or saved, to tell whether it changed since;
   // null while unknown, which counts as changed
   baseline: Node | null;
+  // counts the baselines set, so a read of the file that started before a
+  // save can't replace what the save set
+  baselines: number;
   // the spell checker its underlines are from
   checker: Spellchecker | null;
 }
@@ -77,10 +80,13 @@ let base: EditorState | null = null;
 // the files of the tabs closed this session, the last one last
 const closedPaths: string[] = [];
 const MAX_CLOSED = 20;
+// stops listening for the files opened from outside
+let unlisten: (() => void) | null = null;
 
 // Changes to the tabs run one after another, in the order they were asked
 // for, e.g. two files opened from the terminal at once. They start once the
-// view is there (bootTabs).
+// view is there (bootTabs). Inside a change, call the unqueued helpers below,
+// or it waits for itself.
 let started: () => void = () => {};
 let queue: Promise<unknown> = new Promise<void>((resolve) => {
   started = resolve;
@@ -91,16 +97,16 @@ const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
   return run;
 };
 
-const newId = () => crypto.randomUUID();
 const tabById = (id: string) => tabs.value.find((tab) => tab.id === id);
-const shown = () => view!.state;
 const stateOf = (doc: Node) => documentState(base!, doc);
 
 /**
  * docOf returns the document of the tab `id` as it is now
  */
 const docOf = (id: string): Node | undefined =>
-  id === activeTabId.value && view ? shown().doc : documents.get(id)?.state.doc;
+  id === activeTabId.value && view
+    ? view.state.doc
+    : documents.get(id)?.state.doc;
 
 /**
  * refresh sets whether the tab `id` has changes that aren't saved: its
@@ -117,27 +123,36 @@ const refresh = (id: string) => {
 };
 
 /**
+ * setBaseline makes `doc` what the tab `id` was last opened or saved as
+ */
+const setBaseline = (id: string, kept: TabDocument, doc: Node | null) => {
+  kept.baseline = doc;
+  kept.baselines++;
+  refresh(id);
+};
+
+/**
  * kept returns what a tab keeps of `state`: the document it starts with
  * counts as saved unless `saved` is false
  */
 const kept = (state: EditorState, saved = true): TabDocument => ({
   state,
   baseline: saved ? state.doc : null,
+  baselines: 0,
   checker: spellchecker.value,
 });
 
 /**
- * newTab returns a tab for `file`, with what it keeps
+ * newTab returns a new tab for the document `loaded`, with what it keeps
  */
 const newTab = (
   loaded: LoadedDocument,
   extra: Partial<Tab> = {},
 ): [Tab, TabDocument] => {
-  const state = stateOf(loaded.doc);
   // an import isn't saved until it is saved as markdown
   const saved = loaded.importedFrom === null;
   const tab: Tab = {
-    id: newId(),
+    id: crypto.randomUUID(),
     path: loaded.path,
     importedFrom: loaded.importedFrom,
     untitledNumber: null,
@@ -145,29 +160,35 @@ const newTab = (
     viewAnchor: null,
     ...extra,
   };
-  return [tab, kept(state, saved)];
+  return [tab, kept(stateOf(loaded.doc), saved)];
 };
+
+const blank = (doc: Node): LoadedDocument => ({
+  doc,
+  path: null,
+  importedFrom: null,
+});
 
 /**
  * untitledTab returns a new, empty tab named after the lowest free number
  */
 const untitledTab = (list: readonly Tab[]) =>
-  newTab(
-    { doc: emptyDocument(), path: null, importedFrom: null },
-    { untitledNumber: freeUntitledNumber(list) },
-  );
+  newTab(blank(emptyDocument()), {
+    untitledNumber: freeUntitledNumber(list),
+  });
 
 /**
- * read reads the document at `file`, see readDocument, and reports a file
- * that can't even be looked at, e.g. one it isn't allowed to
+ * welcomeTab returns the tab of the document Blank starts with the first time
  */
-const read = async (file: string, silent = false) => {
-  try {
-    return await readDocument(file, silent);
-  } catch (error) {
-    console.error(`failed to open ${file}`, error);
-    if (!silent)
-      sendNotification(`Failed to open file: ${errorMessage(error)}`);
+const welcomeTab = () => newTab(blank(welcomeDocument()), { welcome: true });
+
+/**
+ * adopt keeps the documents of new tabs, and stores them with the next write
+ */
+const adopt = (added: readonly [Tab, TabDocument][]) => {
+  for (const [tab, document] of added) {
+    documents.set(tab.id, document);
+    storeDocument(tab.id, document.state.doc);
   }
 };
 
@@ -177,13 +198,15 @@ const read = async (file: string, silent = false) => {
  * keeps the tab's text, unsaved, and says so.
  */
 const readBaseline = (id: string, file: string) => {
-  void read(file, true).then((loaded) => {
+  const known = documents.get(id);
+  const asked = known?.baselines;
+  void readDocument(file, true).then((loaded) => {
     const tab = tabById(id);
-    const known = documents.get(id);
-    if (!tab || !known) return;
+    if (!tab || !known || documents.get(id) !== known) return;
+    // saved meanwhile, which knows better
+    if (known.baselines !== asked) return;
     if (loaded && loaded.path === tab.path) {
-      known.baseline = stateOf(loaded.doc).doc;
-      refresh(id);
+      setBaseline(id, known, stateOf(loaded.doc).doc);
     } else if (!loaded) {
       sendNotification(
         `${file} can't be found, so “${tabLabel(tab)}” keeps the text Blank had kept. Save it to keep it.`,
@@ -216,7 +239,7 @@ const storedDocument = async (tab: Tab): Promise<Node | undefined> => {
  */
 const loadTab = async (tab: Tab): Promise<TabDocument> => {
   if (tab.path !== null && !tab.unsaved) {
-    const loaded = await read(tab.path, true);
+    const loaded = await readDocument(tab.path, true);
     if (loaded) return kept(stateOf(loaded.doc));
   }
   const stored = await storedDocument(tab);
@@ -224,30 +247,47 @@ const loadTab = async (tab: Tab): Promise<TabDocument> => {
     // changes kept from the last time, or a file that has gone: the file
     // tells in the background whether they differ from it
     if (!tab.unsaved) updateTab(tab.id, { unsaved: true });
-    readBaseline(tab.id, tab.path);
     return kept(stateOf(stored ?? emptyDocument()), false);
   }
   if (tab.importedFrom !== null) {
     if (stored) return kept(stateOf(stored), false);
-    const loaded = await read(tab.importedFrom, true);
+    const loaded = await readDocument(tab.importedFrom, true);
     return kept(stateOf(loaded?.doc ?? emptyDocument()), false);
   }
-  const start = tab.welcome ? welcomeDocument() : emptyDocument();
-  const document = kept(stateOf(start));
+  const document = kept(
+    stateOf(tab.welcome ? welcomeDocument() : emptyDocument()),
+  );
   if (stored) document.state = stateOf(stored);
   return document;
 };
 
 /**
- * ensureLoaded returns what the tab `id` keeps, loading it if it wasn't yet
+ * ensureLoaded returns what `tab` keeps, loading it if it wasn't yet
  */
 const ensureLoaded = async (tab: Tab): Promise<TabDocument> => {
   let document = documents.get(tab.id);
   if (!document) {
     document = await loadTab(tab);
     documents.set(tab.id, document);
+    if (tab.path !== null && document.baseline === null)
+      readBaseline(tab.id, tab.path);
   }
   return document;
+};
+
+/**
+ * leaveComposition ends what the input method is composing, so its text
+ * lands in the tab it was typed in
+ */
+const leaveComposition = async () => {
+  const dom = view?.dom;
+  if (!view?.composing || !dom) return;
+  const ended = new Promise((resolve) =>
+    dom.addEventListener("compositionend", resolve, { once: true }),
+  );
+  dom.blur();
+  // a webview that ends it without the event goes on after a moment
+  await Promise.race([ended, new Promise((r) => setTimeout(r, 100))]);
 };
 
 /**
@@ -257,6 +297,8 @@ const ensureLoaded = async (tab: Tab): Promise<TabDocument> => {
  */
 const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
   const v = view!;
+  // closing them may still change the leaving tab, e.g. the header strip
+  // keeps what was typed into it
   closeRequests();
   const leaving = activeTabId.value;
   const left = leaving === null ? undefined : documents.get(leaving);
@@ -264,6 +306,7 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
     left.state = v.state;
     left.checker = spellchecker.value;
     updateTab(leaving, { viewAnchor: currentViewAnchor() });
+    refresh(leaving);
   }
   // what pointed into the document that leaves
   pageScrollRequest.value = null;
@@ -287,13 +330,20 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
 };
 
 /**
- * leaveComposition ends what the input method is composing, so its text
- * lands in the tab it was typed in
+ * present shows the tab `id` with the row `change` makes of the tabs as
+ * they are then, once the input method is done: the row and the shown tab
+ * change together, with nothing awaited in between
+ * @param keepLeaving whether the tab shown now stays, to keep its state
  */
-const leaveComposition = async () => {
-  if (!view?.composing) return;
-  view.dom.blur();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+const present = async (
+  id: string,
+  next: TabDocument,
+  change: (list: readonly Tab[]) => readonly Tab[] = (list) => list,
+  keepLeaving = true,
+) => {
+  await leaveComposition();
+  tabs.value = change(tabs.value);
+  if (tabById(id)) showTab(id, next, keepLeaving);
 };
 
 /**
@@ -302,9 +352,7 @@ const leaveComposition = async () => {
 const switchTo = async (id: string) => {
   const tab = tabById(id);
   if (!tab || id === activeTabId.value) return;
-  const document = await ensureLoaded(tab);
-  await leaveComposition();
-  if (tabById(id)) showTab(id, document);
+  await present(id, await ensureLoaded(tab));
 };
 
 /**
@@ -334,12 +382,9 @@ export const cycleTab = (by: number) => {
  */
 export const openNewTab = () =>
   enqueue(async () => {
-    const [tab, document] = untitledTab(tabs.value);
-    documents.set(tab.id, document);
-    storeDocument(tab.id, document.state.doc);
-    tabs.value = [...tabs.value, tab];
-    await leaveComposition();
-    showTab(tab.id, document);
+    const added = untitledTab(tabs.value);
+    adopt([added]);
+    await present(added[0].id, added[1], (list) => [...list, added[0]]);
   });
 
 /**
@@ -382,7 +427,7 @@ const readTabs = async (list: readonly Tab[], files: string[]) => {
       last = open.id;
       continue;
     }
-    const loaded = await read(canonical);
+    const loaded = await readDocument(canonical);
     if (!loaded) continue;
     const opened = newTab(loaded);
     added.push(opened);
@@ -395,8 +440,8 @@ const readTabs = async (list: readonly Tab[], files: string[]) => {
  * untouched is whether `tab` is a new "Untitled" nothing was typed into,
  * which an opened file takes the place of
  */
-const untouched = (tab: Tab | null) =>
-  tab !== null && tab.untitledNumber !== null && !tab.unsaved;
+const untouched = (tab: Tab | undefined) =>
+  tab !== undefined && tab.untitledNumber !== null && !tab.unsaved;
 
 /**
  * insertTabs returns `list` with the tabs `added` right of the active tab,
@@ -404,9 +449,35 @@ const untouched = (tab: Tab | null) =>
  */
 const insertTabs = (list: readonly Tab[], added: readonly Tab[]) => {
   const active = list.findIndex((tab) => tab.id === activeTabId.value);
-  const replace = added.length > 0 && untouched(list[active] ?? null);
+  const replace = added.length > 0 && untouched(list[active]);
   const at = active < 0 ? list.length : active + 1;
   return [...list.slice(0, replace ? active : at), ...added, ...list.slice(at)];
+};
+
+/**
+ * openPathsNow opens the files at `files`, see openPaths
+ */
+const openPathsNow = async (files: string[]) => {
+  const { added, last } = await readTabs(tabs.value, files);
+  if (last === null) return;
+  // an image may have changed on disk since it was loaded
+  if (added.length > 0) forgetImages();
+  adopt(added);
+  const insert = (list: readonly Tab[]) =>
+    insertTabs(
+      list,
+      added.map(([tab]) => tab),
+    );
+  const active = activeTabId.value;
+  if (last === active) {
+    tabs.value = insert(tabs.value);
+    return;
+  }
+  const replace = added.length > 0 && untouched(tabById(active ?? ""));
+  const next = tabById(last) ?? added.find(([tab]) => tab.id === last)![0];
+  const document = await ensureLoaded(next);
+  if (replace && active !== null) documents.delete(active);
+  await present(last, document, insert, !replace);
 };
 
 /**
@@ -415,31 +486,7 @@ const insertTabs = (list: readonly Tab[], added: readonly Tab[]) => {
  * tab shown, and an untouched "Untitled" makes room for them.
  */
 export const openPaths = (files: string[]) =>
-  enqueue(async () => {
-    const { added, last } = await readTabs(tabs.value, files);
-    // an image may have changed on disk since it was loaded
-    if (added.length > 0) forgetImages();
-    const before = tabs.value;
-    const list = insertTabs(
-      before,
-      added.map(([tab]) => tab),
-    );
-    for (const [tab, document] of added) {
-      documents.set(tab.id, document);
-      storeDocument(tab.id, document.state.doc);
-    }
-    const replaced = before.find((tab) => !list.includes(tab));
-    if (replaced) documents.delete(replaced.id);
-    tabs.value = list;
-    if (last === null) return;
-    if (replaced) {
-      const document = await ensureLoaded(tabById(last)!);
-      await leaveComposition();
-      showTab(last, document, false);
-    } else {
-      await switchTo(last);
-    }
-  });
+  enqueue(() => openPathsNow(files));
 
 /**
  * askToSave asks whether to save the changes of `tab` before it closes
@@ -456,37 +503,46 @@ const askToSave = (tab: Tab) =>
 
 /**
  * removeTab takes the tab `id` out of the row. The tab to its right shows
- * then, or the one to its left; the last one leaves a new "Untitled".
+ * then, or the one to its left, unless `next` names another; the last one
+ * leaves a new "Untitled".
+ * @param remember whether Mod+Shift+T may open its file again
  */
-const removeTab = async (id: string) => {
-  const list = tabs.value;
-  const index = list.findIndex((tab) => tab.id === id);
-  if (index < 0) return;
-  const tab = list[index];
-  const rest = list.filter((other) => other.id !== id);
-  if (tab.path !== null) {
+const removeTab = async (
+  id: string,
+  {
+    remember = true,
+    next: wantedNext,
+  }: { remember?: boolean; next?: string } = {},
+) => {
+  const tab = tabById(id);
+  if (!tab) return;
+  const without = (list: readonly Tab[]) =>
+    list.filter((other) => other.id !== id);
+  if (remember && tab.path !== null) {
     closedPaths.push(tab.path);
     if (closedPaths.length > MAX_CLOSED) closedPaths.shift();
   }
   if (id !== activeTabId.value) {
     documents.delete(id);
-    tabs.value = rest;
+    tabs.value = without(tabs.value);
     return;
   }
-  let next = rest[index] ?? rest[index - 1];
+  const index = tabs.value.indexOf(tab);
+  const rest = without(tabs.value);
+  let next =
+    (wantedNext && tabById(wantedNext)) || rest[index] || rest[index - 1];
   let document: TabDocument;
+  let change = without;
   if (next) {
     document = await ensureLoaded(next);
   } else {
-    [next, document] = untitledTab(rest);
-    rest.push(next);
-    documents.set(next.id, document);
-    storeDocument(next.id, document.state.doc);
+    const added = untitledTab(rest);
+    [next, document] = added;
+    adopt([added]);
+    change = (list) => [...without(list), added[0]];
   }
-  await leaveComposition();
   documents.delete(id);
-  tabs.value = rest;
-  showTab(next.id, document, false);
+  await present(next.id, document, change, false);
 };
 
 /**
@@ -519,24 +575,26 @@ export const closeTabs = (ids: readonly string[]) =>
  * moveTab moves the tab `id` `by` places to the right, or the left for a
  * negative `by`, up to the ends of the row
  */
-export const moveTab = (id: string, by: number) => {
-  const list = [...tabs.value];
-  const from = list.findIndex((tab) => tab.id === id);
-  if (from < 0) return;
-  const to = Math.min(Math.max(from + by, 0), list.length - 1);
-  if (to === from) return;
-  const [tab] = list.splice(from, 1);
-  list.splice(to, 0, tab);
-  tabs.value = list;
-};
+export const moveTab = (id: string, by: number) =>
+  enqueue(async () => {
+    const list = [...tabs.value];
+    const from = list.findIndex((tab) => tab.id === id);
+    if (from < 0) return;
+    const to = Math.min(Math.max(from + by, 0), list.length - 1);
+    if (to === from) return;
+    const [tab] = list.splice(from, 1);
+    list.splice(to, 0, tab);
+    tabs.value = list;
+  });
 
 /**
  * reopenTab opens the file of the tab closed last again
  */
-export const reopenTab = () => {
-  const file = closedPaths.pop();
-  return file === undefined ? Promise.resolve() : openPaths([file]);
-};
+export const reopenTab = () =>
+  enqueue(async () => {
+    const file = closedPaths.pop();
+    if (file !== undefined) await openPathsNow([file]);
+  });
 
 /**
  * saveTabNow saves the tab `id`, see saveTab
@@ -550,11 +608,11 @@ const saveTabNow = async (
   if (!tab) return false;
   const document = await ensureLoaded(tab);
   const current =
-    id === activeTabId.value ? (state ?? shown()) : document.state;
-  const target = await _saveFile(current, tab, options);
-  if (target === null) return false;
-  // what was typed while the save dialog was open is still unsaved
-  document.baseline = current.doc;
+    id === activeTabId.value ? (state ?? view!.state) : document.state;
+  const written = await _saveFile(current, tab, options);
+  if (written === null) return false;
+  // the name other ways to the file are compared by
+  const target = await canonicalPath(written);
   updateTab(id, {
     path: target,
     importedFrom: null,
@@ -565,11 +623,12 @@ const saveTabNow = async (
     path.value = target;
     importedFrom.value = null;
   }
-  refresh(id);
+  // what was typed while the save dialog was open is still unsaved
+  setBaseline(id, document, current.doc);
   // another tab still showing the file as it was before
   const other = tabs.value.find((tab) => tab.id !== id && tab.path === target);
   if (other && !other.unsaved) {
-    await removeTab(other.id);
+    await removeTab(other.id, { remember: false, next: id });
   } else if (other) {
     sendNotification(
       `${target} is also open in another tab, with changes that aren't saved`,
@@ -597,7 +656,8 @@ export const saveTab = (
  */
 const openedPaths = async (): Promise<string[]> => {
   try {
-    await listen<string[]>("open-paths", (event) => {
+    unlisten?.();
+    unlisten = await listen<string[]>("open-paths", (event) => {
       void openPaths(event.payload);
     });
     return (await invoke<string[] | null>("take_open_paths")) ?? [];
@@ -633,28 +693,20 @@ export const restoreTabs = async (start: EditorState): Promise<EditorState> => {
   }
   activeTabId.value = active;
   const { added, last } = await readTabs(list, await openedPaths());
-  for (const [tab, document] of added) {
-    documents.set(tab.id, document);
-    storeDocument(tab.id, document.state.doc);
-  }
+  adopt(added);
   list = insertTabs(
     list,
     added.map(([tab]) => tab),
   );
-  active = last ?? active;
   if (list.length === 0) {
-    const [tab, document] = newTab(
-      { doc: welcomeDocument(), path: null, importedFrom: null },
-      { welcome: true },
-    );
-    documents.set(tab.id, document);
-    storeDocument(tab.id, document.state.doc);
-    list = [tab];
+    const welcome = welcomeTab();
+    adopt([welcome]);
+    list = [welcome[0]];
   }
-  const tab = list.find(({ id }) => id === active) ?? list[0];
+  const tab = list.find(({ id }) => id === (last ?? active)) ?? list[0];
   tabs.value = list;
-  const document = await ensureLoaded(tab);
   activeTabId.value = tab.id;
+  const document = await ensureLoaded(tab);
   showDocument(document.state, tabById(tab.id)!);
   return document.state;
 };
@@ -680,6 +732,8 @@ export const bootTabs = (
     });
     started();
     onScopeDispose(() => {
+      unlisten?.();
+      unlisten = null;
       view = null;
       base = null;
       wanted = null;

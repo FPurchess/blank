@@ -32,12 +32,16 @@ $tab-max: 200px;
 }
 
 .tab-list {
+  // what the tabs' offsets are from, for scrolling one into view
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
   min-width: 0;
   height: 100%;
   margin-left: var(--s1);
+  // room for the focus ring of the tabs at the ends
+  padding-inline: 4px;
   overflow-x: auto;
   // the wheel scrolls it; no bar shows
   scrollbar-width: none;
@@ -145,8 +149,4 @@ $tab-max: 200px;
   display: inline-flex;
   gap: 6px;
   padding: 0 10px 0 8px;
-}
-
-.dialog .dialog-text {
-  margin: 0 0 12px;
 }

@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { application } from "./app.ts";
+import { application, profileEnv } from "./app.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(dirname, "..");
@@ -112,10 +112,7 @@ export const config: WebdriverIO.Config = {
           ...process.env,
           // debug builds download dictionaries from here instead of the CDNs
           BLANK_DICTIONARY_MIRROR: mirrorUrl,
-          XDG_DATA_HOME: path.join(profileDir, "data"),
-          XDG_CONFIG_HOME: path.join(profileDir, "config"),
-          XDG_CACHE_HOME: path.join(profileDir, "cache"),
-          BLANK_INSTANCE_ID: process.env.BLANK_INSTANCE_ID,
+          ...profileEnv(profileDir),
         },
       },
     );

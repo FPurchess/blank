@@ -41,7 +41,7 @@ A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ct
 
 | Command                     | Shortcut                    |
 | --------------------------- | --------------------------- |
-| Save / Open / New tab       | `Mod S` / `Mod O` / `Mod N` |
+| Save / Open / New document  | `Mod S` / `Mod O` / `Mod N` |
 | Next tab / Close tab        | `Ctrl Tab` / `Mod W`        |
 | Heading 1 – 6 / Paragraph   | `Mod 1` … `Mod 6` / `Mod 0` |
 | Bullet list / Numbered list | `Mod 8` / `Mod 9`           |

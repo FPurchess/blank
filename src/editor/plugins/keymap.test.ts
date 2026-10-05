@@ -364,6 +364,23 @@ describe("plugin.keymap", () => {
   });
 
   describe("the keys that work outside the editor", () => {
+    it("leave a fixed key to any command bound to it", () => {
+      config.value = {
+        ...defaultConfig,
+        keymap: {
+          ...defaultConfig.keymap,
+          [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown",
+        },
+      };
+      const cycle = vi.spyOn(tabs, "cycleTab");
+      const { view } = withKeymap(doc(p("text")));
+
+      expect(
+        commandKeys(WINDOW_COMMANDS)(view, keyEvent("Ctrl-PageDown")),
+      ).toBe(false);
+      expect(cycle).not.toHaveBeenCalled();
+    });
+
     it("run the window's commands and nothing else", async () => {
       const run = vi.spyOn(tabs, "openNewTab").mockResolvedValue(undefined);
       const { view } = withKeymap(doc(p("text")));

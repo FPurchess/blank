@@ -21,6 +21,11 @@ pub fn run() {
         return;
     }
     let mut builder = tauri::Builder::default();
+    // Cmd+W closes the tab, not the window (see menu.rs)
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.menu(menu::without_close_window);
+    }
     // every file opened while Blank runs goes to it, as a tab (see open.rs);
     // first, so a second Blank hands its files over before it starts anything
     if open::single_instance(open::has_session_bus) {
@@ -57,8 +62,6 @@ pub fn run() {
             std::thread::spawn(move || fonts::warm(&fonts));
             // the files Blank was started with, for the webview
             open::queue_own_args(app.handle());
-            #[cfg(target_os = "macos")]
-            app.set_menu(menu::without_close_window(app.handle())?)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

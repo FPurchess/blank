@@ -15,10 +15,12 @@ use tauri_plugin_cli::CliExt;
 // the name of the bus Blank owns while it runs, from the AppStream ID
 const DBUS_ID: &str = "io.github.fpurchess.blank";
 
-/// dbus_id returns the name Blank runs as, which a second Blank finds it by.
-/// Debug builds run as another one, so `tauri dev` and the E2E tests never
-/// hand their files to an installed Blank, and each E2E spec, which sets
-/// `BLANK_INSTANCE_ID`, runs as one of its own.
+/// dbus_id returns the bus name Blank runs as on Linux, which a second Blank
+/// finds it by. Debug builds run as another one, so `tauri dev` and the E2E
+/// tests never hand their files to an installed Blank, and each E2E spec,
+/// which sets `BLANK_INSTANCE_ID`, runs as one of its own. (On macOS and
+/// Windows the plugin names its socket and mutex after the app's identifier,
+/// which debug builds share with an installed Blank.)
 pub fn dbus_id() -> String {
     #[cfg(debug_assertions)]
     {
@@ -162,17 +164,27 @@ fn args_paths<R: Runtime>(app: &AppHandle<R>, argv: Vec<String>, cwd: &Path) -> 
 }
 
 /// forwarded opens the files of a second Blank, started with `argv` in
-/// `cwd`, which then exits
+/// `cwd`, which then exits. The plugin hands an empty `cwd` when it isn't
+/// UTF-8, against which a relative path would name another file, so those
+/// are left out.
 pub fn forwarded<R: Runtime>(app: &AppHandle<R>, argv: Vec<String>, cwd: String) {
-    let paths = args_paths(app, argv, Path::new(&cwd));
+    let mut paths = args_paths(app, argv, Path::new(&cwd));
+    if cwd.is_empty() {
+        paths.retain(|path| Path::new(path).is_absolute());
+    }
     deliver(app, paths);
     focus_window(app);
 }
 
-/// queue_own_args keeps the files Blank was started with for the webview
+/// queue_own_args keeps the files Blank was started with for the webview.
+/// A name that isn't UTF-8 comes along with its odd bytes replaced, rather
+/// than crashing the start.
 pub fn queue_own_args<R: Runtime>(app: &AppHandle<R>) {
     let cwd = std::env::current_dir().unwrap_or_default();
-    let paths = args_paths(app, std::env::args().collect(), &cwd);
+    let argv = std::env::args_os()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    let paths = args_paths(app, argv, &cwd);
     deliver(app, paths);
 }
 
@@ -254,6 +266,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     fn runs_as_another_instance_in_debug_builds() {
         assert!(dbus_id().starts_with("io.github.fpurchess.blank.debug"));
     }

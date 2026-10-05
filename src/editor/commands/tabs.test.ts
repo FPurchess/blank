@@ -80,7 +80,7 @@ describe("the tab commands", () => {
 
   it("select and move tabs", () => {
     const activate = vi.spyOn(actions, "activateTab").mockResolvedValue();
-    const move = vi.spyOn(actions, "moveTab").mockImplementation(() => {});
+    const move = vi.spyOn(actions, "moveTab").mockResolvedValue();
 
     selectTab("c")(state, () => {});
     moveTab(-1)(state, () => {});

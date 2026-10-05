@@ -6,7 +6,7 @@ import { browser, $, $$, expect } from "@wdio/globals";
 import { Key } from "webdriverio";
 
 import { BAND_HEIGHT, TOP_BAR_HEIGHT } from "../src/chrome.ts";
-import { application } from "./app.ts";
+import { application, profileEnv } from "./app.ts";
 
 // the geometry of what the page view paints, see src/engine/geometry.ts
 export interface Box {
@@ -90,12 +90,16 @@ export const restartApp = async (
  */
 const appPids = () => {
   const instance = `BLANK_INSTANCE_ID=${process.env.BLANK_INSTANCE_ID}`;
+  const binary = fs.realpathSync(application);
   return fs.readdirSync("/proc").filter((pid) => {
     if (!/^\d+$/.test(pid)) return false;
     try {
-      const exe = fs.readlinkSync(`/proc/${pid}/exe`);
+      // a binary rebuilt since it started reads " (deleted)"
+      const exe = fs
+        .readlinkSync(`/proc/${pid}/exe`)
+        .replace(/ \(deleted\)$/, "");
       const environ = fs.readFileSync(`/proc/${pid}/environ`, "utf8");
-      return exe === application && environ.split("\0").includes(instance);
+      return exe === binary && environ.split("\0").includes(instance);
     } catch {
       // gone meanwhile, or not ours to read
       return false;
@@ -171,16 +175,9 @@ export const expectActiveTab = async (label: string, tip?: string) => {
 
 /** clicks the tab named `label` */
 export const clickTab = async (label: string) => {
-  const tabs = await $$("#tab-row [role=tab]");
-  for (const tab of tabs) {
-    const name = await tab.$(".tab-label");
-    const text = await browser.execute(
-      (element) => element.textContent?.trim(),
-      name,
-    );
-    if (text === label) return name.click();
-  }
-  throw new Error(`no tab named ${label}`);
+  const index = (await tabLabels()).indexOf(label);
+  if (index < 0) throw new Error(`no tab named ${label}`);
+  await $$("#tab-row .tab-label")[index].click();
 };
 
 /**
@@ -201,17 +198,31 @@ export const answerUnsaved = async (
  * current one without saving them, the way the tab row and Mod+W do
  */
 export const onlyNewTab = async () => {
-  const tab = await activeTab();
-  await tab.click({ button: "right" });
-  await $('.context-menus [data-id="close-others"]').click();
-  // one question for each tab with changes
-  while (await $("#unsaved-dialog").isExisting()) {
-    await answerUnsaved("Don't save");
+  /**
+   * closes tabs until `done`, answering each question to save with Don't
+   * save; the closing runs after the press, so it waits for either
+   */
+  const closeUntil = async (done: () => Promise<boolean>) => {
+    await browser.waitUntil(async () => {
+      if (await $("#unsaved-dialog").isExisting()) {
+        await answerUnsaved("Don't save");
+      }
+      return done();
+    });
+  };
+  if ((await tabLabels()).length > 1) {
+    await activeTab().click({ button: "right" });
+    await $('.context-menus [data-id="close-others"]').click();
+    await closeUntil(async () => (await tabLabels()).length === 1);
   }
   await pressMod("w");
-  if (await $("#unsaved-dialog").isExisting())
-    await answerUnsaved("Don't save");
-  expect(await tabLabels()).toEqual(["Untitled"]);
+  // the last tab leaves a new, empty "Untitled"
+  await closeUntil(
+    async () =>
+      !(await $("#unsaved-dialog").isExisting()) &&
+      (await tabLabels()).join() === "Untitled" &&
+      (await editorText("#editor"))[0]?.trim() === "",
+  );
 };
 
 /**
@@ -861,12 +872,13 @@ export const secondStart = (args: string[], cwd = process.cwd()) => {
   const started = spawnSync(application, args, {
     cwd,
     timeout: 20_000,
-    env: {
-      ...process.env,
-      XDG_DATA_HOME: path.join(profile, "data"),
-      XDG_CONFIG_HOME: path.join(profile, "config"),
-      XDG_CACHE_HOME: path.join(profile, "cache"),
-    },
+    env: { ...process.env, ...profileEnv(profile) },
   });
+  if (started.status === null) {
+    // it opened a window of its own rather than handing over
+    throw new Error(
+      "the second start didn't hand its files over: is there a session bus (dbus-run-session)?",
+    );
+  }
   return started.status;
 };

@@ -1,8 +1,7 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { commandLabel } from "../commandList";
 import type { MenuItem, Tab } from "../state";
-import { dropAt, movedBy } from "./dragModel";
-import { scrollFor } from "./pageViewModel";
+import { scrollFor } from "./scrollModel";
 import { stepTo } from "./rovingModel";
 
 // The tab row (TabRow.vue): what a key, a click and a drag on a tab do, its
@@ -14,21 +13,28 @@ export type TabKey =
   { move: number } | "activate" | "close" | "menu" | "leave" | null;
 
 /**
- * tabKey returns what `key` does on the tab at `index` of `count`: the
- * arrows, Home and End move the focus, Enter and Space show the tab, Delete
- * closes it, Shift+F10 opens its menu and Esc goes back to the text
+ * tabKey returns what the key of `event` does on the tab at `index` of
+ * `count`: the arrows, Home and End move the focus, Enter and Space show the
+ * tab, Delete closes it, Shift+F10 opens its menu and Esc goes back to the
+ * text. With Ctrl, Alt or Meta it does none of these, so the window's
+ * commands get it.
  */
 export const tabKey = (
-  key: string,
-  shift: boolean,
+  event: Pick<
+    KeyboardEvent,
+    "key" | "shiftKey" | "ctrlKey" | "altKey" | "metaKey"
+  >,
   index: number,
   count: number,
 ): TabKey => {
+  const { key, shiftKey } = event;
+  if (event.ctrlKey || event.altKey || event.metaKey) return null;
+  if (shiftKey) return key === "F10" ? "menu" : null;
   const to = stepTo(key, index, count);
   if (to !== undefined) return { move: to };
   if (key === "Enter" || key === " ") return "activate";
   if (key === "Delete") return "close";
-  if (key === "ContextMenu" || (shift && key === "F10")) return "menu";
+  if (key === "ContextMenu") return "menu";
   if (key === "Escape") return "leave";
   return null;
 };
@@ -40,21 +46,23 @@ export const tabKey = (
 export const middleCloses = (pressed: string | null, released: string | null) =>
   pressed !== null && pressed === released;
 
-// the room the Blocks button's name takes, with some to spare, so the name
-// doesn't come and go while the window is resized around the limit
-const LABEL_ROOM = 72;
+// room to spare beyond the Blocks button's name, so the name doesn't come
+// and go while the window is resized around the limit
+const LABEL_SPARE = 16;
 
 /**
  * compactBlocks is whether the Blocks button shows only its icon: once the
  * tabs need the room, until there is room for its name again
  * @param overflow whether the tabs don't fit their list
  * @param spare the empty room the row has left
+ * @param label the width the name takes
  */
 export const compactBlocks = (
   compact: boolean,
   overflow: boolean,
   spare: number,
-) => overflow || (compact && spare < LABEL_ROOM);
+  label: number,
+) => overflow || (compact && spare < label + LABEL_SPARE);
 
 /**
  * scrollLeftFor returns where to scroll the list of tabs so that the tab
@@ -71,14 +79,6 @@ export const scrollLeftFor = (
     below: 8,
   });
 
-/**
- * dragBy returns by how many places the tab at `index` moves when dragged
- * to `x`: to the nearest of the lines between the tabs
- * @param edges the left edge of each tab, and the right edge of the last
- */
-export const dragBy = (edges: readonly number[], index: number, x: number) =>
-  movedBy([index, index + 1], dropAt(edges, [index, index + 1], x, 0));
-
 // what the menu of a tab does, by the tab's id
 export interface TabActions {
   close(id: string): void;
@@ -89,21 +89,25 @@ export interface TabActions {
 }
 
 /**
- * tabMenu returns the menu of `tab`, the tab at `index` of `count`
+ * tabMenu returns the menu of `tab`, the tab at `index` of `count`. Only the
+ * shown tab's menu names the keys, which act on the shown tab.
  */
 export const tabMenu = (
   tab: Tab,
   index: number,
   count: number,
+  shown: boolean,
   actions: TabActions,
 ): MenuItem[] => {
   const C = CommandIdentifier;
+  const key = (command: CommandIdentifier) =>
+    shown ? getKeyBinding(command) : undefined;
   return [
     {
       id: "close",
       label: "Close",
       icon: "x",
-      shortcut: getKeyBinding(C.TAB_CLOSE),
+      shortcut: key(C.TAB_CLOSE),
       run: () => actions.close(tab.id),
     },
     {
@@ -123,13 +127,13 @@ export const tabMenu = (
       id: "save",
       label: commandLabel(C.FILE_SAVE),
       icon: "save",
-      shortcut: getKeyBinding(C.FILE_SAVE),
+      shortcut: key(C.FILE_SAVE),
       run: () => actions.save(tab.id, false),
     },
     {
       id: "save-as",
       label: commandLabel(C.FILE_SAVE_AS),
-      shortcut: getKeyBinding(C.FILE_SAVE_AS),
+      shortcut: key(C.FILE_SAVE_AS),
       run: () => actions.save(tab.id, true),
     },
     ...(tab.path === null

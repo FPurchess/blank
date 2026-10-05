@@ -13,7 +13,6 @@ import { CommandIdentifier } from "../config";
 import { commandLabel } from "../commandList";
 import {
   closeOtherTabs,
-  closeTab,
   closeTabsToRight,
   newFile,
   saveFile,
@@ -24,7 +23,7 @@ import {
   toggleBlocksPane,
 } from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
-import { moveTab } from "../editor/tabs";
+import { closeTabs, moveTab } from "../editor/tabs";
 import {
   activeTabId,
   blocksPaneOpen,
@@ -35,13 +34,11 @@ import {
 import BlankLogo from "./BlankLogo.vue";
 import IconButton from "./components/IconButton.vue";
 import { useMenuButton } from "./composables/useMenuButton";
-import { useWindowCommands } from "./composables/useWindowCommands";
 import DocumentTab from "./DocumentTab.vue";
-import { wheelPixels } from "./outlineModel";
-import { DRAG_START } from "../editor/pageMove";
+import { wheelPixels } from "./scrollModel";
+import { tabDrag } from "./tabDrag";
 import {
   compactBlocks,
-  dragBy,
   middleCloses,
   scrollLeftFor,
   tabKey,
@@ -52,36 +49,44 @@ import {
 // document, + for a new one, and the Blocks button. The tabs are a tab list
 // with one tab in the tab order: ←→ Home End move the focus, Enter shows the
 // tab, Delete closes it, Esc and F6 go back to the text. What the keys and
-// the pointer do is in tabRowModel.ts, what the tabs do in src/editor/tabs.ts.
+// the menu do is in tabRowModel.ts, dragging in tabDrag.ts, what the tabs do
+// in src/editor/tabs.ts.
 const editor = useEditor();
 const list = useTemplateRef<HTMLElement>("list");
 const spare = useTemplateRef<HTMLElement>("spare");
+const label = useTemplateRef<HTMLElement>("label");
 const C = CommandIdentifier;
-
-// the keys of the window work from the tab row, and everywhere else
-useWindowCommands();
-
-// the tab that is in the tab order, the active one unless the arrows moved on
-const focused = shallowRef<string | null>(null);
-const stop = () => focused.value ?? activeTabId.value;
+const newLabel = commandLabel(C.FILE_NEW);
+const blocksTip = commandLabel(C.INSERT_BLOCK);
 
 const tabElements = () => [
   ...(list.value?.querySelectorAll<HTMLElement>("[role=tab]") ?? []),
 ];
+const elementOf = (id: string | null) =>
+  tabElements().find((element) => element.dataset.tabId === id);
 const tabIdOf = (target: EventTarget | null) =>
   (target as Element | null)
     ?.closest<HTMLElement>("[data-tab-id]")
     ?.getAttribute("data-tab-id") ?? null;
 const indexOf = (id: string | null) =>
   tabs.value.findIndex((tab) => tab.id === id);
+const onClose = (target: EventTarget | null) =>
+  !!(target as Element | null)?.closest(".tab-close");
 
+const run = (command: Parameters<typeof editor.run>[0], focus = true) =>
+  editor.run(command, { focus });
+
+// the tab that is in the tab order: the shown one, unless the arrows moved
+// the focus on
+const focused = shallowRef<string | null>(null);
+const stop = () => focused.value ?? activeTabId.value;
+
+/**
+ * focusTab gives the tab `id` the focus, once it's rendered
+ */
 const focusTab = (id: string | null) => {
   focused.value = id;
-  void nextTick(() =>
-    tabElements()
-      .find((element) => element.dataset.tabId === id)
-      ?.focus(),
-  );
+  void nextTick(() => elementOf(id)?.focus());
 };
 
 // F6 comes to the tab row after the text
@@ -94,8 +99,19 @@ onUnmounted(
   }),
 );
 
-const run = (command: Parameters<typeof editor.run>[0], focus = true) =>
-  editor.run(command, { focus });
+/**
+ * close closes the tab `id`. Closed from the keyboard, the focus goes to the
+ * tab shown then, rather than away with the tab.
+ */
+const close = (id: string, fromKeys = false) => {
+  const closing = closeTabs([id]);
+  if (!fromKeys) return editor.focus();
+  void closing.then(() => {
+    if (!list.value?.contains(document.activeElement)) {
+      focusTab(activeTabId.value);
+    }
+  });
+};
 
 // the menu of a tab, at the pointer or below the tab
 const menu = useMenuButton(() => {
@@ -104,31 +120,29 @@ const menu = useMenuButton(() => {
 const openMenu = (id: string, element: HTMLElement, at?: MouseEvent) => {
   const tab = tabs.value.find((candidate) => candidate.id === id);
   if (!tab) return;
-  const items = tabMenu(tab, indexOf(id), tabs.value.length, {
-    close: (tabId) => run(closeTab(tabId)),
-    closeOthers: (tabId) => run(closeOtherTabs(tabId)),
-    closeRight: (tabId) => run(closeTabsToRight(tabId)),
-    save: (tabId, force) => run(saveFile({ force }, tabId)),
-    copyPath: (path) => void writeText(path).catch(console.error),
-  });
-  const box = element.getBoundingClientRect();
+  const items = tabMenu(
+    tab,
+    indexOf(id),
+    tabs.value.length,
+    id === activeTabId.value,
+    {
+      close: (tabId) => close(tabId),
+      closeOthers: (tabId) => run(closeOtherTabs(tabId)),
+      closeRight: (tabId) => run(closeTabsToRight(tabId)),
+      save: (tabId, force) => run(saveFile({ force }, tabId)),
+      copyPath: (path) => void writeText(path).catch(console.error),
+    },
+  );
   menu.openAt(element, items, {
-    anchor: at
-      ? { left: at.clientX, top: at.clientY, bottom: at.clientY }
-      : { left: box.left, top: box.top, bottom: box.bottom },
-    keyboard: !at,
+    anchor: at && { left: at.clientX, top: at.clientY, bottom: at.clientY },
+    toggles: false,
   });
 };
 
 const onKeydown = (event: KeyboardEvent) => {
   const id = tabIdOf(event.target);
   if (id === null) return;
-  const action = tabKey(
-    event.key,
-    event.shiftKey,
-    indexOf(id),
-    tabs.value.length,
-  );
+  const action = tabKey(event, indexOf(id), tabs.value.length);
   if (action === null) return;
   event.preventDefault();
   if (typeof action === "object") {
@@ -136,7 +150,7 @@ const onKeydown = (event: KeyboardEvent) => {
   } else if (action === "activate") {
     run(selectTab(id), false);
   } else if (action === "close") {
-    run(closeTab(id), false);
+    close(id, true);
   } else if (action === "menu") {
     openMenu(id, event.target as HTMLElement);
   } else {
@@ -144,71 +158,56 @@ const onKeydown = (event: KeyboardEvent) => {
   }
 };
 
+// dragging a tab moves it along the row
+const drag = tabDrag({
+  boxes: () => tabElements().map((element) => element.getBoundingClientRect()),
+  indexOf,
+  move: (id, by) => moveTab(id, by),
+  capture: (pointerId) => list.value?.setPointerCapture?.(pointerId),
+});
+
 // a middle click closes the tab it was pressed and let go on
 let middlePressed: string | null = null;
-// a drag of a tab moves it along the row
-let drag: { id: string; x: number; moving: boolean } | null = null;
+// when × was last clicked, so a quick second click on what slid under the
+// pointer, another tab's × or the empty row, does nothing
+let closedAt = -Infinity;
+const DOUBLE_CLICK = 500;
 
 const onPointerdown = (event: PointerEvent) => {
   const id = tabIdOf(event.target);
   if (event.button === 1) middlePressed = id;
-  if (event.button !== 0 || id === null) return;
-  if ((event.target as Element).closest(".tab-close")) return;
-  drag = { id, x: event.clientX, moving: false };
-};
-
-const onPointermove = (event: PointerEvent) => {
-  if (!drag) return;
-  if (!(event.buttons & 1)) return void (drag = null);
-  if (!drag.moving && Math.abs(event.clientX - drag.x) < DRAG_START) return;
-  if (!drag.moving) {
-    // the drag follows the pointer off the row too, once it's a drag: a
-    // capture before would take the click from the tab
-    list.value?.setPointerCapture?.(event.pointerId);
-    drag.moving = true;
-  }
-  const boxes = tabElements().map((element) => element.getBoundingClientRect());
-  const edges = [
-    ...boxes.map((box) => box.left),
-    boxes[boxes.length - 1]?.right ?? 0,
-  ];
-  const by = dragBy(edges, indexOf(drag.id), event.clientX);
-  if (by !== 0) moveTab(drag.id, by);
-};
-
-// whether the click that follows a drag does nothing
-let dragged = false;
-const onPointerup = () => {
-  dragged = drag?.moving ?? false;
-  drag = null;
+  if (id !== null && !onClose(event.target)) drag.down(event, id);
 };
 
 const onMouseup = (event: MouseEvent) => {
   if (event.button !== 1) return;
   const id = tabIdOf(event.target);
-  if (middleCloses(middlePressed, id)) run(closeTab(id!), false);
+  if (middleCloses(middlePressed, id)) close(id!);
   middlePressed = null;
 };
 
 const onClick = (event: MouseEvent) => {
-  if (dragged) return void (dragged = false);
+  if (!drag.clicked()) return;
   const id = tabIdOf(event.target);
   if (id === null) return;
-  if ((event.target as Element).closest(".tab-close")) run(closeTab(id));
-  else run(selectTab(id));
+  if (!onClose(event.target)) return void run(selectTab(id));
+  if (event.timeStamp - closedAt < DOUBLE_CLICK) return;
+  closedAt = event.timeStamp;
+  close(id);
 };
 
 const onContextmenu = (event: MouseEvent) => {
-  const id = tabIdOf(event.target);
-  if (id === null) return;
-  event.preventDefault();
   const element = (event.target as Element).closest<HTMLElement>("[role=tab]");
-  if (element) openMenu(id, element, event);
+  const id = tabIdOf(element);
+  if (!element || id === null) return;
+  event.preventDefault();
+  openMenu(id, element, event);
 };
 
 // a double click on the row's empty part opens a new tab
 const onDblclick = (event: MouseEvent) => {
   const target = event.target as Element;
+  if (event.timeStamp - closedAt < DOUBLE_CLICK) return;
   if (target === list.value || target === spare.value) run(newFile());
 };
 
@@ -224,15 +223,15 @@ const onWheel = (event: WheelEvent) => {
   if (element.scrollLeft !== before) event.preventDefault();
 };
 
-// the tab shown is always scrolled into view
+// the tab shown is always scrolled into view, and keeps the focus while the
+// tab row has it
 watch(
   activeTabId,
   (id) => {
-    focused.value = null;
+    if (tabRowFocused.value) focusTab(id);
+    else focused.value = null;
     const element = list.value;
-    const tab = tabElements().find(
-      (candidate) => candidate.dataset.tabId === id,
-    );
+    const tab = elementOf(id);
     if (!element || !tab) return;
     const left = scrollLeftFor(
       tab.offsetLeft,
@@ -247,9 +246,13 @@ watch(
 
 const onFocusin = () => (tabRowFocused.value = true);
 const onFocusout = (event: FocusEvent) => {
-  if (list.value?.contains(event.relatedTarget as Node | null)) return;
+  const to = event.relatedTarget as Node | null;
+  if (list.value?.contains(to)) return;
   tabRowFocused.value = false;
-  focused.value = null;
+  // a menu of a tab keeps the tab that opened it in the tab order
+  if (!to || !(to as Element).closest?.(".context-menus")) {
+    focused.value = null;
+  }
 };
 onUnmounted(() => (tabRowFocused.value = false));
 
@@ -259,16 +262,25 @@ const toggleBlocks = () => {
   else run(toggleBlocksPane(), false);
 };
 
-// the Blocks button drops its name once the tabs need the room
+// the Blocks button drops its name once the tabs need the room, measured
+// once a frame, after the row has its size
 const compact = shallowRef(false);
+let labelWidth = 0;
+let frame: number | undefined;
 const fit = () => {
-  const element = list.value;
-  if (!element) return;
-  compact.value = compactBlocks(
-    compact.value,
-    element.scrollWidth > element.clientWidth + 1,
-    spare.value?.clientWidth ?? 0,
-  );
+  if (frame !== undefined) return;
+  frame = requestAnimationFrame(() => {
+    frame = undefined;
+    const element = list.value;
+    if (!element) return;
+    labelWidth = label.value?.offsetWidth || labelWidth;
+    compact.value = compactBlocks(
+      compact.value,
+      element.scrollWidth > element.clientWidth + 1,
+      spare.value?.clientWidth ?? 0,
+      labelWidth,
+    );
+  });
 };
 let resized: ResizeObserver | undefined;
 onMounted(() => {
@@ -278,7 +290,10 @@ onMounted(() => {
   resized.observe(spare.value!);
 });
 watch(() => tabs.value.length, fit, { flush: "post" });
-onUnmounted(() => resized?.disconnect());
+onUnmounted(() => {
+  resized?.disconnect();
+  if (frame !== undefined) cancelAnimationFrame(frame);
+});
 </script>
 
 <template>
@@ -291,9 +306,9 @@ onUnmounted(() => resized?.disconnect());
       aria-label="Documents"
       @keydown="onKeydown"
       @pointerdown="onPointerdown"
-      @pointermove="onPointermove"
-      @pointerup="onPointerup"
-      @pointercancel="onPointerup"
+      @pointermove="drag.move"
+      @pointerup="drag.up"
+      @pointercancel="drag.up"
       @mouseup="onMouseup"
       @click="onClick"
       @contextmenu="onContextmenu"
@@ -313,7 +328,7 @@ onUnmounted(() => resized?.disconnect());
     <IconButton
       class="tab-row-new"
       icon="plus"
-      :label="commandLabel(C.FILE_NEW)"
+      :label="newLabel"
       :command="C.FILE_NEW"
       :focusable="false"
       @click="run(newFile())"
@@ -324,13 +339,13 @@ onUnmounted(() => resized?.disconnect());
       :class="{ compact }"
       icon="blocks"
       label="Blocks"
-      :tip="commandLabel(C.INSERT_BLOCK)"
+      :tip="blocksTip"
       :command="C.INSERT_BLOCK"
       :pressed="blocksPaneOpen"
       :focusable="false"
       @click="toggleBlocks"
     >
-      <span v-if="!compact" class="tab-row-label">Blocks</span>
+      <span v-if="!compact" ref="label">Blocks</span>
     </IconButton>
   </div>
 </template>

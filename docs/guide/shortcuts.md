@@ -28,7 +28,7 @@
 | [Next tab](./writing#tabs)           | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
 | Previous tab                         | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
 | Close tab                            | `Mod` `W`                                 |
-| Reopen the tab closed last           | `Mod` `Shift` `T`                         |
+| Reopen the file closed last          | `Mod` `Shift` `T`                         |
 | Move tab left                        | `Ctrl` `Shift` `Page Up`                  |
 | Move tab right                       | `Ctrl` `Shift` `Page Down`                |
 | Go to the tabs, and back to the text | `F6`                                      |

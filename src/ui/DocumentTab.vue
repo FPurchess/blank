@@ -35,6 +35,8 @@ const closeTip = tipAttrs({
     v-bind="tip"
   >
     <span class="tab-label">{{ tabLabel(tab) }}</span>
+    <!-- what the dot says, for screen readers -->
+    <span v-if="tab.unsaved" class="visually-hidden">, unsaved changes</span>
     <span class="tab-close" aria-hidden="true" v-bind="closeTip">
       <IconGlyph name="x" />
     </span>

@@ -22,10 +22,13 @@ const close = (callback: () => void) => closeDialog(unsavedDialog, callback);
   <BaseDialog
     id="unsaved-dialog"
     :title="`Save changes to “${request.label}”?`"
+    described-by="unsaved-dialog-text"
     @submit="close(props.request.save)"
     @cancel="close(props.request.cancel)"
   >
-    <p class="dialog-text">Your changes will be lost if you don't save them.</p>
+    <p id="unsaved-dialog-text" class="dialog-text">
+      Your changes will be lost if you don't save them.
+    </p>
     <template #actions>
       <button ref="save" type="submit">Save</button>
       <button type="button" @click="close(request.discard)">Don't save</button>

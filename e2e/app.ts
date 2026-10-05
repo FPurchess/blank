@@ -12,3 +12,13 @@ export const application =
     "debug",
     "blank",
   );
+
+/**
+ * profileEnv returns the environment that keeps the app's storage, config
+ * and cache in the temporary profile `dir`, away from the developer's own
+ */
+export const profileEnv = (dir: string) => ({
+  XDG_DATA_HOME: path.join(dir, "data"),
+  XDG_CONFIG_HOME: path.join(dir, "config"),
+  XDG_CACHE_HOME: path.join(dir, "cache"),
+});

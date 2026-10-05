@@ -18,24 +18,6 @@ import { bandCommand } from "./bandStripsModel";
 // where they are.
 
 /**
- * scrollFor returns where to scroll so that `rect`, on the desk, is in the
- * view from `top` that is `height` high, or null if it already is
- * @param room the space to keep above and below it
- */
-export const scrollFor = (
-  rect: { top: number; height: number },
-  top: number,
-  height: number,
-  { above = 20, below = 64 } = {},
-) => {
-  if (rect.top - above < top) return Math.max(0, rect.top - above);
-  if (rect.top + rect.height + below > top + height) {
-    return rect.top + rect.height + below - height;
-  }
-  return null;
-};
-
-/**
  * endMark returns what the mark between a page and the next shows: its
  * footer, with its number when the footer doesn't show it, and the next
  * page's header

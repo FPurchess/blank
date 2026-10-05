@@ -63,7 +63,7 @@ export const emptyDocument = (): Node => schema.topNodeType.createAndFill()!;
 export const welcomeDocument = (): Node => parseMarkdown(welcomeMessage);
 
 // Word documents larger than this are refused
-export const MAX_WORD_BYTES = 50 * 1024 * 1024;
+const MAX_WORD_BYTES = 50 * 1024 * 1024;
 
 /**
  * importWordDocument imports the Word document at `path` into an untitled
@@ -107,8 +107,8 @@ const importWordDocument = async (
 
 /**
  * readDocument reads the document at `path`: a markdown file, or a Word
- * document that is imported into an untitled one
- * @param silent whether to leave failures out of the notifications
+ * document that is imported into an untitled one. It never throws: what
+ * goes wrong is logged, and told unless `silent`.
  * @returns the document, or undefined when it can't be read
  */
 export const readDocument = async (
@@ -122,8 +122,18 @@ export const readDocument = async (
     if (!silent) sendNotification(message);
   };
   // the resolved path keeps working when Blank is started from another directory
-  const resolvedPath = await tauriPath.resolve(path);
-  if (!(await exists(resolvedPath))) {
+  let resolvedPath: string;
+  let found: boolean;
+  try {
+    resolvedPath = await tauriPath.resolve(path);
+    found = await exists(resolvedPath);
+  } catch (err) {
+    // e.g. a file it isn't allowed to look at
+    const message = `Failed to open file: ${errorMessage(err)}`;
+    report(`${message} (${path})`, message);
+    return;
+  }
+  if (!found) {
     report(
       `File does not exist: ${resolvedPath}`,
       `File not found: ${resolvedPath}`,

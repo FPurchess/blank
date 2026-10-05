@@ -424,6 +424,35 @@ describe("storage", () => {
       });
     });
 
+    it("stores where the view is when the window closes, even if only that changed", async () => {
+      const { flush } = await open("a");
+      await flush();
+      await localforage.removeItem("session");
+
+      await closeHandler?.();
+
+      expect(await localforage.getItem("session")).toMatchObject({
+        active: "a",
+      });
+    });
+
+    it("tries again what a failed write didn't store", async () => {
+      const { transaction, flush } = await open("a");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const setItem = localforage.setItem.bind(localforage);
+      const failing = vi
+        .spyOn(localforage, "setItem")
+        .mockRejectedValueOnce(new Error("busy"));
+
+      transaction.value = replace(doc(p("kept")));
+      await tick();
+      expect(warn).toHaveBeenCalled();
+      failing.mockImplementation(setItem);
+
+      await flush();
+      expect(await text("a")).toBe("kept");
+    });
+
     it("lets the window close when storing fails", async () => {
       const { transaction } = await open("a");
       const error = new Error("quota exceeded");
@@ -522,12 +551,36 @@ describe("storage", () => {
       expect(await loadSession()).toEqual(session);
     });
 
-    it("ignores an invalid session", async () => {
+    it("shows the first tab when the active one is missing", async () => {
       await localforage.setItem("session", { ...session, active: "c" });
+      const { loadSession } = await bootFresh();
+
+      expect((await loadSession())?.active).toBe("a");
+    });
+
+    it("keeps a session it can't read and starts afresh, saying so", async () => {
+      const newer = { ...session, version: 2 };
+      await localforage.setItem("session", newer);
       vi.spyOn(console, "warn").mockImplementation(() => {});
       const { loadSession } = await bootFresh();
 
       expect(await loadSession()).toBeNull();
+      expect(await localforage.getItem("session-backup")).toEqual(newer);
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining('kept as "session-backup"'),
+      );
+    });
+
+    it("numbers an untitled document an earlier Blank stored", async () => {
+      await localforage.setItem("doc", doc(p("from before")).toJSON());
+      const { loadSession } = await bootFresh();
+
+      const migrated = await loadSession();
+
+      expect(migrated!.tabs[migrated!.active]).toMatchObject({
+        path: null,
+        untitledNumber: 1,
+      });
     });
 
     it("turns the one document an earlier Blank stored into an unsaved tab", async () => {
