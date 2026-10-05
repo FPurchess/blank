@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use parley::{
-    Affinity, Alignment, AlignmentOptions, Cursor, FontStyle, FontWeight, Layout, LineHeight,
-    OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
+    Affinity, Alignment, AlignmentOptions, BreakReason, Cursor, FontStyle, FontWeight, Layout,
+    LineHeight, OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
 };
 
 use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE, INK_UNDERLINE};
@@ -401,12 +401,122 @@ impl TextBox {
         let cursor = Cursor::from_byte_index(&self.layout, byte, affinity);
         let rect = cursor.geometry(&self.layout, 0.0);
         let line = self.line_at((rect.y0 + rect.y1) as f32 / 2.0);
-        (
-            line,
-            rect.x0 as f32,
-            rect.y0 as f32,
-            (rect.y1 - rect.y0) as f32,
-        )
+        let x = self.caret_x(cursor).unwrap_or(rect.x0 as f32);
+        (line, x, rect.y0 as f32, (rect.y1 - rect.y0) as f32)
+    }
+
+    /// where a cluster's left edge is painted on its line. Parley's own
+    /// cursor geometry and hit-testing (`Cluster::visual_offset`,
+    /// `Cluster::from_point`) step over the runs before a cluster by
+    /// `Run::advance`, which justifying leaves as shaped, while it widens
+    /// the spaces' clusters, so on a justified line they fall behind the
+    /// glyphs past a change of run (a bold word, code, another font). The
+    /// glyphs are painted by their advances, which take the widening, as
+    /// the advances of the clusters do: summing those is where they stand.
+    fn cluster_x(&self, cluster: &parley::Cluster<'_, Ink>) -> f32 {
+        let path = cluster.path();
+        let Some(line) = self.layout.get(path.line_index()) else {
+            return 0.0;
+        };
+        let metrics = line.metrics();
+        let mut x = metrics.offset + metrics.inline_min_coord;
+        for run in line.runs() {
+            if run.index() == path.run_index() {
+                let visual = run.logical_to_visual(path.logical_index()).unwrap_or(0);
+                return x + run
+                    .visual_clusters()
+                    .take(visual)
+                    .map(|c| c.advance())
+                    .sum::<f32>();
+            }
+            x += run.visual_clusters().map(|c| c.advance()).sum::<f32>();
+        }
+        x
+    }
+
+    /// the width of a line as painted, its spaces at the end included
+    fn painted_width(&self, line: usize) -> f32 {
+        let Some(line) = self.layout.get(line) else {
+            return 0.0;
+        };
+        line.runs()
+            .map(|run| {
+                (0..run.len())
+                    .filter_map(|index| run.get(index))
+                    .map(|c| c.advance())
+                    .sum::<f32>()
+            })
+            .sum()
+    }
+
+    /// the caret's x as Parley's `Cursor::geometry` places it, at the edge
+    /// of the same cluster, but where that cluster is painted; None where
+    /// it stands at no cluster (an empty last line)
+    fn caret_x(&self, cursor: Cursor) -> Option<f32> {
+        let (cluster, at_end) = match cursor.visual_clusters(&self.layout) {
+            [Some(left), Some(right)] => {
+                // at the end of a line, the start of the next unless the
+                // cursor comes from the line's end at a soft break
+                let downstream = cursor.affinity() == Affinity::Downstream;
+                if !left.is_end_of_line()
+                    || left.is_soft_line_break() && left.is_rtl() == downstream
+                {
+                    (left, true)
+                } else {
+                    (right, false)
+                }
+            }
+            [Some(left), None] if left.is_hard_line_break() => return None,
+            [Some(left), _] => (left, true),
+            [_, Some(right)] => (right, false),
+            _ => return None,
+        };
+        let end = if at_end { cluster.advance() } else { 0.0 };
+        Some(self.cluster_x(&cluster) + end)
+    }
+
+    /// the cluster nearest to a point and whether the point is on its
+    /// right half, as `Cluster::from_point` finds it, but by where the
+    /// clusters are painted (see `cluster_x`)
+    fn cluster_at(&self, x: f32, y: f32) -> Option<(parley::Cluster<'_, Ink>, bool)> {
+        let line = self.layout.get(self.line_at(y))?;
+        let metrics = line.metrics();
+        let mut edge = metrics.offset + metrics.inline_min_coord;
+        let mut last = None;
+        for run in line.runs() {
+            let clusters =
+                (0..run.len()).filter_map(|visual| run.get(run.visual_to_logical(visual)?));
+            for cluster in clusters {
+                let advance = cluster.advance();
+                if x <= edge + advance {
+                    let right = x > edge + advance / 2.0;
+                    return Some((cluster, right));
+                }
+                edge += advance;
+                last = Some(cluster);
+            }
+        }
+        // past the end of the line, its last cluster
+        last.map(|cluster| (cluster, true))
+    }
+
+    /// the cursor nearest to a point, as `Cursor::from_point` takes it
+    fn cursor_at(&self, x: f32, y: f32) -> Cursor {
+        let Some((cluster, right)) = self.cluster_at(x, y) else {
+            return Cursor::from_byte_index(&self.layout, self.text.len(), Affinity::Downstream);
+        };
+        let range = cluster.text_range();
+        // never after a hard break, which would put it on the next line
+        let start = if cluster.is_rtl() {
+            right
+        } else {
+            !right || cluster.is_line_break() == Some(BreakReason::Explicit)
+        };
+        if start {
+            Cursor::from_byte_index(&self.layout, range.start, Affinity::Downstream)
+        } else {
+            Cursor::from_byte_index(&self.layout, range.end, Affinity::Upstream)
+        }
     }
 
     /// the line at a height, or the nearest
@@ -420,13 +530,29 @@ impl TextBox {
 
     /// the position nearest to a point in the box's coordinates
     pub fn hit(&self, x: f32, y: f32) -> u32 {
-        let cursor = Cursor::from_point(&self.layout, x, y);
-        self.pos_of(cursor.index())
+        self.pos_of(self.cursor_at(x, y).index())
     }
 
-    /// the word at a point, as ProseMirror positions
+    /// the word at a point, as ProseMirror positions, as
+    /// `Selection::word_from_point` finds it but by where the clusters are
+    /// painted
     pub fn word(&self, x: f32, y: f32) -> (u32, u32) {
-        let range = Selection::word_from_point(&self.layout, x, y).text_range();
+        let Some((mut cluster, _)) = self.cluster_at(x, y) else {
+            let end = self.pos_of(self.text.len());
+            return (end, end);
+        };
+        if !cluster.is_word_boundary() {
+            if let Some(previous) = cluster.previous_logical_word() {
+                cluster = previous;
+            }
+        }
+        let affinity = if cluster.is_rtl() {
+            Affinity::Upstream
+        } else {
+            Affinity::Downstream
+        };
+        let anchor = Cursor::from_byte_index(&self.layout, cluster.text_range().start, affinity);
+        let range = Selection::new(anchor, anchor.next_logical_word(&self.layout)).text_range();
         (self.pos_of(range.start), self.pos_of(range.end))
     }
 
@@ -478,8 +604,7 @@ impl TextBox {
         let Some(info) = lines.get(line) else {
             return (self.pos, false);
         };
-        let cursor = Cursor::from_point(&self.layout, x, (info.top + info.bottom) / 2.0);
-        let byte = cursor.index();
+        let byte = self.cursor_at(x, (info.top + info.bottom) / 2.0).index();
         if line + 1 < lines.len() && byte >= self.end_byte(line) {
             return self.line_end(line);
         }
@@ -493,15 +618,28 @@ impl TextBox {
             Cursor::from_byte_index(&self.layout, from, Affinity::Downstream),
             Cursor::from_byte_index(&self.layout, to, Affinity::Upstream),
         );
+        // Parley measures the first and last line by their clusters, which
+        // take a justified line's widened spaces, but the lines between by
+        // the line's advance, which doesn't: those take the clusters' too
+        let line_of = |cursor: Cursor| {
+            let rect = cursor.geometry(&self.layout, 0.0);
+            self.line_at((rect.y0 + rect.y1) as f32 / 2.0)
+        };
+        let (first, last) = (line_of(selection.anchor()), line_of(selection.focus()));
         selection
             .geometry(&self.layout)
             .into_iter()
             .map(|(rect, line)| {
+                let mut width = (rect.x1 - rect.x0) as f32;
+                if line > first && line < last {
+                    width += self.painted_width(line)
+                        - self.layout.get(line).map_or(0.0, |l| l.metrics().advance);
+                }
                 (
                     line,
                     rect.x0 as f32,
                     rect.y0 as f32,
-                    (rect.x1 - rect.x0) as f32,
+                    width,
                     (rect.y1 - rect.y0) as f32,
                 )
             })
@@ -1022,5 +1160,86 @@ mod tests {
         let (_, end) = edges[0];
         // the tracking after the last letter may stand past the ink
         assert!(end > 297.0 && end <= 300.5, "{end}");
+    }
+
+    /// a justified line that changes run mid line, as caret, hit and
+    /// selection must take it: a bold word in the first of its lines
+    fn justified_with_a_run() -> (Fonts, TextBox) {
+        let mut fonts = repository_fonts();
+        let mut value = text(
+            "Some words that wrap onto more lines than one, all of them full but the last one of them",
+        );
+        value.spans = vec![Span {
+            from: 5,
+            to: 10,
+            bold: true,
+            ..Default::default()
+        }];
+        let boxed = TextBox::new(&mut fonts, &value, 200.0, Alignment::Justify);
+        assert!(boxed.line_count() >= 2);
+        (fonts, boxed)
+    }
+
+    #[test]
+    fn puts_the_caret_on_the_glyphs_of_a_justified_line() {
+        let (fonts, boxed) = justified_with_a_run();
+        let runs = boxed.glyph_runs(&fonts, 0);
+        assert!(runs.len() >= 3, "{runs:?}");
+        for glyph in runs.iter().flat_map(|run| &run.glyphs) {
+            let pos = boxed.pos_of(glyph.start as usize);
+            let (line, x, ..) = boxed.caret(pos, false);
+            assert_eq!(line, 0);
+            assert!(
+                (x - glyph.x).abs() < 0.5,
+                "caret at {pos} is at {x}, its glyph at {}",
+                glyph.x
+            );
+            let middle = glyph.x + glyph.advance / 2.0;
+            let y = (boxed.lines()[0].top + boxed.lines()[0].bottom) / 2.0;
+            // just left of the middle is before the glyph, right of it after
+            let before = boxed.hit(middle - 0.1, y);
+            let after = boxed.hit(middle + 0.1, y);
+            assert_eq!(before, pos, "hit left of the middle of {pos}");
+            assert_eq!(
+                after,
+                boxed.pos_of(glyph.end as usize),
+                "hit right of {pos}"
+            );
+            assert_eq!(boxed.hit_line(0, middle - 0.1).0, pos);
+        }
+    }
+
+    #[test]
+    fn selects_the_glyphs_of_a_justified_line() {
+        let (fonts, boxed) = justified_with_a_run();
+        let glyphs: Vec<Glyph> = boxed
+            .glyph_runs(&fonts, 0)
+            .iter()
+            .flat_map(|run| run.glyphs.clone())
+            .collect();
+        // each word after the bold one, selected alone
+        for glyph in glyphs.iter().filter(|glyph| glyph.start > 10) {
+            let rects = boxed.selection(glyph.start as usize, glyph.end as usize);
+            assert_eq!(rects.len(), 1, "{rects:?}");
+            let (line, x, _, width, _) = rects[0];
+            assert_eq!(line, 0);
+            assert!((x - glyph.x).abs() < 0.5, "{x} for {glyph:?}");
+            assert!((width - glyph.advance).abs() < 0.5, "{width} for {glyph:?}");
+        }
+        // a full line in the middle of a selection reaches the right edge
+        let lines = boxed.line_count();
+        assert!(lines >= 3);
+        let rects = boxed.selection(0, boxed.text.len());
+        assert_eq!(rects.len(), lines, "{rects:?}");
+        for &(line, x, _, width, _) in &rects[..lines - 1] {
+            assert!(x.abs() < 0.5 && x + width > 199.5, "line {line}: {rects:?}");
+        }
+        // as wide as the same line selected from its start, with its spaces
+        let starts: Vec<usize> = boxed.lines().iter().map(|line| line.start).collect();
+        let alone = boxed.selection(starts[1], starts[2]);
+        assert!(
+            (alone[0].3 - rects[1].3).abs() < 0.01,
+            "{alone:?} {rects:?}"
+        );
     }
 }

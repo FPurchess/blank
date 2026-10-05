@@ -317,7 +317,8 @@ pub enum Content {
         height: f32,
         #[serde(default)]
         alt: String,
-        /// the alignment of the paragraph it stands in: center or right
+        /// the alignment of the paragraph it stands in: center or right;
+        /// anything else, justify too, stands it at the start
         #[serde(default)]
         align: Option<String>,
     },
