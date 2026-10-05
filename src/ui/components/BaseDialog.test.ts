@@ -9,7 +9,7 @@ const cancel = vi.fn();
 /**
  * mount shows a dialog with two fields and a button, and waits for it
  */
-const mount = async () => {
+const mount = async (secondary = false) => {
   const element = document.createElement("div");
   document.body.append(element);
   const app = createApp(
@@ -29,6 +29,11 @@ const mount = async () => {
               h("input", { id: "hidden", hidden: true }),
               h("input", { id: "second" }),
             ],
+            ...(secondary && {
+              secondary: () => [
+                h("button", { type: "button", id: "more" }, "More"),
+              ],
+            }),
             actions: () => [
               h("button", { type: "submit", id: "ok" }, "OK"),
               h("button", { type: "button", disabled: true }, "Off"),
@@ -79,6 +84,19 @@ describe("BaseDialog", () => {
     expect(form.getAttribute("aria-labelledby")).toBe("test-dialog-title");
     expect(byId("test-dialog-title").textContent).toBe("Test");
     expect(form.querySelector(".actions #ok")).not.toBeNull();
+    // the title in the head, the fields in the body, the buttons in the foot
+    expect(form.querySelector(".dialog-head h2")?.textContent).toBe("Test");
+    expect(form.querySelector(".dialog-body #first")).not.toBeNull();
+    expect(form.querySelector(".dialog-foot #ok")).not.toBeNull();
+    expect(form.querySelector(".secondary")).toBeNull();
+  });
+
+  it("puts what else it offers at the left of its buttons", async () => {
+    unmount = await mount(true);
+    const foot = byId("test-dialog").querySelector(".dialog-foot")!;
+
+    expect(foot.querySelector(".secondary #more")).not.toBeNull();
+    expect(foot.firstElementChild!.classList).toContain("secondary");
   });
 
   it("submits with Enter and cancels with Esc", async () => {

@@ -259,12 +259,13 @@ describe("linkDialog", () => {
 
   it("keeps the focus inside the dialog", async () => {
     await openDialog({ isEdit: true, url: "https://blank.app" });
-    const cancel = button("Cancel")!;
+    // the last button, at the right of the foot
+    const save = button("Save")!;
 
     expect((await keydown("Tab", { shiftKey: true })).defaultPrevented).toBe(
       true,
     );
-    expect(document.activeElement).toBe(cancel);
+    expect(document.activeElement).toBe(save);
 
     expect((await keydown("Tab")).defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(urlInput());

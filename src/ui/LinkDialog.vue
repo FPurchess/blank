@@ -45,16 +45,14 @@ const submit = () => {
       @input="submitted = false"
     />
     <TextField id="link-dialog-text" v-model="text" label="Link Text" />
-    <template #actions>
-      <button type="submit" :disabled="check.blocked">Save</button>
-      <button
-        v-if="request.isEdit"
-        type="button"
-        @click="close(request.convertToText)"
-      >
+    <template v-if="request.isEdit" #secondary>
+      <button type="button" @click="close(request.convertToText)">
         Convert to Text
       </button>
+    </template>
+    <template #actions>
       <button type="button" @click="close(request.cancel)">Cancel</button>
+      <button type="submit" :disabled="check.blocked">Save</button>
     </template>
   </BaseDialog>
 </template>

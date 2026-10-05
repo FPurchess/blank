@@ -3,9 +3,11 @@ import { useTemplateRef } from "vue";
 
 import { shownIn } from "../../dom";
 
-// A modal dialog: a backdrop with a form, titled `title`. Esc and a press on
-// the backdrop cancel it, Tab keeps the focus inside, and Enter submits the
-// form. The default slot holds its fields, `actions` its buttons.
+// A modal dialog: a backdrop with a form, titled `title` in its head. Esc and
+// a press on the backdrop cancel it, Tab keeps the focus inside, and Enter
+// submits the form. The default slot holds its body, `actions` the buttons at
+// the right of its foot (Cancel, then the submit button), and `secondary`
+// those at the left, e.g. "Edit as text".
 defineProps<{
   id: string;
   title: string;
@@ -61,9 +63,16 @@ const cancelOnBackdrop = (event: MouseEvent) => {
       @keydown.esc.prevent="emit('cancel')"
       @keydown.tab="trapFocus"
     >
-      <h2 :id="`${id}-title`">{{ title }}</h2>
-      <slot />
-      <div class="actions">
+      <header class="dialog-head">
+        <h2 :id="`${id}-title`">{{ title }}</h2>
+      </header>
+      <div class="dialog-body">
+        <slot />
+      </div>
+      <div class="dialog-foot actions">
+        <div v-if="$slots.secondary" class="secondary">
+          <slot name="secondary" />
+        </div>
         <slot name="actions" />
       </div>
     </form>

@@ -51,6 +51,7 @@ describe("the controls' global rules", () => {
       ".toc-popover",
       ".toolbar",
       ".table-picker",
+      ".dialog",
     ]) {
       expect(rule(root), root).toContain(
         "font-size:var(--ui);line-height:20px",

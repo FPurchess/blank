@@ -29,10 +29,12 @@ const close = (callback: () => void) => closeDialog(unsavedDialog, callback);
     <p id="unsaved-dialog-text" class="dialog-text">
       Your changes will be lost if you don't save them.
     </p>
-    <template #actions>
-      <button ref="save" type="submit">Save</button>
+    <template #secondary>
       <button type="button" @click="close(request.discard)">Don't save</button>
+    </template>
+    <template #actions>
       <button type="button" @click="close(request.cancel)">Cancel</button>
+      <button ref="save" type="submit">Save</button>
     </template>
   </BaseDialog>
 </template>
