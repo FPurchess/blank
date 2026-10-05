@@ -104,7 +104,7 @@ const text = (value: unknown): string | undefined => {
 /**
  * propertiesOf returns the title and author among the keys of the frontmatter
  */
-export const propertiesOf = (data: Data): DocumentProperties => {
+const propertiesOf = (data: Data): DocumentProperties => {
   const title = text(data.title);
   const author = text(data.author);
   return { ...(title ? { title } : {}), ...(author ? { author } : {}) };

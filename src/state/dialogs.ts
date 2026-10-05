@@ -59,7 +59,8 @@ export interface PageSetupRequest {
   warnings: string[];
   // applies the settings, written onto `base`, as one undo step
   apply(settings: PageSettings, base: PageBase): void;
-  // returns what is wrong with the frontmatter, or null once it is applied
+  // applies the frontmatter as one undo step; returns what is wrong with it,
+  // or null once it is applied (the dialog checks it with readText first)
   applyText(frontmatter: string): string | null;
   // the frontmatter `base` becomes with the settings written onto it
   textOf(settings: PageSettings, base: PageBase): string;
@@ -67,8 +68,9 @@ export interface PageSetupRequest {
   readText(
     frontmatter: string,
   ): { settings: PageSettings; warnings: string[] } | { error: string };
-  // makes the settings the user's default for documents without their own
-  makeDefault(settings: PageSettings): void;
+  // makes the settings the user's default for documents without their own,
+  // and takes them out of `base`, which becomes the document's frontmatter
+  makeDefault(settings: PageSettings, base: PageBase): void;
   cancel(): void;
 }
 

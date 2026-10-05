@@ -32,16 +32,6 @@ export const pageFrontmatter = (
   );
 
 /**
- * pageTr returns the transaction that writes page settings into the
- * frontmatter of the document, or null when nothing changes
- */
-export const pageTr = (state: EditorState, changes: PageChanges, unit: Unit) =>
-  frontmatterTr(
-    state,
-    pageFrontmatter(frontmatterOf(state.doc), changes, unit),
-  );
-
-/**
  * setFrontmatter replaces the frontmatter of the document as one undo step,
  * and does nothing when nothing changes
  */
@@ -55,11 +45,8 @@ export const setFrontmatter = (view: EditorView, next: string | null) => {
  * writePageSettings
  * @param unit the unit to write new lengths in
  */
-export const writePage = (
-  view: EditorView,
-  changes: PageChanges,
-  unit: Unit,
-) => {
-  const tr = pageTr(view.state, changes, unit);
-  if (tr) view.dispatch(tr);
-};
+export const writePage = (view: EditorView, changes: PageChanges, unit: Unit) =>
+  setFrontmatter(
+    view,
+    pageFrontmatter(frontmatterOf(view.state.doc), changes, unit),
+  );

@@ -19,7 +19,7 @@ import {
   sameMargins,
   SIDES,
 } from "./settings";
-import { paperUnit, parseLength, toUnit, type Unit } from "./units";
+import { paperUnit, parseLength, sameLength, toUnit, type Unit } from "./units";
 
 // What the page setup dialog offers: a few named choices per row, with the
 // exact values behind "Custom…".
@@ -165,7 +165,8 @@ export const typedOrientation = (
   unit: Unit,
 ): Orientation | undefined => {
   const size = typedSize(choices, unit);
-  if (!size || size.width === size.height) return undefined;
+  // square, though typed in different units
+  if (!size || sameLength(size.width, size.height)) return undefined;
   return size.width > size.height ? "landscape" : "portrait";
 };
 

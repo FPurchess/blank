@@ -3,10 +3,11 @@ import { computed, useTemplateRef } from "vue";
 
 // A labelled text field of a dialog, with an optional hint below it that
 // screen readers announce. The default slot goes next to the field, e.g. a
-// button that fills it. A `unit` shows inside the field, after the value, and
-// `errorId` marks the value as invalid, described by that error. `input` is emitted on every native input event, also
-// one that leaves the value as it is (v-model's update isn't), e.g. pasting
-// the same text over itself, which still counts as typing.
+// button that fills it. A `unit` shows inside the field, after the value (not
+// together with the slot), and `errorId` marks the value as invalid,
+// described by that error. `input` is emitted on every native input event,
+// also one that leaves the value as it is (v-model's update isn't), e.g.
+// pasting the same text over itself, which still counts as typing.
 const props = defineProps<{
   id: string;
   label: string;

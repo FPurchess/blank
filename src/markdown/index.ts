@@ -28,7 +28,6 @@ export {
   type DocumentProperties,
   frontmatterError,
   frontmatterOf,
-  propertiesOf,
   readFrontmatter,
   readProperties,
   setProperties,

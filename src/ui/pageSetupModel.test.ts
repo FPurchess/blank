@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { MARGIN_FIELDS, sentence, stopAfter, stopsIn } from "./pageSetupModel";
+import {
+  appliesOnEnter,
+  MARGIN_FIELDS,
+  problemId,
+  problemsOf,
+  sentence,
+  steppedPaper,
+  stopAfter,
+  stopsIn,
+  UNREADABLE,
+} from "./pageSetupModel";
 
 describe("MARGIN_FIELDS", () => {
   it("has a field per side, labelled by it", () => {
@@ -54,5 +64,71 @@ describe("sentence", () => {
     );
     expect(sentence("Done.")).toBe("Done.");
     expect(sentence("Really?")).toBe("Really?");
+  });
+});
+
+describe("problemsOf", () => {
+  const of = (changes: Partial<Parameters<typeof problemsOf>[0]>) =>
+    problemsOf({
+      asText: false,
+      textError: "",
+      unreadable: false,
+      errors: {},
+      ...changes,
+    });
+
+  it("lists what can't be used of the rows, by their part", () => {
+    expect(of({ errors: { paper: "P.", margins: undefined } })).toEqual([
+      ["paper", "P."],
+    ]);
+    expect(of({})).toEqual([]);
+  });
+
+  it("puts frontmatter that can't be read first", () => {
+    expect(of({ unreadable: true, errors: { margins: "M." } })).toEqual([
+      ["properties", UNREADABLE],
+      ["margins", "M."],
+    ]);
+  });
+
+  it("shows only what is wrong with the text while it's edited", () => {
+    expect(
+      of({
+        asText: true,
+        textError: "T",
+        unreadable: true,
+        errors: { paper: "P." },
+      }),
+    ).toEqual([["text", "T"]]);
+    expect(of({ asText: true })).toEqual([]);
+  });
+
+  it("gives the id of a part's problem, or none", () => {
+    const problems = of({ errors: { paper: "P." } });
+    expect(problemId(problems, "paper")).toBe("page-setup-error-paper");
+    expect(problemId(problems, "margins")).toBeUndefined();
+  });
+});
+
+describe("steppedPaper", () => {
+  const options = [{ value: "a" }, { value: "b" }, { value: "c" }];
+
+  it("steps to the next or previous paper, and stops at the ends", () => {
+    expect(steppedPaper(options, "b", 1)).toBe("c");
+    expect(steppedPaper(options, "b", -1)).toBe("a");
+    expect(steppedPaper(options, "c", 1)).toBeUndefined();
+    expect(steppedPaper(options, "a", -1)).toBeUndefined();
+  });
+});
+
+describe("appliesOnEnter", () => {
+  it("applies on an option, not on a list or what isn't a button", () => {
+    const option = document.createElement("button");
+    const list = document.createElement("button");
+    list.setAttribute("aria-haspopup", "menu");
+    expect(appliesOnEnter(option)).toBe(true);
+    expect(appliesOnEnter(list)).toBe(false);
+    expect(appliesOnEnter(document.createElement("input"))).toBe(false);
+    expect(appliesOnEnter(null)).toBe(false);
   });
 });

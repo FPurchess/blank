@@ -18,12 +18,7 @@ import {
 import { frontmatterError, frontmatterOf } from "../../markdown";
 import { activeTabId, announce, type PageBase, pageSetup } from "../../state";
 import { changeTab } from "../tabs";
-import {
-  pageFrontmatter,
-  pageTr,
-  setFrontmatter,
-  writePage,
-} from "./frontmatter";
+import { frontmatterTr, pageFrontmatter, setFrontmatter } from "./frontmatter";
 
 // the settings the page setup dialog sets: all but those of the header and
 // footer strips
@@ -56,6 +51,8 @@ export const openPageSetup = (view: EditorView) => {
       changesOf(base.settings, chosen, defaults, locale),
       unit,
     ) ?? "";
+  // the dialog checks the text first, so an error here is only a safety net
+  // for a caller that doesn't
   const applyText = (text: string) => {
     const error = frontmatterError(text);
     if (error !== null) return error;
@@ -71,7 +68,10 @@ export const openPageSetup = (view: EditorView) => {
     unit,
     frontmatter,
     warnings: layoutWarnings(problems),
-    apply: (chosen, base) => applyText(textOf(chosen, base)),
+    apply: (chosen, base) => {
+      // the dialog doesn't offer Apply while its frontmatter can't be read
+      if (applyText(textOf(chosen, base)) !== null) view.focus();
+    },
     applyText,
     textOf,
     readText: (text) => {
@@ -83,16 +83,22 @@ export const openPageSetup = (view: EditorView) => {
         warnings: layoutWarnings(read.problems),
       };
     },
-    makeDefault: (chosen) => {
+    makeDefault: (chosen, base) => {
       view.focus();
+      // the document follows the new default instead of its own settings,
+      // written onto its frontmatter as the dialog has it, with what was
+      // edited as text
+      const own = Object.fromEntries(DIALOG_KEYS.map((key) => [key, null]));
+      const next = normalize(
+        pageFrontmatter(base.frontmatter, own, unit) ?? "",
+      );
       // what the dialog shows; the header and footer stay the document's
       const shown = DIALOG_KEYS.map((key) => [key, chosen[key]]);
       saveDefaultPage({ ...defaults, ...Object.fromEntries(shown) }, unit)
         .then(() => {
-          // the document follows the new default instead of its own settings
-          const own = Object.fromEntries(DIALOG_KEYS.map((key) => [key, null]));
-          if (tab === null) writePage(view, own, unit);
-          else void changeTab(tab, (state) => pageTr(state, own, unit));
+          // without tabs, as in tests of other modules, the view's document
+          if (tab === null) setFrontmatter(view, next);
+          else void changeTab(tab, (state) => frontmatterTr(state, next));
           sendNotification(
             "New documents are laid out like this now, and so are documents without their own page setup.",
           );

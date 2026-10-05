@@ -42,12 +42,16 @@ const request = () => {
 
 const frontmatter = () => view.state.doc.attrs.frontmatter;
 
-// applies settings onto the document's own frontmatter, as the dialog does
-// until its text is edited
+// what the dialog writes onto until its text is edited: the document's own
+// frontmatter
+const baseOf = ({ frontmatter, settings }: PageSetupRequest) => ({
+  frontmatter,
+  settings,
+});
 const applyOn = (
-  { apply, frontmatter, settings }: PageSetupRequest,
+  request: PageSetupRequest,
   chosen: PageSetupRequest["settings"],
-) => apply(chosen, { frontmatter, settings });
+) => request.apply(chosen, baseOf(request));
 
 describe("command.pageSetup", () => {
   beforeEach(() => {
@@ -165,6 +169,19 @@ describe("command.pageSetup", () => {
     expect(settings.size).toBe("auto");
   });
 
+  it("leaves frontmatter it can't read as it is, giving the text the focus", () => {
+    mount(docWithFrontmatter("title: [oops", p("text")));
+    const focus = vi.spyOn(view, "focus");
+    openPageSetup(view);
+    const opened = request();
+
+    applyOn(opened, { ...opened.settings, orientation: "landscape" });
+
+    expect(frontmatter()).toBe("title: [oops");
+    expect(announcement.value).toBeNull();
+    expect(focus).toHaveBeenCalled();
+  });
+
   describe("textOf", () => {
     it("writes the settings into the frontmatter, keeping the rest", () => {
       mount(docWithFrontmatter("title: Hi # the title", p("text")));
@@ -250,9 +267,12 @@ describe("command.pageSetup", () => {
       saveDefaultPage.mockResolvedValue(undefined);
       mount(docWithFrontmatter("title: Hi\npage:\n  size: a5", p("text")));
       openPageSetup(view);
-      const { settings, makeDefault } = request();
+      const opened = request();
 
-      makeDefault({ ...settings, orientation: "landscape" });
+      opened.makeDefault(
+        { ...opened.settings, orientation: "landscape" },
+        baseOf(opened),
+      );
       await flushPromises();
 
       expect(saveDefaultPage).toHaveBeenCalledWith(
@@ -271,9 +291,9 @@ describe("command.pageSetup", () => {
       mount(docWithFrontmatter("title: Hi\npage:\n  size: a5", p("text")));
       activeTabId.value = "first";
       openPageSetup(view);
-      const { settings, makeDefault } = request();
+      const opened = request();
 
-      makeDefault(settings);
+      opened.makeDefault(opened.settings, baseOf(opened));
       // another tab is shown while the default is saved
       activeTabId.value = "second";
       await flushPromises();
@@ -296,9 +316,9 @@ describe("command.pageSetup", () => {
         ),
       );
       openPageSetup(view);
-      const { settings, makeDefault } = request();
+      const opened = request();
 
-      makeDefault(settings);
+      opened.makeDefault(opened.settings, baseOf(opened));
       await flushPromises();
 
       const [saved] = saveDefaultPage.mock.calls[0];
@@ -308,6 +328,26 @@ describe("command.pageSetup", () => {
       expect(frontmatter()).toBe('page:\n  footer: {center: "{page}"}');
     });
 
+    it("keeps what was edited as text, as one undo step", async () => {
+      saveDefaultPage.mockResolvedValue(undefined);
+      mount(docWithFrontmatter("title: Hi\npage:\n  size: a5", p("text")));
+      openPageSetup(view);
+      const { makeDefault, readText } = request();
+      const text = "title: Bye\npage:\n  size: a5\n";
+      const read = readText(text);
+      if ("error" in read) throw new Error(read.error);
+
+      makeDefault(read.settings, {
+        frontmatter: text,
+        settings: read.settings,
+      });
+      await flushPromises();
+
+      expect(frontmatter()).toBe("title: Bye");
+      undo(view.state, view.dispatch);
+      expect(frontmatter()).toBe("title: Hi\npage:\n  size: a5");
+    });
+
     it("tells when the default can't be saved, and keeps the document", async () => {
       saveDefaultPage.mockRejectedValue(
         new Error("blank.json holds no settings"),
@@ -315,7 +355,8 @@ describe("command.pageSetup", () => {
       mount(docWithFrontmatter("page:\n  size: a5", p("text")));
       openPageSetup(view);
 
-      request().makeDefault(DEFAULT_PAGE);
+      const opened = request();
+      opened.makeDefault(DEFAULT_PAGE, baseOf(opened));
       await flushPromises();
 
       expect(frontmatter()).toBe("page:\n  size: a5");

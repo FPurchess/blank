@@ -189,6 +189,11 @@ body {
   border-radius: var(--r-dialog);
   box-shadow: 0 24px 64px var(--popover-shadow);
 
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
   .dialog-head {
     padding: var(--s3) var(--s5);
     border-bottom: 1px solid var(--line);
@@ -242,6 +247,12 @@ body {
 
   input {
     margin-bottom: 6px;
+  }
+
+  textarea {
+    height: auto;
+    padding: 6px var(--s2);
+    resize: vertical;
   }
 
   p {
@@ -354,11 +365,6 @@ body {
 .dialog.page-setup {
   width: min(620px, calc(100% - 32px));
 
-  // the rules below set a display, which would show what is hidden
-  [hidden] {
-    display: none !important;
-  }
-
   .dialog-body {
     padding: 0;
   }
@@ -412,17 +418,24 @@ body {
     }
   }
 
+  // the four margins on one line
+  .custom[data-fields="margins"] {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  // H1 to H6, as wide as the draft's toggles
+  [data-row="newPageBefore"] .options button {
+    min-width: 32px;
+  }
+
   .note {
     margin: var(--s3) 0 0;
     font-size: var(--ui-small);
   }
 
   textarea {
-    height: auto;
     min-height: 12em;
-    padding: 6px 8px;
     font-family: monospace;
-    resize: vertical;
   }
 
   // the picture of the page on the desk, hidden where the window is narrow

@@ -141,7 +141,6 @@ describe("pageSetup dialog", () => {
     expect(dialog()!.querySelector(".note")?.textContent?.trim()).toBe(
       "Kept in this document. Headers and footers are set on the pages.",
     );
-    expect(dialog()!.querySelector(".hint")).toBeNull();
   });
 
   it("keeps only the checked option of a row in the tab order", async () => {
@@ -228,7 +227,7 @@ describe("pageSetup dialog", () => {
       expect(dialog()).not.toBeNull();
     });
 
-    it("steps through the papers with ←→", async () => {
+    it("steps through the papers with ←→, stopping at the ends", async () => {
       await openDialog();
 
       await keydown("ArrowRight");
@@ -236,6 +235,19 @@ describe("pageSetup dialog", () => {
       await keydown("ArrowLeft");
       await keydown("ArrowLeft");
       expect(paperText()).toBe("A4 (your region)");
+    });
+
+    it("keeps the focus on the list when the arrows reach Custom…", async () => {
+      await openDialog();
+
+      for (let step = 0; step < 6; step++) await keydown("ArrowRight");
+      await nextTick();
+
+      expect(paperText()).toBe("Custom…");
+      expect(fields("paper").hidden).toBe(false);
+      expect(document.activeElement).toBe(paper());
+      await keydown("ArrowLeft");
+      expect(paperText()).toBe("Legal");
     });
   });
 
@@ -307,7 +319,7 @@ describe("pageSetup dialog", () => {
     await choosePaper("custom");
     await type("paper-width", "wide");
 
-    expect(errors().hidden).toBe(false);
+    expect(errors().getAttribute("aria-live")).toBe("polite");
     expect(errorTexts()).toEqual([
       "Enter the width and height, e.g. 170 and 240.",
     ]);
@@ -316,7 +328,9 @@ describe("pageSetup dialog", () => {
     expect(request.apply).not.toHaveBeenCalled();
 
     await type("paper-width", "170");
-    expect(errors().hidden).toBe(true);
+    // the live region stays, empty
+    expect(errors().hidden).toBe(false);
+    expect(errorTexts()).toEqual([]);
     expect(button("Apply").disabled).toBe(false);
   });
 
@@ -336,6 +350,40 @@ describe("pageSetup dialog", () => {
     );
     // the margins are fine
     expect(input("margins-top").hasAttribute("aria-invalid")).toBe(false);
+  });
+
+  it("links what is wrong with the margins to their row while a preset is chosen", async () => {
+    await openDialog();
+    await choosePaper("custom");
+    await type("paper-width", "90");
+    await type("paper-height", "90");
+    await click(option("margins", "Wide"));
+
+    expect(errorTexts()).toEqual(["The margins leave no room for the text."]);
+    expect(row("margins").getAttribute("aria-invalid")).toBe("true");
+    expect(row("margins").getAttribute("aria-describedby")).toBe(
+      "page-setup-error-margins",
+    );
+
+    // the custom margins it opened with (2.5 cm) leave room, and the fields
+    // describe the margins from then on
+    await click(option("margins", "Custom…"));
+    expect(errorTexts()).toEqual([]);
+    expect(row("margins").hasAttribute("aria-describedby")).toBe(false);
+    await type("margins-left", "7");
+    expect(input("margins-top").getAttribute("aria-invalid")).toBe("true");
+    expect(row("margins").hasAttribute("aria-invalid")).toBe(false);
+  });
+
+  it("leaves Shift+↑↓ to a field, to select in it", async () => {
+    await openDialog();
+    await click(option("margins", "Custom…"));
+    input("margins-top").focus();
+
+    const shifted = await keydown("ArrowDown", { shiftKey: true });
+
+    expect(shifted.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(input("margins-top"));
   });
 
   it("says when the paper is too small for the text", async () => {
@@ -473,11 +521,68 @@ describe("pageSetup dialog", () => {
     await choosePaper("a5");
     await click(button("Make this my default"));
 
-    expect(request.makeDefault).toHaveBeenCalledWith({
-      ...DEFAULT_PAGE,
-      size: "a5",
-    });
+    expect(request.makeDefault).toHaveBeenCalledWith(
+      { ...DEFAULT_PAGE, size: "a5" },
+      opened(request),
+    );
     expect(dialog()).toBeNull();
+  });
+
+  it("makes the default from an edited text, which it hands on", async () => {
+    const request = await openDialog({ frontmatter: "title: Hi" });
+    await click(button("Edit as text"));
+    await typeText("title: Bye");
+    await click(button("Edit as options"));
+
+    await click(button("Make this my default"));
+
+    expect(request.makeDefault).toHaveBeenCalledWith(DEFAULT_PAGE, {
+      frontmatter: "title: Bye",
+      settings: DEFAULT_PAGE,
+    });
+  });
+
+  describe("on frontmatter it can't read", () => {
+    const unreadable = () =>
+      openDialog({
+        frontmatter: "title: [oops",
+        readText: vi.fn((text: string) =>
+          text.includes("[oops")
+            ? { error: "Flow sequence isn't closed" }
+            : { settings: DEFAULT_PAGE, warnings: [] },
+        ),
+      });
+
+    it("offers only to fix it as text", async () => {
+      const request = await unreadable();
+
+      expect(errorTexts()).toEqual([
+        "The properties at the top of the file can't be read. Fix them with Edit as text.",
+      ]);
+      expect(button("Apply").disabled).toBe(true);
+      expect(button("Make this my default").disabled).toBe(true);
+      expect(button("Edit as text").disabled).toBe(false);
+      expect(button("Edit as text").getAttribute("aria-describedby")).toBe(
+        "page-setup-error-properties",
+      );
+      await submit();
+      expect(request.apply).not.toHaveBeenCalled();
+      expect(dialog()).not.toBeNull();
+    });
+
+    it("applies again once the text is fixed", async () => {
+      const request = await unreadable();
+      await click(button("Edit as text"));
+      await typeText("title: fixed");
+      await click(button("Edit as options"));
+
+      expect(errorTexts()).toEqual([]);
+      await submit();
+      expect(request.apply).toHaveBeenCalledWith(DEFAULT_PAGE, {
+        frontmatter: "title: fixed",
+        settings: DEFAULT_PAGE,
+      });
+    });
   });
 
   it("shows what of the document's page setup can't be used, as sentences", async () => {
@@ -597,7 +702,7 @@ describe("pageSetup dialog", () => {
       );
 
       await typeText("title: Hi");
-      expect(errors().hidden).toBe(true);
+      expect(errorTexts()).toEqual([]);
       expect(textarea().hasAttribute("aria-invalid")).toBe(false);
     });
 

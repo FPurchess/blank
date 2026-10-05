@@ -38,17 +38,17 @@ Click the paper in the bar at the bottom (e.g. _A4_), press `Mod` `Alt` `U`, or 
 
 Pick the paper from its list, and click the orientation and margins you want. The picture beside them follows every change, so you see your page before you apply it, and **Apply** puts it on your document.
 
-For a size or margins of your own, choose **Custom…** and type them in the fields that open below. The paper is in millimetres, or in inches where Letter paper is used, and the margins in centimetres or inches. You can also write the unit, like `25mm` or `1in`. Type a width larger than the height, and the page turns to landscape by itself. If something can't work, say margins that leave no room for your text, the dialog tells you right below and waits until it's fixed.
+For a size or margins of your own, choose **Custom…** and type them in the fields that open below. The paper is in millimeters, or in inches where Letter paper is used, and the margins in centimeters or inches. You can also write the unit, like `25mm` or `1in`. Type a width larger than the height, and the page turns to landscape by itself. If something can't work, say margins that leave no room for your text, the dialog tells you right below and waits until it's fixed.
 
-**Edit as text** shows the [properties at the top of the file](./files#frontmatter), with your choices written in, for what the dialog has no setting for. **Edit as options** brings you back, with what you typed. **Make this my default** keeps the setup for every [new document](#defaults).
+**Edit as text** shows the [properties at the top of the file](./files#frontmatter) with your choices written in, for anything the dialog has no setting for. **Edit as options** brings you back, with what you typed. **Make this my default** keeps the setup for [new documents and every document without its own](#defaults).
 
 Changed your mind? `Mod` `Z` undoes the whole page setup at once.
 
 It all works from the keyboard too:
 
 - `↑` `↓` move between the settings and fields.
-- `←` `→` change a setting, also the paper. `Home` and `End` jump to its first or last choice.
-- `Space` turns a heading on or off, or opens the paper's list, like `Alt` `↓`.
+- `←` `→` change a setting, also the paper. `Home` and `End` jump to a setting's first or last choice.
+- `Space` turns a heading on or off. On the paper, `Space`, `Enter` or `Alt` `↓` open its list.
 - `Enter` applies, and `Esc` leaves everything as it was.
 
 ## Page numbers, headers and footers {#headers-and-footers}
@@ -114,7 +114,7 @@ page:
 
 You can write these yourself too. `new-page-before` lists the heading levels that start a new page. `header` and `footer` have a `left`, `center` and `right` of one line each, in which `{page}` is the page number, `{pages}` the number of pages, `{title}` and `{author}` come from the properties, `{chapter}` is the chapter of the page, `{date}` the date of the export and `{file}` the name of the file; write <code v-pre>{{</code> for a brace of your own. `first-page` is `plain` for none on the first page, or its own `header` and `footer`, and `even-pages` has the `header` and `footer` of even pages. `number-style` is `1`, `i` or `I`, and `start-number: 0` numbers the pages from 0, e.g. to leave the title page uncounted. `size` is `a3`, `a4`, `a5`, `b5`, `letter`, `legal`, `auto` for the paper of your region, or a size like `170mm x 240mm`. `margins` is one length for all four sides, or `top`, `right`, `bottom` and `left` on their own lines. Lengths are written with their unit: `mm`, `cm`, `in` or `pt`.
 
-The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 landscape_, and a click on it opens the page setup. **Edit as text** in the dialog shows all properties of the file, to change the ones the dialog has no settings for.
+The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 landscape_, and a click on it opens the page setup.
 
 If a setting can't be used, say a paper size Blank doesn't know, the export uses your default for it and tells you so.
 

@@ -25,7 +25,6 @@ import { describePaper } from "../layout/describe";
 import { type Layout, layoutOf } from "../layout/resolve";
 import type { Orientation } from "../layout/settings";
 import { thumbnailSvg } from "../layout/thumbnail";
-import type { Chosen } from "./optionGroupModel";
 import { paperUnit } from "../layout/units";
 import {
   closeDialog,
@@ -39,11 +38,16 @@ import MenuButton from "./components/MenuButton.vue";
 import OptionGroup from "./components/OptionGroup.vue";
 import SettingRow from "./components/SettingRow.vue";
 import LengthFields from "./LengthFields.vue";
+import type { Chosen } from "./optionGroupModel";
 import {
+  appliesOnEnter,
   MARGIN_FIELDS,
   PAPER_FIELDS,
+  problemId,
+  problemsOf,
   sentence,
   stopAfter,
+  steppedPaper,
   stopsIn,
 } from "./pageSetupModel";
 
@@ -101,33 +105,48 @@ const asText = shallowRef(false);
 const text = shallowRef("");
 // what is wrong with the text, once it was read
 const textError = shallowRef("");
+// the frontmatter the rows are written onto can't be read, so they can't be
+// applied until it's fixed as text
+const unreadable = computed(
+  () =>
+    base.value.frontmatter !== null &&
+    "error" in props.request.readText(base.value.frontmatter),
+);
 // what is wrong, by the part it is wrong in, each a sentence on its own line
-const errors = computed<[string, string][]>(() => {
-  if (asText.value) return textError.value ? [["text", textError.value]] : [];
-  return "errors" in result.value ? Object.entries(result.value.errors) : [];
-});
-// the id of the error of a part, which its fields are described by
-const errorId = (part: string) =>
-  errors.value.some(([name]) => name === part)
-    ? `page-setup-error-${part}`
-    : undefined;
-const blocked = computed(() => !asText.value && chosen.value === null);
+const problems = computed(() =>
+  problemsOf({
+    asText: asText.value,
+    textError: textError.value,
+    unreadable: unreadable.value,
+    errors: "errors" in result.value ? result.value.errors : {},
+  }),
+);
+// the id of what is wrong with a part, which its controls are described by
+const errorId = (part: string) => problemId(problems.value, part);
+// the rows hold something that can't be used
+const wrong = computed(() => !asText.value && chosen.value === null);
+// nothing to apply or make the default: the rows, or what they're written
+// onto, can't be used
+const blocked = computed(
+  () => wrong.value || (!asText.value && unreadable.value),
+);
 
 const settings = useTemplateRef<HTMLElement>("settings");
 const textarea = useTemplateRef<HTMLTextAreaElement>("textarea");
 const focusFirst = () => stopsIn(settings.value!)[0]?.focus();
 onMounted(focusFirst);
 
-const choosePaper = async (value: PageChoices["paper"]) => {
+// a paper chosen: a custom size starts from the paper chosen so far, and
+// from the list, its first field takes the focus
+const choosePaper = async (value: PageChoices["paper"], fromList = false) => {
   if (value === "custom" && choices.paper !== "custom" && layout.value) {
-    // start from the paper chosen so far
     Object.assign(
       choices,
       sizeChoices(layout.value.paper, choices.orientation, unit),
     );
   }
   choices.paper = value;
-  if (value === "custom") {
+  if (value === "custom" && fromList) {
     await nextTick();
     settings.value?.querySelector<HTMLInputElement>(".custom input")?.focus();
   }
@@ -139,7 +158,7 @@ const paperItems = (): MenuItem[] =>
     label: option.label,
     radio: true,
     checked: option.value === choices.paper,
-    run: () => void choosePaper(option.value),
+    run: () => void choosePaper(option.value, true),
   }));
 
 // a custom size turns with the orientation, and the orientation follows a
@@ -161,10 +180,10 @@ const setSide = (key: keyof PageChoices["sides"], value: string) => {
 };
 
 // ↑↓ move between the rows and the visible fields before the paper's list
-// sees them, which opens on ↓; Alt+↓ is left to it
+// sees them, which opens on ↓; Alt+↓ is left to it, and Shift+↑↓ to a field
 const onArrows = (event: KeyboardEvent) => {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   const next = stopAfter(
     stopsIn(settings.value!),
     document.activeElement,
@@ -178,22 +197,21 @@ const onArrows = (event: KeyboardEvent) => {
 };
 
 // Enter on an option applies, instead of pressing it, while on the paper's
-// list it opens it; ←→ choose the paper, as they change the other rows
+// list it opens it; ←→ step through the papers on the list, stopping at its
+// ends
 const onKeydown = (event: KeyboardEvent) => {
-  const target = event.target;
-  if (!(target instanceof HTMLButtonElement)) return;
-  const list = target.getAttribute("aria-haspopup") === "menu";
-  if (event.key === "Enter" && !list) {
+  const target = event.target as HTMLElement;
+  if (event.key === "Enter" && appliesOnEnter(target)) {
     event.preventDefault();
-    target.form!.requestSubmit();
+    (target as HTMLButtonElement).form!.requestSubmit();
   } else if (
-    list &&
+    target === paper.value?.$el &&
     (event.key === "ArrowLeft" || event.key === "ArrowRight")
   ) {
     event.preventDefault();
-    const index = PAPER_OPTIONS.findIndex((o) => o.value === choices.paper);
-    const next = PAPER_OPTIONS[index + (event.key === "ArrowRight" ? 1 : -1)];
-    if (next) void choosePaper(next.value);
+    const by = event.key === "ArrowRight" ? 1 : -1;
+    const next = steppedPaper(PAPER_OPTIONS, choices.paper, by);
+    if (next) void choosePaper(next);
   }
 };
 
@@ -227,7 +245,7 @@ const switchMode = async () => {
 
 const makeDefault = () => {
   const settings = chosen.value;
-  if (settings) close(() => props.request.makeDefault(settings));
+  if (settings) close(() => props.request.makeDefault(settings, base.value));
 };
 
 const submit = () => {
@@ -238,7 +256,9 @@ const submit = () => {
     return;
   }
   const settings = chosen.value;
-  if (settings) close(() => props.request.apply(settings, base.value));
+  if (settings && !blocked.value) {
+    close(() => props.request.apply(settings, base.value));
+  }
 };
 </script>
 
@@ -258,7 +278,7 @@ const submit = () => {
           class="warning"
           :hidden="warnings.length === 0"
         >
-          <p v-for="warning in warnings" :key="warning">
+          <p v-for="(warning, index) in warnings" :key="index">
             {{ sentence(warning) }}
           </p>
         </div>
@@ -297,12 +317,22 @@ const submit = () => {
             :options="ORIENTATION_OPTIONS"
             @update:model-value="turn"
           />
+          <!-- what is wrong with the margins describes their fields, or the
+          row while a preset leaves no room on a small custom paper -->
           <OptionGroup
             id="page-setup-margins"
             v-model="choices.margins"
             name="margins"
             label="Margins"
             :options="MARGIN_OPTIONS"
+            :aria-invalid="
+              choices.margins !== 'custom' && errorId('margins')
+                ? true
+                : undefined
+            "
+            :aria-describedby="
+              choices.margins !== 'custom' ? errorId('margins') : undefined
+            "
           />
           <LengthFields
             name="margins"
@@ -336,14 +366,10 @@ const submit = () => {
             @input="textError = ''"
           />
         </div>
-        <div
-          id="page-setup-errors"
-          class="error"
-          aria-live="polite"
-          :hidden="errors.length === 0"
-        >
+        <!-- always there, so screen readers announce what comes into it -->
+        <div id="page-setup-errors" class="error" aria-live="polite">
           <p
-            v-for="[part, message] in errors"
+            v-for="[part, message] in problems"
             :id="`page-setup-error-${part}`"
             :key="part"
           >
@@ -361,7 +387,12 @@ const submit = () => {
       </figure>
     </div>
     <template #secondary>
-      <button type="button" :disabled="blocked" @click="switchMode">
+      <button
+        type="button"
+        :disabled="wrong"
+        :aria-describedby="errorId('properties')"
+        @click="switchMode"
+      >
         {{ asText ? "Edit as options" : "Edit as text" }}
       </button>
     </template>
