@@ -3,6 +3,7 @@ import {
   exists,
   mkdir,
   readTextFile,
+  rename,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
@@ -14,6 +15,7 @@ import {
   getKeyBinding,
   isRecord,
   saveDefaultPage,
+  saveSettings,
 } from "./config";
 import { allMargins, DEFAULT_PAGE } from "./layout/settings";
 import { mockTauriPath } from "./test/tauri";
@@ -479,7 +481,11 @@ describe("config", () => {
 
       expect(mkdir).toHaveBeenCalledWith("/config", { recursive: true });
       const [file, written] = vi.mocked(writeTextFile).mock.calls[0];
-      expect(file).toBe("/config/blank.json");
+      expect(file).toBe("/config/blank.json.tmp");
+      expect(rename).toHaveBeenCalledWith(
+        "/config/blank.json.tmp",
+        "/config/blank.json",
+      );
       expect(JSON.parse(written as string)).toEqual({
         keymap: { undo: "Mod-u" },
         layout: {
@@ -512,8 +518,233 @@ describe("config", () => {
 
         await expect(saveDefaultPage(page, "cm")).rejects.toThrow();
         expect(writeTextFile).not.toHaveBeenCalled();
+        // the page setup reports it itself
+        expect(sendNotification).not.toHaveBeenCalled();
       },
     );
+
+    it("leaves out a default page", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ layout: { page: { size: "a5" } } }),
+      );
+
+      await saveDefaultPage(DEFAULT_PAGE, "cm");
+
+      const [, written] = vi.mocked(writeTextFile).mock.calls[0];
+      expect(JSON.parse(written as string)).toEqual({});
+      expect(config.value.layout.page).toEqual(DEFAULT_PAGE);
+    });
+  });
+
+  describe("saveSettings", () => {
+    // what blank.json holds, as the mocked file system reads and writes it
+    let file: string | null;
+    const written = () => JSON.parse(file!);
+
+    beforeEach(async () => {
+      file = null;
+      vi.mocked(exists).mockImplementation(async () => file !== null);
+      vi.mocked(readTextFile).mockImplementation(async () => file!);
+      let pending = "";
+      vi.mocked(writeTextFile).mockImplementation(async (_path, content) => {
+        pending = content as string;
+      });
+      vi.mocked(rename).mockImplementation(async () => {
+        file = pending;
+      });
+      await bootConfig();
+    });
+
+    it("sets a setting and applies it at once", async () => {
+      expect(
+        await saveSettings([{ path: ["autocorrect", "dashes"], value: false }]),
+      ).toBe(true);
+
+      expect(written()).toEqual({ autocorrect: { dashes: false } });
+      expect(config.value.autocorrect.dashes).toBe(false);
+    });
+
+    it("keeps the other settings, also those it doesn't know", async () => {
+      file = JSON.stringify({ editor: { indentSize: 2 }, mine: [1] });
+
+      await saveSettings([
+        { path: ["spellcheck", "ignoreUppercase"], value: false },
+      ]);
+
+      expect(written()).toEqual({
+        editor: { indentSize: 2 },
+        mine: [1],
+        spellcheck: { ignoreUppercase: false },
+      });
+    });
+
+    it("leaves out a default and the sections left empty", async () => {
+      file = JSON.stringify({ autocorrect: { dashes: false }, editor: {} });
+
+      await saveSettings([{ path: ["autocorrect", "dashes"], value: true }]);
+
+      expect(written()).toEqual({ editor: {} });
+      expect(config.value.autocorrect.dashes).toBe(true);
+    });
+
+    it("removes a setting without a value", async () => {
+      file = JSON.stringify({ keymap: { "file.save": "Mod-b", undo: "F2" } });
+
+      await saveSettings([{ path: ["keymap", "file.save"] }]);
+
+      expect(written()).toEqual({ keymap: { undo: "F2" } });
+      expect(getKeyBinding(CommandIdentifier.FILE_SAVE)).toBe("Mod-s");
+    });
+
+    it("leaves out a default key however it's written", async () => {
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+
+      await saveSettings([
+        { path: ["keymap", "tab.next"], value: "Mod-Tab" },
+        { path: ["keymap", "file.save"], value: "Shift-Mod-S" },
+      ]);
+
+      // Ctrl-Tab is Mod-Tab on Linux, but Shift-Mod-S isn't Mod-s
+      expect(written()).toEqual({ keymap: { "file.save": "Shift-Mod-S" } });
+    });
+
+    it("keeps a removed shortcut, which isn't the default", async () => {
+      await saveSettings([{ path: ["keymap", "file.save"], value: "" }]);
+
+      expect(written()).toEqual({ keymap: { "file.save": "" } });
+      expect(getKeyBinding(CommandIdentifier.FILE_SAVE)).toBe("");
+    });
+
+    it("builds changes on what the file holds", async () => {
+      file = JSON.stringify({ autocorrect: { replace: { de: { a: "b" } } } });
+
+      await saveSettings((settings) => [
+        {
+          path: ["autocorrect", "replace", "de"],
+          value: {
+            // @ts-expect-error -- the test knows the file
+            ...settings.autocorrect.replace.de,
+            c: "d",
+          },
+        },
+      ]);
+
+      expect(written().autocorrect.replace.de).toEqual({ a: "b", c: "d" });
+    });
+
+    it("removes a scope of replacements left empty", async () => {
+      file = JSON.stringify({ autocorrect: { replace: { de: { a: "b" } } } });
+
+      await saveSettings([
+        { path: ["autocorrect", "replace", "de"], value: {} },
+      ]);
+
+      expect(written()).toEqual({});
+    });
+
+    it.each([["not json"], ["[1]"], ["3"]])(
+      "leaves a file alone that holds no settings: %s",
+      async (content) => {
+        file = content;
+
+        expect(
+          await saveSettings([{ path: ["editor", "indentSize"], value: 2 }]),
+        ).toBe(false);
+
+        expect(writeTextFile).not.toHaveBeenCalled();
+        expect(sendNotification).toHaveBeenCalledOnce();
+        expect(config.value.editor.indentSize).toBe(4);
+      },
+    );
+
+    it("reports a failed write", async () => {
+      vi.mocked(rename).mockRejectedValue(new Error("disk full"));
+
+      expect(
+        await saveSettings([{ path: ["editor", "indentSize"], value: 2 }]),
+      ).toBe(false);
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining("disk full"),
+      );
+      expect(config.value.editor.indentSize).toBe(4);
+    });
+
+    it("writes one change after the other", async () => {
+      const first = saveSettings([
+        { path: ["autocorrect", "dashes"], value: false },
+      ]);
+      const second = saveSettings([
+        { path: ["autocorrect", "arrows"], value: false },
+      ]);
+
+      await Promise.all([first, second]);
+
+      expect(written()).toEqual({
+        autocorrect: { dashes: false, arrows: false },
+      });
+    });
+
+    it("keeps the sections that didn't change", async () => {
+      const { keymap, layout, editor } = config.value;
+
+      await saveSettings([{ path: ["autocorrect", "dashes"], value: false }]);
+
+      expect(config.value.keymap).toBe(keymap);
+      expect(config.value.layout).toBe(layout);
+      expect(config.value.editor).toBe(editor);
+    });
+
+    it("ignores a path through __proto__", async () => {
+      await saveSettings([{ path: ["__proto__", "polluted"], value: true }]);
+
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+  });
+
+  describe("focusMode.hideAfter", () => {
+    it.each([0, 10, 60])("reads %s seconds", async (seconds) => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ focusMode: { hideAfter: seconds } }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.focusMode.hideAfter).toBe(seconds);
+      expect(sendNotification).not.toHaveBeenCalled();
+    });
+
+    it.each([[61], [2.5], ["3"], [-1]])(
+      "ignores %s with a notification",
+      async (seconds) => {
+        vi.mocked(exists).mockResolvedValue(true);
+        vi.mocked(readTextFile).mockResolvedValue(
+          JSON.stringify({ focusMode: { hideAfter: seconds } }),
+        );
+
+        await bootConfig();
+
+        expect(config.value.focusMode.hideAfter).toBe(3);
+        expect(sendNotification).toHaveBeenCalledWith(
+          expect.stringContaining("focusMode.hideAfter"),
+        );
+      },
+    );
+
+    it("ignores a section that isn't one", async () => {
+      vi.mocked(exists).mockResolvedValue(true);
+      vi.mocked(readTextFile).mockResolvedValue(
+        JSON.stringify({ focusMode: 3 }),
+      );
+
+      await bootConfig();
+
+      expect(config.value.focusMode.hideAfter).toBe(3);
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining("focusMode"),
+      );
+    });
   });
 
   it("binds language.choose to Mod-Alt-l by default", async () => {

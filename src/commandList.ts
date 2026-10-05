@@ -333,6 +333,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "focus",
     aliases: ["formatting", "focus", "keyboard"],
   },
+  [C.VIEW_FOCUS_MODE]: {
+    group: "View",
+    label: "Focus mode",
+    icon: "focus-mode",
+    aliases: ["distraction", "free", "zen", "hide", "writing"],
+  },
   [C.VIEW_PAGES]: {
     group: "View",
     label: "Pages / page ends",
@@ -374,6 +380,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Word count",
     icon: "info",
     aliases: ["statistics", "characters", "reading", "time"],
+  },
+  [C.APP_SETTINGS]: {
+    group: "Tools",
+    label: "Settings…",
+    icon: "settings",
+    aliases: ["preferences", "options", "configuration", "blank.json"],
   },
 };
 

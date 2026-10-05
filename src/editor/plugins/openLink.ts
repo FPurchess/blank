@@ -6,6 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { errorMessage } from "../../errors";
+import { isMac } from "../../platform";
 import { PAGE_PRESS, type PagePointerEvent } from "../pagePointer";
 
 // set on the editor while the modifier to open links is held
@@ -15,7 +16,7 @@ const FOLLOW_CLASS = "follow-links";
 const OPENABLE_URL = /^(https?|mailto|tel):/i;
 
 // macOS uses Cmd+Click, since Ctrl+Click is the secondary (right) click there
-export const isMac = () => /Mac|iP(hone|[oa]d)/.test(navigator.platform);
+export { isMac };
 
 export const hasOpenModifier = (event: {
   metaKey: boolean;

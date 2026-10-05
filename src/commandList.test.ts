@@ -18,6 +18,7 @@ const DIALOGS = new Set([
   CommandIdentifier.INSERT_IMAGE,
   CommandIdentifier.FORMAT_LINK,
   CommandIdentifier.PAGE_SETUP,
+  CommandIdentifier.APP_SETTINGS,
 ]);
 
 // words that keep their capital inside a label

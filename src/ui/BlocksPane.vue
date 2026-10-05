@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { keydownHandler } from "prosemirror-keymap";
 import {
   computed,
   nextTick,
@@ -17,7 +16,7 @@ import {
   refreshBlocks,
 } from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
-import { commandBinding } from "../editor/keyBindings";
+import { commandKey } from "../editor/keyBindings";
 import { listenOnWindow } from "../scope";
 import {
   blockChoices,
@@ -118,17 +117,10 @@ const insert = (id: string, gap?: number) => {
 };
 
 // the shortcut that opened the pane closes it while it has the focus
-const binding = commandBinding(CommandIdentifier.INSERT_BLOCK);
-const closeKey = keydownHandler(
-  binding
-    ? {
-        [binding]: () => {
-          hideBlocksPane(editor.view);
-          return true;
-        },
-      }
-    : {},
-);
+const closeKey = commandKey(CommandIdentifier.INSERT_BLOCK, () => {
+  hideBlocksPane(editor.view);
+  return true;
+});
 
 const onKeyDown = (event: KeyboardEvent) => {
   if (closeKey(editor.view, event)) {

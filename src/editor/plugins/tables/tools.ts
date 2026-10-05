@@ -1,4 +1,3 @@
-import { keydownHandler } from "prosemirror-keymap";
 import type { Node } from "prosemirror-model";
 import {
   Plugin,
@@ -23,7 +22,7 @@ import {
 } from "../../commands/table/actions";
 import { setCaption } from "../../commands/table/format";
 import { CommandIdentifier } from "../../../config";
-import { commandBinding } from "../../keyBindings";
+import { commandKey } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 import { boxOnCaretPage, followLayout } from "../followLayout";
 import { tableAround } from "./util";
@@ -147,16 +146,12 @@ export const tableTools = () => {
   const actions = tableActions((view) => setTools(view, { caption: true }));
   // the format changes told so far: once each is enough per session
   const told = new Set<string>();
-  const binding = commandBinding(CommandIdentifier.INSERT_TABLE);
-  const toggle = keydownHandler(
-    binding
-      ? {
-          [binding]: (state, dispatch) => {
-            dispatch?.(state.tr.setMeta(toolsKey, { keys: false }));
-            return true;
-          },
-        }
-      : {},
+  const toggle = commandKey(
+    CommandIdentifier.INSERT_TABLE,
+    (state, dispatch) => {
+      dispatch?.(state.tr.setMeta(toolsKey, { keys: false }));
+      return true;
+    },
   );
 
   /**

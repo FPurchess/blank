@@ -40,6 +40,7 @@ import {
 } from "./keymap";
 import * as tabs from "../tabs";
 import { withKeymap } from "../../test/keymap";
+import { createState, createTestView, pressKey } from "../../test/editor";
 
 describe("plugin.keymap", () => {
   const defaultConfig = config.value;
@@ -415,6 +416,60 @@ describe("plugin.keymap", () => {
       "strong",
     );
   });
+  describe("follows a changed keymap at once", () => {
+    const boldOn = (combo: string) => () => {
+      config.value = {
+        ...defaultConfig,
+        keymap: {
+          ...defaultConfig.keymap,
+          [CommandIdentifier.FORMAT_BOLD]: combo,
+        },
+      };
+    };
+    const isBold = (view: { state: { doc: Node } }) =>
+      view.state.doc.firstChild?.firstChild?.marks[0]?.type.name === "strong";
+
+    it("in the shown tab, without a new plugin", () => {
+      const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
+      boldOn("Mod-d")();
+
+      expect(press("Mod-b")).toBe(false);
+      expect(press("Mod-d")).toBe(true);
+      expect(isBold(view)).toBe(true);
+    });
+
+    it("in a tab shown later and in a new one, which share the plugin", () => {
+      const plugin = keymap();
+      const background = createTestView(
+        createState(doc(p("text")), { cursor: [1, 5], plugins: [plugin] }),
+      );
+      boldOn("F2")();
+      const created = createTestView(
+        createState(doc(p("text")), { cursor: [1, 5], plugins: [plugin] }),
+      );
+
+      for (const view of [background, created]) {
+        expect(pressKey(view, plugin, "Mod-b")).toBe(false);
+        expect(pressKey(view, plugin, "F2")).toBe(true);
+        expect(isBold(view)).toBe(true);
+      }
+    });
+
+    it("in the keys that work outside the editor", () => {
+      const run = vi.spyOn(tabs, "openNewTab").mockResolvedValue(undefined);
+      const keys = commandKeys(WINDOW_COMMANDS);
+      const { view } = withKeymap(doc(p("text")));
+      config.value = {
+        ...defaultConfig,
+        keymap: { ...defaultConfig.keymap, [CommandIdentifier.FILE_NEW]: "F9" },
+      };
+
+      expect(keys(view, keyEvent("Mod-n"))).toBe(false);
+      expect(keys(view, keyEvent("F9"))).toBe(true);
+      expect(run).toHaveBeenCalledOnce();
+    });
+  });
+
   it("doesn't notify for the default keymap", () => {
     keymap();
 

@@ -38,6 +38,7 @@ const checker = (): Spellchecker => ({
   check: vi.fn(async () => {}),
   suggest: vi.fn(async () => []),
   userEntry: () => undefined,
+  words: () => [],
   addWord: vi.fn(async () => {}),
   removeWord: vi.fn(async () => {}),
   replaceWord: vi.fn(async () => {}),
