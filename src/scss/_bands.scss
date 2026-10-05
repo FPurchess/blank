@@ -72,6 +72,7 @@
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
+  // HINT_HEIGHT in src/ui/pageViewModel.ts
   height: 24px;
   padding: 0 var(--s2);
   border: 1px dashed var(--line-strong);
@@ -105,20 +106,31 @@ body.band-editing.without-engine #editor {
   transition: opacity var(--fade-out) var(--ease);
 }
 
-// the header or footer being edited
+// the header or footer being edited: over the page view, which clips its
+// slots and strip, so they never cover the bars around it; it takes no
+// clicks itself, so the pages around them close it
 #band-editor {
+  position: fixed;
+  z-index: 8;
+  overflow: clip;
+  pointer-events: none;
   font-size: var(--ui);
   line-height: 20px;
   color: var(--color);
 
+  > .band-card,
+  > .band-slots {
+    position: absolute;
+    pointer-events: auto;
+  }
+
   // without pages, at the window's edge, the strip with the slots in it
   &.at-edge {
     @include popover;
-    position: fixed;
-    z-index: 8;
     left: max(8px, calc(50% - 360px));
     width: min(720px, calc(100vw - 16px));
     overflow: hidden;
+    pointer-events: auto;
 
     &.header {
       top: $top-bar-height + 8px;
@@ -145,8 +157,6 @@ body.band-editing.without-engine #editor {
 // the strip, beside the band on the popover surface
 .band-card {
   @include popover;
-  position: fixed;
-  z-index: 8;
   box-sizing: border-box;
   overflow: hidden;
 
@@ -262,8 +272,6 @@ body.band-editing.without-engine #editor {
 
 // the three slots over the band, where it prints
 .band-slots {
-  position: fixed;
-  z-index: 8;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;

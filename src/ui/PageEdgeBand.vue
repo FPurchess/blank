@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { pageEngine } from "../engine/engine";
 import type { FrameLayout } from "../engine/frames";
 import type { Band } from "../layout/bands";
-import { pageBandParts } from "../layout/placeholders";
-import { pageFields, pageLayout, pageLayoutState } from "../state";
+import { bandSlots } from "../layout/placeholders";
+import { pageLayoutState } from "../state";
 import BandSlots from "./BandSlots.vue";
-import { shownAtRest } from "./bandStripsModel";
+import { addsBand, pageBands } from "./bandStripsModel";
 import BandTarget from "./BandTarget.vue";
 import {
   edgeHintPlace,
   firstHeaderPlace,
   lastFooterPlace,
 } from "./pageViewModel";
+import { styleOf } from "./rect";
 
 // The first page's header right above its text in "page ends", or the last
 // page's footer right below it: the marks where the pages end show the
@@ -32,9 +32,7 @@ const place = computed(() =>
 );
 // where the hint to add one goes while the document has none
 const hint = computed(() =>
-  shownAtRest(pageLayout.value.settings, props.band) === undefined
-    ? edgeHintPlace(props.layout, props.band)
-    : null,
+  addsBand(props.band) ? edgeHintPlace(props.layout, props.band) : null,
 );
 // whether it shows here at all, which changes far less than where
 const here = computed(() => place.value !== null);
@@ -48,17 +46,9 @@ const version = computed(
 // its slots, read from the engine only where it shows, and again only when
 // the page, its version, the page setup or the placeholders' values change
 const slots = computed(() => {
-  const engine = pageEngine;
   void version.value;
-  if (!engine || !here.value) return [];
-  const parts = pageBandParts(
-    pageLayout.value.layout,
-    page.value,
-    pages.value,
-    pageFields.value,
-    engine.bands(page.value),
-  );
-  return header.value ? parts.slice(0, 3) : parts.slice(3, 6);
+  const parts = here.value ? pageBands(page.value, pages.value) : null;
+  return parts ? bandSlots(parts, props.band) : [];
 });
 const shown = computed(() => slots.value.some((parts) => parts.length));
 </script>
@@ -70,12 +60,7 @@ const shown = computed(() => slots.value.some((parts) => parts.length));
     :band="band"
     :page="page"
     :adding="false"
-    :style="{
-      left: `${place.left}px`,
-      top: `${place.top}px`,
-      width: `${place.width}px`,
-      height: `${place.height}px`,
-    }"
+    :style="styleOf(place)"
   >
     <BandSlots :slots="slots" />
   </BandTarget>
@@ -85,11 +70,6 @@ const shown = computed(() => slots.value.some((parts) => parts.length));
     :band="band"
     :page="page"
     :adding="true"
-    :style="{
-      left: `${hint.left}px`,
-      top: `${hint.top}px`,
-      width: `${hint.width}px`,
-      height: `${hint.height}px`,
-    }"
+    :style="styleOf(hint)"
   />
 </template>

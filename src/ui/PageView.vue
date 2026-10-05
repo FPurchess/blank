@@ -443,9 +443,9 @@ const pointerAt = (event: MouseEvent): PagePointer => {
   };
 };
 
-// the headers and footers on the pages, which open their strips
-const BANDS =
-  ".page-band, .page-end .band, .page-first-header, .page-last-footer";
+// the headers and footers on the pages and the hints to add one, which
+// open them (BandTarget.vue), and the sheets' margins
+const BANDS = ".page-band, .band-target, .band-hint";
 
 let anchor: number | null = null;
 // the last point of a drag, in the window, for scrolling at the edges
@@ -467,8 +467,8 @@ const onMouseDown = (event: MouseEvent) => {
     return;
   }
   if (event.button !== 0) return;
-  // a header or footer opens on a click or double click, and a press on it leaves
-  // the selection where it is
+  // a header or footer opens on a click or double click, and a press on it
+  // leaves the selection where it is
   if ((event.target as Element).closest?.(BANDS)) return;
   // a press in the selected text may move it, see onPointerDown
   if (move.mouseDown(event, false)) return;

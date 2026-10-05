@@ -177,6 +177,7 @@ describe("the controls' colors", () => {
       // paper
       const accent = color("accent", paper);
       expect(contrast(color("accent-ink", accent), accent)).toBeGreaterThan(3);
+      expect(contrast(accent, paper)).toBeGreaterThanOrEqual(3);
       // a choice not chosen, and a placeholder's chip: ink on the sunken
       // ground
       const sunken = color("hover", paper);

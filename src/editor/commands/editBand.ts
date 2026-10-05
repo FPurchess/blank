@@ -11,7 +11,11 @@ import {
 } from "../../layout/bands";
 import { changesOf } from "../../layout/choices";
 import { localeUnit, systemLocale } from "../../layout/paper";
-import { emptyBandNotice, pageBandParts } from "../../layout/placeholders";
+import {
+  bandSlots,
+  emptyBandNotice,
+  pageBandParts,
+} from "../../layout/placeholders";
 import { resolveLayout } from "../../layout/resolve";
 import { bandSettings, SLOTS } from "../../layout/settings";
 import { expand } from "../../layout/tokens";
@@ -49,7 +53,7 @@ const chapterOf = (doc: EditorView["state"]["doc"]) => {
  * something written comes out empty on the page it was edited on, because
  * its placeholders have nothing to put in there yet, e.g. {author} with no
  * author set (see emptyBandNotice)
- * @param page the page, counted from 1, or null for the first
+ * @param edited the page, counted from 1, or null for the first
  */
 const tellIfEmpty = (view: EditorView, band: Band, edited: number | null) => {
   const { doc } = view.state;
@@ -76,7 +80,7 @@ const tellIfEmpty = (view: EditorView, band: Band, edited: number | null) => {
   const slots = pageBandParts(layout, page - 1, pages, fields, shown);
   const notice = emptyBandNotice(
     band,
-    band === "header" ? slots.slice(0, 3) : slots.slice(3, 6),
+    bandSlots(slots, band),
     chapter !== null,
   );
   if (notice) announce(notice);
@@ -103,6 +107,7 @@ export const openBand = (view: EditorView, band: Band, page?: number) => {
   bandEditor.value = {
     band,
     page: edited,
+    center: page === undefined,
     bands: bandSettings(settings),
     apply: (bands) => {
       const chosen = { ...settings, ...bands };

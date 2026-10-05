@@ -14,8 +14,8 @@ import {
   sameHover,
   sizeAt,
   spanOf,
-  styleOf,
 } from "./tableHandlesModel";
+import { styleOf } from "./rect";
 import { dropAt } from "./dragModel";
 
 const start = { x: 0, y: 0 };

@@ -41,7 +41,7 @@ export interface Strip {
   pages: Pages;
 }
 
-// what a band is called on its strip and its edge
+// what a band is called on its strip and on the pages
 export const NAMES: Record<Band, string> = {
   header: "Header",
   footer: "Footer",

@@ -63,9 +63,8 @@ Click a place and type, or put something in with the strip's buttons:
 - **Title** and **Author** put in the document's title and author, which follow the [properties](./files#frontmatter). Without a title, the first heading is the title.
 - **Chapter** puts in the chapter a page belongs to: the first heading 1 on the page, or else the last one before it. A running head, as in books.
 - **Date** puts in the date of the export, and **File** the name of the file.
-- **Remove** clears the header or footer from every page.
 
-In a place, they show by their name, like **Page** or **Title**, and your pages show what they stand for.
+In a place, they show by their name, like **Page** or **Title**, and your pages show what they stand for. **Remove** clears the header or footer from every page.
 
 <img class="shot" src="/screenshots/header-footer.gif" alt="Pointing below the page shows + Footer; a click opens the footer, where Page number puts the number in the center. Mod Alt H opens the header, where Chapter goes on the left, Page 1 of 2 on the right, and First page None leaves the title page plain" />
 
@@ -138,4 +137,4 @@ Word can do a few things Blank's page setup can't hold. When a document has them
 - pictures, tables or several lines in a header or footer, of which Blank keeps the text on one line,
 - page numbers in letters (a, b, c), which become 1, 2, 3.
 
-Headers and footers keep their text, not its formatting: bold, colours or another font are left out, as in the rest of the document.
+Headers and footers keep their text, not its formatting: bold, colors or another font are left out, as in the rest of the document.

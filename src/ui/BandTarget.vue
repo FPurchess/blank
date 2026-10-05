@@ -2,10 +2,9 @@
 import { computed } from "vue";
 
 import { NAMES } from "../bandStrip";
-import { editBand } from "../editor/commands/editBand";
 import { useEditor } from "../editor/handle";
 import type { Band } from "../layout/bands";
-import { bandCommand } from "./bandStripsModel";
+import { bandCommand, openBandOn } from "./bandStripsModel";
 import { tipAttrs } from "./tooltipModel";
 
 // A header or footer where the pages show it, which a click opens for
@@ -29,8 +28,7 @@ const name = computed(() =>
 const tip = computed(() =>
   tipAttrs({ name: name.value, command: bandCommand(props.band) }),
 );
-const open = () =>
-  editor.run(editBand(props.band, props.page + 1), { focus: false });
+const open = () => openBandOn(editor, props.band, props.page);
 </script>
 
 <template>

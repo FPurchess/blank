@@ -988,8 +988,6 @@ body.without-engine {
   left: 0;
 }
 
-// where a page of "page ends" ends: its footer, then the next page's header
-// (MARK_HEIGHT in src/engine/frames.ts)
 // the room between a header or footer and the page's text in "page ends",
 // BAND_GAP in src/engine/frames.ts
 $band-gap: 32px;
@@ -997,7 +995,7 @@ $band-gap: 32px;
 $page-end-height: 64px + 2 * $band-gap;
 
 // the three slots of a header or footer shown beside the pages: left,
-// centre and right
+// center and right
 %page-band-text {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -1348,8 +1346,8 @@ body.controls-faded.outline-desk {
 // while a header or footer is edited, the outline dims with the pages and
 // takes no clicks
 body.band-editing #outline {
-  opacity: 0.3;
-  transition: opacity 150ms;
+  opacity: 0.35;
+  transition: opacity var(--fade-out) var(--ease);
 
   * {
     pointer-events: none;

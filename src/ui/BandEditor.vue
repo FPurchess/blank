@@ -37,12 +37,7 @@ import {
   engineMissing,
   pageScrollRequest,
 } from "../state";
-import {
-  bandInWindow,
-  centerRequest,
-  fitsInView,
-  INSERTS,
-} from "./bandStripsModel";
+import { bandInWindow, centerRequest, INSERTS } from "./bandStripsModel";
 import IconButton from "./components/IconButton.vue";
 import IconGlyph from "./components/IconGlyph.vue";
 import MenuButton from "./components/MenuButton.vue";
@@ -52,7 +47,8 @@ import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
 import { useResizeObserver } from "./composables/useResizeObserver";
 import { useWindowWidth } from "./composables/useWindowWidth";
-import { slotRowPlace, stripPlace } from "./pageViewModel";
+import { bandEditorPlace, fitsInView } from "./pageViewModel";
+import { styleOf } from "./rect";
 import SlotField from "./SlotField.vue";
 import { tipAttrs } from "./tooltipModel";
 
@@ -104,27 +100,24 @@ const windowWidth = useWindowWidth();
 const cardHeight = shallowRef(0);
 const measureCard = () => (cardHeight.value = card.value?.offsetHeight ?? 0);
 useResizeObserver(() => [card.value], measureCard);
-const px = (value: number) => `${value}px`;
-const cardStyle = computed(() => {
-  if (!place.value) return undefined;
-  const { left, top, width } = stripPlace({
-    ...place.value,
-    which: band,
-    height: cardHeight.value,
-    windowWidth: windowWidth.value,
-  });
-  return { left: px(left), top: px(top), width: px(width) };
-});
+// the slots and the strip beside them, inside the view that clips them
+const placed = computed(
+  () =>
+    place.value &&
+    bandEditorPlace(place.value, band, cardHeight.value, windowWidth.value),
+);
+const rootStyle = computed(() => styleOf(placed.value?.view ?? null));
+const cardStyle = computed(() => styleOf(placed.value?.card ?? null));
+// at least as high as the band, and higher where a slot's text wraps
 const slotsStyle = computed(() => {
-  if (!place.value) return undefined;
-  const { left, top, width, height, fontSize } = slotRowPlace(place.value.band);
-  return {
-    left: px(left),
-    top: px(top),
-    width: px(width),
-    minHeight: px(height),
-    fontSize: px(fontSize),
-  };
+  const slots = placed.value?.slots;
+  return (
+    slots && {
+      ...styleOf({ ...slots, height: undefined }),
+      minHeight: `${slots.height}px`,
+      fontSize: `${slots.fontSize}px`,
+    }
+  );
 });
 
 // keeps what the slot editors hold for the pages they show
@@ -133,28 +126,35 @@ const save = () => {
   strip.value = withSlots(strip.value, { left, center, right });
 };
 
-// closes the strip and keeps what it holds. The state goes first, so the
-// editor that `apply` focuses keeps the focus; Vue removes the strip's DOM on
-// the next tick.
-const done = () => {
-  if (closed) return true;
+// closes the strip and keeps `kept`. The state goes first, so the editor
+// that `apply` focuses keeps the focus; Vue removes the strip's DOM on the
+// next tick.
+const finish = (kept: Strip) => {
+  if (closed) return;
   closed = true;
-  save();
   bandEditor.value = null;
-  props.request.apply(stripSettings(strip.value, props.request.bands));
+  props.request.apply(stripSettings(kept, props.request.bands));
+};
+
+// closes the strip and keeps what was typed
+const done = () => {
+  if (!closed) {
+    save();
+    finish(strip.value);
+  }
   return true;
 };
 
 // Tab goes around the controls and slots in the order they show: the slots
-// first below a header's strip, last above a footer's; the controls a
-// roving row keeps out of the tab order are left out
+// first where they're above the strip, e.g. for a header, and last where
+// they're below it; the controls a roving row keeps out of the tab order
+// are left out
 const move = (by: number) => {
   const controls = shownIn(card.value!, "button:not([tabindex='-1'])");
   const slots = shownIn(slotRow.value!, ".ProseMirror");
-  const all =
-    band === "header" && place.value
-      ? [...slots, ...controls]
-      : [...controls, ...slots];
+  const all = placed.value?.slotsFirst
+    ? [...slots, ...controls]
+    : [...controls, ...slots];
   const index = all.indexOf(document.activeElement as HTMLElement);
   all[(index + by + all.length) % all.length].focus();
   return true;
@@ -200,12 +200,7 @@ const mirror = async () => {
 };
 
 const remove = () => {
-  // the slots shown too, which done keeps
-  editors.forEach(({ view }) =>
-    view.dispatch(view.state.tr.delete(0, view.state.doc.content.size)),
-  );
-  strip.value = removeBand(strip.value);
-  done();
+  finish(removeBand(strip.value));
   announce(`${NAMES[band]} removed`);
 };
 
@@ -240,14 +235,15 @@ onMounted(() => {
   measureCard();
   announce(`Editing the ${band}`);
   focusSlot();
-  // the band to the middle of the view, unless it shows with its strip
-  // already: a click on it opened it, and the second of a double click
-  // then lands in its slots
+  // the keys open it on the page in view, which scrolls its band to the
+  // middle unless it shows with its strip already; a click opened it where
+  // it is, and the second of a double click lands in its slots
   const shown = place.value;
   if (
+    props.request.center &&
     page !== null &&
     shown &&
-    !fitsInView(shown.band, band, shown.view, cardHeight.value + 8)
+    !fitsInView(shown.band, band, shown.view, cardHeight.value)
   )
     pageScrollRequest.value = centerRequest(page - 1, band);
 });
@@ -260,6 +256,7 @@ onMounted(() => {
     id="band-editor"
     ref="root"
     :class="[band, { 'at-edge': !place }]"
+    :style="rootStyle"
     role="group"
     :aria-label="NAMES[band]"
     @keydown="onKeydown"
@@ -297,7 +294,6 @@ onMounted(() => {
             class="chip"
             icon="plus"
             label="Page number"
-            tip="Page number, in a style you choose"
             :items="pageNumberItems"
             :refocus="focusSlot"
             @mousedown.prevent
@@ -337,11 +333,6 @@ onMounted(() => {
             v-if="strip.evenPages"
             type="button"
             class="quiet"
-            v-bind="
-              tipAttrs({
-                name: `Give the even pages the odd pages' ${band}, left and right swapped`,
-              })
-            "
             @mousedown.prevent
             @click="mirror"
           >

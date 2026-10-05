@@ -65,11 +65,10 @@ describe("ui", () => {
     expect(document.getElementById("ui-app")).toBeNull();
   });
 
-  it("puts the bars in the app, and no header or footer being edited", () => {
+  it("puts the parts of the UI in the app, the top area before the bar", () => {
     const app = [...document.querySelectorAll("#ui-app > [id]")].map(
       (e) => e.id,
     );
-    expect(app).not.toContain("band-editor");
     expect(app).toContain("table-handles");
     expect(app.indexOf("ui-top")).toBeLessThan(app.indexOf("ui-bottom"));
   });

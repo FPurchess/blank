@@ -3,6 +3,7 @@ import { createApp, h, nextTick } from "vue";
 
 import { EditorKey } from "../editor/handle";
 import { formatShortcut } from "../editor/keyBindings";
+import { bandEditor } from "../state";
 import type { Band } from "../layout/bands";
 import { createTestHandle } from "../test/editor";
 import BandTarget from "./BandTarget.vue";
@@ -14,7 +15,7 @@ const mount = async (
   const element = document.createElement("div");
   document.body.append(element);
   const handle = createTestHandle();
-  const run = vi.spyOn(handle, "run").mockReturnValue(true);
+  const run = vi.spyOn(handle, "run");
   const app = createApp(() =>
     h(BandTarget, props, shown ? { default: () => shown } : undefined),
   );
@@ -66,5 +67,12 @@ describe("BandTarget", () => {
     expect(target.run).toHaveBeenCalledWith(expect.any(Function), {
       focus: false,
     });
+    // where it is, counted from 1
+    expect(bandEditor.value).toMatchObject({
+      band: "footer",
+      page: 3,
+      center: false,
+    });
+    bandEditor.value = null;
   });
 });

@@ -66,6 +66,9 @@ export interface BandEditorRequest {
   // the page whose band it edits, counted from 1; null without pages, e.g.
   // without the layout engine
   page: number | null;
+  // whether to bring the band into view, as the keys open the page in view,
+  // while a click opens it where it is
+  center: boolean;
   // the headers, footers and page numbers as they are
   bands: BandSettings;
   // keeps what was edited, as one undo step

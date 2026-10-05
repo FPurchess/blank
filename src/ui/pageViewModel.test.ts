@@ -4,15 +4,18 @@ import type { FrameLayout } from "../engine/frames";
 import { testLayout } from "../test/layout";
 import {
   bandBox,
+  bandEditorPlace,
   bandPlace,
   caretLine,
   edgeHintPlace,
+  fitsInView,
   movesPages,
   endMark,
   firstHeaderPlace,
   lastFooterPlace,
   pageLabel,
   sheetSlots,
+  sheetTargets,
   slotRowPlace,
   stripPlace,
 } from "./pageViewModel";
@@ -320,6 +323,17 @@ describe("stripPlace", () => {
         windowWidth: 600,
       }),
     ).toMatchObject({ left: 8, width: 584 });
+    // a sheet reaching past the window's right edge
+    expect(
+      stripPlace({
+        sheet: { ...sheet, left: 300 },
+        band: band(200),
+        which: "header",
+        view,
+        height: 150,
+        windowWidth: 1000,
+      }),
+    ).toMatchObject({ left: 192, width: 800 });
     // no room on either side: within the view, its bottom 8 px above the
     // view's
     expect(
@@ -366,5 +380,65 @@ describe("edgeHintPlace", () => {
 
   it("leaves it to the sheets in pages", () => {
     expect(edgeHintPlace(pages, "footer")).toBeNull();
+  });
+});
+
+describe("sheetTargets", () => {
+  it("puts the bands in their margins", () => {
+    const targets = sheetTargets(setup, 2);
+    expect(targets.header).toEqual(bandBox(setup, "header", 2));
+    const footer = bandBox(setup, "footer", 2);
+    // from where the bottom margin starts, 520 points down
+    expect(targets.footer).toMatchObject({
+      left: footer.left,
+      width: footer.width,
+    });
+    expect(targets.footer.top).toBeCloseTo(footer.top - 1040);
+  });
+});
+
+describe("fitsInView and bandEditorPlace", () => {
+  const sheet = { left: 100, top: 0, width: 800, height: 1100 };
+  const view = { left: 20, top: 80, width: 1000, height: 720 };
+  const band = (top: number) => ({
+    left: 180,
+    top,
+    width: 640,
+    height: 15,
+    size: 12,
+  });
+
+  it("needs the band in the view, and room for the strip on its side", () => {
+    expect(fitsInView(band(500), "footer", view, 200)).toBe(true);
+    expect(fitsInView(band(250), "footer", view, 200)).toBe(false);
+    expect(fitsInView(band(500), "header", view, 200)).toBe(true);
+    expect(fitsInView(band(650), "header", view, 200)).toBe(false);
+    expect(fitsInView(band(60), "header", view, 0)).toBe(false);
+    expect(fitsInView(band(790), "footer", view, 0)).toBe(false);
+  });
+
+  it("places the slots and the strip from the view's corner", () => {
+    const placed = bandEditorPlace(
+      { sheet, band: band(600), view },
+      "footer",
+      150,
+      1200,
+    );
+    expect(placed.view).toBe(view);
+    expect(placed.slots).toMatchObject({ left: 154, top: 513.5, height: 28 });
+    expect(placed.card).toEqual({ left: 80, top: 355.5, width: 800 });
+    expect(placed.slotsFirst).toBe(false);
+  });
+
+  it("puts the slots first where the strip is below them", () => {
+    expect(
+      bandEditorPlace({ sheet, band: band(200), view }, "header", 150, 1200)
+        .slotsFirst,
+    ).toBe(true);
+    // a footer whose strip has no room above it
+    expect(
+      bandEditorPlace({ sheet, band: band(120), view }, "footer", 150, 1200)
+        .slotsFirst,
+    ).toBe(true);
   });
 });

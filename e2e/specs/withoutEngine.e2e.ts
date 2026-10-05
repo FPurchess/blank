@@ -23,7 +23,7 @@ import {
 const NO_PDF = "The PDF export needs the page layout, which couldn't start.";
 
 // the start of the last line, which typing keeps in view, clear of the
-// header and the bars at the edges
+// bars at the edges
 const lastLine = () =>
   browser.execute(() => {
     const lines = document.querySelectorAll("#editor > p");

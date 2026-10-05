@@ -22,10 +22,25 @@ import { flushPromises } from "../test/async";
 import { bandInWindow, centerRequest } from "./bandStripsModel";
 import { bootApp } from "./mount";
 
-// where the band is in the window; none without pages
+// where the band is in the window, which follows the scrolling as
+// pageViewport does; none without pages
+const placed = await vi.hoisted(async () => {
+  const { shallowRef } = await import("vue");
+  return shallowRef<{
+    sheet: { left: number; top: number; width: number; height: number };
+    band: {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      size: number;
+    };
+    view: { left: number; top: number; width: number; height: number };
+  } | null>(null);
+});
 vi.mock("./bandStripsModel", async (original) => ({
   ...(await original<typeof import("./bandStripsModel")>()),
-  bandInWindow: vi.fn(() => null),
+  bandInWindow: vi.fn(() => placed.value),
   centerRequest: vi.fn(() => ({
     page: 1,
     x: 0,
@@ -79,14 +94,17 @@ const open = async ({
   band = "header",
   bands = {},
   page = null,
+  center = false,
 }: {
   band?: BandEditorRequest["band"];
   bands?: Partial<BandSettings>;
   page?: number | null;
+  center?: boolean;
 } = {}) => {
   const request: BandEditorRequest = {
     band,
     page,
+    center,
     bands: { ...bandSettings(DEFAULT_PAGE), ...bands },
     apply: vi.fn(),
   };
@@ -124,7 +142,7 @@ describe("the header or footer being edited", () => {
     contextMenu.value = null;
     announcement.value = null;
     pageScrollRequest.value = null;
-    vi.mocked(bandInWindow).mockReturnValue(null);
+    placed.value = null;
     dispose = bootApp(createTestHandle());
   });
 
@@ -137,15 +155,23 @@ describe("the header or footer being edited", () => {
 
   describe("on the page", () => {
     it("puts the slots over the band, and the strip above a footer", async () => {
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(700));
+      placed.value = shownAt(700);
       await open({ band: "footer", page: 2 });
 
       expect(bandInWindow).toHaveBeenCalledWith(1, "footer");
       expect(strip()!.classList).not.toContain("at-edge");
-      // the band grown to a control's height, 6 px wider on each side
+      // over the view, which clips the slots and the strip
+      expect(strip()!.style).toMatchObject({
+        left: "0px",
+        top: "80px",
+        width: "1000px",
+        height: "720px",
+      });
+      // the band grown to a control's height, 6 px wider on each side, from
+      // the view's corner
       expect(slots().style).toMatchObject({
         left: "174px",
-        top: "693.5px",
+        top: "613.5px",
         width: "652px",
         minHeight: "28px",
         fontSize: "12px",
@@ -153,27 +179,25 @@ describe("the header or footer being edited", () => {
       // as wide as the sheet, from its left edge; jsdom measures it 0 high
       expect(card().style).toMatchObject({
         left: "100px",
-        top: "685.5px",
+        top: "605.5px",
         width: "800px",
       });
     });
 
     it("puts the strip below a header", async () => {
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(200));
+      placed.value = shownAt(200);
       await open({ page: 1 });
-      expect(card().style.top).toBe("229.5px");
+      expect(card().style.top).toBe("149.5px");
     });
 
     it("follows the band when the view scrolls or the window changes", async () => {
-      const place = vi.mocked(bandInWindow);
-      place.mockReturnValue(shownAt(700));
+      placed.value = shownAt(700);
       await open({ band: "footer", page: 2 });
-      // a scroll publishes where the view is (pageViewport), which the place
-      // follows
-      place.mockReturnValue(shownAt(600));
-      bandEditor.value = { ...bandEditor.value! };
+      const shown = slots();
+      placed.value = shownAt(600);
       await settle();
-      expect(slots().style.top).toBe("593.5px");
+      expect(slots()).toBe(shown);
+      expect(shown.style.top).toBe("513.5px");
     });
 
     it("scrolls the band into the middle only when it doesn't show with its strip", async () => {
@@ -186,14 +210,19 @@ describe("the header or footer being edited", () => {
         },
         { flush: "sync" },
       );
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(700));
+      placed.value = shownAt(700);
+      await open({ band: "footer", page: 2, center: true });
+      expect(requests).toEqual([]);
+      await click(button("Done"));
+
+      // below the view, but opened by a click: where it is
+      placed.value = shownAt(900);
       await open({ band: "footer", page: 2 });
       expect(requests).toEqual([]);
       await click(button("Done"));
 
-      // below the view
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(900));
-      await open({ band: "footer", page: 2 });
+      // below the view, opened by the keys
+      await open({ band: "footer", page: 2, center: true });
       expect(centerRequest).toHaveBeenCalledWith(1, "footer");
       expect(requests).toEqual([expect.objectContaining({ page: 1, at: 300 })]);
       stop();
@@ -558,7 +587,7 @@ describe("the header or footer being edited", () => {
     });
 
     it("stays open for clicks on itself, its slots and its menu, submenus included", async () => {
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(700));
+      placed.value = shownAt(700);
       const request = await open({ band: "footer", page: 2 });
       // the context menu's levels, as src/ui/ContextMenu.vue renders them
       const menus = document.createElement("div");
@@ -604,7 +633,7 @@ describe("the header or footer being edited", () => {
 
     it("moves between the slots and controls with Tab, in the order they show", async () => {
       // above a footer, the strip comes first
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(700));
+      placed.value = shownAt(700);
       await open({ band: "footer", page: 2 });
       slot("right").focus();
       key(slot("right"), "Tab");
@@ -615,7 +644,7 @@ describe("the header or footer being edited", () => {
       await click(button("Done"));
 
       // below a header, the slots come first
-      vi.mocked(bandInWindow).mockReturnValue(shownAt(200));
+      placed.value = shownAt(200);
       await open({ page: 1 });
       slot("right").focus();
       key(slot("right"), "Tab");

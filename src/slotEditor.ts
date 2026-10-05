@@ -5,7 +5,7 @@ import { Fragment, type Node, Schema, Slice } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
-import { FIELD_NAMES } from "./layout/placeholders";
+import { FIELD_FULL_NAMES, FIELD_NAMES } from "./layout/placeholders";
 import { escape, type Field, segments } from "./layout/tokens";
 
 // The editor of one slot of a header or footer strip: a line of text with
@@ -36,18 +36,6 @@ export const slotSchema = new Schema({
   },
 });
 
-// what a chip is called for screen readers, a little longer than the name
-// it shows (FIELD_NAMES in src/layout/placeholders.ts), e.g. "Page number"
-const SPOKEN_NAMES: Record<Field, string> = {
-  page: "Page number",
-  pages: "Number of pages",
-  title: "Title",
-  author: "Author",
-  chapter: "Chapter",
-  date: "Date",
-  file: "File name",
-};
-
 /**
  * chip creates the chip of a placeholder in the slot editor: its name, as
  * the pages name a placeholder that comes out empty
@@ -58,7 +46,7 @@ export const chip = (field: Field) => {
   element.dataset.field = field;
   // a role that takes a name, which a plain span's aria-label isn't
   element.setAttribute("role", "img");
-  element.setAttribute("aria-label", SPOKEN_NAMES[field]);
+  element.setAttribute("aria-label", FIELD_FULL_NAMES[field]);
   element.textContent = FIELD_NAMES[field];
   return element;
 };

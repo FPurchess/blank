@@ -8,21 +8,26 @@ import {
   watch,
 } from "vue";
 
-import { editBand } from "../editor/commands/editBand";
 import { BLEED } from "../engine/frames";
 import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
 import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
-import { FIELD_NAMES, pageBandParts } from "../layout/placeholders";
-import { pageFields, pageLayout, pageLayoutState, path, theme } from "../state";
+import { FIELD_NAMES } from "../layout/placeholders";
+import { pageLayout, pageLayoutState, path, theme } from "../state";
 import BandSlots from "./BandSlots.vue";
-import { shownAtRest } from "./bandStripsModel";
+import { addsBand, openBandOn, pageBands } from "./bandStripsModel";
 import BandTarget from "./BandTarget.vue";
 import { layerOf } from "./pageLayer";
 import { shownMarks } from "./pageMarks";
 import { frameRenders, layerDisplay } from "./pageLayers";
-import { bandBox, endMark, selectedBoxes, sheetSlots } from "./pageViewModel";
+import {
+  endMark,
+  selectedBoxes,
+  sheetSlots,
+  sheetTargets,
+} from "./pageViewModel";
+import { styleOf } from "./rect";
 
 // One page of the page view: a canvas the engine's layout of the page is
 // painted into, and in "page ends" the mark where the page ends, unless it's
@@ -65,17 +70,16 @@ const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
 const selectedCanvas = useTemplateRef<HTMLCanvasElement>("selectedCanvas");
 const editor = useEditor();
 
-// a double click on a sheet's top or bottom margin opens its header or
-// footer, which takes the focus, as in Word; a single one there leaves the
-// text as it is
-const openBand = (band: Band) =>
-  editor.run(editBand(band, props.page + 1), { focus: false });
+// a double click anywhere on a sheet's top or bottom margin opens its
+// header or footer, which takes the focus, as in Word; a single one opens it
+// only on the band or the hint to add one (BandTarget.vue)
+const openBand = (band: Band) => openBandOn(editor, band, props.page);
 
-// whether the document has a header and a footer: where it has none, the
-// margins and marks offer to add one
+// whether the document has no header or footer, which the margins and marks
+// then offer to add
 const adding = computed(() => ({
-  header: shownAtRest(pageLayout.value.settings, "header") === undefined,
-  footer: shownAtRest(pageLayout.value.settings, "footer") === undefined,
+  header: addsBand("header"),
+  footer: addsBand("footer"),
 }));
 
 // the header and footer margins of a sheet, in pixels, 0 where the page
@@ -216,30 +220,16 @@ const marked = computed(() =>
 // page and of the next one, not their text; none after the last page, whose
 // footer PageEdgeBand.vue shows
 const pages = computed(() => pageLayoutState.value?.pages ?? 1);
-// what the six slots of a page's header and footer show, with the
-// placeholders that come out empty named (see src/layout/placeholders.ts)
-const bandsOf = (page: number) =>
-  pageBandParts(
-    pageLayout.value.layout,
-    page,
-    pages.value,
-    pageFields.value,
-    pageEngine!.bands(page),
-  );
 const mark = computed(() => {
-  const engine = pageEngine;
-  if (props.sheet || !engine || props.nextBandVersion < 0) return null;
+  if (props.sheet || props.nextBandVersion < 0) return null;
   void props.bandVersion;
   void props.nextBandVersion;
-  return endMark(
-    props.page,
-    bandsOf(props.page),
-    bandsOf(props.page + 1),
-    pageLayout.value.layout,
-  );
+  const bands = pageBands(props.page, pages.value);
+  const next = pageBands(props.page + 1, pages.value);
+  return bands && next
+    ? endMark(props.page, bands, next, pageLayout.value.layout)
+    : null;
 });
-// the slots of a sheet's header and footer whose placeholders come out
-// empty, named over the bands the engine painted
 // the page's size and margins, as text, which stays the same while typing
 // publishes a new layout
 const pageBox = computed(() => {
@@ -255,30 +245,19 @@ const setup = computed(() => {
     .map(Number);
   return { width, height, margins: { top, right, bottom, left } };
 });
+// the slots of a sheet's header and footer whose placeholders come out
+// empty, named over the bands the engine painted
 const named = computed(() => {
-  if (!props.sheet || !pageEngine || !setup.value) return [];
+  if (!props.sheet || !setup.value) return [];
   void props.bandVersion;
-  return sheetSlots(bandsOf(props.page), setup.value, props.scale);
+  const bands = pageBands(props.page, pages.value);
+  return bands ? sheetSlots(bands, setup.value, props.scale) : [];
 });
 // where a sheet's header and footer are in their margins, which a click
 // opens, outlined under the pointer
-const px = (value: number) => `${value}px`;
-const targets = computed(() => {
-  if (!props.sheet || !setup.value) return null;
-  const at = (band: Band, margin: number) => {
-    const box = bandBox(setup.value!, band, props.scale);
-    return {
-      left: px(box.left),
-      top: px(box.top - margin),
-      width: px(box.width),
-      height: px(box.height),
-    };
-  };
-  return {
-    header: at("header", 0),
-    footer: at("footer", props.height - marginBottom.value),
-  };
-});
+const targets = computed(() =>
+  props.sheet && setup.value ? sheetTargets(setup.value, props.scale) : null,
+);
 </script>
 
 <template>
@@ -323,7 +302,7 @@ const targets = computed(() => {
           band="header"
           :page="page"
           :adding="adding.header"
-          :style="adding.header ? undefined : targets?.header"
+          :style="adding.header ? undefined : styleOf(targets?.header ?? null)"
         />
       </div>
       <div
@@ -335,7 +314,7 @@ const targets = computed(() => {
           band="footer"
           :page="page"
           :adding="adding.footer"
-          :style="adding.footer ? undefined : targets?.footer"
+          :style="adding.footer ? undefined : styleOf(targets?.footer ?? null)"
         />
       </div>
     </template>

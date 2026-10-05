@@ -243,7 +243,7 @@ describe("page view", () => {
     expect(margin("header").querySelector(".band-hint")).not.toBeNull();
   });
 
-  it("opens the strip of a band double-clicked on a sheet or where a page ends", async () => {
+  it("opens the strip of a band double-clicked on a sheet, or clicked where a page ends", async () => {
     layOut();
     const editor = new EditorView(document.createElement("div"), {
       state: createState(node, { cursor: 3 }),
