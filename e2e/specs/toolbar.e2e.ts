@@ -112,21 +112,30 @@ describe("formatting toolbar", () => {
   });
 
   it("is where F6 goes after the tabs, and Alt-F10 goes from the tabs too", async () => {
+    // the toolbar remembers the button it had, so any of its buttons
+    const inToolbar = () =>
+      browser.waitUntil(
+        () =>
+          browser.execute(
+            () => !!document.activeElement?.closest("#format-toolbar"),
+          ),
+        { timeoutMsg: "the focus isn't in the toolbar" },
+      );
     await clickInto("#editor p");
     await browser.keys(Key.F6);
     await expect(activeTab()).toBeFocused();
     await browser.keys(Key.F6);
-    await expect(toolbarButton("undo")).toBeFocused();
+    await inToolbar();
     await browser.keys(Key.F6);
     await expect($("#editor")).toBeFocused();
     // the other way round
     await pressShift(Key.F6);
-    await expect(toolbarButton("undo")).toBeFocused();
+    await inToolbar();
     await browser.keys(Key.Escape);
     await browser.keys(Key.F6);
     await expect(activeTab()).toBeFocused();
     await browser.keys([Key.Alt, Key.F10]);
-    await expect(toolbarButton("undo")).toBeFocused();
+    await inToolbar();
     await browser.keys(Key.Escape);
     await expect($("#editor")).toBeFocused();
   });
