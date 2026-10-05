@@ -3,6 +3,7 @@ export { pastedLinks } from "./pastedLinks";
 export { default as autocomplete } from "./autocomplete";
 export { default as images } from "./images";
 export { contextMenuPlugin as contextMenu } from "./contextMenu";
+export { focusModeKeys } from "./focusMode";
 export { keymap } from "./keymap";
 export { languagePicker } from "./languagePicker";
 export { default as openLink } from "./openLink";

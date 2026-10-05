@@ -72,7 +72,8 @@ describe("settings", () => {
 
     await focusEditor();
     await type("a -- b ");
-    await expectEditorText("#editor p", "a -- b");
+    // autocorrect capitalizes the sentence, but leaves the dashes
+    await expectEditorText("#editor p", "A -- b");
     expect(blankJson().autocorrect).toEqual({ dashes: false });
 
     await openSettings("writing");
@@ -125,12 +126,16 @@ describe("settings", () => {
 
   it("adds a word to your dictionary, whose underline goes", async () => {
     await onlyNewTab();
-    // the system language may be another one
-    await pressMod(Key.Alt, "l");
-    await type("en");
-    await type(Key.Enter);
     await openSettings("spelling");
     await row("spellcheck").$("[role=switch]").click();
+    // the system language may be another one: English, from the menu
+    await $("#settings-language").click();
+    await $(
+      '//*[@id="context-menu"]//*[@role="menuitemradio"][.//*[text()="English"]]',
+    ).click();
+    await expect($("#settings-language")).toHaveText(
+      expect.stringContaining("English"),
+    );
     await closeSettings();
 
     await focusEditor();
@@ -150,7 +155,6 @@ describe("settings", () => {
       expect.stringContaining("blankword"),
     );
     await closeSettings();
-
     await browser.waitUntil(
       async () => (await $$("#editor .spelling-error").length) === 0,
       { timeoutMsg: "blankword is still underlined" },

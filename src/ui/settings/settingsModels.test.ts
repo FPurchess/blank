@@ -5,12 +5,19 @@ import { config } from "../../config";
 import type { Spellchecker } from "../../spellcheck/types";
 import { spellchecker } from "../../state";
 import { mockTauriPath, mockTextFiles } from "../../test/tauri";
+import { chunksOf } from "./aboutModel";
 import {
   dictionaryOf,
   dictionarySummary,
   validateWord,
 } from "./dictionaryModel";
-import { addMessage, entriesOf, scopes, validate } from "./replacementsModel";
+import {
+  addMessage,
+  entriesOf,
+  noneYet,
+  scopes,
+  validate,
+} from "./replacementsModel";
 import {
   autocorrectChange,
   filterEntries,
@@ -84,6 +91,11 @@ describe("replacements", () => {
     expect(validate("ab", "a b")).toBeUndefined();
   });
 
+  it("says a language has none yet", () => {
+    expect(noneYet("*")).toBe("None yet for all languages.");
+    expect(noneYet("de")).toBe("None yet for German.");
+  });
+
   it("says which replacement a new one replaces", () => {
     expect(addMessage("bg", "Blank")).toBe("bg now becomes Blank");
     expect(addMessage("bg", "Blank", "big")).toBe(
@@ -139,6 +151,7 @@ describe("dictionaryOf", () => {
     expect(dictionarySummary(dictionary.words.value.length, "en")).toBe(
       "2 words in English",
     );
+    expect(dictionarySummary(0, "de")).toBe("No words in German");
   });
 
   it("goes through the spell checker of its language, which saves", async () => {
@@ -183,5 +196,12 @@ describe("dictionaryOf", () => {
       "BLANK is already in your dictionary.",
     );
     expect(validateWord("Blank", ["BLANK"])).toBeUndefined();
+  });
+});
+
+describe("chunksOf", () => {
+  it("splits the notices into blocks of lines", () => {
+    expect(chunksOf("a\nb\nc\nd\ne", 2)).toEqual(["a\nb", "c\nd", "e"]);
+    expect(chunksOf("", 2)).toEqual([""]);
   });
 });

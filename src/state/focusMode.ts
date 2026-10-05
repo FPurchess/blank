@@ -7,7 +7,7 @@ import { announce } from "./messages";
 import { outlinePeek } from "./outline";
 import { tablePicker, wordCountCard } from "./popups";
 
-// Focus mode lets the controls fade while the user writes (src/ui/FocusMode.vue,
+// Focus mode lets the controls fade while the user writes (src/ui/focusModeModel.ts,
 // see .claude/rules/focus-mode.md). Blank always starts without it.
 
 // whether focus mode is on: the controls may fade
@@ -38,6 +38,17 @@ export const focusModeMessage = (seconds: number) =>
   seconds > 0
     ? `Focus mode: the controls fade when you type or after ${seconds} s; move the mouse to bring them back`
     : "Focus mode: the controls fade when you type; move the mouse to bring them back";
+
+/**
+ * leaveFocusMode turns focus mode off on Esc, unless something is open that
+ * Esc closes first
+ * @returns whether it did
+ */
+export const leaveFocusMode = () => {
+  if (!focusMode.value || controlsStay.value) return false;
+  setFocusMode(false);
+  return true;
+};
 
 /**
  * setFocusMode turns focus mode on or off; off brings the controls back

@@ -37,6 +37,12 @@ export const entriesOf = (config: Config, scope: string) =>
     .map(([typed, becomes]) => ({ key: typed, label: becomes }));
 
 /**
+ * noneYet says that `scope` has no replacements yet
+ */
+export const noneYet = (scope: string) =>
+  `None yet for ${scope === ALL_LANGUAGES ? "all languages" : languageName(scope)}.`;
+
+/**
  * validate returns what is wrong with a new replacement, or undefined
  */
 export const validate = (typed: string, becomes: string) => {

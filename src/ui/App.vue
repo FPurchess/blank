@@ -3,6 +3,8 @@ import {
   blocksPaneOpen,
   blockToolbar,
   contextMenu,
+  controlsFaded,
+  focusMode,
   imageDialog,
   linkDialog,
   pageSetup,
@@ -18,7 +20,6 @@ import BlocksPane from "./BlocksPane.vue";
 import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
-import FocusMode from "./FocusMode.vue";
 import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
@@ -33,7 +34,9 @@ import TocPopover from "./TocPopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
+import { useBodyClass } from "./composables/useBodyClass";
 import { useWindowCommands } from "./composables/useWindowCommands";
+import { watchFocusMode } from "./focusModeModel";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
 // part is keyed by what makes it the same: a dialog by its request, so each
@@ -41,6 +44,10 @@ import { useWindowCommands } from "./composables/useWindowCommands";
 
 // the window's commands work wherever the focus is, not only in the editor
 useWindowCommands();
+// focus mode: the classes that fade the controls, and when they fade
+useBodyClass("focus-mode", () => focusMode.value);
+useBodyClass("controls-faded", () => controlsFaded.value);
+watchFocusMode();
 </script>
 
 <template>
@@ -50,7 +57,6 @@ useWindowCommands();
   <BlockMarks />
   <TopArea />
   <BottomBar />
-  <FocusMode />
   <DocumentOutline />
   <BlocksPane v-if="blocksPaneOpen" />
   <TableHandles />

@@ -35,7 +35,6 @@
     border-right: 1px solid var(--line);
     background: var(--desk-color);
 
-
     [role="tab"] {
       display: flex;
       align-items: center;
@@ -411,6 +410,12 @@
   border: 1px solid var(--line);
   border-radius: var(--r-control);
   font: 12px / 18px monospace;
-  white-space: pre-wrap;
   background: var(--desk-color);
+
+  // the file breaks its own lines, at 80 characters
+  pre {
+    margin: 0;
+    font: inherit;
+    white-space: pre;
+  }
 }

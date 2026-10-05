@@ -13,6 +13,7 @@ import {
   blockTools,
   contextMenu,
   embeds,
+  focusModeKeys,
   forms,
   headings,
   images,
@@ -86,6 +87,8 @@ export const bootEditor = async () => {
         // before tableEditing, whose paste it wraps
         tableClipboard(),
         tableEditing(),
+        // Esc leaves focus mode when nothing before took it
+        focusModeKeys(),
       ],
     }),
   );

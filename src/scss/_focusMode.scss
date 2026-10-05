@@ -1,4 +1,4 @@
-// Focus mode (src/ui/FocusMode.vue): the controls fade out while the user
+// Focus mode (src/ui/focusModeModel.ts): the controls fade out while the user
 // writes and come back when the mouse moves. Only their opacity changes, so
 // the pages never move; panes keep their room. See
 // .claude/rules/focus-mode.md.

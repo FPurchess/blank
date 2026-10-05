@@ -11,6 +11,7 @@ import {
   addMessage,
   ALL_LANGUAGES,
   entriesOf,
+  noneYet,
   scopes,
   validate,
   withEntry,
@@ -85,7 +86,7 @@ const remove = (key: string) =>
     <EntryList
       id="settings-replacements-list"
       :entries="entries"
-      :empty="`None yet for ${choices.find((c) => c.value === scope)?.label}.`"
+      :empty="noneYet(scope)"
       filter-label="Filter your replacements"
       :remove-label="(entry) => `Remove the replacement of ${entry.key}`"
       @remove="remove"

@@ -7,11 +7,11 @@ import {
   controlsFaded,
   controlsStay,
   focusMode,
-  setFocusMode,
+  leaveFocusMode,
   tooltipsSuppressed,
 } from "../state";
 
-// When the controls fade in focus mode and come back (FocusMode.vue, see
+// When the controls fade in focus mode and come back (App.vue runs it, see
 // .claude/rules/focus-mode.md).
 
 // how far the pointer moves before the controls come back, in px: a nudged
@@ -71,17 +71,16 @@ export const watchFocusMode = () => {
     },
     { capture: true },
   );
-  // after everything else that takes Esc, which prevents it
+  // Esc outside the text, after everything else that takes it (in the text,
+  // the editor's focusModeKeys handles it)
   listenOnWindow("keydown", (event) => {
     if (
       event.key === "Escape" &&
-      focusMode.value &&
       !event.defaultPrevented &&
-      !controlsStay.value
-    ) {
+      !(event.target instanceof Element && event.target.closest("#editor")) &&
+      leaveFocusMode()
+    )
       event.preventDefault();
-      setFocusMode(false);
-    }
   });
   listenOnWindow("pointermove", (event) => {
     onChrome =

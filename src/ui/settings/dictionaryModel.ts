@@ -83,4 +83,4 @@ export const validateWord = (word: string, words: readonly string[]) => {
  * "12 words in English"
  */
 export const dictionarySummary = (words: number, tag: string) =>
-  `${count(words, "word")} in ${languageName(tag)}`;
+  `${words === 0 ? "No words" : count(words, "word")} in ${languageName(tag)}`;

@@ -21,7 +21,7 @@ const options = computed(() => hideAfterOptions(hideAfter.value));
 <template>
   <h3 class="settings-heading">Theme</h3>
   <ThemeCards />
-  <h3 class="settings-heading">Focus mode</h3>
+  <h3 class="settings-heading">Interface</h3>
   <OptionGroup
     id="settings-hide-after"
     v-model="hideAfter"

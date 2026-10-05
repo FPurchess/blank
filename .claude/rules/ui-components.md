@@ -76,7 +76,7 @@ All of the UI around the editor is Vue 3.5. `bootUI` (`src/ui.ts`) runs after `b
 | `components/IconGlyph.vue` | an icon of `src/icons.ts`, 16px or `size="large"` 20px |
 | `components/IconButton.vue` | a button that shows only an icon: its label for screen readers and the tooltip, a command's shortcut, `pressed`, `disabled` (aria-disabled), `focusable` |
 | `settings/SettingsDialog.vue` and the rest of `settings/` | the settings (`Mod-,`): the sections, an inner page in place of its section (`InnerPage.vue`), `SwitchRow.vue` (a setting row with a switch), `EntryList.vue` (a list with Remove and a filter), `ThemeCards.vue`; see `settings.md` |
-| `FocusMode.vue`, `FocusModeButton.vue` | focus mode, which renders nothing (its classes on the body and when the controls fade, `focusModeModel.ts`), and its button at the end of the status bar; see `focus-mode.md` |
+| `FocusModeButton.vue` | focus mode's button at the end of the status bar; see `focus-mode.md` |
 | `UiTooltip.vue` | the shared tooltip of controls, mounted once; what it shows and when in `tooltipModel.ts` (`tipAttrs`, `watchTips`), its timer in `hoverIntent.ts` |
 
 Add reusable components to `src/ui/components/` when a second place needs them, not before: `BaseDialog` and `TextField` came with the second dialog. A new part of the UI is a component in `src/ui/`, a line in `App.vue` (keyed by what makes it the same), and its logic in a `…Model.ts` next to it.

@@ -17,7 +17,7 @@ export const BAND_HEIGHT = 28;
 // on Notion (64 px below its bar).
 export const READING_LINE = 64;
 
-// The controls of the window, which fade in focus mode (src/ui/FocusMode.vue,
+// The controls of the window, which fade in focus mode (src/ui/focusModeModel.ts,
 // the chrome-fade mixin in src/scss/_focusMode.scss): the top area (the tab
 // row and the toolbar), the status bar, the outline, the blocks pane and the
 // table and block toolbars. While the pointer is on one, they don't fade.
