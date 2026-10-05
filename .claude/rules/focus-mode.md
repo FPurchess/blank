@@ -3,6 +3,7 @@ paths:
   - "src/ui/focusModeModel.ts"
   - "src/ui/FocusModeButton.vue"
   - "src/state/focusMode.ts"
+  - "src/editor/plugins/focusMode.ts"
   - "src/scss/_focusMode.scss"
   - "src/chrome.ts"
 ---
@@ -16,5 +17,5 @@ Focus mode (`view.focus`, `Mod-Shift-f`, and the last button of the status bar) 
 - **Back:** they come back when the pointer moves more than `POINTER_TRAVEL` (6px), when the focus moves into one of them (F6, Alt-F10), and when something opens that they stay for.
 - **Never:** they don't fade while the pointer is on one of them, or while `controlsStay` (`src/state/focusMode.ts`) holds: `uiTakesFocus` (dialogs and the header and footer strip, the context menu and the menus of menu buttons, a part of the window holding the focus), the language and table pickers, the outline's peek or the word count card. A new popup that isn't in `uiTakesFocus` goes there.
 - **While faded:** `body.controls-faded` hides the pointer over the pages, and `tooltipsSuppressed` hides the tooltips.
-- **Esc** leaves focus mode when nothing took it before (`defaultPrevented`) and nothing is open (`controlsStay`).
+- **Esc** leaves focus mode through `leaveFocusMode()` (`src/state/focusMode.ts`), unless something is open (`controlsStay`). ProseMirror takes every Esc in the editor (`captureKeyDown`), so the window never sees one free there: in the text, the editor plugin `focusModeKeys` (`src/editor/plugins/focusMode.ts`), the last of the plugins, handles it once no plugin before took it (a form, a picker). Outside the text, a window listener does, when nothing prevented it.
 - **Not stored:** focus mode itself isn't kept. The rest time is in blank.json, which Settings → Appearance writes.

@@ -9,7 +9,7 @@ Open **Settings** with `Mod` `,` and choose **Keyboard shortcuts**. Click the ke
 - A shortcut needs `Ctrl` or `Alt` (on macOS `Cmd`, `Ctrl` or `Option`) with a key, or is an F key on its own.
 - If another command already has the keys, Blank says which one. Press them again to move them to the new command; the other one is then left without a shortcut.
 - A changed shortcut has a reset button next to it, and **Reset all** brings back every default.
-- Some keys stay with what they do everywhere, and Blank says why when you press them: `Mod` `A`, `C`, `V` and `X`, `Mod` `Backspace` and `Delete`, `Ctrl` `Page Up` / `Page Down`, `Alt` `F4`, and on macOS `Option` with a letter or digit (it types a character) and the text keys `Ctrl` `A`, `E`, `H` and `D`.
+- Some keys stay with what they do everywhere, and Blank says why when you press them: `Mod` `A`, `C`, `V` and `X`, `Mod` `Backspace` and `Delete`, `Ctrl` `Page Up` / `Page Down`, `Alt` `F4` on Windows and Linux, and on macOS `Option` with a letter or digit (it types a character) and the text keys `Ctrl` `A`, `E`, `H` and `D`, `Option` `Backspace` and `Delete`, and `Ctrl` `Option` `Backspace`.
 
 The shortcuts are kept in [blank.json](./configuration#keyboard-shortcuts), which you can also edit by hand.
 

@@ -26,7 +26,7 @@ Map a command to a key under `keymap`. Keys are written like `Mod-Shift-s`, wher
 }
 ```
 
-The tab commands are named `tab.…`, e.g. `"tab.close": "Mod-w"`. `Ctrl` `Page Up` and `Ctrl` `Page Down` always go to the previous and next tab too, unless you give those keys to another command.
+The tab commands are named `tab.…`, e.g. `"tab.close": "Mod-w"`. `Ctrl` `Page Up` and `Ctrl` `Page Down` always go to the previous and next tab too, unless you give those keys to another command here; the settings don't allow that.
 
 An empty key, `""`, takes a command's key away. A code block has none to start with: give it one here if you make code blocks often, e.g. `"blocktype.code_block": "Mod-Alt-k"`.
 

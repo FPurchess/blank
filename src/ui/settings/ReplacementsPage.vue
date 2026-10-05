@@ -97,7 +97,7 @@ const remove = (key: string) =>
     </EntryList>
     <template #footnote>
       Blank replaces what you typed once the word is complete: when you type a
-      space, punctuation, Tab or Enter after it. Yours win over Blank's own.
+      space, punctuation, Tab or Enter after it. Yours come before Blank's own replacements.
     </template>
   </InnerPage>
 </template>

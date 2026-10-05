@@ -40,7 +40,7 @@ The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and ever
 - `canonicalBinding` and `sameBinding` (`src/keyNames.ts`, no imports from the config) say when two bindings are the same key on the platform. Compare bindings with them, never as strings.
 - **Recording a key** (`shortcutsModel.ts`):
   - It names the key as prosemirror-keymap matches it, through the key code when a modifier is held, so layouts and Option don't change the letter.
-  - It refuses keys the text or the window needs (`REFUSED`, and Option with a letter on macOS).
+  - It refuses keys the text or the window needs (`REFUSED`, and Option with a letter or digit on macOS).
   - It moves a key another command has only on a second press. A reset does the same, so the dialog never makes two commands share a key.
 
 ## The dialog
@@ -49,6 +49,7 @@ The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and ever
 - **Height:** it measures `.settings-body` on Appearance once and keeps that height, so it never jumps; longer sections scroll.
 - **Opening:** `settingsSection` (`src/state/settingsDialog.ts`) is the section it opens on again.
 - **Inner pages:** your replacements, your dictionary and the licenses show in place of their section (`useInnerPage`). The section stays mounted but `hidden`, so Back gives the focus back to the button that opened the page. `InnerPage.vue` makes Esc go back instead of closing.
+- **Licenses:** `LicensesPage.vue` loads the notices only when it opens and draws them a block of `NOTICE_LINES` at a time, one per frame (`chunksOf`, `aboutModel.ts`): drawn at once, the 11,000 lines held the webview up for most of a second.
 - **Enter:** BaseDialog submits on Enter. In a field of the settings, Enter is the field's (`enterInField`), so it never closes the dialog.
 - **Recording:** while a shortcut is recorded, a capture listener on the form takes every key.
 - **Rows** are `SettingRow`s, and a switch is a `SwitchRow` (the row names the switch, and a click on its label switches it). Lists of entries are `EntryList`s, with a filter from `FILTER_FROM` entries on. A change goes through `save(changes, message)`, which announces the message once it's saved.
