@@ -84,4 +84,15 @@ describe("SegmentedTabs", () => {
     expect(selected.value).toBe("first");
     expect(document.activeElement).toBe(tabs()[0]);
   });
+
+  it("goes on from the tab selected elsewhere", async () => {
+    unmount = await mount();
+    selected.value = "first";
+    await nextTick();
+    expect(tabs().map((tab) => tab.tabIndex)).toEqual([0, -1, -1]);
+    tabs()[0].focus();
+    press("ArrowRight");
+    await nextTick();
+    expect(selected.value).toBe("odd");
+  });
 });

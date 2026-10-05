@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string">
-import { useTemplateRef } from "vue";
+import { useTemplateRef, watch } from "vue";
 
 import { useRovingFocus } from "../composables/useRovingFocus";
 
@@ -20,11 +20,17 @@ const indexOf = (value: T) =>
     0,
     props.items.findIndex((item) => item.value === value),
   );
-const { onKeydown, follow } = useRovingFocus(
+const { current, onKeydown, follow } = useRovingFocus(
   () => root.value,
   "[role=tab]",
   indexOf(selected.value),
   (index) => (selected.value = props.items[index].value),
+);
+// the keys go on from the tab selected, also once something else chose it
+// or the tabs changed
+watch(
+  () => indexOf(selected.value),
+  (index) => (current.value = index),
 );
 
 const choose = (value: T, event: MouseEvent) => {
