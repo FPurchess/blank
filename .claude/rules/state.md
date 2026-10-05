@@ -25,18 +25,20 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | `appearance.ts` | `themes`, `theme`, `isTheme`, and `colorMode` (accent or mono, see `design.md`) |
 | `language.ts` | `language`, `languagePicker` |
 | `spellcheck.ts` | `spellcheck`, `spellcheckStatus`, `spellchecker` |
-| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`, `unsavedDialog`) and popovers (`tocPopover`) and of the open header or footer strip (`bandEditor`, with `bandEditorDone`, which closes it), `focusTakingDialogs`, those of them that take the focus, and `closeDialog` |
+| `dialogs.ts` | the requests of open dialogs (`linkDialog`, `imageDialog`, `pageSetup`, `unsavedDialog`, `settingsDialog`) and popovers (`tocPopover`) and of the open header or footer strip (`bandEditor`, with `bandEditorDone`, which closes it), `focusTakingDialogs`, those of them that take the focus, and `closeDialog` |
 | `blocksPane.ts` | the blocks pane: `blocksPaneOpen` (persisted), `blocksPaneFocused` (part of `uiTakesFocus`), `blockChoices` (the blocks it offers) and `focusBlocksSearch()`, which asks it for the focus in its search |
 | `popups.ts` | `tablePicker`, `tableToolbar`, `tableHandles` (with `Point`, `Span`), `blockToolbar`, `ToolbarItem` (with the `command` whose shortcut its tooltip shows), `BoxAnchor` (an `Anchor` with its right end), `contextMenu` (its `owner`, the button that opened it, if a button did), `MenuItem` (with an optional `icon`, `detail` and `look`, a class that draws it like what it makes), `Anchor`, `tooltipsSuppressed` (keeps the controls' tooltips hidden), and `wordCountCard` (whether the word count's card shows) |
 | `messages.ts` | `announcement` and `spellcheckMessage`, written through `announce()` (`quiet` for what only screen readers hear) and `flashSpellcheckMessage()`; `bootMessages()` clears each after a moment |
 | `page.ts` | `frontmatter` (of the document, notifying only when it changes), `pageLayout` (its `resolveLayout` over `config`'s defaults, resolved again only when either changes) and `pageFields` (what the placeholders of headers and footers show, the same object while they stay the same) |
 | `pageView.ts` | the page view: `pageView` (the view chosen), `pageLayoutState` (the pages as laid out), `pageCaret`, `pageSelection`, `pageHeadBox` (where the selection's head is painted, with its affinity, e.g. for the IME), `pageDropCaret` (where dragged text would drop), `pageDropGap` (where a dragged block would drop), `pageHoverBlock` (the content block under the pointer), `engineMissing` (true once the editor shows the text itself), `pagePosition`, `pageScrollRequest`, and `pageViewport` (where the view is and how far it scrolled, for `src/engine/geometry.ts`; written at most once per frame, and only when it changed) |
+| `settingsDialog.ts` | `settingsSections` and `settingsSection`, the section the settings open on (see `settings.md`) |
+| `focusMode.ts` | `focusMode`, `controlsFaded`, `controlsStay` (what the controls stay for) and `setFocusMode()` (see `focus-mode.md`) |
 | `focus.ts` | `uiTakesFocus`, whether a dialog, the context menu, the caption field, the blocks pane, the tab row or the formatting toolbar holds the focus; the parts F6 moves through (`registerFocusStop`, `cycleFocus`) |
 | `toolbar.ts` | the formatting toolbar: `toolbarFocused` (part of `uiTakesFocus`); Alt-F10 gives it the focus through its focus stop (`focusStop("toolbar")` in `focus.ts`) |
 | `headings.ts` | `headings`, the document's listed headings (`listedHeadings`: at the top and in forms' fields, with text), the same list the outline, tables of contents and the PDF's bookmarks use, published by the editor's `headings` plugin view through `publishHeadings` (from the view, so it sees what `appendTransaction` changed) |
 | `outline.ts` | the outline: `outlinePinned` (kept open, persisted), `outlinePeek` (the floating list), `outlineEntries` (the headings it lists, the same objects while they stay the same), and `toggleOutline()`, its rules for the shortcut and the dashes |
 
-`config` (blank.json over the defaults) stays in `src/config.ts`, next to its loader.
+`config` (blank.json over the defaults) stays in `src/config.ts`, next to its loader and its one writer, `saveSettings` (see `settings.md`).
 
 ## Rules
 

@@ -79,7 +79,7 @@ export default defineConfigWithTheme<
         text: "Guide",
         link: "/guide/writing",
         activeMatch:
-          "^/guide/(writing|tables|blocks|files|pages|autocorrect|spelling|themes|configuration|faq)",
+          "^/guide/(writing|tables|blocks|files|pages|settings|autocorrect|spelling|themes|configuration|faq)",
       },
       { text: "Shortcuts", link: "/guide/shortcuts" },
     ],
@@ -98,6 +98,7 @@ export default defineConfigWithTheme<
       {
         text: "Reference",
         items: [
+          { text: "Settings", link: "/guide/settings" },
           { text: "Keyboard shortcuts", link: "/guide/shortcuts" },
           { text: "Autocorrect", link: "/guide/autocorrect" },
           { text: "Spell check", link: "/guide/spelling" },

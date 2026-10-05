@@ -6,6 +6,7 @@ import {
   imageDialog,
   linkDialog,
   pageSetup,
+  settingsDialog,
   tablePicker,
   tableToolbar,
   tocPopover,
@@ -24,6 +25,7 @@ import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
+import SettingsDialog from "./settings/SettingsDialog.vue";
 import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
@@ -74,6 +76,11 @@ useWindowCommands();
     v-if="unsavedDialog"
     :key="keyOf(unsavedDialog)"
     :request="unsavedDialog"
+  />
+  <SettingsDialog
+    v-if="settingsDialog"
+    :key="keyOf(settingsDialog)"
+    :request="settingsDialog"
   />
   <TocPopover
     v-if="tocPopover"

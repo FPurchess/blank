@@ -2,6 +2,8 @@ import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 import { coverageConfigDefaults } from "vitest/config";
 
+import { version } from "./package.json";
+
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
@@ -12,6 +14,8 @@ export default defineConfig(async () => ({
   // builds the E2E tests run, for which the Tauri CLI sets TAURI_ENV_DEBUG
   define: {
     __TEST_HOOKS__: JSON.stringify(process.env.TAURI_ENV_DEBUG === "true"),
+    // the version About shows where the app can't tell it, in `bun run dev`
+    __APP_VERSION__: JSON.stringify(version),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

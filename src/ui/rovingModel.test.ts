@@ -11,4 +11,17 @@ describe("stepTo", () => {
     expect(stepTo("End", 0, 3)).toBe(2);
     expect(stepTo("ArrowDown", 0, 3)).toBeUndefined();
   });
+
+  it("moves down a column with ↓ ↑ only", () => {
+    expect(stepTo("ArrowDown", 2, 3, "vertical")).toBe(0);
+    expect(stepTo("ArrowUp", 0, 3, "vertical")).toBe(2);
+    expect(stepTo("End", 0, 3, "vertical")).toBe(2);
+    expect(stepTo("ArrowRight", 0, 3, "vertical")).toBeUndefined();
+  });
+
+  it("moves through a grid with every arrow", () => {
+    expect(stepTo("ArrowRight", 0, 3, "both")).toBe(1);
+    expect(stepTo("ArrowDown", 0, 3, "both")).toBe(1);
+    expect(stepTo("ArrowUp", 0, 3, "both")).toBe(2);
+  });
 });

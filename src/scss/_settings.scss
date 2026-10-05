@@ -1,0 +1,416 @@
+// The settings dialog (src/ui/settings/): the sections in a column on the
+// desk's color, the chosen one on the paper, which scrolls. Its rows are the
+// dialogs' setting rows (SettingRow.vue, main.scss).
+@use "controls" as *;
+
+.dialog.settings {
+  width: min(720px, calc(100% - 32px));
+  max-width: none;
+
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
+  .dialog-body {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  // as tall as Appearance, measured when it opens (SettingsDialog.vue)
+  .settings-body {
+    display: flex;
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  .settings-sections {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 2px;
+    width: 180px;
+    box-sizing: border-box;
+    padding: var(--s3) var(--s2);
+    border-right: 1px solid var(--line);
+    background: var(--desk-color);
+
+
+    [role="tab"] {
+      display: flex;
+      align-items: center;
+      gap: var(--s2);
+      height: var(--row);
+      padding: 0 var(--s2);
+      border: 0;
+      border-radius: var(--r-control);
+      color: inherit;
+      background: none;
+      text-align: left;
+      @include states;
+
+      &[aria-selected="true"] {
+        font-weight: 500;
+        background: var(--pressed);
+      }
+    }
+  }
+
+  .settings-panel {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    padding: var(--s4) var(--s5) var(--s5);
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  // the name of a group of rows
+  .settings-heading {
+    margin: var(--s4) 0 var(--s1);
+    @include group-label;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  .setting:last-child {
+    border-bottom: 0;
+  }
+
+  // what a row says about its value
+  p {
+    margin: 0;
+  }
+
+  .note,
+  .footnote,
+  .empty {
+    font-size: var(--ui-small);
+    line-height: 16px;
+    color: var(--muted);
+  }
+
+  .footnote,
+  .note {
+    margin-top: var(--s3);
+  }
+
+  .dialog-foot .note {
+    align-self: center;
+    margin: 0;
+  }
+
+  .error {
+    margin: var(--s1) 0 0;
+    font-size: var(--ui-small);
+    line-height: 16px;
+    color: var(--spelling-color);
+  }
+
+  // a field whose label only screen readers hear, e.g. the search of the
+  // shortcuts, where its placeholder says what it's for
+  .compact {
+    display: flex;
+    flex-direction: column;
+
+    > label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    input,
+    .field {
+      margin-bottom: 0;
+    }
+  }
+
+  .compact.number .field {
+    width: 104px;
+  }
+
+  // buttons with text: Edit…, Add, the links of About
+  .edit,
+  .add,
+  .about-links button,
+  .shortcuts-top button {
+    @include text-button;
+  }
+
+  .quiet {
+    @include text-button-quiet;
+  }
+
+  // the switch of a row is only its track: the row names it
+  .switch-setting .switch-row {
+    padding: 0;
+  }
+
+  .switch-setting .setting-label {
+    cursor: pointer;
+  }
+}
+
+// Appearance: the themes as cards, each drawn in its own colors
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--s3);
+  margin-bottom: var(--s2);
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  font-size: var(--ui-small);
+  color: inherit;
+  background: none;
+  text-align: left;
+
+  .preview {
+    display: grid;
+    place-items: end center;
+    height: 64px;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid var(--line);
+    border-radius: var(--r-control);
+    // the theme's own desk, paper and ink, as data-theme sets them here
+    background: var(--desk-color);
+
+    i {
+      display: block;
+      width: 60%;
+      height: 48px;
+      border-radius: 2px 2px 0 0;
+      background-color: var(--background-color);
+      background-image:
+        linear-gradient(var(--color) 0 0), linear-gradient(var(--color) 0 0),
+        linear-gradient(var(--color) 0 0);
+      background-size:
+        60% 3px,
+        75% 2px,
+        70% 2px;
+      background-position:
+        8px 9px,
+        8px 18px,
+        8px 24px;
+      background-repeat: no-repeat;
+    }
+  }
+
+  &[aria-checked="true"] {
+    font-weight: 500;
+
+    .preview {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+  }
+}
+
+// an inner page in place of its section: Back and its name above it
+.inner-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: calc(-1 * var(--s1)) 0 var(--s3) -6px;
+
+  h3 {
+    margin: 0;
+    font-size: inherit;
+    font-weight: 500;
+  }
+
+  .subtitle {
+    font-size: var(--ui-small);
+    color: var(--muted);
+  }
+}
+
+// a field and Add, or typed → becomes and Add
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+
+  .compact {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .arrow {
+    color: var(--muted);
+  }
+}
+
+.inner-page .scope {
+  margin-bottom: var(--s3);
+}
+
+// the words of your dictionary, your replacements
+.entry-list {
+  margin-top: var(--s2);
+
+  .filter {
+    margin-bottom: var(--s2);
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .entry {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 2px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .entry-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .empty {
+    margin-top: var(--s2);
+  }
+}
+
+// Keyboard shortcuts: a key per command, which a click records anew
+.shortcuts-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+
+  .search {
+    flex: 1;
+  }
+
+  &.confirm span {
+    flex: 1;
+  }
+}
+
+.shortcut-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+
+  .shortcut-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+
+    small {
+      font-size: var(--ui-small);
+      line-height: 16px;
+      color: var(--muted);
+    }
+  }
+
+  .shortcut-key {
+    min-width: 112px;
+    height: var(--control);
+    padding: 0 var(--s2);
+    border: 1px solid transparent;
+    border-radius: var(--r-control);
+    font: inherit;
+    color: inherit;
+    background: none;
+    text-align: right;
+    @include states;
+
+    &.none {
+      font-size: var(--ui-small);
+      color: var(--muted);
+    }
+
+    &.recording {
+      font-size: var(--ui-small);
+      color: var(--muted);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+  }
+
+  // room for the reset button, so the keys line up
+  .reset-key {
+    width: var(--control);
+  }
+
+  .message {
+    flex-basis: 100%;
+    margin: 0 0 var(--s1);
+    font-size: var(--ui-small);
+    line-height: 16px;
+    text-align: right;
+    color: var(--muted);
+  }
+}
+
+// About: the logo, the name, the version and the links
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+
+  .about-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .about-name {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .about-version {
+    color: var(--muted);
+  }
+
+  .about-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+    margin-top: var(--s2);
+  }
+}
+
+.licenses {
+  margin: 0;
+  padding: var(--s3);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  font: 12px / 18px monospace;
+  white-space: pre-wrap;
+  background: var(--desk-color);
+}

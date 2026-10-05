@@ -999,6 +999,35 @@ describe("docs screenshots", () => {
     film.save(path.join(outDir, "table-mouse.gif"), 415 + SHIFT);
   });
 
+  it("captures the settings", async () => {
+    await focusEditor();
+    await pressMod(",");
+    await $("#settings-dialog").waitForDisplayed();
+    await shot("settings");
+    await type(Key.Escape);
+    await $("#settings-dialog").waitForExist({ reverse: true });
+  });
+
+  it("records focus mode", async () => {
+    const film = await filmNew();
+    await film.hidePointer();
+    await film.shortcut(
+      ["Mod", "Shift", "F"],
+      () => pressMod(Key.Shift, "f"),
+      0.8,
+    );
+    await film.type("The bars fade while you write, and the page stays.");
+    await film.pause(2);
+    // a reach for the mouse brings them back
+    await film.moveTo({ x: 440, y: 330 }, 1.6);
+    await film.shortcut(
+      ["Mod", "Shift", "F"],
+      () => pressMod(Key.Shift, "f"),
+      0.8,
+    );
+    film.save(path.join(outDir, "focus-mode.gif"), FULL);
+  });
+
   it("records the writing demo", async () => {
     const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
     const film = new Recorder(frames);
