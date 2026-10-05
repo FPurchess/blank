@@ -118,7 +118,7 @@ describe("page setup", () => {
     await browser.keys(Key.Space);
     await expect($(`${headings}[aria-pressed="true"]`)).toHaveText("H2");
     await expect($(`${headings}[aria-pressed="true"]`)).toHaveAttribute(
-      "aria-label",
+      "data-tip",
       "Heading 2",
     );
     await browser.keys(Key.Enter);

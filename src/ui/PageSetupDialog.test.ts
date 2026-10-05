@@ -25,9 +25,7 @@ const checked = (name: string) =>
   row(name).querySelector<HTMLButtonElement>('[aria-checked="true"]')!;
 const option = (name: string, label: string) =>
   [...row(name).querySelectorAll<HTMLButtonElement>(".options button")].find(
-    (button) =>
-      (button.getAttribute("aria-label") ?? button.textContent?.trim()) ===
-      label,
+    (button) => button.textContent?.trim() === label,
   )!;
 const fields = (name: string) =>
   dialog()!.querySelector<HTMLElement>(`[data-fields="${name}"]`)!;
@@ -475,7 +473,8 @@ describe("pageSetup dialog", () => {
         "H5",
         "H6",
       ]);
-      expect(toggles()[0].getAttribute("aria-label")).toBe("Heading 1");
+      // named by what they show, as voice control finds them
+      expect(toggles()[0].hasAttribute("aria-label")).toBe(false);
       expect(toggles()[0].dataset.tip).toBe("Heading 1");
       expect(pressed()).toEqual([]);
     });
@@ -486,9 +485,9 @@ describe("pageSetup dialog", () => {
       });
       expect(pressed()).toEqual(["H2"]);
 
-      await click(option("newPageBefore", "Heading 1"));
-      await click(option("newPageBefore", "Heading 2"));
-      await click(option("newPageBefore", "Heading 3"));
+      await click(option("newPageBefore", "H1"));
+      await click(option("newPageBefore", "H2"));
+      await click(option("newPageBefore", "H3"));
       await click(button("Apply"));
 
       expect(request.apply).toHaveBeenCalledWith(
@@ -811,7 +810,7 @@ describe("pageSetup dialog", () => {
     const settings: PageSettings = { ...DEFAULT_PAGE, header };
     const request = await openDialog({ settings });
 
-    await click(option("newPageBefore", "Heading 1"));
+    await click(option("newPageBefore", "H1"));
     await click(option("margins", "Custom…"));
     await submit();
 

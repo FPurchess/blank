@@ -65,11 +65,11 @@ describe("OptionGroup", () => {
     ]);
   });
 
-  it("shows short labels, named and tipped by the long ones", async () => {
+  it("shows short labels, named by them, and tipped by the long ones", async () => {
     unmount = await mount(levels, shallowRef<number[]>([]));
 
     expect(buttons().map((b) => b.textContent?.trim())).toEqual(["H1", "H2"]);
-    expect(buttons()[0].getAttribute("aria-label")).toBe("Heading 1");
+    expect(buttons()[0].hasAttribute("aria-label")).toBe(false);
     expect(buttons()[0].dataset.tip).toBe("Heading 1");
     expect(buttons()[0].getAttribute("aria-pressed")).toBe("false");
   });

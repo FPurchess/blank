@@ -19,7 +19,8 @@ import SettingRow from "./SettingRow.vue";
 // move between them, and Space or a click switches one. One button is in the
 // tab order at a time, so Tab leaves the row, and the dialog can move between
 // rows with ↑↓ (`[data-row] button:not([tabindex="-1"])`). An option with a
-// `short` label shows it, and its label names it.
+// `short` label shows it and is named by it, as voice control finds it, with
+// its label as its tooltip, which describes it.
 const props = defineProps<{
   // the label's id, which names the row for screen readers
   id: string;
@@ -61,11 +62,9 @@ const press = (index: number, event: MouseEvent) => {
   if (!toggles) (event.currentTarget as HTMLButtonElement).focus();
 };
 
-// a short label names its option, and shows its label as the tooltip
-const named = (option: Option<T>) =>
-  option.short === undefined
-    ? {}
-    : { "aria-label": option.label, ...tipAttrs({ name: option.label }) };
+// a short label shows the long one as the tooltip
+const tipped = (option: Option<T>) =>
+  option.short === undefined ? {} : tipAttrs({ name: option.label });
 </script>
 
 <template>
@@ -88,7 +87,7 @@ const named = (option: Option<T>) =>
         :tabindex="index === current ? 0 : -1"
         :aria-checked="toggles ? undefined : isOn(chosen, option.value)"
         :aria-pressed="toggles ? isOn(chosen, option.value) : undefined"
-        v-bind="named(option)"
+        v-bind="tipped(option)"
         @click="press(index, $event)"
       >
         {{ option.short ?? option.label }}
