@@ -1,3 +1,5 @@
+import type { TextAlignment } from "../markdown/alignment";
+
 // The items the layout engine takes, see src-tauri/layout/src/model.rs.
 
 // the styles the engine sets text in (TextKind in model.rs): a paragraph,
@@ -26,7 +28,7 @@ export interface EngineSpan {
 
 // how a paragraph or heading at the top of the document is aligned; left
 // isn't sent (see src/markdown/alignment.ts)
-export type EngineAlign = "center" | "right" | "justify";
+export type EngineAlign = TextAlignment;
 
 export interface EngineText {
   kind: "text";

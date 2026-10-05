@@ -22,7 +22,7 @@ interface ParseState {
 
 type TokenHandler = (
   state: ParseState,
-  token: { meta: Record<string, Node> },
+  token: { meta: { node: Node } },
 ) => void;
 
 // a paragraph's or heading's alignment, from the <div align> around it (see
@@ -92,11 +92,8 @@ export const markdownParser = new MarkdownParser(
 const handlers = (
   markdownParser as unknown as { tokenHandlers: Record<string, TokenHandler> }
 ).tokenHandlers;
-const addParsed =
-  (key: string): TokenHandler =>
-  (state, { meta }) => {
-    const node = meta[key];
-    state.addNode(node.type, node.attrs, node.children);
-  };
-handlers.html_table = addParsed("table");
-handlers.html_block_node = addParsed("node");
+const addParsed: TokenHandler = (state, { meta: { node } }) => {
+  state.addNode(node.type, node.attrs, node.children);
+};
+handlers.html_table = addParsed;
+handlers.html_block_node = addParsed;

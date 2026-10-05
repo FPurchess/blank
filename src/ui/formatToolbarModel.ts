@@ -144,7 +144,7 @@ export const formatItems = (
   previous: readonly FormatItem[] = [],
 ): FormatItem[] => {
   const before = new Map(previous.map((item) => [item.id, item]));
-  return PARTS.flatMap((part) =>
+  const items = PARTS.flatMap((part) =>
     (part.commands ?? []).map((command) => {
       const enabled = can(commandFor(command));
       const checked = pressedOf(command, state);
@@ -165,6 +165,11 @@ export const formatItems = (
       };
     }),
   );
+  // the same list while every button is the same
+  const same =
+    items.length === previous.length &&
+    items.every((item, index) => item === previous[index]);
+  return same ? (previous as FormatItem[]) : items;
 };
 
 /**
@@ -192,6 +197,33 @@ export const entries = (
   });
   return cut.size > 0 ? [...row, { kind: "more", key: "more" }] : row;
 };
+
+/**
+ * partWidths returns how wide each part of the row is, from the boxes of its
+ * controls: from the end of the part before it, so a part's width holds the
+ * separator and the gaps before it; null while a part shows no control
+ */
+export const partWidths = (
+  boxes: (part: PartId) => readonly { left: number; right: number }[],
+): Record<PartId, number> | null => {
+  const widths = {} as Record<PartId, number>;
+  let end: number | null = null;
+  for (const part of PARTS) {
+    const shown = boxes(part.id);
+    if (shown.length === 0) return null;
+    const right = Math.max(...shown.map((box) => box.right));
+    widths[part.id] =
+      right - (end ?? Math.min(...shown.map((box) => box.left)));
+    end = right;
+  }
+  return widths;
+};
+
+/**
+ * sameParts tells whether two sets of parts hold the same ones
+ */
+export const sameParts = (a: ReadonlySet<PartId>, b: ReadonlySet<PartId>) =>
+  a.size === b.size && [...a].every((id) => b.has(id));
 
 /**
  * overflowCut returns the parts to move into the More menu, in
@@ -340,6 +372,8 @@ export const moreMenuItems = (
         commandItem(`more-${item.id}`, item.command, {
           icon: item.icon,
           checked: item.checked,
+          // the alignments are one choice of four
+          radio: part.id === "align" || undefined,
           disabled: !item.enabled,
           run: item.run,
         }),

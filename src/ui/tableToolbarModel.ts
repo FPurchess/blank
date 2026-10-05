@@ -1,8 +1,20 @@
 import { CommandIdentifier } from "../config";
 import { commandShortcut } from "../editor/keyBindings";
-import type { ToolbarItem } from "../state";
+import { separated } from "../separated";
+import type { TableToolbarItem, ToolbarItem } from "../state";
 
-export { type ToolbarEntry, toolbarEntries } from "./toolbarModel";
+// what the toolbar shows in a row: a button, or a separator between groups
+export type ToolbarEntry =
+  { key: string; item: TableToolbarItem } | { key: string; item: null };
+
+/**
+ * toolbarEntries returns the buttons of `items` in their groups, keyed by the
+ * item, so a button stays the same element while the toolbar updates
+ */
+export const toolbarEntries = (items: TableToolbarItem[]): ToolbarEntry[] =>
+  separated(items, null).map((item, index) =>
+    item ? { key: item.id, item } : { key: `separator-${index}`, item: null },
+  );
 
 /**
  * itemLabel labels the button of `item`, with its key in table mode
@@ -13,7 +25,7 @@ export const itemLabel = (item: ToolbarItem, keys: boolean) =>
 /**
  * tableModeHint explains the keys of table mode
  */
-export const tableModeHint = () =>
-  `Shift+arrows move rows and columns · Esc or ${commandShortcut(
-    CommandIdentifier.INSERT_TABLE,
-  )}: done`;
+export const tableModeHint = () => {
+  const key = commandShortcut(CommandIdentifier.INSERT_TABLE);
+  return `Shift+arrows move rows and columns · Esc${key ? ` or ${key}` : ""}: done`;
+};

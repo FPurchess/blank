@@ -23,7 +23,7 @@ import {
 import { alignmentGuard } from "../plugins/alignment";
 import { keymap } from "../plugins/keymap";
 import { pressKey } from "../../test/editor";
-import { alignedBlocks, alignmentAt, alignText } from "./align";
+import { alignmentAt, alignText } from "./align";
 import { setTextblock } from "./setTextblock";
 
 const aligns = (state: EditorState) =>
@@ -59,7 +59,13 @@ describe("alignText", () => {
     });
     const right = run(state, alignText("right")).state;
     expect(aligns(right)).toEqual(["right", "right", null]);
-    expect(alignedBlocks(right)).toHaveLength(2);
+  });
+
+  it("changes nothing for text aligned that way already", () => {
+    const state = createState(doc(p("one")), { cursor: 2 });
+    const { done, state: after } = run(state, alignText("left"));
+    expect(done).toBe(true);
+    expect(after).toBe(state);
   });
 
   it("tells mixed alignments apart from left", () => {
@@ -92,7 +98,6 @@ describe("alignText", () => {
     expect(cell.attrs.align).toBe("center");
     expect(alignmentAt(centered)).toBe("center");
     expect(alignmentAt(state)).toBe("left");
-    expect(alignedBlocks(state)).toEqual([]);
   });
 
   it("names the columns' alignment null where they differ", () => {

@@ -7,7 +7,7 @@ We're very happy that you opened up Blank the first time! Blank is minimalist, o
 
 ## Why Blank works differently
 
-Blank might work a little different than what you are used to in other editors. It is purely keyboard-based. That means there are no buttons to change the paragraph style or mark a text bold. Instead, there are a few, but very intuitive keyboard-shortcuts to do everything you want.
+Blank might work a little different than what you are used to in other editors. It is keyboard-first. The toolbar at the top is there when you'd rather point and click, but a few, very intuitive keyboard-shortcuts do everything you want without leaving the keys.
 
 Blank and it's keyboard shortcuts have quite some advantages over a mouse-driven editor:
 

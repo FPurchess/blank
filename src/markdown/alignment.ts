@@ -7,18 +7,26 @@ import { Transform } from "prosemirror-transform";
 // them; nested ones (in lists, quotes, cells and form fields) don't, so what
 // shows is what gets saved.
 
-export type TextAlignment = "center" | "right" | "justify";
+/**
+ * oneOf returns a reader of the alignment a value names, e.g. from `align`
+ * or `text-align`, if it is one of `values`, null otherwise
+ */
+export const oneOf =
+  <T extends string>(values: readonly T[]) =>
+  (value: unknown): T | null => {
+    const lower = typeof value === "string" ? value.trim().toLowerCase() : "";
+    return (values as readonly string[]).includes(lower) ? (lower as T) : null;
+  };
 
-const STORED: readonly string[] = ["center", "right", "justify"];
+const STORED = ["center", "right", "justify"] as const;
+
+export type TextAlignment = (typeof STORED)[number];
 
 /**
- * textAlignment returns the alignment `value` names, e.g. from `align` or
- * `text-align`; null for left and anything else
+ * textAlignment returns the alignment `value` names, null for left and
+ * anything else
  */
-export const textAlignment = (value: unknown): TextAlignment | null => {
-  const lower = typeof value === "string" ? value.trim().toLowerCase() : "";
-  return STORED.includes(lower) ? (lower as TextAlignment) : null;
-};
+export const textAlignment = oneOf(STORED);
 
 /**
  * alignOf returns how `node` is aligned, or null for left. An empty paragraph
@@ -32,29 +40,25 @@ export const alignOf = (node?: Node | null): TextAlignment | null => {
 };
 
 /**
- * nestedAlignments returns the positions of the aligned textblocks between
- * `from` and `to` that aren't directly in the document
+ * nestedAlignment visits the nodes of `doc` (as nodesBetween does) and calls
+ * `found` with the position of each aligned textblock that isn't directly in
+ * it, e.g. a paragraph in a list, which keeps no alignment
  */
-export const nestedAlignments = (
-  doc: Node,
-  from = 0,
-  to = doc.content.size,
-): number[] => {
-  const found: number[] = [];
-  doc.nodesBetween(from, to, (node, pos, parent) => {
+export const nestedAlignment =
+  (doc: Node, found: (pos: number) => void) =>
+  (node: Node, pos: number, parent: Node | null) => {
     if (!node.isTextblock) return true;
-    if (parent !== doc && node.attrs.align) found.push(pos);
+    if (parent !== doc && node.attrs.align) found(pos);
     return false;
-  });
-  return found;
-};
+  };
 
 /**
  * withoutNestedAlignment returns `doc` without the alignment of the
- * textblocks that aren't directly in it, e.g. a paragraph in a list
+ * textblocks that aren't directly in it
  */
 export const withoutNestedAlignment = (doc: Node): Node => {
-  const positions = nestedAlignments(doc);
+  const positions: number[] = [];
+  doc.descendants(nestedAlignment(doc, (pos) => positions.push(pos)));
   if (positions.length === 0) return doc;
   const tr = new Transform(doc);
   for (const pos of positions) tr.setNodeAttribute(pos, "align", null);

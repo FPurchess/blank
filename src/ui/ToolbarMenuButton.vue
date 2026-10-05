@@ -8,10 +8,11 @@ import { useMenuButton } from "./composables/useMenuButton";
 import { tipAttrs } from "./tooltipModel";
 
 // A button of the formatting toolbar that opens a menu below it: the style
-// menu (its text the selection's style), Insert and More. A click opens it
-// and gives the editor the focus back when it closes; ↓, Enter or Space from
-// the keyboard open it with its first item focused, and Esc gives the button
-// the focus back.
+// menu (its text the selection's style), Insert and More. A menu a click
+// opened gives the text the focus when it closes. One opened from the
+// keyboard (↓, Enter or Space on the focused button) starts on its first
+// item and gives the button the focus back when it closes, also after an
+// item ran, so the toolbar keeps it.
 const props = withDefaults(
   defineProps<{
     // its name, for its tooltip and screen readers
@@ -37,7 +38,9 @@ const menu = useMenuButton((keyboard) => {
 
 const tip = computed(() => tipAttrs({ name: props.label }));
 
+// the menu is built only to open it, not when a click closes it
 const open = (event: Event) => {
+  if (menu.isOpen.value) return menu.toggle(event, []);
   const { left, bottom } = button.value!.getBoundingClientRect();
   menu.toggle(event, props.items({ left, top: bottom, bottom }));
 };

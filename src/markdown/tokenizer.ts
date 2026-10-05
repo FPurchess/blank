@@ -6,6 +6,7 @@ import MarkdownIt, {
 
 import { blankBlocks, blankMarker } from "./blocks/rules";
 import { textAlignment } from "./alignment";
+import { alignment } from "./schema";
 import { parseHtmlBlock, parseHtmlTable } from "./html";
 
 /**
@@ -139,20 +140,19 @@ const htmlTable = (
   token.block = true;
   token.map = [startLine, line + 1];
   token.content = content;
-  token.meta = { table };
+  token.meta = { node: table };
   state.line = line + 1;
   return true;
 };
 
-// the alignment an HTML tag's attributes give, by `align` or a `text-align`
-// style, in any order and either quote; "left" for left, null for none
-const tagAlignment = (attributes: string): string | null => {
-  const named = /\balign\s*=\s*["']\s*([a-z]+)\s*["']/i.exec(attributes);
-  const styled = /\bstyle\s*=\s*["'][^"']*\btext-align\s*:\s*([a-z]+)/i.exec(
-    attributes,
-  );
-  const value = (named ?? styled)?.[1].toLowerCase() ?? null;
-  return value === "left" || textAlignment(value) ? value : null;
+// the alignment an HTML tag's attributes give, by a `text-align` style or
+// else `align` (quoted or not), as the DOM reads them; "left" for left, null
+// for none
+const tagAlignment = (attributes: string) => {
+  const styled = /(?:^|\s)style\s*=\s*["'][^"']*\btext-align\s*:\s*([a-z]+)/i;
+  const named = /(?:^|\s)align\s*=\s*["']?\s*([a-z]+)/i;
+  const value = (styled.exec(attributes) ?? named.exec(attributes))?.[1];
+  return alignment(value) ?? textAlignment(value);
 };
 
 const ALIGN_OPEN = /^<div(\s[^>]*)?>\s*$/i;
@@ -170,7 +170,8 @@ interface AlignEnv {
  * `align_close`, which alignBlocks hands on to the blocks between them; and a
  * paragraph or heading on one line, as `<p align="center">text</p>`, is read
  * as HTML. A `</div>` without a `<div>` before it stays text, like any other
- * HTML, as `html` is off.
+ * HTML, as `html` is off, and so does a `<div>` without an alignment outside
+ * a wrapper; inside one it is counted, so its `</div>` closes it.
  */
 const alignWrapper = (
   state: StateBlock,
@@ -192,7 +193,10 @@ const alignWrapper = (
   }
   const open = ALIGN_OPEN.exec(line);
   const align = open ? tagAlignment(open[1] ?? "") : null;
-  if (align || close) {
+  // a <div> without an alignment inside a wrapper is counted too, so its
+  // </div> doesn't close the wrapper; its blocks keep the wrapper's
+  const nested = !!open && (env.blankAlign ?? 0) > 0;
+  if (align || nested || close) {
     if (silent) return true;
     const token = state.push(close ? "align_close" : "align_open", "div", 0);
     token.block = true;
@@ -239,8 +243,11 @@ const alignBlocks = (state: StateCore) => {
   const open: (string | null)[] = [];
   state.tokens = state.tokens.filter((token) => {
     if (token.type === "align_open") {
-      const align = (token.meta as { align: string }).align;
-      open.push(align === "left" ? null : align);
+      // left is none; a <div> without an alignment keeps the one around it
+      const { align } = token.meta as { align: string | null };
+      open.push(
+        align === null ? (open[open.length - 1] ?? null) : textAlignment(align),
+      );
       return false;
     }
     if (token.type === "align_close") {

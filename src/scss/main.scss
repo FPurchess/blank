@@ -1037,35 +1037,32 @@ $strip-height: 88px;
   }
 }
 
-// the items of the toolbar's style menu, each drawn like what it makes, as
-// on the major-third scale of the headings, a step smaller
-.context-menu .style-heading1 {
-  font-size: 1.56em;
-  font-weight: 500;
-}
-.context-menu .style-heading2 {
-  font-size: 1.25em;
-  font-weight: 500;
-}
-.context-menu .style-heading3 {
-  font-size: 1.1em;
-  font-weight: 500;
-}
-.context-menu .style-heading4 {
-  font-weight: 700;
-}
-.context-menu .style-heading5 {
-  font-weight: 700;
-  font-style: italic;
-}
-.context-menu .style-heading6 {
-  font-style: italic;
-}
-.context-menu .style-quote {
-  font-style: italic;
-}
-.context-menu .style-code_block .label {
-  font-family: monospace;
+// the labels of the toolbar's style menu, each drawn like what it makes:
+// the headings a step smaller on their major-third scale, in their weights
+.context-menu {
+  .style-heading1 .label {
+    font-size: 1.5625em;
+    font-weight: 500;
+  }
+  .style-heading2 .label {
+    font-size: 1.25em;
+    font-weight: 500;
+  }
+  .style-heading3 .label {
+    font-weight: 500;
+  }
+  .style-heading4 .label,
+  .style-heading5 .label {
+    font-weight: 700;
+  }
+  .style-heading5 .label,
+  .style-heading6 .label,
+  .style-quote .label {
+    font-style: italic;
+  }
+  .style-code_block .label {
+    font-family: monospace;
+  }
 }
 
 .context-menu {

@@ -4,7 +4,7 @@ import { schema } from "./schema";
 
 /**
  * withoutLinkUnderline returns `fragment` without the underline on text that
- * is a link: Word and Google Docs underline every link with a style, which
+ * is a link: Google Docs and LibreOffice underline links directly, which
  * would come in as underlined text and be saved as <u> inside each link
  */
 export const withoutLinkUnderline = (fragment: Fragment): Fragment => {

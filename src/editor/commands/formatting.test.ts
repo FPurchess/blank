@@ -127,6 +127,32 @@ describe("the code block command", () => {
   });
 });
 
+describe("a code block made of a paragraph", () => {
+  it("keeps its line breaks as newlines, and back", () => {
+    const broken = doc(
+      schema.node("paragraph", null, [
+        schema.text("one"),
+        schema.nodes.hard_break.create(),
+        schema.text("two"),
+      ]),
+    );
+    const { view } = withKeymap(broken, { cursor: 2 });
+    commandFor(CommandIdentifier.BLOCKTYPE_CODE_BLOCK)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    expect(view.state.doc.firstChild!.type.name).toBe("code_block");
+    expect(view.state.doc.textContent).toBe("one\ntwo");
+    commandFor(CommandIdentifier.BLOCKTYPE_PARAGRAPH)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    expect(view.state.doc.firstChild!.child(1).type.name).toBe("hard_break");
+  });
+});
+
 describe("keys left out", () => {
   const defaults = config.value;
   afterEach(() => {

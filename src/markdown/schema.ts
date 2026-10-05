@@ -8,7 +8,7 @@ import {
 } from "prosemirror-model";
 import { tableNodes } from "prosemirror-tables";
 
-import { textAlignment } from "./alignment";
+import { oneOf, textAlignment } from "./alignment";
 import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
 import {
   checkEmbed,
@@ -18,17 +18,14 @@ import {
   embedSrc,
 } from "./blocks/embeds";
 
-export type Alignment = "left" | "center" | "right";
+const ALIGNMENTS = ["left", "center", "right"] as const;
 
-const ALIGNMENTS: readonly string[] = ["left", "center", "right"];
+export type Alignment = (typeof ALIGNMENTS)[number];
 
 /**
  * alignment returns `value` if it names a column alignment, null otherwise
  */
-export const alignment = (value: unknown): Alignment | null => {
-  const lower = typeof value === "string" ? value.trim().toLowerCase() : "";
-  return ALIGNMENTS.includes(lower) ? (lower as Alignment) : null;
-};
+export const alignment = oneOf(ALIGNMENTS);
 
 /**
  * captionText returns the text of the caption of the table `dom`, the
@@ -291,6 +288,12 @@ const FIELD_CONTENT = [
 
 const nodes = base.spec.nodes
   .update("paragraph", paragraph)
+  // what a newline in a code block becomes in a paragraph and back, when a
+  // block's type changes
+  .update("hard_break", {
+    ...base.spec.nodes.get("hard_break"),
+    linebreakReplacement: true,
+  })
   .update("heading", heading)
   .update("doc", {
     ...base.spec.nodes.get("doc"),

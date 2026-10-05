@@ -1,6 +1,5 @@
 import type JSZip from "jszip";
 
-import type { TextAlignment } from "../../markdown";
 import { EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
@@ -15,22 +14,21 @@ import { child, children, DOCUMENT_PART, parsePart, val, W } from "./xml";
 // text, or mammoth would drop it; the text is an invisible separator, which
 // cleanup.ts also removes wherever it is left.
 
-export type WordAlignment = "left" | TextAlignment;
+// the alignments a marker run carries: left counts in table cells only, as
+// markdown aligns a column
+export const WORD_ALIGNMENTS = ["left", "center", "right", "justify"] as const;
 
-// the text of the marker runs
-export const ALIGN_MARKER = "⁣";
+export type WordAlignment = (typeof WORD_ALIGNMENTS)[number];
 
-// the character style of a marker run, by alignment, matched by its id in
-// styleMap.ts
-export const ALIGN_STYLES: Record<WordAlignment, string> = {
-  left: "BlankAlignLeft",
-  center: "BlankAlignCenter",
-  right: "BlankAlignRight",
-  justify: "BlankAlignJustify",
-};
+// the text of the marker runs, the invisible separator
+export const ALIGN_MARKER = "\u2063";
+
+// the character style of a marker run, matched by its id in styleMap.ts
+export const alignStyle = (align: WordAlignment) =>
+  `BlankAlign${align[0].toUpperCase()}${align.slice(1)}`;
 
 // the class styleMap.ts gives the span of a marker run
-export const alignClass = (align: WordAlignment) => `blank-align-${align}`;
+export const ALIGN_CLASS = "blank-align-";
 
 /**
  * fromWordAlignment reads a w:jc value: left for the start, justify for the
@@ -135,6 +133,16 @@ const alignmentOf = (p: Element, styles: StyleAlignment) => {
 };
 
 /**
+ * inCell tells whether the paragraph `p` is in a table's cell
+ */
+const inCell = (p: Element) => {
+  for (let parent = p.parentElement; parent; parent = parent.parentElement) {
+    if (parent.namespaceURI === W && parent.localName === "tc") return true;
+  }
+  return false;
+};
+
+/**
  * markerRun returns a run in the style of `align`, holding the marker
  */
 const markerRun = (doc: Document, align: WordAlignment) => {
@@ -142,7 +150,7 @@ const markerRun = (doc: Document, align: WordAlignment) => {
   const rPr = r.appendChild(doc.createElementNS(W, "w:rPr"));
   rPr
     .appendChild(doc.createElementNS(W, "w:rStyle"))
-    .setAttributeNS(W, "w:val", ALIGN_STYLES[align]);
+    .setAttributeNS(W, "w:val", alignStyle(align));
   r.appendChild(doc.createElementNS(W, "w:t")).textContent = ALIGN_MARKER;
   return r;
 };
@@ -159,7 +167,7 @@ export const markAlignment = async (zip: JSZip): Promise<boolean> => {
   let marked = false;
   for (const p of [...doc.getElementsByTagNameNS(W, "p")]) {
     const align = alignmentOf(p, styles);
-    if (!align) continue;
+    if (!align || (align === "left" && !inCell(p))) continue;
     const pPr = child(p, "pPr");
     p.insertBefore(markerRun(doc, align), pPr ? pPr.nextSibling : p.firstChild);
     marked = true;

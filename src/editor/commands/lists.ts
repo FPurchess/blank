@@ -3,32 +3,30 @@ import type { Command, EditorState } from "prosemirror-state";
 import { liftListItem, wrapInList } from "prosemirror-schema-list";
 
 import { schema } from "../../markdown";
+import { rangeIn } from "./around";
+
+const isList = (node: Node) =>
+  node.type === schema.nodes.bullet_list ||
+  node.type === schema.nodes.ordered_list;
 
 /**
  * listAround returns the innermost bulleted or numbered list around the
- * selection, with its position, or null if it isn't in one
+ * whole selection, with its position, or null if it isn't in one
  */
 export const listAround = (
   state: EditorState,
 ): { node: Node; pos: number } | null => {
-  const { $from, $to } = state.selection;
-  for (let depth = $from.depth; depth > 0; depth--) {
-    const node = $from.node(depth);
-    const isList =
-      node.type === schema.nodes.bullet_list ||
-      node.type === schema.nodes.ordered_list;
-    // the whole selection in it
-    if (isList && $to.pos <= $from.end(depth)) {
-      return { node, pos: $from.before(depth) };
-    }
-  }
-  return null;
+  const range = rangeIn(state, isList);
+  return range
+    ? { node: range.parent, pos: range.$from.before(range.depth) }
+    : null;
 };
 
 /**
  * toggleList turns the selection into a list of `type`: out of it if it's in
  * one already, into one of `type` if it's in the other kind, and into a new
- * one otherwise, as Word and Google Docs do
+ * one otherwise, as Word and Google Docs do. It goes by the list around the
+ * whole selection, so a selection reaching out of a list wraps a new one.
  */
 export const toggleList =
   (type: NodeType): Command =>

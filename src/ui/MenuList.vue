@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUpdated, useTemplateRef } from "vue";
 
+import { keepFocus } from "../dom";
 import { formatShortcut } from "../editor/keyBindings";
 import { place } from "../popup";
 import type { Anchor, MenuItem } from "../state";
@@ -42,15 +43,6 @@ const placeMenu = () =>
   place(root.value!, props.anchor, { side: props.side ?? undefined });
 onMounted(placeMenu);
 onUpdated(placeMenu);
-
-/**
- * keepFocus keeps the focus in the menu on a press, except in a text field
- */
-const keepFocus = (event: MouseEvent) => {
-  if (!(event.target as Element).closest("input, textarea")) {
-    event.preventDefault();
-  }
-};
 
 defineExpose({
   depth: props.depth,

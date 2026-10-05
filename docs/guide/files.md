@@ -23,7 +23,7 @@ Everything you write is kept as markdown: plain text with a few marks like `#` f
 | Save         | `Mod` `S`         |
 | Save as      | `Mod` `Shift` `S` |
 
-Alignment and underlining have no mark in markdown, so Blank writes them as the bit of HTML that GitHub and most markdown apps show too: centered text goes between `<div align="center">` and `</div>`, with the markdown inside kept as it is, and underlined text between `<u>` and `</u>`. Blank reads `<p align="…">` and `style="text-align: …"` from other apps as well.
+Alignment and underlining have no mark in markdown, so Blank writes them as the bit of HTML that GitHub and most markdown apps show too: centered text goes between `<div align="center">` and `</div>`, with the markdown inside kept as it is, and underlined text between `<u>` and `</u>`. Blank also reads a paragraph or heading written on one line as `<p align="…">…</p>`, or with `style="text-align: …"`, as other apps write them.
 
 The open dialog shows your markdown files and Word documents together, and you can pick several at once: each opens in a [tab](./writing#tabs) of its own. A tab with changes you haven't saved shows a dot, and Blank asks before it closes. Closed the whole window without saving? Nothing is lost: every tab comes back with its text, see [Blank remembers your documents](./writing#blank-remembers-your-documents).
 

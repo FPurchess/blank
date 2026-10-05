@@ -166,7 +166,7 @@ export const emptyBandNotice = (
   band: "header" | "footer",
   slots: BandPart[][],
   chapters: boolean,
-  pageSetup: string,
+  pageSetup: string | undefined,
 ): string | null => {
   const shows = slots.some((parts) =>
     parts.some((part) => "text" in part && part.text.trim()),
@@ -182,6 +182,6 @@ export const emptyBandNotice = (
   );
   const notice = `The ${band} is empty on this page: ${list}.`;
   return fields.includes("author")
-    ? `${notice} Add an author under Edit as text in the page setup (${pageSetup}).`
+    ? `${notice} Add an author under Edit as text in the page setup${pageSetup ? ` (${pageSetup})` : ""}.`
     : notice;
 };

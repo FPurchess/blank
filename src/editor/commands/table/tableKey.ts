@@ -1,4 +1,4 @@
-import type { Command } from "prosemirror-state";
+import type { Command, EditorState } from "prosemirror-state";
 import { isInTable } from "prosemirror-tables";
 
 import { caretBox } from "../../../engine/geometry";
@@ -7,6 +7,16 @@ import { DEFAULT_SIZE } from "./pickerSize";
 import { toolsKey } from "../../plugins/tables/tools";
 import { insertTable } from "./insert";
 import { headAfter } from "../../plugins/pageView";
+
+/**
+ * caretAnchor returns where the caret is painted, for a picker below it
+ */
+const caretAnchor = (state: EditorState): Anchor => {
+  const caret = caretBox(state.selection.head, headAfter(state));
+  return caret
+    ? { left: caret.left, top: caret.top, bottom: caret.bottom }
+    : { left: 0, top: 0, bottom: 0 };
+};
 
 /**
  * openTablePicker opens the picker for the size of a new table, below
@@ -18,14 +28,7 @@ export const openTablePicker =
     if (isInTable(state)) return false;
     if (!insertTable(DEFAULT_SIZE.cols, DEFAULT_SIZE.rows)(state)) return false;
     if (!dispatch || !view) return true;
-    const caret = anchor
-      ? null
-      : caretBox(state.selection.head, headAfter(state));
-    const at =
-      anchor ??
-      (caret
-        ? { left: caret.left, top: caret.top, bottom: caret.bottom }
-        : { left: 0, top: 0, bottom: 0 });
+    const at = anchor ?? caretAnchor(state);
     const close = () => {
       tablePicker.value = null;
       view.focus();

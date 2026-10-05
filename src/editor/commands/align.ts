@@ -17,9 +17,7 @@ export type Align = "left" | TextAlignment;
  * alignedBlocks returns the paragraphs and headings at the top of the
  * document the selection touches, with their positions; none in a table
  */
-export const alignedBlocks = (
-  state: EditorState,
-): { pos: number; node: Node }[] => {
+const alignedBlocks = (state: EditorState): { pos: number; node: Node }[] => {
   if (isInTable(state)) return [];
   const { $from, $to } = state.selection;
   // the top-level blocks from the one the selection starts in to the one it
@@ -84,8 +82,11 @@ export const alignText =
     if (dispatch) {
       const value =
         align === "left" || alignmentAt(state) === align ? null : align;
+      // only the blocks it changes, so aligning text as it is changes nothing
+      const changed = blocks.filter(({ node }) => node.attrs.align !== value);
+      if (changed.length === 0) return true;
       const tr = state.tr;
-      for (const { pos } of blocks) tr.setNodeAttribute(pos, "align", value);
+      for (const { pos } of changed) tr.setNodeAttribute(pos, "align", value);
       dispatch(tr.scrollIntoView());
     }
     return true;

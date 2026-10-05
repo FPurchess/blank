@@ -31,7 +31,11 @@ const chosen = defineModel<Chosen<T>>({ required: true });
 const toggles = Array.isArray(chosen.value);
 const row = useTemplateRef<HTMLElement>("row");
 // the option in the tab order, which ←→ move; in a radio group they check it
-const { current, onKeydown: move } = useRovingFocus(
+const {
+  current,
+  onKeydown: move,
+  follow,
+} = useRovingFocus(
   () => row.value,
   ".options button",
   firstStop(chosen.value, props.options),
@@ -41,7 +45,7 @@ const { current, onKeydown: move } = useRovingFocus(
 );
 
 const press = (index: number, event: MouseEvent) => {
-  current.value = index;
+  follow(event.currentTarget);
   chosen.value = chooseAt(chosen.value, props.options, index);
   // WebKit doesn't focus a clicked button, and ↑↓ go on from the checked one
   if (!toggles) (event.currentTarget as HTMLButtonElement).focus();

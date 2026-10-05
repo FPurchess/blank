@@ -6,7 +6,7 @@ titleTemplate: Blank
 hero:
   name: Blank
   text: A quiet place to write
-  tagline: A minimalist markdown editor for Linux, macOS and Windows. No toolbars, no distractions, just you and the next sentence.
+  tagline: A minimalist markdown editor for Linux, macOS and Windows. No clutter, no distractions, just you and the next sentence.
   image:
     src: /app-icon.svg
     alt: ""

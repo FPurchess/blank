@@ -3,15 +3,14 @@ import type { Command, EditorState } from "prosemirror-state";
 import { liftTarget } from "prosemirror-transform";
 
 import { schema } from "../../markdown";
+import { rangeIn } from "./around";
 
 /**
  * quoteRange returns the range of the selected blocks in the quote they're
  * in, or null if they aren't in one
  */
-const quoteRange = (state: EditorState) => {
-  const { $from, $to } = state.selection;
-  return $from.blockRange($to, (node) => node.type === schema.nodes.blockquote);
-};
+const quoteRange = (state: EditorState) =>
+  rangeIn(state, (node) => node.type === schema.nodes.blockquote);
 
 /**
  * inQuote tells whether the selection is in a quote

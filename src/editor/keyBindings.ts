@@ -75,8 +75,11 @@ export const formatShortcut = (binding: string) => {
  * commandShortcut returns the key bound to `command`, as the platform shows
  * it, for tooltips and hints
  */
-export const commandShortcut = (command: CommandIdentifier) =>
-  formatShortcut(getKeyBinding(command));
+export const commandShortcut = (command: CommandIdentifier) => {
+  const binding = getKeyBinding(command);
+  // a command may have no key (an empty one in blank.json)
+  return binding ? formatShortcut(binding) : undefined;
+};
 
 // the names aria-keyshortcuts gives the modifiers, by the names a binding may
 // use; Mod is Meta on macOS, Control elsewhere

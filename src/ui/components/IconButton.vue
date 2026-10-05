@@ -9,7 +9,8 @@ import IconGlyph from "./IconGlyph.vue";
 // tooltip the label (or `tip`, e.g. the command's longer name) and the
 // command's shortcut (or `tipKey`). `pressed` makes it a toggle;
 // `focusable: false` keeps it out of the tab order, for bars whose keys the
-// editor handles. It's disabled with aria-disabled, so
+// editor handles, and `tabindex` puts it in a row with one tab stop
+// (useRovingFocus). It's disabled with aria-disabled, so
 // it still shows its tooltip; the click is the parent's, which checks.
 // Vue reads a missing boolean prop as false, so `pressed` defaults to
 // undefined: a button that isn't a toggle has no aria-pressed.
@@ -23,6 +24,7 @@ const props = withDefaults(
     pressed?: boolean;
     disabled?: boolean;
     focusable?: boolean;
+    tabindex?: number;
     large?: boolean;
   }>(),
   {
@@ -31,6 +33,7 @@ const props = withDefaults(
     tipKey: undefined,
     pressed: undefined,
     focusable: true,
+    tabindex: undefined,
   },
 );
 
@@ -51,7 +54,7 @@ const tip = computed(() =>
     :aria-label="label"
     :aria-pressed="pressed"
     :aria-disabled="disabled || undefined"
-    :tabindex="focusable ? undefined : -1"
+    :tabindex="tabindex ?? (focusable ? undefined : -1)"
   >
     <IconGlyph :name="icon" :size="large ? 'large' : undefined" />
     <slot />

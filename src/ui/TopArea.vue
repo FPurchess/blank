@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { keepFocus } from "../dom";
 import { noPrimaryPaste } from "../editor/pagePointer";
 import FormatToolbar from "./FormatToolbar.vue";
-import { keepFocus } from "./toolbarModel";
 import TabRow from "./TabRow.vue";
 
 // The top of the window, on the desk above the pages: the tab row and the
@@ -12,7 +12,7 @@ import TabRow from "./TabRow.vue";
 <template>
   <header id="ui-top" @mousedown="keepFocus" @mouseup="noPrimaryPaste">
     <TabRow />
-    <div class="top-row toolbar-row">
+    <div class="top-row">
       <FormatToolbar />
     </div>
   </header>

@@ -161,9 +161,9 @@ export const importDocx = async (
   const dom = new DOMParser().parseFromString(html, "text/html");
   const report = cleanup(dom);
   const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
-  // only blocks at the top keep an alignment (src/markdown/alignment.ts), and
-  // a column the alignment its body cells agree on, as markdown aligns
-  // and links aren't underlined, which Word does with a style
+  // only blocks at the top keep an alignment (src/markdown/alignment.ts), a
+  // column keeps the alignment its body cells agree on, as markdown aligns
+  // columns, and links lose an underline Word users gave them
   const body = withoutNestedAlignment(
     parsed.copy(
       withoutLinkUnderline(mapTables(parsed.content, withColumnAlignment)),

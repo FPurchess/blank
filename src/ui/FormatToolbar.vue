@@ -23,12 +23,12 @@ import {
   insertMenuItems,
   moreMenuItems,
   overflowCut,
-  PARTS,
+  partWidths,
   type PartId,
+  sameParts,
   styleLabel,
   styleMenuItems,
 } from "./formatToolbarModel";
-import { keepFocus } from "./toolbarModel";
 import ToolbarButton from "./ToolbarButton.vue";
 import ToolbarMenuButton from "./ToolbarMenuButton.vue";
 
@@ -56,29 +56,7 @@ const style = computed(() => styleLabel(blockStyleAt(editor.state.value)));
 const cut = shallowRef<ReadonlySet<PartId>>(new Set());
 const shown = computed(() => entries(items.value, cut.value));
 let widths: Record<PartId, number> | null = null;
-let moreWidth = 0;
 
-const measure = () => {
-  const element = root.value;
-  if (!element) return;
-  let previous = Number.NaN;
-  const measured = {} as Record<PartId, number>;
-  for (const part of PARTS) {
-    const boxes = [...element.querySelectorAll(`[data-part="${part.id}"]`)].map(
-      (control) => control.getBoundingClientRect(),
-    );
-    if (boxes.length === 0) return;
-    const right = Math.max(...boxes.map((box) => box.right));
-    const left = Number.isNaN(previous)
-      ? Math.min(...boxes.map((box) => box.left))
-      : previous;
-    measured[part.id] = right - left;
-    previous = right;
-  }
-  widths = measured;
-  const button = element.querySelector("button");
-  moreWidth = (button?.getBoundingClientRect().width ?? 28) + 2;
-};
 const fit = () => {
   const element = root.value;
   if (!element || !widths) return;
@@ -87,29 +65,40 @@ const fit = () => {
     element.clientWidth -
     parseFloat(style.paddingLeft || "0") -
     parseFloat(style.paddingRight || "0");
+  // the More button, or another icon button of its size while it's away
+  const more =
+    element.querySelector("[data-more]") ?? element.querySelector("button");
+  const moreWidth = (more?.getBoundingClientRect().width ?? 0) + 2;
   const next = overflowCut(widths, moreWidth, available);
-  const same =
-    next.size === cut.value.size && [...next].every((id) => cut.value.has(id));
-  if (!same) cut.value = next;
+  if (!sameParts(next, cut.value)) cut.value = next;
 };
 // measured with every part shown, then fitted
 const remeasure = async () => {
   cut.value = new Set();
   await nextTick();
-  measure();
+  const element = root.value;
+  if (!element) return;
+  widths = partWidths((part) =>
+    [...element.querySelectorAll(`[data-part="${part}"]`)].map((control) =>
+      control.getBoundingClientRect(),
+    ),
+  );
   fit();
 };
 
 let resized: ResizeObserver | undefined;
 onMounted(() => {
   void remeasure();
+  // again once the font of the labels is there
   void document.fonts?.ready.then(remeasure);
+  document.fonts?.addEventListener("loadingdone", remeasure);
   if (typeof ResizeObserver === "undefined" || !root.value) return;
   resized = new ResizeObserver(() => fit());
   resized.observe(root.value);
 });
 onUnmounted(() => {
   resized?.disconnect();
+  document.fonts?.removeEventListener("loadingdone", remeasure);
   toolbarFocused.value = false;
 });
 
@@ -121,12 +110,25 @@ const stops = computed(() => {
   }
   return order;
 });
-const { current, onKeydown, focusCurrent } = useRovingFocus(
+const { current, onKeydown, follow, clamp, focusCurrent } = useRovingFocus(
   () => root.value,
   "button",
 );
 const tabindexOf = (key: string) =>
   stops.value.get(key) === current.value ? 0 : -1;
+
+// a part moved into More takes its buttons along, the focused one too: the
+// focus goes to the button now in the tab order, rather than nowhere
+watch(
+  shown,
+  () => {
+    clamp();
+    if (toolbarFocused.value && !root.value?.contains(document.activeElement)) {
+      focusCurrent();
+    }
+  },
+  { flush: "post" },
+);
 
 watch(toolbarFocusRequest, (request) => {
   if (request) void nextTick(focusCurrent);
@@ -135,9 +137,7 @@ watch(toolbarFocusRequest, (request) => {
 const onFocusIn = (event: FocusEvent) => {
   toolbarFocused.value = true;
   // the control the focus went to is the one in the tab order
-  const controls = [...(root.value?.querySelectorAll("button") ?? [])];
-  const index = controls.indexOf(event.target as HTMLButtonElement);
-  if (index >= 0) current.value = index;
+  follow(event.target);
 };
 const onFocusOut = (event: FocusEvent) => {
   if (!root.value?.contains(event.relatedTarget as Node | null)) {
@@ -171,7 +171,6 @@ const moreItems = (anchor: Anchor) =>
     ref="root"
     role="toolbar"
     aria-label="Formatting"
-    @mousedown="keepFocus"
     @keydown="onKey"
     @focusin="onFocusIn"
     @focusout="onFocusOut"
@@ -210,6 +209,7 @@ const moreItems = (anchor: Anchor) =>
         icon="more"
         :chevron="false"
         :items="moreItems"
+        data-more
         :tabindex="tabindexOf(entry.key)"
       />
       <span

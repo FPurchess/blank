@@ -1,11 +1,7 @@
 import type { Node } from "prosemirror-model";
 
 // what a visit is called with: the node, its position and its parent
-export type Visit = (
-  node: Node,
-  pos: number,
-  parent: Node | null,
-) => boolean | void;
+type Visit = (node: Node, pos: number, parent: Node | null) => boolean | void;
 
 /**
  * changedDescendants calls `f` for the descendants of `cur` that aren't in

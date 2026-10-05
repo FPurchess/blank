@@ -10,7 +10,9 @@ import { stepTo } from "../rovingModel";
  * `tabindex="index === current ? 0 : -1"` and passes its keys to `onKeydown`.
  * @param start the control in the tab order at first
  * @param moved told the control the keys moved to, e.g. to choose it
- * @returns `onKeydown`, which says whether it took the key, and
+ * @returns `onKeydown`, which says whether it took the key; `follow`, which
+ *   makes the control the focus or a click went to the current one;
+ *   `clamp`, which keeps `current` in the row after it lost controls; and
  *   `focusCurrent`
  */
 export const useRovingFocus = (
@@ -24,10 +26,17 @@ export const useRovingFocus = (
     const element = root();
     return element ? shownIn(element, selectors) : [];
   };
+  const clamp = () => {
+    const last = Math.max(0, controls().length - 1);
+    if (current.value > last) current.value = last;
+  };
   const focusCurrent = () => {
-    const shown = controls();
-    current.value = Math.min(current.value, Math.max(0, shown.length - 1));
-    shown[current.value]?.focus();
+    clamp();
+    controls()[current.value]?.focus();
+  };
+  const follow = (control: EventTarget | null) => {
+    const index = controls().indexOf(control as HTMLElement);
+    if (index >= 0) current.value = index;
   };
   const onKeydown = (event: KeyboardEvent) => {
     const shown = controls();
@@ -39,5 +48,5 @@ export const useRovingFocus = (
     shown[next]?.focus();
     return true;
   };
-  return { current, onKeydown, focusCurrent };
+  return { current, onKeydown, follow, clamp, focusCurrent };
 };

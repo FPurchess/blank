@@ -46,6 +46,20 @@ describe("markActive", () => {
     ).toBe(false);
   });
 
+  it("leaves out the spaces at the selection's edges, as pressing Bold does", () => {
+    const spaced = doc(
+      schema.node("paragraph", null, [
+        schema.text("a "),
+        schema.text("foo", [strong.create()]),
+        schema.text(" b"),
+      ]),
+    );
+    // " foo", from the space before the bold word
+    expect(markActive(createState(spaced, { cursor: [2, 6] }), strong)).toBe(
+      true,
+    );
+  });
+
   it("is false for a selection without text", () => {
     const empty = doc(p(), p());
     expect(markActive(createState(empty, { cursor: [1, 3] }), strong)).toBe(

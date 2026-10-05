@@ -31,11 +31,12 @@ $top-bar-height: $tab-row-height + $toolbar-height;
 }
 
 // the formatting toolbar (src/ui/FormatToolbar.vue): a row centered over the
-// pages, which never wraps; what doesn't fit goes into its More menu
+// pages, which never wraps; what doesn't fit goes into its More menu. It's
+// centered by the margins of its ends, which never go below 0, so a row
+// wider than the window clips at its end, never its start.
 #format-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 2px;
   width: 100%;
   height: 100%;
@@ -43,6 +44,14 @@ $top-bar-height: $tab-row-height + $toolbar-height;
   box-sizing: border-box;
   overflow: hidden;
   white-space: nowrap;
+
+  > :first-child {
+    margin-left: auto;
+  }
+
+  > :last-child {
+    margin-right: auto;
+  }
 
   .separator {
     @include separator;

@@ -34,7 +34,7 @@ const outDir = path.resolve(
   "public",
   "screenshots",
 );
-// opened from a neutral path, since the app shows it in the top bar
+// opened from a neutral path, since the app shows it in the top area
 const sample = path.join(os.tmpdir(), "on-writing.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 

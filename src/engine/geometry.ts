@@ -555,8 +555,6 @@ export const scrollState = (): {
   };
 };
 
-export { READING_LINE };
-
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
  * top of the view, as far as the view scrolls, without moving the selection

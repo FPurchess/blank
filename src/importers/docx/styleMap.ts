@@ -3,7 +3,7 @@ import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import { TOC_STYLE } from "./toc";
 import { FORM_STYLE } from "./forms";
 import { EMBED_STYLE } from "./embeds";
-import { ALIGN_STYLES, alignClass, type WordAlignment } from "./align";
+import { ALIGN_CLASS, alignStyle, WORD_ALIGNMENTS } from "./align";
 
 // How the styles of Word, LibreOffice, pandoc and Blank's own Word export
 // (src/exporters/docx/template.ts) map to the HTML the markdown schema reads.
@@ -88,9 +88,8 @@ export const STYLE_MAP = [
   `p.${FORM_STYLE} => p.${FORM_CLASS}:fresh`,
   `p.${EMBED_STYLE} => p.${EMBED_CLASS}:fresh`,
   // the runs that mark an aligned paragraph, see align.ts
-  ...Object.entries(ALIGN_STYLES).map(
-    ([align, style]) =>
-      `r.${style} => span.${alignClass(align as WordAlignment)}`,
+  ...WORD_ALIGNMENTS.map(
+    (align) => `r.${alignStyle(align)} => span.${ALIGN_CLASS}${align}`,
   ),
   // underlined runs; links' underlines go in importDocx
   "u => u",

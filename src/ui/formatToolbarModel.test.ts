@@ -27,6 +27,8 @@ import {
   OVERFLOW_ORDER,
   overflowCut,
   PARTS,
+  partWidths,
+  sameParts,
   type PartId,
   pressedOf,
   styleLabel,
@@ -76,7 +78,8 @@ describe("formatItems", () => {
     const first = itemsOf(plain);
     const typed = plain.apply(plain.tr.insertText("x"));
     const second = formatItems(typed, can(typed), vi.fn(), first);
-    expect(second.every((item, index) => item === first[index])).toBe(true);
+    // the list itself too, so the row isn't patched while typing
+    expect(second).toBe(first);
     // in the bold text, Bold is pressed: a new object for it alone
     const bold = createState(text, { cursor: 3 });
     const third = formatItems(bold, can(bold), vi.fn(), second);
@@ -213,6 +216,38 @@ describe("overflowCut", () => {
   });
 });
 
+describe("partWidths", () => {
+  it("measures each part from the end of the one before it", () => {
+    let left = 10;
+    const boxes = Object.fromEntries(
+      PARTS.map((part) => {
+        const box = { left: left + 6, right: left + 6 + 40 };
+        left = box.right;
+        return [part.id, [box]];
+      }),
+    ) as Record<PartId, { left: number; right: number }[]>;
+    const widths = partWidths((part) => boxes[part])!;
+    // the first from its own start, the others with the 6 px before them
+    expect(widths.history).toBe(40);
+    expect(widths.insert).toBe(46);
+    expect(partWidths(() => [])).toBeNull();
+  });
+});
+
+describe("sameParts", () => {
+  it("compares the parts two sets hold", () => {
+    expect(
+      sameParts(new Set<PartId>(["insert"]), new Set<PartId>(["insert"])),
+    ).toBe(true);
+    expect(
+      sameParts(new Set<PartId>(["insert"]), new Set<PartId>(["align"])),
+    ).toBe(false);
+    expect(sameParts(new Set<PartId>(), new Set<PartId>(["align"]))).toBe(
+      false,
+    );
+  });
+});
+
 describe("the style menu", () => {
   it("names the style, and nothing where it differs", () => {
     expect(styleLabel("paragraph")).toBe("Text");
@@ -285,7 +320,7 @@ describe("the Insert and More menus", () => {
     const center = entry(more, `more-${C.FORMAT_ALIGN_CENTER}`);
     expect(center).toMatchObject({ label: "Center", icon: "align-center" });
     const left = entry(more, `more-${C.FORMAT_ALIGN_LEFT}`);
-    expect(left.checked).toBe(true);
+    expect(left).toMatchObject({ checked: true, radio: true });
     expect(entry(more, "more-insert").children).toHaveLength(4);
     expect(more.filter((item) => item === "separator")).toHaveLength(1);
   });

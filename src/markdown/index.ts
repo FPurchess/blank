@@ -19,7 +19,7 @@ import { markdownSerializer } from "./serializer";
 export { type Alignment, headerRowCount, isHeaderCell, schema } from "./schema";
 export {
   alignOf,
-  nestedAlignments,
+  nestedAlignment,
   type TextAlignment,
   textAlignment,
   withoutNestedAlignment,

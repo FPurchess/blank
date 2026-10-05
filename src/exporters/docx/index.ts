@@ -17,10 +17,9 @@ import {
   prepareImages,
 } from "../../images/prepare";
 import { pageGeometry } from "../../layout/resolve";
-import { alignOf, frontmatterOf } from "../../markdown";
+import { alignOf, frontmatterOf, type TextAlignment } from "../../markdown";
 import { listStart } from "../../markdown/lists";
 import type { Alignment, MarkName, NodeName } from "../../markdown/schema";
-import type { TextAlignment } from "../../markdown/alignment";
 import {
   isListed,
   type ListedHeading,
@@ -275,8 +274,8 @@ class Serializer {
   }
 
   /**
-   * alignment returns the alignment of a paragraph or heading for Word, which
-   * calls justified text "both"
+   * alignment returns the Word alignment of a paragraph or heading, none for
+   * left
    */
   private alignment(node: Node) {
     const align = alignOf(node);

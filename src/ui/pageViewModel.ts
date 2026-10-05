@@ -175,8 +175,10 @@ export const sheetSlots = (
  * bandTitle returns the tooltip of a header or footer on the pages, which
  * opens its strip on a double click
  */
-export const bandTitle = (band: Band) =>
-  `Double-click to edit the ${band} (${commandShortcut(bandCommand(band))})`;
+export const bandTitle = (band: Band) => {
+  const key = commandShortcut(bandCommand(band));
+  return `Double-click to edit the ${band}${key ? ` (${key})` : ""}`;
+};
 
 /**
  * caretLine returns where the caret at `left` is drawn: 1.5 pixels wide

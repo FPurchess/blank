@@ -1,3 +1,4 @@
+import type { Node } from "prosemirror-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,11 +15,18 @@ import {
 } from "../test/editor";
 import {
   alignOf,
-  nestedAlignments,
+  nestedAlignment,
   textAlignment,
   withoutNestedAlignment,
 } from "./alignment";
 import { parseMarkdown, schema, serializeMarkdown } from "./index";
+
+// the positions of the aligned blocks that aren't at the top
+const nestedAlignments = (doc: Node) => {
+  const found: number[] = [];
+  doc.descendants(nestedAlignment(doc, (pos) => found.push(pos)));
+  return found;
+};
 
 const aligns = (text: string) =>
   parseMarkdown(text).content.content.map((node) => [
@@ -129,6 +137,34 @@ describe("reading markdown", () => {
       ["bullet_list", null],
       ["paragraph", null],
     ]);
+  });
+
+  it("counts a <div> without an alignment inside a wrapper, which keeps its alignment", () => {
+    expect(
+      aligns(
+        '<div align="center">\n\n<div>\n\ninner\n\n</div>\n\nstill\n\n</div>\n\nafter\n',
+      ),
+    ).toEqual([
+      ["paragraph", "center"],
+      ["paragraph", "center"],
+      ["paragraph", null],
+    ]);
+    // outside one it stays text, like other HTML
+    expect(
+      parseMarkdown("<div>\n\nx\n\n</div>\n").firstChild!.textContent,
+    ).toBe("<div>");
+  });
+
+  it("reads align without quotes, and a style before align, but no data-align", () => {
+    expect(aligns("<p align=center>hi</p>\n")).toEqual([
+      ["paragraph", "center"],
+    ]);
+    expect(
+      aligns('<p align="right" style="text-align: center">hi</p>\n'),
+    ).toEqual([["paragraph", "center"]]);
+    expect(
+      parseMarkdown('<p data-align="center">hi</p>\n').firstChild!.attrs.align,
+    ).toBeNull();
   });
 
   it("keeps a </div> without a <div> before it as text", () => {

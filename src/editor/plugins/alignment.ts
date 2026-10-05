@@ -1,5 +1,6 @@
 import { Plugin } from "prosemirror-state";
 
+import { nestedAlignment } from "../../markdown";
 import { changedDescendants } from "./changed";
 
 /**
@@ -15,11 +16,12 @@ export const alignmentGuard = () =>
     appendTransaction(transactions, oldState, state) {
       if (!transactions.some((tr) => tr.docChanged)) return null;
       const nested: number[] = [];
-      changedDescendants(oldState.doc, state.doc, 0, (node, pos, parent) => {
-        if (!node.isTextblock) return true;
-        if (parent !== state.doc && node.attrs.align) nested.push(pos);
-        return false;
-      });
+      changedDescendants(
+        oldState.doc,
+        state.doc,
+        0,
+        nestedAlignment(state.doc, (pos) => nested.push(pos)),
+      );
       if (nested.length === 0) return null;
       const tr = state.tr;
       for (const pos of nested) tr.setNodeAttribute(pos, "align", null);

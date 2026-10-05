@@ -32,7 +32,7 @@ afterEach(() => dispose());
 const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
 const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
-describe("top bar and counter", () => {
+describe("top area and counter", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     path.value = null;
