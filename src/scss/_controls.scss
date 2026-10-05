@@ -1,6 +1,7 @@
 // The controls' looks and states (see .claude/rules/design.md), built from
 // the tokens of _tokens.scss: mixins that the existing selectors include, and
 // classes only for what a component uses.
+@use "reset";
 
 // hover and press only show while a control can be used
 $enabled: ':not(:disabled, [aria-disabled="true"])';
@@ -189,6 +190,20 @@ $tip-key: 75%;
   color: var(--muted);
 }
 
+// the UI's text, at 13/20: set on the roots of the chrome (the top area, the
+// side panes, what floats), never on the editor, whose type is the document's
+@mixin ui-text {
+  font-size: var(--ui);
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+
+  // the reset sets every element's line height to 1.5em of its own size;
+  // inside, the elements inherit the 20px, unless a rule of theirs says more
+  :where(&) :is(#{reset.$elements}) {
+    line-height: inherit;
+  }
+}
+
 // a line between groups of controls
 @mixin separator {
   align-self: stretch;
@@ -313,6 +328,7 @@ textarea:not(:disabled) {
   color: var(--color);
   background-color: var(--desk-color);
   user-select: none;
+  @include ui-text;
   @if $edge == left {
     border-right: 1px solid var(--line);
   } @else {
@@ -328,14 +344,16 @@ textarea:not(:disabled) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--s2);
-  padding: var(--s3) var(--s3) var(--s2) var(--s4);
+  gap: var(--s1);
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
 }
 
+// an h2 for screen readers, in the UI's type, not the document's headings'
 @mixin side-pane-title {
   margin: 0;
-  font-size: 0.9rem;
+  font: inherit;
   font-weight: 500;
+  letter-spacing: normal;
 }
 
 @mixin side-pane-foot {

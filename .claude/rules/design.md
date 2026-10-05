@@ -29,7 +29,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
 - **Sizes and spacing:**
   - the 8px grid `--s1…--s8` (4, 8, 12, 16, 24, 32, 48);
   - `--control` 28 (icon and text buttons), `--row` 32 (menu rows), `--status-item` 24;
-  - `--ui-small` 12px (status items, tooltips);
+  - type: `--ui` 13px for all UI text at 13/20, `--ui-small` 12px (status items, hints, tooltips) at 12/16. The chrome's roots (the top area, the side panes, the outline, the menus and what floats) include `ui-text` (`_controls.scss`), which gives their elements the 20px back from the reset's 1.5em. Never size UI text in `rem`: the root stays at the editor's 16.5px;
   - radii `--r-control` 6, `--r-pop` 8 (what floats) and `--r-dialog` 12 (dialogs still use 6 until the settings dialog).
 - **Motion:** `--fade-in` 100, `--fade-out` 150, `--chrome-in` 300 and `--chrome-out` 700 (focus mode), with `--ease` and `--ease-soft`. Motion is only feedback.
   - Every new `transition` or `animation` gets its selector in main.scss's `prefers-reduced-motion` block (`motion.test.ts` checks it), which also zeroes the timings.
