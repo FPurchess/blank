@@ -16,7 +16,8 @@ import IconGlyph from "./IconGlyph.vue";
 // undefined: a button that isn't a toggle has no aria-pressed.
 const props = withDefaults(
   defineProps<{
-    icon: string;
+    // none for a button that only says its name, e.g. the style menu's
+    icon?: string;
     label: string;
     tip?: string;
     command?: CommandIdentifier;
@@ -29,6 +30,7 @@ const props = withDefaults(
   }>(),
   {
     tip: undefined,
+    icon: undefined,
     command: undefined,
     tipKey: undefined,
     pressed: undefined,
@@ -56,7 +58,7 @@ const tip = computed(() =>
     :aria-disabled="disabled || undefined"
     :tabindex="tabindex ?? (focusable ? undefined : -1)"
   >
-    <IconGlyph :name="icon" :size="large ? 'large' : undefined" />
+    <IconGlyph v-if="icon" :name="icon" :size="large ? 'large' : undefined" />
     <slot />
   </button>
 </template>

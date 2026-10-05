@@ -6,7 +6,8 @@ import { schema } from "../markdown";
 import {
   type MenuItem,
   contextMenu,
-  focusToolbar,
+  cycleFocus,
+  focusStop,
   tablePicker,
   toolbarFocused,
   uiTakesFocus,
@@ -104,7 +105,7 @@ describe("the formatting toolbar", () => {
   it("takes the focus from Alt-F10, moves with the arrows and gives it back on Escape", async () => {
     await mount();
     const focus = vi.spyOn(editor.view, "focus");
-    focusToolbar();
+    focusStop("toolbar");
     await nextTick();
     await nextTick();
     expect(document.activeElement).toBe(button("undo"));
@@ -130,6 +131,14 @@ describe("the formatting toolbar", () => {
 
     key("Escape");
     expect(focus).toHaveBeenCalled();
+  });
+
+  it("is the stop F6 comes to after the tab row", async () => {
+    await mount();
+    // backwards from the text, the last part of the window
+    cycleFocus(-1, null, () => {});
+    await nextTick();
+    expect(toolbar().contains(document.activeElement)).toBe(true);
   });
 
   it("opens Insert from the keyboard, whose table picker opens below it with the focus in the text", async () => {

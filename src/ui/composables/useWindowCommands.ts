@@ -4,7 +4,8 @@ import { listenOnWindow } from "../../scope";
 import { contextMenu, focusTakingDialogs } from "../../state";
 
 /**
- * useWindowCommands runs the commands of the window (the files, the tabs, F6)
+ * useWindowCommands runs the commands of the window (the files, the tabs, F6,
+ * Alt-F10)
  * on their keys wherever the focus is, e.g. in the tab row or the blocks
  * pane, not only in the editor, whose own keymap runs them there. A dialog
  * or menu that is open keeps its keys.

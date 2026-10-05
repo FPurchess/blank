@@ -1,0 +1,76 @@
+// The formatting toolbar (src/ui/FormatToolbar.vue), the second row of the
+// top area: a row centered over the pages, which never wraps; what doesn't
+// fit goes into its More menu.
+@use "controls" as *;
+
+// A .top-row, centered by the margins of its ends, which never go below 0,
+// so a row wider than the window clips at its end, never its start.
+#format-toolbar {
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0 var(--s2);
+  overflow: hidden;
+  white-space: nowrap;
+
+  > :first-child {
+    margin-left: auto;
+  }
+
+  > :last-child {
+    margin-right: auto;
+  }
+
+  .separator {
+    @include separator;
+    align-self: center;
+    height: 16px;
+    margin: 0 var(--s1);
+  }
+}
+
+// a button of the toolbar that opens a menu: its icon or text and an arrow
+.toolbar-menu-button:not(.icon-only) {
+  @include icon-text-button;
+
+  // the style menu's button: the selection's style in a box of its own
+  // width, so the row doesn't move while the caret does
+  &.style-select {
+    justify-content: space-between;
+    width: 116px;
+    padding: 0 6px 0 10px;
+    border: 1px solid var(--line-strong);
+
+    .text {
+      overflow: clip;
+      text-overflow: ellipsis;
+    }
+  }
+}
+
+// the labels of the toolbar's style menu, each drawn like what it makes:
+// the headings a step smaller on their major-third scale, in their weights
+.context-menu {
+  .style-heading1 .label {
+    font-size: 1.5625em;
+    font-weight: 500;
+  }
+  .style-heading2 .label {
+    font-size: 1.25em;
+    font-weight: 500;
+  }
+  .style-heading3 .label {
+    font-weight: 500;
+  }
+  .style-heading4 .label,
+  .style-heading5 .label {
+    font-weight: 700;
+  }
+  .style-heading5 .label,
+  .style-heading6 .label,
+  .style-quote .label {
+    font-style: italic;
+  }
+  .style-code_block .label {
+    font-family: monospace;
+  }
+}

@@ -41,6 +41,7 @@ import {
   pageViewport,
   tabSwitch,
 } from "../state";
+import { useResizeObserver } from "./composables/useResizeObserver";
 import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
@@ -260,14 +261,11 @@ onUnmounted(() => resolution?.removeEventListener("change", onRatio));
 
 onMounted(() => measure());
 // e.g. when an open strip of a header or footer takes room of the window
-let resized: ResizeObserver | undefined;
-onMounted(() => {
-  if (typeof ResizeObserver === "undefined" || !scroller.value) return;
-  resized = new ResizeObserver(() => measure());
-  resized.observe(scroller.value);
-});
+useResizeObserver(
+  () => [scroller.value],
+  () => measure(),
+);
 onUnmounted(() => {
-  resized?.disconnect();
   if (scrolled !== undefined) cancelAnimationFrame(scrolled);
   pageViewport.value = null;
 });

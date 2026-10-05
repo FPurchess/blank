@@ -330,7 +330,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
   [C.VIEW_TOOLBAR_FOCUS]: {
     group: "View",
     label: "Go to the toolbar",
-    icon: "more",
+    icon: "focus",
     aliases: ["formatting", "focus", "keyboard"],
   },
   [C.VIEW_PAGES]: {
@@ -398,13 +398,14 @@ export const commandLabel = (command: CommandIdentifier) => byId[command].label;
 
 /**
  * commandItem returns the menu item of a command, named and with the key as
- * the command list and the keymap have them, e.g. for the context menu and
- * the toolbar's menus
+ * the command list and the keymap have them, e.g. for the context menu, the
+ * toolbar's menus and a tab's; `item` may leave the key out
+ * (`shortcut: undefined`)
  */
 export const commandItem = (
   id: string,
   command: CommandIdentifier,
-  item: Omit<Exclude<MenuItem, "separator">, "id" | "label" | "shortcut">,
+  item: Omit<Exclude<MenuItem, "separator">, "id" | "label">,
 ): MenuItem => ({
   id,
   label: commandLabel(command),

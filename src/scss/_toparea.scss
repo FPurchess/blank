@@ -1,6 +1,7 @@
 // The top area of the window (src/ui/TopArea.vue): two rows on the desk, the
-// tab row and the formatting toolbar, each with
-// a line below it. The pages start below it. The rows bring their own styles.
+// tab row and the formatting toolbar, each with a line below it. The pages
+// start below it. The rows bring their own styles (_tabs.scss,
+// _formatToolbar.scss).
 @use "controls" as *;
 
 // the heights of the rows (TAB_ROW_HEIGHT and TOOLBAR_HEIGHT in src/chrome.ts)
@@ -28,61 +29,4 @@ $top-bar-height: $tab-row-height + $toolbar-height;
   min-width: 0;
   box-sizing: border-box;
   border-bottom: 1px solid var(--line);
-}
-
-// the formatting toolbar (src/ui/FormatToolbar.vue): a row centered over the
-// pages, which never wraps; what doesn't fit goes into its More menu. It's
-// centered by the margins of its ends, which never go below 0, so a row
-// wider than the window clips at its end, never its start.
-#format-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  width: 100%;
-  height: 100%;
-  padding: 0 var(--s2);
-  box-sizing: border-box;
-  overflow: hidden;
-  white-space: nowrap;
-
-  > :first-child {
-    margin-left: auto;
-  }
-
-  > :last-child {
-    margin-right: auto;
-  }
-
-  .separator {
-    @include separator;
-    align-self: center;
-    height: 16px;
-    margin: 0 var(--s1);
-  }
-}
-
-// a button that opens a menu: its icon or text and an arrow
-.toolbar-menu-button {
-  display: inline-flex;
-  gap: 6px;
-  padding: 0 var(--s1);
-  font-size: var(--ui-small);
-
-  &.wide {
-    padding: 0 var(--s2);
-  }
-
-  // the style menu's button: the selection's style in a box of its own
-  // width, so the row doesn't move while the caret does
-  &.style-select {
-    justify-content: space-between;
-    width: 116px;
-    padding: 0 6px 0 10px;
-    border: 1px solid var(--line-strong);
-
-    .text {
-      overflow: clip;
-      text-overflow: ellipsis;
-    }
-  }
 }

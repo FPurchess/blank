@@ -56,6 +56,14 @@ $tip-key: 75%;
   @include states;
 }
 
+// an icon button that also says what it does, e.g. the tab row's Blocks and
+// the toolbar's Insert: its icon, its name and maybe an arrow in a row
+@mixin icon-text-button {
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+}
+
 // a button with text: always with a box, a border or a fill
 @mixin text-button {
   display: inline-flex;

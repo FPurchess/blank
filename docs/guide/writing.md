@@ -12,7 +12,7 @@ From left to right: undo and redo; the style menu (text, headings 1–6, quote a
 
 In a narrow window, what doesn't fit moves into the **More** button (⋯) at the end of the row: first Insert, then alignment, then indent and quote, then the lists.
 
-Prefer the keyboard? `Alt` `F10` takes you into the toolbar. The arrow keys move from button to button, `Home` and `End` jump to the ends, Enter or Space presses a button, `↓` opens a menu, and `Escape` takes you back to your text, right where you were.
+Prefer the keyboard? `Alt` `F10` takes you into the toolbar, and `F6` gets there too, after the tabs. The arrow keys move from button to button, `Home` and `End` jump to the ends, Enter or Space presses a button, `↓` opens a menu, and `Escape` takes you back to your text, right where you were.
 
 ## Bold, italic and underline {#marks}
 
@@ -89,7 +89,7 @@ Keep several documents open at once, each in a tab at the top of the window. `Mo
 - **Close** with `Mod` `W`, the × on a tab or a middle click. Changes you haven't saved show as a dot instead of the ×, and Blank asks whether to save them before the tab closes. `Mod` `Shift` `T` opens the file you closed last again.
 - **Reorder** by dragging a tab, or with `Ctrl` `Shift` `Page Up` and `Page Down`.
 - **Right-click** a tab to close the others or those to its right, to save it, or to copy its file's path.
-- **Get there from the keyboard** with `F6`, which takes you from the text to the tabs and back. The arrow keys move between tabs, `Enter` shows one, `Delete` closes it and `Esc` takes you back to the text.
+- **Get there from the keyboard** with `F6`, which takes you from the text to the tabs, then to the toolbar, and back. The arrow keys move between tabs, `Enter` shows one, `Delete` closes it and `Esc` takes you back to the text.
 
 The window is named after the tab you're in, and pointing at a tab shows where its file is.
 

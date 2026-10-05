@@ -12,8 +12,6 @@ import TabRow from "./TabRow.vue";
 <template>
   <header id="ui-top" @mousedown="keepFocus" @mouseup="noPrimaryPaste">
     <TabRow />
-    <div class="top-row">
-      <FormatToolbar />
-    </div>
+    <FormatToolbar />
   </header>
 </template>

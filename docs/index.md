@@ -21,7 +21,7 @@ hero:
 features:
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M10 13h4M7 16h10"/></svg>'
     title: Your hands stay on the keys
-    details: Headings, lists, links and emphasis are one shortcut, or one typed character, away. There is nothing to click.
+    details: Headings, lists, links and emphasis are one shortcut, or one typed character, away. The toolbar is there when you'd rather click.
     link: /guide/shortcuts
     linkText: The shortcuts
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7c-2 1-3 3-3 6v4h5v-5H6c0-2 1-3 2.5-3.5M17 7c-2 1-3 3-3 6v4h5v-5h-3c0-2 1-3 2.5-3.5"/></svg>'

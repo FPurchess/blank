@@ -6,6 +6,7 @@
 @use "statusbar" as *;
 @use "toparea" as *;
 @use "tabs";
+@use "formatToolbar";
 
 html {
   overflow-y: auto;
@@ -1034,34 +1035,6 @@ $strip-height: 88px;
     font-size: 0.85em;
     white-space: nowrap;
     opacity: 0.6;
-  }
-}
-
-// the labels of the toolbar's style menu, each drawn like what it makes:
-// the headings a step smaller on their major-third scale, in their weights
-.context-menu {
-  .style-heading1 .label {
-    font-size: 1.5625em;
-    font-weight: 500;
-  }
-  .style-heading2 .label {
-    font-size: 1.25em;
-    font-weight: 500;
-  }
-  .style-heading3 .label {
-    font-weight: 500;
-  }
-  .style-heading4 .label,
-  .style-heading5 .label {
-    font-weight: 700;
-  }
-  .style-heading5 .label,
-  .style-heading6 .label,
-  .style-quote .label {
-    font-style: italic;
-  }
-  .style-code_block .label {
-    font-family: monospace;
   }
 }
 

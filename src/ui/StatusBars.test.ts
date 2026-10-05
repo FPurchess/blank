@@ -48,7 +48,7 @@ describe("top area and counter", () => {
         bubbles: true,
         cancelable: true,
       });
-      document.querySelector("#ui-top .toolbar-row")!.dispatchEvent(event);
+      document.querySelector("#format-toolbar")!.dispatchEvent(event);
       return event.defaultPrevented;
     };
 

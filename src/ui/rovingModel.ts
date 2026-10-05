@@ -1,5 +1,6 @@
 // Rows of items the arrow keys move between, of which one is in the tab
-// order (a roving tabindex): the options of OptionGroup.vue, the tabs.
+// order (a roving tabindex): the rows of useRovingFocus (OptionGroup.vue,
+// the formatting toolbar) and the tabs, whose stop follows the shown tab.
 
 /**
  * stepTo returns the item of a row that `key` moves to from `index`, e.g. an

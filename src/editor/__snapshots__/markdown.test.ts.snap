@@ -220,6 +220,7 @@ exports[`markdown > parses the welcome document 1`] = `
     },
     {
       "attrs": {
+        "align": null,
         "level": 3,
       },
       "content": [
@@ -231,6 +232,9 @@ exports[`markdown > parses the welcome document 1`] = `
       "type": "heading",
     },
     {
+      "attrs": {
+        "align": null,
+      },
       "content": [
         {
           "marks": [

@@ -1,7 +1,7 @@
 [package]
 name = "blank"
 version = "3.0.0"
-description = "Blank is a minimalist, opinionated markdown editor made for writing - purely keyboard-based with PDF-Export, available for Linux, macOS and Windows"
+description = "Blank is a minimalist, opinionated markdown editor made for writing - keyboard-first with PDF-Export, available for Linux, macOS and Windows"
 authors = ["Florian Purchess <florian.purchess@googlemail.com>"]
 license = "AGPL-3.0-only"
 edition = "2021"

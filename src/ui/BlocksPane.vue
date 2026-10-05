@@ -32,6 +32,7 @@ import IconGlyph from "./components/IconGlyph.vue";
 import SidePaneHead from "./components/SidePaneHead.vue";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
+import { useFocusRegion } from "./composables/useFocusRegion";
 import { useWindowWidth } from "./composables/useWindowWidth";
 import { tileDrag } from "./tileDrag";
 
@@ -91,16 +92,14 @@ watch(
   { immediate: true },
 );
 
-const onFocusIn = () => (blocksPaneFocused.value = true);
-const onFocusOut = (event: FocusEvent) => {
-  if (!root.value?.contains(event.relatedTarget as Node | null))
-    blocksPaneFocused.value = false;
-};
+const { onFocusin: onFocusIn, onFocusout: onFocusOut } = useFocusRegion(
+  () => root.value,
+  blocksPaneFocused,
+);
 // going while it has the focus, the pane leaves it to the text, not to the
 // body, where typing would go nowhere
 onBeforeUnmount(() => {
   if (root.value?.contains(document.activeElement)) editor.focus();
-  blocksPaneFocused.value = false;
 });
 
 const tileButtons = () => [

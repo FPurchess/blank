@@ -231,13 +231,21 @@ describe("the tab row's keys", () => {
       }),
     );
 
-  it("is where F6 goes from the text, and back", async () => {
+  it("is where F6 goes from the text, then the toolbar, and back", async () => {
     const focus = vi.spyOn(handle.view, "focus");
 
     cycleFocus(1, null, () => handle.focus());
     await nextTick();
     expect(document.activeElement).toBe(tabElement("a"));
     expect(tabRowFocused.value).toBe(true);
+
+    cycleFocus(1, document.activeElement, () => handle.focus());
+    expect(
+      document
+        .querySelector("#format-toolbar")!
+        .contains(document.activeElement),
+    ).toBe(true);
+    expect(tabRowFocused.value).toBe(false);
 
     cycleFocus(1, document.activeElement, () => handle.focus());
     expect(focus).toHaveBeenCalled();
@@ -256,7 +264,7 @@ describe("the tab row's keys", () => {
     expect(select).toHaveBeenCalledWith("b");
   });
 
-  it("closes with Delete, opens the menu with Shift+F10 and leaves with Esc", () => {
+  it("closes with Delete, opens the menu with Shift+F10 and leaves with Esc", async () => {
     const close = closing();
     const focus = vi.spyOn(handle.view, "focus");
     tabElement("a").focus();
@@ -266,7 +274,12 @@ describe("the tab row's keys", () => {
 
     press("a", "F10", true);
     expect(contextMenu.value?.keyboard).toBe(true);
-    contextMenu.value = null;
+    // closed, a menu opened from the keyboard gives its tab the focus back
+    focus.mockClear();
+    contextMenu.value!.close();
+    await nextTick();
+    expect(document.activeElement).toBe(tabElement("a"));
+    expect(focus).not.toHaveBeenCalled();
 
     press("a", "Escape");
     expect(focus).toHaveBeenCalled();

@@ -13,8 +13,10 @@ import type { CommandIdentifier } from "../config";
 import { blockStyleAt } from "../editor/formatState";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
-import { toolbarFocused, toolbarFocusRequest } from "../state";
+import { FOCUS_ORDER, toolbarFocused } from "../state";
 import type { Anchor } from "../state";
+import { useFocusRegion } from "./composables/useFocusRegion";
+import { useResizeObserver } from "./composables/useResizeObserver";
 import { useRovingFocus } from "./composables/useRovingFocus";
 import {
   entries,
@@ -86,21 +88,16 @@ const remeasure = async () => {
   fit();
 };
 
-let resized: ResizeObserver | undefined;
 onMounted(() => {
   void remeasure();
   // again once the font of the labels is there
   void document.fonts?.ready.then(remeasure);
   document.fonts?.addEventListener("loadingdone", remeasure);
-  if (typeof ResizeObserver === "undefined" || !root.value) return;
-  resized = new ResizeObserver(() => fit());
-  resized.observe(root.value);
 });
 onUnmounted(() => {
-  resized?.disconnect();
   document.fonts?.removeEventListener("loadingdone", remeasure);
-  toolbarFocused.value = false;
 });
+useResizeObserver(() => [root.value], fit);
 
 // the controls in the order the keys move through them
 const stops = computed(() => {
@@ -130,20 +127,18 @@ watch(
   { flush: "post" },
 );
 
-watch(toolbarFocusRequest, (request) => {
-  if (request) void nextTick(focusCurrent);
+// F6 comes to the toolbar after the tab row, and Alt-F10 right away
+const region = useFocusRegion(() => root.value, toolbarFocused, {
+  id: "toolbar",
+  order: FOCUS_ORDER.toolbar,
+  focus: focusCurrent,
 });
-
 const onFocusIn = (event: FocusEvent) => {
-  toolbarFocused.value = true;
+  region.onFocusin();
   // the control the focus went to is the one in the tab order
   follow(event.target);
 };
-const onFocusOut = (event: FocusEvent) => {
-  if (!root.value?.contains(event.relatedTarget as Node | null)) {
-    toolbarFocused.value = false;
-  }
-};
+const onFocusOut = region.onFocusout;
 const onKey = (event: KeyboardEvent) => {
   if (onKeydown(event)) return;
   if (event.key === "Escape") {
@@ -169,6 +164,7 @@ const moreItems = (anchor: Anchor) =>
   <div
     id="format-toolbar"
     ref="root"
+    class="top-row"
     role="toolbar"
     aria-label="Formatting"
     @keydown="onKey"
@@ -195,7 +191,6 @@ const moreItems = (anchor: Anchor) =>
       />
       <ToolbarMenuButton
         v-else-if="entry.kind === 'menu'"
-        class="wide"
         label="Insert"
         icon="plus"
         text="Insert"

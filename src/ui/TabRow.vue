@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import {
-  nextTick,
-  onMounted,
-  onUnmounted,
-  shallowRef,
-  useTemplateRef,
-  watch,
-} from "vue";
+import { nextTick, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
 
 import { CommandIdentifier } from "../config";
 import { commandLabel } from "../commandList";
@@ -27,13 +20,15 @@ import { closeTabs, moveTab } from "../editor/tabs";
 import {
   activeTabId,
   blocksPaneOpen,
-  registerFocusStop,
+  FOCUS_ORDER,
   tabRowFocused,
   tabs,
 } from "../state";
 import BlankLogo from "./BlankLogo.vue";
 import IconButton from "./components/IconButton.vue";
+import { useFocusRegion } from "./composables/useFocusRegion";
 import { useMenuButton } from "./composables/useMenuButton";
+import { useResizeObserver } from "./composables/useResizeObserver";
 import DocumentTab from "./DocumentTab.vue";
 import { wheelPixels } from "./scrollModel";
 import { tabDrag } from "./tabDrag";
@@ -89,16 +84,6 @@ const focusTab = (id: string | null) => {
   void nextTick(() => elementOf(id)?.focus());
 };
 
-// F6 comes to the tab row after the text
-onUnmounted(
-  registerFocusStop({
-    id: "tabs",
-    order: 10,
-    focus: () => focusTab(activeTabId.value),
-    has: (element) => !!element && !!list.value?.contains(element),
-  }),
-);
-
 /**
  * close closes the tab `id`. Closed from the keyboard, the focus goes to the
  * tab shown then, rather than away with the tab.
@@ -113,9 +98,11 @@ const close = (id: string, fromKeys = false) => {
   });
 };
 
-// the menu of a tab, at the pointer or below the tab
-const menu = useMenuButton(() => {
-  if (!list.value?.contains(document.activeElement)) editor.focus();
+// the menu of a tab, at the pointer or below the tab: one opened from the
+// keyboard gives its tab the focus back, one opened by a click the text
+const menu = useMenuButton((keyboard) => {
+  if (keyboard) focusTab(stop());
+  else editor.focus();
 });
 const openMenu = (id: string, element: HTMLElement, at?: MouseEvent) => {
   const tab = tabs.value.find((candidate) => candidate.id === id);
@@ -244,17 +231,20 @@ watch(
   { flush: "post" },
 );
 
-const onFocusin = () => (tabRowFocused.value = true);
-const onFocusout = (event: FocusEvent) => {
-  const to = event.relatedTarget as Node | null;
-  if (list.value?.contains(to)) return;
-  tabRowFocused.value = false;
-  // a menu of a tab keeps the tab that opened it in the tab order
-  if (!to || !(to as Element).closest?.(".context-menus")) {
-    focused.value = null;
-  }
-};
-onUnmounted(() => (tabRowFocused.value = false));
+// F6 comes to the tab row after the text; a menu of a tab keeps the tab that
+// opened it in the tab order
+const { onFocusin, onFocusout } = useFocusRegion(
+  () => list.value,
+  tabRowFocused,
+  {
+    id: "tabs",
+    order: FOCUS_ORDER.tabs,
+    focus: () => focusTab(activeTabId.value),
+  },
+  (to) => {
+    if (!to?.closest(".context-menus")) focused.value = null;
+  },
+);
 
 // the Blocks button: the pane opens with the focus in its search, and goes
 const toggleBlocks = () => {
@@ -282,16 +272,9 @@ const fit = () => {
     );
   });
 };
-let resized: ResizeObserver | undefined;
-onMounted(() => {
-  if (typeof ResizeObserver === "undefined") return;
-  resized = new ResizeObserver(fit);
-  resized.observe(list.value!);
-  resized.observe(spare.value!);
-});
+useResizeObserver(() => [list.value, spare.value], fit);
 watch(() => tabs.value.length, fit, { flush: "post" });
 onUnmounted(() => {
-  resized?.disconnect();
   if (frame !== undefined) cancelAnimationFrame(frame);
 });
 </script>

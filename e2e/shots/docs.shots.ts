@@ -34,7 +34,7 @@ const outDir = path.resolve(
   "public",
   "screenshots",
 );
-// opened from a neutral path, since the app shows it in the top area
+// opened from a neutral path, since its tab shows the name and the path
 const sample = path.join(os.tmpdir(), "on-writing.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 
@@ -755,7 +755,8 @@ describe("docs screenshots", () => {
   });
 
   it("captures the formatting toolbar", async () => {
-    await pressMod("n");
+    // one new tab, so the tab row above it is calm
+    await onlyNewTab();
     await type("a centered heading");
     await pressMod("1");
     await pressMod(Key.Shift, "e");

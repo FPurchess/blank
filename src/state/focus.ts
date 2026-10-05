@@ -22,6 +22,10 @@ export const uiTakesFocus = computed(
     !!tableToolbar.value?.caption,
 );
 
+// where each part of the window comes in the order F6 moves through, after
+// the text
+export const FOCUS_ORDER = { tabs: 10, toolbar: 20 } as const;
+
 // A part of the window F6 moves the focus to, e.g. the tab row, after the
 // editor, in the order of `order` (see cycleFocus)
 export interface FocusStop {
@@ -48,6 +52,14 @@ export const registerFocusStop = (stop: FocusStop) => {
   return () => {
     focusStops.value = focusStops.value.filter((other) => other !== stop);
   };
+};
+
+/**
+ * focusStop gives the part `id` the focus, if it's shown, e.g. the toolbar
+ * for Alt-F10
+ */
+export const focusStop = (id: string) => {
+  focusStops.value.find((stop) => stop.id === id)?.focus();
 };
 
 /**

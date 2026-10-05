@@ -56,7 +56,7 @@ import { toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import { toggleQuote } from "../commands/quote";
-import { focusToolbar } from "../../state";
+import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
 
 export { normalizeBinding };
@@ -166,7 +166,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_FOCUS_NEXT]: moveFocus(1),
   [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: moveFocus(-1),
   [CommandIdentifier.VIEW_TOOLBAR_FOCUS]: (_state, dispatch) => {
-    if (dispatch) focusToolbar();
+    if (dispatch) focusStop("toolbar");
     return true;
   },
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
@@ -248,7 +248,8 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files, the tabs, and moving between the parts
+// the editor: the files, the tabs, and moving between the parts (F6, and
+// Alt-F10 to the toolbar)
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
@@ -262,6 +263,7 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.TAB_MOVE_RIGHT,
   CommandIdentifier.VIEW_FOCUS_NEXT,
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
+  CommandIdentifier.VIEW_TOOLBAR_FOCUS,
 ];
 
 /**

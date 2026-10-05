@@ -39,6 +39,8 @@ export const useRovingFocus = (
     if (index >= 0) current.value = index;
   };
   const onKeydown = (event: KeyboardEvent) => {
+    // with Ctrl, Alt or Meta the keys are the window's, e.g. to move a tab
+    if (event.ctrlKey || event.altKey || event.metaKey) return false;
     const shown = controls();
     const next = stepTo(event.key, current.value, shown.length);
     if (next === undefined) return false;

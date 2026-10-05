@@ -4,7 +4,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { CommandIdentifier, config } from "../../config";
 import { schema } from "../../markdown";
-import { toolbarFocusRequest } from "../../state";
+import { registerFocusStop } from "../../state";
 import {
   blockquote,
   createState,
@@ -173,10 +173,17 @@ describe("keys left out", () => {
 });
 
 describe("the toolbar key", () => {
-  it("asks the toolbar for the focus", () => {
-    toolbarFocusRequest.value = null;
+  it("gives the toolbar's focus stop the focus", () => {
+    const focus = vi.fn();
+    const unregister = registerFocusStop({
+      id: "toolbar",
+      order: 20,
+      focus,
+      has: () => false,
+    });
     const { press } = withKeymap(doc(p("x")));
     expect(press("Alt-F10")).toBe(true);
-    expect(toolbarFocusRequest.value).not.toBeNull();
+    expect(focus).toHaveBeenCalledOnce();
+    unregister();
   });
 });

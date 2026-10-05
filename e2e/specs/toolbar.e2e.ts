@@ -5,7 +5,9 @@ import path from "node:path";
 import { browser, $, expect } from "@wdio/globals";
 
 import {
+  activeTab,
   clickInto,
+  expectActiveTab,
   expectEditorText,
   Key,
   pressMod,
@@ -49,6 +51,7 @@ describe("formatting toolbar", () => {
     file = path.join(dir, "toolbar.md");
     fs.writeFileSync(file, "# Toolbar\n\nsome words here\n");
     await restartApp([file]);
+    await expectActiveTab("toolbar", file);
   });
 
   after(() => {
@@ -82,6 +85,7 @@ describe("formatting toolbar", () => {
     await waitForFileWith(file, '<div align="center">');
 
     await restartApp([file]);
+    await expectActiveTab("toolbar", file);
     await expectEditorText("#editor p", "some words here");
     await expect($("#editor p")).toHaveAttribute(
       "style",
@@ -103,6 +107,26 @@ describe("formatting toolbar", () => {
     await expect(toolbarButton("undo")).toBeFocused();
     await browser.keys(Key.ArrowRight);
     await expect(toolbarButton("redo")).toBeFocused();
+    await browser.keys(Key.Escape);
+    await expect($("#editor")).toBeFocused();
+  });
+
+  it("is where F6 goes after the tabs, and Alt-F10 goes from the tabs too", async () => {
+    await clickInto("#editor p");
+    await browser.keys(Key.F6);
+    await expect(activeTab()).toBeFocused();
+    await browser.keys(Key.F6);
+    await expect(toolbarButton("undo")).toBeFocused();
+    await browser.keys(Key.F6);
+    await expect($("#editor")).toBeFocused();
+    // the other way round
+    await pressShift(Key.F6);
+    await expect(toolbarButton("undo")).toBeFocused();
+    await browser.keys(Key.Escape);
+    await browser.keys(Key.F6);
+    await expect(activeTab()).toBeFocused();
+    await browser.keys([Key.Alt, Key.F10]);
+    await expect(toolbarButton("undo")).toBeFocused();
     await browser.keys(Key.Escape);
     await expect($("#editor")).toBeFocused();
   });

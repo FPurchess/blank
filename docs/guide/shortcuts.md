@@ -19,21 +19,21 @@
 | [Outline](./pages#outline)                  | `Mod` `Alt` `O`   |
 | [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`   |
 | Cycle themes                                | `Mod` `Alt` `T`   |
-| Go to the toolbar                           | `Alt` `F10`       |
 | Choose language                             | `Mod` `Alt` `L`   |
 
-## Tabs
+## Tabs and moving around
 
-| Command                              | Shortcut                                  |
-| ------------------------------------ | ----------------------------------------- |
-| [Next tab](./writing#tabs)           | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
-| Previous tab                         | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
-| Close tab                            | `Mod` `W`                                 |
-| Reopen the file closed last          | `Mod` `Shift` `T`                         |
-| Move tab left                        | `Ctrl` `Shift` `Page Up`                  |
-| Move tab right                       | `Ctrl` `Shift` `Page Down`                |
-| Go to the tabs, and back to the text | `F6`                                      |
-| The other way round                  | `Shift` `F6`                              |
+| Command                                           | Shortcut                                  |
+| ------------------------------------------------- | ----------------------------------------- |
+| [Next tab](./writing#tabs)                        | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
+| Previous tab                                      | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
+| Close tab                                         | `Mod` `W`                                 |
+| Reopen the file closed last                       | `Mod` `Shift` `T`                         |
+| Move tab left                                     | `Ctrl` `Shift` `Page Up`                  |
+| Move tab right                                    | `Ctrl` `Shift` `Page Down`                |
+| Go to the tabs, the toolbar, and back to the text | `F6`                                      |
+| The other way round                               | `Shift` `F6`                              |
+| Go to the toolbar                                 | `Alt` `F10`                               |
 
 ## Editing
 

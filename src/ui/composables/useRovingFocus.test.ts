@@ -36,6 +36,12 @@ describe("useRovingFocus", () => {
     roving.onKeydown(key("Home"));
     expect(focused()).toBe("a");
     expect(roving.onKeydown(key("a"))).toBe(false);
+    // with a modifier, the keys are the window's
+    const withCtrl = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      ctrlKey: true,
+    });
+    expect(roving.onKeydown(withCtrl)).toBe(false);
   });
 
   it("focuses the control in the tab order, within the row when it shrank", () => {
