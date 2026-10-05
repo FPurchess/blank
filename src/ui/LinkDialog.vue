@@ -47,7 +47,7 @@ const submit = () => {
     <TextField id="link-dialog-text" v-model="text" label="Link Text" />
     <template v-if="request.isEdit" #secondary>
       <button type="button" @click="close(request.convertToText)">
-        Convert to Text
+        Convert to text
       </button>
     </template>
     <template #actions>
