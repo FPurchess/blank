@@ -30,7 +30,7 @@ export interface BlankThemeConfig {
 const repo = "https://github.com/FPurchess/blank";
 const origin = "https://blank-writer.xyz";
 const description =
-  "A minimalist, keyboard-only markdown editor made for writing. For Linux, macOS and Windows.";
+  "A minimalist, keyboard-first markdown editor made for writing. For Linux, macOS and Windows.";
 
 const head: HeadConfig[] = [
   ["link", { rel: "icon", type: "image/svg+xml", href: `${base}app-icon.svg` }],

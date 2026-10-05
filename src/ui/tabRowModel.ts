@@ -1,5 +1,5 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
-import { commandLabel } from "../commandList";
+import { commandItem } from "../commandList";
 import type { MenuItem, Tab } from "../state";
 import { scrollFor } from "./scrollModel";
 import { stepTo } from "./rovingModel";
@@ -102,6 +102,8 @@ export const tabMenu = (
   const C = CommandIdentifier;
   const key = (command: CommandIdentifier) =>
     shown ? getKeyBinding(command) : undefined;
+  // the keys act on the shown tab, so only its menu names them
+  const keys = shown ? {} : { shortcut: undefined };
   return [
     {
       id: "close",
@@ -123,19 +125,15 @@ export const tabMenu = (
       run: () => actions.closeRight(tab.id),
     },
     "separator",
-    {
-      id: "save",
-      label: commandLabel(C.FILE_SAVE),
+    commandItem("save", C.FILE_SAVE, {
       icon: "save",
-      shortcut: key(C.FILE_SAVE),
+      ...keys,
       run: () => actions.save(tab.id, false),
-    },
-    {
-      id: "save-as",
-      label: commandLabel(C.FILE_SAVE_AS),
-      shortcut: key(C.FILE_SAVE_AS),
+    }),
+    commandItem("save-as", C.FILE_SAVE_AS, {
+      ...keys,
       run: () => actions.save(tab.id, true),
-    },
+    }),
     ...(tab.path === null
       ? []
       : [

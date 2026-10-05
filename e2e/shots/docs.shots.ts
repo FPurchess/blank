@@ -34,7 +34,7 @@ const outDir = path.resolve(
   "public",
   "screenshots",
 );
-// opened from a neutral path, since the app shows it in the top bar
+// opened from a neutral path, since its tab shows the name and the path
 const sample = path.join(os.tmpdir(), "on-writing.md");
 const themes = ["light", "dark", "black", "red", "green", "blue"];
 
@@ -752,6 +752,19 @@ describe("docs screenshots", () => {
     await film.type("Whisk the flour with the milk and the eggs.");
     await film.pause(2.2);
     film.save(path.join(outDir, "form.gif"), FULL);
+  });
+
+  it("captures the formatting toolbar", async () => {
+    // one new tab, so the tab row above it is calm
+    await onlyNewTab();
+    await type("a centered heading");
+    await pressMod("1");
+    await pressMod(Key.Shift, "e");
+    await type(Key.Enter);
+    await type("the toolbar shows how the text at the caret is set.");
+    await setCaret(false);
+    await shot("toolbar");
+    await setCaret(true);
   });
 
   it("captures a page break", async () => {

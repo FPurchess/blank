@@ -2,6 +2,7 @@ import { defaultMarkdownParser, MarkdownParser } from "prosemirror-markdown";
 import type { Attrs, Node, NodeType } from "prosemirror-model";
 
 import { ATOMS } from "./blocks/atoms";
+import { textAlignment } from "./alignment";
 import { alignment, schema } from "./schema";
 import { tokenizer } from "./tokenizer";
 
@@ -21,8 +22,13 @@ interface ParseState {
 
 type TokenHandler = (
   state: ParseState,
-  token: { meta: { table: Node } },
+  token: { meta: { node: Node } },
 ) => void;
+
+// a paragraph's or heading's alignment, from the <div align> around it (see
+// alignBlocks in ./tokenizer.ts)
+const blockAlign = (token: { attrGet(name: string): string | null }) =>
+  textAlignment(token.attrGet("data-align"));
 
 /**
  * markdownParser reads markdown into a document of Blank's schema, pipe tables and
@@ -34,6 +40,18 @@ export const markdownParser = new MarkdownParser(
   tokenizer as unknown as MarkdownParser["tokenizer"],
   {
     ...defaultMarkdownParser.tokens,
+    paragraph: {
+      block: "paragraph",
+      getAttrs: (token) => ({ align: blockAlign(token) }),
+    },
+    heading: {
+      block: "heading",
+      getAttrs: (token) => ({
+        level: Number(token.tag.slice(1)),
+        align: blockAlign(token),
+      }),
+    },
+    underline: { mark: "underline" },
     table: { block: "table" },
     thead: { ignore: true },
     tbody: { ignore: true },
@@ -69,9 +87,13 @@ export const markdownParser = new MarkdownParser(
   },
 );
 
-// the html_table rule of the tokenizer has already read the table
-(
+// the html_table and align_wrapper rules of the tokenizer have already read
+// the node, a table or a paragraph or heading
+const handlers = (
   markdownParser as unknown as { tokenHandlers: Record<string, TokenHandler> }
-).tokenHandlers.html_table = (state, { meta: { table } }) => {
-  state.addNode(table.type, table.attrs, table.children);
+).tokenHandlers;
+const addParsed: TokenHandler = (state, { meta: { node } }) => {
+  state.addNode(node.type, node.attrs, node.children);
 };
+handlers.html_table = addParsed;
+handlers.html_block_node = addParsed;

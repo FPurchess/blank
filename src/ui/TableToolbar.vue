@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUpdated, useTemplateRef } from "vue";
 
+import { keepFocus } from "../dom";
 import { placeToolbar } from "../popup";
 import type { TableToolbarState } from "../state";
 import CaptionField from "./CaptionField.vue";
 import { tableModeHint, toolbarEntries } from "./tableToolbarModel";
-import { keepFocus } from "./toolbarModel";
 import ToolbarButton from "./ToolbarButton.vue";
 
 // The toolbar of the table the cursor is in, above the table's right end. Its

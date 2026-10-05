@@ -1,6 +1,7 @@
 // The top area of the window (src/ui/TopArea.vue): two rows on the desk, the
-// tab row and the formatting toolbar, each with
-// a line below it. The pages start below it. The rows bring their own styles.
+// tab row and the formatting toolbar, each with a line below it. The pages
+// start below it. The rows bring their own styles (_tabs.scss,
+// _formatToolbar.scss).
 @use "controls" as *;
 
 // the heights of the rows (TAB_ROW_HEIGHT and TOOLBAR_HEIGHT in src/chrome.ts)

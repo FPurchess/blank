@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends OptionValue">
-import { shallowRef } from "vue";
+import { useTemplateRef } from "vue";
 
 import type { Option } from "../../layout/choices";
 import {
@@ -9,7 +9,7 @@ import {
   isOn,
   type OptionValue,
 } from "../optionGroupModel";
-import { stepTo } from "../rovingModel";
+import { useRovingFocus } from "../composables/useRovingFocus";
 
 // A labelled row of option buttons. With a value, it's a radio group: one
 // option is checked, and ←→ check the next. With a list of values, the
@@ -29,30 +29,32 @@ const chosen = defineModel<Chosen<T>>({ required: true });
 
 // a row doesn't change its kind, and a new request gets a new dialog
 const toggles = Array.isArray(chosen.value);
-// the option in the tab order
-const current = shallowRef(firstStop(chosen.value, props.options));
+const row = useTemplateRef<HTMLElement>("row");
+// the option in the tab order, which ←→ move; in a radio group they check it
+const {
+  current,
+  onKeydown: move,
+  follow,
+} = useRovingFocus(
+  () => row.value,
+  ".options button",
+  firstStop(chosen.value, props.options),
+  (index) => {
+    if (!toggles) chosen.value = chooseAt(chosen.value, props.options, index);
+  },
+);
 
 const press = (index: number, event: MouseEvent) => {
-  current.value = index;
+  follow(event.currentTarget);
   chosen.value = chooseAt(chosen.value, props.options, index);
   // WebKit doesn't focus a clicked button, and ↑↓ go on from the checked one
   if (!toggles) (event.currentTarget as HTMLButtonElement).focus();
-};
-
-const move = (event: KeyboardEvent) => {
-  const next = stepTo(event.key, current.value, props.options.length);
-  if (next === undefined) return;
-  event.preventDefault();
-  current.value = next;
-  if (!toggles) chosen.value = chooseAt(chosen.value, props.options, next);
-  // by position: Vue doesn't keep the refs of a v-for in the list's order
-  const row = event.currentTarget as HTMLElement;
-  row.querySelectorAll<HTMLButtonElement>(".options button")[next].focus();
 };
 </script>
 
 <template>
   <div
+    ref="row"
     class="setting"
     :data-row="name"
     :role="toggles ? 'group' : 'radiogroup'"

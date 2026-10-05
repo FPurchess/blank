@@ -42,6 +42,12 @@ describe("commandShortcut", () => {
 
     expect(commandShortcut(CommandIdentifier.PAGE_SETUP)).toBe("Ctrl+Alt+U");
   });
+
+  it("shows none for a command without a key", () => {
+    expect(
+      commandShortcut(CommandIdentifier.BLOCKTYPE_CODE_BLOCK),
+    ).toBeUndefined();
+  });
 });
 
 describe("ariaShortcut", () => {

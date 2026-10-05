@@ -576,10 +576,37 @@ describe("importers.docx", () => {
       );
     });
 
-    it("loses the alignment of table columns", async () => {
+    it("keeps the alignment of table columns, left as the default", async () => {
       expect(
         await roundTrip("| a   |   b |\n| :-- | --: |\n| c   |   d |"),
-      ).toBe("| a   | b   |\n| --- | --- |\n| c   | d   |");
+      ).toBe("| a   |   b |\n| --- | --: |\n| c   |   d |");
+    });
+
+    it("keeps underlined text, and leaves links without it", async () => {
+      expect(
+        await roundTrip("plain <u>under</u> [link](https://example.org)"),
+      ).toBe("plain <u>under</u> [link](https://example.org)");
+      // Word underlines a link a user underlined by hand too
+      const bytes = await rewriteDocx(
+        await exportDocx("[link](https://example.org)"),
+        "word/document.xml",
+        (xml) => xml!.replace(/<w:rPr>/g, '<w:rPr><w:u w:val="single"/>'),
+      );
+      expect((await toMarkdown(bytes)).markdown).toBe(
+        "[link](https://example.org)",
+      );
+    });
+
+    it("keeps the alignment of paragraphs and headings", async () => {
+      const aligned = [
+        '<div align="center">\n\n# Title\n\nCentered.\n\n</div>',
+        '<div align="justify">\n\nJustified.\n\n</div>',
+        "Left.",
+        '<div align="right">\n\nRight.\n\n</div>',
+      ].join("\n\n");
+      const back = await roundTrip(aligned);
+      expect(back).toBe(aligned);
+      expect(back).not.toContain("\u2063");
     });
 
     it("splits a quote at a page break in it", async () => {

@@ -23,6 +23,7 @@ paths:
 
 - A table is saved as a GFM pipe table while `gfmBlocker` (`src/markdown/tables.ts`) returns null, and as an HTML table otherwise (merged cells, blocks in cells, a caption, column widths, ...), which the `html_table` rule in `tokenizer.ts` reads back; other HTML stays text.
 - `normalizeTableHtml` (`html.ts`) cleans every HTML table that comes in.
+- A column's alignment is written as `align="…"` on its HTML cells (GitHub strips `style`); both are read. `mapTables` (`src/markdown/tables.ts`) maps every table of a fragment, for paste and the Word import.
 
 ## Editing
 

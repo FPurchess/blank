@@ -108,7 +108,7 @@ describe("the outline", () => {
     await expect($("#outline.docked, #outline.beside")).toBeExisting();
     await expect($(".outline-list.open")).toBeExisting();
     await expect($(".outline-dashes")).not.toBeExisting();
-    // a short outline still fills the room between the top bar and the
+    // a short outline still fills the room between the top area and the
     // status bar
     const room = await browser.execute(() => {
       const list = document.querySelector(".outline-list")!;

@@ -1,6 +1,12 @@
 import type { Mark, Node } from "prosemirror-model";
 
-import { fieldSpec, formDefinition, isEmptyField, placesOf } from "../markdown";
+import {
+  alignOf,
+  fieldSpec,
+  formDefinition,
+  isEmptyField,
+  placesOf,
+} from "../markdown";
 import { isListed, listedHeadings } from "../markdown/headings";
 import { parseLength } from "../layout/units";
 import { unknownLabel } from "../markdown/blocks/unknown";
@@ -16,6 +22,7 @@ import {
 import { listMarker } from "../markdown/lists";
 import type {
   Content,
+  EngineAlign,
   EngineCellBlock,
   EngineColumn,
   EngineFrame,
@@ -126,15 +133,19 @@ const spanOf = (
     if (mark.type.name === "strong") span.bold = true;
     else if (mark.type.name === "em") span.italic = true;
     else if (mark.type.name === "code") span.code = true;
+    else if (mark.type.name === "underline") span.underline = true;
     else if (mark.type.name === "link") span.link = mark.attrs.href as string;
   }
-  return span.bold || span.italic || span.code || span.link ? span : null;
+  return span.bold || span.italic || span.code || span.underline || span.link
+    ? span
+    : null;
 };
 
 const sameMarks = (a: EngineSpan, b: EngineSpan) =>
   !!a.bold === !!b.bold &&
   !!a.italic === !!b.italic &&
   !!a.code === !!b.code &&
+  !!a.underline === !!b.underline &&
   a.link === b.link;
 
 const styleOf = (node: Node): TextStyle => {
@@ -147,11 +158,13 @@ const styleOf = (node: Node): TextStyle => {
 /**
  * imageContent builds an image, which stands on a line of its own at `pos`
  * @param size its size once it is loaded
+ * @param align the alignment of the paragraph it stands in
  */
 const imageContent = (
   image: Node,
   pos: number,
   size: ReturnType<ImageSizes>,
+  align?: EngineAlign | null,
 ) => ({
   kind: "image" as const,
   pos,
@@ -159,6 +172,7 @@ const imageContent = (
   width: size?.width ?? 0,
   height: size?.height ?? 0,
   alt: (image.attrs.alt as string | null) ?? "",
+  ...(align ? { align } : {}),
 });
 
 /**
@@ -173,6 +187,7 @@ const textOf = (
 ): EngineText => {
   const { text, spans } = spansOf(children);
   const level = node.type.name === "heading" ? (node.attrs.level as number) : 0;
+  const align = alignOf(node);
   return {
     kind: "text",
     pos,
@@ -182,6 +197,7 @@ const textOf = (
     level,
     top,
     ...(listed ? { listed } : {}),
+    ...(align ? { align } : {}),
   };
 };
 
@@ -814,15 +830,18 @@ export const flattenBlocks = (
       if (piece.image) {
         const image = piece.image;
         const size = sizes(image.attrs.src as string);
+        // the record's node is the image, which stays the same when the
+        // paragraph's alignment changes, so the key tells that apart
+        const align = alignOf(node);
         push(
           image,
           piece.pos,
           context,
           pieceSpace,
-          () => imageContent(image, piece.pos, size),
+          () => imageContent(image, piece.pos, size, align),
           {
             marker: pieceMarker,
-            key: size ? `${size.width}x${size.height}` : "?",
+            key: `${size ? `${size.width}x${size.height}` : "?"}${align ?? ""}`,
           },
         );
         return;

@@ -146,7 +146,5 @@ $tab-max: 200px;
 // the Blocks button: its icon and name, just the icon once the tabs need
 // the room
 .tab-row-blocks:not(.compact) {
-  display: inline-flex;
-  gap: 6px;
-  padding: 0 10px 0 8px;
+  @include icon-text-button;
 }

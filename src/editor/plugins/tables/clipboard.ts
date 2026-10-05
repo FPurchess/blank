@@ -14,7 +14,11 @@ import type { EditorView } from "prosemirror-view";
 
 import { headerRowCount, schema, tokenizer } from "../../../markdown";
 import { normalizeTableHtml } from "../../../markdown/html";
-import { cellAt, withColumnAlignment } from "../../../markdown/tables";
+import {
+  cellAt,
+  mapTables,
+  withColumnAlignment,
+} from "../../../markdown/tables";
 import {
   cellPos,
   hasHeaderColumn,
@@ -158,23 +162,6 @@ export const tsvOf = (slice: Slice): string | null => {
     }),
   );
   return formatTsv(rows);
-};
-
-/**
- * mapTables returns `fragment` with every table in it, at any depth,
- * replaced by what `change` makes of it
- */
-const mapTables = (
-  fragment: Fragment,
-  change: (table: Node) => Node,
-): Fragment => {
-  const nodes: Node[] = [];
-  fragment.forEach((node) => {
-    if (node.type === schema.nodes.table) nodes.push(change(node));
-    else if (node.isLeaf) nodes.push(node);
-    else nodes.push(node.copy(mapTables(node.content, change)));
-  });
-  return Fragment.from(nodes);
 };
 
 /**

@@ -33,7 +33,7 @@ import { laidOutState, layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import { hasBand } from "../layout/placeholders";
 import { bootApp } from "./mount";
-import { READING_LINE } from "./readingLine";
+import { READING_LINE } from "../chrome";
 import { alignHiddenEditor } from "../editor/hidden";
 
 vi.mock("../editor/hidden", () => ({ alignHiddenEditor: vi.fn() }));

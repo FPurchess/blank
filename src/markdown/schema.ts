@@ -1,7 +1,14 @@
 import { schema as base } from "prosemirror-markdown";
-import { type Node, NodeSpec, Schema } from "prosemirror-model";
+import {
+  type AttributeSpec,
+  type MarkSpec,
+  type Node,
+  NodeSpec,
+  Schema,
+} from "prosemirror-model";
 import { tableNodes } from "prosemirror-tables";
 
+import { oneOf, textAlignment } from "./alignment";
 import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
 import {
   checkEmbed,
@@ -11,17 +18,14 @@ import {
   embedSrc,
 } from "./blocks/embeds";
 
-export type Alignment = "left" | "center" | "right";
+const ALIGNMENTS = ["left", "center", "right"] as const;
 
-const ALIGNMENTS: readonly string[] = ["left", "center", "right"];
+export type Alignment = (typeof ALIGNMENTS)[number];
 
 /**
  * alignment returns `value` if it names a column alignment, null otherwise
  */
-export const alignment = (value: unknown): Alignment | null => {
-  const lower = typeof value === "string" ? value.trim().toLowerCase() : "";
-  return ALIGNMENTS.includes(lower) ? (lower as Alignment) : null;
-};
+export const alignment = oneOf(ALIGNMENTS);
 
 /**
  * captionText returns the text of the caption of the table `dom`, the
@@ -45,8 +49,10 @@ const cells = tableNodes({
       default: null,
       getFromDOM: (dom) =>
         alignment(dom.style.textAlign || dom.getAttribute("align")),
+      // what the clipboard and the HTML tables of src/markdown/tables.ts
+      // write, which GitHub would strip as a style
       setDOMAttr: (value, attrs) => {
-        if (value) attrs.style = `text-align: ${value}`;
+        if (value) attrs.align = value as string;
       },
     },
   },
@@ -233,6 +239,39 @@ const formField: NodeSpec = {
   ],
 };
 
+// how a paragraph or heading is aligned (see ./alignment.ts): null for left
+const align: AttributeSpec = {
+  default: null,
+  validate: (value) => {
+    if (value !== null && textAlignment(value) !== value) {
+      throw new RangeError(`not an alignment: ${String(value)}`);
+    }
+  },
+};
+
+const blockAlignment = (dom: HTMLElement) =>
+  textAlignment(dom.style.textAlign || dom.getAttribute("align"));
+
+const alignedStyle = (node: Node) =>
+  node.attrs.align ? { style: `text-align: ${node.attrs.align}` } : {};
+
+const paragraph: NodeSpec = {
+  ...base.spec.nodes.get("paragraph"),
+  attrs: { align },
+  parseDOM: [{ tag: "p", getAttrs: (dom) => ({ align: blockAlignment(dom) }) }],
+  toDOM: (node) => ["p", alignedStyle(node), 0],
+};
+
+const heading: NodeSpec = {
+  ...base.spec.nodes.get("heading"),
+  attrs: { ...base.spec.nodes.get("heading")!.attrs, align },
+  parseDOM: [1, 2, 3, 4, 5, 6].map((level) => ({
+    tag: `h${level}`,
+    getAttrs: (dom: HTMLElement) => ({ level, align: blockAlignment(dom) }),
+  })),
+  toDOM: (node) => [`h${node.attrs.level}`, alignedStyle(node), 0],
+};
+
 // the blocks a field holds: those of the document but page breaks and
 // content blocks (the tokens they're read from are FIELD_CONTENT in
 // ./blocks/rules.ts)
@@ -248,6 +287,14 @@ const FIELD_CONTENT = [
 ];
 
 const nodes = base.spec.nodes
+  .update("paragraph", paragraph)
+  // what a newline in a code block becomes in a paragraph and back, when a
+  // block's type changes
+  .update("hard_break", {
+    ...base.spec.nodes.get("hard_break"),
+    linebreakReplacement: true,
+  })
+  .update("heading", heading)
   .update("doc", {
     ...base.spec.nodes.get("doc"),
     content: "(block | top_block)+",
@@ -272,6 +319,23 @@ const nodes = base.spec.nodes
     table_header: cells.table_header,
   });
 
+// underlined text, written <u>…</u> in markdown (see ./tokenizer.ts)
+const underline: MarkSpec = {
+  parseDOM: [
+    { tag: "u" },
+    { tag: "ins" },
+    {
+      style: "text-decoration",
+      getAttrs: (value) => (/\bunderline\b/.test(value) ? null : false),
+    },
+    {
+      style: "text-decoration-line",
+      getAttrs: (value) => (/\bunderline\b/.test(value) ? null : false),
+    },
+  ],
+  toDOM: () => ["u", 0],
+};
+
 // Blank's markdown schema: the prosemirror-markdown schema with the table
 // nodes of prosemirror-tables, whose doc also keeps the file's frontmatter
 // (the YAML block at its top) as it was written, or null if the file has
@@ -285,7 +349,9 @@ export const schema = new Schema({
       all.update(name, { ...all.get(name), group: "block field_content" }),
     nodes,
   ),
-  marks: base.spec.marks,
+  // before code, which prosemirror-markdown's serializer takes as the last
+  // mark of a text
+  marks: base.spec.marks.addBefore("code", "underline", underline),
 });
 
 // the names of the schema's nodes and marks, which code that handles every
@@ -317,7 +383,13 @@ export const NODE_NAMES = [
   "unknown_block",
 ] as const;
 export type NodeName = (typeof NODE_NAMES)[number];
-export const MARK_NAMES = ["em", "strong", "link", "code"] as const;
+export const MARK_NAMES = [
+  "em",
+  "strong",
+  "link",
+  "underline",
+  "code",
+] as const;
 export type MarkName = (typeof MARK_NAMES)[number];
 
 /**

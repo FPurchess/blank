@@ -21,18 +21,19 @@
 | Cycle themes                                | `Mod` `Alt` `T`   |
 | Choose language                             | `Mod` `Alt` `L`   |
 
-## Tabs
+## Tabs and moving around
 
-| Command                              | Shortcut                                  |
-| ------------------------------------ | ----------------------------------------- |
-| [Next tab](./writing#tabs)           | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
-| Previous tab                         | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
-| Close tab                            | `Mod` `W`                                 |
-| Reopen the file closed last          | `Mod` `Shift` `T`                         |
-| Move tab left                        | `Ctrl` `Shift` `Page Up`                  |
-| Move tab right                       | `Ctrl` `Shift` `Page Down`                |
-| Go to the tabs, and back to the text | `F6`                                      |
-| The other way round                  | `Shift` `F6`                              |
+| Command                                           | Shortcut                                  |
+| ------------------------------------------------- | ----------------------------------------- |
+| [Next tab](./writing#tabs)                        | `Ctrl` `Tab`, or `Ctrl` `Page Down`       |
+| Previous tab                                      | `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Up` |
+| Close tab                                         | `Mod` `W`                                 |
+| Reopen the file closed last                       | `Mod` `Shift` `T`                         |
+| Move tab left                                     | `Ctrl` `Shift` `Page Up`                  |
+| Move tab right                                    | `Ctrl` `Shift` `Page Down`                |
+| Go to the tabs, the toolbar, and back to the text | `F6`                                      |
+| The other way round                               | `Shift` `F6`                              |
+| Go to the toolbar                                 | `Alt` `F10`                               |
 
 ## Editing
 
@@ -50,13 +51,14 @@
 | ------------------------------- | --------------- |
 | Paragraph                       | `Mod` `0`       |
 | Heading 1 – 6                   | `Mod` `1` … `6` |
-| Bullet list                     | `Mod` `8`       |
-| Numbered list                   | `Mod` `9`       |
+| Bullet list, on or off          | `Mod` `8`       |
+| Numbered list, on or off        | `Mod` `9`       |
+| Code block                      | (none)          |
 | Indent list item                | `Tab`           |
 | Outdent list item               | `Shift` `Tab`   |
 | Indent code lines               | `Tab`           |
 | Outdent code lines              | `Shift` `Tab`   |
-| Blockquote                      | `Mod` `G`       |
+| Blockquote, on or off           | `Mod` `G`       |
 | Horizontal line                 | `Mod` `H`       |
 | Page break                      | `Mod` `Enter`   |
 | Table                           | `Mod` `T`       |
@@ -88,14 +90,19 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 
 ## Text
 
-| Command              | Shortcut        |
-| -------------------- | --------------- |
-| Bold                 | `Mod` `B`       |
-| Italic               | `Mod` `I`       |
-| Code                 | `Mod` `E`       |
-| Insert or edit link  | `Mod` `K`       |
-| Open link in browser | `Mod` + Click   |
-| Insert or edit image | `Mod` `Alt` `I` |
+| Command              | Shortcut          |
+| -------------------- | ----------------- |
+| Bold                 | `Mod` `B`         |
+| Italic               | `Mod` `I`         |
+| Underline            | `Mod` `U`         |
+| Code                 | `Mod` `E`         |
+| Insert or edit link  | `Mod` `K`         |
+| Open link in browser | `Mod` + Click     |
+| Insert or edit image | `Mod` `Alt` `I`   |
+| Align left           | `Mod` `Shift` `L` |
+| Center               | `Mod` `Shift` `E` |
+| Align right          | `Mod` `Shift` `R` |
+| Justify              | `Mod` `Shift` `J` |
 
 ## Spell check
 

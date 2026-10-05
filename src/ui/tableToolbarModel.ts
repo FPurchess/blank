@@ -25,7 +25,7 @@ export const itemLabel = (item: ToolbarItem, keys: boolean) =>
 /**
  * tableModeHint explains the keys of table mode
  */
-export const tableModeHint = () =>
-  `Shift+arrows move rows and columns · Esc or ${commandShortcut(
-    CommandIdentifier.INSERT_TABLE,
-  )}: done`;
+export const tableModeHint = () => {
+  const key = commandShortcut(CommandIdentifier.INSERT_TABLE);
+  return `Shift+arrows move rows and columns · Esc${key ? ` or ${key}` : ""}: done`;
+};

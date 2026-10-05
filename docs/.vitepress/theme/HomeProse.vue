@@ -5,12 +5,12 @@
       cursor, and the quiet question of what comes next.
     </p>
     <p>
-      Blank is made for that moment and for everything after it. There are no
-      toolbars, no buttons, no panels asking for your attention. There is the
-      page and the sentence you are writing. Your hands stay on the keyboard,
-      and the formatting follows them: type <kbd>#</kbd> and a space, and a
-      heading appears, press <kbd>Mod</kbd> <kbd>I</kbd> and your words lean
-      into italics.
+      Blank is made for that moment and for everything after it. Nothing asks
+      for your attention: one quiet row of formatting buttons, and otherwise the
+      page and the sentence you are writing. Your hands can stay on the
+      keyboard, and the formatting follows them: type <kbd>#</kbd> and a space,
+      and a heading appears, press <kbd>Mod</kbd> <kbd>I</kbd> and your words
+      lean into italics.
     </p>
     <p>
       The small things take care of themselves. Quotes curl, dashes find their

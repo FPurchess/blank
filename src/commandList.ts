@@ -1,4 +1,9 @@
-import { CommandIdentifier, CommandIdentifier as C } from "./config";
+import {
+  CommandIdentifier,
+  CommandIdentifier as C,
+  getKeyBinding,
+} from "./config";
+import type { MenuItem } from "./state";
 
 // One list of Blank's commands: what they're called, where they're grouped,
 // their icon and the other words a search finds them by. Whatever names a
@@ -207,6 +212,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "italic",
     aliases: ["emphasis", "em"],
   },
+  [C.FORMAT_UNDERLINE]: {
+    group: "Format",
+    label: "Underline",
+    icon: "underline",
+    aliases: ["underlined"],
+  },
   [C.FORMAT_CODE]: {
     group: "Format",
     label: "Code",
@@ -231,11 +242,42 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "list-ordered",
     aliases: ["ol", "numbers"],
   },
+  [C.BLOCKTYPE_CODE_BLOCK]: {
+    group: "Format",
+    label: "Code block",
+    icon: "source",
+    aliases: ["pre", "fenced", "program"],
+  },
   [C.FORMAT_BLOCKQUOTE]: {
     group: "Format",
     label: "Quote",
     icon: "quote",
     aliases: ["blockquote", "citation"],
+  },
+  // the labels of the table's alignment actions too
+  [C.FORMAT_ALIGN_LEFT]: {
+    group: "Format",
+    label: "Align left",
+    icon: "align-left",
+    aliases: ["alignment", "left"],
+  },
+  [C.FORMAT_ALIGN_CENTER]: {
+    group: "Format",
+    label: "Center",
+    icon: "align-center",
+    aliases: ["alignment", "centre", "middle"],
+  },
+  [C.FORMAT_ALIGN_RIGHT]: {
+    group: "Format",
+    label: "Align right",
+    icon: "align-right",
+    aliases: ["alignment", "right"],
+  },
+  [C.FORMAT_ALIGN_JUSTIFY]: {
+    group: "Format",
+    label: "Justify",
+    icon: "align-justify",
+    aliases: ["alignment", "justified", "block"],
   },
   [C.FORMAT_INDENT]: {
     group: "Format",
@@ -284,6 +326,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Previous part of the window",
     icon: "focus",
     aliases: ["focus", "tabs", "toolbar", "keyboard", "f6"],
+  },
+  [C.VIEW_TOOLBAR_FOCUS]: {
+    group: "View",
+    label: "Go to the toolbar",
+    icon: "focus",
+    aliases: ["formatting", "focus", "keyboard"],
   },
   [C.VIEW_PAGES]: {
     group: "View",
@@ -347,3 +395,20 @@ export const commandInfo = (command: CommandIdentifier) => byId[command];
  * commandLabel returns what `command` is called
  */
 export const commandLabel = (command: CommandIdentifier) => byId[command].label;
+
+/**
+ * commandItem returns the menu item of a command, named and with the key as
+ * the command list and the keymap have them, e.g. for the context menu, the
+ * toolbar's menus and a tab's; `item` may leave the key out
+ * (`shortcut: undefined`)
+ */
+export const commandItem = (
+  id: string,
+  command: CommandIdentifier,
+  item: Omit<Exclude<MenuItem, "separator">, "id" | "label">,
+): MenuItem => ({
+  id,
+  label: commandLabel(command),
+  shortcut: getKeyBinding(command) || undefined,
+  ...item,
+});

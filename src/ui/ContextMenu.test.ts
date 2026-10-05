@@ -28,8 +28,9 @@ const rows = (element = menu()) => [
     '[role="menuitem"], [role="menuitemradio"]',
   ),
 ];
+// a menu's row, not the toolbar's button of the same command
 const row = (id: string) =>
-  document.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+  document.querySelector<HTMLElement>(`[role^="menuitem"][data-id="${id}"]`)!;
 const focusedId = () => (document.activeElement as HTMLElement)?.dataset.id;
 
 const press = async (key: string, init: KeyboardEventInit = {}) => {

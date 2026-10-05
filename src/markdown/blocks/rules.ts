@@ -113,6 +113,7 @@ const FIELD_CONTENT = new Set([
   "hr",
   "table_open",
   "html_table",
+  "html_block_node",
 ]);
 
 /**

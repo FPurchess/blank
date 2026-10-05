@@ -4,6 +4,7 @@ import { FRONTMATTER_PROPERTY } from "../../exporters/docx/properties";
 import { readWordLayout, type WordLayout } from "./layout";
 import { normalizeNumbering } from "./numbering";
 import { markPageBreaks } from "./pageBreaks";
+import { markAlignment } from "./align";
 import { markTocs } from "./toc";
 import { markForms, readDefinitions } from "./forms";
 import { markEmbeds, readEmbeds } from "./embeds";
@@ -85,9 +86,11 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const forms = await markForms(zip, definitions);
   const numbering = await normalizeNumbering(zip);
   const pageBreaks = await markPageBreaks(zip);
+  // after the page breaks, so each piece of a split paragraph gets its own
+  const aligned = await markAlignment(zip);
   return {
     bytes:
-      tocs || forms || embeds || numbering || pageBreaks
+      tocs || forms || embeds || numbering || pageBreaks || aligned
         ? await zip.generateAsync({ type: "uint8array" })
         : bytes,
     properties,

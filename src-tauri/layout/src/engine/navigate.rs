@@ -115,7 +115,14 @@ impl Engine {
                 let frag = self.frags[frag_index];
                 let unit = &self.laid[item].units[0];
                 let at_end = pos >= self.items[item].to();
-                let (start, end) = self.items[item].text_edges(&self.settings);
+                // beside an image where it stands, e.g. centered, else at
+                // the edges of the column's text
+                let image = unit.decos.iter().find_map(|deco| match deco {
+                    crate::items::Deco::Image { x, w, .. } => Some((*x, x + w)),
+                    _ => None,
+                });
+                let (start, end) =
+                    image.unwrap_or_else(|| self.items[item].text_edges(&self.settings));
                 let height = unit.height.max(12.0);
                 Some((
                     self.page_of_frag(frag_index),
@@ -456,6 +463,30 @@ mod tests {
             panic!()
         };
         assert_eq!(engine.caret(next, false).unwrap().0, 1, "{frag}");
+    }
+
+    #[test]
+    fn puts_the_caret_beside_an_aligned_image() {
+        for (align, left) in [(None, 0.0), (Some("center"), 0.5), (Some("right"), 1.0)] {
+            let image = crate::model::Item {
+                content: Content::Image {
+                    pos: 0,
+                    src: "photo.png".into(),
+                    width: 200.0,
+                    height: 100.0,
+                    alt: String::new(),
+                    align: align.map(String::from),
+                },
+                ..paragraph(0, "")
+            };
+            let engine = engine(vec![image]);
+            let room = engine.settings.content_width() - 200.0;
+            let start = engine.settings.margins.left + room * left;
+            let (_, before, ..) = engine.caret(0, false).unwrap();
+            let (_, after, ..) = engine.caret(1, true).unwrap();
+            assert!((before - start).abs() < 0.01, "{align:?}: {before}");
+            assert!((after - start - 200.0).abs() < 0.01, "{align:?}: {after}");
+        }
     }
 
     /// the line a caret is on, by its height, among the tops of the lines

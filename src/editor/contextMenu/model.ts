@@ -5,7 +5,7 @@ import { deleteSelection, selectAll } from "prosemirror-commands";
 import { redo, redoDepth, undo, undoDepth } from "prosemirror-history";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
-import { commandLabel } from "../../commandList";
+import { commandItem } from "../../commandList";
 import { CommandIdentifier, getKeyBinding } from "../../config";
 import {
   type MenuItem,
@@ -29,21 +29,6 @@ import {
   occurrences,
 } from "../plugins/spellcheck";
 import { openPageSetup } from "../commands/pageSetup";
-
-/**
- * commandItem returns the item of a command, named and with the key as the
- * command list and the keymap have them
- */
-const commandItem = (
-  id: string,
-  command: CommandIdentifier,
-  item: Omit<Exclude<MenuItem, "separator">, "id" | "label" | "shortcut">,
-): MenuItem => ({
-  id,
-  label: commandLabel(command),
-  shortcut: getKeyBinding(command),
-  ...item,
-});
 
 // suggestions shown for a misspelled word at most
 export const MAX_SUGGESTIONS = 5;

@@ -10,7 +10,7 @@ use super::{CellImage, Deco, Laid, Marked, Role, TableCell, Unit};
 use crate::fonts::Fonts;
 use crate::model::{CellBlock, Text, TextKind};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
-use crate::text::TextBox;
+use crate::text::{align_offset, alignment_of, TextBox};
 
 /// the most columns a table has: a merged cell may say it covers any
 /// number, e.g. from an HTML table, and the grid is laid out in memory
@@ -122,11 +122,7 @@ fn lay_out_cell(
     texts: &mut Vec<TextBox>,
     extras: &mut Vec<(TextBox, Role)>,
 ) -> PlacedCell {
-    let alignment = match cell.align.as_deref() {
-        Some("center") => Alignment::Center,
-        Some("right") => Alignment::Right,
-        _ => Alignment::Start,
-    };
+    let alignment = alignment_of(cell.align.as_deref());
     let first = texts.len();
     let first_extra = extras.len();
     let left = x + CELL_PADDING_X;
@@ -200,6 +196,8 @@ fn lay_out_cell(
                         .min((room - 2.0 * CELL_PADDING_Y) / image_height)
                         .min(1.0);
                     let (w, h) = (image_width * scale, image_height * scale);
+                    // aligned like the cell's text, as in the Word export
+                    let x = x + align_offset(cell.align.as_deref(), room_x, w);
                     decos.push(Deco::Image {
                         src: src.clone(),
                         alt: alt.clone(),
@@ -229,7 +227,7 @@ fn lay_out_cell(
                         style: TextKind::Alt,
                         ..Default::default()
                     };
-                    let mut label = TextBox::new(fonts, &text, room_x, Alignment::Start);
+                    let mut label = TextBox::new(fonts, &text, room_x, alignment);
                     label.x = x;
                     label.y = y;
                     y += label.height();
@@ -1247,6 +1245,7 @@ mod tests {
                 width: 100.0,
                 height: 2000.0,
                 alt: String::new(),
+                align: None,
             },
             ..crate::engine::test_support::paragraph(0, "")
         };

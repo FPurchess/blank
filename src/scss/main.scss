@@ -6,6 +6,7 @@
 @use "statusbar" as *;
 @use "toparea" as *;
 @use "tabs";
+@use "formatToolbar";
 
 html {
   overflow-y: auto;
@@ -1469,6 +1470,11 @@ body.outline-docked #page-view {
   right: $outline-dock;
 }
 
+// the formatting toolbar stays centered over the pages
+body.outline-docked #format-toolbar {
+  padding-right: $outline-dock;
+}
+
 // without the engine the editor shows the text in the window itself
 body.without-engine.outline-docked {
   padding-right: $outline-dock;
@@ -1684,6 +1690,10 @@ $tile-columns: 2;
 
 body.blocks-docked #page-view {
   left: $blocks-dock;
+}
+
+body.blocks-docked #format-toolbar {
+  padding-left: $blocks-dock;
 }
 
 // without the engine the editor shows the text in the window itself

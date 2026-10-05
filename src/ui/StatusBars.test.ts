@@ -32,7 +32,7 @@ afterEach(() => dispose());
 const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
 const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
-describe("top bar and counter", () => {
+describe("top area and counter", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     path.value = null;
@@ -48,7 +48,7 @@ describe("top bar and counter", () => {
         bubbles: true,
         cancelable: true,
       });
-      document.querySelector("#ui-top .toolbar-row")!.dispatchEvent(event);
+      document.querySelector("#format-toolbar")!.dispatchEvent(event);
       return event.defaultPrevented;
     };
 

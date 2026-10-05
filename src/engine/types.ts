@@ -1,3 +1,5 @@
+import type { TextAlignment } from "../markdown/alignment";
+
 // The items the layout engine takes, see src-tauri/layout/src/model.rs.
 
 // the styles the engine sets text in (TextKind in model.rs): a paragraph,
@@ -20,8 +22,13 @@ export interface EngineSpan {
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
+  underline?: boolean;
   link?: string;
 }
+
+// how a paragraph or heading at the top of the document is aligned; left
+// isn't sent (see src/markdown/alignment.ts)
+export type EngineAlign = TextAlignment;
 
 export interface EngineText {
   kind: "text";
@@ -39,6 +46,7 @@ export interface EngineText {
   hint?: string;
   // the hint stands for a picture to come: drawn in a box of a picture's size
   picture?: boolean;
+  align?: EngineAlign;
 }
 
 // an entry of a table of contents: a heading's level and text
@@ -108,6 +116,8 @@ export type Content =
       width: number;
       height: number;
       alt: string;
+      // the alignment of the paragraph it stands in
+      align?: EngineAlign;
     }
   | {
       kind: "table";

@@ -10,3 +10,13 @@ export const shownIn = <E extends Element = HTMLElement>(
   [...root.querySelectorAll<E>(selectors)].filter(
     (element) => !element.closest("[hidden]"),
   );
+
+/**
+ * keepFocus keeps the focus where it is (in the editor, or in a menu) on a
+ * press, except in a text field
+ */
+export const keepFocus = (event: MouseEvent) => {
+  if (!(event.target as Element).closest("input, textarea")) {
+    event.preventDefault();
+  }
+};

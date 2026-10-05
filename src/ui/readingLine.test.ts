@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { READING_LINE, sectionAt } from "./readingLine";
+import { READING_LINE } from "../chrome";
+import { sectionAt } from "./readingLine";
 
 describe("sectionAt", () => {
   const tops = [100, 600, 1200, 1800];

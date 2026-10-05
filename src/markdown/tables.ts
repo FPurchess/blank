@@ -313,9 +313,8 @@ export const htmlLines = (table: Node): string[] => {
       if (tag === "th") attrs.push(`scope="${inHead ? "col" : "row"}"`);
       if (cell.attrs.colspan > 1) attrs.push(`colspan="${cell.attrs.colspan}"`);
       if (cell.attrs.rowspan > 1) attrs.push(`rowspan="${cell.attrs.rowspan}"`);
-      if (cell.attrs.align) {
-        attrs.push(`style="text-align: ${cell.attrs.align}"`);
-      }
+      // GitHub keeps `align` and strips `style`
+      if (cell.attrs.align) attrs.push(`align="${cell.attrs.align}"`);
       const open = [tag, ...attrs].join(" ");
       cells.push(`      <${open}>${cellHtml(cell)}</${tag}>`);
     });
@@ -349,4 +348,21 @@ export const htmlLines = (table: Node): string[] => {
     ...section("tbody", rows.slice(headerRows), false),
     "</table>",
   ];
+};
+
+/**
+ * mapTables returns `fragment` with every table in it, at any depth,
+ * replaced by what `change` makes of it
+ */
+export const mapTables = (
+  fragment: Fragment,
+  change: (table: Node) => Node,
+): Fragment => {
+  const nodes: Node[] = [];
+  fragment.forEach((node) => {
+    if (node.type === schema.nodes.table) nodes.push(change(node));
+    else if (node.isLeaf) nodes.push(node);
+    else nodes.push(node.copy(mapTables(node.content, change)));
+  });
+  return Fragment.from(nodes);
 };

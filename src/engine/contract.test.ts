@@ -13,6 +13,7 @@ import {
   schema,
 } from "../markdown";
 import {
+  aligned,
   blockquote,
   captioned,
   codeBlock,
@@ -63,6 +64,7 @@ const marked = schema.node("paragraph", null, [
   schema.text("bold ", [schema.marks.strong.create()]),
   schema.text("italic ", [schema.marks.em.create()]),
   schema.text("code ", [schema.marks.code.create()]),
+  schema.text("underlined ", [schema.marks.underline.create()]),
   schema.text("link", [
     schema.marks.link.create({ href: "https://example.org" }),
   ]),
@@ -125,6 +127,9 @@ const rich = docWithFrontmatter(
   ol(li(p("first"), schema.nodes.page_break.create())),
   ul(li(p("item"))),
   image("top.png"),
+  aligned("center", p("centered")),
+  aligned("right", h(2, "to the right")),
+  aligned("center", image("centered.png")),
   codeBlock("code"),
   schema.nodes.horizontal_rule.create(),
   captioned(

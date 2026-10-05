@@ -6,7 +6,9 @@ import { tableEditing } from "prosemirror-tables";
 import { schema } from "../markdown";
 import { transaction, uiTakesFocus } from "../state";
 import {
+  alignmentGuard,
   autocomplete,
+  pastedLinks,
   blockRemovals,
   blockTools,
   contextMenu,
@@ -77,6 +79,8 @@ export const bootEditor = async () => {
         images(),
         properties(),
         tableGuard(),
+        alignmentGuard(),
+        pastedLinks(),
         tableView(),
         tableHandles(),
         // before tableEditing, whose paste it wraps

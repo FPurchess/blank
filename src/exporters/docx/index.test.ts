@@ -1235,3 +1235,48 @@ describe("exporter.docx tables", () => {
     expect(Number(extent![1])).toBe(3 * 9525);
   });
 });
+
+describe("exporter.docx alignment", () => {
+  it("aligns paragraphs and headings, justified as Word's both", async () => {
+    const exported = await exportMarkdown(
+      [
+        '<div align="center">\n\n# Title\n\n</div>',
+        '<div align="right">\n\nTo the right.\n\n</div>',
+        '<div align="justify">\n\nJustified.\n\n</div>',
+        "Left.",
+      ].join("\n\n"),
+    );
+    const aligns = (await paragraphs(exported)).map(({ text, p }) => [
+      text,
+      attr(child(p, "jc"), "val"),
+    ]);
+    expect(aligns).toEqual([
+      ["Title", "center"],
+      ["To the right.", "right"],
+      ["Justified.", "both"],
+      ["Left.", null],
+    ]);
+  });
+
+  it("doesn't stretch a justified line that ends in a line break", async () => {
+    const exported = await exportMarkdown("text");
+    const settings = await exported.xml("word/settings.xml");
+    expect(all(settings, "doNotExpandShiftReturn")).toHaveLength(1);
+  });
+});
+
+describe("exporter.docx underline", () => {
+  it("underlines underlined runs", async () => {
+    const exported = await exportMarkdown("plain <u>under</u>");
+    const runs = all(await exported.xml("word/document.xml"), "r").map((r) => [
+      all(r, "t")
+        .map((t) => t.textContent)
+        .join(""),
+      attr(child(r, "u"), "val"),
+    ]);
+    expect(runs).toEqual([
+      ["plain ", null],
+      ["under", "single"],
+    ]);
+  });
+});

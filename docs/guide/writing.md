@@ -1,8 +1,35 @@
 # Writing in Blank
 
-Blank shows your text as it will look, not as markdown syntax, and on the lines and pages it will have on paper (see [Pages](./pages#on-the-screen)). There are no toolbars: you format with [keyboard shortcuts](./shortcuts) or by typing markdown, which Blank turns into formatting as you go.
+Blank shows your text as it will look, not as markdown syntax, and on the lines and pages it will have on paper (see [Pages](./pages#on-the-screen)). You format with [keyboard shortcuts](./shortcuts), by typing markdown, which Blank turns into formatting as you go, or with the toolbar at the top when you'd rather point and click.
 
 <img class="shot" src="/screenshots/theme-light.png" alt="A document in Blank's light theme" />
+
+## The toolbar {#toolbar}
+
+The second row at the top of the window has everything to format your text, and shows how the text at the cursor is set: Bold lights up in bold text, the list you're in is pressed, and the style menu says _Heading 2_ while you're in one.
+
+From left to right: undo and redo; the style menu (text, headings 1–6, quote and code block, each shown in its own style); bold, italic, underline, code and link; bulleted and numbered lists, quote, outdent and indent; the four alignments; and **Insert** for an image, a table, a horizontal line or a page break. Clicking a button leaves your cursor and selection where they were, so you can go on typing. Hover over a button to see its shortcut.
+
+In a narrow window, what doesn't fit moves into the **More** button (⋯) at the end of the row: first Insert, then alignment, then indent and quote, then the lists.
+
+Prefer the keyboard? `Alt` `F10` takes you into the toolbar, and `F6` gets there too, after the tabs. The arrow keys move from button to button, `Home` and `End` jump to the ends, Enter or Space presses a button, `↓` opens a menu, and `Escape` takes you back to your text, right where you were.
+
+## Bold, italic and underline {#marks}
+
+`Mod` `B`, `Mod` `I` and `Mod` `U` make the selected text bold, italic or underlined, and `Mod` `E` code. If only part of the selection has it, the whole selection gets it; press again to take it away. Lists and quotes work the same way: `Mod` `8`, `Mod` `9` and `Mod` `G` turn a list or quote on, and off again when you're in one. In a numbered list, `Mod` `8` turns it into a bulleted one, and back with `Mod` `9`.
+
+## Alignment {#alignment}
+
+| Alignment   | Shortcut          |
+| ----------- | ----------------- |
+| Align left  | `Mod` `Shift` `L` |
+| Center      | `Mod` `Shift` `E` |
+| Align right | `Mod` `Shift` `R` |
+| Justify     | `Mod` `Shift` `J` |
+
+These align the paragraphs and headings you've selected, or the one the cursor is in; press the same shortcut again to go back to the left. Justified text runs straight down both edges, by widening the spaces between words; the last line of a paragraph stays as it is. A new paragraph you start with Enter keeps the alignment, as in Word.
+
+In a table, Align left, Center and Align right align the selected columns. Lists, quotes and form fields always stay on the left. The pages, the PDF and Word documents show your alignment just as you set it. See [Files & formats](./files#markdown) for how it's kept in the file.
 
 ## Format as you type
 
@@ -62,7 +89,7 @@ Keep several documents open at once, each in a tab at the top of the window. `Mo
 - **Close** with `Mod` `W`, the × on a tab or a middle click. Changes you haven't saved show as a dot instead of the ×, and Blank asks whether to save them before the tab closes. `Mod` `Shift` `T` opens the file you closed last again.
 - **Reorder** by dragging a tab, or with `Ctrl` `Shift` `Page Up` and `Page Down`.
 - **Right-click** a tab to close the others or those to its right, to save it, or to copy its file's path.
-- **Get there from the keyboard** with `F6`, which takes you from the text to the tabs and back. The arrow keys move between tabs, `Enter` shows one, `Delete` closes it and `Esc` takes you back to the text.
+- **Get there from the keyboard** with `F6`, which takes you from the text to the tabs, then to the toolbar, and back. The arrow keys move between tabs, `Enter` shows one, `Delete` closes it and `Esc` takes you back to the text.
 
 The window is named after the tab you're in, and pointing at a tab shows where its file is.
 

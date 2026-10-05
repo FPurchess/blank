@@ -26,6 +26,9 @@ export const ul = (...items: Node[]) => schema.node("bullet_list", null, items);
 export const ol = (...items: Node[]) =>
   schema.node("ordered_list", null, items);
 export const doc = (...blocks: Node[]) => schema.node("doc", null, blocks);
+// `block`, a paragraph or heading, aligned
+export const aligned = (align: string, block: Node) =>
+  block.type.create({ ...block.attrs, align }, block.content);
 // a document of a file that starts with `frontmatter`
 export const docWithFrontmatter = (frontmatter: string, ...blocks: Node[]) =>
   schema.node("doc", { frontmatter }, blocks);
