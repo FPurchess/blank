@@ -11,6 +11,9 @@ defineProps<{
   title: string;
   // a class of the form besides `dialog`, for a dialog's own styles
   formClass?: string;
+  // the id of the text that says what the dialog is about, read out with
+  // its title
+  describedBy?: string;
 }>();
 const emit = defineEmits<{ submit: []; cancel: [] }>();
 
@@ -53,6 +56,7 @@ const cancelOnBackdrop = (event: MouseEvent) => {
       role="dialog"
       aria-modal="true"
       :aria-labelledby="`${id}-title`"
+      :aria-describedby="describedBy"
       @submit.prevent="emit('submit')"
       @keydown.esc.prevent="emit('cancel')"
       @keydown.tab="trapFocus"

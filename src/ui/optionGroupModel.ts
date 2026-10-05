@@ -45,17 +45,3 @@ export const firstStop = <T extends OptionValue>(
         0,
         options.findIndex((option) => option.value === chosen),
       );
-
-/**
- * stepTo returns the option that `key` moves to from `index`, wrapping around
- * (→ ← Home End), or undefined for another key
- */
-export const stepTo = (key: string, index: number, count: number) => {
-  const moves: Record<string, number> = {
-    ArrowRight: index + 1,
-    ArrowLeft: index - 1,
-    Home: 0,
-    End: count - 1,
-  };
-  return key in moves ? (moves[key] + count) % count : undefined;
-};

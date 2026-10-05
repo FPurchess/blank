@@ -1,0 +1,152 @@
+// The tab row (src/ui/TabRow.vue), the top row of the top area: the logo, the
+// tabs, + and the Blocks button.
+@use "controls" as *;
+@use "toparea" as *;
+
+// the tabs, between their narrowest and widest (as the draft has them)
+$tab-min: 76px;
+$tab-max: 200px;
+
+.tab-row {
+  justify-content: flex-start;
+  gap: var(--s1);
+  padding: 0 6px;
+}
+
+.blank-logo {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0 5px;
+
+  .logo-ground {
+    fill: var(--color);
+  }
+
+  .logo-beam {
+    fill: none;
+    stroke: var(--desk-color);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+}
+
+.tab-list {
+  // what the tabs' offsets are from, for scrolling one into view
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 100%;
+  margin-left: var(--s1);
+  // room for the focus ring of the tabs at the ends
+  padding-inline: 4px;
+  overflow-x: auto;
+  // the wheel scrolls it; no bar shows
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  // as wide as its name, from the narrowest to the widest
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: $tab-min;
+  max-width: $tab-max;
+  height: 30px;
+  padding: 0 4px 0 var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  color: var(--muted);
+
+  &:not([aria-selected="true"]):hover {
+    background: var(--hover);
+    color: var(--color);
+  }
+
+  &[aria-selected="true"] {
+    // the paper, which re-points --muted for what's on it
+    --muted: var(--muted-on-paper);
+    border-color: var(--line);
+    background: var(--background-color);
+    color: var(--color);
+    font-weight: 500;
+
+    &::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      bottom: -1px;
+      left: 10px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--tab-mark);
+    }
+  }
+}
+
+.tab-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--muted);
+
+  &:hover {
+    background: var(--pressed);
+    color: var(--color);
+  }
+
+  .icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+// unsaved: a dot, which turns into × under the pointer
+.tab.unsaved:not(:hover) .tab-close {
+  .icon {
+    display: none;
+  }
+
+  &::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+}
+
+// the empty part of the row, where a double click opens a new tab
+.tab-row-spare {
+  flex: 1;
+  align-self: stretch;
+  min-width: 24px;
+}
+
+// the Blocks button: its icon and name, just the icon once the tabs need
+// the room
+.tab-row-blocks:not(.compact) {
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+}

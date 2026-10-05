@@ -28,7 +28,7 @@ import {
 import { shownIn } from "../dom";
 import { SLOTS } from "../layout/settings";
 import type { SlotEditor } from "../slotEditor";
-import { type BandEditorRequest, bandEditor } from "../state";
+import { type BandEditorRequest, bandEditor, bandEditorDone } from "../state";
 import { INSERTS } from "./bandStripsModel";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
@@ -158,9 +158,14 @@ useDismiss(
 );
 
 // a strip that goes without done, e.g. with the app, focuses nothing more
-onUnmounted(() => (closed = true));
+onUnmounted(() => {
+  closed = true;
+  if (bandEditorDone.value === done) bandEditorDone.value = null;
+});
 
 onMounted(() => {
+  // e.g. before another tab shows, whose bands these aren't
+  bandEditorDone.value = done;
   if (props.request.insert) editors[1].insert(props.request.insert);
   editors[active].focus();
 });

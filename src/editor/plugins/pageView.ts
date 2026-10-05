@@ -34,12 +34,7 @@ import {
   pageBoxInWindow,
   viewBox,
 } from "../../engine/geometry";
-import {
-  forgetFailures,
-  forgetImages,
-  imageSizes,
-  loadedImages,
-} from "../../engine/images";
+import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
@@ -416,9 +411,9 @@ export const pageSync = () => {
       },
     },
     view(view) {
-      // a new document, whose images are its own: another folder's img.png
-      // may be another picture, or changed on disk since
-      forgetImages();
+      // a new view comes with every tab shown. The images loaded stay: their
+      // URLs are absolute, so the tabs share them (see src/editor/tabs.ts,
+      // which forgets them when files are opened)
       // the widths kept of the table the cursor is in, for this view's
       // document only: a new document gets a new view
       let frozen: FrozenWidths | null = null;
@@ -483,7 +478,7 @@ export const pageSync = () => {
               // dispatched, which the view doesn't have yet: its update lays
               // out once, with them. Once the view has it, and the
               // transactions appended to it, a change is laid out here.
-              // So does a document on its way to the editor (applyDocument),
+              // So does a document on its way to the editor (showDocument),
               // whose new plugin view lays it out.
               const pending = transaction.value;
               if (

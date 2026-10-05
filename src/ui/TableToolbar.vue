@@ -5,6 +5,7 @@ import { placeToolbar } from "../popup";
 import type { TableToolbarState } from "../state";
 import CaptionField from "./CaptionField.vue";
 import { tableModeHint, toolbarEntries } from "./tableToolbarModel";
+import { keepFocus } from "./toolbarModel";
 import ToolbarButton from "./ToolbarButton.vue";
 
 // The toolbar of the table the cursor is in, above the table's right end. Its
@@ -25,16 +26,6 @@ const hint = tableModeHint();
 const place = () => placeToolbar(root.value!, props.state.anchor);
 onMounted(place);
 onUpdated(place);
-
-/**
- * keepFocus keeps the focus in the editor when the toolbar is pressed,
- * except in the caption field
- */
-const keepFocus = (event: MouseEvent) => {
-  if (!(event.target as Element).closest("input, textarea")) {
-    event.preventDefault();
-  }
-};
 </script>
 
 <template>

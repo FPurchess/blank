@@ -8,6 +8,7 @@ import { browser, $, $$, expect } from "@wdio/globals";
 
 import {
   clickInto,
+  expectActiveTab,
   expectEditorText,
   Key,
   restartApp,
@@ -34,7 +35,7 @@ describe("Word import", () => {
     fs.copyFileSync(FIXTURE, docxPath);
     original = sha256(docxPath);
 
-    // open the document via command-line argument, see readDocumentFromCliArgs
+    // open the document via command-line argument, see src-tauri/src/open.rs
     await restartApp([docxPath]);
   });
 
@@ -56,7 +57,7 @@ describe("Word import", () => {
       "src",
       expect.stringMatching(/^data:image\/png;base64,/),
     );
-    await expect($("#ui-top")).toHaveText("» report.docx (imported)");
+    await expectActiveTab("report", `Imported from ${docxPath}, not saved yet`);
   });
 
   it("never writes to the Word document", async () => {
@@ -74,6 +75,6 @@ describe("Word import", () => {
     await restartApp();
 
     await expectEditorText("#editor h1", "Fixture edited");
-    await expect($("#ui-top")).toHaveText("» report.docx (imported)");
+    await expectActiveTab("report", `Imported from ${docxPath}, not saved yet`);
   });
 });

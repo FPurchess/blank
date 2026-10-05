@@ -8,16 +8,22 @@ import { $, browser } from "@wdio/globals";
 import {
   editorText,
   focusEditor,
-  textBox,
+  hoverEdge,
   Key,
+  onlyNewTab,
   paste,
   pressMod,
-  restartApp,
-  type,
-  hoverEdge,
   pressShift,
+  restartApp,
+  textBox,
+  type,
 } from "../helpers.ts";
-import { STATUS_HEIGHT } from "../../src/chrome.ts";
+import {
+  BAND_HEIGHT,
+  STATUS_HEIGHT,
+  TAB_ROW_HEIGHT,
+  TOP_BAR_HEIGHT,
+} from "../../src/chrome.ts";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(
@@ -73,6 +79,10 @@ const WINDOW_HEIGHT = 600;
 const BOTTOM_STRIP = 80;
 // a GIF of the whole window
 const FULL = WINDOW_HEIGHT - BOTTOM_STRIP;
+// how much lower the first page starts than when the crops below were set: 24
+// px below the top area (VIEW_TOP), where it once started 56 px below the
+// window's top
+const SHIFT = TOP_BAR_HEIGHT + 24 - 56;
 
 /**
  * Recorder films typing as a GIF: a frame after every key, each shown for as long as a
@@ -244,7 +254,8 @@ class Recorder {
   /** move the mouse onto the top or bottom bar, which shows the hints there */
   async hover(edge: "top" | "bottom", seconds = 0.8) {
     const height = await browser.execute(() => window.innerHeight);
-    await this.moveTo({ x: 400, y: edge === "top" ? 20 : height - 20 }, 0.6);
+    const y = edge === "top" ? TOP_BAR_HEIGHT + BAND_HEIGHT / 2 : height - 20;
+    await this.moveTo({ x: 400, y }, 0.6);
     await this.frame(seconds);
   }
 
@@ -257,7 +268,7 @@ class Recorder {
    * write the GIF, with the frame durations from above. It shows the top
    * `height` pixels of the window and the status bar below them.
    */
-  save(gif: string, height = WINDOW_HEIGHT - BOTTOM_STRIP - 200) {
+  save(gif: string, height = WINDOW_HEIGHT - BOTTOM_STRIP - 200 + SHIFT) {
     const list = path.join(this.dir, "frames.txt");
     const entries = this.frames.map(
       ({ file, duration }) => `file '${file}'\nduration ${duration.toFixed(3)}`,
@@ -429,8 +440,8 @@ const recordings: string[] = [];
 const filmNew = async () => {
   const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
   recordings.push(frames);
-  await pressMod("n");
-  await expect($("#ui-top")).toHaveText("» Untitled");
+  // one tab, so the recordings don't show the tabs of the ones before
+  await onlyNewTab();
   // the pointer in the middle of the text, so no button looks hovered and
   // no hint shows at the edges
   await browser
@@ -663,7 +674,7 @@ describe("docs screenshots", () => {
     await film.clickOn($('#blocks-pane .tile[data-block="blank/recipe"]'), 1.8);
     await film.hidePointer();
     await film.pause(0.6);
-    film.save(path.join(outDir, "blocks-pane.gif"), 545);
+    film.save(path.join(outDir, "blocks-pane.gif"), FULL);
   });
 
   it("records a table of contents", async () => {
@@ -720,7 +731,7 @@ describe("docs screenshots", () => {
     await film.press("↑", Key.ArrowUp, 0.5);
     await film.press("↑", Key.ArrowUp, 1.2);
     await film.press("Esc", Key.Escape, 1.6);
-    film.save(path.join(outDir, "toc.gif"), 545);
+    film.save(path.join(outDir, "toc.gif"), FULL);
   });
 
   it("records filling in a form", async () => {
@@ -740,7 +751,7 @@ describe("docs screenshots", () => {
     await film.press("Tab", Key.Tab, 0.6);
     await film.type("Whisk the flour with the milk and the eggs.");
     await film.pause(2.2);
-    film.save(path.join(outDir, "form.gif"), 545);
+    film.save(path.join(outDir, "form.gif"), FULL);
   });
 
   it("captures a page break", async () => {
@@ -803,7 +814,7 @@ describe("docs screenshots", () => {
     await film.press("↓", Key.ArrowDown, 0.8);
     await film.type("Prices are per piece.");
     await film.pause(2.5);
-    film.save(path.join(outDir, "table-insert.gif"), 395);
+    film.save(path.join(outDir, "table-insert.gif"), 395 + SHIFT);
   });
 
   it("records typing a table header", async () => {
@@ -816,7 +827,7 @@ describe("docs screenshots", () => {
       await film.type(text);
     }
     await film.pause(2.5);
-    film.save(path.join(outDir, "table-header.gif"), 275);
+    film.save(path.join(outDir, "table-header.gif"), 275 + SHIFT);
   });
 
   it("records writing in cells", async () => {
@@ -839,7 +850,7 @@ describe("docs screenshots", () => {
     await film.shortcut(["Shift", "←"], () => pressShift(Key.ArrowLeft), 0.9);
     await film.press("Backspace", Key.Backspace, 1);
     await film.pause(2);
-    film.save(path.join(outDir, "table-cells.gif"), 335);
+    film.save(path.join(outDir, "table-cells.gif"), 335 + SHIFT);
   });
 
   it("records table mode", async () => {
@@ -865,7 +876,7 @@ describe("docs screenshots", () => {
     await film.press("R", "r", 1.2);
     await film.press("Esc", Key.Escape, 0.8);
     await film.pause(2);
-    film.save(path.join(outDir, "table-mode.gif"), 335);
+    film.save(path.join(outDir, "table-mode.gif"), 335 + SHIFT);
   });
 
   it("records pasting cells from a spreadsheet", async () => {
@@ -899,7 +910,7 @@ describe("docs screenshots", () => {
       1.6,
     );
     await film.pause(2);
-    film.save(path.join(outDir, "table-paste.gif"), 335);
+    film.save(path.join(outDir, "table-paste.gif"), 335 + SHIFT);
   });
 
   it("records changing a table with the mouse", async () => {
@@ -967,18 +978,18 @@ describe("docs screenshots", () => {
     const x = Math.round((table.columns[0] + table.columns[1]) / 2);
     await film.moveTo({ x, y: Math.round(table.bottom) + 1 }, 0.7);
     await film.drag({ x, y: Math.round(table.bottom) + 70 }, 0.9);
-    await film.moveTo({ x: 700, y: 20 }, 0.6);
+    // the empty half of the tab row
+    await film.moveTo({ x: 500, y: TAB_ROW_HEIGHT / 2 }, 0.6);
     await film.hidePointer();
     await film.pause(2);
     await browser.releaseActions();
-    film.save(path.join(outDir, "table-mouse.gif"), 415);
+    film.save(path.join(outDir, "table-mouse.gif"), 415 + SHIFT);
   });
 
   it("records the writing demo", async () => {
     const frames = fs.mkdtempSync(path.join(os.tmpdir(), "blank-frames-"));
     const film = new Recorder(frames);
-    await pressMod("n");
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await onlyNewTab();
 
     // an empty page and a blinking cursor, then a writer finding their way in.
     // autocorrect does the rest: headings, quotes, dashes, apostrophes and capitals

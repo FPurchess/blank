@@ -1,6 +1,7 @@
 import { $, expect } from "@wdio/globals";
 
 import {
+  expectActiveTab,
   expectEditorText,
   focusEditor,
   Key,
@@ -17,7 +18,7 @@ describe("editing", () => {
     await pressMod("n");
 
     await expectEditorText("#editor", "");
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await expectActiveTab("Untitled", "Not saved yet");
     await expect($("#ui-stats")).toHaveText("0 words");
   });
 

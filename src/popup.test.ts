@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { TOP_BAR_HEIGHT } from "./chrome";
 import { place, placeTip, placeToolbar } from "./popup";
 
 // jsdom's window is 1024 × 768
@@ -29,11 +30,11 @@ describe("placeToolbar", () => {
     expect(element.hidden).toBe(false);
   });
 
-  it("stays below the top bar while the table's top is scrolled away", () => {
+  it("stays below the top area while the table's top is scrolled away", () => {
     const element = toolbar();
     placeToolbar(element, table(-200, 500));
 
-    expect(element.style.top).toBe("36px");
+    expect(element.style.top).toBe(`${TOP_BAR_HEIGHT + 4}px`);
     expect(element.hidden).toBe(false);
   });
 
@@ -90,11 +91,12 @@ describe("placeTip", () => {
     expect(element.style.top).toBe(`${400 - 6 - 24}px`);
   });
 
-  it("puts it below where the top bar leaves no room", () => {
+  it("puts it below where the top area leaves no room, as on its own buttons", () => {
     const element = toolbar(80, 24);
-    placeTip(element, box(500, 40, 28), 0);
+    const top = TOP_BAR_HEIGHT - 34;
+    placeTip(element, box(500, top, 28), 0);
 
-    expect(element.style.top).toBe(`${68 + 6}px`);
+    expect(element.style.top).toBe(`${top + 28 + 6}px`);
   });
 
   it("puts it at the pointer on a wide control", () => {

@@ -65,8 +65,8 @@ describe("status bar", () => {
   it("shows the details of the word count, which a key closes", async () => {
     await $("#ui-stats").click();
     await expect($("#word-count-card")).toBeDisplayed();
-    // the name is set in capitals
-    await expect($("#word-count-card")).toHaveText(/TWO PAGES\.MD/);
+    // the tab's name, set in capitals
+    await expect($("#word-count-card")).toHaveText(/^TWO PAGES/);
 
     await type("x");
     await expect($("#word-count-card")).not.toExist();

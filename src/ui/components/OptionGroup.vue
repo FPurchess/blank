@@ -8,8 +8,8 @@ import {
   firstStop,
   isOn,
   type OptionValue,
-  stepTo,
 } from "../optionGroupModel";
+import { stepTo } from "../rovingModel";
 
 // A labelled row of option buttons. With a value, it's a radio group: one
 // option is checked, and ←→ check the next. With a list of values, the

@@ -235,6 +235,15 @@ export const hasPrimarySelection = () =>
   !/Android/.test(navigator.userAgent);
 
 /**
+ * noPrimaryPaste keeps the webview from pasting the primary selection itself
+ * when the middle button is let go, with its markup and where the caret was:
+ * pastePrimary does it on the pages, and nothing else takes a paste
+ */
+export const noPrimaryPaste = (event: MouseEvent) => {
+  if (event.button === 1 && hasPrimarySelection()) event.preventDefault();
+};
+
+/**
  * pastePrimary pastes the primary selection, the text selected last in any
  * app, at `pos`, as a middle click does in other apps: the caret goes there
  * as with a click, and the text comes as plain text

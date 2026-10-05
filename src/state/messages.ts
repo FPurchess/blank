@@ -9,20 +9,28 @@ export interface Message {
   text: string;
   // tells apart two messages with the same text
   id: number;
+  // only for screen readers, e.g. which tab is now open, which the tab row
+  // already shows
+  quiet?: boolean;
 }
 
 let lastId = 0;
-const message = (text: string): Message => ({ text, id: ++lastId });
+const message = (text: string, quiet = false): Message => ({
+  text,
+  id: ++lastId,
+  ...(quiet && { quiet }),
+});
 
 // announcement is a short message about what just happened, e.g. "2 rows
 // added", shown in the status bar and read out by screen readers
 export const announcement = shallowRef<Message | null>(null);
 
 /**
- * announce tells the user what just happened, see announcement
+ * announce tells the user what just happened, see announcement. A `quiet`
+ * one is only read out, not shown.
  */
-export const announce = (text: string) => {
-  announcement.value = message(text);
+export const announce = (text: string, { quiet = false } = {}) => {
+  announcement.value = message(text, quiet);
 };
 
 // spellcheckMessage is a short message shown next to the spell check status,

@@ -2,6 +2,7 @@ import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { READING_LINE, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { pageSync } from "../editor/plugins/pageView";
 import { schema } from "../markdown";
 import { computed } from "vue";
@@ -152,7 +153,10 @@ describe("geometry", () => {
 
   it("scrolls to a heading at the reading line", () => {
     scrollToHeading(2);
-    expect(pageScrollRequest.value).toMatchObject({ page: 0, at: 108 });
+    expect(pageScrollRequest.value).toMatchObject({
+      page: 0,
+      at: READING_LINE,
+    });
   });
 
   it("asks the page view to show text below its top, keeping the selection", () => {
@@ -296,12 +300,18 @@ describe("geometry without the engine", () => {
     const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
     window.scrollY = 1000;
     try {
-      expect(scrollTops([3])).toEqual([1300]);
-      expect(scrollState()).toMatchObject({ top: 1000 });
+      // the window scrolls under the top area, so what shows starts below it
+      expect(scrollTops([3])).toEqual([1300 - TOP_BAR_HEIGHT]);
+      expect(scrollState()).toMatchObject({
+        top: 1000,
+        height: window.innerHeight - TOP_BAR_HEIGHT - STATUS_HEIGHT,
+      });
       // no pages without the engine
       expect(pageTops()).toBeNull();
       scrollToText(3, 108);
-      expect(scrollBy).toHaveBeenLastCalledWith({ top: 192 });
+      expect(scrollBy).toHaveBeenLastCalledWith({
+        top: 300 - TOP_BAR_HEIGHT - 108,
+      });
       scrollViewBy(40);
       expect(scrollBy).toHaveBeenLastCalledWith({ top: 40 });
     } finally {

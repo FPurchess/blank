@@ -2,6 +2,7 @@ import { browser, $, expect } from "@wdio/globals";
 
 import {
   editorText,
+  expectActiveTab,
   expectEditorText,
   focusEditor,
   Key,
@@ -28,7 +29,7 @@ describe("persistence", () => {
     await restartApp();
 
     await expectEditorText("#editor p", "Remember me 4711");
-    await expect($("#ui-top")).toHaveText("» Untitled");
+    await expectActiveTab("Untitled");
     await expect($("body")).toHaveAttribute("data-theme", "dark");
     await expect($("#ui-language")).toHaveText("FR");
   });

@@ -1,5 +1,6 @@
 import { roundPercent } from "../markdown/tables";
 import type { Anchor, Point, Span, TableHandlesState } from "../state";
+import { dropAt, movedBy } from "./dragModel";
 
 // What the handles of the table under the mouse (TableHandles.vue) show and
 // do, without their DOM: which row, column or line the mouse is over, where
@@ -122,32 +123,6 @@ const lineOf = (table: TableHandlesState, index: number) =>
   table.rows[
     Math.min(Math.max(index - table.firstRow, 0), table.rows.length - 1)
   ];
-
-/**
- * dropAt returns the line of `lines` where rows or columns dragged from
- * `span` land for the mouse at `value`: not within them, and not before
- * `min`, e.g. the header rows
- */
-export const dropAt = (
-  lines: readonly number[],
-  [from, to]: Span,
-  value: number,
-  min: number,
-) => {
-  let best = from;
-  for (let i = Math.max(min, 0); i < lines.length; i++) {
-    if (i > from && i < to) continue;
-    if (Math.abs(lines[i] - value) < Math.abs(lines[best] - value)) best = i;
-  }
-  return best;
-};
-
-/**
- * movedBy returns by how many rows or columns dropping `span` at the line
- * `line` moves it
- */
-export const movedBy = ([from, to]: Span, line: number) =>
-  line < from ? line - from : line > to ? line - to : 0;
 
 /**
  * resized returns the column widths in percent after the line before column

@@ -21,7 +21,11 @@ import WordCount from "./WordCount.vue";
     out by screen readers, so it's always there, empty in between. It sits
     next to the counter, so it doesn't push the items on the right. -->
     <span id="ui-announcement" role="status">{{
-      announcement?.text ?? ""
+      announcement?.quiet ? "" : announcement?.text
+    }}</span>
+    <!-- what only screen readers hear, e.g. which tab is now open -->
+    <span id="ui-announcement-spoken" class="visually-hidden" role="status">{{
+      announcement?.quiet ? announcement.text : ""
     }}</span>
     <span class="status-grow" />
     <PageStatus />

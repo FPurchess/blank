@@ -81,8 +81,10 @@ jobs:
       - name: build app
         run: bun run tauri build --debug --no-bundle
 
+      # a session bus, which Blank needs to run as one instance and hand the
+      # files of a second start to the first (src-tauri/src/open.rs)
       - name: run e2e tests
-        run: xvfb-run --auto-servernum bun run test
+        run: dbus-run-session -- xvfb-run --auto-servernum bun run test
         working-directory: e2e
         env:
           E2E_SKIP_BUILD: 1

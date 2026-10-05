@@ -9,6 +9,7 @@ import {
   pageLayoutState,
   pageScrollRequest,
 } from "../state";
+import { READING_LINE } from "../chrome";
 import { createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 
@@ -89,7 +90,7 @@ describe("page number", () => {
     stop();
 
     expect(requests).toEqual([expect.objectContaining({ page: 1, y: 0 })]);
-    expect(requests[0].at).toBeLessThan(108);
+    expect(requests[0].at).toBeLessThan(READING_LINE);
   });
 
   it("closes its menu when clicked again, even though the press was outside the menu", async () => {

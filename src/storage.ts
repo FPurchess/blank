@@ -3,16 +3,21 @@ import { Node } from "prosemirror-model";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { type Ref, watch } from "vue";
 
+import { invoke } from "@tauri-apps/api/core";
+
 import {
+  activeTabId,
   blocksPaneOpen,
-  importedFrom,
+  currentViewAnchor,
   language,
   outlinePinned,
   PAGE_VIEW_MODES,
+  pageLayoutState,
   pageView,
   type PageViewMode,
-  path,
   spellcheck,
+  type Tab,
+  tabs,
   transaction,
   isTheme,
   theme,
@@ -30,33 +35,99 @@ localforage.config({
   version: 1,
 });
 
-// the document is written at most this long after the first unsaved change
+// the documents and tabs are written at most this long after the first
+// unsaved change
 const maxWait = 1000;
 
-let latestDoc: Node | null = null;
-let latestPath: string | null = null;
-let latestImportedFrom: string | null = null;
+// A tab as stored in the session: everything but its document, which is
+// stored under `tab:<id>`
+type StoredTab = Omit<Tab, "id">;
+
+// The open tabs: their order, the active one, and each one's details
+export interface Session {
+  version: 1;
+  order: string[];
+  active: string;
+  tabs: Record<string, StoredTab>;
+}
+
+const SESSION = "session";
+const tabKey = (id: string) => `tab:${id}`;
+
+// the documents waiting to be written, and the ones last written, by tab
+const pendingDocs = new Map<string, Node>();
+const storedDocs = new Map<string, Node>();
+// the tabs closed since the last write, whose documents are removed then
+const removedTabs = new Set<string>();
+let sessionPending = false;
 let pending = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 // the settings being written, which flush waits for too
 const settling = new Set<Promise<void>>();
 
 /**
- * write stores the latest path and document together, so the stored path
- * never points at a file while the stored document belongs to another one.
- * The Word document an untitled document was imported from belongs to it too.
+ * sessionOf returns the session to store: the tabs as they are, with the
+ * active one's spot in the view now
  */
-const write = () => {
+const sessionOf = (): Session | null => {
+  const list = tabs.value;
+  if (list.length === 0) return null;
+  // the first tab, for a moment where the active one is being replaced
+  const active = list.some((tab) => tab.id === activeTabId.value)
+    ? activeTabId.value!
+    : list[0].id;
+  const anchor = currentViewAnchor();
+  return {
+    version: 1,
+    order: list.map((tab) => tab.id),
+    active,
+    tabs: Object.fromEntries(
+      list.map(({ id, ...tab }) => [
+        id,
+        id === active && pageLayoutState.value
+          ? { ...tab, viewAnchor: anchor }
+          : tab,
+      ]),
+    ),
+  };
+};
+
+/**
+ * write stores what changed: first the tabs' documents, then the session,
+ * then it removes the documents of closed tabs, so the stored session never
+ * lists a tab whose document is missing. What fails stays pending for the
+ * next write.
+ */
+const write = async () => {
   clearTimeout(timer);
   timer = undefined;
-  // nothing to pair the path with yet: keep the stored pair as it is
-  if (latestDoc === null) return Promise.resolve();
   pending = false;
-  return Promise.all([
-    localforage.setItem("path", latestPath),
-    localforage.setItem("importedFrom", latestImportedFrom),
-    localforage.setItem("doc", latestDoc.toJSON()),
-  ]).then(() => undefined);
+  const docs = [...pendingDocs];
+  pendingDocs.clear();
+  const session = sessionPending ? sessionOf() : null;
+  sessionPending = false;
+  const removed = [...removedTabs];
+  removedTabs.clear();
+  try {
+    await Promise.all(
+      docs.map(async ([id, doc]) => {
+        await localforage.setItem(tabKey(id), doc.toJSON());
+        storedDocs.set(id, doc);
+      }),
+    );
+    if (session) await localforage.setItem(SESSION, session);
+    await Promise.all(removed.map((id) => localforage.removeItem(tabKey(id))));
+  } catch (error) {
+    // unless a newer document came meanwhile
+    for (const [id, doc] of docs) {
+      if (!pendingDocs.has(id) && storedDocs.get(id) !== doc)
+        pendingDocs.set(id, doc);
+    }
+    for (const id of removed) removedTabs.add(id);
+    sessionPending ||= session !== null;
+    pending = true;
+    throw error;
+  }
 };
 
 /**
@@ -70,6 +141,21 @@ const schedule = () => {
       write().catch(console.warn);
     }, maxWait);
   }
+};
+
+// false when the session isn't kept: the storage can't be used, or another
+// Blank keeps it (see bootStorage)
+let sessionKept = true;
+
+/**
+ * storeDocument stores `doc` as the document of the tab `id` with the next
+ * write, e.g. of a tab that was just opened
+ */
+export const storeDocument = (id: string, doc: Node) => {
+  if (!sessionKept) return;
+  if (storedDocs.get(id) === doc || pendingDocs.get(id) === doc) return;
+  pendingDocs.set(id, doc);
+  schedule();
 };
 
 /**
@@ -129,14 +215,57 @@ const isTrue = (value: unknown): value is boolean => value === true;
 const isPageViewMode = (value: unknown): value is PageViewMode =>
   PAGE_VIEW_MODES.includes(value as PageViewMode);
 
-// false when the storage can't be used, so nothing is restored or persisted
-let storageAvailable = true;
+/**
+ * ownSession takes the lock on the session, which only one Blank holds at a
+ * time. Without it, this Blank was started next to one that keeps the
+ * session. A lock that can't be checked counts as taken by this one.
+ */
+const ownSession = async () => {
+  try {
+    return await invoke<boolean>("session_lock");
+  } catch (error) {
+    console.warn("can't check the session lock", error);
+    return true;
+  }
+};
+
+/**
+ * watchSession stores the active tab's document as it changes, and the
+ * session as tabs open, close, move or change
+ */
+const watchSession = () => {
+  watch(
+    transaction,
+    (tx) => {
+      const id = activeTabId.value;
+      if (tx !== null && id !== null) storeDocument(id, tx.doc);
+    },
+    { flush: "sync" },
+  );
+  let known = new Set<string>();
+  watch(
+    [tabs, activeTabId],
+    ([list]) => {
+      const ids = new Set(list.map((tab) => tab.id));
+      for (const id of known) {
+        if (ids.has(id)) continue;
+        removedTabs.add(id);
+        pendingDocs.delete(id);
+        storedDocs.delete(id);
+      }
+      known = ids;
+      sessionPending = true;
+      schedule();
+    },
+    { flush: "sync" },
+  );
+};
 
 export const bootStorage = async () => {
   try {
     await localforage.ready();
   } catch (error) {
-    storageAvailable = false;
+    sessionKept = false;
     language.value = detectLanguage();
     console.error("storage is unavailable", error);
     sendNotification(
@@ -144,24 +273,6 @@ export const bootStorage = async () => {
     );
     return;
   }
-
-  watch(
-    path,
-    (value) => {
-      latestPath = value;
-      schedule();
-    },
-    { flush: "sync" },
-  );
-
-  watch(
-    importedFrom,
-    (value) => {
-      latestImportedFrom = value;
-      schedule();
-    },
-    { flush: "sync" },
-  );
 
   await restore("theme", theme, isTheme, themes[0]);
 
@@ -183,22 +294,21 @@ export const bootStorage = async () => {
   // the blocks pane closed until the user opens it
   await restore("blocksPane", blocksPaneOpen, isTrue, false);
 
-  watch(
-    transaction,
-    (tx) => {
-      if (tx === null) return;
-      latestDoc = tx.doc;
-      latestPath = path.value;
-      latestImportedFrom = importedFrom.value;
-      schedule();
-    },
-    { flush: "sync" },
-  );
+  sessionKept = await ownSession();
+  if (sessionKept) {
+    watchSession();
+  } else {
+    sendNotification(
+      "Blank is already open in another window, so this window won't remember its tabs",
+    );
+  }
 
   // store the last edits before the window closes. A failing or hanging
   // storage must never keep the window open
   try {
     await getCurrentWindow().onCloseRequested(async () => {
+      // with where the view is now, even if only that changed
+      if (sessionKept) sessionPending = pending = true;
       await Promise.race([flush(), timeout(maxWait)]).catch(console.warn);
     });
   } catch (err) {
@@ -236,18 +346,106 @@ export const restorable = (stored: unknown): unknown => {
   };
 };
 
-export const getDocumentFromStorage = async (): Promise<Node | undefined> => {
-  if (!storageAvailable) return;
-  const node = await localforage.getItem("doc");
-  return node === null ? undefined : Node.fromJSON(schema, restorable(node));
+const isSession = (value: unknown): value is Session => {
+  const session = value as Session | null;
+  return (
+    session?.version === 1 &&
+    Array.isArray(session.order) &&
+    session.order.length > 0 &&
+    session.order.every((id) => typeof session.tabs?.[id] === "object")
+  );
 };
 
-export const getPathfromStorage = async () =>
-  storageAvailable
-    ? await localforage.getItem<string | null>("path")
-    : undefined;
+/**
+ * migrate turns the one document an earlier Blank stored into the first tab:
+ * the old keys go only once the new ones are written. The tab counts as
+ * unsaved, since that Blank didn't know whether it was, until the file says
+ * otherwise (see src/editor/tabs.ts).
+ */
+const migrate = async (): Promise<Session | null> => {
+  const doc = await localforage.getItem("doc");
+  if (doc === null) return null;
+  const id = crypto.randomUUID();
+  const tab = {
+    path: (await localforage.getItem<string | null>("path")) ?? null,
+    importedFrom:
+      (await localforage.getItem<string | null>("importedFrom")) ?? null,
+  };
+  const session: Session = {
+    version: 1,
+    order: [id],
+    active: id,
+    tabs: {
+      [id]: {
+        ...tab,
+        // an untitled one is numbered, as new ones are
+        untitledNumber:
+          tab.path === null && tab.importedFrom === null ? 1 : null,
+        unsaved: true,
+        viewAnchor: null,
+      },
+    },
+  };
+  await localforage.setItem(tabKey(id), doc);
+  await localforage.setItem(SESSION, session);
+  await Promise.all(
+    ["doc", "path", "importedFrom"].map((key) => localforage.removeItem(key)),
+  );
+  return session;
+};
 
-export const getImportedFromStorage = async () =>
-  storageAvailable
-    ? await localforage.getItem<string | null>("importedFrom")
-    : undefined;
+/**
+ * loadSession returns the stored session, or null when there is none or this
+ * Blank doesn't keep it
+ */
+export const loadSession = async (): Promise<Session | null> => {
+  if (!sessionKept) return null;
+  const stored = await localforage.getItem(SESSION);
+  if (isSession(stored)) {
+    const active = stored.order.includes(stored.active)
+      ? stored.active
+      : stored.order[0];
+    return { ...stored, active };
+  }
+  if (stored === null) return migrate();
+  // e.g. one a newer Blank wrote: kept, so going back to it loses nothing
+  console.warn("ignoring a session this Blank can't read", stored);
+  await localforage.setItem("session-backup", stored).catch(console.warn);
+  sendNotification(
+    'Your last tabs couldn\'t be restored, so Blank starts afresh. They were kept as "session-backup".',
+  );
+  return null;
+};
+
+/**
+ * loadTabDocument returns the stored document of the tab `id`, or undefined
+ * when none is stored. It throws when the stored one can't be read.
+ */
+export const loadTabDocument = async (
+  id: string,
+): Promise<Node | undefined> => {
+  if (!sessionKept) return;
+  const stored = await localforage.getItem(tabKey(id));
+  if (stored === null) return;
+  const doc = Node.fromJSON(schema, restorable(stored));
+  storedDocs.set(id, doc);
+  return doc;
+};
+
+/**
+ * backupTabDocument copies the stored document of the tab `id` to
+ * `tab-backup:<id>`, so autosave can't overwrite the only copy of a document
+ * that can't be restored
+ * @returns whether a copy was kept
+ */
+export const backupTabDocument = async (id: string): Promise<boolean> => {
+  try {
+    const raw = await localforage.getItem(tabKey(id));
+    if (raw === null) return false;
+    await localforage.setItem(`tab-backup:${id}`, raw);
+    return true;
+  } catch (error) {
+    console.error("failed to back up the stored document", error);
+    return false;
+  }
+};

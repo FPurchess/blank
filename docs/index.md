@@ -31,8 +31,8 @@ features:
     linkText: Autocorrect
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>'
     title: Nothing gets lost
-    details: Close the window mid-thought. Blank keeps your words and has them ready the next time you open it.
-    link: /guide/writing#blank-remembers-your-document
+    details: Close the window mid-thought. Blank keeps every open tab and has your words ready the next time you open it.
+    link: /guide/writing#blank-remembers-your-documents
     linkText: How it works
   - icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>'
     title: Plain markdown, fine PDFs

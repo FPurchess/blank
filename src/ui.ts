@@ -5,6 +5,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 
 import { bootNativeMenuGuard } from "./nativeMenu";
+import { bootWindowTitle } from "./windowTitle";
 import { bootScope } from "./scope";
 import { bootApp } from "./ui/mount";
 import type { EditorHandle } from "./editor/handle";
@@ -31,6 +32,7 @@ export const bootUI = (editor: EditorHandle) =>
 
     bootNativeMenuGuard();
     bootApp(editor);
+    bootWindowTitle();
 
     // FIXME: better handling of permission errors
     setupNotification().catch(console.error);

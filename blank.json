@@ -27,6 +27,12 @@
     "file.save": "Mod-s",
     "file.save_as": "Mod-Shift-s",
     "file.open": "Mod-o",
+    "tab.close": "Mod-w",
+    "tab.next": "Ctrl-Tab",
+    "tab.previous": "Ctrl-Shift-Tab",
+    "tab.reopen": "Mod-Shift-t",
+    "tab.move_left": "Ctrl-Shift-PageUp",
+    "tab.move_right": "Ctrl-Shift-PageDown",
     "export.pdf": "Mod-Alt-p",
     "export.docx": "Mod-Alt-w",
     "theme.cycle": "Mod-Alt-t",
@@ -40,6 +46,8 @@
     "edit.footer": "Mod-Alt-f",
     "view.pages": "Mod-Alt-v",
     "view.outline": "Mod-Alt-o",
+    "view.focus_next": "F6",
+    "view.focus_previous": "Shift-F6",
     "tools.stats": "Mod-Alt-c"
   },
   "autocorrect": {

@@ -82,17 +82,3 @@ export const outlinePlacement = (
   if (!pinned || windowWidth < OUTLINE_BREAKPOINT) return "dashes";
   return free >= OUTLINE_DOCK ? "beside" : "docked";
 };
-
-/**
- * wheelPixels returns how far a wheel turn scrolls, in pixels
- * @param viewHeight the height of what scrolls, for a turn by pages
- */
-export const wheelPixels = (
-  { deltaY, deltaMode }: Pick<WheelEvent, "deltaY" | "deltaMode">,
-  viewHeight: number,
-) =>
-  deltaMode === 1
-    ? deltaY * 16
-    : deltaMode === 2
-      ? deltaY * viewHeight
-      : deltaY;

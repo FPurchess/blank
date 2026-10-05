@@ -5,7 +5,7 @@ import { EditorView } from "prosemirror-view";
 import { schema } from "../../markdown";
 import { headings } from "../../state";
 import { doc, h, p, table, td, th, tr } from "../../test/editor";
-import { applyDocument } from "../document";
+import { documentState } from "../document";
 import { headings as headingsPlugin } from "./headings";
 import { tableGuard } from "./tables";
 
@@ -70,7 +70,7 @@ describe("the headings plugin", () => {
 
   it("publishes the headings of a document that is opened", () => {
     const editor = mount();
-    editor.updateState(applyDocument(editor.state, doc(h(3, "Opened"))));
+    editor.updateState(documentState(editor.state, doc(h(3, "Opened"))));
     expect(headings.value).toEqual([{ level: 3, text: "Opened", pos: 0 }]);
   });
 });

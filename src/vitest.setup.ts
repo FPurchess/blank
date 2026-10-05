@@ -39,10 +39,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: vi.fn(),
 }));
 
-vi.mock("@tauri-apps/plugin-cli", () => ({
-  getMatches: vi.fn(),
-}));
-
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   readText: vi.fn(),
   writeText: vi.fn(),

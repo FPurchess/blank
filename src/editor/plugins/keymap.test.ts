@@ -20,6 +20,7 @@ import {
   codeBlock,
   doc,
   h,
+  keyEvent,
   li,
   ol,
   p,
@@ -31,7 +32,13 @@ import {
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import { schema } from "../../markdown";
-import { keymap, normalizeBinding } from "./keymap";
+import {
+  commandKeys,
+  keymap,
+  normalizeBinding,
+  WINDOW_COMMANDS,
+} from "./keymap";
+import * as tabs from "../tabs";
 import { withKeymap } from "../../test/keymap";
 
 describe("plugin.keymap", () => {
@@ -319,13 +326,71 @@ describe("plugin.keymap", () => {
       });
     });
 
-    it("Mod-n starts a new file", () => {
-      const { view, press } = withKeymap(doc(p("text")));
+    it.each([
+      ["Mod-n", "openNewTab", []],
+      ["Ctrl-Tab", "cycleTab", [1]],
+      ["Ctrl-Shift-Tab", "cycleTab", [-1]],
+      ["Ctrl-PageDown", "cycleTab", [1]],
+      ["Ctrl-PageUp", "cycleTab", [-1]],
+      ["Mod-Shift-t", "reopenTab", []],
+    ] as const)("%s runs %s", async (combo, action, args) => {
+      const run = vi.spyOn(tabs, action).mockResolvedValue(undefined);
+      const { press } = withKeymap(doc(p("text")));
 
-      expect(press("Mod-n")).toBe(true);
+      expect(press(combo)).toBe(true);
+      await flushPromises();
 
-      expect(view.state.doc.textContent).toBe("");
-      expect(path.value).toBeNull();
+      expect(run).toHaveBeenCalledWith(...args);
+    });
+
+    it("keeps Ctrl-PageDown for another command that has it", () => {
+      config.value = {
+        ...defaultConfig,
+        keymap: {
+          ...defaultConfig.keymap,
+          [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown",
+        },
+      };
+      const cycle = vi.spyOn(tabs, "cycleTab");
+      const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
+
+      expect(press("Ctrl-PageDown")).toBe(true);
+
+      expect(cycle).not.toHaveBeenCalled();
+      expect(view.state.doc.firstChild?.firstChild?.marks[0].type.name).toBe(
+        "strong",
+      );
+    });
+  });
+
+  describe("the keys that work outside the editor", () => {
+    it("leave a fixed key to any command bound to it", () => {
+      config.value = {
+        ...defaultConfig,
+        keymap: {
+          ...defaultConfig.keymap,
+          [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown",
+        },
+      };
+      const cycle = vi.spyOn(tabs, "cycleTab");
+      const { view } = withKeymap(doc(p("text")));
+
+      expect(
+        commandKeys(WINDOW_COMMANDS)(view, keyEvent("Ctrl-PageDown")),
+      ).toBe(false);
+      expect(cycle).not.toHaveBeenCalled();
+    });
+
+    it("run the window's commands and nothing else", async () => {
+      const run = vi.spyOn(tabs, "openNewTab").mockResolvedValue(undefined);
+      const { view } = withKeymap(doc(p("text")));
+      const keys = commandKeys(WINDOW_COMMANDS);
+
+      expect(keys(view, keyEvent("Mod-n"))).toBe(true);
+      expect(keys(view, keyEvent("Mod-b"))).toBe(false);
+      await flushPromises();
+
+      expect(run).toHaveBeenCalledOnce();
     });
   });
 

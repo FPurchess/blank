@@ -1,5 +1,7 @@
 import { computed, shallowRef } from "vue";
 
+import { frameLayout, viewAnchor, type ViewAnchor } from "../engine/frames";
+
 // The page view, which the layout engine paints (see src/engine and
 // src/ui/PageView.vue): the view the user chose, and what the engine laid
 // out, published by the editor's pageView plugin.
@@ -120,3 +122,18 @@ export interface PageViewport {
 }
 
 export const pageViewport = shallowRef<PageViewport | null>(null);
+
+/**
+ * currentViewAnchor returns the spot of the pages at the top of the view, to
+ * come back to it later, e.g. when the tab is shown again; null at the top or
+ * without pages
+ */
+export const currentViewAnchor = (): ViewAnchor | null => {
+  const layout = pageLayoutState.value;
+  const viewport = pageViewport.value;
+  if (!layout || !viewport) return null;
+  return viewAnchor(
+    frameLayout(layout, pageView.value, viewport.width),
+    viewport.scrollTop,
+  );
+};

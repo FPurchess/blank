@@ -46,11 +46,17 @@ read-fonts = "0.41"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"
+# every file opened becomes a tab in the running window (src/open.rs); 2.4,
+# which works with tauri 2.11
+tauri-plugin-single-instance = "~2.4"
 
 # the primary selection, which a middle click pastes (src/primary.rs); the
 # version tauri's webview already uses
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+# whether there is a session bus for the single-instance plugin (src/open.rs);
+# the version it uses
+zbus = "5"
 
 
 [dev-dependencies]

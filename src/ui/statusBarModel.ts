@@ -1,30 +1,11 @@
 import { hasOwnRules } from "../editor/plugins/autocomplete/languages/lookup";
-import { basename } from "../paths";
 import { languageName } from "../spellcheck/service";
 import type { SpellcheckStatus } from "../spellcheck/types";
 import type { ListedHeading } from "../markdown/headings";
 import type { MenuItem, PageViewMode } from "../state";
 
-// What the bars at the top and bottom of the window say (TopBar.vue,
-// BottomBar.vue and the items in it).
-
-/**
- * titleOf returns what the document is called: its file's path, or only
- * its name for "name", the name of the Word document it was imported from,
- * or "Untitled"
- */
-export const titleOf = (
-  file: string | null,
-  source: string | null,
-  form: "path" | "name" = "path",
-) =>
-  file !== null
-    ? form === "name"
-      ? basename(file)
-      : file
-    : source === null
-      ? "Untitled"
-      : `${basename(source)} (imported)`;
+// What the status bar at the bottom of the window says (BottomBar.vue and
+// the items in it).
 
 /**
  * spellcheckLabel returns what the spell check item shows, `message` if there

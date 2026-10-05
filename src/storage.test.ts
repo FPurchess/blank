@@ -4,6 +4,7 @@ import { EditorState } from "prosemirror-state";
 import { schema } from "./markdown";
 import { Node } from "prosemirror-model";
 
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -238,121 +239,146 @@ describe("storage", () => {
     });
   });
 
-  describe("document and path", () => {
+  describe("tabs and their documents", () => {
     const state = EditorState.create({ schema, doc: doc(p("draft")) });
     const replace = (node: ReturnType<typeof doc>) =>
       state.tr.replaceWith(0, state.doc.content.size, node);
+    const tab = (id: string, path: string | null = null) => ({
+      id,
+      path,
+      importedFrom: null,
+      untitledNumber: path === null ? 1 : null,
+      unsaved: false,
+      viewAnchor: null,
+    });
 
     /**
-     * stored returns the stored path and the text of the stored document
+     * text returns the text of the stored document of the tab `id`
      */
-    const stored = async () => ({
-      path: await localforage.getItem("path"),
-      text: (await localforage.getItem("doc"))
-        ? Node.fromJSON(schema, await localforage.getItem("doc")).textContent
-        : undefined,
-    });
+    const text = async (id: string) => {
+      const stored = await localforage.getItem(`tab:${id}`);
+      return stored ? Node.fromJSON(schema, stored).textContent : undefined;
+    };
 
-    it("stores the Word document an untitled document was imported from with it", async () => {
-      const { transaction, importedFrom, getImportedFromStorage } =
-        await bootFresh();
+    /**
+     * open boots storage with the tabs `ids`, the first one active
+     */
+    const open = async (...ids: string[]) => {
+      const storage = await bootFresh();
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      storage.tabs.value = ids.map((id) => tab(id));
+      storage.activeTabId.value = ids[0];
+      return storage;
+    };
 
-      transaction.value = replace(doc(p("imported")));
-      importedFrom.value = "/docs/report.docx";
-      vi.advanceTimersByTime(1000);
+    const tick = async (ms = 1000) => {
+      vi.advanceTimersByTime(ms);
       await flushPromises();
-      expect(await getImportedFromStorage()).toBe("/docs/report.docx");
-      expect((await stored()).text).toBe("imported");
+    };
 
-      importedFrom.value = null;
-      vi.advanceTimersByTime(1000);
-      await flushPromises();
-      expect(await getImportedFromStorage()).toBeNull();
-    });
-
-    it("stores the latest document a second after the first change", async () => {
-      const { transaction } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    it("stores the active tab's document a second after the first change", async () => {
+      const { transaction } = await open("a");
 
       transaction.value = replace(doc(p("first")));
       transaction.value = replace(doc(h(1, "Final"), p("text")));
-      vi.advanceTimersByTime(999);
-      await flushPromises();
-      expect(await localforage.getItem("doc")).toBeNull();
+      await tick(999);
+      expect(await localforage.getItem("tab:a")).toBeNull();
 
-      vi.advanceTimersByTime(1);
-      await flushPromises();
-      expect((await stored()).text).toBe("Finaltext");
+      await tick(1);
+      expect(await text("a")).toBe("Finaltext");
     });
 
     it("keeps storing while the user types without a pause", async () => {
-      const { transaction } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const { transaction } = await open("a");
 
       // a keystroke every 100ms for 3 seconds
       for (let i = 1; i <= 30; i++) {
         transaction.value = replace(doc(p(`typed ${i}`)));
-        vi.advanceTimersByTime(100);
-        await flushPromises();
-        if (i === 10) expect((await stored()).text).toBe("typed 10");
-        if (i === 20) expect((await stored()).text).toBe("typed 20");
+        await tick(100);
+        if (i === 10) expect(await text("a")).toBe("typed 10");
+        if (i === 20) expect(await text("a")).toBe("typed 20");
       }
-      expect((await stored()).text).toBe("typed 30");
+      expect(await text("a")).toBe("typed 30");
     });
 
-    it("always stores the path (and imported Word document) together with the document", async () => {
-      const { path, transaction } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    it("stores each document under its own tab", async () => {
+      const { transaction, activeTabId } = await open("a", "b");
+
+      transaction.value = replace(doc(p("in a")));
+      activeTabId.value = "b";
+      transaction.value = replace(doc(p("in b")));
+      await tick();
+
+      expect(await text("a")).toBe("in a");
+      expect(await text("b")).toBe("in b");
+    });
+
+    it("doesn't store a document again for a selection", async () => {
+      const { transaction } = await open("a");
+      const stored = replace(doc(p("text")));
+      transaction.value = stored;
+      await tick();
+      const setItem = vi.spyOn(localforage, "setItem");
+
+      const moved = EditorState.create({ schema, doc: stored.doc }).tr;
+      transaction.value = moved;
+      await tick();
+
+      expect(setItem.mock.calls.map(([key]) => key)).not.toContain("tab:a");
+    });
+
+    it("stores a document a tab was opened with", async () => {
+      const { storeDocument } = await open("a");
+
+      storeDocument("b", doc(p("opened")));
+      await tick();
+
+      expect(await text("b")).toBe("opened");
+    });
+
+    it("stores the session after the documents it lists", async () => {
+      const { transaction } = await open("a");
       const setItem = vi.spyOn(localforage, "setItem");
 
       transaction.value = replace(doc(p("a")));
-      vi.advanceTimersByTime(1000);
-      await flushPromises();
-      path.value = "/b.md";
-      transaction.value = replace(doc(p("b")));
-      vi.advanceTimersByTime(1000);
-      await flushPromises();
-      path.value = null;
-      vi.advanceTimersByTime(1000);
-      await flushPromises();
+      await tick();
 
       expect(setItem.mock.calls.map(([key]) => key)).toEqual([
-        "path",
-        "importedFrom",
-        "doc",
-        "path",
-        "importedFrom",
-        "doc",
-        "path",
-        "importedFrom",
-        "doc",
+        "tab:a",
+        "session",
       ]);
-      expect(await stored()).toEqual({ path: null, text: "b" });
+      expect(await localforage.getItem("session")).toEqual({
+        version: 1,
+        order: ["a"],
+        active: "a",
+        tabs: { a: { ...tab("a"), id: undefined } },
+      });
     });
 
-    it("doesn't store a new path before its document is known", async () => {
-      await localforage.setItem("path", "/a.md");
-      await localforage.setItem("doc", doc(p("a")).toJSON());
-      const { path } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    it("removes the document of a closed tab", async () => {
+      const { transaction, tabs, activeTabId } = await open("a", "b");
+      transaction.value = replace(doc(p("a")));
+      activeTabId.value = "b";
+      transaction.value = replace(doc(p("b")));
+      await tick();
 
-      path.value = "/b.md";
-      vi.advanceTimersByTime(1000);
-      await flushPromises();
+      tabs.value = [tab("b")];
+      await tick();
 
-      expect(await stored()).toEqual({ path: "/a.md", text: "a" });
+      expect(await localforage.getItem("tab:a")).toBeNull();
+      expect(await text("b")).toBe("b");
+      expect(
+        ((await localforage.getItem("session")) as { order: string[] }).order,
+      ).toEqual(["b"]);
     });
 
     it("flush stores pending changes right away", async () => {
-      const { path, transaction, flush } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const { transaction, flush } = await open("a");
 
-      path.value = "/b.md";
       transaction.value = replace(doc(p("unsaved")));
       await flush();
 
-      expect(await stored()).toEqual({ path: "/b.md", text: "unsaved" });
+      expect(await text("a")).toBe("unsaved");
     });
 
     it("flush does nothing without pending changes", async () => {
@@ -386,17 +412,49 @@ describe("storage", () => {
       expect(await localforage.getItem("pageView")).toBe("pages");
     });
 
-    it("stores pending changes when the window closes", async () => {
-      const { transaction } = await bootFresh();
+    it("stores pending changes and the session when the window closes", async () => {
+      const { transaction } = await open("a");
 
       transaction.value = replace(doc(p("closing")));
       await closeHandler?.();
 
-      expect((await stored()).text).toBe("closing");
+      expect(await text("a")).toBe("closing");
+      expect(await localforage.getItem("session")).toMatchObject({
+        active: "a",
+      });
+    });
+
+    it("stores where the view is when the window closes, even if only that changed", async () => {
+      const { flush } = await open("a");
+      await flush();
+      await localforage.removeItem("session");
+
+      await closeHandler?.();
+
+      expect(await localforage.getItem("session")).toMatchObject({
+        active: "a",
+      });
+    });
+
+    it("tries again what a failed write didn't store", async () => {
+      const { transaction, flush } = await open("a");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const setItem = localforage.setItem.bind(localforage);
+      const failing = vi
+        .spyOn(localforage, "setItem")
+        .mockRejectedValueOnce(new Error("busy"));
+
+      transaction.value = replace(doc(p("kept")));
+      await tick();
+      expect(warn).toHaveBeenCalled();
+      failing.mockImplementation(setItem);
+
+      await flush();
+      expect(await text("a")).toBe("kept");
     });
 
     it("lets the window close when storing fails", async () => {
-      const { transaction } = await bootFresh();
+      const { transaction } = await open("a");
       const error = new Error("quota exceeded");
       vi.spyOn(localforage, "setItem").mockRejectedValue(error);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -408,15 +466,13 @@ describe("storage", () => {
     });
 
     it("lets the window close when storing hangs", async () => {
-      const { transaction } = await bootFresh();
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const { transaction } = await open("a");
       vi.spyOn(localforage, "setItem").mockReturnValue(new Promise(() => {}));
 
       transaction.value = replace(doc(p("closing")));
       let closed = false;
       const closing = closeHandler?.().then(() => (closed = true));
-      vi.advanceTimersByTime(999);
-      await flushPromises();
+      await tick(999);
       expect(closed).toBe(false);
 
       vi.advanceTimersByTime(1);
@@ -435,68 +491,208 @@ describe("storage", () => {
       expect(warn).toHaveBeenCalled();
     });
 
-    it("returns undefined when no document is stored", async () => {
-      const { getDocumentFromStorage } = await import("./storage");
+    it("returns undefined when a tab has no stored document", async () => {
+      const { loadTabDocument } = await bootFresh();
 
-      expect(await getDocumentFromStorage()).toBeUndefined();
+      expect(await loadTabDocument("a")).toBeUndefined();
     });
 
-    it("restores a stored document", async () => {
-      const stored = doc(h(2, "Stored"), p("content"));
-      await localforage.setItem("doc", stored.toJSON());
-      const { getDocumentFromStorage } = await import("./storage");
+    it("restores a stored document with its frontmatter", async () => {
+      const stored = docWithFrontmatter("title: Stored", h(2, "Stored"));
+      await localforage.setItem("tab:a", stored.toJSON());
+      const { loadTabDocument } = await bootFresh();
 
-      const restored = await getDocumentFromStorage();
+      const restored = await loadTabDocument("a");
 
       // the module is imported again, and so is its schema
       expect(restored?.toJSON()).toEqual(stored.toJSON());
+      expect(restored?.attrs.frontmatter).toBe("title: Stored");
     });
 
-    it("restores the frontmatter of a stored document", async () => {
-      const stored = docWithFrontmatter("title: Stored", p("content"));
+    it("backs up a stored document", async () => {
+      await localforage.setItem("tab:a", { type: "broken" });
+      const { backupTabDocument } = await bootFresh();
+
+      expect(await backupTabDocument("a")).toBe(true);
+      expect(await localforage.getItem("tab-backup:a")).toEqual({
+        type: "broken",
+      });
+      expect(await backupTabDocument("missing")).toBe(false);
+    });
+  });
+
+  describe("session", () => {
+    const session = {
+      version: 1,
+      order: ["a", "b"],
+      active: "b",
+      tabs: {
+        a: {
+          path: "/a.md",
+          importedFrom: null,
+          untitledNumber: null,
+          unsaved: false,
+          viewAnchor: null,
+        },
+        b: {
+          path: null,
+          importedFrom: null,
+          untitledNumber: 1,
+          unsaved: true,
+          viewAnchor: { page: 1, y: 20 },
+        },
+      },
+    };
+
+    it("loads the stored session", async () => {
+      await localforage.setItem("session", session);
+      const { loadSession } = await bootFresh();
+
+      expect(await loadSession()).toEqual(session);
+    });
+
+    it("shows the first tab when the active one is missing", async () => {
+      await localforage.setItem("session", { ...session, active: "c" });
+      const { loadSession } = await bootFresh();
+
+      expect((await loadSession())?.active).toBe("a");
+    });
+
+    it("keeps a session it can't read and starts afresh, saying so", async () => {
+      const newer = { ...session, version: 2 };
+      await localforage.setItem("session", newer);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { loadSession } = await bootFresh();
+
+      expect(await loadSession()).toBeNull();
+      expect(await localforage.getItem("session-backup")).toEqual(newer);
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining('kept as "session-backup"'),
+      );
+    });
+
+    it("numbers an untitled document an earlier Blank stored", async () => {
+      await localforage.setItem("doc", doc(p("from before")).toJSON());
+      const { loadSession } = await bootFresh();
+
+      const migrated = await loadSession();
+
+      expect(migrated!.tabs[migrated!.active]).toMatchObject({
+        path: null,
+        untitledNumber: 1,
+      });
+    });
+
+    it("turns the one document an earlier Blank stored into an unsaved tab", async () => {
+      const stored = doc(p("from before"));
       await localforage.setItem("doc", stored.toJSON());
-      const { getDocumentFromStorage } = await import("./storage");
+      await localforage.setItem("path", "/old.md");
+      await localforage.setItem("importedFrom", null);
+      const { loadSession } = await bootFresh();
 
-      const restored = await getDocumentFromStorage();
+      const migrated = await loadSession();
 
-      expect(restored?.attrs.frontmatter).toBe("title: Stored");
+      const id = migrated!.active;
+      expect(migrated).toEqual({
+        version: 1,
+        order: [id],
+        active: id,
+        tabs: {
+          [id]: {
+            path: "/old.md",
+            importedFrom: null,
+            untitledNumber: null,
+            unsaved: true,
+            viewAnchor: null,
+          },
+        },
+      });
+      expect(await localforage.getItem(`tab:${id}`)).toEqual(stored.toJSON());
+      expect(await localforage.getItem("session")).toEqual(migrated);
+      for (const key of ["doc", "path", "importedFrom"]) {
+        expect(await localforage.getItem(key)).toBeNull();
+      }
+    });
+
+    it("keeps the old document when the migration can't be written", async () => {
+      await localforage.setItem("doc", doc(p("from before")).toJSON());
+      const { loadSession } = await bootFresh();
+      vi.spyOn(localforage, "setItem").mockRejectedValue(new Error("full"));
+
+      await expect(loadSession()).rejects.toThrow("full");
+      expect(await localforage.getItem("doc")).not.toBeNull();
+    });
+
+    it("has no session without anything stored", async () => {
+      const { loadSession } = await bootFresh();
+
+      expect(await loadSession()).toBeNull();
+    });
+
+    describe("when another Blank keeps it", () => {
+      beforeEach(() => {
+        mockIPC((cmd) => (cmd === "session_lock" ? false : undefined));
+      });
+
+      it("neither restores nor stores the tabs, and says so", async () => {
+        await localforage.setItem("session", session);
+        const { loadSession, transaction, tabs, activeTabId, flush } =
+          await bootFresh();
+        const setItem = vi.spyOn(localforage, "setItem");
+
+        tabs.value = [{ id: "c", ...session.tabs.a }];
+        activeTabId.value = "c";
+        transaction.value = EditorState.create({ schema }).tr;
+        await flush();
+
+        expect(await loadSession()).toBeNull();
+        expect(setItem).not.toHaveBeenCalled();
+        expect(sendNotification).toHaveBeenCalledWith(
+          "Blank is already open in another window, so this window won't remember its tabs",
+        );
+      });
     });
   });
 
   describe("unavailable storage", () => {
     it("notifies and neither restores nor persists anything", async () => {
-      await localforage.setItem("doc", doc(p("stored")).toJSON());
-      await localforage.setItem("path", "/stored.md");
+      await localforage.setItem("session", { version: 1 });
       vi.spyOn(localforage, "ready").mockRejectedValue(new Error("no idb"));
       const setItem = vi.spyOn(localforage, "setItem");
       vi.spyOn(console, "error").mockImplementation(() => {});
 
-      const {
-        path,
-        getDocumentFromStorage,
-        getPathfromStorage,
-        getImportedFromStorage,
-      } = await bootFresh();
-      path.value = "/other.md";
-      await flushPromises();
+      const { loadSession, loadTabDocument, storeDocument, flush } =
+        await bootFresh();
+      storeDocument("a", doc(p("text")));
+      await flush();
 
       expect(sendNotification).toHaveBeenCalledWith(
         expect.stringContaining("no idb"),
       );
       expect(setItem).not.toHaveBeenCalled();
-      expect(await getDocumentFromStorage()).toBeUndefined();
-      expect(await getPathfromStorage()).toBeUndefined();
-      expect(await getImportedFromStorage()).toBeUndefined();
+      expect(await loadSession()).toBeNull();
+      expect(await loadTabDocument("a")).toBeUndefined();
     });
   });
 
   it("warns instead of failing when a value can't be stored", async () => {
-    const { transaction } = await bootFresh();
+    const { transaction, tabs, activeTabId } = await bootFresh();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const error = new Error("quota exceeded");
     vi.spyOn(localforage, "setItem").mockRejectedValue(error);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
+    tabs.value = [
+      {
+        id: "a",
+        path: null,
+        importedFrom: null,
+        untitledNumber: 1,
+        unsaved: false,
+        viewAnchor: null,
+      },
+    ];
+    activeTabId.value = "a";
     const state = EditorState.create({ schema, doc: doc(p("draft")) });
     transaction.value = state.tr.insertText("!");
     vi.advanceTimersByTime(1000);

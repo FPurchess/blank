@@ -4,7 +4,11 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../../src/chrome.ts";
+import {
+  READING_LINE,
+  STATUS_HEIGHT,
+  TOP_BAR_HEIGHT,
+} from "../../src/chrome.ts";
 import { Key, pressMod, restartApp } from "../helpers.ts";
 
 // The outline: the dashes at the right edge, the list they open, a click on
@@ -72,7 +76,8 @@ describe("the outline", () => {
     const before = await selection();
     await $$(".outline-entry")[6].click();
     await browser.waitUntil(
-      async () => Math.abs(((await headingOffset("Chapter 4")) ?? 0) - 108) < 2,
+      async () =>
+        Math.abs(((await headingOffset("Chapter 4")) ?? 0) - READING_LINE) < 2,
       { timeoutMsg: "the heading didn't land below the top of the view" },
     );
     await expect($(".outline-entry.current")).toHaveText("Chapter 4");

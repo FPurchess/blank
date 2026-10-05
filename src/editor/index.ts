@@ -30,19 +30,20 @@ import {
   tableTools,
   tableView,
 } from "./plugins";
-import { applyInitialDocument } from "./document";
+import { bootTabs, restoreTabs } from "./tabs";
 import { nativePointer } from "./pagePointer";
 import { setGeometryView } from "../engine/geometry";
 import { createEditorHandle, syncPlugin } from "./handle";
-import { STATUS_HEIGHT } from "../chrome";
+import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { timed } from "../engine/perf";
 
 /**
- * bootEditor mounts the editor with the first document
+ * bootEditor mounts the editor with the tabs of the last session and the
+ * files Blank was started with
  * @returns the handle the UI works with the editor through
  */
 export const bootEditor = async () => {
-  const state = await applyInitialDocument(
+  const state = await restoreTabs(
     EditorState.create({
       schema,
       // the pickers and autocorrect see Enter and Tab before the table keys
@@ -93,8 +94,13 @@ export const bootEditor = async () => {
     // share the .ProseMirror class with
     attributes: { id: "editor" },
     // without the layout engine the editor shows the text itself, and keeps
-    // the caret clear of the status bar when it scrolls to it
-    scrollMargin: { top: 5, left: 5, right: 5, bottom: STATUS_HEIGHT + 8 },
+    // the caret clear of the top area and the status bar when it scrolls to it
+    scrollMargin: {
+      top: TOP_BAR_HEIGHT + 8,
+      left: 5,
+      right: 5,
+      bottom: STATUS_HEIGHT + 8,
+    },
     handleDOMEvents: {
       blur: (view: EditorView, e: Event) => {
         // the dialogs take the focus while they are open
@@ -118,7 +124,7 @@ export const bootEditor = async () => {
   setGeometryView(view);
   const editor = createEditorHandle(view);
   sync = editor.sync;
-  transaction.value = view.state.tr;
+  bootTabs(view, editor.handle.state);
   // focus the editor, unless a click was quicker, which focusing would undo
   window.setTimeout(() => {
     // unless the editor is gone by then, e.g. at the end of a test

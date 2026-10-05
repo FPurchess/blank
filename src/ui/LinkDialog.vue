@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, useTemplateRef } from "vue";
 
-import { linkDialog, type LinkDialogRequest } from "../state";
-import { closeDialog } from "./closeDialog";
+import { closeDialog, linkDialog, type LinkDialogRequest } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import TextField from "./components/TextField.vue";
 import { checkLink } from "./linkDialogModel";

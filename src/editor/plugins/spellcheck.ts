@@ -14,11 +14,6 @@ import { language, spellchecker } from "../../state";
 import { words, type Word } from "../../spellcheck/tokenize";
 import type { Spellchecker } from "../../spellcheck/types";
 
-// set on transactions that replace the whole document, e.g. for a new file,
-// which forgets the words ignored in the previous one. An opened file gets a
-// fresh editor state, which forgets them anyway.
-export const REPLACE_DOCUMENT = "replaceDocument";
-
 // how long typing pauses before the changed text is checked
 const DELAY = 150;
 
@@ -129,8 +124,6 @@ const apply = (
 ): SpellState => {
   let { decorations, ignored, pending, dirty } = value;
   const meta = tr.getMeta(spellcheckKey) as Meta | undefined;
-
-  if (tr.getMeta(REPLACE_DOCUMENT)) return fresh();
 
   if (tr.docChanged) {
     decorations = decorations.map(tr.mapping, tr.doc);
@@ -260,6 +253,16 @@ const check = async (view: EditorView, checker: Spellchecker) => {
 };
 
 /**
+ * resetSpellcheck sets `tr` to drop the underlines and check the whole
+ * document again, e.g. with another spell checker, or for a tab shown again
+ * whose underlines are from one that has gone since
+ */
+export const resetSpellcheck = (tr: Transaction) =>
+  tr
+    .setMeta(spellcheckKey, { type: "reset" } satisfies Meta)
+    .setMeta("addToHistory", false);
+
+/**
  * spellcheck underlines misspelled words while `spellchecker` holds a spell
  * checker
  */
@@ -309,11 +312,7 @@ export const spellcheck = () =>
       const stop = watch(
         spellchecker,
         () => {
-          view.dispatch(
-            view.state.tr
-              .setMeta(spellcheckKey, { type: "reset" } satisfies Meta)
-              .setMeta("addToHistory", false),
-          );
+          view.dispatch(resetSpellcheck(view.state.tr));
           schedule(0);
         },
         { flush: "sync" },

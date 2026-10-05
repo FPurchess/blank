@@ -21,7 +21,11 @@ You can find a full list of keyboard shortcuts here: https://blank-writer.xyz/gu
 
 ### Blank remembers your content
 
-You might be in a hurry closing Blank without saving your changes. That's no problem. Blank remembers what you wrote and restores the last content upon the next start. This way, you can just open & close Blank without worrying about losing anything.
+You might be in a hurry closing Blank without saving your changes. That's no problem. Blank remembers what you wrote and restores every open tab upon the next start. This way, you can just open & close Blank without worrying about losing anything.
+
+### Several documents in tabs
+
+`Mod` `N` opens a new document in a tab of its own, and every file you open gets one too. `Ctrl` `Tab` goes to the next tab, `Mod` `W` closes one, and a dot on a tab means it has changes you haven't saved.
 
 ### Unobtrusive Autocompletion
 

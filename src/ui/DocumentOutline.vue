@@ -36,9 +36,9 @@ import {
   listShape,
   OUTLINE_DOCK,
   outlinePlacement,
-  wheelPixels,
 } from "./outlineModel";
 import { sectionAt } from "./readingLine";
+import { wheelPixels } from "./scrollModel";
 
 // The outline: the document's headings as dashes at the right edge, which
 // open into a list of them on hover or a click; a click on a heading scrolls

@@ -4,7 +4,13 @@ import path from "node:path";
 
 import { $, expect } from "@wdio/globals";
 
-import { expectEditorText, restartApp, waitForInk } from "../helpers.ts";
+import {
+  expectActiveTab,
+  expectEditorText,
+  restartApp,
+  tabLabels,
+  waitForInk,
+} from "../helpers.ts";
 
 describe("launch", () => {
   it("shows the welcome document", async () => {
@@ -48,8 +54,8 @@ describe("launch", () => {
     expect(width).toBeGreaterThan(10);
   });
 
-  it("shows an untitled document", async () => {
-    await expect($("#ui-top")).toHaveText("» Untitled");
+  it("shows the welcome document in its tab", async () => {
+    await expectActiveTab("Welcome", "Not saved yet");
   });
 
   it("counts the words", async () => {
@@ -60,7 +66,7 @@ describe("launch", () => {
     await expect($("body")).toHaveAttribute("data-theme", "light");
   });
 
-  describe("with more than one file", () => {
+  describe("with several files", () => {
     let fixtureDir: string;
 
     before(() => {
@@ -71,18 +77,18 @@ describe("launch", () => {
       fs.rmSync(fixtureDir, { recursive: true, force: true });
     });
 
-    it("still starts the editor", async () => {
+    it("opens each in a tab, and shows the last", async () => {
       const fileA = path.join(fixtureDir, "a.md");
       const fileB = path.join(fixtureDir, "b.md");
       fs.writeFileSync(fileA, "# File A\n");
       fs.writeFileSync(fileB, "# File B\n");
 
-      // the CLI plugin rejects a second path, see readDocumentFromCliArgs
       await restartApp([fileA, fileB]);
 
-      await expect($("#editor")).toBeExisting();
       await expect($(".boot-error")).not.toBeExisting();
-      await expectEditorText("#editor h1", "Welcome to Blank");
+      await expectEditorText("#editor h1", "File B");
+      expect(await tabLabels()).toEqual(["Welcome", "a", "b"]);
+      await expectActiveTab("b", fileB);
     });
   });
 });

@@ -13,7 +13,6 @@ import { bootEngine, exposeEngineHooks } from "./engine/engine";
 import { exposeGeometry } from "./engine/geometry";
 import { deferred, flushPromises } from "./test/async";
 import { createTestHandle, doc, p } from "./test/editor";
-import { mockCliArgs } from "./test/tauri";
 
 vi.mock("./config", () => ({ bootConfig: vi.fn() }));
 vi.mock("./storage", () => ({ bootStorage: vi.fn(), exposeStorage: vi.fn() }));
@@ -224,7 +223,6 @@ describe("main with the real editor and engine", () => {
       bootConfig: vi.fn(async () => {}),
     }));
     vi.mocked(bootUI).mockImplementation(() => () => {});
-    mockCliArgs();
     await localforage.clear();
     await localforage.setItem(
       "doc",

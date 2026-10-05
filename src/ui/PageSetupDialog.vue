@@ -19,8 +19,7 @@ import {
 import { describePaper } from "../layout/describe";
 import { type Layout, layoutOf } from "../layout/resolve";
 import { thumbnailSvg } from "../layout/thumbnail";
-import { pageSetup, type PageSetupRequest } from "../state";
-import { closeDialog } from "./closeDialog";
+import { closeDialog, pageSetup, type PageSetupRequest } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import OptionGroup from "./components/OptionGroup.vue";
 import TextField from "./components/TextField.vue";

@@ -23,13 +23,12 @@ import {
 import { createState, createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 
-// The bars at the top and bottom of the window: TopBar.vue, BottomBar.vue
-// and the items in it
+// The bars at the top and bottom of the window: TopArea.vue (its tabs are
+// in TabRow.test.ts), BottomBar.vue and the items in it
 
 let dispose = () => {};
 afterEach(() => dispose());
 
-const uiTop = () => document.querySelector<HTMLElement>("#ui-top");
 const uiStats = () => document.querySelector<HTMLElement>("#ui-stats");
 const uiLanguage = () => document.querySelector<HTMLElement>("#ui-language");
 
@@ -42,37 +41,27 @@ describe("top bar and counter", () => {
     dispose = bootApp(createTestHandle());
   });
 
-  describe("file path", () => {
-    it("shows Untitled without a path", async () => {
-      expect(uiTop()?.textContent).toBe("» Untitled");
+  describe("top area", () => {
+    const press = (type: string, button = 0) => {
+      const event = new MouseEvent(type, {
+        button,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.querySelector("#ui-top .toolbar-row")!.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    it("keeps the editor's focus when it is pressed", () => {
+      expect(press("mousedown")).toBe(true);
     });
 
-    it("shows the current path", async () => {
-      path.value = "/this/is/a/test/path";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» /this/is/a/test/path");
-
-      path.value = null;
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» Untitled");
-    });
-
-    it("shows the name of an imported Word document until it is saved", async () => {
-      importedFrom.value = "/docs/report.docx";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» report.docx (imported)");
-
-      path.value = "/docs/report.md";
-      await nextTick();
-      expect(uiTop()?.textContent).toBe("» /docs/report.md");
-    });
-
-    it("shows a path containing markup as plain text", async () => {
-      path.value = "/tmp/<img src=x>.md";
-      await nextTick();
-
-      expect(uiTop()?.textContent).toBe("» /tmp/<img src=x>.md");
-      expect(uiTop()?.children).toHaveLength(0);
+    it("pastes nothing on a middle click, where Linux would paste", () => {
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+      expect(press("mouseup", 1)).toBe(true);
+      expect(press("mouseup", 0)).toBe(false);
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+      expect(press("mouseup", 1)).toBe(false);
     });
   });
 
@@ -129,6 +118,8 @@ describe("language chooser", () => {
     expect(ids).toEqual([
       "ui-stats",
       "ui-announcement",
+      // what only screen readers hear, e.g. which tab is shown
+      "ui-announcement-spoken",
       // the page in view, read out when it changes, not shown; the page
       // number itself needs the pages, which these tests don't lay out
       "ui-page-spoken",
@@ -442,6 +433,19 @@ describe("announcement", () => {
     announcement.value = null;
     await nextTick();
     expect(uiAnnouncement().textContent).toBe("");
+  });
+
+  it("reads out a quiet one without showing it", async () => {
+    const spoken = () =>
+      document.querySelector<HTMLElement>("#ui-announcement-spoken")!;
+    expect(spoken().getAttribute("role")).toBe("status");
+
+    announce("notes, tab 2 of 3", { quiet: true });
+    await nextTick();
+
+    expect(uiAnnouncement().textContent).toBe("");
+    expect(spoken().textContent).toBe("notes, tab 2 of 3");
+    expect(spoken().classList).toContain("visually-hidden");
   });
 
   it("sits next to the counter, before the items on the right", () => {

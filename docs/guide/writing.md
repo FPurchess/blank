@@ -54,13 +54,27 @@ To change or remove an image, put the cursor right before or after it and press 
 
 Images are as wide as they are in the file, up to the width of the page, and [PDFs and Word documents](./files#pdf) include them at that size.
 
-## Blank remembers your document
+## Tabs
 
-Blank keeps what you write as you go, at least once a second and once more when you close the window, and restores it on the next start, together with the open file, the theme and the language. So you can close the window mid-thought without saving, and pick up right where you left off.
+Keep several documents open at once, each in a tab at the top of the window. `Mod` `N` or **+** starts a new one, and a double-click on the empty part of the row does too. Every file you open gets a tab of its own, next to the one you're in; open a file that's already open and Blank just takes you to its tab.
+
+- **Switch** with `Ctrl` `Tab` and `Ctrl` `Shift` `Tab`, or `Ctrl` `Page Down` and `Ctrl` `Page Up`, or click a tab. Each tab keeps its own place in the text and its own undo.
+- **Close** with `Mod` `W`, the × on a tab or a middle click. Changes you haven't saved show as a dot instead of the ×, and Blank asks whether to save them before the tab closes. `Mod` `Shift` `T` opens the file you closed last again.
+- **Reorder** by dragging a tab, or with `Ctrl` `Shift` `Page Up` and `Page Down`.
+- **Right-click** a tab to close the others or those to its right, to save it, or to copy its file's path.
+- **Get there from the keyboard** with `F6`, which takes you from the text to the tabs and back. The arrow keys move between tabs, `Enter` shows one, `Delete` closes it and `Esc` takes you back to the text.
+
+The window is named after the tab you're in, and pointing at a tab shows where its file is.
+
+## Blank remembers your documents
+
+Blank keeps what you write as you go, at least once a second and once more when you close the window, and restores every tab on the next start, unsaved changes included, together with the theme and the language. So you can close the window mid-thought without saving, and pick up right where you left off. Closing the window never asks about saving; only closing a tab does.
+
+A tab whose file you saved shows the file as it is on disk now, in case it changed meanwhile.
 
 ## Save, open and export
 
-Your documents are plain markdown files: `Mod` `S` saves, `Mod` `O` opens, also Word documents. To share a piece, export it as a PDF with `Mod` `Alt` `P` or as a Word document with `Mod` `Alt` `W`. [Files & formats](./files) has everything about PDF and Word.
+Your documents are plain markdown files: `Mod` `S` saves the tab you're in, `Mod` `O` opens one or several files, also Word documents. To share a piece, export it as a PDF with `Mod` `Alt` `P` or as a Word document with `Mod` `Alt` `W`. [Files & formats](./files) has everything about PDF and Word.
 
 ## The status bar
 

@@ -7,22 +7,8 @@ import {
   pageMenuItems,
   pickerWindow,
   spellcheckLabel,
-  titleOf,
   viewLabel,
 } from "./statusBarModel";
-
-describe("titleOf", () => {
-  it("names the file, an imported Word document, or Untitled", () => {
-    expect(titleOf("/docs/a.md", "/docs/a.docx")).toBe("/docs/a.md");
-    expect(titleOf(null, "/docs/a.docx")).toBe("a.docx (imported)");
-    expect(titleOf(null, null)).toBe("Untitled");
-  });
-
-  it("names the file only by its name, if asked", () => {
-    expect(titleOf("/docs/a.md", null, "name")).toBe("a.md");
-    expect(titleOf(null, "/docs/a.docx", "name")).toBe("a.docx (imported)");
-  });
-});
 
 describe("spellcheckLabel", () => {
   it("shows a message instead of the status", () => {

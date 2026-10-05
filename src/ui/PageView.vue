@@ -16,7 +16,7 @@ import { hasOpenModifier, linkHint } from "../editor/plugins/openLink";
 import { pictureBoxAt } from "../editor/plugins/forms";
 import {
   dropExternal,
-  hasPrimarySelection,
+  noPrimaryPaste,
   pastePrimary,
   PAGE_MENU,
   PAGE_PRESS,
@@ -39,6 +39,7 @@ import {
   pageSelection,
   pageView,
   pageViewport,
+  tabSwitch,
 } from "../state";
 import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
@@ -47,23 +48,22 @@ import PageOverlay from "./PageOverlay.vue";
 import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
 import {
+  anchorTop,
   type Frame,
   frameLayout,
+  type FrameLayout,
   keptRange,
   onDesk,
+  viewAnchor,
+  type ViewAnchor,
   visibleRange,
 } from "../engine/frames";
 import { pageBitmaps } from "./pageBitmaps";
 import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
 import { PageMarksMemo } from "./pageMarks";
-import {
-  anchorTop,
-  movesPages,
-  scrollFor,
-  selectedOn,
-  viewAnchor,
-} from "./pageViewModel";
+import { movesPages, selectedOn } from "./pageViewModel";
+import { scrollFor } from "./scrollModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -156,7 +156,7 @@ const doc = computed(() => editor.state.value.doc);
 const decorations = computed(
   () => spellcheckKey.getState(editor.state.value)?.decorations,
 );
-const marks = new PageMarksMemo();
+let marks = new PageMarksMemo();
 
 // a frame as a page frame shows it, all plain values
 type ShownFrame = Frame & {
@@ -273,6 +273,48 @@ onUnmounted(() => {
 });
 listenOnWindow("resize", () => measure());
 
+// Another tab shows: what was kept of the last document goes, and the view
+// goes back to where it was on this one once its layout is there (see
+// restore below). Before the new document is laid out, in the switch itself.
+let restoring: { anchor: ViewAnchor | null } | null = null;
+watch(
+  tabSwitch,
+  (change) => {
+    if (!change) return;
+    restoring = { anchor: change.anchor };
+    kept = "";
+    shownFrames = new Map();
+    marks = new PageMarksMemo();
+    move.cancel();
+  },
+  { flush: "sync" },
+);
+
+/**
+ * scrollTo scrolls the view to `top`: the render that follows already shows
+ * the pages there, rather than those at the old scroll in the new layout
+ */
+const scrollTo = (top: number) => {
+  scrollTop.value = top;
+  void nextTick(() => {
+    if (!scroller.value) return;
+    scroller.value.scrollTop = top;
+    measure(false);
+  });
+};
+
+/**
+ * restore scrolls a tab shown again to where it was, once `next` has the
+ * page it was on; the rest of a long document may come a chunk later
+ * @returns whether the switch is done with
+ */
+const restore = (next: FrameLayout, anchor: ViewAnchor | null) => {
+  const top = anchor ? anchorTop(next, anchor) : 0;
+  if (top === null && pageEngine?.laying) return false;
+  scrollTo(top ?? 0);
+  return true;
+};
+
 // the view keeps the spot of the page at its top when it switches, when a
 // resize shows the pages at another scale, or when the room above the first
 // page changes, e.g. for its header. Before the new layout renders,
@@ -280,19 +322,15 @@ listenOnWindow("resize", () => measure());
 // out anew on every key, but keeps the view and the scale.
 watch(layout, (next, previous) => {
   const element = scroller.value;
-  if (!element || !next || !previous) return;
-  if (!movesPages(next, previous)) return;
+  if (!element || !next) return;
+  if (restoring) {
+    if (restore(next, restoring.anchor)) restoring = null;
+    return;
+  }
+  if (!previous || !movesPages(next, previous)) return;
   const anchor = viewAnchor(previous, element.scrollTop);
   const top = anchor && anchorTop(next, anchor);
-  if (top === null) return;
-  // the render that follows already shows the pages there, rather than
-  // those at the old scroll in the new layout
-  scrollTop.value = top;
-  void nextTick(() => {
-    if (!scroller.value) return;
-    scroller.value.scrollTop = top;
-    measure(false);
-  });
+  if (top !== null) scrollTo(top);
 });
 
 /**
@@ -443,12 +481,6 @@ const onMouseDown = (event: MouseEvent) => {
     shift: event.shiftKey,
   });
   dragAt = { x: event.clientX, y: event.clientY };
-};
-
-// the webview pastes the primary selection itself when the middle button
-// is let go, with its markup and where the caret was: pastePrimary did
-const onMouseUp = (event: MouseEvent) => {
-  if (event.button === 1 && hasPrimarySelection()) event.preventDefault();
 };
 
 // moving the selected text to another place, see src/editor/pageMove.ts
@@ -636,7 +668,7 @@ onUnmounted(() => {
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
     @mousedown="onMouseDown"
-    @mouseup="onMouseUp"
+    @mouseup="noPrimaryPaste"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"

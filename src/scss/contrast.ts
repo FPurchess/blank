@@ -72,14 +72,25 @@ export const themeVariables = (theme: string) => {
 };
 
 /**
+ * scssValue reads what an SCSS file sets a variable to, as written, e.g.
+ * `$tab-row-height + $toolbar-height`
+ */
+export const scssValue = (file: string, name: string) => {
+  const source = readFileSync(resolve(import.meta.dirname, file), "utf8");
+  const found = new RegExp(`\\$${name}:\\s*([^;]+);`).exec(source);
+  if (!found) throw new Error(`$${name} isn't set in ${file}`);
+  return found[1].trim();
+};
+
+/**
  * scssNumber reads a number an SCSS file sets as a variable, e.g.
  * `$page-end-opacity: 0.6;`
  */
 export const scssNumber = (file: string, name: string) => {
-  const source = readFileSync(resolve(import.meta.dirname, file), "utf8");
-  const found = new RegExp(`\\$${name}:\\s*([\\d.]+)`).exec(source);
-  if (!found) throw new Error(`$${name} isn't set in ${file}`);
-  return Number(found[1]);
+  const value = parseFloat(scssValue(file, name));
+  if (Number.isNaN(value))
+    throw new Error(`$${name} in ${file} isn't a number`);
+  return value;
 };
 
 // whether what's on shows in the theme's accent or in its ink, as

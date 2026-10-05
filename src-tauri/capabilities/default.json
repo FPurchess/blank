@@ -11,7 +11,7 @@
     "opener:default",
     "notification:default",
     "dialog:default",
-    "cli:default",
+    "core:window:allow-set-title",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     {

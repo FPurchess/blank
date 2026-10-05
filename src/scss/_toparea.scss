@@ -1,0 +1,31 @@
+// The top area of the window (src/ui/TopArea.vue): two rows on the desk, the
+// tab row and the formatting toolbar, each with
+// a line below it. The pages start below it. The rows bring their own styles.
+@use "controls" as *;
+
+// the heights of the rows (TAB_ROW_HEIGHT and TOOLBAR_HEIGHT in src/chrome.ts)
+$tab-row-height: 40px;
+$toolbar-height: 40px;
+// the whole area, which the page view, the panes and the header strip stay
+// below (TOP_BAR_HEIGHT in src/chrome.ts)
+$top-bar-height: $tab-row-height + $toolbar-height;
+
+#ui-top {
+  position: fixed;
+  // above the page view
+  z-index: 2;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-rows: $tab-row-height $toolbar-height;
+  background-color: var(--desk-color);
+  user-select: none;
+}
+
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--line);
+}

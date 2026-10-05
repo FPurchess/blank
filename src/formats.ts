@@ -1,6 +1,8 @@
 // The file formats Blank reads and writes, and how the file dialogs offer
 // them.
 
+// markdown files, which Blank opens and saves
+export const MARKDOWN_EXTENSIONS = ["md", "markdown", "mdown", "mkd", "mkdn"];
 // Word documents, which are imported into an untitled markdown document
 export const WORD_EXTENSIONS = ["docx", "docm", "dotx", "dotm"];
 // document formats Blank can't read, which aren't markdown either

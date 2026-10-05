@@ -16,14 +16,14 @@ Your writing lives in plain markdown files that any editor can read, today and i
 
 Everything you write is kept as markdown: plain text with a few marks like `#` for headings, so the file stays small, readable and yours.
 
-| Command  | Shortcut          |
-| -------- | ----------------- |
-| New file | `Mod` `N`         |
-| Open     | `Mod` `O`         |
-| Save     | `Mod` `S`         |
-| Save as  | `Mod` `Shift` `S` |
+| Command      | Shortcut          |
+| ------------ | ----------------- |
+| New document | `Mod` `N`         |
+| Open         | `Mod` `O`         |
+| Save         | `Mod` `S`         |
+| Save as      | `Mod` `Shift` `S` |
 
-The open dialog shows your markdown files and Word documents together. Closed Blank without saving? It keeps your text anyway, see [Blank remembers your document](./writing#blank-remembers-your-document).
+The open dialog shows your markdown files and Word documents together, and you can pick several at once: each opens in a [tab](./writing#tabs) of its own. A tab with changes you haven't saved shows a dot, and Blank asks before it closes. Closed the whole window without saving? Nothing is lost: every tab comes back with its text, see [Blank remembers your documents](./writing#blank-remembers-your-documents).
 
 ### Properties on top of the file {#frontmatter}
 
