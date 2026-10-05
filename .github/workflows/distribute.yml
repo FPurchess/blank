@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish, e.g. v2.1.0"
+        description: "Release tag to publish, e.g. v3.0.0"
         required: true
   pull_request:
     paths:
@@ -45,10 +45,12 @@ jobs:
       - uses: snapcore/action-build@v1
         id: build
 
-      - name: show the desktop entry as installed
+      - name: show the listing and the desktop entry as installed
         env:
           SNAP_FILE: ${{ steps.build.outputs.snap }}
-        run: unsquashfs -cat "$SNAP_FILE" meta/gui/blank.desktop
+        run: |
+          unsquashfs -cat "$SNAP_FILE" meta/snap.yaml
+          unsquashfs -cat "$SNAP_FILE" meta/gui/blank.desktop
 
       - uses: actions/upload-artifact@v7
         with:

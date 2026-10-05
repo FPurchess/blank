@@ -2,26 +2,12 @@
 # Linux packages. CI (.github/workflows/distribute.yml) downloads it as blank.deb next to this
 # folder. WebKitGTK, GTK and friends come from the gnome extension's gnome-46-2404 runtime;
 # don't stage them, mixing WebKit versions breaks the webview.
+# The summary and description come from the release's own AppStream metainfo (parse-info
+# below), so the store listing always describes the version it ships.
 name: blank
 title: Blank
 base: core24
 adopt-info: blank
-summary: A quiet place to write markdown
-description: |
-  Blank is a minimalist markdown editor made for writing. There are no toolbars, no buttons,
-  no panels asking for your attention: there is the page and the sentence you are writing.
-
-  - Your hands stay on the keyboard: headings, lists, links and emphasis are one shortcut,
-    or one typed character, away
-  - Quotes curl, dashes find their length and sentences start with a capital, in 14
-    languages, as you type
-  - Close the window mid-thought and Blank keeps your words for the next time you open it
-  - Plain markdown files, exported as carefully typeset PDFs or Word documents
-  - Light, dark and colored themes, and shortcuts you can rebind
-
-  Open any file with Mod+O. From the terminal, `blank notes.md` opens files in your
-  home folder that aren't hidden. For USB drives and other disks, run
-  `sudo snap connect blank:removable-media` once.
 license: AGPL-3.0-only
 icon: src-tauri/icons/128x128@2x.png
 website: https://blank-writer.xyz/
@@ -56,11 +42,11 @@ parts:
     plugin: dump
     source: blank.deb
     source-type: deb
+    parse-info: [usr/share/metainfo/io.github.fpurchess.blank.metainfo.xml]
     override-build: |
       craftctl default
       craftctl set version="$(dpkg-deb -f "$CRAFT_PROJECT_DIR/blank.deb" Version)"
-      # the desktop entry of the Linux packages, also for releases whose deb predates it, with
+      # the release's own desktop entry, so Exec matches the arguments its binary takes, with
       # the icon from icon: above, since the deb's icon name doesn't resolve inside the snap
-      sed -e 's|{{exec}}|blank|g' -e 's|^Icon=.*|Icon=${SNAP}/meta/gui/icon.png|' \
-        "$CRAFT_PROJECT_DIR/src-tauri/linux/blank.desktop" \
-        > "$CRAFT_PART_INSTALL/usr/share/applications/blank.desktop"
+      sed -i 's|^Icon=.*|Icon=${SNAP}/meta/gui/icon.png|' \
+        "$CRAFT_PART_INSTALL/usr/share/applications/blank.desktop"
