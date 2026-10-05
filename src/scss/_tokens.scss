@@ -47,11 +47,13 @@
   --s5: 24px;
   --s6: 32px;
   --s8: 48px;
-  // controls, the small text of status items and tooltips, and the radii of
-  // controls, of what floats and of dialogs
+  // controls, the radii of controls, of what floats and of dialogs, and the
+  // UI's type: all its text at 13/20, status items, hints and tooltips at
+  // 12/16 (the document has a scale of its own, _typography.scss)
   --control: 28px;
   --row: 32px;
   --status-item: 24px;
+  --ui: 13px;
   --ui-small: 12px;
   --r-control: 6px;
   --r-pop: 8px;
