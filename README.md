@@ -40,7 +40,7 @@ Blank keeps your open tabs, unsaved changes included, between sessions. That is 
 
 ## Documentation
 
-Everything else lives on **[blank-writer.xyz](https://blank-writer.xyz/)**: [writing in Blank](https://blank-writer.xyz/guide/writing), [tables](https://blank-writer.xyz/guide/tables), [files and formats: PDF and Word](https://blank-writer.xyz/guide/files), [autocorrect in 14 languages](https://blank-writer.xyz/guide/autocorrect), [spell check](https://blank-writer.xyz/guide/spelling), the [six themes](https://blank-writer.xyz/guide/themes), [the settings and your own shortcuts](https://blank-writer.xyz/guide/settings) and the [FAQ](https://blank-writer.xyz/guide/faq).
+The guide, all shortcuts and the FAQ are on **[blank-writer.xyz](https://blank-writer.xyz/)**.
 
 ## Contributing
 
