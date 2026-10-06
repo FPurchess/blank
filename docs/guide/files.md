@@ -41,7 +41,7 @@ tags: [sea, light]
 # Chapter 1
 ```
 
-Blank keeps this block exactly as it is, down to the comments and spacing, and saves it back unchanged. It stays out of your text: to see or change it, open the [page setup](./pages#page-setup) and click **Edit as text**. That's where you set the `title` and `author` too.
+Blank keeps this block exactly as it is, down to the comments and spacing, and saves it back unchanged. It stays out of your text, and the [page setup](./pages#page-setup) writes its settings into it. To change anything else in it, like the `title` and `author`, edit the file in another editor.
 
 The `title` and `author` also go into your PDF and Word documents, where readers and search show them. Without a `title`, Blank uses your first heading.
 

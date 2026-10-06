@@ -320,7 +320,7 @@ describe("page button", () => {
     uiPage().click();
 
     expect(mousedown.defaultPrevented).toBe(true);
-    expect(pageSetup.value).toMatchObject({ frontmatter });
+    expect(pageSetup.value).toMatchObject({ settings: { size: "a5" } });
     expect(focus).toHaveBeenCalled();
     pageSetup.value = null;
   });

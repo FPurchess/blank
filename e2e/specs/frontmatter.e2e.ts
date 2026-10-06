@@ -99,15 +99,17 @@ describe("frontmatter", () => {
     );
     await restartApp();
 
-    // the properties show as text in the page setup
+    // saved again, the file keeps the frontmatter it came back with
     await clickInto("#editor p");
-    await pressMod(Key.Alt, "u");
-    await expect($("#page-setup")).toBeDisplayed();
-    await $("button=Edit as text").click();
-    await expect($("#page-setup-text")).toHaveValue(
-      expect.stringContaining("title: The Lighthouse"),
+    await type(Key.End);
+    await type(" again");
+    await pressMod("s");
+    const expected = `${FRONTMATTER}\n\n# Chapter\n\nText. more again`;
+    await browser.waitUntil(
+      () => fs.readFileSync(fixturePath, "utf8") === expected,
+      {
+        timeoutMsg: `the file has not been saved, it contains: ${fs.readFileSync(fixturePath, "utf8")}`,
+      },
     );
-    await browser.keys(Key.Escape);
-    await expect($("#page-setup")).not.toExist();
   });
 });

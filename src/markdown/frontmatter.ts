@@ -120,25 +120,6 @@ export const readProperties = (
 ): DocumentProperties => propertiesOf(readFrontmatter(frontmatter) ?? {});
 
 /**
- * frontmatterError checks frontmatter typed by the user
- * @param yaml the frontmatter, without the `---` lines around it
- * @returns what is wrong with it, or null if it can be written
- */
-export const frontmatterError = (yaml: string): string | null => {
-  // the file would end the frontmatter there
-  if (/^(---|\.\.\.)\s*$/m.test(yaml)) {
-    return "A line with only --- or ... would end the properties";
-  }
-  const document = parseDocument(yaml);
-  const [error] = document.errors;
-  if (error) return error.message.split("\n")[0];
-  const { contents } = document;
-  return contents === null || isMap(contents)
-    ? null
-    : "The properties must be names with values, like title: My text";
-};
-
-/**
  * updateFrontmatter changes the frontmatter as a YAML document, which keeps
  * its other keys, their order and its comments. Frontmatter that can't be
  * read is left as it is, since changing it could destroy what was written.

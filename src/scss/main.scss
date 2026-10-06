@@ -239,20 +239,10 @@ body {
     color: var(--muted);
   }
 
-  input,
-  textarea {
-    @include field;
-    font: inherit;
-  }
-
   input {
+    @include field;
     margin-bottom: 6px;
-  }
-
-  textarea {
-    height: auto;
-    padding: 6px var(--s2);
-    resize: vertical;
+    font: inherit;
   }
 
   p {
@@ -309,7 +299,6 @@ body {
 
   // a value that can't be used, see TextField's `errorId`
   input[aria-invalid="true"],
-  textarea[aria-invalid="true"],
   .field:has([aria-invalid="true"]) {
     border-color: var(--spelling-color);
   }
@@ -382,16 +371,10 @@ body {
     padding: var(--s2) var(--s5) var(--s4);
   }
 
-  .settings,
-  .text-editor {
+  .settings {
     display: flex;
     flex-direction: column;
     min-width: 0;
-  }
-
-  .text-editor {
-    gap: 6px;
-    padding-top: var(--s3);
   }
 
   // the custom size or margins, below their row
@@ -431,11 +414,6 @@ body {
   .note {
     margin: var(--s3) 0 0;
     font-size: var(--ui-small);
-  }
-
-  textarea {
-    min-height: 12em;
-    font-family: monospace;
   }
 
   // the picture of the page on the desk, hidden where the window is narrow

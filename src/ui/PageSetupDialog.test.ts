@@ -38,8 +38,6 @@ const button = (label: string) =>
 const errors = () => document.querySelector<HTMLElement>("#page-setup-errors")!;
 const errorTexts = () =>
   [...errors().querySelectorAll("p")].map((p) => p.textContent?.trim());
-const textarea = () =>
-  document.querySelector<HTMLTextAreaElement>("#page-setup-text")!;
 const caption = () =>
   dialog()!.querySelector("figcaption")?.textContent?.trim();
 
@@ -53,23 +51,14 @@ const choosePaper = async (id: string) => {
   await click(menuItem(id)!);
 };
 
-// what the dialog wrote onto: the document's own page setup
-const opened = (request: PageSetupRequest) => ({
-  frontmatter: request.frontmatter,
-  settings: request.settings,
-});
-
 const openDialog = async (request: Partial<PageSetupRequest> = {}) => {
   const full: PageSetupRequest = {
     settings: DEFAULT_PAGE,
     locale: "de-DE",
     unit: "cm",
-    frontmatter: null,
+    readable: true,
     warnings: [],
     apply: vi.fn(),
-    applyText: vi.fn(() => null),
-    textOf: vi.fn(() => "page:\n  size: a5"),
-    readText: vi.fn(() => ({ settings: DEFAULT_PAGE, warnings: [] })),
     makeDefault: vi.fn(),
     cancel: vi.fn(),
     ...request,
@@ -94,12 +83,6 @@ const keydown = async (key: string, init: KeyboardEventInit = {}) => {
 const type = async (id: string, value: string) => {
   input(id).value = value;
   input(id).dispatchEvent(new Event("input"));
-  await nextTick();
-};
-
-const typeText = async (value: string) => {
-  textarea().value = value;
-  textarea().dispatchEvent(new Event("input"));
   await nextTick();
 };
 
@@ -181,10 +164,10 @@ describe("pageSetup dialog", () => {
       expect(caption()).toBe("A5");
       expect(document.activeElement).toBe(paper());
       await submit();
-      expect(request.apply).toHaveBeenCalledWith(
-        { ...DEFAULT_PAGE, size: "a5" },
-        opened(request),
-      );
+      expect(request.apply).toHaveBeenCalledWith({
+        ...DEFAULT_PAGE,
+        size: "a5",
+      });
     });
 
     it("starts a custom size from the paper chosen, and focuses it", async () => {
@@ -271,10 +254,10 @@ describe("pageSetup dialog", () => {
     await keydown("ArrowRight");
     await keydown("Enter");
 
-    expect(request.apply).toHaveBeenCalledWith(
-      { ...DEFAULT_PAGE, orientation: "landscape" },
-      opened(request),
-    );
+    expect(request.apply).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      orientation: "landscape",
+    });
     expect(pageSetup.value).toBeNull();
     expect(dialog()).toBeNull();
   });
@@ -285,10 +268,10 @@ describe("pageSetup dialog", () => {
     await click(option("margins", "Wide"));
     await click(button("Apply"));
 
-    expect(request.apply).toHaveBeenCalledWith(
-      { ...DEFAULT_PAGE, margins: allMargins(cm(3.5)) },
-      opened(request),
-    );
+    expect(request.apply).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      margins: allMargins(cm(3.5)),
+    });
   });
 
   it("takes custom margins, with ↓ into the fields", async () => {
@@ -302,13 +285,10 @@ describe("pageSetup dialog", () => {
     await type("margins-left", "20mm");
     await submit();
 
-    expect(request.apply).toHaveBeenCalledWith(
-      {
-        ...DEFAULT_PAGE,
-        margins: { ...allMargins(cm(2.5)), top: cm(3), left: mm(20) },
-      },
-      opened(request),
-    );
+    expect(request.apply).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      margins: { ...allMargins(cm(2.5)), top: cm(3), left: mm(20) },
+    });
   });
 
   it("explains what can't be used and doesn't apply it", async () => {
@@ -393,7 +373,7 @@ describe("pageSetup dialog", () => {
     expect(errorTexts()).toEqual(["The paper is too small for the text."]);
   });
 
-  it("measures custom paper in millimetres and margins in the region's unit", async () => {
+  it("measures custom paper in millimeters and margins in the region's unit", async () => {
     await openDialog();
     await choosePaper("custom");
 
@@ -428,7 +408,6 @@ describe("pageSetup dialog", () => {
         size: { width: mm(297), height: mm(300) },
         orientation: "portrait",
       }),
-      opened(request),
     );
   });
 
@@ -490,10 +469,10 @@ describe("pageSetup dialog", () => {
       await click(option("newPageBefore", "H3"));
       await click(button("Apply"));
 
-      expect(request.apply).toHaveBeenCalledWith(
-        { ...DEFAULT_PAGE, newPageBefore: [1, 3] },
-        opened(request),
-      );
+      expect(request.apply).toHaveBeenCalledWith({
+        ...DEFAULT_PAGE,
+        newPageBefore: [1, 3],
+      });
     });
 
     it("moves with ←→ without switching, and stays a stop for ↑↓", async () => {
@@ -520,68 +499,24 @@ describe("pageSetup dialog", () => {
     await choosePaper("a5");
     await click(button("Make this my default"));
 
-    expect(request.makeDefault).toHaveBeenCalledWith(
-      { ...DEFAULT_PAGE, size: "a5" },
-      opened(request),
-    );
+    expect(request.makeDefault).toHaveBeenCalledWith({
+      ...DEFAULT_PAGE,
+      size: "a5",
+    });
     expect(dialog()).toBeNull();
   });
 
-  it("makes the default from an edited text, which it hands on", async () => {
-    const request = await openDialog({ frontmatter: "title: Hi" });
-    await click(button("Edit as text"));
-    await typeText("title: Bye");
-    await click(button("Edit as options"));
+  it("offers nothing to apply while the frontmatter can't be read", async () => {
+    const request = await openDialog({ readable: false });
 
-    await click(button("Make this my default"));
-
-    expect(request.makeDefault).toHaveBeenCalledWith(DEFAULT_PAGE, {
-      frontmatter: "title: Bye",
-      settings: DEFAULT_PAGE,
-    });
-  });
-
-  describe("on frontmatter it can't read", () => {
-    const unreadable = () =>
-      openDialog({
-        frontmatter: "title: [oops",
-        readText: vi.fn((text: string) =>
-          text.includes("[oops")
-            ? { error: "Flow sequence isn't closed" }
-            : { settings: DEFAULT_PAGE, warnings: [] },
-        ),
-      });
-
-    it("offers only to fix it as text", async () => {
-      const request = await unreadable();
-
-      expect(errorTexts()).toEqual([
-        "The properties at the top of the file can't be read. Fix them with Edit as text.",
-      ]);
-      expect(button("Apply").disabled).toBe(true);
-      expect(button("Make this my default").disabled).toBe(true);
-      expect(button("Edit as text").disabled).toBe(false);
-      expect(button("Edit as text").getAttribute("aria-describedby")).toBe(
-        "page-setup-error-properties",
-      );
-      await submit();
-      expect(request.apply).not.toHaveBeenCalled();
-      expect(dialog()).not.toBeNull();
-    });
-
-    it("applies again once the text is fixed", async () => {
-      const request = await unreadable();
-      await click(button("Edit as text"));
-      await typeText("title: fixed");
-      await click(button("Edit as options"));
-
-      expect(errorTexts()).toEqual([]);
-      await submit();
-      expect(request.apply).toHaveBeenCalledWith(DEFAULT_PAGE, {
-        frontmatter: "title: fixed",
-        settings: DEFAULT_PAGE,
-      });
-    });
+    expect(errorTexts()).toEqual([
+      "The properties at the top of the file can't be read, so the page setup can't be written into them.",
+    ]);
+    expect(button("Apply").disabled).toBe(true);
+    expect(button("Make this my default").disabled).toBe(true);
+    await submit();
+    expect(request.apply).not.toHaveBeenCalled();
+    expect(dialog()).not.toBeNull();
   });
 
   it("shows what of the document's page setup can't be used, as sentences", async () => {
@@ -636,134 +571,14 @@ describe("pageSetup dialog", () => {
     expect(again.cancel).toHaveBeenCalledTimes(1);
   });
 
-  it("puts Edit as text on the left, and Apply last", async () => {
+  it("puts Apply last in its foot", async () => {
     await openDialog();
 
     const foot = dialog()!.querySelector(".dialog-foot")!;
-    expect(foot.querySelector(".secondary button")?.textContent?.trim()).toBe(
-      "Edit as text",
-    );
+    expect(foot.querySelector(".secondary")).toBeNull();
     expect(
       [...foot.querySelectorAll("button")].map((b) => b.textContent?.trim()),
-    ).toEqual(["Edit as text", "Make this my default", "Cancel", "Apply"]);
-  });
-
-  describe("as text", () => {
-    it("shows the choices written into the frontmatter", async () => {
-      const request = await openDialog({ frontmatter: "title: Hi" });
-      await click(option("orientation", "Landscape"));
-
-      await click(button("Edit as text"));
-
-      expect(request.textOf).toHaveBeenCalledWith(
-        { ...DEFAULT_PAGE, orientation: "landscape" },
-        opened(request),
-      );
-      expect(textarea().value).toBe("page:\n  size: a5");
-      expect(document.activeElement).toBe(textarea());
-      expect(button("Make this my default").hidden).toBe(true);
-      expect(dialog()!.querySelector<HTMLElement>(".settings")!.hidden).toBe(
-        true,
-      );
-      expect(dialog()!.querySelector<HTMLElement>(".thumbnail")!.hidden).toBe(
-        true,
-      );
-    });
-
-    it("applies the text it reads, closing the dialog", async () => {
-      const request = await openDialog({ frontmatter: "title: Hi" });
-      await click(button("Edit as text"));
-
-      await typeText("title: Bye");
-      await submit();
-
-      expect(request.readText).toHaveBeenCalledWith("title: Bye");
-      expect(request.applyText).toHaveBeenCalledWith("title: Bye");
-      expect(request.apply).not.toHaveBeenCalled();
-      expect(pageSetup.value).toBeNull();
-      expect(dialog()).toBeNull();
-    });
-
-    it("stays open to fix what can't be read, linked to the text", async () => {
-      const request = await openDialog({
-        readText: vi.fn(() => ({ error: "Nested mappings are not allowed" })),
-      });
-
-      await click(button("Edit as text"));
-      await submit();
-
-      expect(dialog()).not.toBeNull();
-      expect(request.applyText).not.toHaveBeenCalled();
-      expect(errorTexts()).toEqual(["Nested mappings are not allowed"]);
-      expect(textarea().getAttribute("aria-invalid")).toBe("true");
-      expect(textarea().getAttribute("aria-describedby")).toBe(
-        "page-setup-error-text",
-      );
-
-      await typeText("title: Hi");
-      expect(errorTexts()).toEqual([]);
-      expect(textarea().hasAttribute("aria-invalid")).toBe(false);
-    });
-
-    it("goes back to the rows with what the text says", async () => {
-      const header = { left: "{title}", center: "", right: "" };
-      const read: PageSettings = {
-        ...DEFAULT_PAGE,
-        size: "a5",
-        orientation: "landscape",
-        header,
-      };
-      const request = await openDialog({
-        readText: vi.fn(() => ({ settings: read, warnings: ["Odd"] })),
-      });
-      await click(button("Edit as text"));
-      await typeText("page:\n  size: a5");
-
-      await click(button("Edit as options"));
-      await nextTick();
-
-      expect(textarea().closest<HTMLElement>(".text-editor")!.hidden).toBe(
-        true,
-      );
-      expect(paperText()).toBe("A5");
-      expect(checked("orientation").textContent?.trim()).toBe("Landscape");
-      expect(checked("orientation").tabIndex).toBe(0);
-      expect(caption()).toBe("A5 landscape");
-      expect(dialog()!.querySelector(".warning")?.textContent?.trim()).toBe(
-        "Odd.",
-      );
-      expect(document.activeElement).toBe(paper());
-
-      // what is applied now goes onto the text, with its header
-      await click(option("margins", "Wide"));
-      await submit();
-      expect(request.apply).toHaveBeenCalledWith(
-        { ...read, margins: allMargins(cm(3.5)) },
-        { frontmatter: "page:\n  size: a5", settings: read },
-      );
-    });
-
-    it("stays in the text when it can't be read", async () => {
-      await openDialog({
-        readText: vi.fn(() => ({ error: "Nested mappings are not allowed" })),
-      });
-      await click(button("Edit as text"));
-
-      await click(button("Edit as options"));
-
-      expect(dialog()!.querySelector<HTMLElement>(".settings")!.hidden).toBe(
-        true,
-      );
-      expect(errorTexts()).toEqual(["Nested mappings are not allowed"]);
-    });
-
-    it("can't be edited as text while the rows hold something wrong", async () => {
-      await openDialog();
-      await choosePaper("custom");
-      await type("paper-width", "wide");
-
-      expect(button("Edit as text").disabled).toBe(true);
-    });
+    ).toEqual(["Make this my default", "Cancel", "Apply"]);
   });
 
   it("is a dialog of its own, with fields for lengths", async () => {
@@ -791,7 +606,7 @@ describe("pageSetup dialog", () => {
     const enter = await keydown("Enter");
 
     expect(enter.defaultPrevented).toBe(true);
-    expect(request.apply).toHaveBeenCalledWith(DEFAULT_PAGE, opened(request));
+    expect(request.apply).toHaveBeenCalledWith(DEFAULT_PAGE);
   });
 
   it("keeps showing the last page it could draw while the choices are wrong", async () => {
@@ -814,7 +629,7 @@ describe("pageSetup dialog", () => {
     await click(option("margins", "Custom…"));
     await submit();
 
-    const [applied, base] = vi.mocked(request.apply).mock.calls[0];
+    const [applied] = vi.mocked(request.apply).mock.calls[0];
     expect(applied).toEqual({ ...settings, newPageBefore: [1] });
     const proxied = (value: unknown): boolean =>
       isProxy(value) ||
@@ -822,7 +637,6 @@ describe("pageSetup dialog", () => {
         value !== null &&
         Object.values(value).some(proxied));
     expect(proxied(applied)).toBe(false);
-    expect(proxied(base)).toBe(false);
     expect(applied.header).toBe(header);
   });
 

@@ -348,7 +348,7 @@ describe("header and footer", () => {
     // which tells why it shows nothing on the page, and how to set an author
     await expect($("#ui-announcement")).toHaveText(
       expect.stringContaining(
-        "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as text in the page setup",
+        "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author to the properties at the top of the file",
       ),
     );
     // and on the sheet, in its top margin

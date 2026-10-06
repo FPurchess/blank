@@ -9,27 +9,17 @@ import { changesOf } from "../../layout/choices";
 import { layoutWarnings } from "../../layout/describe";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { resolveLayout } from "../../layout/resolve";
-import {
-  BAND_KEYS,
-  PAGE_KEYS,
-  type PageKey,
-  type PageSettings,
-} from "../../layout/settings";
-import { frontmatterError, frontmatterOf } from "../../markdown";
-import { activeTabId, announce, type PageBase, pageSetup } from "../../state";
+import { BAND_KEYS, PAGE_KEYS, type PageKey } from "../../layout/settings";
+import { frontmatterOf, readFrontmatter } from "../../markdown";
+import { activeTabId, announce, pageSetup } from "../../state";
 import { changeTab } from "../tabs";
-import { frontmatterTr, pageFrontmatter, setFrontmatter } from "./frontmatter";
+import { pageTr, writePage } from "./frontmatter";
 
 // the settings the page setup dialog sets: all but those of the header and
 // footer strips
 const DIALOG_KEYS = PAGE_KEYS.filter(
   (key) => !(BAND_KEYS as readonly PageKey[]).includes(key),
 );
-
-// the frontmatter as typed, as the document keeps it: nothing for an empty
-// one, and no blank lines at its end
-const normalize = (text: string) =>
-  text.trim() === "" ? null : text.replace(/\s+$/, "");
 
 /**
  * openPageSetup opens the page setup dialog for the document of `view`
@@ -45,60 +35,28 @@ export const openPageSetup = (view: EditorView) => {
   // default is saved, even if another tab is shown by then
   const tab = activeTabId.value;
 
-  const textOf = (chosen: PageSettings, base: PageBase) =>
-    pageFrontmatter(
-      base.frontmatter,
-      changesOf(base.settings, chosen, defaults, locale),
-      unit,
-    ) ?? "";
-  // the dialog checks the text first, so an error here is only a safety net
-  // for a caller that doesn't
-  const applyText = (text: string) => {
-    const error = frontmatterError(text);
-    if (error !== null) return error;
-    setFrontmatter(view, normalize(text));
-    announce("Page setup applied");
-    view.focus();
-    return null;
-  };
-
   pageSetup.value = {
     settings,
     locale,
     unit,
-    frontmatter,
+    readable: readFrontmatter(frontmatter) !== undefined,
     warnings: layoutWarnings(problems),
-    apply: (chosen, base) => {
-      // the dialog doesn't offer Apply while its frontmatter can't be read
-      if (applyText(textOf(chosen, base)) !== null) view.focus();
-    },
-    applyText,
-    textOf,
-    readText: (text) => {
-      const error = frontmatterError(text);
-      if (error !== null) return { error };
-      const read = resolveLayout(normalize(text), defaults, locale);
-      return {
-        settings: read.settings,
-        warnings: layoutWarnings(read.problems),
-      };
-    },
-    makeDefault: (chosen, base) => {
+    apply: (chosen) => {
+      writePage(view, changesOf(settings, chosen, defaults, locale), unit);
+      announce("Page setup applied");
       view.focus();
-      // the document follows the new default instead of its own settings,
-      // written onto its frontmatter as the dialog has it, with what was
-      // edited as text
-      const own = Object.fromEntries(DIALOG_KEYS.map((key) => [key, null]));
-      const next = normalize(
-        pageFrontmatter(base.frontmatter, own, unit) ?? "",
-      );
+    },
+    makeDefault: (chosen) => {
+      view.focus();
       // what the dialog shows; the header and footer stay the document's
       const shown = DIALOG_KEYS.map((key) => [key, chosen[key]]);
       saveDefaultPage({ ...defaults, ...Object.fromEntries(shown) }, unit)
         .then(() => {
+          // the document follows the new default instead of its own settings
+          const own = Object.fromEntries(DIALOG_KEYS.map((key) => [key, null]));
           // without tabs, as in tests of other modules, the view's document
-          if (tab === null) setFrontmatter(view, next);
-          else void changeTab(tab, (state) => frontmatterTr(state, next));
+          if (tab === null) writePage(view, own, unit);
+          else void changeTab(tab, (state) => pageTr(state, own, unit));
           sendNotification(
             "New documents are laid out like this now, and so are documents without their own page setup.",
           );

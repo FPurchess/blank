@@ -5,7 +5,6 @@ import {
   nextTick,
   onMounted,
   reactive,
-  shallowRef,
   useTemplateRef,
 } from "vue";
 
@@ -29,7 +28,6 @@ import { paperUnit } from "../layout/units";
 import {
   closeDialog,
   type MenuItem,
-  type PageBase,
   pageSetup,
   type PageSetupRequest,
 } from "../state";
@@ -54,32 +52,16 @@ import {
 // The page setup dialog (see src/editor/commands/pageSetup.ts): rows for the
 // paper, the orientation, the margins and the headings that start a new page,
 // which ↑↓ move between and ←→ change, with a picture of the page. The paper
-// is a list, custom sizes and margins are typed in below their row. "Edit as
-// text" edits the whole frontmatter instead, for what the rows don't offer,
-// and "Edit as options" goes back to the rows with what the text says.
+// is a list, custom sizes and margins are typed in below their row.
 const props = defineProps<{ request: PageSetupRequest }>();
 const { locale, unit } = props.request;
 
 // the headers and footers, which the dialog keeps as they are, stay out of
 // the reactive choices, so the settings it applies hold no proxies
-const { bands: openedBands, ...shown } = choicesOf(
-  props.request.settings,
-  locale,
-  unit,
-);
+const { bands, ...shown } = choicesOf(props.request.settings, locale, unit);
 const choices = reactive(shown);
-const bands = shallowRef(openedBands);
-// what the choices are written onto: the document's frontmatter, or the
-// text last edited
-const base = shallowRef<PageBase>({
-  frontmatter: props.request.frontmatter,
-  settings: props.request.settings,
-});
-const warnings = shallowRef(props.request.warnings);
 
-const result = computed(() =>
-  settingsOf({ ...choices, bands: bands.value }, locale, unit),
-);
+const result = computed(() => settingsOf({ ...choices, bands }, locale, unit));
 const chosen = computed(() =>
   "settings" in result.value ? result.value.settings : null,
 );
@@ -101,40 +83,23 @@ const paperLabel = computed(
 const paper = useTemplateRef<ComponentPublicInstance>("paper");
 const focusPaper = () => (paper.value?.$el as HTMLElement | undefined)?.focus();
 
-const asText = shallowRef(false);
-const text = shallowRef("");
-// what is wrong with the text, once it was read
-const textError = shallowRef("");
-// the frontmatter the rows are written onto can't be read, so they can't be
-// applied until it's fixed as text
-const unreadable = computed(
-  () =>
-    base.value.frontmatter !== null &&
-    "error" in props.request.readText(base.value.frontmatter),
-);
 // what is wrong, by the part it is wrong in, each a sentence on its own line
 const problems = computed(() =>
   problemsOf({
-    asText: asText.value,
-    textError: textError.value,
-    unreadable: unreadable.value,
+    unreadable: !props.request.readable,
     errors: "errors" in result.value ? result.value.errors : {},
   }),
 );
 // the id of what is wrong with a part, which its controls are described by
 const errorId = (part: string) => problemId(problems.value, part);
-// the rows hold something that can't be used
-const wrong = computed(() => !asText.value && chosen.value === null);
-// nothing to apply or make the default: the rows, or what they're written
-// onto, can't be used
+// nothing to apply or make the default: the rows hold something that can't
+// be used, or the frontmatter they'd be written into can't be read
 const blocked = computed(
-  () => wrong.value || (!asText.value && unreadable.value),
+  () => chosen.value === null || !props.request.readable,
 );
 
 const settings = useTemplateRef<HTMLElement>("settings");
-const textarea = useTemplateRef<HTMLTextAreaElement>("textarea");
-const focusFirst = () => stopsIn(settings.value!)[0]?.focus();
-onMounted(focusFirst);
+onMounted(() => stopsIn(settings.value!)[0]?.focus());
 
 // a paper chosen: a custom size starts from the paper chosen so far, and
 // from the list, its first field takes the focus
@@ -217,48 +182,16 @@ const onKeydown = (event: KeyboardEvent) => {
 
 const close = (callback: () => void) => closeDialog(pageSetup, callback);
 
-// the text with the choices written in, or the rows with what the text says
-const switchMode = async () => {
-  if (!asText.value) {
-    if (!chosen.value) return;
-    text.value = props.request.textOf(chosen.value, base.value);
-    textError.value = "";
-    asText.value = true;
-    await nextTick();
-    textarea.value?.focus();
-    return;
-  }
-  const read = props.request.readText(text.value);
-  if ("error" in read) {
-    textError.value = read.error;
-    return;
-  }
-  const { bands: readBands, ...rows } = choicesOf(read.settings, locale, unit);
-  Object.assign(choices, rows);
-  bands.value = readBands;
-  base.value = { frontmatter: text.value, settings: read.settings };
-  warnings.value = read.warnings;
-  asText.value = false;
-  await nextTick();
-  focusFirst();
-};
-
 const makeDefault = () => {
   const settings = chosen.value;
-  if (settings) close(() => props.request.makeDefault(settings, base.value));
+  if (settings && !blocked.value) {
+    close(() => props.request.makeDefault(settings));
+  }
 };
 
 const submit = () => {
-  if (asText.value) {
-    const read = props.request.readText(text.value);
-    if ("error" in read) textError.value = read.error;
-    else close(() => props.request.applyText(text.value));
-    return;
-  }
   const settings = chosen.value;
-  if (settings && !blocked.value) {
-    close(() => props.request.apply(settings, base.value));
-  }
+  if (settings && !blocked.value) close(() => props.request.apply(settings));
 };
 </script>
 
@@ -267,7 +200,7 @@ const submit = () => {
     id="page-setup"
     title="Page setup"
     form-class="page-setup"
-    :described-by="warnings.length ? 'page-setup-warnings' : undefined"
+    :described-by="request.warnings.length ? 'page-setup-warnings' : undefined"
     @submit="submit"
     @cancel="close(request.cancel)"
   >
@@ -276,16 +209,15 @@ const submit = () => {
         <div
           id="page-setup-warnings"
           class="warning"
-          :hidden="warnings.length === 0"
+          :hidden="request.warnings.length === 0"
         >
-          <p v-for="(warning, index) in warnings" :key="index">
+          <p v-for="(warning, index) in request.warnings" :key="index">
             {{ sentence(warning) }}
           </p>
         </div>
         <div
           ref="settings"
           class="settings"
-          :hidden="asText"
           @keydown.capture="onArrows"
           @keydown="onKeydown"
         >
@@ -354,18 +286,6 @@ const submit = () => {
             Kept in this document. Headers and footers are set on the pages.
           </p>
         </div>
-        <div class="text-editor" :hidden="!asText">
-          <label for="page-setup-text">Properties at the top of the file</label>
-          <textarea
-            id="page-setup-text"
-            ref="textarea"
-            v-model="text"
-            spellcheck="false"
-            :aria-invalid="errorId('text') ? true : undefined"
-            :aria-describedby="errorId('text')"
-            @input="textError = ''"
-          />
-        </div>
         <!-- always there, so screen readers announce what comes into it -->
         <div id="page-setup-errors" class="error" aria-live="polite">
           <p
@@ -377,7 +297,7 @@ const submit = () => {
           </p>
         </div>
       </div>
-      <figure class="thumbnail" :hidden="asText">
+      <figure class="thumbnail">
         <template v-if="picture">
           <!-- the SVG is drawn by thumbnailSvg, which escapes all text -->
           <!-- eslint-disable-next-line vue/no-v-html -->
@@ -386,23 +306,8 @@ const submit = () => {
         </template>
       </figure>
     </div>
-    <template #secondary>
-      <button
-        type="button"
-        :disabled="wrong"
-        :aria-describedby="errorId('properties')"
-        @click="switchMode"
-      >
-        {{ asText ? "Edit as options" : "Edit as text" }}
-      </button>
-    </template>
     <template #actions>
-      <button
-        type="button"
-        :hidden="asText"
-        :disabled="blocked"
-        @click="makeDefault"
-      >
+      <button type="button" :disabled="blocked" @click="makeDefault">
         Make this my default
       </button>
       <button type="button" @click="close(request.cancel)">Cancel</button>

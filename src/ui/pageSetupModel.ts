@@ -44,30 +44,25 @@ export const stopsIn = (element: HTMLElement) =>
 export const sentence = (text: string) =>
   /[.?!…]$/.test(text) ? text : `${text}.`;
 
-// what is wrong in the dialog: the part it is wrong in ("paper", "margins",
-// "text" or "properties") and a sentence that says it
+// what is wrong in the dialog: the part it is wrong in ("properties",
+// "paper" or "margins") and a sentence that says it
 export type Problem = [part: string, message: string];
 
 export const UNREADABLE =
-  "The properties at the top of the file can't be read. Fix them with Edit as text.";
+  "The properties at the top of the file can't be read, so the page setup can't be written into them.";
 
 /**
- * problemsOf returns what is wrong, each on a line of its own: in the text
- * while it's edited, else the frontmatter the rows are written onto when it
- * can't be read, and what can't be used of the rows
+ * problemsOf returns what is wrong, each on a line of its own: the
+ * frontmatter the rows would be written into, when it can't be read, and what
+ * can't be used of the rows
  */
 export const problemsOf = ({
-  asText,
-  textError,
   unreadable,
   errors,
 }: {
-  asText: boolean;
-  textError: string;
   unreadable: boolean;
   errors: Partial<Record<string, string>>;
 }): Problem[] => {
-  if (asText) return textError ? [["text", textError]] : [];
   const rows = Object.entries(errors).filter(
     (entry): entry is Problem => entry[1] !== undefined,
   );

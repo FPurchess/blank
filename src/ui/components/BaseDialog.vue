@@ -7,7 +7,7 @@ import { shownIn } from "../../dom";
 // a press on the backdrop cancel it, Tab keeps the focus inside, and Enter
 // submits the form. The default slot holds its body, `actions` the buttons at
 // the right of its foot (Cancel, then the submit button), and `secondary`
-// those at the left, e.g. "Edit as text".
+// those at the left, e.g. "Don't save".
 defineProps<{
   id: string;
   title: string;

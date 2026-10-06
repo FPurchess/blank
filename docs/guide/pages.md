@@ -40,7 +40,7 @@ Pick the paper from its list, and click the orientation and margins you want. Th
 
 For a size or margins of your own, choose **Custom…** and type them in the fields that open below. The paper is in millimeters, or in inches where Letter paper is used, and the margins in centimeters or inches. You can also write the unit, like `25mm` or `1in`. Type a width larger than the height, and the page turns to landscape by itself. If something can't work, say margins that leave no room for your text, the dialog tells you right below and waits until it's fixed.
 
-**Edit as text** shows the [properties at the top of the file](./files#frontmatter) with your choices written in, for anything the dialog has no setting for. **Edit as options** brings you back, with what you typed. **Make this my default** keeps the setup for [new documents and every document without its own](#defaults).
+**Make this my default** keeps the setup for [new documents and every document without its own](#defaults).
 
 Changed your mind? `Mod` `Z` undoes the whole page setup at once.
 
