@@ -261,6 +261,12 @@ impl Engine {
                 }
                 self.frag_of(item, unit)?
             }
+            // a block without text, like a table of contents laid out as a
+            // title and its entries, is left from its last unit going down
+            None if down => self
+                .frags_of(item)
+                .filter(|&index| !self.frags[index].repeat)
+                .last()?,
             None => self.frag_of(item, 0)?,
         };
         let mut next = frag_index;

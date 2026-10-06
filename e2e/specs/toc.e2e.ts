@@ -84,6 +84,20 @@ describe("a table of contents", () => {
       });
   });
 
+  it("is left with ↓ right after it is inserted", async () => {
+    // still selected: ↓ goes into the heading below it, where the typing goes
+    await type(Key.ArrowDown);
+    await type("q");
+    await browser.waitUntil(async () =>
+      (await entries()).some((entry) => entry?.includes("q")),
+    );
+    await expect($("#editor nav.toc")).toBeExisting();
+    await pressMod("z");
+    await browser.waitUntil(
+      async () => JSON.stringify(await entries()) === '["one","two"]',
+    );
+  });
+
   it("follows a heading as it is renamed", async () => {
     await clickInto("#editor h1", 1);
     await type(" and more");
