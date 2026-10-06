@@ -64,6 +64,9 @@ let pending = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 // the settings being written, which flush waits for too
 const settling = new Set<Promise<void>>();
+// the write under way, e.g. one the timer started, which flush waits for
+// too: what it took is no longer pending
+let writing: Promise<unknown> = Promise.resolve();
 
 /**
  * sessionOf returns the session to store: the tabs as they are, with the
@@ -98,7 +101,13 @@ const sessionOf = (): Session | null => {
  * lists a tab whose document is missing. What fails stays pending for the
  * next write.
  */
-const write = async () => {
+const write = () => {
+  const run = writeNow();
+  writing = run.catch(() => {});
+  return run;
+};
+
+const writeNow = async () => {
   clearTimeout(timer);
   timer = undefined;
   pending = false;
@@ -164,7 +173,7 @@ export const storeDocument = (id: string, doc: Node) => {
  * are stored
  */
 export const flush = (): Promise<void> =>
-  Promise.all([pending ? write() : undefined, ...settling]).then(
+  Promise.all([writing, pending ? write() : undefined, ...settling]).then(
     () => undefined,
   );
 
