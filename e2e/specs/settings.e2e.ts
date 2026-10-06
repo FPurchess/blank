@@ -172,6 +172,12 @@ describe("settings", () => {
       timeoutMsg: "the top area didn't fade",
     });
     expect(await opacityOf("#ui-bottom")).toBe("0");
+    // where the bars were, the window has the color around the pages
+    const [behind, around] = await browser.execute(() => [
+      getComputedStyle(document.body).backgroundColor,
+      getComputedStyle(document.querySelector("#page-view")!).backgroundColor,
+    ]);
+    expect(behind).toBe(around);
 
     await browser
       .action("pointer")

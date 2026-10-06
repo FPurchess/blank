@@ -1536,8 +1536,11 @@ body.without-engine.outline-docked {
   padding-right: $outline-dock;
 }
 
-// the room beside the sheets has the desk's color, as the page view has
-body.outline-docked.outline-desk {
+// the room beside the sheets has the desk's color, as the page view has:
+// where the outline is docked, and where the controls have faded in focus
+// mode, so the bars leave the desk behind and not a strip of paper
+body.outline-docked.outline-desk,
+body.controls-faded.outline-desk {
   background-color: var(--desk-color);
 }
 
