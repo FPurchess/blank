@@ -2,7 +2,7 @@
 # Takes the docs screenshots CI captured into the committed ones, but only those that show
 # something else (see same() below): the others keep their committed bytes, so the noise of a
 # capture never makes a commit. Deletes committed images the capture no longer makes.
-# Run by the screenshots-pr job of .github/workflows/e2e.yml; needs ffmpeg.
+# Run by the screenshots-pr job of .github/workflows/screenshots.yml; needs ffmpeg.
 #
 # usage: scripts/sync-screenshots.sh <captured dir> <committed dir>
 set -euo pipefail

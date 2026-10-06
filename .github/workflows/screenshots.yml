@@ -1,0 +1,171 @@
+name: Screenshots
+
+# Captures the docs screenshots once the E2E tests passed on a push to main, with the debug build
+# the E2E run tested, and proposes what changed. Pull requests never run it.
+#   screenshots     runs the spec files of e2e/shots/ on that build (scripts/docs-shots.sh) and
+#                   uploads the images
+#   screenshots-pr  proposes the images whose frames changed in a single PR from bot/screenshots,
+#                   which the maintainer merges with `gh pr merge --squash --admin`: a PR the
+#                   GITHUB_TOKEN opens runs no workflows, so it never gets its checks
+# Merging that PR can't start a loop: the capture skips a push that changes only the screenshots,
+# a capture without a changed frame proposes nothing, and there is only ever the one PR.
+on:
+  workflow_run:
+    workflows: [E2E]
+    types: [completed]
+    branches: [main]
+
+# one capture at a time; a run for an older main proposes nothing (see screenshots-pr)
+concurrency:
+  group: screenshots
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # the commit E2E tested, which this workflow captures (github.sha is main's head when it starts)
+  HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  screenshots:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # the build from the E2E run
+      actions: read
+    outputs:
+      skipped: ${{ steps.guard.outputs.skip }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 2
+
+      # merging the screenshots PR changes only the screenshots, which mustn't capture them again
+      - name: skip a push of the screenshots alone
+        id: guard
+        run: |
+          if ! git diff --name-only HEAD^ HEAD | grep -qv '^docs/public/screenshots/'; then
+            echo "::notice::this push changes only the screenshots, nothing to capture"
+            echo skip=true >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: ./.github/actions/webkit-deps
+        with:
+          ffmpeg: true
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # only tauri-driver, not the build cache of the e2e job: the app is built already
+      - if: steps.guard.outputs.skip != 'true'
+        id: driver
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/tauri-driver
+          key: tauri-driver-2.0.6-${{ runner.os }}
+
+      - name: install tauri-driver
+        if: steps.guard.outputs.skip != 'true' && steps.driver.outputs.cache-hit != 'true'
+        run: cargo install tauri-driver --locked --version 2.0.6
+
+      - name: install e2e dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
+        working-directory: e2e
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: app-debug
+          path: ${{ runner.temp }}/app
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: capture the screenshots
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          # artifacts lose the executable bit
+          chmod +x "$RUNNER_TEMP/app/blank"
+          # the spec files side by side, each in an app, a display and a session bus of its own
+          bash scripts/docs-shots.sh
+        env:
+          E2E_SKIP_BUILD: 1
+          # the runner has 4 CPUs, and each app takes about 1.5 of them
+          JOBS: 2
+          E2E_APP_PATH: ${{ runner.temp }}/app/blank
+          SHOTS_DIR: ${{ runner.temp }}/shots
+
+      - if: steps.guard.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-screenshots
+          path: ${{ runner.temp }}/shots
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: upload screenshots of failed shots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-failure
+          path: e2e/screenshots
+          if-no-files-found: ignore
+
+  screenshots-pr:
+    needs: screenshots
+    if: needs.screenshots.outputs.skipped != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+
+      # images of an older main would undo what a newer push changed; its run captures them
+      - name: skip when main moved on
+        id: fresh
+        run: |
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" = "$HEAD_SHA" ]; then
+            echo ok=true >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main moved past ${HEAD_SHA::7}, a newer run captures the screenshots"
+          fi
+
+      - name: install ffmpeg
+        if: steps.fresh.outputs.ok
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - if: steps.fresh.outputs.ok
+        uses: actions/download-artifact@v8
+        with:
+          name: docs-screenshots
+          path: ${{ runner.temp }}/shots
+
+      - name: take the images whose frames changed
+        if: steps.fresh.outputs.ok
+        run: scripts/sync-screenshots.sh "$RUNNER_TEMP/shots" docs/public/screenshots
+
+      - name: propose them
+        if: steps.fresh.outputs.ok
+        run: scripts/screenshots-pr.sh
+        env:
+          GH_TOKEN: ${{ github.token }}

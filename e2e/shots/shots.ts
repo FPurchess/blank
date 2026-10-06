@@ -1,7 +1,7 @@
 // What the docs shots (*.shots.ts next to this file) share: where the images
 // go, the recorder that films a GIF, the stills, and new documents to film in.
 // scripts/docs-shots.sh runs the spec files side by side, each in an app of
-// its own; CI proposes what they capture in a PR (.github/workflows/e2e.yml).
+// its own; CI proposes what they capture in a PR (.github/workflows/screenshots.yml).
 //
 // Every picture comes twice, in the light theme and as `<name>-dark`, which
 // the docs show as the site's own theme is light or dark (`<Shot>` in

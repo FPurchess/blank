@@ -1,16 +1,8 @@
 name: E2E
 
-# Runs the E2E tests on the debug build, and on main captures the docs screenshots with the
-# same build:
-#   e2e             the tests (a required check); on main it hands the build on as an artifact
-#   screenshots     runs the spec files of e2e/shots/ on that build (scripts/docs-shots.sh) and
-#                   uploads the images
-#   screenshots-pr  proposes the images whose frames changed in a single PR from bot/screenshots,
-#                   which the maintainer merges with `gh pr merge --squash --admin`: a PR the
-#                   GITHUB_TOKEN opens runs no workflows, so it never gets its checks
-# Merging that PR can't start a loop: the capture skips a push that changes only the screenshots,
-# a capture without a changed frame proposes nothing, and there is only ever the one PR. A burst
-# of merges cancels the older runs, which is fine, since the newest one captures everything.
+# Runs the E2E tests on the debug build. On a push to main, it hands the build on to the
+# Screenshots workflow (.github/workflows/screenshots.yml), which captures the docs screenshots
+# with it once the tests passed.
 on:
   # a pull request runs on every push to it, so other branches don't run
   # twice; main still runs after each merge
@@ -18,11 +10,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      capture:
-        description: "Also capture the docs screenshots as an artifact (proposes them in the screenshots PR only on main)"
-        type: boolean
-        default: false
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -93,151 +80,12 @@ jobs:
           if-no-files-found: ignore
 
       # the debug build embeds the frontend and the built-in dictionaries, so the binary is all
-      # the screenshots job needs
+      # the Screenshots workflow needs
       - name: upload the app for the screenshots
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || inputs.capture
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
           path: src-tauri/target/debug/blank
           retention-days: 1
           if-no-files-found: error
-
-  screenshots:
-    needs: e2e
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || inputs.capture
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      skipped: ${{ steps.guard.outputs.skip }}
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
-
-      # merging the screenshots PR changes only the screenshots, which mustn't capture them again
-      - name: skip a push of the screenshots alone
-        id: guard
-        if: github.event_name == 'push'
-        run: |
-          if ! git diff --name-only HEAD^ HEAD | grep -qv '^docs/public/screenshots/'; then
-            echo "::notice::this push changes only the screenshots, nothing to capture"
-            echo skip=true >> "$GITHUB_OUTPUT"
-          fi
-
-      - if: steps.guard.outputs.skip != 'true'
-        uses: ./.github/actions/webkit-deps
-        with:
-          ffmpeg: true
-
-      - if: steps.guard.outputs.skip != 'true'
-        uses: oven-sh/setup-bun@v2
-
-      - if: steps.guard.outputs.skip != 'true'
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      # only tauri-driver, not the build cache of the e2e job: the app is built already
-      - if: steps.guard.outputs.skip != 'true'
-        id: driver
-        uses: actions/cache@v6
-        with:
-          path: ~/.cargo/bin/tauri-driver
-          key: tauri-driver-2.0.6-${{ runner.os }}
-
-      - name: install tauri-driver
-        if: steps.guard.outputs.skip != 'true' && steps.driver.outputs.cache-hit != 'true'
-        run: cargo install tauri-driver --locked --version 2.0.6
-
-      - name: install e2e dependencies
-        if: steps.guard.outputs.skip != 'true'
-        run: bun install --frozen-lockfile
-        working-directory: e2e
-
-      - if: steps.guard.outputs.skip != 'true'
-        uses: actions/download-artifact@v8
-        with:
-          name: app-debug
-          path: ${{ runner.temp }}/app
-
-      - name: capture the screenshots
-        if: steps.guard.outputs.skip != 'true'
-        run: |
-          # artifacts lose the executable bit
-          chmod +x "$RUNNER_TEMP/app/blank"
-          # the spec files side by side, each in an app, a display and a session bus of its own
-          bash scripts/docs-shots.sh
-        env:
-          E2E_SKIP_BUILD: 1
-          # the runner has 4 CPUs, and each app takes about 1.5 of them
-          JOBS: 2
-          E2E_APP_PATH: ${{ runner.temp }}/app/blank
-          SHOTS_DIR: ${{ runner.temp }}/shots
-
-      - if: steps.guard.outputs.skip != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: docs-screenshots
-          path: ${{ runner.temp }}/shots
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: upload screenshots of failed shots
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: screenshots-failure
-          path: e2e/screenshots
-          if-no-files-found: ignore
-
-  screenshots-pr:
-    needs: screenshots
-    if: github.ref == 'refs/heads/main' && needs.screenshots.outputs.skipped != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-      pull-requests: write
-    concurrency:
-      group: screenshots-pr
-      cancel-in-progress: false
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      # images of an older main would undo what a newer push changed; its run captures them
-      - name: skip when main moved on
-        id: fresh
-        run: |
-          git fetch -q origin main
-          if [ "$(git rev-parse origin/main)" = "$GITHUB_SHA" ]; then
-            echo ok=true >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::main moved past ${GITHUB_SHA::7}, a newer run captures the screenshots"
-          fi
-
-      - name: install ffmpeg
-        if: steps.fresh.outputs.ok
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-
-      - if: steps.fresh.outputs.ok
-        uses: actions/download-artifact@v8
-        with:
-          name: docs-screenshots
-          path: ${{ runner.temp }}/shots
-
-      - name: take the images whose frames changed
-        if: steps.fresh.outputs.ok
-        run: scripts/sync-screenshots.sh "$RUNNER_TEMP/shots" docs/public/screenshots
-
-      - name: propose them
-        if: steps.fresh.outputs.ok
-        run: scripts/screenshots-pr.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
