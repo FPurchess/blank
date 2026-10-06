@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails while the docs screenshots of a commit aren't on it yet, since the
 # docs of a release would show old ones: while the `screenshots` check
-# (.github/workflows/e2e.yml) of its code commit (scripts/code-commit.sh) is
+# (.github/workflows/screenshots.yml) of its code commit (scripts/code-commit.sh) is
 # still running, or while the screenshots PR from bot/screenshots is open.
 # Warns only when the check failed or didn't run. make release runs it on
 # origin/main; ALLOW_OLD_SCREENSHOTS=1 lets it pass anyway.

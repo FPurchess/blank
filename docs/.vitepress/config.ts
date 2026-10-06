@@ -67,7 +67,7 @@ if (channel === "dev") {
 }
 
 // The screenshots are captured on main by CI, and proposed in a PR of their own
-// (.github/workflows/e2e.yml), so a page can show a picture before its file is
+// (.github/workflows/screenshots.yml), so a page can show a picture before its file is
 // there. Vite would fail the build on it: the page links it where it will be.
 const MISSING_SHOT = "\0missing-shot:";
 const missingShots: Plugin = {

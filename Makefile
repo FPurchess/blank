@@ -92,7 +92,7 @@ docs-dev: install-docs ## Serve the website with hot reload
 docs-build: install-docs ## Build the website into docs/.vitepress/dist
 	bun run docs:build
 
-# CI captures the screenshots the website shows and proposes them in a PR (.github/workflows/e2e.yml);
+# CI captures the screenshots the website shows and proposes them in a PR (.github/workflows/screenshots.yml);
 # these only write to e2e/screenshots/docs, to look at (scripts/docs-shots.sh: JOBS, topics)
 docs-screenshots: install-e2e ## Build the debug app and capture all docs shots into e2e/screenshots/docs (Linux only)
 	bun run docs:screenshots

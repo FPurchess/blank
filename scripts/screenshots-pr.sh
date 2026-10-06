@@ -3,7 +3,7 @@
 # bot/screenshots: commits them on top of the checked out commit, force-pushes the branch and
 # opens the PR or updates its description. Without a change, it closes the PR and deletes the
 # branch, since main has these screenshots then. Run by the screenshots-pr job of
-# .github/workflows/e2e.yml with GH_TOKEN; needs git and gh.
+# .github/workflows/screenshots.yml with GH_TOKEN; needs git and gh.
 #
 # usage: scripts/screenshots-pr.sh
 set -euo pipefail
