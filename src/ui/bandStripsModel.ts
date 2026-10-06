@@ -57,6 +57,14 @@ export const bandCommand = (band: Band) =>
     : CommandIdentifier.EDIT_FOOTER;
 
 /**
+ * bandPage names a page's header or footer, e.g. "footer 3", as its targets
+ * on the pages carry it (data-band-page), so the strip open on it can tell
+ * a press on them from one elsewhere
+ * @param page the page, counted from 1
+ */
+export const bandPage = (band: Band, page: number) => `${band} ${page}`;
+
+/**
  * openBandOn opens a page's header or footer for editing, as a click on it
  * does, leaving the focus to its slots
  * @param page the page, counted from 0

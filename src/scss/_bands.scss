@@ -7,15 +7,12 @@
 @use "statusbar" as *;
 @use "toparea" as *;
 
-// the header and footer margins of a sheet: a double click opens the band,
-// and the hint to add one sits in their middle
+// the header and footer margins of a sheet, which a click anywhere on opens
+// the band, with the hint to add one in their middle
 .page-band {
   position: absolute;
   left: 0;
   right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 
   &.header {
     top: 0;
@@ -49,13 +46,34 @@
   }
 }
 
-// on a sheet, over the band the engine painted
-.page-band .band-target {
-  position: absolute;
+// on a sheet, the whole margin, outlined under the pointer around the band
+// the engine painted in it
+.page-band {
+  .band-target,
+  .band-hint {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+  }
+
+  .band-target:hover {
+    outline: none;
+  }
+
+  .band-target-line {
+    position: absolute;
+    border-radius: 4px;
+  }
+
+  .band-target:hover .band-target-line {
+    outline: 1px dashed var(--line-strong);
+    outline-offset: 2px;
+  }
 }
 
 // where the document has no such band: "+ Header" or "+ Footer", while the
 // pointer is on the margin or the mark's line
+.page-band .band-hint,
 .page-end .band.band-hint,
 .page-edge-hint {
   display: flex;

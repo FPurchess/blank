@@ -610,6 +610,30 @@ describe("the header or footer being edited", () => {
       expect(request.apply).not.toHaveBeenCalled();
     });
 
+    it("stays open for a press on the band it edits, as a double click on a sheet's margin gives", async () => {
+      placed.value = shownAt(700);
+      const request = await open({ band: "footer", page: 2 });
+      // the targets of the pages, as BandTarget.vue renders them
+      const target = (bandPage: string) => {
+        const element = document.createElement("button");
+        element.dataset.bandPage = bandPage;
+        document.body.append(element);
+        return element;
+      };
+      const own = target("footer 2");
+      const other = target("footer 3");
+
+      own.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      await settle();
+      expect(request.apply).not.toHaveBeenCalled();
+      // another page's footer is outside
+      other.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      await settle();
+      expect(request.apply).toHaveBeenCalled();
+      own.remove();
+      other.remove();
+    });
+
     it("removes the band from every page, and says so", async () => {
       const request = await open({
         bands: {

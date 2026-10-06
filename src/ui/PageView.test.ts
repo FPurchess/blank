@@ -234,16 +234,19 @@ describe("page view", () => {
     await nextTick();
     const target = margin("footer").querySelector<HTMLElement>(".band-target")!;
     expect(target.dataset.tip).toBe("Edit the footer");
-    expect(parseFloat(target.style.width)).toBeGreaterThan(0);
-    expect(parseFloat(target.style.top)).toBeGreaterThan(0);
+    expect(target.dataset.bandPage).toBe("footer 2");
+    // the margin takes the click, the line the engine painted the outline
+    const line = target.querySelector<HTMLElement>(".band-target-line")!;
+    expect(parseFloat(line.style.width)).toBeGreaterThan(0);
+    expect(parseFloat(line.style.top)).toBeGreaterThan(0);
     expect(
-      parseFloat(target.style.top) + parseFloat(target.style.height),
+      parseFloat(line.style.top) + parseFloat(line.style.height),
     ).toBeLessThanOrEqual(parseFloat(margin("footer").style.height));
     // the header has none yet
     expect(margin("header").querySelector(".band-hint")).not.toBeNull();
   });
 
-  it("opens the strip of a band double-clicked on a sheet, or clicked where a page ends", async () => {
+  it("opens the strip of a band clicked anywhere in a sheet's margin, or where a page ends", async () => {
     layOut();
     const editor = new EditorView(document.createElement("div"), {
       state: createState(node, { cursor: 3 }),
@@ -266,11 +269,11 @@ describe("page view", () => {
     );
     expect(presses).toHaveLength(1);
     expect(editor.state.selection.head).toBe(3);
-    // a single click opens nothing, a double click the strip
-    footer.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(bandEditor.value).toBeNull();
-    footer.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(bandEditor.value).toMatchObject({ band: "footer" });
+    // a click anywhere in the margin opens the strip: the target fills it
+    const target = footer.querySelector<HTMLElement>(".band-hint")!;
+    expect(target.parentElement).toBe(footer);
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bandEditor.value).toMatchObject({ band: "footer", page: 1 });
     bandEditor.value = null;
     pageView.value = "page-ends";
     await nextTick();

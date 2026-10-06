@@ -328,14 +328,12 @@ describe("header and footer", () => {
     await expect($("#page-view")).toHaveElementClass("pages");
     const margin = $('.page-frame[data-page="2"] .page-band.footer');
     await margin.scrollIntoView({ block: "center" });
-    // a double click near the margin's left end, away from the hint
+    // a click near the margin's left end, away from the hint: the whole
+    // margin opens the band
     const { width } = await margin.getSize();
     await browser
       .action("pointer")
       .move({ origin: margin, x: -Math.round(width / 2) + 30, y: 0 })
-      .down()
-      .up()
-      .pause(50)
       .down()
       .up()
       .perform();

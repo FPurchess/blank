@@ -38,7 +38,12 @@ import {
   engineMissing,
   pageScrollRequest,
 } from "../state";
-import { bandInWindow, centerRequest, INSERTS } from "./bandStripsModel";
+import {
+  bandInWindow,
+  bandPage,
+  centerRequest,
+  INSERTS,
+} from "./bandStripsModel";
 import IconButton from "./components/IconButton.vue";
 import IconGlyph from "./components/IconGlyph.vue";
 import MenuButton from "./components/MenuButton.vue";
@@ -217,10 +222,20 @@ const onKeydown = (event: KeyboardEvent) => {
   }
 };
 
-// a click anywhere else but on the strip, its slots and its menus, submenus
-// included (src/ui/ContextMenu.vue), keeps what was typed
+// a click anywhere else but on the strip, its slots, its menus, submenus
+// included (src/ui/ContextMenu.vue), and the band it edits on the page (a
+// sheet's whole margin, which a double click presses twice), keeps what was
+// typed
 useDismiss(
-  () => [root.value, document.querySelector(".context-menus")],
+  () => [
+    root.value,
+    document.querySelector(".context-menus"),
+    ...(page === null
+      ? []
+      : document.querySelectorAll(
+          `[data-band-page="${bandPage(band, page)}"]`,
+        )),
+  ],
   () => done(),
 );
 
@@ -238,7 +253,7 @@ onMounted(() => {
   focusSlot();
   // the keys open it on the page in view, which scrolls its band to the
   // middle unless it shows with its strip already; a click opened it where
-  // it is, and the second of a double click lands in its slots
+  // it is, and the second press of a double click lands on its band
   const shown = place.value;
   if (
     props.request.center &&

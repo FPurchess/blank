@@ -49,6 +49,8 @@ describe("BandTarget", () => {
     expect(target.button.dataset.tip).toBe("Edit the footer");
     expect(target.button.dataset.tipKey).toBe(formatShortcut("Mod-Alt-f"));
     expect(target.button.tabIndex).toBe(-1);
+    // the page counted from 1, as the strip's request has it
+    expect(target.button.dataset.bandPage).toBe("footer 3");
     expect(target.button.hasAttribute("title")).toBe(false);
   });
 

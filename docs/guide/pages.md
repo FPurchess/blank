@@ -68,7 +68,7 @@ In a place, they show by their name, like **Page** or **Title**, and your pages 
 
 <img class="shot" src="/screenshots/header-footer.gif" alt="Pointing below the page shows + Footer; a click opens the footer, where Page number puts the number in the center. Mod Alt H opens the header, where Chapter goes on the left, Page 1 of 2 on the right, and First page None leaves the title page plain" />
 
-`Tab` moves to the next place and on to the strip's buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Click a header or footer there to change it, or double-click a sheet's top or bottom margin. `Mod` `Z` in your text undoes the whole change.
+`Tab` moves to the next place and on to the strip's buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Click a header or footer there to change it; on a sheet, anywhere in its top or bottom margin does. `Mod` `Z` in your text undoes the whole change.
 
 When a placeholder has nothing to put in yet, say **Author** while the document has no author, or **Chapter** before the first heading 1, your pages show its name there in faint italics, so you can still see the header or footer and click it. Only the screen shows these names: your PDF and Word document leave the place empty until there is something to put in. And if the header or footer you're done with shows nothing at all on your page yet, the bottom bar tells you why, say that no author is set, and how to set one.
 

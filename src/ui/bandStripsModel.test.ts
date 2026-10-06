@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INSERTS } from "./bandStripsModel";
+import { bandPage, INSERTS } from "./bandStripsModel";
 
 describe("INSERTS", () => {
   it("names the placeholders as the pages do, with a tooltip each", () => {
@@ -11,5 +11,11 @@ describe("INSERTS", () => {
       ["Date", "Insert the date", "{date}"],
       ["File", "Insert the file name", "{file}"],
     ]);
+  });
+});
+
+describe("bandPage", () => {
+  it("names a page's band, counted from 1", () => {
+    expect(bandPage("footer", 3)).toBe("footer 3");
   });
 });

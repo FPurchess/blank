@@ -9,14 +9,12 @@ import {
 } from "vue";
 
 import { BLEED } from "../engine/frames";
-import { useEditor } from "../editor/handle";
 import { pageEngine } from "../engine/engine";
-import type { Band } from "../layout/bands";
 import { imagesLoaded, loadedImage } from "../engine/images";
 import { FIELD_NAMES } from "../layout/placeholders";
 import { pageLayout, pageLayoutState, path, theme } from "../state";
 import BandSlots from "./BandSlots.vue";
-import { addsBand, openBandOn, pageBands } from "./bandStripsModel";
+import { addsBand, pageBands } from "./bandStripsModel";
 import BandTarget from "./BandTarget.vue";
 import { layerOf } from "./pageLayer";
 import { shownMarks } from "./pageMarks";
@@ -68,12 +66,6 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const headerCanvas = useTemplateRef<HTMLCanvasElement>("headerCanvas");
 const footerCanvas = useTemplateRef<HTMLCanvasElement>("footerCanvas");
 const selectedCanvas = useTemplateRef<HTMLCanvasElement>("selectedCanvas");
-const editor = useEditor();
-
-// a double click anywhere on a sheet's top or bottom margin opens its
-// header or footer, which takes the focus, as in Word; a single one opens it
-// only on the band or the hint to add one (BandTarget.vue)
-const openBand = (band: Band) => openBandOn(editor, band, props.page);
 
 // whether the document has no header or footer, which the margins and marks
 // then offer to add
@@ -288,29 +280,21 @@ const targets = computed(() =>
       />
     </template>
     <template v-if="sheet">
-      <div
-        class="page-band header"
-        :style="{ height: `${marginTop}px` }"
-        @dblclick="openBand('header')"
-      >
-        <BandTarget
-          band="header"
-          :page="page"
-          :adding="adding.header"
-          :style="adding.header ? undefined : styleOf(targets?.header ?? null)"
-        />
+      <div class="page-band header" :style="{ height: `${marginTop}px` }">
+        <BandTarget band="header" :page="page" :adding="adding.header">
+          <span
+            class="band-target-line"
+            :style="styleOf(targets?.header ?? null)"
+          />
+        </BandTarget>
       </div>
-      <div
-        class="page-band footer"
-        :style="{ height: `${marginBottom}px` }"
-        @dblclick="openBand('footer')"
-      >
-        <BandTarget
-          band="footer"
-          :page="page"
-          :adding="adding.footer"
-          :style="adding.footer ? undefined : styleOf(targets?.footer ?? null)"
-        />
+      <div class="page-band footer" :style="{ height: `${marginBottom}px` }">
+        <BandTarget band="footer" :page="page" :adding="adding.footer">
+          <span
+            class="band-target-line"
+            :style="styleOf(targets?.footer ?? null)"
+          />
+        </BandTarget>
       </div>
     </template>
     <div
