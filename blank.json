@@ -55,7 +55,9 @@
     "view.focus_next": "F6",
     "view.focus_previous": "Shift-F6",
     "view.toolbar_focus": "Alt-F10",
-    "tools.stats": "Mod-Alt-c"
+    "view.focus": "Mod-Shift-f",
+    "tools.stats": "Mod-Alt-c",
+    "app.settings": "Mod-,"
   },
   "autocorrect": {
     "arrows": true,
@@ -76,6 +78,9 @@
   },
   "editor": {
     "indentSize": 4
+  },
+  "focusMode": {
+    "hideAfter": 3
   },
   "layout": {
     "page": {

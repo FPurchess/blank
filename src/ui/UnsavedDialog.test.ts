@@ -44,7 +44,7 @@ describe("the question whether to save", () => {
       [...dialog()!.querySelectorAll("button")].map((b) =>
         b.textContent?.trim(),
       ),
-    ).toEqual(["Save", "Don't save", "Cancel"]);
+    ).toEqual(["Don't save", "Cancel", "Save"]);
     expect(document.activeElement).toBe(button("Save"));
     // read out with the title
     const form = dialog()!.querySelector("form")!;

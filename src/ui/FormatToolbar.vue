@@ -32,7 +32,7 @@ import {
   styleMenuItems,
 } from "./formatToolbarModel";
 import ToolbarButton from "./ToolbarButton.vue";
-import ToolbarMenuButton from "./ToolbarMenuButton.vue";
+import MenuButton from "./components/MenuButton.vue";
 
 // The formatting toolbar, the second row of the top area: history, the style
 // menu, the marks, lists and quote, alignment and Insert, with what doesn't
@@ -180,16 +180,16 @@ const moreItems = (anchor: Anchor) =>
         :tabindex="tabindexOf(entry.key)"
         :data-part="entry.part"
       />
-      <ToolbarMenuButton
+      <MenuButton
         v-else-if="entry.kind === 'menu' && entry.menu === 'style'"
-        class="style-select"
+        class="select style-select"
         label="Text style"
         :text="style"
         :items="styleItems"
         :tabindex="tabindexOf(entry.key)"
         :data-part="entry.part"
       />
-      <ToolbarMenuButton
+      <MenuButton
         v-else-if="entry.kind === 'menu'"
         label="Insert"
         icon="plus"
@@ -198,7 +198,7 @@ const moreItems = (anchor: Anchor) =>
         :tabindex="tabindexOf(entry.key)"
         :data-part="entry.part"
       />
-      <ToolbarMenuButton
+      <MenuButton
         v-else-if="entry.kind === 'more'"
         label="More"
         icon="more"

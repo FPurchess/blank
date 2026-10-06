@@ -112,6 +112,13 @@ export interface UnsavedDialogRequest {
 // tab's changes before it closes, or null while none is asked
 export const unsavedDialog = shallowRef<UnsavedDialogRequest | null>(null);
 
+// the settings open on the section shown last (settingsSection)
+export type SettingsRequest = Record<string, never>;
+
+// settingsDialog holds the request of the open settings dialog, or null while
+// it is closed. It isn't about a document, so closing a tab leaves it open.
+export const settingsDialog = shallowRef<SettingsRequest | null>(null);
+
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
 // dialog goes here too
@@ -122,6 +129,7 @@ export const focusTakingDialogs = [
   bandEditor,
   tocPopover,
   unsavedDialog,
+  settingsDialog,
 ] as const;
 
 /**

@@ -3,9 +3,12 @@ import {
   blocksPaneOpen,
   blockToolbar,
   contextMenu,
+  controlsFaded,
+  focusMode,
   imageDialog,
   linkDialog,
   pageSetup,
+  settingsDialog,
   tablePicker,
   tableToolbar,
   tocPopover,
@@ -23,6 +26,7 @@ import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
+import SettingsDialog from "./settings/SettingsDialog.vue";
 import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
@@ -30,7 +34,9 @@ import TocPopover from "./TocPopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
+import { useBodyClass } from "./composables/useBodyClass";
 import { useWindowCommands } from "./composables/useWindowCommands";
+import { watchFocusMode } from "./focusModeModel";
 
 // All of the UI around the editor, see .claude/rules/ui-components.md. Each
 // part is keyed by what makes it the same: a dialog by its request, so each
@@ -38,6 +44,10 @@ import { useWindowCommands } from "./composables/useWindowCommands";
 
 // the window's commands work wherever the focus is, not only in the editor
 useWindowCommands();
+// focus mode: the classes that fade the controls, and when they fade
+useBodyClass("focus-mode", () => focusMode.value);
+useBodyClass("controls-faded", () => controlsFaded.value);
+watchFocusMode();
 </script>
 
 <template>
@@ -72,6 +82,11 @@ useWindowCommands();
     v-if="unsavedDialog"
     :key="keyOf(unsavedDialog)"
     :request="unsavedDialog"
+  />
+  <SettingsDialog
+    v-if="settingsDialog"
+    :key="keyOf(settingsDialog)"
+    :request="settingsDialog"
   />
   <TocPopover
     v-if="tocPopover"

@@ -239,16 +239,16 @@ describe("linkDialog", () => {
       expect(request.cancel).toHaveBeenCalled();
     });
 
-    it("only offers Convert to Text for an existing link", async () => {
+    it("only offers Convert to text for an existing link", async () => {
       await openDialog();
-      expect(button("Convert to Text")).toBeUndefined();
+      expect(button("Convert to text")).toBeUndefined();
 
       const request = await openDialog({
         isEdit: true,
         url: "https://blank.app",
       });
       expect(dialog()?.querySelector("h2")?.textContent).toBe("Edit link");
-      button("Convert to Text")?.click();
+      button("Convert to text")?.click();
       await nextTick();
 
       expect(request.convertToText).toHaveBeenCalled();
@@ -259,12 +259,13 @@ describe("linkDialog", () => {
 
   it("keeps the focus inside the dialog", async () => {
     await openDialog({ isEdit: true, url: "https://blank.app" });
-    const cancel = button("Cancel")!;
+    // the last button, at the right of the foot
+    const save = button("Save")!;
 
     expect((await keydown("Tab", { shiftKey: true })).defaultPrevented).toBe(
       true,
     );
-    expect(document.activeElement).toBe(cancel);
+    expect(document.activeElement).toBe(save);
 
     expect((await keydown("Tab")).defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(urlInput());

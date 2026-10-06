@@ -40,6 +40,7 @@ const checker = (overrides: Partial<Spellchecker> = {}): Spellchecker => ({
   check: vi.fn(async () => {}),
   suggest: vi.fn(async () => ["wrong"]),
   userEntry: (word) => (word === "blank" ? "blank" : undefined),
+  words: () => ["blank"],
   addWord: vi.fn(),
   removeWord: vi.fn(),
   replaceWord: vi.fn(),

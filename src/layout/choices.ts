@@ -44,6 +44,9 @@ export interface PageChoices {
 export interface Option<T> {
   value: T;
   label: string;
+  // what the option shows when its label is too long for it, e.g. "H1"; the
+  // label then names it for screen readers and its tooltip
+  short?: string;
 }
 
 /**

@@ -23,7 +23,13 @@ describe("the reference blank.json", () => {
   });
 
   it("holds the defaults", () => {
-    for (const section of ["keymap", "autocorrect", "spellcheck", "editor"])
+    for (const section of [
+      "keymap",
+      "autocorrect",
+      "spellcheck",
+      "editor",
+      "focusMode",
+    ])
       expect(reference[section], section).toEqual(
         defaults[section as keyof typeof defaults],
       );

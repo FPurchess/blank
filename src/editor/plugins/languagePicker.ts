@@ -1,7 +1,6 @@
 import { Plugin } from "prosemirror-state";
-import { keydownHandler } from "prosemirror-keymap";
 
-import { CommandIdentifier, getKeyBinding } from "../../config";
+import { CommandIdentifier } from "../../config";
 import {
   backspace,
   closePicker,
@@ -10,6 +9,7 @@ import {
   typeChar,
 } from "../../languagePicker";
 import { languagePicker as pickerState } from "../../state";
+import { commandKey } from "../keyBindings";
 import { PAGE_PRESS } from "../pagePointer";
 
 /**
@@ -18,11 +18,9 @@ import { PAGE_PRESS } from "../pagePointer";
  */
 export const languagePicker = () => {
   // the binding that opened the picker closes it again
-  const toggle = keydownHandler({
-    [getKeyBinding(CommandIdentifier.LANGUAGE_CHOOSE)]: () => {
-      closePicker();
-      return true;
-    },
+  const toggle = commandKey(CommandIdentifier.LANGUAGE_CHOOSE, () => {
+    closePicker();
+    return true;
   });
 
   return new Plugin({

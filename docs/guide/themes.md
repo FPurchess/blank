@@ -1,6 +1,6 @@
 # Themes
 
-Press `Mod` `Alt` `T` to cycle through the themes. Blank remembers your choice.
+Choose a theme in the [settings](./settings#appearance) (`Mod` `,`), where each one shows on a card in its own colors, or press `Mod` `Alt` `T` to cycle through them. Blank remembers your choice.
 
 <div class="themes">
   <figure><img class="shot" src="/screenshots/theme-light.png" alt="Light theme" /><figcaption>Light</figcaption></figure>

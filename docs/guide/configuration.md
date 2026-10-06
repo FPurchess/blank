@@ -2,6 +2,8 @@
 
 Blank reads its settings from `blank.json` in the app config folder. The file is optional: list only what you want to change, everything else keeps its default.
 
+The [settings](./settings) (`Mod` `,`) write this file for you and apply each change at once. They keep only what differs from the defaults, and leave the rest of the file, including settings they don't show, as you wrote it.
+
 | System  | Config file                                                           |
 | ------- | --------------------------------------------------------------------- |
 | Linux   | `~/.config/com.github.fpurchess.blank/blank.json`                     |
@@ -9,7 +11,7 @@ Blank reads its settings from `blank.json` in the app config folder. The file is
 | macOS   | `~/Library/Application Support/com.github.fpurchess.blank/blank.json` |
 | Windows | `%APPDATA%\com.github.fpurchess.blank\blank.json`                     |
 
-Restart Blank after changing the file. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as `"false"` in quotes instead of `false`, or a shortcut for a command it doesn't know, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored. Other names it doesn't know are skipped.
+Restart Blank after changing the file by hand. If the file is not valid JSON, Blank ignores it and uses the defaults. A single setting that Blank can't use, such as `"false"` in quotes instead of `false`, or a shortcut for a command it doesn't know, never stops Blank from starting: it keeps the default for that setting and tells you which ones it ignored. Other names it doesn't know are skipped.
 
 ## Keyboard shortcuts
 
@@ -24,7 +26,7 @@ Map a command to a key under `keymap`. Keys are written like `Mod-Shift-s`, wher
 }
 ```
 
-The tab commands are named `tab.…`, e.g. `"tab.close": "Mod-w"`. `Ctrl` `Page Up` and `Ctrl` `Page Down` always go to the previous and next tab too, unless you give those keys to another command.
+The tab commands are named `tab.…`, e.g. `"tab.close": "Mod-w"`. `Ctrl` `Page Up` and `Ctrl` `Page Down` always go to the previous and next tab too, unless you give those keys to another command here; the settings don't allow that.
 
 An empty key, `""`, takes a command's key away. A code block has none to start with: give it one here if you make code blocks often, e.g. `"blocktype.code_block": "Mod-Alt-k"`.
 
@@ -75,6 +77,18 @@ The words you add to the dictionary are kept next to `blank.json`, in the `dicti
 {
   "editor": {
     "indentSize": 2
+  }
+}
+```
+
+## Focus mode {#focus-mode}
+
+In [focus mode](./writing#focus-mode), the bars fade when you type, and also once the mouse has rested for `hideAfter` seconds, 3 by default. `0` fades them only when you type; up to 60 seconds work:
+
+```json
+{
+  "focusMode": {
+    "hideAfter": 10
   }
 }
 ```

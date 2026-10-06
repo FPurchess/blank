@@ -22,6 +22,8 @@
   // a control under the pointer and while it's pressed
   --hover: color-mix(in srgb, var(--color) 8%, transparent);
   --pressed: color-mix(in srgb, var(--color) 14%, transparent);
+  // what dims the window behind a dialog
+  --scrim: color-mix(in srgb, var(--desk-color) 55%, transparent);
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   // the primary button under the pointer: the accent a step toward the text
   // on it, which also works in mono

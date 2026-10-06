@@ -121,18 +121,14 @@ const submit = () => {
       v-model="alt"
       label="Description"
     />
+    <template v-if="request.isEdit" #secondary>
+      <button type="button" @click="close(request.remove)">Remove</button>
+    </template>
     <template #actions>
+      <button type="button" @click="close(request.cancel)">Cancel</button>
       <button type="submit" :disabled="check.blocked">
         {{ request.isEdit ? "Save" : "Insert" }}
       </button>
-      <button
-        v-if="request.isEdit"
-        type="button"
-        @click="close(request.remove)"
-      >
-        Remove
-      </button>
-      <button type="button" @click="close(request.cancel)">Cancel</button>
     </template>
   </BaseDialog>
 </template>

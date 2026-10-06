@@ -1,11 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CommandIdentifier } from "../config";
+import { bindKeys } from "../test/keymap";
+import { CommandIdentifier, config } from "../config";
+import { createState, createTestView, doc, keyEvent, p } from "../test/editor";
 import {
   ariaShortcut,
   commandBinding,
+  commandKey,
   commandShortcut,
   formatShortcut,
+  liveKeys,
 } from "./keyBindings";
 
 describe("formatShortcut", () => {
@@ -82,5 +86,43 @@ describe("ariaShortcut", () => {
 describe("commandBinding", () => {
   it("returns a command's key as the keymap reads it", () => {
     expect(commandBinding(CommandIdentifier.INSERT_TABLE)).toBe("Mod-t");
+  });
+});
+
+describe("liveKeys", () => {
+  const defaults = config.value;
+  afterEach(() => {
+    config.value = defaults;
+  });
+  const view = () => createTestView(createState(doc(p("text"))));
+
+  it("builds the keys again only when the keymap changed", () => {
+    const run = vi.fn(() => true);
+    const build = vi.fn(() => ({
+      [config.value.keymap[CommandIdentifier.FILE_SAVE]]: run,
+    }));
+    const keys = liveKeys(build);
+
+    expect(keys(view(), keyEvent("Mod-s"))).toBe(true);
+    expect(keys(view(), keyEvent("Mod-s"))).toBe(true);
+    // a change of something else keeps the keymap
+    config.value = { ...config.value, editor: { indentSize: 2 } };
+    expect(keys(view(), keyEvent("Mod-s"))).toBe(true);
+    expect(build).toHaveBeenCalledOnce();
+
+    bindKeys({ [CommandIdentifier.FILE_SAVE]: "F9" });
+    expect(keys(view(), keyEvent("Mod-s"))).toBe(false);
+    expect(keys(view(), keyEvent("F9"))).toBe(true);
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs a command on its key, or nothing without one", () => {
+    const run = vi.fn(() => true);
+    const keys = commandKey(CommandIdentifier.INSERT_TABLE, run);
+
+    expect(keys(view(), keyEvent("Mod-t"))).toBe(true);
+    bindKeys({ [CommandIdentifier.INSERT_TABLE]: "" });
+    expect(keys(view(), keyEvent("Mod-t"))).toBe(false);
+    expect(run).toHaveBeenCalledOnce();
   });
 });

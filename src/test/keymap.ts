@@ -1,6 +1,7 @@
 import type { Node } from "prosemirror-model";
 import { history } from "prosemirror-history";
 
+import { type Config, config } from "../config";
 import { keymap } from "../editor/plugins/keymap";
 import {
   createState,
@@ -19,4 +20,15 @@ export const withKeymap = (node: Node, options: StateOptions = {}) => {
     createState(node, { ...options, plugins: [history(), plugin] }),
   );
   return { view, press: (combo: string) => pressKey(view, plugin, combo) };
+};
+
+/**
+ * bindKeys gives the commands in `changes` those keys, as the settings would,
+ * over the keymap of the config now; reset `config.value` after the test
+ */
+export const bindKeys = (changes: Partial<Config["keymap"]>) => {
+  config.value = {
+    ...config.value,
+    keymap: { ...config.value.keymap, ...changes },
+  };
 };

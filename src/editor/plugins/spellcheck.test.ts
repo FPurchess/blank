@@ -48,6 +48,7 @@ const fakeChecker = (tag = "en") => {
     }),
     suggest: vi.fn(async () => []),
     userEntry: () => undefined,
+    words: () => [],
     addWord: vi.fn(),
     removeWord: vi.fn(),
     replaceWord: vi.fn(),

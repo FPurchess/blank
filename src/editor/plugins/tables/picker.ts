@@ -1,10 +1,9 @@
-import { keydownHandler } from "prosemirror-keymap";
 import { Plugin } from "prosemirror-state";
 
 import { tablePicker } from "../../../state";
 import { resizePicker } from "../../commands/table/pickerSize";
 import { CommandIdentifier } from "../../../config";
-import { commandBinding } from "../../keyBindings";
+import { commandKey } from "../../keyBindings";
 import { PAGE_PRESS } from "../../pagePointer";
 
 /**
@@ -13,17 +12,10 @@ import { PAGE_PRESS } from "../../pagePointer";
  */
 export const tablePickerKeys = () => {
   // the binding that opened the picker closes it again
-  const binding = commandBinding(CommandIdentifier.INSERT_TABLE);
-  const toggle = keydownHandler(
-    binding
-      ? {
-          [binding]: () => {
-            tablePicker.value?.cancel();
-            return true;
-          },
-        }
-      : {},
-  );
+  const toggle = commandKey(CommandIdentifier.INSERT_TABLE, () => {
+    tablePicker.value?.cancel();
+    return true;
+  });
 
   return new Plugin({
     props: {

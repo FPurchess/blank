@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { watch } from "vue";
+import { nextTick, watch } from "vue";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
+import { config } from "../config";
 import { language, spellcheck, spellchecker, spellcheckStatus } from "../state";
 import { deferred, flushPromises } from "../test/async";
 import * as ipc from "./ipc";
@@ -32,7 +33,11 @@ const installed = { available: true, installed: true, outdated: false };
 
 // what the tests started, stopped after each one
 const stops: (() => void)[] = [];
-afterEach(() => stops.splice(0).forEach((stop) => stop()));
+const defaults = config.value;
+afterEach(() => {
+  stops.splice(0).forEach((stop) => stop());
+  config.value = defaults;
+});
 
 /**
  * statuses records the spell check statuses from now on
@@ -227,6 +232,36 @@ describe("spellcheck service", () => {
     });
   });
 
+  describe("what it ignores", () => {
+    it("checks the text again when the settings change it", async () => {
+      stops.push(bootSpellcheck());
+      spellcheck.value = true;
+      await vi.waitFor(() => expect(spellchecker.value?.tag).toBe("en"));
+      const before = spellchecker.value;
+
+      config.value = {
+        ...config.value,
+        spellcheck: { ...config.value.spellcheck, ignoreUppercase: false },
+      };
+      await nextTick();
+
+      expect(spellchecker.value).not.toBe(before);
+      expect(spellchecker.value?.tag).toBe("en");
+    });
+
+    it("doesn't for a change of anything else", async () => {
+      stops.push(bootSpellcheck());
+      spellcheck.value = true;
+      await vi.waitFor(() => expect(spellchecker.value?.tag).toBe("en"));
+      const before = spellchecker.value;
+
+      config.value = { ...config.value, editor: { indentSize: 2 } };
+      await nextTick();
+
+      expect(spellchecker.value).toBe(before);
+    });
+  });
+
   describe("checking", () => {
     it("checks words once and in batches", async () => {
       const checker = await ready();
@@ -250,6 +285,15 @@ describe("spellcheck service", () => {
       expect(checker.isCorrect("BLANK")).toBe(true);
       expect(checker.userEntry("Blank")).toBe("blank");
       expect(checker.userEntry("house")).toBeUndefined();
+    });
+
+    it("lists the words of the personal dictionary as they are now", async () => {
+      const checker = await ready();
+
+      await checker.addWord("zebra");
+
+      expect(checker.words()).toEqual(["blank", "zebra"]);
+      expect(spellchecker.value?.words()).toEqual(["blank", "zebra"]);
     });
 
     it("drops the results of a previous language", async () => {

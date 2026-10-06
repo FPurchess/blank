@@ -63,4 +63,6 @@ Blank uses the Hunspell dictionaries collected at [wooorm/dictionaries](https://
 
 The words you add are kept in plain text files in the app config folder, one per language, e.g. `dictionaries/de.txt` for German, Austrian and Swiss German. Each line holds one word. You can edit, sync or back up these files; Blank reads them when you turn spell check on, change the language or start it.
 
+To see and change the words of the current language, open the [settings](./settings#spelling) (`Mod` `,`), choose **Spelling** and click **Edit…** next to **Your dictionary**. Words you add or remove there are underlined or accepted at once.
+
 A word added in lowercase is also accepted with a capital or in capitals: _blank_ accepts _Blank_ and _BLANK_. A word with capitals is accepted as written or in capitals: _iPhone_ accepts _IPHONE_, but not _Iphone_.

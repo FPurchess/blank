@@ -14,6 +14,8 @@ export interface Spellchecker {
   suggest(word: string): Promise<string[]>;
   // returns the entry of the personal dictionary that accepts `word`
   userEntry(word: string): string | undefined;
+  // the words of the personal dictionary, as they are now
+  words(): readonly string[];
   addWord(word: string): Promise<void>;
   removeWord(entry: string): Promise<void>;
   replaceWord(entry: string, word: string): Promise<void>;

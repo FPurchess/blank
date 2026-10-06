@@ -2,11 +2,14 @@
 @use "themes/index";
 // first, so main.scss's own rules override its global ones
 @use "controls" as *;
+@use "focusMode" as *;
+@use "hidden" as *;
 @use "typography";
 @use "statusbar" as *;
 @use "toparea" as *;
 @use "tabs";
 @use "formatToolbar";
+@use "settings";
 
 html {
   overflow-y: auto;
@@ -21,12 +24,7 @@ body {
 
 // read out by screen readers, not shown
 .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  @include visually-hidden;
 }
 
 .ProseMirror {
@@ -184,25 +182,61 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--scrim);
 }
 
+// a dialog, see src/ui/components/BaseDialog.vue: a sheet of paper with its
+// title in the head, its body, and its buttons in the foot. It's paper, so
+// secondary text is --muted-on-paper (see the popover mixin).
 .dialog {
+  --muted: var(--muted-on-paper);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  max-width: min(480px, calc(100% - 48px));
-  padding: 24px;
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
   box-sizing: border-box;
+  overflow: hidden;
+  @include ui-text;
   color: var(--color);
   background-color: var(--background-color);
-  border: 1px solid var(--color);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-dialog);
+  box-shadow: 0 24px 64px var(--popover-shadow);
 
-  h2 {
-    margin: 0 0 6px;
-    font-size: 1.1rem;
+  .dialog-head {
+    padding: var(--s3) var(--s5);
+    border-bottom: 1px solid var(--line);
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+  }
+
+  .dialog-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    padding: var(--s4) var(--s5);
+    overflow: auto;
+  }
+
+  .dialog-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s2);
+    padding: var(--s3) var(--s5);
+    border-top: 1px solid var(--line);
+
+    // what the dialog also offers, on the left, away from its own button
+    .secondary {
+      display: flex;
+      gap: var(--s2);
+      margin-right: auto;
+    }
   }
 
   // a sentence that says what the dialog is about
@@ -211,28 +245,24 @@ body {
   }
 
   label {
-    font-size: 0.9rem;
-    opacity: 0.7;
+    color: var(--muted);
   }
 
   input,
-  button {
+  textarea {
+    @include field;
     font: inherit;
-    color: inherit;
-    background: transparent;
-    border: 1px solid var(--color);
-    border-radius: 3px;
   }
 
   input {
-    padding: 6px 8px;
     margin-bottom: 6px;
   }
 
   p {
     margin: -2px 0 6px;
-    font-size: 0.8rem;
-    opacity: 0.7;
+    font-size: var(--ui-small);
+    line-height: 16px;
+    color: var(--muted);
   }
 
   // a field with a button next to it
@@ -248,19 +278,47 @@ body {
     }
   }
 
-  .actions {
+  // a field with its unit inside it (TextField's `unit`), which draws the
+  // field's box around both
+  .field {
+    @include field;
     display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 6px;
+    align-items: center;
+    gap: var(--s1);
+    margin-bottom: 6px;
+
+    &:focus-within {
+      outline: 2px solid var(--focus);
+      outline-offset: -1px;
+      border-color: transparent;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: auto;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      outline: none;
+      background: none;
+    }
+
+    .unit {
+      font-size: var(--ui-small);
+      color: var(--muted);
+    }
+  }
+
+  // a value that can't be used, see TextField's `errorId`
+  input[aria-invalid="true"],
+  textarea[aria-invalid="true"],
+  .field:has([aria-invalid="true"]) {
+    border-color: var(--spelling-color);
   }
 
   button {
-    padding: 4px 12px;
-
-    &:disabled {
-      opacity: 0.38;
-    }
+    font: inherit;
   }
 
   // the buttons that close the dialog, and the one next to a field: the one
@@ -275,37 +333,33 @@ body {
   }
 }
 
-// a row of options in a dialog, see src/ui/components/OptionGroup.vue
+// a row of a dialog's settings, see src/ui/components/SettingRow.vue: its
+// label on the left and its control on the right, a line between rows
 .dialog {
   .setting {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: var(--s4);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
   }
 
-  .setting-label {
-    font-size: 0.9rem;
-    opacity: 0.7;
-  }
-
-  // the options of a row look like one control, the chosen ones filled
-  .options {
+  .setting-text {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    flex: 1;
+    flex-direction: column;
 
-    button {
-      padding: 3px 10px;
-      font-size: 0.9rem;
-      opacity: 0.75;
-
-      &[aria-checked="true"],
-      &[aria-pressed="true"] {
-        color: var(--background-color);
-        background-color: var(--color);
-        opacity: 1;
-      }
+    small {
+      font-size: var(--ui-small);
+      line-height: 16px;
+      color: var(--muted);
     }
+  }
+
+  // the options of a row as one segmented control, see OptionGroup.vue
+  .options {
+    @include segmented;
+    flex-wrap: wrap;
   }
 }
 
@@ -899,6 +953,8 @@ $strip-height: 88px;
   @include ui-text;
   @include popover;
   user-select: none;
+  // the context bars hide with the controls in focus mode
+  @include chrome-fade;
 
   &[hidden] {
     display: none;
@@ -1480,8 +1536,11 @@ body.without-engine.outline-docked {
   padding-right: $outline-dock;
 }
 
-// the room beside the sheets has the desk's color, as the page view has
-body.outline-docked.outline-desk {
+// the room beside the sheets has the desk's color, as the page view has:
+// where the outline is docked, and where the controls have faded in focus
+// mode, so the bars leave the desk behind and not a strip of paper
+body.outline-docked.outline-desk,
+body.controls-faded.outline-desk {
   background-color: var(--desk-color);
 }
 
@@ -1495,6 +1554,7 @@ body.outline-docked.outline-desk {
   user-select: none;
   color: var(--color);
   @include ui-text;
+  @include chrome-fade;
 }
 
 // one dash per heading, as long as its level is high, cut off below 400 px
@@ -1672,6 +1732,13 @@ $tile-columns: 2;
   // toolbars it floats over, below the dialogs and the menus
   z-index: 6;
   width: $blocks-dock;
+  @include chrome-fade;
+}
+
+// the pointer hides over the pages while the controls have faded
+body.controls-faded #page-view,
+body.controls-faded #editor {
+  cursor: none;
 }
 
 .side-pane-head {
@@ -2003,12 +2070,18 @@ body.without-engine.blocks-docked {
     animation: none;
   }
 
+  .switch-row .switch::after,
   .band-line,
   .band-hint,
   body.band-editing #page-view,
   .outline-dashes,
   .outline-entry,
-  body.band-editing #outline {
+  body.band-editing #outline,
+  #ui-top,
+  #ui-bottom,
+  #outline,
+  #blocks-pane,
+  .toolbar {
     transition: none;
   }
 }

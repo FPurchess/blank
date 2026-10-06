@@ -3,10 +3,14 @@ import {
   exists,
   mkdir,
   readTextFile,
+  rename,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { shallowRef } from "vue";
+
+import { errorMessage } from "./errors";
+import { sameBinding } from "./keyNames";
 
 import {
   DEFAULT_PAGE,
@@ -72,7 +76,9 @@ export enum CommandIdentifier {
   VIEW_FOCUS_NEXT = "view.focus_next",
   VIEW_FOCUS_PREVIOUS = "view.focus_previous",
   VIEW_TOOLBAR_FOCUS = "view.toolbar_focus",
+  VIEW_FOCUS_MODE = "view.focus",
   TOOLS_STATS = "tools.stats",
+  APP_SETTINGS = "app.settings",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -108,6 +114,16 @@ export interface EditorConfig {
 export const MIN_INDENT = 1;
 export const MAX_INDENT = 16;
 
+export interface FocusModeConfig {
+  // the seconds the pointer rests before the controls fade in focus mode; 0
+  // fades them only when typing
+  hideAfter: number;
+}
+
+// the rest times blank.json may set
+const MIN_HIDE_AFTER = 0;
+const MAX_HIDE_AFTER = 60;
+
 export interface LayoutConfig {
   // the page setup of documents that don't have their own
   page: PageSettings;
@@ -118,6 +134,7 @@ export interface Config {
   autocorrect: AutocorrectConfig;
   spellcheck: SpellcheckConfig;
   editor: EditorConfig;
+  focusMode: FocusModeConfig;
   layout: LayoutConfig;
 }
 
@@ -180,7 +197,9 @@ const defaultConfig: Config = {
     [CommandIdentifier.VIEW_FOCUS_NEXT]: "F6",
     [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: "Shift-F6",
     [CommandIdentifier.VIEW_TOOLBAR_FOCUS]: "Alt-F10",
+    [CommandIdentifier.VIEW_FOCUS_MODE]: "Mod-Shift-f",
     [CommandIdentifier.TOOLS_STATS]: "Mod-Alt-c",
+    [CommandIdentifier.APP_SETTINGS]: "Mod-,",
   },
   autocorrect: {
     arrows: true,
@@ -200,6 +219,9 @@ const defaultConfig: Config = {
   editor: {
     indentSize: 4,
   },
+  focusMode: {
+    hideAfter: 3,
+  },
   layout: {
     page: DEFAULT_PAGE,
   },
@@ -208,6 +230,9 @@ const defaultConfig: Config = {
 // config is the loaded blank.json, over the defaults. It is replaced whole,
 // never changed in place.
 export const config = shallowRef<Config>(defaultConfig);
+
+// the defaults, e.g. for what a reset in the settings goes back to
+export const defaults: Readonly<Config> = defaultConfig;
 
 const configName = "blank.json";
 
@@ -370,6 +395,20 @@ const mergeSpellcheck = (user: unknown, problems: string[]) =>
   mergeFlat("spellcheck", defaultConfig.spellcheck, user, problems);
 
 /**
+ * wholeNumberIn tells whether `value` is a whole number from `min` to `max`,
+ * e.g. an indent size
+ */
+export const wholeNumberIn = (
+  value: unknown,
+  min: number,
+  max: number,
+): value is number =>
+  typeof value === "number" &&
+  Number.isInteger(value) &&
+  value >= min &&
+  value <= max;
+
+/**
  * mergeEditor takes the user's editor settings that are valid and keeps the
  * defaults for the rest: the indent size is a whole number of spaces from
  * MIN_INDENT to MAX_INDENT
@@ -383,15 +422,29 @@ const mergeEditor = (user: unknown, problems: string[]): EditorConfig => {
   }
   const size = user.indentSize;
   if (size === undefined) return editor;
-  if (
-    typeof size !== "number" ||
-    !Number.isInteger(size) ||
-    size < MIN_INDENT ||
-    size > MAX_INDENT
-  )
-    problems.push("editor.indentSize");
-  else editor.indentSize = size;
+  if (wholeNumberIn(size, MIN_INDENT, MAX_INDENT)) editor.indentSize = size;
+  else problems.push("editor.indentSize");
   return editor;
+};
+
+/**
+ * mergeFocusMode takes the user's focus mode settings that are valid and
+ * keeps the defaults for the rest: the rest time is a whole number of seconds
+ * from MIN_HIDE_AFTER to MAX_HIDE_AFTER
+ */
+const mergeFocusMode = (user: unknown, problems: string[]): FocusModeConfig => {
+  const focusMode = { ...defaultConfig.focusMode };
+  if (user === undefined) return focusMode;
+  if (!isRecord(user)) {
+    problems.push("focusMode");
+    return focusMode;
+  }
+  const seconds = user.hideAfter;
+  if (seconds === undefined) return focusMode;
+  if (wholeNumberIn(seconds, MIN_HIDE_AFTER, MAX_HIDE_AFTER))
+    focusMode.hideAfter = seconds;
+  else problems.push("focusMode.hideAfter");
+  return focusMode;
 };
 
 /**
@@ -415,30 +468,46 @@ const mergeLayout = (user: unknown, problems: string[]): LayoutConfig => {
 };
 
 /**
+ * mergeConfig reads the settings of blank.json, `user`, over the defaults.
+ * Invalid settings keep their default and are listed in `problems`.
+ */
+const mergeConfig = (user: Record<string, unknown>) => {
+  const problems: string[] = [];
+  const merged: Config = {
+    ...defaultConfig,
+    ...user,
+    // merge keymaps so a partial user keymap keeps the remaining defaults
+    keymap: mergeKeymap(user.keymap, problems),
+    // merge autocorrect so a partial user config keeps the remaining defaults
+    autocorrect: mergeAutocorrect(user.autocorrect, problems),
+    // merge spell check settings the same way
+    spellcheck: mergeSpellcheck(user.spellcheck, problems),
+    editor: mergeEditor(user.editor, problems),
+    focusMode: mergeFocusMode(user.focusMode, problems),
+    layout: mergeLayout(user.layout, problems),
+  };
+  return { config: merged, problems };
+};
+
+/**
+ * reportProblems tells the user which settings of blank.json can't be used
+ */
+const reportProblems = (problems: string[]) => {
+  if (problems.length === 0) return;
+  console.warn("ignored invalid settings in blank.json", problems);
+  sendNotification(
+    `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
+  );
+};
+
+/**
  * bootConfig initializes the config. Invalid settings are ignored with a
  * notification, so Blank still starts with the defaults.
  */
 export const bootConfig = async () => {
-  const userConfig = await getUserConfig();
-  const problems: string[] = [];
-  config.value = {
-    ...defaultConfig,
-    ...userConfig,
-    // merge keymaps so a partial user keymap keeps the remaining defaults
-    keymap: mergeKeymap(userConfig.keymap, problems),
-    // merge autocorrect so a partial user config keeps the remaining defaults
-    autocorrect: mergeAutocorrect(userConfig.autocorrect, problems),
-    // merge spell check settings the same way
-    spellcheck: mergeSpellcheck(userConfig.spellcheck, problems),
-    editor: mergeEditor(userConfig.editor, problems),
-    layout: mergeLayout(userConfig.layout, problems),
-  };
-  if (problems.length > 0) {
-    console.warn("ignored invalid settings in blank.json", problems);
-    sendNotification(
-      `Ignored invalid settings in blank.json: ${problems.join(", ")}`,
-    );
-  }
+  const { config: merged, problems } = mergeConfig(await getUserConfig());
+  config.value = merged;
+  reportProblems(problems);
 };
 
 /**
@@ -450,28 +519,184 @@ export const getKeyBinding = (command: CommandIdentifier) =>
   config.value.keymap[command];
 
 /**
+ * deepEqual tells whether two values read from JSON are the same
+ */
+const deepEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b))
+    return a.length === b.length && a.every((item, i) => deepEqual(item, b[i]));
+  if (!isRecord(a) || !isRecord(b)) return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && deepEqual(a[key], b[key]))
+  );
+};
+
+/**
+ * keepUnchanged returns `next` with the sections that equal those of
+ * `previous` taken from it, so what follows a section, e.g. the page layout
+ * or the keymap, only runs again when that section changed
+ */
+const keepUnchanged = (previous: Config, next: Config): Config => {
+  const kept: Record<string, unknown> = { ...next };
+  for (const key of Object.keys(next) as (keyof Config)[])
+    if (deepEqual(previous[key], next[key])) kept[key] = previous[key];
+  return kept as unknown as Config;
+};
+
+// A change of blank.json: the setting at `path`, e.g. ["autocorrect",
+// "dashes"], set to `value`, or back to its default without one
+export interface SettingChange {
+  path: readonly string[];
+  value?: unknown;
+}
+
+/**
+ * defaultAt returns the default of the setting at `path`, or undefined for
+ * one without a default, e.g. the replacements of a language
+ */
+const defaultAt = (path: readonly string[]): unknown =>
+  path.reduce<unknown>(
+    (value, key) =>
+      isRecord(value) && Object.hasOwn(value, key) ? value[key] : undefined,
+    defaultConfig,
+  );
+
+/**
+ * isDefault tells whether `value` is what the setting at `path` is without
+ * it, so blank.json can leave it out: a key binding that is the default key,
+ * however it's written, or a value that equals the default
+ */
+const isDefault = (path: readonly string[], value: unknown) => {
+  const fallback = defaultAt(path);
+  if (path[0] === "keymap" && path.length === 2)
+    return (
+      typeof value === "string" &&
+      typeof fallback === "string" &&
+      (value === fallback || sameBinding(value, fallback))
+    );
+  return deepEqual(value, fallback);
+};
+
+/**
+ * applyChange sets the setting at `path` in `settings`, the parsed
+ * blank.json, or removes it when it's the default. Objects that are left
+ * empty go too: every setting reads an empty object like a missing one.
+ */
+const applyChange = (
+  settings: Record<string, unknown>,
+  { path, value }: SettingChange,
+) => {
+  // JSON.parse makes "__proto__" an own key, but assigning it would replace
+  // the prototype
+  if (path.length === 0 || path.includes("__proto__")) return;
+  const parents = [settings];
+  for (const key of path.slice(0, -1)) {
+    const parent = parents[parents.length - 1];
+    // a value that isn't an object there was invalid and ignored anyway
+    if (!isRecord(parent[key])) parent[key] = {};
+    parents.push(parent[key] as Record<string, unknown>);
+  }
+  const last = path[path.length - 1];
+  const target = parents[parents.length - 1];
+  const empty = isRecord(value) && Object.keys(value).length === 0;
+  if (value === undefined || empty || isDefault(path, value))
+    delete target[last];
+  else target[last] = value;
+  for (let i = parents.length - 1; i > 0; i--)
+    if (Object.keys(parents[i]).length === 0)
+      delete parents[i - 1][path[i - 1]];
+};
+
+// the changes to make, or a function that returns them from what blank.json
+// holds, for a change that builds on it (e.g. adding to a list)
+export type SettingChanges =
+  SettingChange[] | ((settings: Record<string, unknown>) => SettingChange[]);
+
+/**
+ * writeSettings makes `changes` in blank.json, see saveSettings
+ * @returns what went wrong, or undefined once they are saved
+ */
+const writeSettings = async (
+  changes: SettingChanges,
+): Promise<string | undefined> => {
+  const configFile = await getConfigFile();
+  let settings: unknown = {};
+  try {
+    if (await exists(configFile))
+      settings = JSON.parse(await readTextFile(configFile));
+  } catch (error) {
+    console.error("failed to read blank.json", error);
+    return "Blank couldn't read blank.json, so it left the file as it is";
+  }
+  // overwriting would lose what the user wrote
+  if (!isRecord(settings))
+    return "blank.json holds no settings, so Blank left it as it is";
+
+  for (const change of typeof changes === "function"
+    ? changes(settings)
+    : changes)
+    applyChange(settings, change);
+
+  await mkdir(await path.appConfigDir(), { recursive: true });
+  // a new file renamed over the old one, so an interrupted write never leaves
+  // half of it
+  await writeTextFile(
+    `${configFile}.tmp`,
+    `${JSON.stringify(settings, null, 2)}\n`,
+  );
+  await rename(`${configFile}.tmp`, configFile);
+
+  // what was written by hand since the start applies now too
+  const { config: merged, problems } = mergeConfig(settings);
+  reportProblems(problems);
+  config.value = keepUnchanged(config.value, merged);
+};
+
+// the writes of blank.json, one after the other, so fast changes can't
+// interleave
+let writes: Promise<unknown> = Promise.resolve();
+
+/**
+ * write queues `changes` after the writes before
+ * @returns what went wrong, or undefined once they are saved
+ */
+const write = (changes: SettingChanges) => {
+  const written = writes
+    .then(() => writeSettings(changes))
+    .catch((error: unknown) => {
+      console.error("failed to save blank.json", error);
+      return `Blank couldn't save blank.json: ${errorMessage(error)}`;
+    });
+  writes = written;
+  return written;
+};
+
+/**
+ * saveSettings makes `changes` in blank.json and applies them at once. The
+ * file's other settings stay as they are, and a setting that is the default
+ * is left out, so the file keeps only what the user changed. A file that
+ * isn't a JSON object is left as it is. What goes wrong is told in a
+ * notification.
+ * @returns whether the settings were saved
+ */
+export const saveSettings = async (changes: SettingChanges) => {
+  const failure = await write(changes);
+  if (failure) sendNotification(failure);
+  return failure === undefined;
+};
+
+/**
  * saveDefaultPage makes `page` the page setup of documents that don't have
  * their own, in blank.json. The file's other settings stay as they are.
  * @param page the page setup
  * @param unit the unit to write lengths in
- * @throws if blank.json can't be read or written
+ * @throws if blank.json can't be read or written, with what went wrong
  */
 export const saveDefaultPage = async (page: PageSettings, unit: Unit) => {
-  const configFile = await getConfigFile();
-  let settings: Record<string, unknown> = {};
-  if (await exists(configFile)) {
-    const parsed: unknown = JSON.parse(await readTextFile(configFile));
-    // overwriting would lose what the user wrote
-    if (!isRecord(parsed)) throw new Error("blank.json holds no settings");
-    settings = parsed;
-  }
-  const layout = isRecord(settings.layout) ? settings.layout : {};
-  settings.layout = { ...layout, page: pageSettingsJSON(page, unit) };
-
-  await mkdir(await path.appConfigDir(), { recursive: true });
-  await writeTextFile(configFile, `${JSON.stringify(settings, null, 2)}\n`);
-  config.value = {
-    ...config.value,
-    layout: { ...config.value.layout, page },
-  };
+  const failure = await write([
+    { path: ["layout", "page"], value: pageSettingsJSON(page, unit) },
+  ]);
+  if (failure) throw new Error(failure);
 };

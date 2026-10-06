@@ -32,14 +32,10 @@ import {
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import { schema } from "../../markdown";
-import {
-  commandKeys,
-  keymap,
-  normalizeBinding,
-  WINDOW_COMMANDS,
-} from "./keymap";
+import { commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
 import * as tabs from "../tabs";
-import { withKeymap } from "../../test/keymap";
+import { bindKeys, withKeymap } from "../../test/keymap";
+import { createState, createTestView, pressKey } from "../../test/editor";
 
 describe("plugin.keymap", () => {
   const defaultConfig = config.value;
@@ -347,13 +343,7 @@ describe("plugin.keymap", () => {
     });
 
     it("keeps Ctrl-PageDown for another command that has it", () => {
-      config.value = {
-        ...defaultConfig,
-        keymap: {
-          ...defaultConfig.keymap,
-          [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown",
-        },
-      };
+      bindKeys({ [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown" });
       const cycle = vi.spyOn(tabs, "cycleTab");
       const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
@@ -368,13 +358,7 @@ describe("plugin.keymap", () => {
 
   describe("the keys that work outside the editor", () => {
     it("leave a fixed key to any command bound to it", () => {
-      config.value = {
-        ...defaultConfig,
-        keymap: {
-          ...defaultConfig.keymap,
-          [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown",
-        },
-      };
+      bindKeys({ [CommandIdentifier.FORMAT_BOLD]: "Ctrl-PageDown" });
       const cycle = vi.spyOn(tabs, "cycleTab");
       const { view } = withKeymap(doc(p("text")));
 
@@ -398,13 +382,7 @@ describe("plugin.keymap", () => {
   });
 
   it("uses the bindings from the config", () => {
-    config.value = {
-      ...defaultConfig,
-      keymap: {
-        ...defaultConfig.keymap,
-        [CommandIdentifier.FORMAT_BOLD]: "Mod-d",
-      },
-    };
+    bindKeys({ [CommandIdentifier.FORMAT_BOLD]: "Mod-d" });
     const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
     expect(press("Mod-b")).toBe(false);
@@ -415,6 +393,57 @@ describe("plugin.keymap", () => {
       "strong",
     );
   });
+  describe("follows a changed keymap at once", () => {
+    const boldOn = (combo: string) => () => {
+      config.value = {
+        ...defaultConfig,
+        keymap: {
+          ...defaultConfig.keymap,
+          [CommandIdentifier.FORMAT_BOLD]: combo,
+        },
+      };
+    };
+    const isBold = (view: { state: { doc: Node } }) =>
+      view.state.doc.firstChild?.firstChild?.marks[0]?.type.name === "strong";
+
+    it("in the shown tab, without a new plugin", () => {
+      const { view, press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
+      boldOn("Mod-d")();
+
+      expect(press("Mod-b")).toBe(false);
+      expect(press("Mod-d")).toBe(true);
+      expect(isBold(view)).toBe(true);
+    });
+
+    it("in a tab shown later and in a new one, which share the plugin", () => {
+      const plugin = keymap();
+      const background = createTestView(
+        createState(doc(p("text")), { cursor: [1, 5], plugins: [plugin] }),
+      );
+      boldOn("F2")();
+      const created = createTestView(
+        createState(doc(p("text")), { cursor: [1, 5], plugins: [plugin] }),
+      );
+
+      for (const view of [background, created]) {
+        expect(pressKey(view, plugin, "Mod-b")).toBe(false);
+        expect(pressKey(view, plugin, "F2")).toBe(true);
+        expect(isBold(view)).toBe(true);
+      }
+    });
+
+    it("in the keys that work outside the editor", () => {
+      const run = vi.spyOn(tabs, "openNewTab").mockResolvedValue(undefined);
+      const keys = commandKeys(WINDOW_COMMANDS);
+      const { view } = withKeymap(doc(p("text")));
+      bindKeys({ [CommandIdentifier.FILE_NEW]: "F9" });
+
+      expect(keys(view, keyEvent("Mod-n"))).toBe(false);
+      expect(keys(view, keyEvent("F9"))).toBe(true);
+      expect(run).toHaveBeenCalledOnce();
+    });
+  });
+
   it("doesn't notify for the default keymap", () => {
     keymap();
 
@@ -458,38 +487,5 @@ describe("plugin.keymap", () => {
     expect(sendNotification).toHaveBeenCalledWith(
       "Ignored invalid key bindings in blank.json: format.bold: Hyper-b",
     );
-  });
-});
-
-describe("normalizeBinding", () => {
-  it.each([
-    ["Mod-b", "Mod-b"],
-    ["Mod-Shift-z", "Mod-Shift-z"],
-    ["Tab", "Tab"],
-    ["Shift-Tab", "Shift-Tab"],
-    ["Mod--", "Mod--"],
-    ["Mod-Space", "Mod-Space"],
-    ["Ctrl-Alt-s", "Ctrl-Alt-s"],
-    ["Control-Meta-s", "Control-Meta-s"],
-    ["c-a-s-m-x", "c-a-s-m-x"],
-    ["Cmd-p", "Meta-p"],
-    ["Option-p", "Alt-p"],
-    ["option-p", "Alt-p"],
-    ["Command-Shift-s", "Meta-Shift-s"],
-    ["COMMAND-s", "Meta-s"],
-    ["Super-e", "Meta-e"],
-  ])("normalizes %j to %j", (binding, expected) => {
-    expect(normalizeBinding(binding)).toBe(expected);
-  });
-
-  it.each(["", "Hyper-b", "Win-b", "Command--p", "Fn-F1"])(
-    "rejects %j",
-    (binding) => {
-      expect(normalizeBinding(binding)).toBeUndefined();
-    },
-  );
-
-  it("rejects a binding that isn't a string", () => {
-    expect(normalizeBinding(42 as unknown as string)).toBeUndefined();
   });
 });

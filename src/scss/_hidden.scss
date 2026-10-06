@@ -1,0 +1,10 @@
+// What only screen readers hear, not shown: the .visually-hidden class, and a
+// field's label where its placeholder names it on the screen (the settings)
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

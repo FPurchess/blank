@@ -1,4 +1,3 @@
-import { keymap as _keymap, keydownHandler } from "prosemirror-keymap";
 import { undo, redo } from "prosemirror-history";
 import {
   baseKeymap,
@@ -21,6 +20,8 @@ import {
   closeTab,
   cycleTabs,
   moveFocus,
+  openSettings,
+  toggleFocusMode,
   moveTab,
   newFile,
   openFile,
@@ -47,9 +48,10 @@ import {
 import * as exporters from "../../exporters";
 import { CommandIdentifier, getKeyBinding } from "../../config";
 import type { MarkType, Node } from "prosemirror-model";
-import { Command } from "prosemirror-state";
+import { type Command, Plugin } from "prosemirror-state";
 import { inCell } from "./tables/util";
-import { normalizeBinding } from "../keyBindings";
+import { normalizeBinding, sameBinding } from "../../keyNames";
+import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
@@ -58,8 +60,6 @@ import { toggleList } from "../commands/lists";
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
-
-export { normalizeBinding };
 
 /**
  * outsideCells runs `command` only outside table cells, which can't hold
@@ -169,7 +169,9 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     if (dispatch) focusStop("toolbar");
     return true;
   },
+  [CommandIdentifier.VIEW_FOCUS_MODE]: toggleFocusMode(),
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
+  [CommandIdentifier.APP_SETTINGS]: openSettings(),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -214,15 +216,13 @@ const bindingsOf = (
     }
   }
   // a fixed key yields to any command bound to it, not only to these
-  const configured = new Set(
-    Object.keys(commandMap).map((id) =>
-      normalizeBinding(getKeyBinding(id as CommandIdentifier)),
-    ),
+  const configured = Object.keys(commandMap).map((id) =>
+    getKeyBinding(id as CommandIdentifier),
   );
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
-      const normalized = normalizeBinding(key)!;
-      if (!configured.has(normalized)) bindings[normalized] = commandMap[id];
+      if (!configured.some((binding) => sameBinding(binding, key)))
+        bindings[key] = commandMap[id];
     }
   }
   return bindings;
@@ -248,8 +248,8 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files, the tabs, and moving between the parts (F6, and
-// Alt-F10 to the toolbar)
+// the editor: the files, the tabs, moving between the parts (F6, and Alt-F10
+// to the toolbar), focus mode and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
@@ -264,6 +264,8 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_FOCUS_NEXT,
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
+  CommandIdentifier.VIEW_FOCUS_MODE,
+  CommandIdentifier.APP_SETTINGS,
 ];
 
 /**
@@ -271,7 +273,7 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
  * their keys, e.g. for keys pressed outside the editor
  */
 export const commandKeys = (ids: readonly CommandIdentifier[]) =>
-  keydownHandler(bindingsOf(ids));
+  liveKeys(() => bindingsOf(ids));
 
 /**
  * keepAlignment makes the paragraph Enter starts at the end of an aligned
@@ -285,20 +287,32 @@ const keepAlignment = (node: Node, atEnd: boolean) => {
     : null;
 };
 
-export const keymap = () =>
-  _keymap({
-    ...baseKeymap,
+/**
+ * keymap runs the commands on their keys, over prosemirror's base keymap. It
+ * follows the keymap of the settings: a changed key works at once, in every
+ * tab, since they all share this plugin.
+ */
+export const keymap = () => {
+  // invalid bindings are reported once, at the start
+  bindCommands();
+  return new Plugin({
+    props: {
+      handleKeyDown: liveKeys(() => ({
+        ...baseKeymap,
 
-    ...bindCommands(),
+        ...bindingsOf(Object.keys(commandMap) as CommandIdentifier[]),
 
-    // baseKeymap's Enter, but a paragraph after an aligned block, made at
-    // its end, is aligned like it, as in Word
-    Enter: chainCommands(
-      splitListItem(schema.nodes.list_item),
-      newlineInCode,
-      createParagraphNear,
-      liftEmptyBlock,
-      splitBlockAs(keepAlignment),
-    ),
-    "Shift-Enter": insertNode(schema.nodes.hard_break),
+        // baseKeymap's Enter, but a paragraph after an aligned block, made at
+        // its end, is aligned like it, as in Word
+        Enter: chainCommands(
+          splitListItem(schema.nodes.list_item),
+          newlineInCode,
+          createParagraphNear,
+          liftEmptyBlock,
+          splitBlockAs(keepAlignment),
+        ),
+        "Shift-Enter": insertNode(schema.nodes.hard_break),
+      })),
+    },
   });
+};

@@ -1,6 +1,21 @@
 # Keyboard shortcuts
 
-`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux. All shortcuts except the line break, `Mod` + Click and `Ctrl` `Page Up` / `Page Down` can be [changed](./configuration#keyboard-shortcuts).
+`Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux. All shortcuts except the line break, `Mod` + Click and `Ctrl` `Page Up` / `Page Down` can be changed.
+
+## Change a shortcut
+
+Open **Settings** with `Mod` `,` and choose **Keyboard shortcuts**. Click the key of a command (or press `Enter` on it) and press the new keys: they work at once, in every tab. `Esc` cancels, and `Backspace` removes the shortcut.
+
+- A shortcut needs `Ctrl` or `Alt` (on macOS `Cmd`, `Ctrl` or `Option`) with a key, or is an F key on its own.
+- If another command already has the keys, Blank says which one. Press them again to move them to the new command; the other one is then left without a shortcut.
+- A changed shortcut has a reset button next to it, and **Reset all** brings back every default.
+- Some keys stay with what they do everywhere, and Blank says why when you press them: `Mod` `A`, `C`, `V` and `X`, `Mod` `Backspace` and `Delete`, `Ctrl` `Page Up` / `Page Down`, `Alt` `F4` on Windows and Linux, and on macOS `Option` with a letter or digit (it types a character) and the text keys `Ctrl` `A`, `E`, `H` and `D`, `Option` `Backspace` and `Delete`, and `Ctrl` `Option` `Backspace`.
+
+The shortcuts are kept in [blank.json](./configuration#keyboard-shortcuts), which you can also edit by hand.
+
+::: info Keyboards with AltGr
+On keyboard layouts that type characters with `AltGr` (Polish, German and many more), Windows and Linux report `AltGr` as `Ctrl` `Alt`. A shortcut with `Ctrl` `Alt` and a key that `AltGr` uses on your layout then runs the command instead of typing the character. Choose another key for that command in the settings.
+:::
 
 ## Files
 
@@ -20,6 +35,8 @@
 | [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`   |
 | Cycle themes                                | `Mod` `Alt` `T`   |
 | Choose language                             | `Mod` `Alt` `L`   |
+| [Focus mode](./writing#focus-mode)          | `Mod` `Shift` `F` |
+| [Settings](./settings)                      | `Mod` `,`         |
 
 ## Tabs and moving around
 

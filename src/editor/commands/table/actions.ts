@@ -5,7 +5,7 @@ import type { EditorView } from "prosemirror-view";
 import type { Alignment } from "../../../markdown";
 import { cellAt } from "../../../markdown/tables";
 import { language } from "../../../state";
-import { isMac } from "../../plugins/openLink";
+import { isMac } from "../../../platform";
 import {
   alignColumns,
   canMerge,

@@ -29,8 +29,8 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
 - **Sizes and spacing:**
   - the 8px grid `--s1…--s8` (4, 8, 12, 16, 24, 32, 48);
   - `--control` 28 (icon and text buttons), `--row` 32 (menu rows), `--status-item` 24;
-  - type: `--ui` 13px for all UI text at 13/20, `--ui-small` 12px (status items, hints, tooltips) at 12/16. The chrome's roots (the top area, the side panes, the outline, the menus and what floats) include `ui-text` (`_controls.scss`), which gives their elements the 20px back from the reset's 1.5em. Never size UI text in `rem`: the root stays at the editor's 16.5px;
-  - radii `--r-control` 6, `--r-pop` 8 (what floats) and `--r-dialog` 12 (dialogs still use 6 until the settings dialog).
+  - type: `--ui` 13px for all UI text at 13/20, `--ui-small` 12px (status items, hints, tooltips) at 12/16. The chrome's roots (the top area, the side panes, the outline, the menus, what floats and the dialogs) include `ui-text` (`_controls.scss`), which gives their elements the 20px back from the reset's 1.5em. Never size UI text in `rem`: the root stays at the editor's 16.5px;
+  - radii `--r-control` 6, `--r-pop` 8 (what floats) and `--r-dialog` 12 (dialogs).
 - **Motion:** `--fade-in` 100, `--fade-out` 150, `--chrome-in` 300 and `--chrome-out` 700 (focus mode), with `--ease` and `--ease-soft`. Motion is only feedback.
   - Every new `transition` or `animation` gets its selector in main.scss's `prefers-reduced-motion` block (`motion.test.ts` checks it), which also zeroes the timings.
   - Don't add a second reduced-motion block before it: the test reads the first.
@@ -54,17 +54,22 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `separator`;
   - `field` (an input or select on the paper);
   - `group-label` (the small capitals naming a group);
-  - `shortcut`.
-- **Classes only where a component uses one:** `.icon-button` (`IconButton.vue`) and `.status-item`.
+  - `shortcut`;
+  - `select-button` (a menu button showing a value, in a box);
+  - `switch` and `switch-on` (a switch's track and knob);
+  - `segmented` (a row of choices as one control: a sunken `--hover` ground, the chosen one raised on the paper in weight 500, the others in ink, since secondary text is too faint on that ground).
+- **Classes only where a component uses one:** `.icon-button` (`IconButton.vue`), `.status-item`, `.menu-button` with `.select` (`MenuButton.vue`), `.switch-row` (`SwitchControl.vue`) and `.segmented` (`SegmentedTabs.vue`).
+- **Shared controls** (`src/ui/components/`): `IconButton`, `MenuButton` for a menu or a select, `SwitchControl` for a setting that is on or off and applies at once, `SegmentedTabs` for switching what a surface shows.
 - **States:**
   - hover `--hover` and pressed `--pressed`, only while enabled;
   - on (`aria-pressed`/`aria-checked="true"`): `--on-fill` with the icon in `--on-ink`, or for status items `$on: text`;
   - disabled: opacity 0.38.
 - **Keyboard focus** is the global 2px `--focus` ring with a 2px offset, on `:focus-visible` only. Don't add `:focus` outlines. Pickers and the floating toolbars never take the editor's focus, and the top area's rows take it only from the keyboard (`editor-boundary.md`).
 - **Text buttons always have a box,** a border or a fill. One primary per surface: the dialogs' submit button, filled with the accent made solid over the desk (`solid()` in `_controls.scss`), so it's solid ink in mono.
+- **Dialogs** (`BaseDialog.vue`): paper with a 1px `--line` border, the `--r-dialog` radius and a large soft shadow in `--popover-shadow`, over `--scrim` (the desk, half see-through), which dims the window behind. A head with the title (15px, 500) and a foot with the buttons, each divided from the body by a `--line`: what else the dialog offers on the left (`secondary`), then Cancel and the primary on the right. No close ✕: Esc, Cancel and a press on the scrim close it. It includes `ui-text` (`--ui` at 13/20); hints and small labels are `--ui-small`. Like a popover, it re-points `--muted` to `--muted-on-paper`, and the rows of its settings are `SettingRow`s. What is wrong is in `--spelling-color` (`themes.test.ts` checks it on the paper), each on its own line, and linked to its field with `aria-invalid` and `aria-describedby`.
 - **The one depth cue:** `popover` (a 1px `--line` border, the `--r-pop` radius, one shadow), only on what floats (menus, toolbars, pickers). It's paper, so it re-points `--muted` to `--muted-on-paper`: whatever is inside just uses `--muted`. A new surface on the paper does the same, rather than a property of its own.
 - **Closing what a component opened** (a menu, a card, a floating list): `useDismiss(inside, close, options)` (`src/ui/composables/useDismiss.ts`) closes it on a press outside `inside()`, which lists its own elements and what belongs to it (the button that opened it, so a press there toggles), and optionally on Escape, any key, blur or resize. It takes the Escape it closes on (`preventDefault`): closing may give the editor the focus, which would get the rest of the press as typing (it once replaced a selected table of contents). Other keys of `anyKey` go on. Don't add another window `pointerdown` listener for it.
-- **A command's key for code that handles it itself:** `commandBinding(id)` (`src/editor/keyBindings.ts`), normalized for prosemirror-keymap; `commandShortcut(id)` writes it for people.
+- **A command's key for code that handles it itself:** `commandKey(id, run)` or `liveKeys(build)` (`src/editor/keyBindings.ts`), which follow the keymap when the settings change it; never a `keydownHandler` built once from `commandBinding(id)`. `commandShortcut(id)` writes the key for people, `sameBinding` compares two.
 - **Side panes:** `side-pane($edge, $offset)` (the blocks pane; made for the outline's open list too), with `side-pane-head`, `side-pane-title` and `side-pane-foot` (`SidePaneHead.vue`). A flat surface of the desk's color with a 1px `--line` on the side of the pages; below `OUTLINE_BREAKPOINT`, where it floats over the pages (class `floating`), the popovers' shadow. Its surface is the desk, so it keeps `--muted`.
 - **The pointer:**
   - The global rule gives the hand to buttons, links and the roles button, tab, menuitem*, option, radio and switch. Text fields get the text cursor, and anything `:disabled`/`aria-disabled` the arrow.

@@ -24,6 +24,7 @@ const checker: Spellchecker = {
   check: async () => {},
   suggest: async () => [],
   userEntry: () => undefined,
+  words: () => [],
   addWord: async () => {},
   removeWord: async () => {},
   replaceWord: async () => {},

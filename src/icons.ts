@@ -73,6 +73,9 @@ const ICONS: Record<string, string> = {
   page: "M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M8.5 8h7 M8.5 12h7 M8.5 16h4",
   focus:
     "M3 8V5a2 2 0 0 1 2-2h3 M16 3h3a2 2 0 0 1 2 2v3 M21 16v3a2 2 0 0 1-2 2h-3 M8 21H5a2 2 0 0 1-2-2v-3 M12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4z",
+  // focus mode: the lines of text stay, the bars above and below fade
+  "focus-mode":
+    "M3 4h3 M10.5 4h3 M18 4h3 M3 20h3 M10.5 20h3 M18 20h3 M6 10h12 M6 14h9",
   more: "M5 12h.01 M12 12h.01 M19 12h.01",
   trash:
     "M4 7h16 M10 11v6 M14 11v6 M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13 M9 7V4h6v3",

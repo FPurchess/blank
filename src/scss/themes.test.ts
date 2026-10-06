@@ -165,6 +165,44 @@ describe("the controls' colors", () => {
     },
   );
 
+  it.each(cases)(
+    "draw switches and segmented controls on the paper in %s, %s",
+    (theme, mode) => {
+      const { color, paper } = grounds(theme, mode);
+      // a switch that is off: its track's border and knob
+      expect(
+        contrast(color("line-strong", paper), paper),
+      ).toBeGreaterThanOrEqual(3);
+      // a switch that is on: the knob on the accent, and the track on the
+      // paper
+      const accent = color("accent", paper);
+      expect(contrast(color("accent-ink", accent), accent)).toBeGreaterThan(3);
+      // a choice not chosen: ink on the sunken ground
+      const sunken = color("hover", paper);
+      expect(contrast(color("color", sunken), sunken)).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    },
+  );
+
+  it.each(cases)(
+    "set a dialog apart from the page it dims in %s, %s",
+    (theme, mode) => {
+      const { color, desk, paper } = grounds(theme, mode);
+      // the page under the scrim sinks toward the desk, more than halfway,
+      // while the dialog stays paper; its border and shadow do the rest
+      const dimmed = color("scrim", paper);
+      expect(luminance(dimmed)).toBeLessThan(luminance(paper));
+      expect(contrast(dimmed, paper)).toBeGreaterThan(
+        1 + (contrast(desk, paper) - 1) / 2,
+      );
+      // what is wrong in a dialog reads as text on its paper
+      expect(
+        contrast(color("spelling-color", paper), paper),
+      ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
   it.each(themes)("mark the active tab in the accent in %s", (theme) => {
     const { color, paper } = grounds(theme, "accent");
     expect(contrast(color("tab-mark", paper), paper)).toBeGreaterThanOrEqual(3);

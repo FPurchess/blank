@@ -4,7 +4,7 @@ Blank corrects what you type the way Word and LibreOffice do. Most corrections a
 
 - **Undo** (`Mod` `Z`) reverts the last correction and keeps what you typed. That goes for block shortcuts too: one undo turns a new list or heading back into the `-` or `#` you typed.
 - Nothing is corrected inside code blocks or inline code.
-- Every group below can be [turned off](./configuration#autocorrect), and you can add your own replacements.
+- Every group below can be turned off in the [settings](./settings#writing) (`Mod` `,` → **Writing**), and you can add your own replacements there under **Your replacements**: for every language or only the current one. Yours come before Blank's own replacements. They're kept in [blank.json](./configuration#autocorrect).
 
 ## What gets corrected
 

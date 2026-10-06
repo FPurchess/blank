@@ -835,15 +835,27 @@ export const paste = (data: Record<string, string>) =>
   }, data);
 
 /**
- * moves the mouse to the middle of the window just below the top area or just
- * above its bottom edge, where the hints to add a header or footer show
+ * moves the mouse to the middle of the window just below the top area, or to
+ * the empty middle of the status bar, where the hints to add a header or
+ * footer show (not on the bar's items, which keep the pointer for themselves)
  */
 export const hoverEdge = async (edge: "top" | "bottom") => {
   const { width, height } = await browser.getWindowSize();
-  const y = edge === "top" ? TOP_BAR_HEIGHT + BAND_HEIGHT / 2 : height - 20;
+  let x = width / 2;
+  let y = TOP_BAR_HEIGHT + BAND_HEIGHT / 2;
+  if (edge === "bottom") {
+    const gap = await browser.execute(() => {
+      const rect = document
+        .querySelector("#ui-bottom .status-grow")
+        ?.getBoundingClientRect();
+      return rect ? { x: rect.left + rect.width / 2, width: rect.width } : null;
+    });
+    if (gap && gap.width > 0) x = gap.x;
+    y = height - 20;
+  }
   await browser
     .action("pointer")
-    .move({ x: Math.round(width / 2), y: Math.round(y), origin: "viewport" })
+    .move({ x: Math.round(x), y: Math.round(y), origin: "viewport" })
     .perform();
 };
 

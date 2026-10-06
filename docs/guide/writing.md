@@ -120,5 +120,15 @@ The bar at the bottom shows where you are and what's switched on. Click any item
 | _Spelling_      | whether [spell check](./spelling) is on (_Spelling off_ when it isn't) | turn spell check on or off                                                                                          | `Mod` `Alt` `S`                          |
 | ‹ ›             | while spell check is on and the window is wide enough                  | go to the previous or next misspelled word                                                                          | `Mod` `Alt` `Shift` `N`, `Mod` `Alt` `N` |
 | the view        | [pages or page ends](./pages#on-the-screen), whichever you're in       | switch to the other                                                                                                 | `Mod` `Alt` `V`                          |
+| focus mode      | whether [focus mode](#focus-mode) is on                                | turn it on or off                                                                                                   | `Mod` `Shift` `F`                        |
 
 Next to the word count, the bar tells you for a moment what just happened, like _2 rows added_, and screen readers read it out. The details of the word count close as soon as you type on; with `Mod` `Alt` `C`, screen readers read them out as well.
+
+## Focus mode
+
+When you want only the page, turn on focus mode with `Mod` `Shift` `F` or the last button of the status bar. Nothing changes at first. As soon as you type, the tabs, the toolbar, the panes, the outline and the status bar fade out, slowly, and the page stays exactly where it was. Move the mouse and they're back at once.
+
+- The bars also fade once the mouse has rested for 3 seconds. Choose 10 seconds, or only when typing, in the [settings](./settings#appearance).
+- They never fade while the mouse is on one of them, or while a menu, a dialog or the header and footer strip is open.
+- Every shortcut still works while they're hidden, and `F6` brings them back to move through them with the keyboard.
+- `Esc` leaves focus mode, unless something else is open that `Esc` closes first.

@@ -1,14 +1,20 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { watch } from "vue";
 
+import { config } from "../config";
 import { language, spellcheck, spellchecker, spellcheckStatus } from "../state";
 import { errorMessage } from "../errors";
+import { bootScope } from "../scope";
 import * as ipc from "./ipc";
 import type { Spellchecker } from "./types";
 import { dictionaryKey, forms, readWords, writeWords } from "./userDictionary";
 
 // words checked per call to the engine at most
 const BATCH_SIZE = 5000;
+
+// publishes the current spell checker again, so the text is checked again,
+// e.g. when what it ignores changed; nothing while there is none
+let republish: (() => void) | undefined;
 
 /**
  * languageName returns the English name of `tag`, e.g. "German (Switzerland)"
@@ -130,6 +136,7 @@ const createSpellchecker = (
       return found;
     },
     userEntry: (word) => entries.find((entry) => forms(entry).includes(word)),
+    words: () => entries,
     async addWord(word) {
       if (!current() || entries.includes(word)) return;
       entries = [...entries, word];
@@ -157,6 +164,7 @@ const createSpellchecker = (
     },
   });
 
+  republish = publish;
   return createView();
 };
 
@@ -227,10 +235,19 @@ export const update = async () => {
  * on. It doesn't wait for the dictionary, so a download never delays the start.
  * @returns dispose, which stops following spellcheck and language
  */
-export const bootSpellcheck = () => {
-  // after the writes of a tick, so turning it on and choosing a language at
-  // once loads one dictionary, not first the old language's
-  const stop = watch([spellcheck, language], () => void update());
-  void update();
-  return stop;
-};
+export const bootSpellcheck = () =>
+  bootScope(() => {
+    // after the writes of a tick, so turning it on and choosing a language at
+    // once loads one dictionary, not first the old language's
+    watch([spellcheck, language], () => void update());
+    // which words it ignores changed in the settings: the text is checked
+    // again, in the shown tab now and in others when they're shown
+    watch(
+      [
+        () => config.value.spellcheck.ignoreUppercase,
+        () => config.value.spellcheck.ignoreWordsWithNumbers,
+      ],
+      () => republish?.(),
+    );
+    void update();
+  });

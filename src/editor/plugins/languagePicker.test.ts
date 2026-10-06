@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { bindKeys } from "../../test/keymap";
+import { CommandIdentifier, config } from "../../config";
 
 import { PAGE_PRESS } from "../pagePointer";
 import { pagePointer } from "../../test/pagePointer";
@@ -30,9 +33,24 @@ const setup = () => {
 };
 
 describe("plugin.languagePicker", () => {
+  const defaults = config.value;
   beforeEach(() => {
     language.value = "de";
     closePicker();
+  });
+  afterEach(() => {
+    config.value = defaults;
+  });
+
+  it("closes on the key that opens it, also after it changed", () => {
+    const { press } = setup();
+    bindKeys({ [CommandIdentifier.LANGUAGE_CHOOSE]: "F8" });
+    openPicker();
+
+    expect(press("Mod-Alt-l")).toBe(true);
+    expect(pickerState.value.open).toBe(true);
+    expect(press("F8")).toBe(true);
+    expect(pickerState.value.open).toBe(false);
   });
 
   it("leaves keys alone while the picker is closed", () => {

@@ -3,7 +3,8 @@ import { computed, useTemplateRef } from "vue";
 
 // A labelled text field of a dialog, with an optional hint below it that
 // screen readers announce. The default slot goes next to the field, e.g. a
-// button that fills it. `input` is emitted on every native input event, also
+// button that fills it. A `unit` shows inside the field, after the value, and
+// `errorId` marks the value as invalid, described by that error. `input` is emitted on every native input event, also
 // one that leaves the value as it is (v-model's update isn't), e.g. pasting
 // the same text over itself, which still counts as typing.
 const props = defineProps<{
@@ -15,6 +16,11 @@ const props = defineProps<{
   placeholder?: string;
   // the keyboard a touch screen shows, e.g. "decimal" for lengths
   inputmode?: "decimal";
+  // the unit of a length, e.g. "cm"
+  unit?: string;
+  // the id of the message that says what is wrong with the value, while
+  // something is
+  errorId?: string;
 }>();
 const value = defineModel<string>({ required: true });
 const emit = defineEmits<{ input: [] }>();
@@ -28,7 +34,11 @@ const attributes = computed(() => ({
   spellcheck: false,
   placeholder: props.placeholder,
   inputmode: props.inputmode,
-  "aria-describedby": props.hint?.id,
+  "aria-invalid": props.errorId ? true : undefined,
+  "aria-describedby":
+    [props.hint?.id, props.unit && `${props.id}-unit`, props.errorId]
+      .filter(Boolean)
+      .join(" ") || undefined,
 }));
 
 defineExpose({
@@ -51,6 +61,15 @@ defineExpose({
     />
     <slot />
   </div>
+  <span v-else-if="unit" class="field">
+    <input
+      ref="input"
+      v-model="value"
+      v-bind="attributes"
+      @input="emit('input')"
+    />
+    <span :id="`${id}-unit`" class="unit">{{ unit }}</span>
+  </span>
   <input
     v-else
     ref="input"

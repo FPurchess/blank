@@ -65,10 +65,10 @@ describe("links", () => {
     await pressMod("k");
     await expect($("#link-dialog-url")).toHaveValue(BLANK);
     await expect($("#link-dialog-text")).toHaveValue("Blank");
-    // URL → Link Text → Save → Convert to Text
+    // URL → Link text → Convert to text, at the left of the buttons
     await type(Key.Tab);
     await type(Key.Tab);
-    await type(Key.Tab);
+    await expect($("button=Convert to text")).toBeFocused();
     await type(Key.Enter);
 
     await expect(dialog()).not.toBeExisting();

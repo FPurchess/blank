@@ -25,3 +25,5 @@ export { togglePageView } from "./pageView";
 export { showOutline } from "./outline";
 export { showWordCount } from "./wordCount";
 export { moveFocus } from "./focus";
+export { toggleFocusMode } from "./focusMode";
+export { openSettings } from "./settings";
