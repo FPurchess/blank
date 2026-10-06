@@ -1,5 +1,5 @@
 import { commandShortcut } from "../editor/keyBindings";
-import { BLEED, type FrameLayout, PROPERTIES_ROOM } from "../engine/frames";
+import { BLEED, type FrameLayout } from "../engine/frames";
 import {
   BAND,
   type Band,
@@ -53,21 +53,6 @@ export const endMark = <Slot>(
 // in "page ends" a frame shows some room beside the text
 const insetOf = (layout: FrameLayout) =>
   layout.mode === "pages" ? 0 : BLEED * layout.scale;
-
-/**
- * propertiesPlace returns where the line with the document's properties
- * goes: right above the first page's text and its header, as wide as it
- */
-export const propertiesPlace = (layout: FrameLayout) => {
-  const first = layout.frames[0];
-  if (!first) return null;
-  const inset = insetOf(layout);
-  return {
-    left: first.left + inset,
-    top: first.top - layout.headerRoom - PROPERTIES_ROOM - 4,
-    width: first.width - 2 * inset,
-  };
-};
 
 /**
  * firstHeaderPlace returns where the first page's header goes in "page

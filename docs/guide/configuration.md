@@ -106,7 +106,7 @@ Your own forms are form definitions, YAML files in the `forms` folder next to `b
   "layout": {
     "page": {
       "size": "a5",
-      "orientation": "portrait",
+      "orientation": "landscape",
       "margins": "2cm"
     }
   }

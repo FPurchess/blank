@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A row of a dialog's settings: its label on the left, with an optional
 // description below it, and its control on the right (the slot). Attributes
-// go on the row, e.g. the role of an OptionGroup.
+// go on the row, e.g. the role of an OptionGroup. A control that has a
+// description refers to it with aria-describedby="<id>-description".
 defineProps<{
   // the label's id, which names the control for screen readers
   id: string;

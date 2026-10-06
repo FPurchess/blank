@@ -6,7 +6,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../../config";
 import { allMargins, DEFAULT_PAGE } from "../../layout/settings";
-import { pageSetup } from "../../state";
+import { activeTabId, announcement, pageSetup } from "../../state";
 import { doc, docWithFrontmatter, p } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import pageSetupCommand, { openPageSetup } from "./pageSetup";
@@ -16,6 +16,8 @@ vi.mock("../../config", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../config")>()),
   saveDefaultPage,
 }));
+const changeTab = vi.hoisted(() => vi.fn());
+vi.mock("../tabs", () => ({ changeTab }));
 
 let view: EditorView;
 
@@ -38,11 +40,13 @@ const frontmatter = () => view.state.doc.attrs.frontmatter;
 describe("command.pageSetup", () => {
   beforeEach(() => {
     pageSetup.value = null;
+    announcement.value = null;
   });
 
   afterEach(() => {
     view?.destroy();
     pageSetup.value = null;
+    activeTabId.value = null;
   });
 
   it("opens the dialog with the document's page over the defaults", () => {
@@ -55,7 +59,7 @@ describe("command.pageSetup", () => {
       settings: { ...DEFAULT_PAGE, orientation: "landscape" },
       locale: "en-US",
       unit: "in",
-      frontmatter: "page:\n  orientation: landscape",
+      readable: true,
       warnings: [],
     });
   });
@@ -89,13 +93,18 @@ describe("command.pageSetup", () => {
   it("writes only what changed, as one undo step", () => {
     mount(docWithFrontmatter("title: Hi", p("text")));
     openPageSetup(view);
-    const { settings, apply } = request();
+    const opened = request();
 
-    apply({ ...settings, orientation: "landscape", margins: allMargins(72) });
+    opened.apply({
+      ...opened.settings,
+      orientation: "landscape",
+      margins: allMargins(72),
+    });
 
     expect(frontmatter()).toBe(
       "title: Hi\npage:\n  orientation: landscape\n  margins: 1in",
     );
+    expect(announcement.value?.text).toBe("Page setup applied");
     undo(view.state, view.dispatch);
     expect(frontmatter()).toBe("title: Hi");
   });
@@ -103,9 +112,9 @@ describe("command.pageSetup", () => {
   it("removes what is back to the default", () => {
     mount(docWithFrontmatter("page:\n  orientation: landscape", p("text")));
     openPageSetup(view);
-    const { settings, apply } = request();
+    const opened = request();
 
-    apply({ ...settings, orientation: "portrait" });
+    opened.apply({ ...opened.settings, orientation: "portrait" });
 
     expect(frontmatter()).toBeNull();
   });
@@ -114,39 +123,27 @@ describe("command.pageSetup", () => {
     mount(doc(p("text")));
     openPageSetup(view);
     const before = view.state;
-    const { settings, apply } = request();
+    const opened = request();
 
-    apply(settings);
+    opened.apply(opened.settings);
 
     expect(view.state).toBe(before);
+    // Apply still says it applied what the dialog shows
+    expect(announcement.value?.text).toBe("Page setup applied");
   });
 
-  describe("applyText", () => {
-    it("writes the frontmatter as typed", () => {
-      mount(docWithFrontmatter("title: Hi", p("text")));
-      openPageSetup(view);
+  it("tells the dialog when the frontmatter can't be read", () => {
+    mount(docWithFrontmatter("title: [oops", p("text")));
+    openPageSetup(view);
+    const opened = request();
 
-      expect(request().applyText("title: Bye\n# note\n\n")).toBeNull();
-      expect(frontmatter()).toBe("title: Bye\n# note");
-    });
-
-    it("removes the frontmatter when it is emptied", () => {
-      mount(docWithFrontmatter("title: Hi", p("text")));
-      openPageSetup(view);
-
-      expect(request().applyText("  \n")).toBeNull();
-      expect(frontmatter()).toBeNull();
-    });
-
-    it("refuses what can't be written", () => {
-      mount(docWithFrontmatter("title: Hi", p("text")));
-      openPageSetup(view);
-
-      expect(request().applyText("- a list")).toBe(
-        "The properties must be names with values, like title: My text",
-      );
-      expect(frontmatter()).toBe("title: Hi");
-    });
+    expect(opened.readable).toBe(false);
+    expect(opened.warnings).toEqual([
+      "Blank used the default page setup where the properties at the top of the file can't be read",
+    ]);
+    // the dialog doesn't offer Apply then, and nothing is lost if it's run
+    opened.apply({ ...opened.settings, orientation: "landscape" });
+    expect(frontmatter()).toBe("title: [oops");
   });
 
   describe("makeDefault", () => {
@@ -154,9 +151,9 @@ describe("command.pageSetup", () => {
       saveDefaultPage.mockResolvedValue(undefined);
       mount(docWithFrontmatter("title: Hi\npage:\n  size: a5", p("text")));
       openPageSetup(view);
-      const { settings, makeDefault } = request();
+      const opened = request();
 
-      makeDefault({ ...settings, orientation: "landscape" });
+      opened.makeDefault({ ...opened.settings, orientation: "landscape" });
       await flushPromises();
 
       expect(saveDefaultPage).toHaveBeenCalledWith(
@@ -165,8 +162,30 @@ describe("command.pageSetup", () => {
       );
       expect(frontmatter()).toBe("title: Hi");
       expect(sendNotification).toHaveBeenCalledWith(
-        "New documents and documents without their own page setup are laid out like this now",
+        "New documents are laid out like this now, and so are documents without their own page setup.",
       );
+      expect(changeTab).not.toHaveBeenCalled();
+    });
+
+    it("changes the tab it was opened for, even once another is shown", async () => {
+      saveDefaultPage.mockResolvedValue(undefined);
+      mount(docWithFrontmatter("title: Hi\npage:\n  size: a5", p("text")));
+      activeTabId.value = "first";
+      openPageSetup(view);
+      const opened = request();
+
+      opened.makeDefault(opened.settings);
+      // another tab is shown while the default is saved
+      activeTabId.value = "second";
+      await flushPromises();
+
+      expect(changeTab).toHaveBeenCalledWith("first", expect.any(Function));
+      // the view shows another document now, which stays as it is
+      expect(frontmatter()).toBe("title: Hi\npage:\n  size: a5");
+      // what it does to the tab's state: its own page setup goes
+      const [, change] = changeTab.mock.calls[0];
+      const tr = change(view.state);
+      expect(tr.doc.attrs.frontmatter).toBe("title: Hi");
     });
 
     it("saves what the dialog shows, and keeps the document's header", async () => {
@@ -178,9 +197,9 @@ describe("command.pageSetup", () => {
         ),
       );
       openPageSetup(view);
-      const { settings, makeDefault } = request();
+      const opened = request();
 
-      makeDefault(settings);
+      opened.makeDefault(opened.settings);
       await flushPromises();
 
       const [saved] = saveDefaultPage.mock.calls[0];
@@ -197,7 +216,8 @@ describe("command.pageSetup", () => {
       mount(docWithFrontmatter("page:\n  size: a5", p("text")));
       openPageSetup(view);
 
-      request().makeDefault(DEFAULT_PAGE);
+      const opened = request();
+      opened.makeDefault(DEFAULT_PAGE);
       await flushPromises();
 
       expect(frontmatter()).toBe("page:\n  size: a5");

@@ -9,7 +9,6 @@ import {
   firstHeaderPlace,
   lastFooterPlace,
   pageLabel,
-  propertiesPlace,
   sheetSlots,
 } from "./pageViewModel";
 
@@ -166,17 +165,6 @@ describe("sheetSlots", () => {
         top: expect.closeTo((800 - 36 - 8.8 * 1.3) * 2, 6),
       }),
     ]);
-  });
-});
-
-describe("propertiesPlace", () => {
-  it("puts the properties above the first page and its header", () => {
-    expect(propertiesPlace(pages)).toEqual({ left: 40, top: 68, width: 600 });
-    expect(propertiesPlace({ ...pageEnds, headerRoom: 20 })).toEqual({
-      left: 76,
-      top: 48,
-      width: 528,
-    });
   });
 });
 

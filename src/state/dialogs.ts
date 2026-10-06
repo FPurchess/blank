@@ -46,13 +46,12 @@ export interface PageSetupRequest {
   // the locale whose paper "auto" is, and the unit to show lengths in
   locale: string;
   unit: Unit;
-  // the document's frontmatter, for editing it as text
-  frontmatter: string | null;
+  // whether the document's frontmatter can be read, and so written into
+  readable: boolean;
   // what of the document's page setup can't be used
   warnings: string[];
+  // writes the settings into the document as one undo step
   apply(settings: PageSettings): void;
-  // returns what is wrong with the frontmatter, or null once it is applied
-  applyText(frontmatter: string): string | null;
   // makes the settings the user's default for documents without their own
   makeDefault(settings: PageSettings): void;
   cancel(): void;

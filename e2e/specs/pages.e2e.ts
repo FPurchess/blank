@@ -16,6 +16,8 @@ import {
 
 const checked = (row: string) =>
   $(`#page-setup [data-row="${row}"] [aria-checked="true"]`);
+// the paper's list, which shows the paper chosen
+const paper = () => $("#page-setup-paper");
 
 describe("page setup", () => {
   let fixtureDir: string;
@@ -38,14 +40,11 @@ describe("page setup", () => {
     await pressMod(Key.Alt, "u");
 
     await expect($("#page-setup")).toBeDisplayed();
-    await expect(checked("paper")).toHaveText(
-      expect.stringContaining("(your region)"),
-    );
-    await expect(checked("paper")).toBeFocused();
+    await expect(paper()).toHaveText(expect.stringContaining("(your region)"));
+    await expect(paper()).toBeFocused();
     await expect(checked("orientation")).toHaveText("Portrait");
     await expect(checked("margins")).toHaveText("Normal");
-    // what "Custom…" and "Edit as text" show stays hidden until then
-    await expect($("#page-setup-text")).not.toBeDisplayed();
+    // what "Custom…" shows stays hidden until then
     await expect($("#page-setup-margins-top")).not.toBeDisplayed();
   });
 
@@ -60,10 +59,9 @@ describe("page setup", () => {
 
     await expect($("#page-setup")).not.toExist();
     await expect($("#ui-page")).toHaveText(
-      expect.stringMatching(/\(landscape\)$/),
+      expect.stringMatching(/ landscape$/),
     );
-    // the page setup stays out of the way of the text
-    await expect($("#editor .doc-properties")).not.toExist();
+    await expect($("#ui-announcement")).toHaveText("Page setup applied");
 
     await pressMod("s");
     await browser.waitUntil(
@@ -80,7 +78,7 @@ describe("page setup", () => {
     await pressMod("z");
 
     await expect($("#ui-page")).toHaveText(
-      expect.stringMatching(/\(portrait\)$/),
+      expect.stringMatching(/^(A4|Letter)$/),
     );
   });
 
@@ -117,7 +115,11 @@ describe("page setup", () => {
     }
     await browser.keys(Key.ArrowRight);
     await browser.keys(Key.Space);
-    await expect($(`${headings}[aria-pressed="true"]`)).toHaveText("Heading 2");
+    await expect($(`${headings}[aria-pressed="true"]`)).toHaveText("H2");
+    await expect($(`${headings}[aria-pressed="true"]`)).toHaveAttribute(
+      "data-tip",
+      "Heading 2",
+    );
     await browser.keys(Key.Enter);
 
     await expect($("#page-setup")).not.toExist();
@@ -156,7 +158,7 @@ describe("page setup", () => {
 
   it("shows the paper in the bottom bar, which opens the page setup", async () => {
     await expect($("#ui-page")).toHaveText(
-      expect.stringMatching(/^(A4|Letter) \(portrait\)$/),
+      expect.stringMatching(/^(A4|Letter)$/),
     );
 
     await $("#ui-page").click();

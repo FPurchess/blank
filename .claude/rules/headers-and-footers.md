@@ -29,7 +29,7 @@ paths:
   - `number-style`: `1`, `i` or `I`
   - `start-number`
   
-  `BAND_KEYS`/`bandSettings` are these keys; the page setup dialog keeps them as they are, and **Make This My Default** saves only the dialog's keys.
+  `BAND_KEYS`/`bandSettings` are these keys; the page setup dialog keeps them as they are, and **Make this my default** saves only the dialog's keys.
 - The slots hold plain text with the fields of `src/layout/tokens.ts` (`{page}`, `{pages}`, `{title}`, `{author}`, `{chapter}`, `{date}`, `{file}`; `{{` for a brace). There is no formatting, on purpose.
 - `src/layout/bands.ts` is what both exporters share:
   - the band's size and distance from the edge (`BAND`, `BAND_ROOM`)

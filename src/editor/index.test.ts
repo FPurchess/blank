@@ -129,8 +129,8 @@ describe("bootEditor", () => {
 
     handle.run(openPageSetup());
 
-    // the welcome document has no frontmatter
-    expect(pageSetup.value).toMatchObject({ frontmatter: null });
+    // the welcome document has no frontmatter, so nothing of its own
+    expect(pageSetup.value).toMatchObject({ readable: true, warnings: [] });
     pageSetup.value = null;
   });
 

@@ -67,6 +67,8 @@ describe("tabs", () => {
 
     expect(await tabLabels()).toEqual(["Welcome", "two"]);
     expect(fs.readFileSync(path.join(dir, "one.md"), "utf8")).toBe("# One\n");
+    // the text of the tab shown now has the focus, so typing goes on there
+    await expect($("#editor")).toBeFocused();
   });
 
   it("reopens the tab closed last", async () => {

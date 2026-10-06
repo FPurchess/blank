@@ -40,13 +40,12 @@ describe("frontmatter", () => {
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   });
 
-  it("shows the properties above the text instead of the YAML", async () => {
-    await expectEditorText(
-      "#editor .doc-properties",
-      "The Lighthouse · by Ada, Grace · tags",
-    );
+  it("keeps the YAML out of the text", async () => {
     await expectEditorText("#editor h1", "Chapter");
     await expect($("#editor hr")).not.toExist();
+    await expect(
+      browser.execute(() => document.querySelector("#editor")?.textContent),
+    ).resolves.not.toContain("Lighthouse");
   });
 
   it("saves the frontmatter unchanged", async () => {
@@ -100,9 +99,17 @@ describe("frontmatter", () => {
     );
     await restartApp();
 
-    await expectEditorText(
-      "#editor .doc-properties",
-      "The Lighthouse · by Ada, Grace · tags",
+    // saved again, over a file changed meanwhile, it writes the frontmatter
+    // it came back with (typing would let autocorrect change the text)
+    fs.writeFileSync(fixturePath, "changed");
+    await clickInto("#editor p");
+    await pressMod("s");
+    const expected = `${FRONTMATTER}\n\n# Chapter\n\nText. more`;
+    await browser.waitUntil(
+      () => fs.readFileSync(fixturePath, "utf8") === expected,
+      {
+        timeoutMsg: `the file has not been saved, it contains: ${fs.readFileSync(fixturePath, "utf8")}`,
+      },
     );
   });
 });

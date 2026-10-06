@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import type { Node } from "prosemirror-model";
-import type { EditorState } from "prosemirror-state";
+import type { EditorState, Transaction } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { onScopeDispose, type Ref, watch } from "vue";
 
@@ -29,6 +29,7 @@ import {
   tabLabel,
   tabs,
   tabSwitch,
+  uiTakesFocus,
   unsavedDialog,
   updateTab,
 } from "../state";
@@ -356,6 +357,30 @@ const switchTo = async (id: string) => {
 };
 
 /**
+ * changeTab applies what `change` makes of the state of the tab `id`: in the
+ * view while it is shown, otherwise to the state it keeps, which is stored
+ * and undone like any change once it is shown. A closed tab is left alone.
+ * It waits for the tab changes asked for before, e.g. a switch.
+ */
+export const changeTab = (
+  id: string,
+  change: (state: EditorState) => Transaction | null,
+) =>
+  enqueue(async () => {
+    if (id === activeTabId.value && view) {
+      const tr = change(view.state);
+      if (tr) view.dispatch(tr);
+      return;
+    }
+    const kept = documents.get(id);
+    const tr = kept && change(kept.state);
+    if (!kept || !tr) return;
+    kept.state = kept.state.apply(tr);
+    storeDocument(id, kept.state.doc);
+    refresh(id);
+  });
+
+/**
  * activateTab shows the tab `id`
  */
 export const activateTab = (id: string) => {
@@ -489,15 +514,21 @@ export const openPaths = (files: string[]) =>
   enqueue(() => openPathsNow(files));
 
 /**
- * askToSave asks whether to save the changes of `tab` before it closes
+ * askToSave asks whether to save the changes of `tab` before it closes. The
+ * answer gives the text the focus back, which the question took and which
+ * would go with its dialog, unless another part of the UI holds it then.
  */
 const askToSave = (tab: Tab) =>
   new Promise<"save" | "discard" | "cancel">((resolve) => {
+    const answer = (choice: "save" | "discard" | "cancel") => () => {
+      if (!uiTakesFocus.value) view?.focus();
+      resolve(choice);
+    };
     unsavedDialog.value = {
       label: tabLabel(tab),
-      save: () => resolve("save"),
-      discard: () => resolve("discard"),
-      cancel: () => resolve("cancel"),
+      save: answer("save"),
+      discard: answer("discard"),
+      cancel: answer("cancel"),
     };
   });
 

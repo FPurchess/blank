@@ -104,7 +104,7 @@ const text = (value: unknown): string | undefined => {
 /**
  * propertiesOf returns the title and author among the keys of the frontmatter
  */
-export const propertiesOf = (data: Data): DocumentProperties => {
+const propertiesOf = (data: Data): DocumentProperties => {
   const title = text(data.title);
   const author = text(data.author);
   return { ...(title ? { title } : {}), ...(author ? { author } : {}) };
@@ -118,25 +118,6 @@ export const propertiesOf = (data: Data): DocumentProperties => {
 export const readProperties = (
   frontmatter: string | null,
 ): DocumentProperties => propertiesOf(readFrontmatter(frontmatter) ?? {});
-
-/**
- * frontmatterError checks frontmatter typed by the user
- * @param yaml the frontmatter, without the `---` lines around it
- * @returns what is wrong with it, or null if it can be written
- */
-export const frontmatterError = (yaml: string): string | null => {
-  // the file would end the frontmatter there
-  if (/^(---|\.\.\.)\s*$/m.test(yaml)) {
-    return "A line with only --- or ... would end the properties";
-  }
-  const document = parseDocument(yaml);
-  const [error] = document.errors;
-  if (error) return error.message.split("\n")[0];
-  const { contents } = document;
-  return contents === null || isMap(contents)
-    ? null
-    : "The properties must be names with values, like title: My text";
-};
 
 /**
  * updateFrontmatter changes the frontmatter as a YAML document, which keeps

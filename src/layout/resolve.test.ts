@@ -5,6 +5,7 @@ import {
   layoutOf,
   leavesRoom,
   pageGeometry,
+  paperLeavesRoom,
   resolveLayout,
 } from "./resolve";
 import {
@@ -156,6 +157,16 @@ describe("leavesRoom", () => {
     // A5 is 14.8 cm wide
     expect(leavesRoom(a5(cm(12.3)))).toBe(true);
     expect(leavesRoom(a5(cm(12.4)))).toBe(false);
+  });
+});
+
+describe("paperLeavesRoom", () => {
+  it("wants 2.5 cm of paper both ways, whatever the margins", () => {
+    const paper = (width: number) =>
+      layoutOf({ ...DEFAULT_PAGE, size: { width, height: cm(10) } }, "de-DE");
+    expect(paperLeavesRoom(paper(cm(2.5)))).toBe(true);
+    expect(leavesRoom(paper(cm(2.5)))).toBe(false);
+    expect(paperLeavesRoom(paper(cm(2.4)))).toBe(false);
   });
 });
 

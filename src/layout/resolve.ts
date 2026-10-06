@@ -1,6 +1,7 @@
 import { readFrontmatter } from "../markdown";
 import { localePaper, matchPaper, type PaperName, systemLocale } from "./paper";
 import {
+  allMargins,
   PAGE_KEYS,
   type PageKey,
   type PageSettings,
@@ -84,6 +85,13 @@ export const leavesRoom = (layout: Layout) => {
   const { contentWidth, contentHeight } = pageGeometry(layout);
   return Math.min(contentWidth, contentHeight) >= MIN_CONTENT;
 };
+
+/**
+ * paperLeavesRoom checks that the paper itself is large enough for the text,
+ * whatever its margins
+ */
+export const paperLeavesRoom = (layout: Layout) =>
+  leavesRoom({ ...layout, margins: allMargins(0) });
 
 /**
  * differences returns the settings in which two page setups print

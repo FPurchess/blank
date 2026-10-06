@@ -46,7 +46,6 @@ import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
-import PageProperties from "./PageProperties.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
 import {
   anchorTop,
@@ -733,7 +732,6 @@ onUnmounted(() => {
       />
       <PageEdgeBand band="header" :layout="layout" />
       <PageEdgeBand band="footer" :layout="layout" />
-      <PageProperties :layout="layout" />
     </div>
   </div>
 </template>

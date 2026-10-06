@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describePageSize, describePaper, layoutWarnings } from "./describe";
+import { describePaper, layoutWarnings } from "./describe";
 import { layoutOf } from "./resolve";
 import { DEFAULT_PAGE, type PageSettings } from "./settings";
 import { cm } from "../test/layout";
@@ -22,29 +22,6 @@ describe("describePaper", () => {
     expect(describe_({ size: { width: 432, height: 648 } }, "in")).toBe(
       "6 × 9 in",
     );
-  });
-});
-
-describe("describePageSize", () => {
-  it.each([
-    [{}, "cm", "A4 (portrait)"],
-    [
-      { size: "letter" as const, orientation: "landscape" as const },
-      "in",
-      "Letter (landscape)",
-    ],
-    [
-      { size: { width: cm(17), height: cm(24) } },
-      "cm",
-      "170 × 240 mm (portrait)",
-    ],
-  ] as const)("names %j with its orientation", (settings, unit, name) => {
-    expect(
-      describePageSize(
-        layoutOf({ ...DEFAULT_PAGE, ...settings }, "de-DE"),
-        unit,
-      ),
-    ).toBe(name);
   });
 });
 

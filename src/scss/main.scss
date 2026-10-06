@@ -50,20 +50,6 @@ body {
     margin-top: 0;
   }
 
-  // the summary of the frontmatter, see src/editor/plugins/properties.ts
-  .doc-properties {
-    font-size: 0.8em;
-    line-height: 1.4;
-    opacity: 0.55;
-    margin-bottom: 1.5em;
-    cursor: pointer;
-    user-select: none;
-
-    & + * {
-      margin-top: 0;
-    }
-  }
-
   code,
   pre {
     white-space: pre-wrap;
@@ -203,6 +189,11 @@ body {
   border-radius: var(--r-dialog);
   box-shadow: 0 24px 64px var(--popover-shadow);
 
+  // the rules below set a display, which would show what is hidden
+  [hidden] {
+    display: none !important;
+  }
+
   .dialog-head {
     padding: var(--s3) var(--s5);
     border-bottom: 1px solid var(--line);
@@ -248,14 +239,10 @@ body {
     color: var(--muted);
   }
 
-  input,
-  textarea {
-    @include field;
-    font: inherit;
-  }
-
   input {
+    @include field;
     margin-bottom: 6px;
+    font: inherit;
   }
 
   p {
@@ -312,7 +299,6 @@ body {
 
   // a value that can't be used, see TextField's `errorId`
   input[aria-invalid="true"],
-  textarea[aria-invalid="true"],
   .field:has([aria-invalid="true"]) {
     border-color: var(--spelling-color);
   }
@@ -363,66 +349,86 @@ body {
   }
 }
 
-// the page setup dialog, see src/ui/PageSetupDialog.vue
+// the page setup dialog, see src/ui/PageSetupDialog.vue: the rows, and a
+// picture of the page on the desk at their right
 .dialog.page-setup {
-  max-width: min(640px, calc(100% - 32px));
+  width: min(620px, calc(100% - 32px));
 
-  // the rules below set a display, which would show what is hidden
-  [hidden] {
-    display: none !important;
+  .dialog-body {
+    padding: 0;
   }
 
-  .body {
+  .layout {
     display: flex;
-    gap: 20px;
-    align-items: flex-start;
+    min-height: 0;
   }
 
-  .settings,
-  .text-editor {
+  .main {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 10px;
+    min-width: 0;
+    padding: var(--s2) var(--s5) var(--s4);
+  }
+
+  .settings {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
   }
 
+  // the custom size or margins, below their row
   .custom {
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--s2) var(--s3);
+    padding: var(--s2) 0 var(--s3);
+    border-bottom: 1px solid var(--line);
 
     > div {
       display: flex;
-      flex: 1;
       flex-direction: column;
+      gap: 4px;
       min-width: 0;
     }
 
-    input {
-      width: 100%;
-      box-sizing: border-box;
+    label {
+      font-size: var(--ui-small);
+    }
+
+    .field {
+      margin: 0;
     }
   }
 
-  textarea {
-    min-height: 12em;
-    padding: 6px 8px;
-    font-family: monospace;
-    font-size: 0.9rem;
-    color: inherit;
-    background: transparent;
-    border: 1px solid var(--color);
-    border-radius: 3px;
-    resize: vertical;
+  // the four margins on one line
+  .custom[data-fields="margins"] {
+    grid-template-columns: repeat(4, 1fr);
   }
 
+  // H1 to H6, as wide as the draft's toggles
+  [data-row="newPageBefore"] .options button {
+    min-width: 32px;
+  }
+
+  .note {
+    margin: var(--s3) 0 0;
+    font-size: var(--ui-small);
+  }
+
+  // the picture of the page on the desk, hidden where the window is narrow
   .thumbnail {
     display: flex;
+    flex: none;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    width: 140px;
-    margin: 18px 0 0;
+    gap: var(--s2);
+    width: 168px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: var(--s5) var(--s4);
+    background: var(--desk-color);
+    border-left: 1px solid var(--line);
 
     // holds the SVG, which lays out as if it were the figure's own child
     .picture {
@@ -431,63 +437,43 @@ body {
 
     .paper {
       fill: var(--background-color);
-      stroke: var(--color);
+      stroke: var(--line-strong);
     }
 
     .margins {
       fill: none;
-      stroke: var(--color);
+      stroke: var(--line-strong);
       stroke-dasharray: 2 2;
-      opacity: 0.35;
     }
 
     .text line {
-      stroke: var(--color);
+      stroke: var(--line-strong);
       stroke-width: 1.5;
-      opacity: 0.3;
     }
 
     // the header and footer, as they read on the page
     .band {
-      fill: var(--color);
-      opacity: 0.8;
+      fill: var(--muted);
     }
 
+    // in ink: --muted is the paper's here, which isn't made for the desk
     figcaption {
-      font-size: 0.8rem;
-      opacity: 0.7;
+      font-size: var(--ui-small);
+    }
+
+    @media (max-width: 640px) {
+      display: none;
     }
   }
 
-  .error,
-  .warning {
-    opacity: 1;
+  .warning p,
+  .error p {
+    margin: var(--s2) 0 0;
+    font-size: var(--ui-small);
   }
 
-  .hint {
-    margin-top: 6px;
-  }
-
-  .actions {
-    flex-wrap: wrap;
-
-    // "Edit as text" on the left, away from Apply
-    button:first-child {
-      margin-right: auto;
-    }
-  }
-
-  // small windows put the picture above the rows
-  @media (max-width: 560px) {
-    .body {
-      flex-direction: column-reverse;
-      align-items: stretch;
-    }
-
-    .thumbnail {
-      width: auto;
-      margin: 0;
-    }
+  .error p {
+    color: var(--spelling-color);
   }
 }
 
@@ -2016,18 +2002,6 @@ body.without-engine.blocks-docked {
 #page-view.follow-links .page-frame,
 #page-view.on-picture,
 #page-view.on-picture .page-frame {
-  cursor: pointer;
-}
-
-// the line with the document's properties above the first page
-#page-view .doc-properties {
-  position: absolute;
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 1.4;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  opacity: 0.55;
   cursor: pointer;
 }
 

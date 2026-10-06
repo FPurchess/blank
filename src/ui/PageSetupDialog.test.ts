@@ -6,13 +6,16 @@ import {
   DEFAULT_PAGE,
   type PageSettings,
 } from "../layout/settings";
-import { pageSetup, type PageSetupRequest } from "../state";
+import { contextMenu, pageSetup, type PageSetupRequest } from "../state";
 import { createTestHandle } from "../test/editor";
 import { cm, mm } from "../test/layout";
 import { bootApp } from "./mount";
 
 let dispose = () => {};
-afterEach(() => dispose());
+afterEach(() => {
+  dispose();
+  contextMenu.value = null;
+});
 
 const dialog = () => document.querySelector<HTMLElement>("#page-setup");
 const form = () => dialog()?.querySelector("form") as HTMLFormElement;
@@ -33,16 +36,29 @@ const button = (label: string) =>
     (b) => b.textContent?.trim() === label,
   )!;
 const errors = () => document.querySelector<HTMLElement>("#page-setup-errors")!;
+const errorTexts = () =>
+  [...errors().querySelectorAll("p")].map((p) => p.textContent?.trim());
+const caption = () =>
+  dialog()!.querySelector("figcaption")?.textContent?.trim();
+
+// the paper's list, and what it shows
+const paper = () => input("paper") as unknown as HTMLButtonElement;
+const paperText = () => paper().querySelector(".text")?.textContent?.trim();
+const menuItem = (id: string) =>
+  document.querySelector<HTMLElement>(`.context-menu [data-id="${id}"]`);
+const choosePaper = async (id: string) => {
+  await click(paper());
+  await click(menuItem(id)!);
+};
 
 const openDialog = async (request: Partial<PageSetupRequest> = {}) => {
   const full: PageSetupRequest = {
     settings: DEFAULT_PAGE,
     locale: "de-DE",
     unit: "cm",
-    frontmatter: null,
+    readable: true,
     warnings: [],
     apply: vi.fn(),
-    applyText: vi.fn(() => null),
     makeDefault: vi.fn(),
     cancel: vi.fn(),
     ...request,
@@ -52,11 +68,12 @@ const openDialog = async (request: Partial<PageSetupRequest> = {}) => {
   return full;
 };
 
-const keydown = async (key: string) => {
+const keydown = async (key: string, init: KeyboardEventInit = {}) => {
   const event = new KeyboardEvent("keydown", {
     key,
     bubbles: true,
     cancelable: true,
+    ...init,
   });
   (document.activeElement ?? form()).dispatchEvent(event);
   await nextTick();
@@ -83,6 +100,7 @@ describe("pageSetup dialog", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     pageSetup.value = null;
+    contextMenu.value = null;
     dispose = bootApp(createTestHandle());
   });
 
@@ -93,15 +111,17 @@ describe("pageSetup dialog", () => {
   it("shows the document's page and focuses the paper", async () => {
     await openDialog();
 
-    expect(checked("paper").textContent?.trim()).toBe("A4 (your region)");
+    expect(paperText()).toBe("A4 (your region)");
+    expect(paper().getAttribute("aria-label")).toBe("Paper: A4 (your region)");
     expect(checked("orientation").textContent?.trim()).toBe("Portrait");
     expect(checked("margins").textContent?.trim()).toBe("Normal");
-    expect(document.activeElement).toBe(checked("paper"));
-    expect(dialog()!.querySelector("figcaption")?.textContent?.trim()).toBe(
-      "A4",
-    );
+    expect(document.activeElement).toBe(paper());
+    expect(caption()).toBe("A4");
     expect(fields("paper").hidden).toBe(true);
     expect(fields("margins").hidden).toBe(true);
+    expect(dialog()!.querySelector(".note")?.textContent?.trim()).toBe(
+      "Kept in this document. Headers and footers are set on the pages.",
+    );
   });
 
   it("keeps only the checked option of a row in the tab order", async () => {
@@ -113,6 +133,105 @@ describe("pageSetup dialog", () => {
     expect(tabbable).toEqual([-1, 0, -1, -1]);
   });
 
+  describe("the paper's list", () => {
+    it("lists the paper of the region first, the chosen one checked", async () => {
+      await openDialog();
+
+      await click(paper());
+
+      const items = [
+        ...document.querySelectorAll<HTMLElement>(".context-menu [data-id]"),
+      ];
+      expect(items.map((item) => item.textContent?.trim())).toEqual([
+        "✓A4 (your region)",
+        "A3",
+        "A5",
+        "B5",
+        "Letter",
+        "Legal",
+        "Custom…",
+      ]);
+      expect(menuItem("auto")?.getAttribute("aria-checked")).toBe("true");
+      expect(paper().getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("chooses a paper, and gives the list the focus back", async () => {
+      const request = await openDialog();
+
+      await choosePaper("a5");
+
+      expect(paperText()).toBe("A5");
+      expect(caption()).toBe("A5");
+      expect(document.activeElement).toBe(paper());
+      await submit();
+      expect(request.apply).toHaveBeenCalledWith({
+        ...DEFAULT_PAGE,
+        size: "a5",
+      });
+    });
+
+    it("starts a custom size from the paper chosen, and focuses it", async () => {
+      await openDialog({
+        settings: { ...DEFAULT_PAGE, orientation: "landscape" },
+      });
+
+      await choosePaper("custom");
+      await nextTick();
+
+      expect(fields("paper").hidden).toBe(false);
+      expect(input("paper-width").value).toBe("297");
+      expect(input("paper-height").value).toBe("210");
+      expect(document.activeElement).toBe(input("paper-width"));
+    });
+
+    it("leaves ↑↓ to the rows, and opens with Alt+↓", async () => {
+      await openDialog();
+
+      const down = await keydown("ArrowDown");
+      expect(down.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(checked("orientation"));
+      expect(contextMenu.value).toBeNull();
+
+      await keydown("ArrowUp");
+      expect(document.activeElement).toBe(paper());
+      await keydown("ArrowDown", { altKey: true });
+      expect(contextMenu.value).not.toBeNull();
+    });
+
+    it("never applies with Enter, which opens it", async () => {
+      const request = await openDialog();
+
+      const enter = await keydown("Enter");
+
+      expect(enter.defaultPrevented).toBe(false);
+      expect(request.apply).not.toHaveBeenCalled();
+      expect(dialog()).not.toBeNull();
+    });
+
+    it("steps through the papers with ←→, stopping at the ends", async () => {
+      await openDialog();
+
+      await keydown("ArrowRight");
+      expect(paperText()).toBe("A3");
+      await keydown("ArrowLeft");
+      await keydown("ArrowLeft");
+      expect(paperText()).toBe("A4 (your region)");
+    });
+
+    it("keeps the focus on the list when the arrows reach Custom…", async () => {
+      await openDialog();
+
+      for (let step = 0; step < 6; step++) await keydown("ArrowRight");
+      await nextTick();
+
+      expect(paperText()).toBe("Custom…");
+      expect(fields("paper").hidden).toBe(false);
+      expect(document.activeElement).toBe(paper());
+      await keydown("ArrowLeft");
+      expect(paperText()).toBe("Legal");
+    });
+  });
+
   it("changes a row with ←→ and moves between rows with ↑↓", async () => {
     await openDialog();
 
@@ -121,15 +240,11 @@ describe("pageSetup dialog", () => {
     await keydown("ArrowRight");
     expect(checked("orientation").textContent?.trim()).toBe("Landscape");
     expect(document.activeElement).toBe(checked("orientation"));
-    expect(dialog()!.querySelector("figcaption")?.textContent?.trim()).toBe(
-      "A4 landscape",
-    );
+    expect(caption()).toBe("A4 landscape");
     await keydown("ArrowRight");
     expect(checked("orientation").textContent?.trim()).toBe("Portrait");
     await keydown("ArrowUp");
-    expect(document.activeElement).toBe(checked("paper"));
-    await keydown("End");
-    expect(checked("paper").textContent?.trim()).toBe("Custom…");
+    expect(document.activeElement).toBe(paper());
   });
 
   it("applies the chosen settings with Enter", async () => {
@@ -179,20 +294,121 @@ describe("pageSetup dialog", () => {
   it("explains what can't be used and doesn't apply it", async () => {
     const request = await openDialog();
 
-    await click(option("paper", "Custom…"));
+    await choosePaper("custom");
     await type("paper-width", "wide");
 
-    expect(errors().hidden).toBe(false);
-    expect(errors().textContent?.trim()).toBe(
-      "Enter the width and height, e.g. 17 and 24",
-    );
+    expect(errors().getAttribute("aria-live")).toBe("polite");
+    expect(errorTexts()).toEqual([
+      "Enter the width and height, e.g. 170 and 240.",
+    ]);
     expect(button("Apply").disabled).toBe(true);
     await submit();
     expect(request.apply).not.toHaveBeenCalled();
 
-    await type("paper-width", "17");
-    expect(errors().hidden).toBe(true);
+    await type("paper-width", "170");
+    // the live region stays, empty
+    expect(errors().hidden).toBe(false);
+    expect(errorTexts()).toEqual([]);
     expect(button("Apply").disabled).toBe(false);
+  });
+
+  it("links the fields to what is wrong with them", async () => {
+    await openDialog();
+    await choosePaper("custom");
+    expect(input("paper-width").hasAttribute("aria-invalid")).toBe(false);
+
+    await type("paper-width", "wide");
+
+    const width = input("paper-width");
+    expect(width.getAttribute("aria-invalid")).toBe("true");
+    const described = width.getAttribute("aria-describedby")!.split(" ");
+    expect(described).toContain("page-setup-error-paper");
+    expect(document.getElementById("page-setup-error-paper")?.textContent).toBe(
+      "Enter the width and height, e.g. 170 and 240.",
+    );
+    // the margins are fine
+    expect(input("margins-top").hasAttribute("aria-invalid")).toBe(false);
+  });
+
+  it("links what is wrong with the margins to their row while a preset is chosen", async () => {
+    await openDialog();
+    await choosePaper("custom");
+    await type("paper-width", "90");
+    await type("paper-height", "90");
+    await click(option("margins", "Wide"));
+
+    expect(errorTexts()).toEqual(["The margins leave no room for the text."]);
+    expect(row("margins").getAttribute("aria-invalid")).toBe("true");
+    expect(row("margins").getAttribute("aria-describedby")).toBe(
+      "page-setup-error-margins",
+    );
+
+    // the custom margins it opened with (2.5 cm) leave room, and the fields
+    // describe the margins from then on
+    await click(option("margins", "Custom…"));
+    expect(errorTexts()).toEqual([]);
+    expect(row("margins").hasAttribute("aria-describedby")).toBe(false);
+    await type("margins-left", "7");
+    expect(input("margins-top").getAttribute("aria-invalid")).toBe("true");
+    expect(row("margins").hasAttribute("aria-invalid")).toBe(false);
+  });
+
+  it("leaves Shift+↑↓ to a field, to select in it", async () => {
+    await openDialog();
+    await click(option("margins", "Custom…"));
+    input("margins-top").focus();
+
+    const shifted = await keydown("ArrowDown", { shiftKey: true });
+
+    expect(shifted.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(input("margins-top"));
+  });
+
+  it("says when the paper is too small for the text", async () => {
+    await openDialog();
+    await choosePaper("custom");
+
+    await type("paper-width", "20");
+
+    expect(errorTexts()).toEqual(["The paper is too small for the text."]);
+  });
+
+  it("measures custom paper in millimeters and margins in the region's unit", async () => {
+    await openDialog();
+    await choosePaper("custom");
+
+    const unit = (id: string) =>
+      document.getElementById(`page-setup-${id}-unit`)?.textContent;
+    expect(unit("paper-width")).toBe("mm");
+    expect(unit("margins-top")).toBe("cm");
+    expect(
+      input("paper-width").getAttribute("aria-describedby")?.split(" "),
+    ).toContain("page-setup-paper-width-unit");
+  });
+
+  it("turns a custom size wider than high landscape, and back", async () => {
+    const request = await openDialog();
+    await choosePaper("custom");
+
+    await type("paper-width", "300");
+    expect(checked("orientation").textContent?.trim()).toBe("Landscape");
+    // the stop of the row follows what it shows
+    expect(checked("orientation").tabIndex).toBe(0);
+    // kept as its portrait size, turned
+    expect(caption()).toBe("297 × 300 mm landscape");
+
+    // turning it swaps the size
+    await click(option("orientation", "Portrait"));
+    expect(input("paper-width").value).toBe("297");
+    expect(input("paper-height").value).toBe("300");
+
+    await submit();
+    expect(request.apply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        size: { width: mm(297), height: mm(300) },
+        orientation: "portrait",
+      }),
+    );
   });
 
   it("shows lengths in the unit of the region", async () => {
@@ -202,14 +418,17 @@ describe("pageSetup dialog", () => {
       unit: "in",
     });
 
-    expect(checked("paper").textContent?.trim()).toBe("Letter (your region)");
+    expect(paperText()).toBe("Letter (your region)");
     expect(checked("margins").textContent?.trim()).toBe("Custom…");
     expect(input("margins-top").value).toBe("0.5");
     expect(
       document
         .querySelector('label[for="page-setup-margins-top"]')
         ?.textContent?.trim(),
-    ).toBe("Top (in)");
+    ).toBe("Top");
+    expect(
+      document.getElementById("page-setup-margins-top-unit")?.textContent,
+    ).toBe("in");
   });
 
   describe("new page before", () => {
@@ -221,18 +440,21 @@ describe("pageSetup dialog", () => {
         .filter((button) => button.getAttribute("aria-pressed") === "true")
         .map((button) => button.textContent?.trim());
 
-    it("offers every heading level, none pressed by default", async () => {
+    it("offers every heading level, short, none pressed by default", async () => {
       await openDialog();
 
       expect(row("newPageBefore").getAttribute("role")).toBe("group");
       expect(toggles().map((button) => button.textContent?.trim())).toEqual([
-        "Heading 1",
-        "Heading 2",
-        "Heading 3",
-        "Heading 4",
-        "Heading 5",
-        "Heading 6",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5",
+        "H6",
       ]);
+      // named by what they show, as voice control finds them
+      expect(toggles()[0].hasAttribute("aria-label")).toBe(false);
+      expect(toggles()[0].dataset.tip).toBe("Heading 1");
       expect(pressed()).toEqual([]);
     });
 
@@ -240,11 +462,11 @@ describe("pageSetup dialog", () => {
       const request = await openDialog({
         settings: { ...DEFAULT_PAGE, newPageBefore: [2] },
       });
-      expect(pressed()).toEqual(["Heading 2"]);
+      expect(pressed()).toEqual(["H2"]);
 
-      await click(option("newPageBefore", "Heading 1"));
-      await click(option("newPageBefore", "Heading 2"));
-      await click(option("newPageBefore", "Heading 3"));
+      await click(option("newPageBefore", "H1"));
+      await click(option("newPageBefore", "H2"));
+      await click(option("newPageBefore", "H3"));
       await click(button("Apply"));
 
       expect(request.apply).toHaveBeenCalledWith({
@@ -274,7 +496,7 @@ describe("pageSetup dialog", () => {
   it("makes the settings the default", async () => {
     const request = await openDialog();
 
-    await click(option("paper", "A5"));
+    await choosePaper("a5");
     await click(button("Make this my default"));
 
     expect(request.makeDefault).toHaveBeenCalledWith({
@@ -284,16 +506,58 @@ describe("pageSetup dialog", () => {
     expect(dialog()).toBeNull();
   });
 
-  it("shows what of the document's page setup can't be used", async () => {
+  it("offers nothing to apply while the frontmatter can't be read", async () => {
+    const request = await openDialog({ readable: false });
+
+    expect(errorTexts()).toEqual([
+      "The properties at the top of the file can't be read, so the page setup can't be written into them.",
+    ]);
+    expect(button("Apply").disabled).toBe(true);
+    expect(button("Make this my default").disabled).toBe(true);
+    await submit();
+    expect(request.apply).not.toHaveBeenCalled();
+    expect(dialog()).not.toBeNull();
+  });
+
+  it("shows what of the document's page setup can't be used, as sentences", async () => {
     await openDialog({
-      warnings: ["Blank used the default page setup where x"],
+      warnings: [
+        "Blank used the default page setup where x",
+        "The top margin is small for the header",
+      ],
     });
 
     const warning = dialog()!.querySelector<HTMLElement>(".warning")!;
     expect(warning.hidden).toBe(false);
-    expect(warning.textContent?.trim()).toBe(
-      "Blank used the default page setup where x",
-    );
+    expect(
+      [...warning.querySelectorAll("p")].map((p) => p.textContent?.trim()),
+    ).toEqual([
+      "Blank used the default page setup where x.",
+      "The top margin is small for the header.",
+    ]);
+    // read out with the title
+    expect(form().getAttribute("aria-describedby")).toBe(warning.id);
+  });
+
+  it("hides the warning line without warnings", async () => {
+    await openDialog();
+
+    expect(dialog()!.querySelector<HTMLElement>(".warning")!.hidden).toBe(true);
+    expect(form().hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("shows each error on a line of its own", async () => {
+    await openDialog();
+
+    await choosePaper("custom");
+    await type("paper-width", "wide");
+    await click(option("margins", "Custom…"));
+    await type("margins-top", "much");
+
+    expect(errorTexts()).toEqual([
+      "Enter the width and height, e.g. 170 and 240.",
+      "Enter each margin as a length, e.g. 2.5.",
+    ]);
   });
 
   it("cancels with Escape and with Cancel", async () => {
@@ -307,41 +571,14 @@ describe("pageSetup dialog", () => {
     expect(again.cancel).toHaveBeenCalledTimes(1);
   });
 
-  describe("as text", () => {
-    it("edits the whole frontmatter", async () => {
-      const request = await openDialog({ frontmatter: "title: Hi" });
+  it("puts Apply last in its foot", async () => {
+    await openDialog();
 
-      await click(button("Edit as text"));
-      const text =
-        document.querySelector<HTMLTextAreaElement>("#page-setup-text")!;
-      expect(text.value).toBe("title: Hi");
-      expect(document.activeElement).toBe(text);
-      expect(button("Make this my default").hidden).toBe(true);
-      expect(dialog()!.querySelector<HTMLElement>(".hint")!.hidden).toBe(true);
-
-      text.value = "title: Bye";
-      text.dispatchEvent(new Event("input"));
-      await submit();
-
-      expect(request.applyText).toHaveBeenCalledWith("title: Bye");
-      expect(request.apply).not.toHaveBeenCalled();
-      expect(dialog()).toBeNull();
-    });
-
-    it("stays open to fix what can't be written", async () => {
-      await openDialog({
-        applyText: vi.fn(() => "Nested mappings are not allowed"),
-      });
-
-      await click(button("Edit as text"));
-      await submit();
-
-      expect(dialog()).not.toBeNull();
-      expect(errors().hidden).toBe(false);
-      expect(errors().textContent?.trim()).toBe(
-        "Nested mappings are not allowed",
-      );
-    });
+    const foot = dialog()!.querySelector(".dialog-foot")!;
+    expect(foot.querySelector(".secondary")).toBeNull();
+    expect(
+      [...foot.querySelectorAll("button")].map((b) => b.textContent?.trim()),
+    ).toEqual(["Make this my default", "Cancel", "Apply"]);
   });
 
   it("is a dialog of its own, with fields for lengths", async () => {
@@ -374,7 +611,7 @@ describe("pageSetup dialog", () => {
 
   it("keeps showing the last page it could draw while the choices are wrong", async () => {
     await openDialog();
-    await click(option("paper", "Custom…"));
+    await choosePaper("custom");
     const drawn = dialog()!.querySelector(".thumbnail")!.innerHTML;
 
     await type("paper-width", "wide");
@@ -388,7 +625,7 @@ describe("pageSetup dialog", () => {
     const settings: PageSettings = { ...DEFAULT_PAGE, header };
     const request = await openDialog({ settings });
 
-    await click(option("newPageBefore", "Heading 1"));
+    await click(option("newPageBefore", "H1"));
     await click(option("margins", "Custom…"));
     await submit();
 
@@ -413,23 +650,6 @@ describe("pageSetup dialog", () => {
     expect(checked("margins").textContent?.trim()).toBe("Normal");
   });
 
-  it("clears what was wrong with the text once it's typed again", async () => {
-    await openDialog({
-      applyText: vi.fn(() => "Nested mappings are not allowed"),
-    });
-    await click(button("Edit as text"));
-    await submit();
-    expect(errors().hidden).toBe(false);
-
-    const text =
-      document.querySelector<HTMLTextAreaElement>("#page-setup-text")!;
-    text.dispatchEvent(new Event("input"));
-    await nextTick();
-
-    expect(errors().hidden).toBe(true);
-    expect(button("Apply").disabled).toBe(false);
-  });
-
   it("names each row by its label and marks its options", async () => {
     await openDialog();
 
@@ -439,6 +659,7 @@ describe("pageSetup dialog", () => {
     );
     expect(label?.textContent?.trim()).toBe("Margins");
     expect(margins.contains(label)).toBe(true);
+    expect(margins.getAttribute("role")).toBe("radiogroup");
     expect(checked("margins").getAttribute("role")).toBe("radio");
     expect(checked("margins").dataset.value).toBe("normal");
     expect(
@@ -457,53 +678,13 @@ describe("pageSetup dialog", () => {
     expect((await keydown("ArrowDown")).defaultPrevented).toBe(false);
   });
 
-  it("hides the warning line without warnings", async () => {
+  it("blocks applying and making wrong choices the default", async () => {
     await openDialog();
 
-    expect(dialog()!.querySelector<HTMLElement>(".warning")!.hidden).toBe(true);
-  });
-
-  it("joins several warnings and errors into sentences", async () => {
-    await openDialog({ warnings: ["One", "Two"] });
-    expect(dialog()!.querySelector(".warning")!.textContent?.trim()).toBe(
-      "One. Two",
-    );
-
-    await click(option("paper", "Custom…"));
-    await type("paper-width", "wide");
-    await click(option("margins", "Custom…"));
-    await type("margins-top", "much");
-    expect(errors().textContent?.trim()).toBe(
-      "Enter the width and height, e.g. 17 and 24. " +
-        "Enter each margin as a length, e.g. 2.5",
-    );
-  });
-
-  it("blocks making wrong choices the default", async () => {
-    await openDialog();
-
-    await click(option("paper", "Custom…"));
+    await choosePaper("custom");
     await type("paper-width", "wide");
 
     expect(button("Make this my default").disabled).toBe(true);
-  });
-
-  // even while the rows hold something wrong
-  it("shows only the text once it's edited as text", async () => {
-    await openDialog();
-    await click(option("paper", "Custom…"));
-    await type("paper-width", "wide");
-
-    await click(button("Edit as text"));
-
-    expect(dialog()!.querySelector<HTMLElement>(".settings")!.hidden).toBe(
-      true,
-    );
-    expect(dialog()!.querySelector<HTMLElement>(".thumbnail")!.hidden).toBe(
-      true,
-    );
-    expect(button("Edit as text").hidden).toBe(true);
-    expect(button("Apply").disabled).toBe(false);
-    expect(errors().hidden).toBe(true);
+    expect(button("Apply").disabled).toBe(true);
   });
 });

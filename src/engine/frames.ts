@@ -13,13 +13,10 @@ import type {
 
 // room above the first page, below the top area the page view starts under
 export const VIEW_TOP = 24;
-// more room above the first page for the line with the document's
-// properties
-export const PROPERTIES_ROOM = 28;
 // the room between a header or footer and the page's text in "page ends"
 export const BAND_GAP = 32;
 // room above the first page's text in "page ends" for its header, between
-// the properties' room and the first frame: its line, and the gap below it
+// the view's top and the first frame: its line, and the gap below it
 export const HEADER_ROOM = 20 + BAND_GAP;
 // room below the last page's text in "page ends" for its footer, which no
 // mark shows there: the gap above it, and its line
@@ -95,7 +92,6 @@ export const frameLayout = (
   width: number,
 ): FrameLayout => {
   const frames: Frame[] = [];
-  const viewTop = VIEW_TOP + (layout.properties ? PROPERTIES_ROOM : 0);
   if (mode === "pages") {
     const scale = Math.max(
       0.2,
@@ -107,7 +103,7 @@ export const frameLayout = (
     for (let page = 0; page < layout.pages; page++) {
       frames.push({
         page,
-        top: viewTop + page * (sheetHeight + SHEET_GAP),
+        top: VIEW_TOP + page * (sheetHeight + SHEET_GAP),
         left,
         width: sheetWidth,
         height: sheetHeight,
@@ -118,7 +114,7 @@ export const frameLayout = (
       });
     }
     const height =
-      viewTop +
+      VIEW_TOP +
       layout.pages * (sheetHeight + SHEET_GAP) -
       SHEET_GAP +
       VIEW_BOTTOM;
@@ -140,7 +136,7 @@ export const frameLayout = (
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
   const headerRoom = layout.header ? HEADER_ROOM : 0;
   const footerRoom = layout.footer ? FOOTER_ROOM : 0;
-  let top = viewTop + headerRoom;
+  let top = VIEW_TOP + headerRoom;
   for (let page = 0; page < layout.pages; page++) {
     const bottom = Math.max(layout.bottoms[page] ?? 0, margins.top + MIN_TEXT);
     const h = bottom - margins.top;

@@ -139,17 +139,15 @@ describe("emptyBandNotice", () => {
         "header",
         [[{ field: "author" }, { text: " " }, { field: "chapter" }], [], []],
         false,
-        "Ctrl+Alt+U",
       ),
     ).toBe(
-      "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author under Edit as text in the page setup (Ctrl+Alt+U).",
+      "The header is empty on this page: no author is set and the document has no chapter heading yet. Add an author to the properties at the top of the file.",
     );
     expect(
       emptyBandNotice(
         "footer",
         [[{ field: "chapter" }], [{ field: "title" }], [{ field: "file" }]],
         true,
-        "Ctrl+Alt+U",
       ),
     ).toBe(
       "The footer is empty on this page: no chapter heading comes before this page, the document has no title or heading yet, and the document isn't saved to a file yet.",
@@ -157,13 +155,11 @@ describe("emptyBandNotice", () => {
   });
 
   it("tells nothing when the band shows something, or has nothing written", () => {
-    const key = "Ctrl+Alt+U";
     expect(
       emptyBandNotice(
         "header",
         [[{ text: "by " }, { field: "author" }]],
         false,
-        key,
       ),
     ).toBeNull();
     expect(
@@ -171,9 +167,8 @@ describe("emptyBandNotice", () => {
         "header",
         [[{ field: "author" }], [{ text: "3" }]],
         false,
-        key,
       ),
     ).toBeNull();
-    expect(emptyBandNotice("header", [[], [], []], false, key)).toBeNull();
+    expect(emptyBandNotice("header", [[], [], []], false)).toBeNull();
   });
 });

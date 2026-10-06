@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {
+  type ComponentPublicInstance,
   computed,
   nextTick,
   onMounted,
   reactive,
-  shallowRef,
   useTemplateRef,
 } from "vue";
 
@@ -13,28 +13,46 @@ import {
   HEADING_OPTIONS,
   MARGIN_OPTIONS,
   ORIENTATION_OPTIONS,
+  type PageChoices,
   paperOptions,
   settingsOf,
+  sizeChoices,
+  turned,
+  typedOrientation,
 } from "../layout/choices";
 import { describePaper } from "../layout/describe";
 import { type Layout, layoutOf } from "../layout/resolve";
+import type { Orientation } from "../layout/settings";
 import { thumbnailSvg } from "../layout/thumbnail";
-import { closeDialog, pageSetup, type PageSetupRequest } from "../state";
-import BaseDialog from "./components/BaseDialog.vue";
-import OptionGroup from "./components/OptionGroup.vue";
-import TextField from "./components/TextField.vue";
+import { paperUnit } from "../layout/units";
 import {
+  closeDialog,
+  type MenuItem,
+  pageSetup,
+  type PageSetupRequest,
+} from "../state";
+import BaseDialog from "./components/BaseDialog.vue";
+import MenuButton from "./components/MenuButton.vue";
+import OptionGroup from "./components/OptionGroup.vue";
+import SettingRow from "./components/SettingRow.vue";
+import LengthFields from "./LengthFields.vue";
+import type { Chosen } from "./optionGroupModel";
+import {
+  appliesOnEnter,
   MARGIN_FIELDS,
   PAPER_FIELDS,
+  problemId,
+  problemsOf,
+  sentence,
   stopAfter,
+  steppedPaper,
   stopsIn,
 } from "./pageSetupModel";
 
-// The page setup dialog (see src/editor/commands/pageSetup.ts): a row of
-// choices for the paper, the orientation, the margins and the headings that
-// start a new page, which ↑↓ move between and ←→ change, with a picture of
-// the page. Custom sizes and margins are typed in below their row. "Edit as
-// Text" edits the whole frontmatter instead, for what the rows don't offer.
+// The page setup dialog (see src/editor/commands/pageSetup.ts): rows for the
+// paper, the orientation, the margins and the headings that start a new page,
+// which ↑↓ move between and ←→ change, with a picture of the page. The paper
+// is a list, custom sizes and margins are typed in below their row.
 const props = defineProps<{ request: PageSetupRequest }>();
 const { locale, unit } = props.request;
 
@@ -42,6 +60,7 @@ const { locale, unit } = props.request;
 // the reactive choices, so the settings it applies hold no proxies
 const { bands, ...shown } = choicesOf(props.request.settings, locale, unit);
 const choices = reactive(shown);
+
 const result = computed(() => settingsOf({ ...choices, bands }, locale, unit));
 const chosen = computed(() =>
   "settings" in result.value ? result.value.settings : null,
@@ -55,70 +74,124 @@ const picture = computed(() => layout.value && thumbnailSvg(layout.value));
 const caption = computed(
   () => layout.value && describePaper(layout.value, unit),
 );
-// the same list on every render, so the row doesn't re-render while typing
-const PAPER_OPTIONS = paperOptions(locale);
 
-const asText = shallowRef(false);
-const text = shallowRef(props.request.frontmatter ?? "");
-// what is wrong with the text, once Apply found it
-const textError = shallowRef("");
-const errors = computed(() => {
-  if (asText.value) return textError.value;
-  return "errors" in result.value
-    ? Object.values(result.value.errors).join(". ")
-    : "";
-});
-const blocked = computed(() => !asText.value && chosen.value === null);
+// the same list on every render
+const PAPER_OPTIONS = paperOptions(locale);
+const paperLabel = computed(
+  () => PAPER_OPTIONS.find((option) => option.value === choices.paper)?.label,
+);
+const paper = useTemplateRef<ComponentPublicInstance>("paper");
+const focusPaper = () => (paper.value?.$el as HTMLElement | undefined)?.focus();
+
+// what is wrong, by the part it is wrong in, each a sentence on its own line
+const problems = computed(() =>
+  problemsOf({
+    unreadable: !props.request.readable,
+    errors: "errors" in result.value ? result.value.errors : {},
+  }),
+);
+// the id of what is wrong with a part, which its controls are described by
+const errorId = (part: string) => problemId(problems.value, part);
+// nothing to apply or make the default: the rows hold something that can't
+// be used, or the frontmatter they'd be written into can't be read
+const blocked = computed(
+  () => chosen.value === null || !props.request.readable,
+);
 
 const settings = useTemplateRef<HTMLElement>("settings");
-const textarea = useTemplateRef<HTMLTextAreaElement>("textarea");
 onMounted(() => stopsIn(settings.value!)[0]?.focus());
 
-// ↑↓ move between the rows and the visible fields, Enter on an option applies
-const onKeydown = (event: KeyboardEvent) => {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    const next = stopAfter(
-      stopsIn(settings.value!),
-      document.activeElement,
-      event.key === "ArrowDown" ? 1 : -1,
+// a paper chosen: a custom size starts from the paper chosen so far, and
+// from the list, its first field takes the focus
+const choosePaper = async (value: PageChoices["paper"], fromList = false) => {
+  if (value === "custom" && choices.paper !== "custom" && layout.value) {
+    Object.assign(
+      choices,
+      sizeChoices(layout.value.paper, choices.orientation, unit),
     );
-    if (next) {
-      event.preventDefault();
-      next.focus();
-    }
-  } else if (
-    event.key === "Enter" &&
-    event.target instanceof HTMLButtonElement
-  ) {
-    // instead of pressing the option
+  }
+  choices.paper = value;
+  if (value === "custom" && fromList) {
+    await nextTick();
+    settings.value?.querySelector<HTMLInputElement>(".custom input")?.focus();
+  }
+};
+
+const paperItems = (): MenuItem[] =>
+  PAPER_OPTIONS.map((option) => ({
+    id: option.value,
+    label: option.label,
+    radio: true,
+    checked: option.value === choices.paper,
+    run: () => void choosePaper(option.value, true),
+  }));
+
+// a custom size turns with the orientation, and the orientation follows a
+// size typed wider than high
+const turn = (value: Chosen<Orientation>) => {
+  // a radio group's value, never a list
+  const orientation = value as Orientation;
+  if (choices.paper === "custom") {
+    Object.assign(choices, turned(choices, orientation, unit));
+  }
+  choices.orientation = orientation;
+};
+const setSize = (key: "width" | "height", value: string) => {
+  choices[key] = value;
+  choices.orientation = typedOrientation(choices, unit) ?? choices.orientation;
+};
+const setSide = (key: keyof PageChoices["sides"], value: string) => {
+  choices.sides[key] = value;
+};
+
+// ↑↓ move between the rows and the visible fields before the paper's list
+// sees them, which opens on ↓; Alt+↓ is left to it, and Shift+↑↓ to a field
+const onArrows = (event: KeyboardEvent) => {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const next = stopAfter(
+    stopsIn(settings.value!),
+    document.activeElement,
+    event.key === "ArrowDown" ? 1 : -1,
+  );
+  if (next) {
     event.preventDefault();
-    event.target.form!.requestSubmit();
+    event.stopPropagation();
+    next.focus();
+  }
+};
+
+// Enter on an option applies, instead of pressing it, while on the paper's
+// list it opens it; ←→ step through the papers on the list, stopping at its
+// ends
+const onKeydown = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement;
+  if (event.key === "Enter" && appliesOnEnter(target)) {
+    event.preventDefault();
+    (target as HTMLButtonElement).form!.requestSubmit();
+  } else if (
+    target === paper.value?.$el &&
+    (event.key === "ArrowLeft" || event.key === "ArrowRight")
+  ) {
+    event.preventDefault();
+    const by = event.key === "ArrowRight" ? 1 : -1;
+    const next = steppedPaper(PAPER_OPTIONS, choices.paper, by);
+    if (next) void choosePaper(next);
   }
 };
 
 const close = (callback: () => void) => closeDialog(pageSetup, callback);
 
-const editAsText = async () => {
-  asText.value = true;
-  await nextTick();
-  textarea.value?.focus();
-};
-
 const makeDefault = () => {
   const settings = chosen.value;
-  if (settings) close(() => props.request.makeDefault(settings));
+  if (settings && !blocked.value) {
+    close(() => props.request.makeDefault(settings));
+  }
 };
 
 const submit = () => {
-  if (asText.value) {
-    const error = props.request.applyText(text.value);
-    // applyText has given the editor the focus back
-    if (error === null) pageSetup.value = null;
-    else textError.value = error;
-    return;
-  }
   const settings = chosen.value;
-  if (settings) close(() => props.request.apply(settings));
+  if (settings && !blocked.value) close(() => props.request.apply(settings));
 };
 </script>
 
@@ -127,87 +200,104 @@ const submit = () => {
     id="page-setup"
     title="Page setup"
     form-class="page-setup"
+    :described-by="request.warnings.length ? 'page-setup-warnings' : undefined"
     @submit="submit"
     @cancel="close(request.cancel)"
   >
-    <p class="warning" :hidden="request.warnings.length === 0">
-      {{ request.warnings.join(". ") }}
-    </p>
-    <div class="body">
-      <div
-        ref="settings"
-        class="settings"
-        :hidden="asText"
-        @keydown="onKeydown"
-      >
-        <OptionGroup
-          id="page-setup-paper"
-          v-model="choices.paper"
-          name="paper"
-          label="Paper"
-          :options="PAPER_OPTIONS"
-        />
+    <div class="layout">
+      <div class="main">
         <div
-          class="custom"
-          data-fields="paper"
-          :hidden="choices.paper !== 'custom'"
+          id="page-setup-warnings"
+          class="warning"
+          :hidden="request.warnings.length === 0"
         >
-          <div v-for="field in PAPER_FIELDS" :key="field.key">
-            <TextField
-              :id="`page-setup-paper-${field.key}`"
-              v-model="choices[field.key]"
-              :label="`${field.label} (${unit})`"
-              inputmode="decimal"
-            />
-          </div>
+          <p v-for="(warning, index) in request.warnings" :key="index">
+            {{ sentence(warning) }}
+          </p>
         </div>
-        <OptionGroup
-          id="page-setup-orientation"
-          v-model="choices.orientation"
-          name="orientation"
-          label="Orientation"
-          :options="ORIENTATION_OPTIONS"
-        />
-        <OptionGroup
-          id="page-setup-margins"
-          v-model="choices.margins"
-          name="margins"
-          label="Margins"
-          :options="MARGIN_OPTIONS"
-        />
         <div
-          class="custom"
-          data-fields="margins"
-          :hidden="choices.margins !== 'custom'"
+          ref="settings"
+          class="settings"
+          @keydown.capture="onArrows"
+          @keydown="onKeydown"
         >
-          <div v-for="field in MARGIN_FIELDS" :key="field.key">
-            <TextField
-              :id="`page-setup-margins-${field.key}`"
-              v-model="choices.sides[field.key]"
-              :label="`${field.label} (${unit})`"
-              inputmode="decimal"
+          <SettingRow id="page-setup-paper-label" name="paper" label="Paper">
+            <MenuButton
+              id="page-setup-paper"
+              ref="paper"
+              class="select"
+              label="Paper"
+              :text="paperLabel"
+              :items="paperItems"
+              :refocus="focusPaper"
             />
-          </div>
+          </SettingRow>
+          <LengthFields
+            name="paper"
+            :fields="PAPER_FIELDS"
+            :values="choices"
+            :unit="paperUnit(unit)"
+            :error-id="errorId('paper')"
+            :hidden="choices.paper !== 'custom'"
+            @update="setSize"
+          />
+          <OptionGroup
+            id="page-setup-orientation"
+            :model-value="choices.orientation"
+            name="orientation"
+            label="Orientation"
+            :options="ORIENTATION_OPTIONS"
+            @update:model-value="turn"
+          />
+          <!-- what is wrong with the margins describes their fields, or the
+          row while a preset leaves no room on a small custom paper -->
+          <OptionGroup
+            id="page-setup-margins"
+            v-model="choices.margins"
+            name="margins"
+            label="Margins"
+            :options="MARGIN_OPTIONS"
+            :aria-invalid="
+              choices.margins !== 'custom' && errorId('margins')
+                ? true
+                : undefined
+            "
+            :aria-describedby="
+              choices.margins !== 'custom' ? errorId('margins') : undefined
+            "
+          />
+          <LengthFields
+            name="margins"
+            :fields="MARGIN_FIELDS"
+            :values="choices.sides"
+            :unit="unit"
+            :error-id="errorId('margins')"
+            :hidden="choices.margins !== 'custom'"
+            @update="setSide"
+          />
+          <OptionGroup
+            id="page-setup-newPageBefore"
+            v-model="choices.newPageBefore"
+            name="newPageBefore"
+            label="New page before"
+            :options="HEADING_OPTIONS"
+          />
+          <p class="note">
+            Kept in this document. Headers and footers are set on the pages.
+          </p>
         </div>
-        <OptionGroup
-          id="page-setup-newPageBefore"
-          v-model="choices.newPageBefore"
-          name="newPageBefore"
-          label="New page before"
-          :options="HEADING_OPTIONS"
-        />
+        <!-- always there, so screen readers announce what comes into it -->
+        <div id="page-setup-errors" class="error" aria-live="polite">
+          <p
+            v-for="[part, message] in problems"
+            :id="`page-setup-error-${part}`"
+            :key="part"
+          >
+            {{ message }}
+          </p>
+        </div>
       </div>
-      <div class="text-editor" :hidden="!asText">
-        <label for="page-setup-text">Properties at the top of the file</label>
-        <textarea
-          id="page-setup-text"
-          ref="textarea"
-          v-model="text"
-          spellcheck="false"
-          @input="textError = ''"
-        />
-      </div>
-      <figure class="thumbnail" :hidden="asText">
+      <figure class="thumbnail">
         <template v-if="picture">
           <!-- the SVG is drawn by thumbnailSvg, which escapes all text -->
           <!-- eslint-disable-next-line vue/no-v-html -->
@@ -216,31 +306,12 @@ const submit = () => {
         </template>
       </figure>
     </div>
-    <p
-      id="page-setup-errors"
-      class="error"
-      aria-live="polite"
-      :hidden="!errors"
-    >
-      {{ errors }}
-    </p>
-    <p class="hint" :hidden="asText">
-      ↑↓ choose · ←→ change · Space switch a heading · Enter apply · Esc cancel
-    </p>
     <template #actions>
-      <button type="button" :hidden="asText" @click="editAsText">
-        Edit as text
-      </button>
-      <button
-        type="button"
-        :hidden="asText"
-        :disabled="blocked"
-        @click="makeDefault"
-      >
+      <button type="button" :disabled="blocked" @click="makeDefault">
         Make this my default
       </button>
-      <button type="submit" :disabled="blocked">Apply</button>
       <button type="button" @click="close(request.cancel)">Cancel</button>
+      <button type="submit" :disabled="blocked">Apply</button>
     </template>
   </BaseDialog>
 </template>
