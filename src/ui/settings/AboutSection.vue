@@ -4,7 +4,8 @@ import { onMounted, shallowRef } from "vue";
 import { _openLink } from "../../editor/plugins/openLink";
 import { announce } from "../../state";
 import BlankLogo from "../BlankLogo.vue";
-import { appVersion, SOURCE_CODE, WEBSITE } from "./aboutModel";
+import { SOURCE_CODE, WEBSITE } from "../../links";
+import { appVersion } from "./aboutModel";
 import LicensesPage from "./LicensesPage.vue";
 import PagedSection from "./PagedSection.vue";
 

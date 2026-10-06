@@ -60,12 +60,18 @@ const ICONS: Record<string, string> = {
     "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M7 9h.01 M11 9h.01 M15 9h.01 M7 13h.01 M17 13h.01 M9 15.5h6",
   help: "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3 M12 17h.01",
   info: "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z M12 16v-4 M12 8h.01",
+  // the main menu
+  menu: "M4 6h16 M4 12h16 M4 18h16",
+  // Blank itself (About): the logo's I-beam on its square, in lines
+  logo: "M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z M9 6.5h1.5A1.5 1.5 0 0 1 12 8v8a1.5 1.5 0 0 1-1.5 1.5H9 M15 6.5h-1.5A1.5 1.5 0 0 0 12 8 M12 16a1.5 1.5 0 0 0 1.5 1.5H15",
   spell: "M3 16 6.5 6l3.5 10 M4.4 12.5h4.2 M13 15l3 3 5-6",
   globe:
     "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z M3 12h18 M12 3a14 14 0 0 1 0 18 M12 3a14 14 0 0 0 0 18",
   "zoom-in":
     "M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14z M20 20l-4.3-4.3 M8 11h6 M11 8v6",
   "zoom-out": "M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14z M20 20l-4.3-4.3 M8 11h6",
+  // the page as wide as the window: arrows out to both edges
+  fit: "M4 4v16 M20 4v16 M8 12h8 M10 9.5 7.5 12l2.5 2.5 M14 9.5l2.5 2.5-2.5 2.5",
   pages:
     "M8 3h9a2 2 0 0 1 2 2v12 M5 7h9a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z",
   "page-ends":

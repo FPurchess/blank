@@ -19,6 +19,7 @@ import {
   closeTab,
   cycleTabs,
   moveFocus,
+  openGuide,
   openSettings,
   toggleFocusMode,
   moveTab,
@@ -55,7 +56,7 @@ import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { toggleBlocksPane } from "../commands/contentBlocks";
+import { toggleBlocks, toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import {
@@ -191,6 +192,10 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_FOCUS_MODE]: toggleFocusMode(),
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
   [CommandIdentifier.APP_SETTINGS]: openSettings(),
+  [CommandIdentifier.VIEW_BLOCKS]: toggleBlocks(),
+  [CommandIdentifier.APP_SHORTCUTS]: openSettings("shortcuts"),
+  [CommandIdentifier.APP_GUIDE]: openGuide(),
+  [CommandIdentifier.APP_ABOUT]: openSettings("about"),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -294,14 +299,17 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files and printing, the tabs, moving between the parts
-// (F6, and Alt-F10 to the toolbar), focus mode and the settings
+// the editor: the files, printing and exports, the tabs, moving between the
+// parts (F6, and Alt-F10 to the toolbar), the blocks pane, focus mode and the
+// settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
   CommandIdentifier.FILE_SAVE,
   CommandIdentifier.FILE_SAVE_AS,
   CommandIdentifier.FILE_PRINT,
+  CommandIdentifier.EXPORT_PDF,
+  CommandIdentifier.EXPORT_DOCX,
   CommandIdentifier.TAB_CLOSE,
   CommandIdentifier.TAB_NEXT,
   CommandIdentifier.TAB_PREVIOUS,
@@ -312,6 +320,7 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
   CommandIdentifier.VIEW_FOCUS_MODE,
+  CommandIdentifier.VIEW_BLOCKS,
   CommandIdentifier.APP_SETTINGS,
 ];
 

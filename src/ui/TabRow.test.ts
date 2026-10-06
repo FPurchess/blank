@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import * as commands from "../editor/commands";
-import * as contentBlocks from "../editor/commands/contentBlocks";
 import * as tabActions from "../editor/tabs";
 import {
   activeTabId,
@@ -364,16 +363,12 @@ describe("the Blocks button", () => {
   });
 
   it("opens the pane, and hides it again", async () => {
-    const hide = vi
-      .spyOn(contentBlocks, "hideBlocksPane")
-      .mockImplementation(() => (blocksPaneOpen.value = false) as never);
-
     button().click();
     expect(blocksPaneOpen.value).toBe(true);
     await nextTick();
     expect(button().getAttribute("aria-pressed")).toBe("true");
 
     button().click();
-    expect(hide).toHaveBeenCalled();
+    expect(blocksPaneOpen.value).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { config } from "./config";
+import { splitBinding } from "./keyNames";
 import { DEFAULT_PAGE, readPageSettings } from "./layout/settings";
 
 // The reference blank.json at the root of the repository and the list of
@@ -64,12 +65,18 @@ describe("the shortcuts in the docs", () => {
   };
 
   // "Mod-Shift-s" is written `Mod` `Shift` `S` there
-  const keycaps = (binding: string) =>
-    binding
-      .split("-")
+  const keycaps = (binding: string) => {
+    const { modifiers, key } = splitBinding(binding);
+    return [...modifiers, key]
       .map((key) => KEY_NAMES[key] ?? key)
       .map((key) => `\`${key.length === 1 ? key.toUpperCase() : key}\``)
       .join(" ");
+  };
+
+  it("write a key that is a minus or an equals sign as one keycap", () => {
+    expect(keycaps("Mod--")).toBe("`Mod` `-`");
+    expect(keycaps("Mod-=")).toBe("`Mod` `=`");
+  });
 
   // the docs list the headings in one row, `Mod` `1` … `6`
   const IN_ONE_ROW = new Set([

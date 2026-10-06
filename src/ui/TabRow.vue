@@ -12,11 +12,8 @@ import {
   saveFile,
   selectTab,
 } from "../editor/commands";
-import {
-  hideBlocksPane,
-  toggleBlocksPane,
-} from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
+import { commandFor } from "../editor/plugins/keymap";
 import { activateTab, closeTabs, moveTab } from "../editor/tabs";
 import { engineless } from "../engine/engine";
 import { logError } from "../log";
@@ -260,12 +257,6 @@ const { onFocusin, onFocusout } = useFocusRegion(
   },
 );
 
-// the Blocks button: the pane opens with the focus in its search, and goes
-const toggleBlocks = () => {
-  if (blocksPaneOpen.value) hideBlocksPane(editor.view);
-  else run(toggleBlocksPane(), false);
-};
-
 // the Blocks button drops its name once the tabs need the room, measured
 // once a frame, after the row has its size
 const compact = shallowRef(false);
@@ -340,7 +331,7 @@ onUnmounted(() => {
       :command="C.INSERT_BLOCK"
       :pressed="blocksPaneOpen"
       :focusable="false"
-      @click="toggleBlocks"
+      @click="run(commandFor(C.VIEW_BLOCKS), false)"
     >
       <span v-if="!compact" ref="label">Blocks</span>
     </IconButton>

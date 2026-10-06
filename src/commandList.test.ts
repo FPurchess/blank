@@ -23,7 +23,7 @@ const DIALOGS = new Set([
 ]);
 
 // words that keep their capital inside a label
-const NAMES = new Set(["PDF", "Word"]);
+const NAMES = new Set(["PDF", "Word", "Blank"]);
 
 describe("the command list", () => {
   it("lists every command once", () => {

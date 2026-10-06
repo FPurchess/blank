@@ -34,6 +34,7 @@ import {
   insertTopBlock,
   pasteTopBlocks,
   readBlocks,
+  toggleBlocks,
   toggleBlocksPane,
 } from "./contentBlocks";
 import { boxOnCaretPage } from "../plugins/followLayout";
@@ -131,6 +132,19 @@ describe("the blocks pane", () => {
     toggleBlocksPane()(view.state, view.dispatch, view);
     expect(blocksPaneOpen.value).toBe(false);
     expect(blocksPaneFocused.value).toBe(false);
+  });
+
+  it("opens and closes from its button or the menu, wherever the focus is", () => {
+    const view = createTestView(createState(doc(p())));
+    expect(toggleBlocks()(view.state)).toBe(true);
+    expect(blocksPaneOpen.value).toBe(false);
+
+    toggleBlocks()(view.state, view.dispatch, view);
+    expect(blocksPaneOpen.value).toBe(true);
+    expect(blocksPaneSearch.value).not.toBeNull();
+    // the text has the focus, and the pane closes all the same
+    toggleBlocks()(view.state, view.dispatch, view);
+    expect(blocksPaneOpen.value).toBe(false);
   });
 
   it("offers the table of contents and Blank's forms", async () => {

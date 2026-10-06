@@ -23,7 +23,7 @@
     "format.italic": "Mod-i",
     "format.underline": "Mod-u",
     "format.code": "Mod-e",
-    "format.link": "Mod-k",
+    "format.link": "Mod-Alt-k",
     "format.blockquote": "Mod-g",
     "format.align_left": "Mod-Shift-l",
     "format.align_center": "Mod-Shift-e",
@@ -58,7 +58,11 @@
     "view.toolbar_focus": "Alt-F10",
     "view.focus": "Mod-Shift-f",
     "tools.stats": "Mod-Alt-c",
-    "app.settings": "Mod-,"
+    "app.settings": "Mod-,",
+    "view.blocks": "",
+    "app.shortcuts": "",
+    "app.guide": "",
+    "app.about": ""
   },
   "autocorrect": {
     "arrows": true,

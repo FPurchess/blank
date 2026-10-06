@@ -118,7 +118,7 @@ describe("plugin.keymap", () => {
     expect(view.state.doc.toJSON()).toEqual(flat.toJSON());
   });
 
-  describe("Mod-k", () => {
+  describe("Mod-Alt-k", () => {
     beforeEach(() => {
       linkDialog.value = null;
     });
@@ -126,7 +126,7 @@ describe("plugin.keymap", () => {
     it("opens the link dialog for the selection", async () => {
       const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
-      expect(press("Mod-k")).toBe(true);
+      expect(press("Mod-Alt-k")).toBe(true);
 
       await vi.waitFor(() => expect(linkDialog.value?.text).toBe("text"));
     });
@@ -134,7 +134,7 @@ describe("plugin.keymap", () => {
     it("is not handled in a code block", async () => {
       const { press } = withKeymap(doc(codeBlock("code")));
 
-      expect(press("Mod-k")).toBe(false);
+      expect(press("Mod-Alt-k")).toBe(false);
       await flushPromises();
 
       expect(linkDialog.value).toBeNull();

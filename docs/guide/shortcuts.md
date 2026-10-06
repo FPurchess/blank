@@ -121,13 +121,15 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Italic               | `Mod` `I`         |
 | Underline            | `Mod` `U`         |
 | Code                 | `Mod` `E`         |
-| Insert or edit link  | `Mod` `K`         |
+| Insert or edit link  | `Mod` `Alt` `K`   |
 | Open link in browser | `Mod` + Click     |
 | Insert or edit image | `Mod` `Alt` `I`   |
 | Align left           | `Mod` `Shift` `L` |
 | Center               | `Mod` `Shift` `E` |
 | Align right          | `Mod` `Shift` `R` |
 | Justify              | `Mod` `Shift` `J` |
+
+The link dialog moved from `Mod` `K` to `Mod` `Alt` `K`.
 
 ## Spell check
 
