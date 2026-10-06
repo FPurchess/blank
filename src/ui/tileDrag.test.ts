@@ -55,6 +55,22 @@ describe("dragging a tile onto the pages", () => {
     expect(pageDropGap.value).toBeNull();
   });
 
+  it("keeps the pointer's events only once it drags", () => {
+    // the webview sends the click to the element holding the capture, which
+    // would take it from the tile
+    const setPointerCapture = vi.fn();
+    const drag = dragOn();
+    drag.down(
+      pointer(10, { currentTarget: { setPointerCapture } } as never),
+      "toc",
+    );
+    drag.move(pointer(12));
+    expect(setPointerCapture).not.toHaveBeenCalled();
+    drag.move(pointer(50, { pointerId: 7 }));
+    drag.move(pointer(200, { pointerId: 7 }));
+    expect(setPointerCapture).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
   it("leaves a click a click", () => {
     const drag = dragOn();
     drag.down(pointer(10), "toc");

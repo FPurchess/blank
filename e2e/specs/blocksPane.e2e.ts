@@ -1,6 +1,7 @@
 import { $, browser, expect } from "@wdio/globals";
 
 import {
+  clickInto,
   focusEditor,
   Key,
   nextFrames,
@@ -120,6 +121,23 @@ describe("the blocks pane", () => {
     await type(Key.Delete);
     await expect($("#ui-announcement")).toHaveText("Table of contents removed");
     expect(await kinds()).not.toContain("toc");
+  });
+
+  it("inserts the block of a clicked tile after the cursor's paragraph", async () => {
+    await clickInto("#editor p", 1);
+    await pressMod(Key.Alt, "b");
+    const tile = $('#blocks-pane .tile[data-block="toc"]');
+    await expect(tile).toBeDisplayed();
+    await tile.click();
+    await expect($("#ui-announcement")).toHaveText(
+      "Table of contents inserted",
+    );
+    expect(await kinds()).toEqual([
+      "paragraph",
+      "paragraph",
+      "toc",
+      "paragraph",
+    ]);
   });
 
   it("stays open across a restart, until its shortcut closes it", async () => {
