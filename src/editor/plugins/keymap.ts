@@ -76,6 +76,8 @@ import {
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
+import { clearRecentFiles } from "../commands/recentFiles";
+import { recorded } from "../commandRun";
 
 /**
  * outsideCells runs `command` only outside table cells, which can't hold
@@ -196,6 +198,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.APP_SHORTCUTS]: openSettings("shortcuts"),
   [CommandIdentifier.APP_GUIDE]: openGuide(),
   [CommandIdentifier.APP_ABOUT]: openSettings("about"),
+  [CommandIdentifier.FILE_CLEAR_RECENT]: clearRecentFiles(),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -205,11 +208,22 @@ const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
   [CommandIdentifier.TAB_PREVIOUS]: ["Ctrl-PageUp"],
 };
 
+// the commands as the UI runs them, one per id, so a computed asking whether
+// one can run keeps the same function
+const clicked = new Map<CommandIdentifier, Command>();
+
 /**
  * commandFor returns the command bound to `id`, the one its key runs, e.g.
- * for the toolbar's buttons
+ * for the toolbar's buttons; running it remembers it (see recorded)
  */
-export const commandFor = (id: CommandIdentifier): Command => commandMap[id];
+export const commandFor = (id: CommandIdentifier): Command => {
+  let command = clicked.get(id);
+  if (!command) {
+    command = recorded(id, commandMap[id], false);
+    clicked.set(id, command);
+  }
+  return command;
+};
 
 /**
  * keyCommands are what the keys of some commands run instead of what the
@@ -257,7 +271,7 @@ const bindingsOf = (
       invalid.push(`${id}: ${binding}`);
       continue;
     }
-    const command = keyCommandFor(id);
+    const command = recorded(id, keyCommandFor(id), true);
     bindings[normalized] = command;
     // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
     // on Windows, where the keymap can't fall back to the key code
@@ -273,7 +287,7 @@ const bindingsOf = (
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
       if (!configured.some((binding) => sameBinding(binding, key)))
-        bindings[key] = keyCommandFor(id);
+        bindings[key] = recorded(id, keyCommandFor(id), true);
     }
   }
   return bindings;

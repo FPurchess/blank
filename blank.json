@@ -62,7 +62,8 @@
     "view.blocks": "",
     "app.shortcuts": "",
     "app.guide": "",
-    "app.about": ""
+    "app.about": "",
+    "file.clear_recent": ""
   },
   "autocorrect": {
     "arrows": true,

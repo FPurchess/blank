@@ -2,8 +2,8 @@
 import { computed } from "vue";
 
 import { CommandIdentifier } from "../config";
-import { togglePageView } from "../editor/commands";
 import { useEditor } from "../editor/handle";
+import { commandFor } from "../editor/plugins/keymap";
 import { engineMissing, pageView } from "../state";
 import { viewLabel } from "./statusBarModel";
 import StatusItem from "./StatusItem.vue";
@@ -25,7 +25,7 @@ const label = computed(() => viewLabel(pageView.value));
       :tip="label.tip"
       :label="label.aria"
       :command="CommandIdentifier.VIEW_PAGES"
-      @click="editor.run(togglePageView())"
+      @click="editor.run(commandFor(CommandIdentifier.VIEW_PAGES))"
     />
   </template>
 </template>

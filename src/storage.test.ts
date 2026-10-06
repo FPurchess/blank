@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import localforage from "localforage";
 import { EditorState } from "prosemirror-state";
+import { CommandIdentifier } from "./config";
 import { schema } from "./markdown";
 import { Node } from "prosemirror-model";
 
@@ -183,6 +184,44 @@ describe("storage", () => {
       const { printSettings } = await bootFresh();
 
       expect(printSettings.value).toEqual(PRINT_DEFAULTS);
+    });
+  });
+
+  describe("recent commands and files", () => {
+    it("are empty on first start and kept", async () => {
+      const { recentCommands, recentFiles, recordCommand, rememberFile } =
+        await bootFresh();
+      expect(recentCommands.value).toEqual([]);
+      expect(recentFiles.value).toEqual([]);
+
+      recordCommand(CommandIdentifier.EXPORT_PDF, true);
+      rememberFile("/docs/a.md");
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("recentFiles")).toEqual([
+          "/docs/a.md",
+        ]),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.recentCommands.value).toEqual([
+        { id: CommandIdentifier.EXPORT_PDF, byKey: true },
+      ]);
+      expect(restarted.recentFiles.value).toEqual(["/docs/a.md"]);
+    });
+
+    it("drop what Blank no longer knows", async () => {
+      await localforage.setItem("recentCommands", [
+        { id: "gone.command", byKey: false },
+        { id: CommandIdentifier.FILE_SAVE, byKey: false },
+      ]);
+      await localforage.setItem("recentFiles", "not a list");
+
+      const { recentCommands, recentFiles } = await bootFresh();
+
+      expect(recentCommands.value).toEqual([
+        { id: CommandIdentifier.FILE_SAVE, byKey: false },
+      ]);
+      expect(recentFiles.value).toEqual([]);
     });
   });
 

@@ -8,6 +8,8 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   activeTabId,
   blocksPaneOpen,
+  cleanRecentCommands,
+  cleanRecentFiles,
   currentViewAnchor,
   language,
   outlinePinned,
@@ -16,6 +18,8 @@ import {
   pageView,
   type PageViewMode,
   printSettings,
+  recentCommands,
+  recentFiles,
   spellcheck,
   type Tab,
   tabs,
@@ -28,6 +32,7 @@ import {
   detectLanguage,
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
+import { CommandIdentifier } from "./config";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
 import { sendNotification } from "@tauri-apps/plugin-notification";
@@ -223,6 +228,12 @@ const restore = async <T>(
 };
 
 const isTrue = (value: unknown): value is boolean => value === true;
+const isList = (value: unknown): value is never[] => Array.isArray(value);
+// a list as `clean` keeps it, the same one if it keeps all of it, so
+// nothing is written back
+const cleaned = <T>(list: readonly T[], kept: readonly T[]) =>
+  kept.length === list.length ? list : kept;
+const COMMAND_IDS = new Set<string>(Object.values(CommandIdentifier));
 const isPageViewMode = (value: unknown): value is PageViewMode =>
   PAGE_VIEW_MODES.includes(value as PageViewMode);
 
@@ -306,6 +317,17 @@ export const bootStorage = async () => {
   await restore("blocksPane", blocksPaneOpen, isTrue, false);
   // what the print dialog chose last, the printer at first
   await restore("print", printSettings, isPrintSettings, PRINT_DEFAULTS);
+  // the commands and files used last, without what Blank no longer knows
+  await restore("recentCommands", recentCommands, isList, []);
+  await restore("recentFiles", recentFiles, isList, []);
+  recentCommands.value = cleaned(
+    recentCommands.value,
+    cleanRecentCommands(recentCommands.value, COMMAND_IDS),
+  );
+  recentFiles.value = cleaned(
+    recentFiles.value,
+    cleanRecentFiles(recentFiles.value),
+  );
 
   sessionKept = await ownSession();
   if (sessionKept) {

@@ -23,6 +23,7 @@ import {
   pageHoverBlock,
   pageScrollRequest,
   path,
+  rememberFile,
   spellchecker,
   type Tab,
   tabAnnouncement,
@@ -449,11 +450,13 @@ const readTabs = async (list: readonly Tab[], files: string[]) => {
     const canonical = await canonicalPath(file);
     const open = openTabOf([...list, ...added.map(([tab]) => tab)], canonical);
     if (open) {
+      rememberFile(canonical);
       last = open.id;
       continue;
     }
     const loaded = await readDocument(canonical);
     if (!loaded) continue;
+    rememberFile(canonical);
     const opened = newTab(loaded);
     added.push(opened);
     last = opened[0].id;
@@ -644,6 +647,7 @@ const saveTabNow = async (
   if (written === null) return false;
   // the name other ways to the file are compared by
   const target = await canonicalPath(written);
+  rememberFile(target);
   updateTab(id, {
     path: target,
     importedFrom: null,

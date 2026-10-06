@@ -18,6 +18,7 @@ import {
   importedFrom,
   linkDialog,
   path,
+  recentFiles,
   tabs,
   tabSwitch,
   transaction,
@@ -252,6 +253,16 @@ describe("opening", () => {
 
     expect(tabs.value).toHaveLength(3);
     expect(path.value).toBe("/a.md");
+  });
+
+  it("remembers the files it opened, newest first", async () => {
+    recentFiles.value = [];
+    await boot();
+    await openPaths(["/a.md", "/b.md"]);
+    expect(recentFiles.value).toEqual(["/b.md", "/a.md"]);
+    // opening one again counts too
+    await openPaths(["/a.md"]);
+    expect(recentFiles.value).toEqual(["/a.md", "/b.md"]);
   });
 
   it("takes the place of an untouched Untitled", async () => {
@@ -491,6 +502,7 @@ describe("unsaved changes", () => {
       unsaved: false,
     });
     expect(path.value).toBe("/new.md");
+    expect(recentFiles.value[0]).toBe("/new.md");
   });
 
   it("close another clean tab of the file saved to", async () => {

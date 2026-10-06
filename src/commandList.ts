@@ -53,6 +53,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "folder-open",
     aliases: ["load", "docx", "word", "import"],
   },
+  [C.FILE_CLEAR_RECENT]: {
+    group: "File",
+    label: "Clear recent files",
+    icon: "trash",
+    aliases: ["recent", "history", "forget"],
+  },
   [C.FILE_SAVE]: {
     group: "File",
     label: "Save",

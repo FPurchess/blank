@@ -144,7 +144,10 @@ describe("the tab row", () => {
   });
 
   it("opens a new tab with + and a double click on its empty part", () => {
-    const create = spy("newFile");
+    // + runs New document, the command, whose work is opening a tab
+    const create = vi
+      .spyOn(tabActions, "openNewTab")
+      .mockResolvedValue(undefined as never);
 
     document.querySelector<HTMLElement>(".tab-row-new")!.click();
     document

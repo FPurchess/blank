@@ -91,6 +91,7 @@ export enum CommandIdentifier {
   APP_SHORTCUTS = "app.shortcuts",
   APP_GUIDE = "app.guide",
   APP_ABOUT = "app.about",
+  FILE_CLEAR_RECENT = "file.clear_recent",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -218,6 +219,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.APP_SHORTCUTS]: "",
     [CommandIdentifier.APP_GUIDE]: "",
     [CommandIdentifier.APP_ABOUT]: "",
+    [CommandIdentifier.FILE_CLEAR_RECENT]: "",
   },
   autocorrect: {
     arrows: true,

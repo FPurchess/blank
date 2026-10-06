@@ -11,6 +11,7 @@ import {
   languagePicker,
   linkDialog,
   path,
+  recentCommands,
   tablePicker,
   theme,
   themes,
@@ -32,7 +33,7 @@ import {
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import { schema } from "../../markdown";
-import { commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
+import { commandFor, commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
 import * as tabs from "../tabs";
 import { bindKeys, withKeymap } from "../../test/keymap";
 import { createState, createTestView, pressKey } from "../../test/editor";
@@ -50,7 +51,8 @@ describe("plugin.keymap", () => {
       .filter((binding) => binding !== "");
 
     expect(new Set(bindings).size).toBe(bindings.length);
-    // only the code block has none by default
+    // the code block has none by default, and nor have the commands the
+    // main menu runs
     expect(config.value.keymap[CommandIdentifier.BLOCKTYPE_CODE_BLOCK]).toBe(
       "",
     );
@@ -487,5 +489,59 @@ describe("plugin.keymap", () => {
     expect(sendNotification).toHaveBeenCalledWith(
       "Ignored invalid key bindings in blank.json: format.bold: Hyper-b",
     );
+  });
+});
+
+describe("the commands that ran", () => {
+  afterEach(() => {
+    recentCommands.value = [];
+  });
+
+  it("are remembered when a key runs them", () => {
+    const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
+    press("Mod-b");
+    expect(recentCommands.value[0]).toEqual({
+      id: CommandIdentifier.FORMAT_BOLD,
+      byKey: true,
+    });
+  });
+
+  it("are remembered when the UI runs them, not when it asks", () => {
+    const view = createTestView(
+      createState(doc(p("text")), { cursor: [1, 5] }),
+    );
+    const bold = commandFor(CommandIdentifier.FORMAT_BOLD);
+    // the same command each time, for computeds that ask
+    expect(commandFor(CommandIdentifier.FORMAT_BOLD)).toBe(bold);
+
+    expect(bold(view.state)).toBe(true);
+    expect(recentCommands.value).toEqual([]);
+
+    bold(view.state, view.dispatch, view);
+    expect(recentCommands.value[0]).toEqual({
+      id: CommandIdentifier.FORMAT_BOLD,
+      byKey: false,
+    });
+  });
+
+  it("leave out what only moves the focus or opens a menu", () => {
+    const view = createTestView(createState(doc(p("text"))));
+    commandFor(CommandIdentifier.VIEW_FOCUS_NEXT)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    commandFor(CommandIdentifier.FILE_CLEAR_RECENT)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    expect(recentCommands.value).toEqual([]);
+  });
+
+  it("aren't remembered when they did nothing", () => {
+    const view = createTestView(createState(doc(codeBlock("code"))));
+    commandFor(CommandIdentifier.FORMAT_LINK)(view.state, view.dispatch, view);
+    expect(recentCommands.value).toEqual([]);
   });
 });

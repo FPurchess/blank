@@ -7,7 +7,6 @@ import { commandLabel } from "../commandList";
 import {
   closeOtherTabs,
   closeTabsToRight,
-  newFile,
   print,
   saveFile,
   selectTab,
@@ -206,7 +205,8 @@ const onContextmenu = (event: MouseEvent) => {
 const onDblclick = (event: MouseEvent) => {
   const target = event.target as Element;
   if (event.timeStamp - closedAt < DOUBLE_CLICK) return;
-  if (target === list.value || target === spare.value) run(newFile());
+  if (target === list.value || target === spare.value)
+    run(commandFor(C.FILE_NEW));
 };
 
 // the wheel scrolls the tabs that don't fit
@@ -319,7 +319,7 @@ onUnmounted(() => {
       :label="newLabel"
       :command="C.FILE_NEW"
       :focusable="false"
-      @click="run(newFile())"
+      @click="run(commandFor(C.FILE_NEW))"
     />
     <div ref="spare" class="tab-row-spare" @dblclick="onDblclick" />
     <IconButton
