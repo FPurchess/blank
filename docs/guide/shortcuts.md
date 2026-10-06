@@ -78,6 +78,8 @@ Add `Shift` to the last three to select as you go. When a block like a table of 
 | Outdent list item               | `Shift` `Tab`   |
 | Indent code lines               | `Tab`           |
 | Outdent code lines              | `Shift` `Tab`   |
+| Tab, in text                    | `Tab`           |
+| Take away a tab at line start   | `Shift` `Tab`   |
 | Blockquote, on or off           | `Mod` `G`       |
 | Horizontal line                 | `Mod` `H`       |
 | Page break                      | `Mod` `Enter`   |
@@ -105,6 +107,8 @@ Add `Shift` to the last three to select as you go. When a block like a table of 
 | Select the cell, then the table | `Mod` `A`                |
 | Clear the selected cells        | `Backspace` or `Delete`  |
 | Table mode, in a table          | `Mod` `T`                |
+
+In your text, `Tab` never takes you out of it: `F6` does that. See [Lists](./writing#lists) for what Enter and Backspace do in a list, and [Tabs](./writing#tabs-in-text) for tabs in your text.
 
 In table mode, the arrow keys insert rows and columns, `Shift` + arrows move them, and letters align (`L` `C` `R`), sort (`S`), merge (`M`) and switch headers (`H`). See [Change a table](./tables#change) for all keys.
 

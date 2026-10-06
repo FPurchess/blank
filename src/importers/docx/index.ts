@@ -22,6 +22,7 @@ import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
 import { type WordLayout, pageChanges } from "./layout";
 import { type WordProperties, prepareDocx } from "./prepare";
 import { STYLE_MAP } from "./styleMap";
+import { hideTabs, showTabs } from "./tabs";
 import { readZipDirectory } from "./zipGuard";
 
 export interface ImportResult {
@@ -160,7 +161,8 @@ export const importDocx = async (
   // an inert document: nothing in it runs or loads
   const dom = new DOMParser().parseFromString(html, "text/html");
   const report = cleanup(dom);
-  const parsed = SchemaParser.fromSchema(schema).parse(dom.body);
+  hideTabs(dom.body);
+  const parsed = showTabs(SchemaParser.fromSchema(schema).parse(dom.body));
   // only blocks at the top keep an alignment (src/markdown/alignment.ts), a
   // column keeps the alignment its body cells agree on, as markdown aligns
   // columns, and links lose an underline Word users gave them

@@ -13,6 +13,7 @@ import { fieldSpec, isEmptyField } from "./blocks/forms";
 import { alignOf } from "./alignment";
 import { schema } from "./schema";
 import { gfmBlocker, gfmLines, htmlLines } from "./tables";
+import { decodeTabs, encodeTabs } from "./tabs";
 
 const { nodes } = defaultMarkdownSerializer;
 
@@ -99,10 +100,23 @@ const hasHardBreak = (node: Node) => {
 };
 
 /**
+ * TabSerializer writes the tabs at the start and the end of a line as
+ * entities, which markdown would drop (see ./tabs.ts)
+ */
+class TabSerializer extends MarkdownSerializer {
+  serialize(
+    content: Node,
+    options?: Parameters<MarkdownSerializer["serialize"]>[1],
+  ) {
+    return decodeTabs(super.serialize(encodeTabs(content), options));
+  }
+}
+
+/**
  * markdownSerializer writes a document of Blank's schema as markdown: a table as a
  * pipe table if it fits one, as an HTML table otherwise
  */
-export const markdownSerializer = new MarkdownSerializer(
+export const markdownSerializer = new TabSerializer(
   {
     ...nodes,
     paragraph: aligned((state, node, parent, index) => {

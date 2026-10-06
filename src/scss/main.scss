@@ -42,6 +42,9 @@ body {
   word-wrap: break-word;
   white-space: pre-wrap;
   white-space: break-spaces;
+  // the pages' tab stops, 36 pt apart in 11 pt text (TAB_STOP in
+  // src-tauri/layout/src/style.rs)
+  tab-size: calc(36em / 11);
   -webkit-font-variant-ligatures: none;
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0; /* the above doesn't seem to work in Edge */

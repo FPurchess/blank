@@ -55,6 +55,24 @@ Inline markdown works too: `**bold**`, `*italic*`, `` `code` ``, `[title](url)` 
 
 Code is set in IBM Plex Mono. `Mod` + Click on a link opens it in your browser. Emoji appear in black and white, in the colour of your text. Chinese, Japanese, Korean and other scripts use the fonts your computer has for them. Whatever you write, it looks on paper just as it does on the screen, and a word too long for its line, like a long web address, simply carries on to the next one.
 
+## Lists {#lists}
+
+<img class="shot" src="/screenshots/lists.gif" alt="Tab takes a new item under the one above, Shift Tab takes it back out, Backspace on an empty item deletes it, and Enter on an empty item ends the list" />
+
+Type `-` or `1.` and a space to start a list, or press `Mod` `8` or `Mod` `9`. Then:
+
+- **Enter** starts the next item. Enter on an empty item ends the list, so Enter twice gets you out of it, also from a list inside another.
+- **Tab** moves an item a level in, under the item above, wherever your cursor is in it. **Shift** **Tab** moves it a level out again, and out of the list on its first level. Select several items to move them together. The first item of a list has no item above to go under, so it stays where it is.
+- **Backspace** on an empty item deletes it, and the cursor goes to the end of the item above. At the start of an item with text, it moves the item a level out, out of the list on its first level, and the next Backspace joins it to the line above.
+
+Leaving a list in the middle with Enter, or taking an item out, splits it in two. The part after it starts again at 1. Join them back by pressing Backspace at the start of the line between them.
+
+## Tabs in text {#tabs-in-text}
+
+`Tab` puts a tab where your cursor is, as in a word processor, and the text after it moves on to the next tab stop. The stops are half an inch (about 1.27 cm) apart. Select several lines, or a whole one, and `Tab` puts a tab at the start of each, to indent them. `Shift` `Tab` takes one away again, wherever your cursor is on the line. The pages, the PDF and Word documents put your tabs on the same stops, and Word documents bring theirs along when you import them. In the markdown file, a tab at the start or the end of a line is written as `&#9;`, which other markdown apps read as a tab too.
+
+`Tab` never takes you out of your text. To get to the tabs and the toolbar with the keyboard, press `F6`.
+
 ## Code blocks {#code}
 
 Type ` ``` ` and Enter at the start of a line to start a code block. In it, `Tab` and `Shift` `Tab` work as in a code editor: select some lines and `Tab` indents all of them by 4 spaces, `Shift` `Tab` outdents them, and the same lines stay selected, so you can press again to go further. Each line moves to the next or the previous step of 4, so a line indented by 6 spaces outdents to 4, not 2, and lines without indentation stay where they are. Without a selection, `Tab` puts in spaces up to the next step, and `Shift` `Tab` outdents the line the cursor is on. Code indented with tabs keeps its tabs. Each press is one step for `Mod` `Z`. Prefer 2 spaces? Set it in [blank.json](./configuration#code-blocks).

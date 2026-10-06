@@ -4,6 +4,7 @@ import type {
   ParagraphChild,
   INumberingOptions,
   Paragraph,
+  Tab,
   Table,
   TableOfContents,
 } from "docx";
@@ -331,7 +332,7 @@ class Serializer {
         const lines = node.textContent.split("\n");
         return lines.map((text, index) => ({
           style: STYLE.codeBlock,
-          children: text ? [new this.docx.TextRun(text)] : [],
+          children: text ? [new this.docx.TextRun(this.textOf(text))] : [],
           ...this.decoration(position, false),
           ...this.indent(position),
           ...(index === lines.length - 1
@@ -850,7 +851,7 @@ class Serializer {
       default: {
         const code = hasMark(node, "code");
         return new TextRun({
-          text: node.text ?? "",
+          ...this.textOf(node.text ?? ""),
           bold: hasMark(node, "strong") || undefined,
           italics: hasMark(node, "em") || undefined,
           underline: hasMark(node, "underline") ? {} : undefined,
@@ -858,6 +859,22 @@ class Serializer {
         });
       }
     }
+  }
+
+  /**
+   * textOf returns the options of a run of `text` with its tabs as Word's
+   * tabs: a tab in the text of a run would be a space in Word
+   */
+  private textOf(
+    text: string,
+  ): { text: string } | { children: (string | Tab)[] } {
+    if (!text.includes("\t")) return { text };
+    const children: (string | Tab)[] = [];
+    text.split("\t").forEach((part, index) => {
+      if (index > 0) children.push(new this.docx.Tab());
+      if (part) children.push(part);
+    });
+    return { children };
   }
 
   private image(node: Node): ParagraphChild {
@@ -1012,6 +1029,10 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
     lastModifiedBy: fields.author,
     title: fields.title,
     evenAndOddHeaderAndFooters,
+    // tab stops 36 pt apart, as on the pages (TAB_STOP in
+    // src-tauri/layout/src/style.rs); Word's default, which other apps don't
+    // all share
+    defaultTabStop: 36 * 20,
     // the frontmatter as it was written, so importing the document again
     // restores what Word has no place for, see src/importers/docx/prepare.ts
     ...(frontmatter === null

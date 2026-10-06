@@ -90,6 +90,16 @@ describe("importers.docx", () => {
     await roundTrip("warm up");
   }, 60_000);
 
+  it("keeps tabs, also at the start of a line and in code", async () => {
+    const markdown = "&#9;one\ttwo&#9;\n\n```\n\tcode\n```";
+    expect(await roundTrip(markdown)).toBe(markdown);
+  });
+
+  it("drops the tab Word puts at the start of a list item", async () => {
+    const markdown = "1. &#9;first\n2. second";
+    expect(await roundTrip(markdown)).toBe("1. first\n2. second");
+  });
+
   // each test writes a .docx and reads it back through docx, JSZip and
   // mammoth, about 110 ms here; give them room on a machine under heavy load
   describe("tables of contents", { timeout: 20_000 }, () => {

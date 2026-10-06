@@ -10,7 +10,7 @@ use parley::{
 
 use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE, INK_UNDERLINE};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
-use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE};
+use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, TAB_STOP};
 
 /// A laid out textblock and where it stands in its item.
 pub struct TextBox {
@@ -101,6 +101,76 @@ pub fn align_offset(align: Option<&str>, room: f32, width: f32) -> f32 {
 impl TextBox {
     /// lays out `text` in `width` points
     pub fn new(fonts: &mut Fonts, text: &Text, width: f32, alignment: Alignment) -> TextBox {
+        TextBox::new_at(fonts, text, width, alignment, 0.0)
+    }
+
+    /// lays out `text` in `width` points, `origin` points from where its
+    /// tab stops are counted, e.g. the edge of the text column for a
+    /// quote's or a list's text, as Word counts them from the margin
+    pub fn new_at(
+        fonts: &mut Fonts,
+        text: &Text,
+        width: f32,
+        alignment: Alignment,
+        origin: f32,
+    ) -> TextBox {
+        // each tab reaches the next stop: it's widened by letter spacing on
+        // it alone. The tabs are measured in a layout, each one moving the
+        // ones after it on its line, and laid out again until they stay where
+        // they are, which is once unless widening them breaks the lines
+        // anew; a line with many tabs, e.g. pasted columns, isn't laid out
+        // once for each of them
+        let mut tabs: Vec<(std::ops::Range<usize>, f32)> = text
+            .text
+            .match_indices('\t')
+            .map(|(byte, _)| (byte..byte + 1, 0.0))
+            .collect();
+        if tabs.is_empty() {
+            return TextBox::lay_out(fonts, text, width, alignment, &tabs);
+        }
+        for _ in 0..=tabs.len() {
+            let boxed = TextBox::lay_out(fonts, text, width, Alignment::Start, &tabs);
+            let mut moved = false;
+            // how far the tabs before on the line moved what follows them
+            let mut shift = (usize::MAX, 0.0);
+            for tab in tabs.iter_mut() {
+                let cursor =
+                    Cursor::from_byte_index(&boxed.layout, tab.0.start, Affinity::Downstream);
+                let [_, Some(cluster)] = cursor.visual_clusters(&boxed.layout) else {
+                    continue;
+                };
+                let line = cluster.path().line_index();
+                if shift.0 != line {
+                    shift = (line, 0.0);
+                }
+                let x = origin + boxed.cluster_x(&cluster) + shift.1;
+                // the next stop, not the one the tab stands at
+                let stop = ((x + 0.01) / TAB_STOP).floor() * TAB_STOP + TAB_STOP;
+                let change = stop - x - cluster.advance();
+                if change.abs() > 0.01 {
+                    tab.1 += change;
+                    shift.1 += change;
+                    moved = true;
+                }
+            }
+            if !moved {
+                if alignment == Alignment::Start {
+                    return boxed;
+                }
+                break;
+            }
+        }
+        TextBox::lay_out(fonts, text, width, alignment, &tabs)
+    }
+
+    /// lays out `text` with the letter spacing of each of its tabs
+    fn lay_out(
+        fonts: &mut Fonts,
+        text: &Text,
+        width: f32,
+        alignment: Alignment,
+        tabs: &[(std::ops::Range<usize>, f32)],
+    ) -> TextBox {
         let style = text_style(text.style);
         let len = utf16_len(&text.text);
         let laid_text = if text.text.is_empty() {
@@ -145,6 +215,12 @@ impl TextBox {
                     }
                     push_span(&mut builder, span, range, &style, mono_stack, &mut links);
                 }
+            }
+            for (range, spacing) in tabs {
+                builder.push(
+                    StyleProperty::LetterSpacing(style.tracking + spacing),
+                    range.clone(),
+                );
             }
             builder.build(&laid_text)
         };
@@ -320,25 +396,29 @@ impl TextBox {
             let size = parley_run.font_size();
             let mut pen = run.offset();
             let baseline = run.baseline();
-            let glyphs: Vec<Glyph> = clustered
-                .into_iter()
-                .skip(skip)
-                .take(count)
-                .map(|(glyph, range)| {
-                    let positioned = Glyph {
-                        id: glyph.id,
-                        x: pen + glyph.x,
-                        y: baseline + glyph.y,
-                        advance: glyph.advance,
-                        dx: glyph.x,
-                        dy: glyph.y,
-                        start: range.start as u32,
-                        end: range.end as u32,
-                    };
-                    pen += glyph.advance;
-                    positioned
-                })
-                .collect();
+            let text = &self.text;
+            // a tab is the room up to its stop, with nothing in it: the
+            // fonts have no glyph for it. The run is split there, since
+            // the PDF sets a run's glyphs one after the other.
+            let mut pieces: Vec<Vec<Glyph>> = vec![vec![]];
+            for (glyph, range) in clustered.into_iter().skip(skip).take(count) {
+                let positioned = Glyph {
+                    id: glyph.id,
+                    x: pen + glyph.x,
+                    y: baseline + glyph.y,
+                    advance: glyph.advance,
+                    dx: glyph.x,
+                    dy: glyph.y,
+                    start: range.start as u32,
+                    end: range.end as u32,
+                };
+                pen += glyph.advance;
+                if text.get(range) == Some("\t") {
+                    pieces.push(vec![]);
+                } else if let Some(piece) = pieces.last_mut() {
+                    piece.push(positioned);
+                }
+            }
             let ink = run.style().brush;
             let font = self
                 .run_fonts
@@ -351,19 +431,38 @@ impl TextBox {
                     .map_or((0.1, 0.05), |(file, _)| file.underline);
                 (offset * size, thickness * size)
             });
-            if glyphs.is_empty() && ink & INK_CODE == 0 {
+            // a run of a tab alone, e.g. in inline code, keeps its fill
+            if pieces.len() == 1 || pieces.iter().all(Vec::is_empty) {
+                let glyphs = pieces.into_iter().flatten().collect::<Vec<_>>();
+                if glyphs.is_empty() && ink & INK_CODE == 0 {
+                    continue;
+                }
+                result.push(GlyphRun {
+                    font,
+                    size,
+                    ink,
+                    glyphs,
+                    underline,
+                    baseline,
+                    x: run.offset(),
+                    width: run.advance(),
+                });
                 continue;
             }
-            result.push(GlyphRun {
-                font,
-                size,
-                ink,
-                glyphs,
-                underline,
-                baseline,
-                x: run.offset(),
-                width: run.advance(),
-            });
+            for glyphs in pieces.into_iter().filter(|piece| !piece.is_empty()) {
+                let x = glyphs[0].x - glyphs[0].dx;
+                let width = glyphs.iter().map(|glyph| glyph.advance).sum();
+                result.push(GlyphRun {
+                    font,
+                    size,
+                    ink,
+                    glyphs,
+                    underline,
+                    baseline,
+                    x,
+                    width,
+                });
+            }
         }
         result
     }
@@ -760,6 +859,68 @@ mod tests {
             text: value.into(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn tabs_reach_the_next_stop() {
+        let mut fonts = repository_fonts();
+        let caret_x = |boxed: &TextBox, pos: u32| boxed.caret(pos, false).1;
+        // positions: 1 before "ab", 3 at the tab, 4 after it
+        let boxed = TextBox::new(&mut fonts, &text("ab\tcd\te"), 300.0, Alignment::Start);
+        assert!((caret_x(&boxed, 4) - TAB_STOP).abs() < 0.01);
+        assert!((caret_x(&boxed, 7) - 2.0 * TAB_STOP).abs() < 0.01);
+        // a leading tab, and one standing at a stop, which goes on to the next
+        let leading = TextBox::new(&mut fonts, &text("\t\tx"), 300.0, Alignment::Start);
+        assert!((caret_x(&leading, 2) - TAB_STOP).abs() < 0.01);
+        assert!((caret_x(&leading, 3) - 2.0 * TAB_STOP).abs() < 0.01);
+        // counted from the origin: 10 pt in, the first stop is 26 pt away
+        let indented = TextBox::new_at(&mut fonts, &text("\tx"), 300.0, Alignment::Start, 10.0);
+        assert!((caret_x(&indented, 2) - (TAB_STOP - 10.0)).abs() < 0.01);
+        // the tab is painted as nothing, and the glyphs after it at its stop
+        let runs = boxed.glyph_runs(&fonts, 0);
+        let glyphs: Vec<&Glyph> = runs.iter().flat_map(|run| &run.glyphs).collect();
+        assert_eq!(glyphs.len(), 5);
+        assert!(glyphs.iter().all(|glyph| glyph.id != 0));
+        assert!((glyphs[2].x - glyphs[2].dx - TAB_STOP).abs() < 0.01);
+        // each run starts where its first glyph is drawn
+        for run in &runs {
+            assert!((run.x - (run.glyphs[0].x - run.glyphs[0].dx)).abs() < 0.01);
+        }
+        assert!(boxed.missing.is_empty());
+        // a click in the tab's room goes to its nearer side
+        let middle = (boxed.lines()[0].top + boxed.lines()[0].bottom) / 2.0;
+        assert_eq!(boxed.hit(caret_x(&boxed, 3) + 2.0, middle), 3);
+        assert_eq!(boxed.hit(TAB_STOP - 2.0, middle), 4);
+    }
+
+    #[test]
+    fn many_tabs_on_a_line_reach_their_stops() {
+        let mut fonts = repository_fonts();
+        let columns = "ab\t".repeat(40);
+        let boxed = TextBox::new(&mut fonts, &text(&columns), 2000.0, Alignment::Center);
+        assert_eq!(boxed.line_count(), 1);
+        let shift = boxed.caret(1, false).1;
+        // each "ab" after a tab starts at a stop, from where the line starts
+        for column in 1..40 {
+            let x = boxed.caret(1 + 3 * column, false).1 - shift;
+            assert!((x - column as f32 * TAB_STOP).abs() < 0.02, "{column}: {x}");
+        }
+    }
+
+    #[test]
+    fn tabs_break_lines_like_spaces() {
+        let mut fonts = repository_fonts();
+        let boxed = TextBox::new(
+            &mut fonts,
+            &text("word\tword\tword"),
+            60.0,
+            Alignment::Start,
+        );
+        assert_eq!(boxed.line_count(), 3);
+        // a justified line widens its spaces, never its tabs
+        let line = format!("{} end", "a\tb c d e f g ".repeat(3));
+        let justified = TextBox::new(&mut fonts, &text(&line), 200.0, Alignment::Justify);
+        assert!((justified.caret(3, false).1 - TAB_STOP).abs() < 0.01);
     }
 
     #[test]

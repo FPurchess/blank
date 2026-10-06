@@ -68,6 +68,10 @@ pub const CODE_SIZE: f32 = 10.0;
 /// inline code, as much smaller than the text around it
 pub const CODE_SCALE: f32 = 0.9;
 
+/// the distance between the tab stops, Word's default of half an inch:
+/// a tab in the text reaches the next one
+pub const TAB_STOP: f32 = 36.0;
+
 /// the gap between a list marker and the text
 pub const MARKER_GAP: f32 = 6.0;
 /// the width of a quote bar

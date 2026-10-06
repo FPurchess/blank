@@ -83,6 +83,29 @@ export const createState = (
 };
 
 /**
+ * marked takes the "|" in the text of `node` out and returns the doc with
+ * the cursor there, or with the selection between two of them
+ */
+export const marked = (
+  node: Node,
+): { doc: Node; cursor: number | [number, number] } => {
+  const marks: number[] = [];
+  node.descendants((child, pos) => {
+    if (!child.isText) return;
+    for (const [index, char] of [...child.text!].entries())
+      if (char === "|") marks.push(pos + index);
+  });
+  if (marks.length === 0 || marks.length > 2)
+    throw new Error(`one or two | in the text, not ${marks.length}`);
+  let tr = EditorState.create({ schema, doc: node }).tr;
+  for (const pos of [...marks].reverse()) tr = tr.delete(pos, pos + 1);
+  // the second mark stands one character further in, before the first goes
+  const cursor: number | [number, number] =
+    marks.length === 1 ? marks[0] : [marks[0], marks[1] - 1];
+  return { doc: tr.doc, cursor };
+};
+
+/**
  * endOfBlock returns the position at the end of the doc's top-level block
  * at `index`, i.e. where the cursor sits after typing into that block.
  */

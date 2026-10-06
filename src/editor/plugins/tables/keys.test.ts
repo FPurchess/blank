@@ -7,6 +7,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { schema } from "../../../markdown";
 import {
+  codeBlock,
   createState,
   createTestView,
   doc,
@@ -112,6 +113,17 @@ describe("Tab", () => {
     press("Tab");
     const { from, to } = view.state.selection;
     expect(view.state.doc.textBetween(from, to)).toBe("x");
+  });
+
+  it("indents code in a cell, and outdents it, instead of moving on", () => {
+    const node = doc(table(tr(th("a")), tr(td(codeBlock("x")), td("y"))), p());
+    const { view, press } = setup(node, at(node, "x"));
+
+    expect(press("Tab")).toBe(true);
+    const code = () => view.state.doc.firstChild!.lastChild!.firstChild!;
+    expect(code().textContent).toBe(" ".repeat(4) + "x");
+    expect(press("Shift-Tab")).toBe(true);
+    expect(code().textContent).toBe("x");
   });
 
   it("leaves Tab to the keymap outside tables", () => {

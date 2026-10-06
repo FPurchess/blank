@@ -118,6 +118,26 @@ describe("exporter.docx", () => {
     ]);
   });
 
+  it("writes tabs as Word's tabs, 36 pt apart", async () => {
+    const exported = await exportMarkdown(
+      "&#9;one\ttwo *th\tree*\n\n```\n\tcode\n```",
+    );
+    const [text, code] = await paragraphs(exported);
+    // a tab stands between the runs' text, in the marked run too
+    const runs = all(text.p, "r").map((r) =>
+      [...r.childNodes]
+        .map((node) => (node.nodeName === "w:tab" ? "→" : node.textContent))
+        .join(""),
+    );
+    expect(runs.join("")).toBe("→one→two th→ree");
+    expect(text.text).toBe("onetwo three");
+    expect(all(code.p, "tab")).toHaveLength(1);
+    const settings = await exported.xml("word/settings.xml");
+    expect(attr(child(settings.documentElement, "defaultTabStop"), "val")).toBe(
+      "720",
+    );
+  });
+
   it("leaves out content blocks Blank can't show, and says so", async () => {
     const exported = await exportMarkdown(
       ["a", "<!-- blank:toc@9 -->", "<!-- blank:x@1 -->", "b"].join("\n\n"),
