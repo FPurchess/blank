@@ -38,8 +38,14 @@ export interface TileDrag {
  * tileDrag follows a drag of a tile onto the pages
  */
 export const tileDrag = (target: TileDragTarget): TileDrag => {
-  let press: { id: string; x: number; y: number; dragging: boolean } | null =
-    null;
+  let press: {
+    id: string;
+    x: number;
+    y: number;
+    dragging: boolean;
+    // the element pressed, which keeps the pointer's events once it drags
+    element: Element | null;
+  } | null = null;
 
   const cancel = () => {
     press = null;
@@ -50,18 +56,25 @@ export const tileDrag = (target: TileDragTarget): TileDrag => {
     down(event, id) {
       press = null;
       if (event.button !== 0) return;
-      press = { id, x: event.clientX, y: event.clientY, dragging: false };
-      (event.currentTarget as Element | null)?.setPointerCapture?.(
-        event.pointerId,
-      );
+      press = {
+        id,
+        x: event.clientX,
+        y: event.clientY,
+        dragging: false,
+        element: event.currentTarget as Element | null,
+      };
     },
     move(event) {
       if (!press) return;
       if (!(event.buttons & 1)) return cancel();
       const { clientX: x, clientY: y } = event;
-      if (!press.dragging && Math.hypot(x - press.x, y - press.y) < DRAG_START)
-        return;
-      press.dragging = true;
+      if (!press.dragging) {
+        if (Math.hypot(x - press.x, y - press.y) < DRAG_START) return;
+        // the drag follows the pointer onto the pages, once it's a drag: a
+        // capture before would take the click from the tile
+        press.element?.setPointerCapture?.(event.pointerId);
+        press.dragging = true;
+      }
       pageDropGap.value = target.onPages(x, y)
         ? gapAt(target.doc(), x, y)
         : null;
