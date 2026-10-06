@@ -1,9 +1,4 @@
-import {
-  BAND_GAP,
-  BAND_ROW,
-  BLEED,
-  type FrameLayout,
-} from "../engine/frames";
+import { BAND_GAP, BAND_ROW, BLEED, type FrameLayout } from "../engine/frames";
 import {
   BAND,
   type Band,
