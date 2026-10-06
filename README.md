@@ -20,15 +20,15 @@
   </picture>
 </p>
 
-Every piece of writing begins the same way: an empty page, a blinking cursor, and the quiet question of what comes next.
+Blank is a desktop editor for documents such as letters, reports and longer texts. It saves plain markdown files and shows them on pages that match the PDF it exports.
 
-Blank is made for that moment and for everything after it. Nothing asks for your attention: one quiet row of formatting buttons, and otherwise the page and the sentence you are writing. Your hands can stay on the keyboard, and the formatting follows them: type `#` and a space, and a heading appears, press `Mod` `I` and your words lean into italics.
+- **Pages that match the PDF:** Blank lays out your text with its own layout engine, so every line and every page ends on the screen where it ends in the PDF. Headers, footers, page numbers, tables, images and a table of contents are part of the page. [Pages](https://blank-writer.xyz/guide/pages)
+- **Formatting as you type:** markdown such as `#` or `**bold**` turns into formatting while you type. A toolbar holds the formats, and every command has a shortcut you can change. Autocorrect sets typographic quotes and dashes in 14 languages, and spell check covers about 80. [Writing in Blank](https://blank-writer.xyz/guide/writing)
+- **PDF and Word:** export to PDF or to Word, and open Word documents as markdown. [Files and formats](https://blank-writer.xyz/guide/files)
+- **Focus mode:** the tabs, the toolbar and the status bar fade while you type, and come back when you move the mouse.
+- **Offline and open source:** no account, and nothing you write leaves your computer. Linux, macOS and Windows.
 
-The small things take care of themselves. Quotes curl, dashes find their length, and a new sentence starts with a capital letter in the language you write in. When you are ready to proofread, spell check underlines what it doesn't know and offers what you meant. Close the window mid-thought and Blank keeps your words for the next time you open it.
-
-Underneath, it's plain markdown, so your writing stays yours, readable by any editor for as long as you keep it.
-
-What you see is what you print. Blank sets your text in pages as you write, and every line and every page ends on the screen exactly where it ends in the PDF, headers, footers and page numbers included. [See your pages](https://blank-writer.xyz/guide/pages).
+Blank keeps your open tabs, unsaved changes included, between sessions. That is not a backup: save what you want to keep.
 
 ## Download
 
@@ -38,26 +38,9 @@ What you see is what you print. Blank sets your text in pages as you write, and 
 
 **macOS** blocks Blank on first open because it isn't notarized by Apple. **Linux** needs glibc 2.35+ and WebKitGTK 4.1 (Ubuntu 22.04+, Debian 12+). See the [install guide](https://blank-writer.xyz/guide/install) for both.
 
-## Keyboard shortcuts
-
-A handful of shortcuts is all it takes to begin. `Mod` is `Cmd` on macOS and `Ctrl` on Windows and Linux.
-
-| Command                     | Shortcut                    |
-| --------------------------- | --------------------------- |
-| Save / Open / New document  | `Mod S` / `Mod O` / `Mod N` |
-| Next tab / Close tab        | `Ctrl Tab` / `Mod W`        |
-| Heading 1 – 6 / Paragraph   | `Mod 1` … `Mod 6` / `Mod 0` |
-| Bullet list / Numbered list | `Mod 8` / `Mod 9`           |
-| Bold / Italic / Code        | `Mod B` / `Mod I` / `Mod E` |
-| Insert link                 | `Mod K`                     |
-| Insert table                | `Mod T`                     |
-| Export as PDF / Word        | `Mod Alt P` / `Mod Alt W`   |
-
-All shortcuts, and how to change them, are in the [documentation](https://blank-writer.xyz/guide/shortcuts).
-
 ## Documentation
 
-Everything else lives on **[blank-writer.xyz](https://blank-writer.xyz/)**: [writing in Blank](https://blank-writer.xyz/guide/writing), [tables](https://blank-writer.xyz/guide/tables), [files and formats: PDF and Word](https://blank-writer.xyz/guide/files), [autocorrect in 14 languages](https://blank-writer.xyz/guide/autocorrect), [spell check](https://blank-writer.xyz/guide/spelling), the [six themes](https://blank-writer.xyz/guide/themes), [your own shortcuts and settings](https://blank-writer.xyz/guide/configuration) and the [FAQ](https://blank-writer.xyz/guide/faq).
+The guide, all shortcuts and the FAQ are on **[blank-writer.xyz](https://blank-writer.xyz/)**.
 
 ## Contributing
 
