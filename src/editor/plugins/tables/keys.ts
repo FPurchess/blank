@@ -1,6 +1,5 @@
 import { chainCommands } from "prosemirror-commands";
 import { keydownHandler } from "prosemirror-keymap";
-import type { ResolvedPos } from "prosemirror-model";
 import {
   Plugin,
   Selection,
@@ -19,6 +18,8 @@ import {
 } from "prosemirror-tables";
 
 import { schema } from "../../../markdown";
+import { indentCode, outdentCode } from "../../commands/codeIndent";
+import { listItemStart } from "../../commands/listKeys";
 import { addRows } from "../../commands/table/insert";
 import { cellPos, refreshed, transactionOf } from "../../commands/table/rect";
 import { removeTable } from "../../commands/table/remove";
@@ -35,24 +36,17 @@ import {
 type Direction = "up" | "down" | "left" | "right";
 
 /**
- * listItemStart returns the depth of the list item whose first line starts
- * at `$pos`, or -1
- */
-const listItemStart = ($pos: ResolvedPos): number => {
-  if ($pos.parentOffset !== 0 || $pos.depth < 2) return -1;
-  const item = $pos.node(-1);
-  if (item.type !== schema.nodes.list_item || $pos.index(-1) !== 0) return -1;
-  return $pos.depth - 1;
-};
-
-/**
  * tab moves to the next (`dir` 1) or previous (-1) cell, adding a row after
- * the last cell. At the start of a list item it indents or outdents instead.
+ * the last cell. In code, and at the start of a list item, it indents or
+ * outdents instead.
  */
 const tab =
   (dir: 1 | -1): Command =>
-  (state, dispatch) => {
+  (state, dispatch, view) => {
     if (!isInTable(state)) return false;
+    if ((dir === 1 ? indentCode : outdentCode)(state, dispatch, view)) {
+      return true;
+    }
     const { selection } = state;
     // isInTable means the list item is in a cell
     const item = selection.empty ? listItemStart(selection.$from) : -1;

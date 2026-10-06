@@ -4,10 +4,7 @@ import { liftListItem, wrapInList } from "prosemirror-schema-list";
 
 import { schema } from "../../markdown";
 import { rangeIn } from "./around";
-
-const isList = (node: Node) =>
-  node.type === schema.nodes.bullet_list ||
-  node.type === schema.nodes.ordered_list;
+import { isList } from "./listKeys";
 
 /**
  * listAround returns the innermost bulleted or numbered list around the

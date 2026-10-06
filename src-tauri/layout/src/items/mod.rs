@@ -333,7 +333,7 @@ impl Laid {
 
 fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
     let alignment = alignment_of(text.align.as_deref());
-    let mut boxed = TextBox::new(fonts, text, width, alignment);
+    let mut boxed = TextBox::new_at(fonts, text, width, alignment, indent);
     boxed.x = indent;
     // what an empty text says, in its style, on the screen only; in the
     // middle of a box for a picture to come

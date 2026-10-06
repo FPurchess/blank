@@ -2,9 +2,17 @@
 // the demo on the home page (see shots.ts)
 import { $, browser } from "@wdio/globals";
 
-import { editorText, Key, pressMod, textBox, type } from "../helpers.ts";
+import {
+  editorText,
+  Key,
+  pressMod,
+  pressShift,
+  textBox,
+  type,
+} from "../helpers.ts";
 import {
   DEMO,
+  SHIFT,
   filmNew,
   finishShots,
   newDocument,
@@ -41,6 +49,32 @@ describe("docs shots: writing", () => {
     await film.type("> the sea is never the same twice.");
     await film.pause(2.5);
     film.save("writing.gif");
+  });
+
+  // the lists of the writing guide: Tab takes an item in, Shift+Tab out,
+  // Backspace deletes an empty one, and Enter on an empty one ends the list
+  it("records writing a list", async () => {
+    const film = await filmNew({ view: "pages" });
+    film.hidePointer();
+    await film.type("- apples");
+    await film.enter(0.5);
+    await film.press("Tab", Key.Tab, 0.6);
+    await film.type("green ones");
+    await film.enter(0.5);
+    await film.shortcut(["Shift", "Tab"], () => pressShift(Key.Tab), 0.8);
+    await film.type("pears");
+    await film.enter(0.5);
+    await film.type("plums");
+    await film.pause(0.6);
+    // the last item taken back: its letters, then Backspace on the empty
+    // item deletes it, and the cursor is back after "pears"
+    await film.erase(5);
+    await film.press("Backspace", Key.Backspace, 0.8);
+    await film.enter(0.5);
+    await film.press("Enter", Key.Enter, 0.8);
+    await film.type("that's all.");
+    await film.pause(2.5);
+    film.save("lists.gif", 335 + SHIFT);
   });
 
   it("captures the language chooser", async () => {

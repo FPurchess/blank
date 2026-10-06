@@ -218,6 +218,27 @@ describe.runIf(hasPdftotext)("the PDF holds the layout", () => {
     expect(words).toBeGreaterThan(20);
   });
 
+  it("with tabs, at their stops and with nothing painted for them", () => {
+    const markdown = [
+      "&#9;Indented\tby\ttabs to the stops.",
+      "",
+      "> quoted\tand *marked\ttext*",
+      "",
+      "1. one\ttwo",
+    ].join("\n");
+    const engine = testEngine();
+    engine.sync(parseMarkdown(markdown), () => undefined);
+    const laid = JSON.parse(engine.raw.words()) as LaidWord[];
+    const left = laid.find((word) => word.text === "Indented")!.left;
+    // the left margin, then the first tab stop 36 pt in
+    const by = laid.find((word) => word.text === "by")!;
+    expect(by.left - left).toBeGreaterThan(36);
+    expect((by.left - (left - 36)) % 36).toBeCloseTo(0, 1);
+    const { words } = compare(markdown, "tabs");
+    // the list's number too
+    expect(words).toBe(13);
+  });
+
   it("with words longer than the line, broken where they must", () => {
     const url = `https://example.com/${"a-long-path/".repeat(12)}end`;
     const word = "Donaudampfschifffahrtsgesellschaft".repeat(4);

@@ -210,16 +210,17 @@ describe("code blocks: Tab and Shift-Tab", () => {
     expect(view.state.doc.firstChild!.childCount).toBe(1);
   });
 
-  it("doesn't take Tab outside code blocks", () => {
-    const { press } = withKeymap(doc(p("text")), { cursor: 2 });
-    expect(press("Tab")).toBe(false);
-    expect(press("Shift-Tab")).toBe(false);
+  it("leaves Tab outside code blocks to the text", () => {
+    const { view, press } = withKeymap(doc(p("text")), { cursor: 2 });
+    expect(press("Tab")).toBe(true);
+    expect(view.state.doc.textContent).toBe("t\text");
   });
 
-  it("doesn't take a selection that leaves the code block", () => {
-    const { press } = withKeymap(doc(codeBlock("    a"), p("b")), {
-      cursor: [2, 10],
-    });
-    expect(press("Shift-Tab")).toBe(false);
+  it("leaves code alone with a selection that leaves the code block", () => {
+    const start = doc(codeBlock("    a"), p("b"));
+    const { view, press } = withKeymap(start, { cursor: [2, 10] });
+    // the line of text has no tab to take, and the key stays in the editor
+    expect(press("Shift-Tab")).toBe(true);
+    expect(view.state.doc.eq(start)).toBe(true);
   });
 });

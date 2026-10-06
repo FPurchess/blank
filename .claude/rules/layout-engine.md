@@ -77,6 +77,7 @@ The wasm API between Rust (`model.rs`, `wasm.rs`) and TypeScript (`flatten.ts`, 
 ## Known limits
 
 - No hyphenation or widow and orphan control; justified lines only widen their spaces. Headings keep only their first line with the next block.
+- Tabs reach the next default stop, every 36 pt (`TAB_STOP` in `style.rs`; the Word export sets `defaultTabStop` to match), counted from the edge of the text column (`TextBox::new_at`, the `indent` of `text_units`), or from a cell's or a box's own edge. Parley has no tab stops: `TextBox::new_at` widens each tab with letter spacing on it alone, lays out again until the tabs stay where they are, and never paints the tab's glyph (the fonts have none, it'd be the missing glyph); `glyph_runs` splits a run at a tab, since the PDF places a run's glyphs one after the other. There are no custom stops, and a tab ending a hair before a stop is that thin, as in Word. Parley classes a tab as no space, so justifying never widens it.
 - Emoji are the monochrome Noto Emoji, in the text's colour; colour glyphs (COLR, bitmaps) aren't painted.
 - Chinese, Japanese, Korean and symbols Blank's fonts lack come from the system's fonts, so another machine can lay the same document out differently, and a machine without such a font shows boxes on screen and in the PDF. Fonts whose licence forbids embedding a subset are skipped (see CLAUDE.md, Gotchas).
 - The text is painted from unhinted outlines with grayscale anti-aliasing on whole-pixel baselines: a shade lighter than the webview's text at 1×, no subpixel anti-aliasing.

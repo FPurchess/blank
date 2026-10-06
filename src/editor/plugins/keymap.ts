@@ -3,16 +3,15 @@ import {
   baseKeymap,
   chainCommands,
   createParagraphNear,
+  deleteSelection,
+  joinBackward,
   liftEmptyBlock,
   newlineInCode,
+  selectNodeBackward,
   splitBlockAs,
   toggleMark,
 } from "prosemirror-commands";
-import {
-  liftListItem,
-  sinkListItem,
-  splitListItem,
-} from "prosemirror-schema-list";
+import { splitListItem } from "prosemirror-schema-list";
 import { alignOf, fieldAt, schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -57,6 +56,20 @@ import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
+import {
+  backspaceInList,
+  enterEmptyItem,
+  joinAfterList,
+} from "../commands/listKeys";
+import {
+  indentLines,
+  inItems,
+  insertTab,
+  keepKey,
+  liftItems,
+  outdentLines,
+  sinkItems,
+} from "../commands/indent";
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
@@ -117,14 +130,17 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),
   [CommandIdentifier.INSERT_BLOCK]: toggleBlocksPane(),
-  // the lines of a code block first, then list items
+  // the lines of a code block first, then list items, then lines of text;
+  // their keys do a little more, see keyCommands
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
     indentCode,
-    sinkListItem(schema.nodes.list_item),
+    sinkItems,
+    indentLines,
   ),
   [CommandIdentifier.FORMAT_UNINDENT]: chainCommands(
     outdentCode,
-    liftListItem(schema.nodes.list_item),
+    liftItems,
+    outdentLines,
   ),
   [CommandIdentifier.FORMAT_BOLD]: markCommand(schema.marks.strong),
   [CommandIdentifier.FORMAT_ITALIC]: markCommand(schema.marks.em),
@@ -188,6 +204,33 @@ const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
 export const commandFor = (id: CommandIdentifier): Command => commandMap[id];
 
 /**
+ * keyCommands are what the keys of some commands run instead of what the
+ * buttons run, which is enabled only where it does something: Tab puts a
+ * tab at the cursor, and Tab and Shift-Tab never move the focus out of the
+ * text, where a list item can't go further or a line has no tab to take
+ */
+const keyCommands: Partial<Record<CommandIdentifier, Command>> = {
+  [CommandIdentifier.FORMAT_INDENT]: chainCommands(
+    indentCode,
+    // with the first item, the items after it go down
+    inItems(chainCommands(sinkItems, indentLines)),
+    insertTab,
+    indentLines,
+    keepKey,
+  ),
+  [CommandIdentifier.FORMAT_UNINDENT]: chainCommands(
+    outdentCode,
+    inItems(liftItems),
+    outdentLines,
+    keepKey,
+  ),
+};
+
+// the command the key of `id` runs
+const keyCommandFor = (id: CommandIdentifier): Command =>
+  keyCommands[id] ?? commandMap[id];
+
+/**
  * bindingsOf binds the commands `ids` to their configured keys, and then to
  * their fixed keys (see FIXED_KEYS). Bindings that can't be used are added
  * to `invalid`; a command without a key (an empty one) is left out.
@@ -206,7 +249,7 @@ const bindingsOf = (
       invalid.push(`${id}: ${binding}`);
       continue;
     }
-    const command = commandMap[id];
+    const command = keyCommandFor(id);
     bindings[normalized] = command;
     // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
     // on Windows, where the keymap can't fall back to the key code
@@ -222,7 +265,7 @@ const bindingsOf = (
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
       if (!configured.some((binding) => sameBinding(binding, key)))
-        bindings[key] = commandMap[id];
+        bindings[key] = keyCommandFor(id);
     }
   }
   return bindings;
@@ -287,6 +330,16 @@ const keepAlignment = (node: Node, atEnd: boolean) => {
     : null;
 };
 
+// baseKeymap's Backspace, but at the start of a list item or of the
+// paragraph after a list, as in Google Docs (see listKeys)
+const backspace = chainCommands(
+  deleteSelection,
+  backspaceInList,
+  joinAfterList,
+  joinBackward,
+  selectNodeBackward,
+);
+
 /**
  * keymap runs the commands on their keys, over prosemirror's base keymap. It
  * follows the keymap of the settings: a changed key works at once, in every
@@ -305,6 +358,7 @@ export const keymap = () => {
         // baseKeymap's Enter, but a paragraph after an aligned block, made at
         // its end, is aligned like it, as in Word
         Enter: chainCommands(
+          enterEmptyItem,
           splitListItem(schema.nodes.list_item),
           newlineInCode,
           createParagraphNear,
@@ -312,6 +366,8 @@ export const keymap = () => {
           splitBlockAs(keepAlignment),
         ),
         "Shift-Enter": insertNode(schema.nodes.hard_break),
+        Backspace: backspace,
+        "Shift-Backspace": backspace,
       })),
     },
   });

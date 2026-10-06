@@ -93,7 +93,11 @@ describe("formatItems", () => {
     expect(byId(listed, C.FORMAT_ALIGN_CENTER).enabled).toBe(false);
     const plain = itemsOf(createState(doc(p("a"))));
     expect(byId(plain, C.UNDO).enabled).toBe(false);
-    expect(byId(plain, C.FORMAT_INDENT).enabled).toBe(false);
+    // a tab in front of the line, but none there to take away
+    expect(byId(plain, C.FORMAT_INDENT).enabled).toBe(true);
+    expect(byId(plain, C.FORMAT_UNINDENT).enabled).toBe(false);
+    // the first item of a list has no item above to go under
+    expect(byId(listed, C.FORMAT_INDENT).enabled).toBe(false);
     expect(byId(plain, C.FORMAT_ALIGN_JUSTIFY).enabled).toBe(true);
     const cell = itemsOf(createState(doc(table(tr(td("a")))), { cursor: 4 }));
     expect(byId(cell, C.FORMAT_ALIGN_JUSTIFY).enabled).toBe(false);
