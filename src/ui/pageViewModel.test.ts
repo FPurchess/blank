@@ -205,8 +205,6 @@ describe("movesPages", () => {
     expect(movesPages(pageEnds, { ...pageEnds })).toBe(false);
     expect(movesPages(pages, pageEnds)).toBe(true);
     expect(movesPages({ ...pageEnds, scale: 2 }, pageEnds)).toBe(true);
-    // the header of the first page takes room above it
-    expect(movesPages({ ...pageEnds, headerRoom: 20 }, pageEnds)).toBe(true);
     const lower = { ...frame, ...place, top: 128 };
     expect(movesPages({ ...pageEnds, frames: [lower] }, pageEnds)).toBe(true);
   });
@@ -334,18 +332,30 @@ describe("stripPlace", () => {
         windowWidth: 1000,
       }),
     ).toMatchObject({ left: 192, width: 800 });
-    // no room on either side: within the view, its bottom 8 px above the
+    // no room on either side: within the view, its top 8 px below the
     // view's
+    const short = { ...view, height: 300 };
+    expect(
+      stripPlace({
+        sheet,
+        band: band(330),
+        which: "footer",
+        view: short,
+        height: 250,
+        windowWidth: 1000,
+      }).top,
+    ).toBe(80 + 8);
+    // a band below the view: its slots stay in it, the strip above them
     expect(
       stripPlace({
         sheet,
         band: band(400),
         which: "footer",
-        view: { ...view, height: 300 },
+        view: short,
         height: 250,
         windowWidth: 1000,
       }).top,
-    ).toBe(80 + 300 - 250 - 8);
+    ).toBe(80 + 300 - 4 - 28 - 8 - 250);
   });
 
   it("follows the band as the view scrolls", () => {
@@ -354,27 +364,50 @@ describe("stripPlace", () => {
 });
 
 describe("slotRowPlace", () => {
+  const view = { left: 0, top: 40, width: 1000, height: 700 };
+  const band = (top: number, height = 14, size = 9) => ({
+    left: 100,
+    top,
+    width: 600,
+    height,
+    size,
+  });
+
   it("grows the band to a control's height, a little wider", () => {
-    expect(
-      slotRowPlace({ left: 100, top: 200, width: 600, height: 14, size: 9 }),
-    ).toEqual({ left: 94, top: 193, width: 612, height: 28, fontSize: 12 });
+    expect(slotRowPlace(band(200), view)).toEqual({
+      left: 94,
+      top: 193,
+      width: 612,
+      height: 28,
+      fontSize: 12,
+    });
     // a band shown larger keeps its size
-    expect(
-      slotRowPlace({ left: 0, top: 0, width: 600, height: 40, size: 20 }),
-    ).toMatchObject({ top: 0, height: 40, fontSize: 20 });
+    expect(slotRowPlace(band(100, 40, 20), view)).toMatchObject({
+      top: 100,
+      height: 40,
+      fontSize: 20,
+    });
+  });
+
+  it("stays whole in the view, a little from its edges", () => {
+    // the first page's header in "page ends", at the top of the pages
+    expect(slotRowPlace(band(40, 20), view).top).toBe(44);
+    // a band scrolled partly out at the bottom
+    expect(slotRowPlace(band(730), view).top).toBe(708);
   });
 });
 
 describe("edgeHintPlace", () => {
-  it("offers a header right above the text, a footer a gap below it", () => {
+  it("offers a header and a footer on their lines, a gap from the text", () => {
+    // centered on the line, a band row high, a gap above the text
     expect(edgeHintPlace(pageEnds, "header")).toEqual({
       left: 76,
-      top: 76,
+      top: 100 - 32 - 20 - 2,
       width: 528,
       height: 24,
     });
     expect(edgeHintPlace(pageEnds, "footer")).toMatchObject({
-      top: 100 + 900 + 32,
+      top: 100 + 900 + 32 - 2,
     });
   });
 

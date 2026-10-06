@@ -121,17 +121,18 @@ const HINT_HEIGHT = 24;
 /**
  * edgeHintPlace returns where "page ends" offers to add a header above the
  * first page's text, or a footer below the last page's, while the document
- * has none, in the room the desk keeps there: right above the text, or a
- * gap below it, where the footer would show. The sheets of "pages" offer
- * it in their margins.
+ * has none, in the room the desk keeps there (HEADER_ROOM, VIEW_BOTTOM): on
+ * the line where the header or footer would show, a gap from the text. The
+ * sheets of "pages" offer it in their margins.
  */
 export const edgeHintPlace = (layout: FrameLayout, band: Band) => {
   const frame = edgeFrame(layout, band);
   if (!frame || layout.mode === "pages") return null;
-  const top =
+  const line =
     band === "header"
-      ? Math.max(0, frame.top - HINT_HEIGHT)
+      ? frame.top - BAND_GAP - BAND_ROW
       : frame.top + frame.height + BAND_GAP;
+  const top = Math.max(0, line + (BAND_ROW - HINT_HEIGHT) / 2);
   return textColumn(layout, frame, top, HINT_HEIGHT);
 };
 
@@ -295,6 +296,8 @@ const STRIP_GAP = 8;
 // the band's text on each side (.band-slots .slot in _bands.scss)
 const SLOT_HEIGHT = 28;
 const SLOT_BLEED = 6;
+// how far the slots keep from the view's edges
+const SLOT_EDGE = 4;
 
 // a band in the window, with the size of its text
 type BandRect = Rect & { size: number };
@@ -302,14 +305,20 @@ type BandRect = Rect & { size: number };
 /**
  * slotRowPlace returns where the slots that edit a band go: over the band,
  * a little wider, and at least as high as a control, with its text no
- * smaller than the controls' (--ui-small)
+ * smaller than the controls' (--ui-small); and always whole in the view,
+ * which clips them, e.g. over the first page's header in "page ends", whose
+ * line is at the top of the pages, or a band scrolled partly out of view
  * @param band the band in the window, with its text's size
+ * @param view the page view's box in the window
  */
-export const slotRowPlace = (band: BandRect) => {
+export const slotRowPlace = (band: BandRect, view: Rect) => {
   const height = Math.max(SLOT_HEIGHT, band.height);
+  const over = band.top + (band.height - height) / 2;
+  const highest = view.top + SLOT_EDGE;
+  const lowest = view.top + view.height - height - SLOT_EDGE;
   return {
     left: band.left - SLOT_BLEED,
-    top: band.top + (band.height - height) / 2,
+    top: Math.max(highest, Math.min(over, lowest)),
     width: band.width + 2 * SLOT_BLEED,
     height,
     fontSize: Math.max(12, band.size),
@@ -319,7 +328,7 @@ export const slotRowPlace = (band: BandRect) => {
 // where a strip `height` high goes beside a band's slots, and whether the
 // view has room for it there: below them or above them
 const stripSides = (band: BandRect, view: Rect, height: number) => {
-  const slots = slotRowPlace(band);
+  const slots = slotRowPlace(band, view);
   const below = slots.top + slots.height + STRIP_GAP;
   const above = slots.top - height - STRIP_GAP;
   const highest = view.top + STRIP_GAP;
@@ -422,7 +431,7 @@ export const bandEditorPlace = (
 ) => {
   const { view } = place;
   const card = stripPlace({ ...place, which, height, windowWidth });
-  const slots = slotRowPlace(place.band);
+  const slots = slotRowPlace(place.band, view);
   const inView = <R extends { left: number; top: number }>(rect: R): R => ({
     ...rect,
     left: rect.left - view.left,
@@ -503,11 +512,10 @@ export const selectedBoxes = (selected: string): PageBox[] =>
 /**
  * movesPages returns whether a new layout shows the pages elsewhere on the
  * desk: in the other view, at another scale, or below more or less room
- * above the first page, e.g. for its header; typing lays out anew on every
- * key but leaves them where they are
+ * above the first page; typing lays out anew on every key but leaves them
+ * where they are
  */
 export const movesPages = (next: FrameLayout, previous: FrameLayout) =>
   next.mode !== previous.mode ||
   next.scale !== previous.scale ||
-  next.headerRoom !== previous.headerRoom ||
   next.frames[0]?.top !== previous.frames[0]?.top;

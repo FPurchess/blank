@@ -18,7 +18,9 @@ export const BAND_GAP = 32;
 // the line of a header or footer in "page ends"
 export const BAND_ROW = 20;
 // room above the first page's text in "page ends" for its header, between
-// the view's top and the first frame: its line, and the gap below it
+// the view's top and the first frame: its line, and the gap below it; kept
+// also without a header, for the hint that adds one and for its slots, so
+// the text stays where it is when one comes or goes
 export const HEADER_ROOM = BAND_ROW + BAND_GAP;
 // room below the last page's text in "page ends" for its footer, which no
 // mark shows there: the gap above it, and its line
@@ -138,7 +140,7 @@ export const frameLayout = (
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
   const headerRoom = layout.header ? HEADER_ROOM : 0;
   const footerRoom = layout.footer ? FOOTER_ROOM : 0;
-  let top = VIEW_TOP + headerRoom;
+  let top = VIEW_TOP + HEADER_ROOM;
   for (let page = 0; page < layout.pages; page++) {
     const bottom = Math.max(layout.bottoms[page] ?? 0, margins.top + MIN_TEXT);
     const h = bottom - margins.top;
