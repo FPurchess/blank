@@ -99,12 +99,12 @@ describe("frontmatter", () => {
     );
     await restartApp();
 
-    // saved again, the file keeps the frontmatter it came back with
+    // saved again, over a file changed meanwhile, it writes the frontmatter
+    // it came back with (typing would let autocorrect change the text)
+    fs.writeFileSync(fixturePath, "changed");
     await clickInto("#editor p");
-    await type(Key.End);
-    await type(" again");
     await pressMod("s");
-    const expected = `${FRONTMATTER}\n\n# Chapter\n\nText. more again`;
+    const expected = `${FRONTMATTER}\n\n# Chapter\n\nText. more`;
     await browser.waitUntil(
       () => fs.readFileSync(fixturePath, "utf8") === expected,
       {
