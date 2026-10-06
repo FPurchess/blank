@@ -1,1 +1,0 @@
-import{_ as a,o,c as t,a5 as n}from"./chunks/framework.DtspaGiy.js";const m=JSON.parse('{"title":"FAQ","description":"","frontmatter":{},"headers":[],"relativePath":"guide/faq.md","filePath":"guide/faq.md"}'),r={name:"guide/faq.md"};function s(d,e,h,i,c,l){return o(),t("div",null,[...e[0]||(e[0]=[n("",22)])])}const k=a(r,[["render",s]]);export{m as __pageData,k as default};
