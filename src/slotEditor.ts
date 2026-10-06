@@ -2,9 +2,11 @@ import { baseKeymap } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { Fragment, type Node, Schema, Slice } from "prosemirror-model";
-import { EditorState } from "prosemirror-state";
+import { EditorState, Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
+import { CommandIdentifier } from "./config";
+import { commandBinding, liveKeys } from "./editor/keyBindings";
 import { FIELD_FULL_NAMES, FIELD_NAMES } from "./layout/placeholders";
 import { escape, type Field, segments } from "./layout/tokens";
 
@@ -71,6 +73,17 @@ export const slotText = (doc: Node) => {
   return text.trim();
 };
 
+// undo and redo in a slot, on the keys the main editor has for them
+const historyKeys = () =>
+  liveKeys(() => {
+    const keys: Record<string, typeof undo> = {};
+    const undoKey = commandBinding(CommandIdentifier.UNDO);
+    const redoKey = commandBinding(CommandIdentifier.REDO);
+    if (undoKey) keys[undoKey] = undo;
+    if (redoKey) keys[redoKey] = redo;
+    return keys;
+  });
+
 // what Tab, Shift+Tab, Enter and Escape do in a slot editor
 export interface SlotKeys {
   next(): boolean;
@@ -111,10 +124,10 @@ export const createSlotEditor = (
           "Shift-Tab": keys.previous,
           Enter: keys.done,
           Escape: keys.done,
-          "Mod-z": undo,
-          "Mod-Shift-z": redo,
-          "Mod-y": redo,
         }),
+        // undo and redo on their keys in the keymap, which the settings may
+        // change while the slot is open
+        new Plugin({ props: { handleKeyDown: historyKeys() } }),
         keymap(baseKeymap),
       ],
     }),

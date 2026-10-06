@@ -92,6 +92,11 @@
   opacity: 1;
 }
 
+// none while focus mode has faded the controls (focus-mode.md)
+body.controls-faded .band-hint .band-hint-chip {
+  opacity: 0;
+}
+
 .band-hint:hover .band-hint-chip {
   border-style: solid;
   color: var(--color);

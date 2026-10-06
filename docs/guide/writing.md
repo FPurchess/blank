@@ -151,6 +151,6 @@ When you want only the page, turn on focus mode with `Mod` `Shift` `F` or the la
 <Shot src="focus-mode.gif" alt="Mod Shift F turns on focus mode; as the typing starts, the tabs, the toolbar and the status bar fade out and only the page stays; a move of the mouse brings them back, and Esc leaves focus mode" />
 
 - The bars also fade once the mouse has rested for 3 seconds. Choose 10 seconds, or only when typing, in the [settings](./settings#appearance).
-- They never fade while the mouse is on one of them, or while a menu, a dialog or the header and footer strip is open.
+- They never fade while the mouse is on one of them, or while a menu, a dialog or a header or footer you're editing is open. While they're faded, the margins don't offer **+ Header** or **+ Footer** either.
 - Every shortcut still works while they're hidden, and `F6` brings them back to move through them with the keyboard.
 - `Esc` leaves focus mode, unless something else is open that `Esc` closes first.

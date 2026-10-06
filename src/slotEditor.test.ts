@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TextSelection } from "prosemirror-state";
 
+import { CommandIdentifier, config } from "./config";
 import {
   chip,
   createSlotEditor,
@@ -125,6 +126,46 @@ describe("slot editor", () => {
     );
 
     expect(editor!.text()).toBe("a");
+  });
+});
+
+describe("undo and redo in a slot", () => {
+  const original = config.value;
+  afterEach(() => {
+    config.value = original;
+    editor?.destroy();
+    editor = undefined;
+    document.body.innerHTML = "";
+  });
+
+  const ctrl = (key: string, shiftKey = false) =>
+    editor!.view.someProp("handleKeyDown", (f) =>
+      f(
+        editor!.view,
+        new KeyboardEvent("keydown", { key, ctrlKey: true, shiftKey }),
+      ),
+    );
+
+  it("follow the keys the keymap gives them, also once it changed", () => {
+    mount("a");
+    atEnd();
+    editor!.view.dispatch(editor!.view.state.tr.insertText("b"));
+    config.value = {
+      ...original,
+      keymap: {
+        ...original.keymap,
+        [CommandIdentifier.UNDO]: "Mod-u",
+        [CommandIdentifier.REDO]: "Mod-r",
+      },
+    };
+
+    // the old key does nothing any more
+    ctrl("z");
+    expect(editor!.text()).toBe("ab");
+    ctrl("u");
+    expect(editor!.text()).toBe("a");
+    ctrl("r");
+    expect(editor!.text()).toBe("ab");
   });
 });
 

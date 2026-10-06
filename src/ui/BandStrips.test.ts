@@ -17,6 +17,7 @@ import {
   type MenuItem,
   pageScrollRequest,
 } from "../state";
+import { controlsStay } from "../state/focusMode";
 import { createTestHandle } from "../test/editor";
 import { flushPromises } from "../test/async";
 import { bandInWindow, centerRequest } from "./bandStripsModel";
@@ -715,6 +716,14 @@ describe("the header or footer being edited", () => {
       const chip = slot("center").querySelector(".chip")!;
       expect(chip.textContent).toBe("Page");
       expect(chip.getAttribute("aria-label")).toBe("Page number");
+    });
+
+    it("keeps focus mode's controls while it's open", async () => {
+      expect(controlsStay.value).toBe(false);
+      await open();
+      expect(controlsStay.value).toBe(true);
+      await click(button("Done"));
+      expect(controlsStay.value).toBe(false);
     });
 
     it("gives Done its key in its tooltip", async () => {
