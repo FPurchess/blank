@@ -428,6 +428,15 @@ describe("fitsInView and bandEditorPlace", () => {
     expect(placed.slots).toMatchObject({ left: 154, top: 513.5, height: 28 });
     expect(placed.card).toEqual({ left: 80, top: 355.5, width: 800 });
     expect(placed.slotsFirst).toBe(false);
+    // the spotlight: the sheet from the view's corner, the slots from the
+    // sheet's
+    expect(placed.sheet).toEqual({ ...sheet, left: 80, top: -80 });
+    expect(placed.hole).toEqual({
+      left: 74,
+      top: 593.5,
+      width: 652,
+      height: 28,
+    });
   });
 
   it("puts the slots first where the strip is below them", () => {

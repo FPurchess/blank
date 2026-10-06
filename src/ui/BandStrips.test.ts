@@ -185,6 +185,31 @@ describe("the header or footer being edited", () => {
       });
     });
 
+    it("veils the pages but the band's sheet, and its text but the slots", async () => {
+      placed.value = shownAt(700);
+      await open({ band: "footer", page: 2 });
+      const veil = strip()!.querySelector<HTMLElement>(".band-veil")!;
+      // under the strip and the slots, hidden from screen readers
+      expect(strip()!.firstElementChild).toBe(veil);
+      expect(veil.getAttribute("aria-hidden")).toBe("true");
+      // the sheet, from the view's corner
+      expect(veil.style).toMatchObject({
+        left: "100px",
+        top: "-380px",
+        width: "800px",
+        height: "1100px",
+      });
+      // the slots, from the sheet's
+      expect(
+        veil.querySelector<HTMLElement>(".band-veil-hole")!.style,
+      ).toMatchObject({
+        left: "74px",
+        top: "993.5px",
+        width: "652px",
+        height: "28px",
+      });
+    });
+
     it("puts the strip below a header", async () => {
       placed.value = shownAt(200);
       await open({ page: 1 });
@@ -235,6 +260,8 @@ describe("the header or footer being edited", () => {
       expect(strip()!.classList).toContain("footer");
       expect(card().getAttribute("style")).toBeNull();
       expect(slots().getAttribute("style")).toBeNull();
+      // the editor fades instead of a veil
+      expect(strip()!.querySelector(".band-veil")).toBeNull();
     });
   });
 

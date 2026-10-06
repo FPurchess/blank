@@ -120,9 +120,14 @@ body.controls-faded .band-hint .band-hint-chip {
   color: var(--color);
 }
 
-// while a band is edited, the pages fade and take no clicks, but the view
-// still scrolls, and the strip follows; the sheets keep their paper
-body.band-editing #page-view .page-desk > :not(.page-sheet),
+// while a band is edited, the pages take no clicks but on the sheets, where
+// a press is done with it, and the view still scrolls, and the strip
+// follows; the veil (.band-veil) dims them
+body.band-editing #page-view .page-desk > :not(.page-sheet) {
+  pointer-events: none;
+}
+
+// without pages, the editor fades instead
 body.band-editing.without-engine #editor {
   opacity: 0.35;
   pointer-events: none;
@@ -144,6 +149,18 @@ body.band-editing.without-engine #editor {
   > .band-slots {
     position: absolute;
     pointer-events: auto;
+  }
+
+  // the spotlight: in the desk's color, so the rest steps back in every
+  // theme, everything but the band's sheet nearly goes (--spotlight), and
+  // its text half as much, so its edge shows which page and where on it
+  // the band is; the view clips it to itself, under the strip and slots
+  > .band-veil {
+    --veil: color-mix(in srgb, var(--desk-color) var(--spotlight), transparent);
+    position: absolute;
+    overflow: hidden;
+    box-shadow: 0 0 0 100vmax var(--veil);
+    animation: band-veil-in var(--fade-in) var(--ease);
   }
 
   // without pages, at the window's edge, the strip with the slots in it
@@ -357,5 +374,19 @@ body.band-editing.without-engine #editor {
     &.ProseMirror-selectednode {
       outline: 1px solid var(--accent);
     }
+  }
+}
+
+// the sheet's text around the slots, under the half of the veil
+.band-veil-hole {
+  position: absolute;
+  border-radius: 4px;
+  box-shadow: 0 0 0 100vmax var(--veil);
+  opacity: 0.5;
+}
+
+@keyframes band-veil-in {
+  from {
+    opacity: 0;
   }
 }

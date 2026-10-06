@@ -20,6 +20,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `--hover` and `--pressed`;
   - `--accent-soft` and `--accent-hover`;
   - `--scrim` (the desk, half see-through, behind a dialog);
+  - `--spotlight` (how far the pages step back into the desk around a header or footer being edited, 85%);
   - `--focus`;
   - `--on-fill`/`--on-ink` (a control that is on) and `--on-text`/`--on-weight` (a status item that is on);
   - `--ink-fill` (solid ink).

@@ -24,6 +24,9 @@
   --pressed: color-mix(in srgb, var(--color) 14%, transparent);
   // what dims the window behind a dialog
   --scrim: color-mix(in srgb, var(--desk-color) 55%, transparent);
+  // how far the pages step back, into the desk, around a header or footer
+  // being edited (src/scss/_bands.scss): 85% fades them, 100% hides them
+  --spotlight: 85%;
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   // the primary button under the pointer: the accent a step toward the text
   // on it, which also works in mono

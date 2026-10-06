@@ -406,7 +406,10 @@ export const stripPlace = ({
  * bandEditorPlace returns where the header or footer being edited goes: its
  * slots over the band and its strip beside them (stripPlace), both from
  * the top left corner of the view, which clips them, so they never cover
- * the bars around it; and whether the slots come first, above the strip
+ * the bars around it; whether the slots come first, above the strip; and
+ * the spotlight on them: the sheet, which the veil over the pages leaves
+ * out, and the slots on it, which the lighter veil over the sheet leaves
+ * out (`hole`, from the sheet's corner)
  * @param place the band, its sheet and the view, in the window
  * @param height the strip's height
  * @param windowWidth the window's width
@@ -430,6 +433,13 @@ export const bandEditorPlace = (
     card: inView(card),
     slots: inView(slots),
     slotsFirst: slots.top < card.top,
+    sheet: inView(place.sheet),
+    hole: {
+      left: slots.left - place.sheet.left,
+      top: slots.top - place.sheet.top,
+      width: slots.width,
+      height: slots.height,
+    },
   };
 };
 

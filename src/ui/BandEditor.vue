@@ -277,6 +277,16 @@ onMounted(() => {
     :aria-label="NAMES[band]"
     @keydown="onKeydown"
   >
+    <!-- the spotlight: the pages step back behind the band's sheet, and its
+    text behind the slots -->
+    <div
+      v-if="placed"
+      class="band-veil"
+      :style="styleOf(placed.sheet)"
+      aria-hidden="true"
+    >
+      <div class="band-veil-hole" :style="styleOf(placed.hole)" />
+    </div>
     <div ref="card" class="band-card" :style="cardStyle">
       <div class="band-card-head">
         <IconGlyph :name="band" />

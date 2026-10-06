@@ -53,7 +53,7 @@ It all works from the keyboard too:
 
 ## Page numbers, headers and footers {#headers-and-footers}
 
-Point at the bottom margin of a page, or just below the last page, and click **+ Footer**. The footer opens right where it prints: three places in the margin, on the left, in the center and on the right, and a strip beside them. Click **Page number**, pick how it reads, and click **Done**: every page of your PDF and Word document now has its number at the bottom. A header works the same from the top margin with **+ Header**.
+Point at the bottom margin of a page, or just below the last page, and click **+ Footer**. The footer opens right where it prints: three places in the margin, on the left, in the center and on the right, and a strip beside them. Everything else steps back while you edit. Click **Page number**, pick how it reads, and click **Done**: every page of your PDF and Word document now has its number at the bottom. A header works the same from the top margin with **+ Header**.
 
 The fast way is the keyboard: `Mod` `Alt` `F` opens the footer and `Mod` `Alt` `H` the header, on the page you're looking at.
 
