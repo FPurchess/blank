@@ -52,16 +52,16 @@ describe("lists and tabs", () => {
     await type(Key.Enter);
     await type("after");
 
-    await expectEditorText("#editor > ul > li > ul > li", "green");
-    await expectEditorText("#editor > ul > li", "pears", 1);
-    await expectEditorText("#editor > p:last-child", "after");
+    await expectEditorText("#editor > ul > li > ul > li", /^green$/i);
+    await expectEditorText("#editor > ul > li", /^pears$/i, 1);
+    await expectEditorText("#editor > p:last-child", /^after$/i);
   });
 
   it("puts a tab in text and keeps the focus in it", async () => {
     await type(Key.Home);
     await type(Key.Tab);
 
-    await expectEditorText("#editor > p:last-child", /^\tafter$/);
+    await expectEditorText("#editor > p:last-child", /^\tafter$/i);
     const inEditor = await browser.execute(
       () => document.activeElement?.closest("#editor") !== null,
     );
@@ -71,9 +71,10 @@ describe("lists and tabs", () => {
   it("saves the list and the tab", async () => {
     await pressMod("s");
 
-    // tight or loose, with blank lines between the items
+    // tight or loose, with blank lines between the items, and with the
+    // capitals autocorrect gives the start of each item
     const expected =
-      /[-*+] apples\n\n? {2}[-*+] green\n\n?[-*+] pears\n\n&#9;after\n?$/;
+      /[-*+] apples\n\n? {2}[-*+] green\n\n?[-*+] pears\n\n&#9;after\n?$/i;
     await browser.waitUntil(
       () => expected.test(fs.readFileSync(file, "utf8")),
       {
@@ -85,7 +86,7 @@ describe("lists and tabs", () => {
   it("reads the tab back", async () => {
     await restartApp([file]);
 
-    await expectEditorText("#editor > p:last-child", /^\tafter$/);
+    await expectEditorText("#editor > p:last-child", /^\tafter$/i);
   });
 
   it("leaves nested lists with Enter twice", async () => {
@@ -102,7 +103,7 @@ describe("lists and tabs", () => {
     await type(Key.Enter);
     await type("out");
 
-    await expectEditorText("#editor > ul:last-of-type li li li", "c");
-    await expectEditorText("#editor > p:last-child", "out");
+    await expectEditorText("#editor > ul:last-of-type li li li", /^c$/i);
+    await expectEditorText("#editor > p:last-child", /^out$/i);
   });
 });
