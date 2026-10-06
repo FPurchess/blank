@@ -27,6 +27,7 @@ import {
   withSlots,
 } from "../bandStrip";
 import { shownIn } from "../dom";
+import { FIELD_FULL_NAMES } from "../layout/placeholders";
 import { SLOTS } from "../layout/settings";
 import type { SlotEditor } from "../slotEditor";
 import {
@@ -293,11 +294,11 @@ onMounted(() => {
           <MenuButton
             class="chip"
             icon="plus"
-            label="Page number"
+            :label="FIELD_FULL_NAMES.page"
             :items="pageNumberItems"
             :refocus="focusSlot"
             @mousedown.prevent
-            >Page number</MenuButton
+            >{{ FIELD_FULL_NAMES.page }}</MenuButton
           >
           <IconButton
             v-for="placeholder in INSERTS"

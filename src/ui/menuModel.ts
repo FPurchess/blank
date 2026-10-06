@@ -1,3 +1,4 @@
+import type { Option } from "../layout/choices";
 import type { MenuItem } from "../state";
 
 // A menu item, as opposed to a separator: it can be focused and run unless
@@ -6,6 +7,26 @@ export type MenuEntry = Exclude<MenuItem, "separator">;
 
 export const isEntry = (item: MenuItem): item is MenuEntry =>
   item !== "separator";
+
+/**
+ * radioItems returns a menu of options to choose one of, the current one
+ * checked, which run `choose` with the value chosen
+ * @param prefix comes before each value in the items' ids, e.g.
+ *   "first-page:"
+ */
+export const radioItems = <T extends string>(
+  options: readonly Option<T>[],
+  current: T,
+  choose: (value: T) => void,
+  prefix = "",
+): MenuEntry[] =>
+  options.map(({ value, label }) => ({
+    id: `${prefix}${value}`,
+    label,
+    radio: true,
+    checked: value === current,
+    run: () => choose(value),
+  }));
 
 /**
  * enabledAt returns whether the item at `index` of `items` can be focused

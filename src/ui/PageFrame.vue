@@ -265,12 +265,7 @@ const targets = computed(() =>
     class="page-frame"
     :class="{ sheet }"
     :data-page="page + 1"
-    :style="{
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${width}px`,
-      height: `${height}px`,
-    }"
+    :style="styleOf({ left, top, width, height })"
   >
     <!-- its size is set when it's painted, in device pixels -->
     <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
@@ -350,13 +345,7 @@ const targets = computed(() =>
       class="page-band-names"
       :class="[band.slot, { named: band.named }]"
       aria-hidden="true"
-      :style="{
-        left: `${band.left}px`,
-        top: `${band.top}px`,
-        width: `${band.width}px`,
-        height: `${band.height}px`,
-        fontSize: `${band.size}px`,
-      }"
+      :style="{ ...styleOf(band), fontSize: `${band.size}px` }"
     >
       <template v-for="(part, at) in band.parts" :key="at"
         ><span v-if="'text' in part" class="painted">{{ part.text }}</span
@@ -375,12 +364,7 @@ const targets = computed(() =>
       :key="over.key"
       :class="over.kind === 'spelling' ? 'page-misspelling' : 'page-break-mark'"
       aria-hidden="true"
-      :style="{
-        left: `${over.left}px`,
-        top: `${over.top}px`,
-        width: `${over.width}px`,
-        height: `${over.height}px`,
-      }"
+      :style="styleOf(over)"
     />
   </div>
 </template>

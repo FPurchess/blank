@@ -62,6 +62,13 @@ export interface Option<T> {
 }
 
 /**
+ * optionLabel returns what the option of `value` reads, e.g. on the button of
+ * a menu of them
+ */
+export const optionLabel = <T>(options: readonly Option<T>[], value: T) =>
+  options.find((option) => option.value === value)?.label;
+
+/**
  * paperOptions lists the paper to choose from: the paper of the region
  * first, the others, and a custom size
  */

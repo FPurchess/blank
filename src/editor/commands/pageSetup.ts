@@ -3,12 +3,9 @@ import type { EditorView } from "prosemirror-view";
 
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { config, saveDefaultPage } from "../../config";
+import { saveDefaultPage } from "../../config";
 import { errorMessage } from "../../errors";
-import { changesOf } from "../../layout/choices";
 import { layoutWarnings } from "../../layout/describe";
-import { localeUnit, systemLocale } from "../../layout/paper";
-import { resolveLayout } from "../../layout/resolve";
 import {
   BAND_KEYS,
   PAGE_KEYS,
@@ -16,10 +13,9 @@ import {
   type PageKey,
   REMOVE,
 } from "../../layout/settings";
-import { frontmatterOf, readFrontmatter } from "../../markdown";
 import { activeTabId, announce, pageSetup } from "../../state";
 import { changeTab } from "../tabs";
-import { pageTr, writePage } from "./frontmatter";
+import { pageEdit, pageTr, writePage } from "./frontmatter";
 
 // the settings the page setup dialog sets: all but those of the header and
 // footer strips
@@ -32,11 +28,8 @@ const DIALOG_KEYS = PAGE_KEYS.filter(
  */
 export const openPageSetup = (view: EditorView) => {
   if (pageSetup.value !== null) return;
-  const locale = systemLocale();
-  const unit = localeUnit(locale);
-  const defaults = config.value.layout.page;
-  const frontmatter = frontmatterOf(view.state.doc);
-  const { settings, problems } = resolveLayout(frontmatter, defaults, locale);
+  const { locale, unit, defaults, settings, problems, readable, write } =
+    pageEdit(view);
   // the tab the dialog is for, which Make this my default changes once the
   // default is saved, even if another tab is shown by then
   const tab = activeTabId.value;
@@ -45,10 +38,10 @@ export const openPageSetup = (view: EditorView) => {
     settings,
     locale,
     unit,
-    readable: readFrontmatter(frontmatter) !== undefined,
+    readable,
     warnings: layoutWarnings(problems),
     apply: (chosen) => {
-      writePage(view, changesOf(settings, chosen, defaults, locale), unit);
+      write(chosen);
       announce("Page setup applied");
       view.focus();
     },

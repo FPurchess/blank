@@ -1,8 +1,16 @@
-import { BAND_GAP, BAND_ROW, BLEED, type FrameLayout } from "../engine/frames";
+import {
+  BAND_GAP,
+  BAND_ROW,
+  BLEED,
+  type Frame,
+  type FrameLayout,
+} from "../engine/frames";
 import {
   BAND,
   type Band,
+  BAND_LINE,
   bandsOn,
+  bandTop,
   formatNumber,
   pageNumber,
 } from "../layout/bands";
@@ -54,22 +62,43 @@ const insetOf = (layout: FrameLayout) =>
   layout.mode === "pages" ? 0 : BLEED * layout.scale;
 
 /**
+ * textColumn returns a box as wide as the text of `frame`, from `top`,
+ * `height` high: where a header or footer goes in "page ends", in line with
+ * the text
+ */
+const textColumn = (
+  layout: FrameLayout,
+  frame: Frame,
+  top: number,
+  height: number,
+): Rect => {
+  const inset = insetOf(layout);
+  return {
+    left: frame.left + inset,
+    top,
+    width: frame.width - 2 * inset,
+    height,
+  };
+};
+
+// the frame of the first page for a header, of the last for a footer: those
+// whose band "page ends" shows beside them, without a mark
+const edgeFrame = (layout: FrameLayout, band: Band): Frame | undefined =>
+  band === "header"
+    ? layout.frames[0]
+    : layout.frames[layout.frames.length - 1];
+
+/**
  * firstHeaderPlace returns where the first page's header goes in "page
  * ends": right above its text, as wide as it. The sheets of "pages" show
  * it themselves.
  */
 export const firstHeaderPlace = (layout: FrameLayout) => {
-  const first = layout.frames[0];
+  const first = edgeFrame(layout, "header");
   // the room the layout keeps for it, none without a header
   const room = layout.headerRoom;
   if (!first || layout.mode === "pages" || !room) return null;
-  const inset = insetOf(layout);
-  return {
-    left: first.left + inset,
-    top: first.top - room,
-    width: first.width - 2 * inset,
-    height: room,
-  };
+  return textColumn(layout, first, first.top - room, room);
 };
 
 /**
@@ -78,17 +107,11 @@ export const firstHeaderPlace = (layout: FrameLayout) => {
  * shows a footer. The sheets of "pages" show it themselves.
  */
 export const lastFooterPlace = (layout: FrameLayout) => {
-  const last = layout.frames[layout.frames.length - 1];
+  const last = edgeFrame(layout, "footer");
   // the room the layout keeps for it, none without a footer
   const room = layout.footerRoom;
   if (!last || layout.mode === "pages" || !room) return null;
-  const inset = insetOf(layout);
-  return {
-    left: last.left + inset,
-    top: last.top + last.height,
-    width: last.width - 2 * inset,
-    height: room,
-  };
+  return textColumn(layout, last, last.top + last.height, room);
 };
 
 // the height of the hint that adds a header or footer (.band-hint-chip in
@@ -103,51 +126,30 @@ const HINT_HEIGHT = 24;
  * it in their margins.
  */
 export const edgeHintPlace = (layout: FrameLayout, band: Band) => {
-  if (layout.mode === "pages") return null;
-  const frame =
+  const frame = edgeFrame(layout, band);
+  if (!frame || layout.mode === "pages") return null;
+  const top =
     band === "header"
-      ? layout.frames[0]
-      : layout.frames[layout.frames.length - 1];
-  if (!frame) return null;
-  const inset = insetOf(layout);
-  return {
-    left: frame.left + inset,
-    top:
-      band === "header"
-        ? Math.max(0, frame.top - HINT_HEIGHT)
-        : frame.top + frame.height + BAND_GAP,
-    width: frame.width - 2 * inset,
-    height: HINT_HEIGHT,
-  };
+      ? Math.max(0, frame.top - HINT_HEIGHT)
+      : frame.top + frame.height + BAND_GAP;
+  return textColumn(layout, frame, top, HINT_HEIGHT);
 };
-
-// a band's line on a sheet, at the natural 1.3 em of IBM Plex Sans, as the
-// layout engine sets it (BAND_LINE in src-tauri/layout/src/bands.rs)
-const BAND_LINE = BAND.size * 1.3;
 
 // a page's size and margins, in points
 type PageSetup = Pick<PageLayoutState, "width" | "height" | "margins">;
 
 /**
  * bandBox returns where the engine sets a sheet's header or footer, in
- * pixels from the sheet's top left corner: as wide as the text, the header
- * `BAND.distance` below the top edge and the footer as far above the bottom
- * one, moved down by what the margin leaves beyond that and one band line
- * (band_boxes in src-tauri/layout/src/engine/display.rs)
+ * pixels from the sheet's top left corner: as wide as the text, at bandTop
+ * (src/layout/bands.ts), one band line high
  * @param page the size and margins of the page, in points
  * @param scale CSS pixels per point
  */
 export const bandBox = (page: PageSetup, band: Band, scale: number) => {
   const { margins } = page;
-  const top =
-    band === "header"
-      ? BAND.distance
-      : page.height -
-        margins.bottom +
-        Math.max(0, margins.bottom - BAND.distance - BAND_LINE);
   return {
     left: margins.left * scale,
-    top: top * scale,
+    top: bandTop(page, band) * scale,
     width: (page.width - margins.left - margins.right) * scale,
     height: BAND_LINE * scale,
     // the size of its text
@@ -270,17 +272,16 @@ export const bandPlace = (
       },
     };
   }
-  const inset = insetOf(layout);
+  // the line a gap above or below the text, as a header's and a footer's
+  // room in the layout (HEADER_ROOM, FOOTER_ROOM)
+  const top =
+    band === "header"
+      ? Math.max(0, frame.top - BAND_GAP - BAND_ROW)
+      : frame.top + frame.height + BAND_GAP;
   return {
     sheet,
     band: {
-      left: frame.left + inset,
-      top:
-        band === "header"
-          ? Math.max(0, frame.top - BAND_GAP - BAND_ROW)
-          : frame.top + frame.height + BAND_GAP,
-      width: frame.width - 2 * inset,
-      height: BAND_ROW,
+      ...textColumn(layout, frame, top, BAND_ROW),
       size: PAGE_END_BAND_SIZE,
     },
   };

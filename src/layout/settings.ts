@@ -202,7 +202,8 @@ const readBands = (value: unknown): Bands | undefined => {
 const readFirstPage = (value: unknown): FirstPage | undefined =>
   value === "same" || value === "plain" ? value : readBands(value);
 
-// "same" is the same as leaving the key out
+// "same": no header and footer of their own, also over a user's default
+// that gives them one
 const readEvenPages = (value: unknown): Bands | null | undefined =>
   value === "same" ? null : readBands(value);
 

@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { doc, docWithFrontmatter, h, p } from "../test/editor";
 import { testLayout } from "../test/layout";
 import {
+  BAND,
+  BAND_LINE,
   bandsOn,
+  bandTop,
   bandVariant,
   documentFields,
   fieldValues,
@@ -55,6 +58,21 @@ describe("bandsOn", () => {
       startNumber: 0,
     });
     expect(bandsOn(layout, 1)).toEqual(NO_BANDS);
+  });
+});
+
+describe("bandTop", () => {
+  const page = (bottom: number) => ({ height: 800, margins: { bottom } });
+
+  it("sets the header and footer a distance from the edges", () => {
+    expect(bandTop(page(72), "header")).toBe(BAND.distance);
+    expect(bandTop(page(72), "footer")).toBeCloseTo(
+      800 - BAND.distance - BAND_LINE,
+    );
+  });
+
+  it("sets the footer where the text ends in a margin too small for it", () => {
+    expect(bandTop(page(20), "footer")).toBe(780);
   });
 });
 

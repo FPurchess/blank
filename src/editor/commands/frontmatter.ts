@@ -1,9 +1,21 @@
 import type { EditorState, Transaction } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-import { type PageChanges, writePageSettings } from "../../layout/settings";
+import { config } from "../../config";
+import { changesOf } from "../../layout/choices";
+import { localeUnit, systemLocale } from "../../layout/paper";
+import { resolveLayout } from "../../layout/resolve";
+import {
+  type PageChanges,
+  type PageSettings,
+  writePageSettings,
+} from "../../layout/settings";
 import type { Unit } from "../../layout/units";
-import { frontmatterOf, updateFrontmatter } from "../../markdown";
+import {
+  frontmatterOf,
+  readFrontmatter,
+  updateFrontmatter,
+} from "../../markdown";
 
 /**
  * frontmatterTr returns the transaction that replaces the frontmatter of the
@@ -43,4 +55,29 @@ export const writePage = (
 ) => {
   const tr = pageTr(view.state, changes, unit);
   if (tr) view.dispatch(tr);
+};
+
+/**
+ * pageEdit starts a change of the page settings of the document of `view`,
+ * as the page setup and the header and footer strip make one: the settings
+ * as they are, over the user's defaults, whether the frontmatter can be read
+ * to write them into, and `write`, which writes the settings chosen as one
+ * undo step, only what changed and nothing that is back to the default
+ */
+export const pageEdit = (view: EditorView) => {
+  const locale = systemLocale();
+  const unit = localeUnit(locale);
+  const defaults = config.value.layout.page;
+  const frontmatter = frontmatterOf(view.state.doc);
+  const { settings, problems } = resolveLayout(frontmatter, defaults, locale);
+  return {
+    locale,
+    unit,
+    defaults,
+    settings,
+    problems,
+    readable: readFrontmatter(frontmatter) !== undefined,
+    write: (chosen: PageSettings) =>
+      writePage(view, changesOf(settings, chosen, defaults, locale), unit),
+  };
 };

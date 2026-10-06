@@ -6,6 +6,7 @@ import { pickerLanguages } from "../../languagePicker";
 import { languageName } from "../../spellcheck/service";
 import { announce, language, type MenuItem, spellcheck } from "../../state";
 import MenuButton from "../components/MenuButton.vue";
+import { radioItems } from "../menuModel";
 import SettingRow from "../components/SettingRow.vue";
 import DictionaryPage from "./DictionaryPage.vue";
 import { dictionaryOf, dictionarySummary } from "./dictionaryModel";
@@ -25,16 +26,17 @@ const checking = computed({
 });
 
 const languageItems = (): MenuItem[] =>
-  pickerLanguages().map((code) => ({
-    id: code,
-    label: languageName(code),
-    radio: true,
-    checked: code === language.value,
-    run: () => {
+  radioItems(
+    pickerLanguages().map((code) => ({
+      value: code,
+      label: languageName(code),
+    })),
+    language.value,
+    (code) => {
       language.value = code;
       announce(languageName(code));
     },
-  }));
+  );
 
 const ignore = (
   key: "ignoreUppercase" | "ignoreWordsWithNumbers",

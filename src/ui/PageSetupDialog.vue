@@ -19,6 +19,7 @@ import {
   sizeChoices,
   turned,
   typedOrientation,
+  optionLabel,
 } from "../layout/choices";
 import { describePaper } from "../layout/describe";
 import { type Layout, layoutOf } from "../layout/resolve";
@@ -36,6 +37,7 @@ import MenuButton from "./components/MenuButton.vue";
 import OptionGroup from "./components/OptionGroup.vue";
 import SettingRow from "./components/SettingRow.vue";
 import LengthFields from "./LengthFields.vue";
+import { radioItems } from "./menuModel";
 import type { Chosen } from "./optionGroupModel";
 import {
   appliesOnEnter,
@@ -77,9 +79,7 @@ const caption = computed(
 
 // the same list on every render
 const PAPER_OPTIONS = paperOptions(locale);
-const paperLabel = computed(
-  () => PAPER_OPTIONS.find((option) => option.value === choices.paper)?.label,
-);
+const paperLabel = computed(() => optionLabel(PAPER_OPTIONS, choices.paper));
 const paper = useTemplateRef<ComponentPublicInstance>("paper");
 const focusPaper = () => (paper.value?.$el as HTMLElement | undefined)?.focus();
 
@@ -118,13 +118,11 @@ const choosePaper = async (value: PageChoices["paper"], fromList = false) => {
 };
 
 const paperItems = (): MenuItem[] =>
-  PAPER_OPTIONS.map((option) => ({
-    id: option.value,
-    label: option.label,
-    radio: true,
-    checked: option.value === choices.paper,
-    run: () => void choosePaper(option.value, true),
-  }));
+  radioItems(
+    PAPER_OPTIONS,
+    choices.paper,
+    (value) => void choosePaper(value, true),
+  );
 
 // a custom size turns with the orientation, and the orientation follows a
 // size typed wider than high

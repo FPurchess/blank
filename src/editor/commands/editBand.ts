@@ -9,8 +9,7 @@ import {
   documentFields,
   fieldValues,
 } from "../../layout/bands";
-import { changesOf } from "../../layout/choices";
-import { localeUnit, systemLocale } from "../../layout/paper";
+import { unreadable } from "../../layout/describe";
 import {
   bandSlots,
   emptyBandNotice,
@@ -28,7 +27,7 @@ import {
   path,
 } from "../../state";
 import { frontmatterOf } from "../../markdown";
-import { writePage } from "./frontmatter";
+import { pageEdit } from "./frontmatter";
 
 /**
  * chapterOf returns the first heading 1 of a document, what {chapter}
@@ -95,13 +94,13 @@ const tellIfEmpty = (view: EditorView, band: Band, edited: number | null) => {
 export const openBand = (view: EditorView, band: Band, page?: number) => {
   // a click outside an open strip closes it first, keeping its text
   if (bandEditor.value !== null) return;
-  const locale = systemLocale();
-  const defaults = config.value.layout.page;
-  const { settings } = resolveLayout(
-    frontmatterOf(view.state.doc),
-    defaults,
-    locale,
-  );
+  const { settings, readable, write } = pageEdit(view);
+  // what can't be read can't be written into: the strip opens only once it
+  // can keep what it edits
+  if (!readable) {
+    announce(unreadable(`the ${band}`));
+    return;
+  }
   const inView = pageInView();
   const edited = page ?? (inView === null ? null : inView + 1);
   bandEditor.value = {
@@ -110,12 +109,7 @@ export const openBand = (view: EditorView, band: Band, page?: number) => {
     center: page === undefined,
     bands: bandSettings(settings),
     apply: (bands) => {
-      const chosen = { ...settings, ...bands };
-      writePage(
-        view,
-        changesOf(settings, chosen, defaults, locale),
-        localeUnit(locale),
-      );
+      write({ ...settings, ...bands });
       view.focus();
       tellIfEmpty(view, band, edited);
     },

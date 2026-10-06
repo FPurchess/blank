@@ -14,8 +14,10 @@ import {
   type NumberStyle,
   type Slots,
 } from "./layout/settings";
+import { type Option, optionLabel } from "./layout/choices";
 import { expand } from "./layout/tokens";
 import type { MenuItem } from "./state";
+import { radioItems } from "./ui/menuModel";
 
 // The open header or footer strip without its DOM: what it edits, which
 // pages it shows, its menus, and what it keeps when it closes.
@@ -47,18 +49,19 @@ export const NAMES: Record<Band, string> = {
   footer: "Footer",
 };
 
-export const NUMBER_STYLES: { style: NumberStyle; label: string }[] = [
-  { style: "1", label: "1, 2, 3" },
-  { style: "i", label: "i, ii, iii" },
-  { style: "I", label: "I, II, III" },
+// how the page numbers count, and what the first page has, as their menus
+// offer them
+const NUMBER_STYLE_OPTIONS: Option<NumberStyle>[] = [
+  { value: "1", label: "1, 2, 3" },
+  { value: "i", label: "i, ii, iii" },
+  { value: "I", label: "I, II, III" },
 ];
 
-export const FIRST_PAGE_CHOICES: { choice: FirstPageChoice; label: string }[] =
-  [
-    { choice: "same", label: "The same as the others" },
-    { choice: "plain", label: "None" },
-    { choice: "own", label: "Its own" },
-  ];
+const FIRST_PAGE_OPTIONS: Option<FirstPageChoice>[] = [
+  { value: "same", label: "The same as the others" },
+  { value: "plain", label: "None" },
+  { value: "own", label: "Its own" },
+];
 
 /**
  * mirror swaps the left and right of slots, for even pages, whose outer
@@ -137,7 +140,7 @@ export const bandSummary = ({ firstPage, evenPages }: Strip) =>
  * firstPageLabel returns what the first page has, as its button shows it
  */
 export const firstPageLabel = ({ firstPage }: Strip) =>
-  FIRST_PAGE_CHOICES.find(({ choice }) => choice === firstPage)!.label;
+  optionLabel(FIRST_PAGE_OPTIONS, firstPage)!;
 
 /**
  * withSlots keeps what the slots shown hold
@@ -257,13 +260,7 @@ export const firstPageMenu = (
   strip: Strip,
   choose: (choice: FirstPageChoice) => void,
 ): MenuItem[] =>
-  FIRST_PAGE_CHOICES.map(({ choice, label }) => ({
-    id: `first-page:${choice}`,
-    label,
-    checked: choice === strip.firstPage,
-    radio: true,
-    run: () => choose(choice),
-  }));
+  radioItems(FIRST_PAGE_OPTIONS, strip.firstPage, choose, "first-page:");
 
 // a first page number as typed, undefined for anything else
 const readStartNumber = (typed: string) => {
@@ -298,13 +295,13 @@ export const pageNumberMenu = (
       run: () => actions.insert(preset),
     })),
     "separator",
-    ...NUMBER_STYLES.map(({ style, label }) => ({
-      id: `number-style:${style}`,
-      label,
-      checked: style === strip.numberStyle,
-      radio: true,
-      run: () => actions.setNumberStyle(style),
-    })),
+    ...radioItems(
+      NUMBER_STYLE_OPTIONS,
+      strip.numberStyle,
+      actions.setNumberStyle,
+      "number-style:",
+    ),
+
     "separator",
     {
       id: "start-number",

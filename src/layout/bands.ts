@@ -29,8 +29,29 @@ export const BAND = {
   distance: 36,
 };
 
+// a band's line, at the natural 1.3 em of IBM Plex Sans, as the layout
+// engine sets it (BAND_LINE in src-tauri/layout/src/bands.rs)
+export const BAND_LINE = BAND.size * 1.3;
+
 // the room a band needs between the edge and the text, in points
-export const BAND_ROOM = BAND.distance + BAND.size * 1.3 + 6;
+export const BAND_ROOM = BAND.distance + BAND_LINE + 6;
+
+/**
+ * bandTop returns where the engine sets the line of a page's header or
+ * footer, in points from the page's top edge: the header `BAND.distance`
+ * below it, and the footer as far above the bottom edge, moved down to where
+ * the text ends where the margin leaves less than that and one line
+ * (band_boxes in src-tauri/layout/src/engine/display.rs)
+ */
+export const bandTop = (
+  page: { height: number; margins: { bottom: number } },
+  band: Band,
+) =>
+  band === "header"
+    ? BAND.distance
+    : page.height -
+      page.margins.bottom +
+      Math.max(0, page.margins.bottom - BAND.distance - BAND_LINE);
 
 // a header or a footer
 export type Band = "header" | "footer";

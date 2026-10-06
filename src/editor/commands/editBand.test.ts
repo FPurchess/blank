@@ -71,6 +71,15 @@ describe("command.editBand", () => {
     expect(request().page).toBe(5);
   });
 
+  it("doesn't open on properties it can't write into, and says why", () => {
+    mount(docWithFrontmatter("title: [unclosed", p("text")));
+    openBand(view, "footer");
+    expect(bandEditor.value).toBeNull();
+    expect(announcement.value?.text).toBe(
+      "The properties at the top of the file can't be read, so the footer can't be written into them.",
+    );
+  });
+
   it("does nothing without a view", () => {
     mount(doc(p("text")));
     expect(editBand("footer")(view.state)).toBe(true);

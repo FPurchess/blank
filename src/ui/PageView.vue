@@ -63,6 +63,7 @@ import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
 import { PageMarksMemo } from "./pageMarks";
 import { movesPages, selectedOn } from "./pageViewModel";
+import { styleOf } from "./rect";
 import { scrollFor } from "./scrollModel";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
@@ -690,12 +691,7 @@ onUnmounted(() => {
           v-for="frame in frames"
           :key="frame.page"
           class="page-sheet"
-          :style="{
-            top: `${frame.top}px`,
-            left: `${frame.left}px`,
-            width: `${frame.width}px`,
-            height: `${frame.height}px`,
-          }"
+          :style="styleOf(frame)"
         />
       </template>
       <PageOverlay
