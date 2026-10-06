@@ -2,7 +2,7 @@
 
 Blank can underline the words it doesn't know with a wavy line, so a typo never slips into your finished piece. Spell check is off until you turn it on: some writers like a clean page while drafting and only proofread at the end.
 
-<img class="shot" src="/screenshots/spelling.png" alt="A misspelled word underlined in red, with the menu of suggestions open below it" />
+<Shot src="spelling.png" alt="A misspelled word underlined in red, with the menu of suggestions open below it" />
 
 ## Turn it on
 

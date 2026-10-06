@@ -36,3 +36,16 @@ export const bootAppearance = () =>
     },
     { flush: "sync", immediate: true },
   );
+
+/**
+ * exposeAppearance lets the docs shots switch the theme for a moment, to
+ * capture each frame in light and dark, through `window.blankSetTheme`
+ * (debug builds only, see src/main.ts)
+ */
+export const exposeAppearance = () => {
+  Object.assign(window, {
+    blankSetTheme: (name: unknown) => {
+      if (isTheme(name)) theme.value = name;
+    },
+  });
+};

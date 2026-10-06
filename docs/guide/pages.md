@@ -1,6 +1,6 @@
 # Pages
 
-Your PDF and Word documents come out on the paper of your region, A4 or Letter, with generous margins of 2.5 cm. Most documents never need more than that. When one does, a single shortcut gets you there.
+Your PDF and Word documents come out on the paper of your region, A4 or Letter, with generous margins of 2.5 cm. Most documents never need more than that. When one does, the [page setup](#page-setup) is a click or a shortcut away.
 
 ## Your pages on the screen {#on-the-screen}
 
@@ -9,7 +9,7 @@ Blank shows your text the way it prints: every line and every page ends on the s
 - **Page ends** (where Blank starts): one calm column of text, as wide as it is on the paper. Where one page ends and the next begins, a dashed line shows the page's number and footer, and the header of the page that follows. The first page's header sits above your text, and the last page's footer below it. A new document is just that: an empty page and your caret.
 - **Pages**: the sheets themselves, one below the other, with their margins, headers, footers and page numbers in place.
 
-<img class="shot" src="/screenshots/page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
+<Shot src="page-views.gif" alt="Mod Alt V switches from Page ends, one column with a dashed line where each page ends, to Pages, the sheets on a desk, and back" />
 
 Blank remembers your choice. The button at the right end of the bar at the bottom switches between the two views too: its icon shows the view you're in. Next to it, the bar tells you which page you're looking at, like _Page 3 of 12_, and counts along as you scroll; click it to jump to another page, listed with the first heading on each. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
 
@@ -19,7 +19,7 @@ Once your document has two headings, a short dash for each of them sits at the r
 
 Point at the dashes to see all your headings, and click one to scroll straight to it. In the list, a short line in your accent color marks where you are. Your cursor stays where you were writing, so you can look something up and keep typing right away.
 
-<img class="shot" src="/screenshots/outline.gif" alt="Pointing at the dashes on the right shows the headings of the document; a click on one scrolls to it, and Mod Alt O opens and closes the list" />
+<Shot src="outline.gif" alt="Pointing at the dashes on the right shows the headings of the document; a click on one scrolls to it, and Mod Alt O opens and closes the list" />
 
 To keep the outline open, click the dashes or press `Mod` `Alt` `O`. On a window at least 1000 pixels wide, the list stays beside your pages, and they move over a little if they need the room. On a smaller window it floats over the pages until you click a heading or somewhere else. `Mod` `Alt` `O` or the × at the top of the list puts it away again, and Blank remembers whether you keep it open. Rest the pointer on the dashes or the × to see the shortcut.
 
@@ -27,7 +27,7 @@ To keep the outline open, click the dashes or press `Mod` `Alt` `O`. On a window
 
 Click the paper in the bar at the bottom (e.g. _A4_), press `Mod` `Alt` `U`, or choose **Page setup…** from the menu (right-click or `Shift` `F10`).
 
-![The page setup dialog with the paper, orientation, margins and the headings that start a new page, and a picture of the page beside them](/screenshots/page-setup.png)
+<Shot src="page-setup.png" alt="The page setup dialog with the paper, orientation, margins and the headings that start a new page, and a picture of the page beside them" />
 
 | Setting         | Choices                                                              |
 | --------------- | -------------------------------------------------------------------- |
@@ -81,7 +81,7 @@ When the first or even pages have their own, tabs above the places switch betwee
 
 ## Page breaks {#page-breaks}
 
-![A page break between two paragraphs, shown as a dashed line labelled Page break](/screenshots/page-break.png)
+<Shot src="page-break.png" alt="A page break between two paragraphs, shown as a dashed line labelled Page break" />
 
 Press `Mod` `Enter` to continue on a new page, as in Word and Google Docs. You can also type `+++` on an empty line and press `Enter`. The page ends right there, and Blank labels it _Page break_ (only on the screen, not on paper). To remove it, press `Backspace` at the start of the line below it.
 

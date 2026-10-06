@@ -22,7 +22,7 @@ If you want it to: press `Mod` `Alt` `S`. See [Spell check](./spelling).
 
 ## Does Blank send my text anywhere?
 
-No. The only thing Blank ever downloads is a [spell check dictionary](./spelling#languages), and only when you check a language that doesn't come with Blank.
+No. There's no account, and nothing you write leaves your computer. Blank downloads two things from the internet: a [spell check dictionary](./spelling#languages) when you check a language that doesn't come with Blank, and the images from the web that your documents show and that your PDF and Word exports include.
 
 ## Can I use the mouse?
 

@@ -6,7 +6,7 @@
 .PHONY: help install install-e2e dev dev-web build snap build-debug lint lint-fix \
 	format format-check test test-coverage test-rust test-e2e test-e2e-headless check clean \
 	dictionaries engine \
-	install-docs docs-dev docs-build docs-screenshots bump release
+	install-docs docs-dev docs-build docs-screenshots docs-shot bump release
 
 help: ## List all targets
 	@grep -E '^([a-zA-Z0-9_-]+:.*|)## ' $(MAKEFILE_LIST) | \
@@ -92,8 +92,14 @@ docs-dev: install-docs ## Serve the website with hot reload
 docs-build: install-docs ## Build the website into docs/.vitepress/dist
 	bun run docs:build
 
-docs-screenshots: install-e2e ## Build the debug app and capture the website's screenshots (Linux only)
-	xvfb-run -a bun run docs:screenshots
+# CI captures the screenshots the website shows and proposes them in a PR (.github/workflows/e2e.yml);
+# these only write to e2e/screenshots/docs, to look at (scripts/docs-shots.sh: JOBS, topics)
+docs-screenshots: install-e2e ## Build the debug app and capture all docs shots into e2e/screenshots/docs (Linux only)
+	bun run docs:screenshots
+
+docs-shot: install-e2e ## Capture one docs shot into e2e/screenshots/docs: make docs-shot NAME="records table mode"
+	@[ -n "$(NAME)" ] || { echo 'usage: make docs-shot NAME="<title of its it()>"' >&2; exit 1; }
+	bun run docs:shot "$(NAME)"
 
 ## Release
 
@@ -153,6 +159,8 @@ release: ## Publish origin/main by pushing it to the release branch (DRY_RUN=1 o
 		fail "origin/release is not an ancestor of origin/main"; \
 	bash scripts/check-engine-ci.sh "$$(git rev-parse origin/main)" || \
 		fail "release only what the engine check passed on"; \
+	bash scripts/check-screenshots-ci.sh "$$(git rev-parse origin/main)" || \
+		fail "release once the docs show the screenshots of what's released"; \
 	echo "Releasing v$$v at $$(git log -1 --format='%h %s' origin/main)"; \
 	echo "Changes since the last release:"; \
 	git log --oneline origin/release..origin/main; \

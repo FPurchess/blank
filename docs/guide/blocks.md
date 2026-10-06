@@ -6,6 +6,8 @@ Besides your text, a document can hold blocks: a table of contents Blank fills i
 
 Press `Mod` `Alt` `B` to open the pane. Each block is a tile with a small drawing of it; rest the pointer on one to read what it is.
 
+<Shot src="blocks-pane.gif" alt="Mod Alt B opens the Blocks pane; the Table of contents tile is dragged between two paragraphs, where a line shows it will go, and a click on the Recipe tile puts a recipe in where the cursor is" />
+
 - **Insert a block where you're writing:** click its tile. It goes in place of the empty line the cursor is on, or right after the paragraph, list, quote or table the cursor is in.
 - **Insert it somewhere else:** drag its tile onto your pages. A line shows where it will go, between two paragraphs; let go there. `Escape` changes your mind.
 - **Find one:** type into **Search blocks** at the top. It looks through the names and what the blocks are, and `Enter` inserts the first one it finds.
@@ -31,7 +33,7 @@ A block Blank can't show, say one a newer Blank wrote, stays in your document as
 
 A table of contents lists your headings with the page each one starts on, and keeps itself up to date: rename a heading, add one, or let the text before it grow onto another page, and the table follows right away. The page numbers are the ones your footer shows, roman numerals and a later first page number included.
 
-<img class="shot" src="/screenshots/toc.gif" alt="Mod Alt B and Enter insert a table of contents, which lists the headings with their pages and follows a heading as it is renamed" />
+<Shot src="toc.gif" alt="Mod Alt B and Enter insert a table of contents, which lists the headings with their pages and follows a heading as it is renamed" />
 
 - **Insert it** from the pane, or type `[toc]` (or `[TOC]`, or GitLab's `[[_TOC_]]`) on an empty line and press `Enter`, though not inside a list or a quote.
 - **Its settings:** select it and click the pencil, or press `Enter`. **Headings it lists** goes from headings 1 only down to all six levels (1 – 3 is where it starts), and **Title** is what stands above it. Every change shows at once, and `Mod` `Z` takes it back. `Escape` or a click elsewhere closes them.
@@ -43,7 +45,7 @@ It lists the headings the outline lists: those at the top of your document, not 
 
 A form is a block of fields to fill in, laid out the same every time: a recipe with its name, a photo beside the ingredients, and the steps. Blank comes with the recipe; you can [make your own forms](#your-own-forms) too.
 
-<img class="shot" src="/screenshots/form.gif" alt="Mod Alt B, the arrow down and Enter put in a recipe; Tab goes from its name to the photo, the ingredients beside it and the steps below, each filled in" />
+<Shot src="form.gif" alt="Mod Alt B, the arrow down and Enter put in a recipe; Tab goes from its name to the photo, the ingredients beside it and the steps below, each filled in" />
 
 - **Put one in** from the pane. It starts on a page of its own if it's made to.
 - **Fill it in:** click a field, or start typing right after inserting it. `Tab` goes to the next field and `Shift` `Tab` back. In a table, `Tab` goes from cell to cell and on to the next field after the last cell; in a list or a code block, `Tab` indents as usual. In a field of one line, such as a name, `Enter` goes on to the next field too, and `Shift` `Enter` breaks the line. An empty field says what goes in it, on the screen only: the PDF and your printout leave it blank.

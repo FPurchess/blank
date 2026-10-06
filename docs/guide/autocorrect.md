@@ -43,7 +43,7 @@ Table cells often hold values rather than sentences, so the first word of a cell
 
 Quotes, sentence capitalization and dashes follow the language shown at the bottom right. Blank picks your system language on first start.
 
-<img class="shot" src="/screenshots/language.png" alt="The language chooser at the bottom right of the window" />
+<Shot src="language.png" alt="The language chooser at the bottom right of the window" />
 
 To choose another one, press `Mod` `Alt` `L` or click the language. Then pick one with `←` / `→`, or type a two-letter [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes) code such as `de`, and confirm with `Enter`. `Esc` cancels. Keep typing for a regional variant, e.g. `dech` for Swiss German: autocorrect follows the rules of the language, and [spell check](./spelling#languages) uses the variant's dictionary.
 

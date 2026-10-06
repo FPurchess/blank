@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import type { Plugin } from "vite";
 import {
   defineConfigWithTheme,
   type DefaultTheme,
@@ -9,7 +11,10 @@ import {
 // "latest" at the root, "dev" at dev/ and each release frozen at v<version>/
 const root = process.env.DOCS_ROOT ?? "/";
 const base = process.env.DOCS_BASE ?? root;
-const channel = (process.env.DOCS_CHANNEL ?? "latest") as Channel;
+// what `vitepress dev` serves is the branch being written, not a release:
+// it says so with the dev banner, rather than passing for the latest version
+const channel = (process.env.DOCS_CHANNEL ??
+  (process.argv.includes("dev") ? "dev" : "latest")) as Channel;
 // the app version, overridable to preview a frozen release locally
 const version =
   process.env.DOCS_VERSION ??
@@ -61,10 +66,57 @@ if (channel === "dev") {
   ]);
 }
 
+// The screenshots are captured on main by CI, and proposed in a PR of their own
+// (.github/workflows/e2e.yml), so a page can show a picture before its file is
+// there. Vite would fail the build on it: the page links it where it will be.
+const MISSING_SHOT = "\0missing-shot:";
+const missingShots: Plugin = {
+  name: "blank-missing-shots",
+  enforce: "pre",
+  resolveId(id) {
+    if (!id.startsWith("/screenshots/")) return;
+    if (existsSync(new URL(`../public${id}`, import.meta.url))) return;
+    this.warn(`${id} isn't captured yet, the page links it anyway`);
+    return MISSING_SHOT + id;
+  },
+  load(id) {
+    if (!id.startsWith(MISSING_SHOT)) return;
+    const url = base + id.slice(MISSING_SHOT.length + 1);
+    return `export default ${JSON.stringify(url)};`;
+  },
+};
+
+// `DOCS_SHOTS=../e2e/screenshots/docs make docs-dev` shows the pictures a
+// local capture made (make docs-screenshots) instead of the committed ones,
+// to look at them on their pages before CI captures them
+const shotsDir = process.env.DOCS_SHOTS
+  ? resolve(process.env.DOCS_SHOTS)
+  : undefined;
+const localShots: Plugin = {
+  name: "blank-local-shots",
+  apply: "serve",
+  configureServer(server) {
+    if (!shotsDir) return;
+    server.middlewares.use((request, response, next) => {
+      // the picture itself, not Vite's import of it (`?import`), which a raw
+      // <img> in a page turns into
+      const match = /\/screenshots\/([a-z0-9-]+\.(png|gif))$/.exec(
+        request.url ?? "",
+      );
+      const file = match && resolve(shotsDir, match[1]);
+      if (!file || !existsSync(file)) return next();
+      response.setHeader("Content-Type", `image/${match[2]}`);
+      response.setHeader("Cache-Control", "no-store");
+      createReadStream(file).pipe(response);
+    });
+  },
+};
+
 export default defineConfigWithTheme<
   DefaultTheme.Config & { blank: BlankThemeConfig }
 >({
   base,
+  vite: { plugins: [missingShots, localShots] },
   lang: "en-US",
   title: "Blank",
   description,

@@ -1,7 +1,7 @@
 // The test hooks a debug build of the app puts on `window` (__TEST_HOOKS__):
 // `blankGeometry` (exposeGeometry in src/engine/geometry.ts),
-// `blankPageViewPerf` (src/engine/perf.ts), `blankBootTimes` and
-// `blankBreakEngine`. Written out here, since E2E's type check can't compile
+// `blankPageViewPerf` (src/engine/perf.ts), `blankBootTimes`,
+// `blankBreakEngine` and `blankSetTheme` (src/state/appearance.ts). Written out here, since E2E's type check can't compile
 // the app's sources; keep them in step.
 
 interface BlankBox {
@@ -47,4 +47,7 @@ interface Window {
   blankPageViewPerf: (clear?: boolean) => Record<string, number[]>;
   // makes the engine trap, as a broken engine would
   blankBreakEngine: () => void;
+  // switches to a theme, as the settings do; the docs shots capture each
+  // frame in light and dark with it
+  blankSetTheme: (name: string) => void;
 }

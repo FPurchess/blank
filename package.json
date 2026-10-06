@@ -35,7 +35,8 @@
     "test:e2e": "cd e2e && bun run test",
     "docs:dev": "cd docs && bun run dev",
     "docs:build": "cd docs && bun run build",
-    "docs:screenshots": "cd e2e && bun run screenshots",
+    "docs:screenshots": "bash scripts/docs-shots.sh",
+    "docs:shot": "bash scripts/docs-shots.sh --grep",
     "prepare": "husky"
   },
   "resolutions": {
