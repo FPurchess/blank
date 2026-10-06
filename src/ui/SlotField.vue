@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
 
-import type { DocumentFields } from "../layout/bands";
 import type { Slots } from "../layout/settings";
 import {
   createSlotEditor,
@@ -9,7 +8,7 @@ import {
   type SlotKeys,
 } from "../slotEditor";
 
-// One slot of the open header or footer strip, which holds a small
+// One slot of the header or footer being edited, which holds a small
 // ProseMirror editor (src/slotEditor.ts). Vue renders only the slot's
 // element: the editor's DOM inside it is ProseMirror's, and so is its
 // `data-empty`.
@@ -18,7 +17,8 @@ const props = defineProps<{
   position: keyof Slots;
   // what the slot holds when it's shown; typing doesn't come back here
   text: string;
-  fields: DocumentFields;
+  // its name for screen readers, e.g. "Footer, left"
+  label: string;
   // what Tab, Shift+Tab, Enter and Escape do
   keys: SlotKeys;
 }>();
@@ -27,7 +27,7 @@ const emit = defineEmits<{ ready: [editor: SlotEditor]; focus: [] }>();
 const place = useTemplateRef<HTMLElement>("place");
 let editor: SlotEditor | undefined;
 onMounted(() => {
-  editor = createSlotEditor(place.value!, props.text, props.fields, props.keys);
+  editor = createSlotEditor(place.value!, props.text, props.keys, props.label);
   editor.view.dom.addEventListener("focus", () => emit("focus"));
   emit("ready", editor);
 });

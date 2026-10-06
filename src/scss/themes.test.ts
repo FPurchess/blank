@@ -177,7 +177,9 @@ describe("the controls' colors", () => {
       // paper
       const accent = color("accent", paper);
       expect(contrast(color("accent-ink", accent), accent)).toBeGreaterThan(3);
-      // a choice not chosen: ink on the sunken ground
+      expect(contrast(accent, paper)).toBeGreaterThanOrEqual(3);
+      // a choice not chosen, and a placeholder's chip: ink on the sunken
+      // ground
       const sunken = color("hover", paper);
       expect(contrast(color("color", sunken), sunken)).toBeGreaterThanOrEqual(
         4.5,
@@ -202,6 +204,15 @@ describe("the controls' colors", () => {
       ).toBeGreaterThanOrEqual(4.5);
     },
   );
+
+  it.each(cases)("show a danger on the paper in %s, %s", (theme, mode) => {
+    const { color, paper } = grounds(theme, mode);
+    // Remove's icon under the pointer, in a header or footer's strip
+    const hover = color("hover", paper);
+    expect(
+      contrast(color("spelling-color", hover), hover),
+    ).toBeGreaterThanOrEqual(3);
+  });
 
   it.each(themes)("mark the active tab in the accent in %s", (theme) => {
     const { color, paper } = grounds(theme, "accent");

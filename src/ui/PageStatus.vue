@@ -1,16 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { caretPage, pageTops, scrollState } from "../engine/geometry";
+import { caretPage, pageInView } from "../engine/geometry";
 import { useEditor } from "../editor/handle";
-import {
-  headings,
-  pageLayoutState,
-  pageScrollRequest,
-  pageViewport,
-} from "../state";
+import { headings, pageLayoutState, pageScrollRequest } from "../state";
 import { pageLabel } from "./pageViewModel";
-import { sectionAt } from "./readingLine";
 import { useMenuButton } from "./composables/useMenuButton";
 import { firstHeadings, pageMenuItems } from "./statusBarModel";
 import StatusItem from "./StatusItem.vue";
@@ -30,18 +24,11 @@ const PAGE_JUMP_ROOM = 16;
 
 const editor = useEditor();
 
-// where each page starts, once per layout, not per scroll
-const tops = computed(() => pageTops());
 const position = computed(() => {
-  void pageViewport.value;
   const layout = pageLayoutState.value;
-  const starts = tops.value;
-  const state = scrollState();
-  if (!layout || !starts?.length || !state) return null;
-  return {
-    page: sectionAt(starts, state.top, state.height, state.max) + 1,
-    pages: layout.pages,
-  };
+  const page = pageInView();
+  if (!layout || page === null) return null;
+  return { page: page + 1, pages: layout.pages };
 });
 const label = computed(() => (position.value ? pageLabel(position.value) : ""));
 const spoken = computed(() =>

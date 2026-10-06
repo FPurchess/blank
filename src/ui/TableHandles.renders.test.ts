@@ -5,6 +5,7 @@ import { flushPromises } from "../test/async";
 import { createTestHandle } from "../test/editor";
 import { fakeTableHandles } from "../test/tables";
 import { bootApp } from "./mount";
+import * as rect from "./rect";
 import * as model from "./tableHandlesModel";
 
 // How much work the handles do for the pointer: they follow every move of
@@ -17,12 +18,15 @@ vi.mock("./tableHandlesModel", async (actual) => {
   return {
     ...real,
     handlesOf: vi.fn(real.handlesOf),
-    styleOf: vi.fn(real.styleOf),
   };
+});
+vi.mock("./rect", async (actual) => {
+  const real = await actual<typeof import("./rect")>();
+  return { ...real, styleOf: vi.fn(real.styleOf) };
 });
 
 const placed = () => vi.mocked(model.handlesOf).mock.calls.length;
-const rendered = () => vi.mocked(model.styleOf).mock.calls.length;
+const rendered = () => vi.mocked(rect.styleOf).mock.calls.length;
 
 const mouse = async (x: number, y: number) => {
   window.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y }));

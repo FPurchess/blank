@@ -13,4 +13,12 @@
     transition-duration: var(--chrome-out);
     pointer-events: none;
   }
+
+  // and while a header or footer is edited, with the pages around it (see
+  // src/scss/_bands.scss), at once: a press there is done with it
+  body.band-editing & {
+    opacity: 0;
+    transition-duration: var(--fade-out);
+    pointer-events: none;
+  }
 }

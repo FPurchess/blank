@@ -305,9 +305,9 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
   },
   [C.EDIT_FOOTER]: {
     group: "Page",
-    label: "Footer and page numbers",
+    label: "Footer",
     icon: "footer",
-    aliases: ["page", "numbers"],
+    aliases: ["page", "numbers", "page number", "page numbers"],
   },
   [C.VIEW_OUTLINE]: {
     group: "View",

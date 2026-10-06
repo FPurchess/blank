@@ -55,6 +55,13 @@ const SETTING_PROBLEMS: Record<PageKey, string> = {
   startNumber: "its first page number isn't a number",
 };
 
+/**
+ * unreadable says that the frontmatter can't be read, so `what` (e.g. "the
+ * page setup", "the footer") can't be written into it
+ */
+export const unreadable = (what: string) =>
+  `The properties at the top of the file can't be read, so ${what} can't be written into them.`;
+
 // what the problems of resolveLayout mean to the user, by the key of the
 // frontmatter they are about
 const PROBLEMS: Record<string, string> = {

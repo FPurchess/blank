@@ -19,8 +19,8 @@ import {
   previewOf,
   sameHover,
   spanOf,
-  styleOf,
 } from "./tableHandlesModel";
+import { styleOf } from "./rect";
 
 // The handles of the table under the mouse, see
 // src/editor/plugins/tables/handles.ts: a grip on the left edge of the row and

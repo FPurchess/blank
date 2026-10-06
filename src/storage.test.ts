@@ -390,6 +390,29 @@ describe("storage", () => {
       expect(setItem).not.toHaveBeenCalled();
     });
 
+    it("flush waits for a write under way, which took what was pending", async () => {
+      const { transaction, flush } = await open("a");
+      const written = deferred();
+      const setItem = localforage.setItem.bind(localforage);
+      vi.spyOn(localforage, "setItem").mockImplementation(
+        async (key, value) => {
+          await written.promise;
+          return setItem(key, value);
+        },
+      );
+      transaction.value = replace(doc(p("on its way")));
+      // the first takes it, as the timer's write would
+      void flush();
+      let flushed = false;
+      const flushing = flush().then(() => (flushed = true));
+      await flushPromises();
+      expect(flushed).toBe(false);
+
+      written.resolve();
+      await flushing;
+      expect(await text("a")).toBe("on its way");
+    });
+
     it("flush waits for the settings changed before it", async () => {
       const { pageView, flush } = await bootFresh();
       const written = deferred();

@@ -138,19 +138,18 @@ describe("the room for the first page's header", () => {
   const tops = (placed: ReturnType<typeof frameLayout>) =>
     placed.frames.map((frame) => frame.top);
 
-  it("is none without a header", () => {
+  it("is kept in page ends also without a header, for adding one", () => {
     const placed = frameLayout(layout, "page-ends", 800);
     expect(placed.headerRoom).toBe(0);
-    expect(placed.frames[0].top).toBe(VIEW_TOP);
+    expect(placed.frames[0].top).toBe(VIEW_TOP + HEADER_ROOM);
   });
 
-  it("moves the frames and the desk down in page ends", () => {
+  it("leaves the frames where they are when a header comes in page ends", () => {
     const without = frameLayout(layout, "page-ends", 800);
     const placed = frameLayout({ ...layout, header: true }, "page-ends", 800);
     expect(placed.headerRoom).toBe(HEADER_ROOM);
-    expect(placed.frames[0].top).toBe(VIEW_TOP + HEADER_ROOM);
-    expect(tops(placed)).toEqual(tops(without).map((top) => top + HEADER_ROOM));
-    expect(placed.height).toBe(without.height + HEADER_ROOM);
+    expect(tops(placed)).toEqual(tops(without));
+    expect(placed.height).toBe(without.height);
   });
 
   it("is none on sheets, which show their headers", () => {

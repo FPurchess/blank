@@ -1,24 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { TOP_BAR_HEIGHT } from "../chrome";
-import { NEAR_BOTTOM, NEAR_TOP, nearEdge } from "./bandStripsModel";
+import { bandPage, INSERTS } from "./bandStripsModel";
 
-describe("nearEdge", () => {
-  it("shows the top hint just below the top area, never on it", () => {
-    expect(nearEdge(0, 600, false)).toBeNull();
-    expect(nearEdge(TOP_BAR_HEIGHT - 1, 600, false)).toBeNull();
-    expect(nearEdge(TOP_BAR_HEIGHT, 600, false)).toBe("top");
-    expect(nearEdge(NEAR_TOP - 1, 600, false)).toBe("top");
-    expect(nearEdge(NEAR_TOP, 600, false)).toBeNull();
+describe("INSERTS", () => {
+  it("names the placeholders as the pages do, with a tooltip each", () => {
+    expect(INSERTS.map(({ label, tip, text }) => [label, tip, text])).toEqual([
+      ["Title", "Insert the title", "{title}"],
+      ["Author", "Insert the author", "{author}"],
+      ["Chapter", "Insert the chapter", "{chapter}"],
+      ["Date", "Insert the date", "{date}"],
+      ["File", "Insert the file name", "{file}"],
+    ]);
   });
+});
 
-  it("shows the bottom hint on the status bar and just above it", () => {
-    expect(nearEdge(600 - NEAR_BOTTOM, 600, false)).toBeNull();
-    expect(nearEdge(600 - NEAR_BOTTOM + 1, 600, false)).toBe("bottom");
-    expect(nearEdge(599, 600, false)).toBe("bottom");
-  });
-
-  it("leaves the bottom hint away on the status bar's controls", () => {
-    expect(nearEdge(590, 600, true)).toBeNull();
+describe("bandPage", () => {
+  it("names a page's band, counted from 1", () => {
+    expect(bandPage("footer", 3)).toBe("footer 3");
   });
 });

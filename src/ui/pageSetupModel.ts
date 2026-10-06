@@ -1,5 +1,6 @@
 import { shownIn } from "../dom";
 import type { PageChoices } from "../layout/choices";
+import { unreadable } from "../layout/describe";
 import { SIDES } from "../layout/settings";
 
 // What the page setup dialog (PageSetupDialog.vue) shows besides its rows.
@@ -48,8 +49,7 @@ export const sentence = (text: string) =>
 // "paper" or "margins") and a sentence that says it
 export type Problem = [part: string, message: string];
 
-export const UNREADABLE =
-  "The properties at the top of the file can't be read, so the page setup can't be written into them.";
+export const UNREADABLE = unreadable("the page setup");
 
 /**
  * problemsOf returns what is wrong, each on a line of its own: the

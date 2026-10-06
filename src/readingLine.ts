@@ -1,7 +1,7 @@
 // The line the view is read at (READING_LINE, see src/chrome.ts): what is
 // at or above it is what the view shows. The outline marks the section of
 // the heading there, and the bottom bar counts the page there.
-import { READING_LINE } from "../chrome";
+import { READING_LINE } from "./chrome";
 
 /**
  * sectionAt returns which of `tops` the view shows the section of: the last

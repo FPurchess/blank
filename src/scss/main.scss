@@ -10,6 +10,7 @@
 @use "tabs";
 @use "formatToolbar";
 @use "settings";
+@use "bands";
 
 html {
   overflow-y: auto;
@@ -480,302 +481,10 @@ body {
   }
 }
 
-// the header and footer strips, see src/ui/BandStrips.vue: pinned below the top
-// bar and above the bottom bar, lined up with the text column
-$band-height: 28px;
-
-.band-edge,
-.band-editor {
-  position: fixed;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  pointer-events: none;
-  color: var(--color);
-  user-select: none;
-
-  &.header {
-    top: $top-bar-height;
-  }
-
-  &.footer {
-    bottom: $status-height;
-  }
-
-  &[hidden] {
-    display: none;
-  }
-}
-
-// as wide as the text of .ProseMirror
-.band-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-  box-sizing: border-box;
-  pointer-events: auto;
-}
-
-.slot-text,
-.slot {
-  &.left {
-    text-align: left;
-  }
-
-  &.center {
-    text-align: center;
-  }
-
-  &.right {
-    text-align: right;
-  }
-}
-
-// the opacity of the faint text beside the text of the pages: the bands at
-// rest, where a page ends and the label of a page break. At least 3:1 on the
-// page in every theme (src/scss/themes.test.ts)
+// the opacity of the faint text beside the text of the pages: the bands
+// where a page ends and the label of a page break. At least 3:1 on the page
+// in every theme (src/scss/themes.test.ts)
 $faint-text-opacity: 0.6;
-
-// a header or footer at rest: one faint line, like it prints
-.band-line {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  min-height: $band-height;
-  align-items: center;
-  font-size: 0.75rem;
-  opacity: $faint-text-opacity;
-  background-color: var(--background-color);
-  transition: opacity 150ms;
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
-// where there is none, a hint shows while the mouse is near: just below the
-// top area and just above the status bar, whose controls fill the rows; only
-// its buttons take clicks, and only while it shows
-.band-edge.empty {
-  &.header {
-    top: $top-bar-height;
-  }
-
-  &.footer {
-    bottom: $status-height;
-  }
-
-  .band-inner {
-    pointer-events: none;
-  }
-}
-
-.band-hint {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  height: $band-height;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 150ms;
-
-  body.near-top .header &,
-  body.near-bottom .footer & {
-    opacity: 0.6;
-
-    button {
-      pointer-events: auto;
-    }
-  }
-
-  button {
-    font: inherit;
-    font-size: 0.75rem;
-    color: inherit;
-    background: transparent;
-    border: 1px dashed var(--color);
-    border-radius: 3px;
-    padding: 1px 8px;
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-// the placeholders in the text: the page number, the title, ...
-.chip {
-  padding: 0 4px;
-  border-radius: 3px;
-  background-color: color-mix(in srgb, var(--color) 12%, transparent);
-  white-space: nowrap;
-
-  // the page numbers, which are named rather than shown
-  &[data-field="page"],
-  &[data-field="pages"] {
-    font-variant: small-caps;
-  }
-
-  &.ProseMirror-selectednode {
-    outline: 1px solid var(--color);
-  }
-}
-
-// the strip being edited, with its toolbar
-.band-editor {
-  z-index: 8;
-  user-select: auto;
-  animation: band-open 150ms ease-out;
-
-  .band-inner {
-    padding-top: 4px;
-    padding-bottom: 6px;
-    background-color: var(--background-color);
-    border-bottom: 1px dashed var(--color);
-  }
-
-  &.footer .band-inner {
-    border-top: 1px dashed var(--color);
-    border-bottom: 0;
-    padding-top: 6px;
-    padding-bottom: 4px;
-  }
-
-  .slots {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    font-size: 0.85rem;
-  }
-
-  .slot {
-    position: relative;
-    border-radius: 3px;
-
-    .ProseMirror {
-      min-height: 1.6em;
-      padding: 2px 6px;
-      outline: none;
-      white-space: pre-wrap;
-      border-radius: 3px;
-      font-size: inherit;
-      max-width: none;
-      min-width: 0;
-      margin: 0;
-    }
-
-    &:hover .ProseMirror,
-    .ProseMirror:focus {
-      background-color: color-mix(in srgb, var(--color) 6%, transparent);
-    }
-
-    // Left, Center, Right where a slot is empty
-    &[data-empty="true"]::before {
-      content: attr(data-placeholder);
-      position: absolute;
-      inset: 2px 6px auto;
-      opacity: 0.35;
-      pointer-events: none;
-    }
-  }
-
-  // which pages above the slots, what to insert below them
-  .band-pages,
-  .band-tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
-
-    .band-label {
-      opacity: 0.6;
-      margin-right: 6px;
-    }
-
-    .spacer {
-      flex: 1;
-    }
-
-    button {
-      font: inherit;
-      color: inherit;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      padding: 1px 8px;
-      opacity: 0.75;
-
-      &:hover,
-      &:focus-visible {
-        border-color: var(--color);
-        opacity: 1;
-      }
-
-      &[aria-pressed="true"],
-      &.done {
-        color: var(--background-color);
-        background-color: var(--color);
-        opacity: 1;
-      }
-
-      &[hidden] {
-        display: none;
-      }
-    }
-  }
-
-  .band-pages {
-    margin-bottom: 4px;
-  }
-
-  .band-tools {
-    margin-top: 4px;
-  }
-
-  // the pages that have a band of their own
-  .band-tabs {
-    display: flex;
-    gap: 2px;
-
-    &[hidden] {
-      display: none;
-    }
-
-    button[aria-selected="true"] {
-      border-color: var(--color);
-      opacity: 1;
-    }
-  }
-}
-
-@keyframes band-open {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-.band-editor.footer {
-  animation-name: band-open-footer;
-}
-
-@keyframes band-open-footer {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
-
-// the text fades while a strip is edited, and makes room for the strips; the
-// strips' own editors are ProseMirror editors too, so it goes by its id
-// the open strip takes room of its own below the top area or above the status
-// bar, so it covers none of the text (see #page-view below): its rows of
-// pages, slots and placeholders (bands.e2e.ts checks it)
-$strip-height: 88px;
 
 .boot-error {
   max-width: 720px;
@@ -1279,8 +988,6 @@ body.without-engine {
   left: 0;
 }
 
-// where a page of "page ends" ends: its footer, then the next page's header
-// (MARK_HEIGHT in src/engine/frames.ts)
 // the room between a header or footer and the page's text in "page ends",
 // BAND_GAP in src/engine/frames.ts
 $band-gap: 32px;
@@ -1288,7 +995,7 @@ $band-gap: 32px;
 $page-end-height: 64px + 2 * $band-gap;
 
 // the three slots of a header or footer shown beside the pages: left,
-// centre and right
+// center and right
 %page-band-text {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -1329,11 +1036,18 @@ $page-end-height: 64px + 2 * $band-gap;
   justify-content: space-between;
   font-size: 11px;
   letter-spacing: 0.04em;
-  opacity: $faint-text-opacity;
   pointer-events: none;
 
+  // a click opens them (BandTarget.vue)
   .band {
     @extend %page-band-text;
+    pointer-events: auto;
+  }
+
+  // faint, but for the hint that adds a band
+  .band-target,
+  .line {
+    opacity: $faint-text-opacity;
   }
 
   // the space between the footer and the header, with the dashed line in
@@ -1374,14 +1088,6 @@ $page-end-height: 64px + 2 * $band-gap;
   font-size: 11px;
   letter-spacing: 0.04em;
   opacity: $faint-text-opacity;
-  cursor: pointer;
-
-  // over its line of text, as the bands where a page ends, not the gap
-  // below it
-  &:hover {
-    background-color: color-mix(in srgb, var(--color) 8%, transparent);
-    background-clip: content-box;
-  }
 }
 
 .page-first-header {
@@ -1446,54 +1152,6 @@ $page-end-height: 64px + 2 * $band-gap;
   }
 }
 
-// the header and footer margins of a sheet, and the bands where a page
-// ends: a click opens the strip of the band
-.page-band {
-  position: absolute;
-  left: 0;
-  right: 0;
-  cursor: pointer;
-
-  &.header {
-    top: 0;
-  }
-
-  &.footer {
-    bottom: 0;
-  }
-
-  &:hover {
-    background-color: color-mix(in srgb, var(--color) 4%, transparent);
-  }
-}
-
-.page-end .band {
-  pointer-events: auto;
-  cursor: pointer;
-
-  &:hover {
-    background-color: color-mix(in srgb, var(--color) 8%, transparent);
-    // over its line of text, between the insets that line it up with the
-    // page's text
-    background-clip: content-box;
-  }
-}
-
-// the open strip of a header or footer takes room of its own at the top or
-// bottom of the window, so it covers none of the pages
-body.editing-header #page-view {
-  top: $top-bar-height + $strip-height;
-}
-
-body.editing-footer #page-view {
-  bottom: $status-height + $strip-height;
-}
-
-body.band-editing #page-view {
-  opacity: 0.3;
-  transition: opacity 150ms;
-}
-
 // the outline (src/ui/DocumentOutline.vue): the headings as dashes at the
 // right edge, which open into a list of them: open beside the pages or
 // floating over them as a side pane (see side-pane in _controls.scss), or
@@ -1529,7 +1187,8 @@ body.without-engine.outline-docked {
 // where the outline is docked, and where the controls have faded in focus
 // mode, so the bars leave the desk behind and not a strip of paper
 body.outline-docked.outline-desk,
-body.controls-faded.outline-desk {
+body.controls-faded.outline-desk,
+body.band-editing.outline-desk {
   background-color: var(--desk-color);
 }
 
@@ -1682,17 +1341,6 @@ body.controls-faded.outline-desk {
 
   .outline-entry.level-#{$level} {
     padding-left: calc(var(--s2) + #{14px * ($level - 1)});
-  }
-}
-
-// while a header or footer is edited, the outline dims with the pages and
-// takes no clicks
-body.band-editing #outline {
-  opacity: 0.3;
-  transition: opacity 150ms;
-
-  * {
-    pointer-events: none;
   }
 }
 
@@ -2042,18 +1690,15 @@ body.without-engine.blocks-docked {
   .tooltip,
   .word-count-card,
   .page-caret,
-  .band-editor,
-  .band-editor.footer {
+  #band-editor > .band-veil {
     animation: none;
   }
 
   .switch-row .switch::after,
-  .band-line,
-  .band-hint,
-  body.band-editing #page-view,
+  .band-hint-chip,
+  body.band-editing.without-engine #editor,
   .outline-dashes,
   .outline-entry,
-  body.band-editing #outline,
   #ui-top,
   #ui-bottom,
   #outline,

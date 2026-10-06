@@ -53,31 +53,34 @@ It all works from the keyboard too:
 
 ## Page numbers, headers and footers {#headers-and-footers}
 
-Point at the bottom edge of the window and click **# Page numbers**: every page of your PDF and Word document now has its number at the bottom center. That's it.
+Point at the bottom margin of a page, or just below the last page, and click **+ Footer**. The footer opens right where it prints: three places in the margin, on the left, in the center and on the right, and a strip beside them. Everything else steps back while you edit. Click **Page number**, pick how it reads, and click **Done**: every page of your PDF and Word document now has its number at the bottom. A header works the same from the top margin with **+ Header**.
 
-For more, point at the top or bottom edge and click **+ Header** or **+ Footer**, or press `Mod` `Alt` `H` for the header and `Mod` `Alt` `F` for the footer. A strip opens right there, with a place on the left, in the center and on the right. Click one and type, or use the buttons below it:
+The fast way is the keyboard: `Mod` `Alt` `F` opens the footer and `Mod` `Alt` `H` the header, on the page you're looking at.
 
-- **# Page number** puts in the number of the page. Its menu offers _3_, _Page 3_, _3 of 12_ and _Page 3 of 12_, numbers in the style _1, 2, 3_, _i, ii, iii_ or _I, II, III_, and **Start At…** for the number of the first page, e.g. 0 to leave a title page uncounted.
+Click a place and type, or put something in with the strip's buttons:
+
+- **Page number** puts in the number of the page. Its menu offers _1_, _Page 1_, _1 of 2_ and _Page 1 of 2_, numbers in the style _1, 2, 3_, _i, ii, iii_ or _I, II, III_, and **Start at…** for the number of the first page, e.g. 0 to leave a title page uncounted.
 - **Title** and **Author** put in the document's title and author, which follow the [properties](./files#frontmatter). Without a title, the first heading is the title.
 - **Chapter** puts in the chapter a page belongs to: the first heading 1 on the page, or else the last one before it. A running head, as in books.
 - **Date** puts in the date of the export, and **File** the name of the file.
-- **Remove** clears the header or footer on every page.
 
-<img class="shot" src="/screenshots/header-footer.gif" alt="A click on Page numbers at the bottom edge numbers the pages; Mod Alt H opens the header, where Chapter goes on the left, Page 3 of 12 on the right, and First Page None leaves the title page plain" />
+In a place, they show by their name, like **Page** or **Title**, and your pages show what they stand for. **Remove** clears the header or footer from every page.
 
-`Tab` moves to the next place and on to the buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Double-click a header or footer there, or a sheet's top or bottom margin, to open it again. `Mod` `Z` in your text undoes the whole change.
+<img class="shot" src="/screenshots/header-footer.gif" alt="Pointing below the page shows + Footer; a click opens the footer, where Page number puts the number in the center. Mod Alt H opens the header, where Chapter goes on the left, Page 1 of 2 on the right, and First page None leaves the title page plain" />
 
-When a placeholder has nothing to put in yet, say **Author** while the document has no author, or **Chapter** before the first heading 1, your pages show its name there in faint italics, so you can still see the header or footer and double-click it. Only the screen shows these names: your PDF and Word document leave the place empty until there is something to put in. And if the header or footer you're done with shows nothing at all on your page yet, the bottom bar tells you why, say that no author is set, and how to set one.
+`Tab` moves to the next place and on to the strip's buttons. `Enter`, `Esc` or a click anywhere in your text is done. Your pages show what they carry: in **Pages** on every sheet, and in **Page ends** above the first page, between the pages and below the last one. Click a header or footer there to change it; on a sheet, anywhere in its top or bottom margin does. `Mod` `Z` in your text undoes the whole change.
+
+When a placeholder has nothing to put in yet, say **Author** while the document has no author, or **Chapter** before the first heading 1, your pages show its name there in faint italics, so you can still see the header or footer and click it. Only the screen shows these names: your PDF and Word document leave the place empty until there is something to put in. And if the header or footer you're done with shows nothing at all on your page yet, the bottom bar tells you why, say that no author is set, and how to set one.
 
 ### The first page and even pages {#first-and-even-pages}
 
-Above the places, **First Page ▾** chooses what the first page has: the same as the other pages, **None**, e.g. for a title page, or **Its Own**, e.g. a letterhead with your address on the first page and just the page number after it.
+In the strip, **First page** chooses what the first page has: **The same as the others**, **None**, e.g. for a title page, or **Its own**, e.g. a letterhead with your address on the first page and just the page number after it.
 
-**Odd & Even Pages** gives the left and right pages of a book their own header and footer. The even pages start as the odd ones mirrored, so the page numbers sit on the outside, and **Mirror Odd Pages** mirrors them again after a change. As in Word, a page counts as even by the number it shows.
+Switch on **Odd and even pages differ** to give the left and right pages of a book their own header and footer. Odd and even pages then have two headers and two footers, each kept on its own. The even pages start as the odd ones mirrored, so the page numbers sit on the outside. Changed the odd pages later? **Mirror the odd pages** copies them to the even pages again, left and right swapped. As in Word, a page counts as even by the number it shows.
 
-<img class="shot" src="/screenshots/even-pages.gif" alt="Mod Alt F opens the footer, with the title in the center and the page number on the right; Odd and Even Pages adds even pages, with the page number mirrored to the left, and the tabs switch between odd and even pages" />
+<img class="shot" src="/screenshots/even-pages.gif" alt="Mod Alt F opens the footer, with the title in the center and the page number on the right; switching on Odd and even pages differ adds even pages, with the page number mirrored to the left, and the tabs switch between odd and even pages" />
 
-When the first or even pages have their own, tabs above the places switch between them.
+When the first or even pages have their own, the strip's **Editing** row switches between them. Opening a header or footer on a page shows the one that page has: the first page's own on the first page, the even pages' on an even one.
 
 ## Page breaks {#page-breaks}
 
@@ -112,7 +115,7 @@ page:
 ---
 ```
 
-You can write these yourself too. `new-page-before` lists the heading levels that start a new page. `header` and `footer` have a `left`, `center` and `right` of one line each, in which `{page}` is the page number, `{pages}` the number of pages, `{title}` and `{author}` come from the properties, `{chapter}` is the chapter of the page, `{date}` the date of the export and `{file}` the name of the file; write <code v-pre>{{</code> for a brace of your own. `first-page` is `plain` for none on the first page, or its own `header` and `footer`, and `even-pages` has the `header` and `footer` of even pages. `number-style` is `1`, `i` or `I`, and `start-number: 0` numbers the pages from 0, e.g. to leave the title page uncounted. `size` is `a3`, `a4`, `a5`, `b5`, `letter`, `legal`, `auto` for the paper of your region, or a size like `170mm x 240mm`. `margins` is one length for all four sides, or `top`, `right`, `bottom` and `left` on their own lines. Lengths are written with their unit: `mm`, `cm`, `in` or `pt`.
+You can write these yourself too. `new-page-before` lists the heading levels that start a new page. `header` and `footer` have a `left`, `center` and `right` of one line each, in which `{page}` is the page number, `{pages}` the number of pages, `{title}` and `{author}` come from the properties, `{chapter}` is the chapter of the page, `{date}` the date of the export and `{file}` the name of the file; write <code v-pre>{{</code> for a brace of your own. `first-page` is `plain` for none on the first page, or its own `header` and `footer`, and `even-pages` has the `header` and `footer` of even pages, or is `same` for the same as on the other pages. `number-style` is `1`, `i` or `I`, and `start-number: 0` numbers the pages from 0, e.g. to leave the title page uncounted. `size` is `a3`, `a4`, `a5`, `b5`, `letter`, `legal`, `auto` for the paper of your region, or a size like `170mm x 240mm`. `margins` is one length for all four sides, or `top`, `right`, `bottom` and `left` on their own lines. Lengths are written with their unit: `mm`, `cm`, `in` or `pt`.
 
 The page setup stays out of the way of your text: the bar at the bottom shows the paper, e.g. _A5 landscape_, and a click on it opens the page setup.
 
@@ -134,4 +137,4 @@ Word can do a few things Blank's page setup can't hold. When a document has them
 - pictures, tables or several lines in a header or footer, of which Blank keeps the text on one line,
 - page numbers in letters (a, b, c), which become 1, 2, 3.
 
-Headers and footers keep their text, not its formatting: bold, colours or another font are left out, as in the rest of the document.
+Headers and footers keep their text, not its formatting: bold, colors or another font are left out, as in the rest of the document.

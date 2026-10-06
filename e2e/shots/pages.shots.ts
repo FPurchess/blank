@@ -54,9 +54,12 @@ describe("docs shots: pages and themes", () => {
     await film.type("It was a dark and stormy night.");
     await film.pause(0.6);
 
-    // page numbers in one click, from the hint at the bottom edge
-    await film.hover("bottom");
-    await film.clickOn($("#band-footer").$("button=# Page numbers"), 1.2);
+    // page numbers: point below the page, + Footer, then Page number
+    const addFooter = $('button.band-hint[aria-label="Add a footer"]');
+    await film.hover(addFooter);
+    await film.clickOn(addFooter, 1);
+    await film.clickOn($("#band-editor").$("button=Page number"), 0.8);
+    await film.clickOn($("#context-menu").$('[data-id="{page}"]'), 1);
     await film.clickOn($("#band-editor").$("button=Done"), 1);
 
     // the header: the chapter on the left, the page on the right
@@ -64,13 +67,13 @@ describe("docs shots: pages and themes", () => {
     await film.clickOn($("#band-editor .slot.left .ProseMirror"), 0.3);
     await film.clickOn($("#band-editor").$("button=Chapter"), 0.8);
     await film.clickOn($("#band-editor .slot.right .ProseMirror"), 0.3);
-    await film.clickOn($("#band-editor").$("button=# Page number ▾"), 1);
+    await film.clickOn($("#band-editor").$("button=Page number"), 1);
     await film.clickOn(
       $("#context-menu").$('[data-id="Page {page} of {pages}"]'),
       1,
     );
     // a title page without them
-    await film.clickOn($("#band-editor").$("button=First Page ▾"), 1);
+    await film.clickOn($("#band-editor button.select"), 1);
     await film.clickOn(
       $("#context-menu").$('[data-id="first-page:plain"]'),
       0.8,
@@ -93,12 +96,12 @@ describe("docs shots: pages and themes", () => {
     await film.shortcut(["Mod", "Alt", "F"], () => pressMod(Key.Alt, "f"), 0.8);
     await film.clickOn($("#band-editor").$("button=Title"), 0.6);
     await film.clickOn($("#band-editor .slot.right .ProseMirror"), 0.3);
-    await film.clickOn($("#band-editor").$("button=# Page number ▾"), 0.8);
+    await film.clickOn($("#band-editor").$("button=Page number"), 0.8);
     await film.clickOn($("#context-menu").$('[data-id="{page}"]'), 0.8);
     // the even pages start mirrored: the page number on the outside
-    await film.clickOn($("#band-editor").$("button=Odd & Even Pages"), 1.6);
-    await film.clickOn($("#band-editor").$("button=Odd Pages"), 1.2);
-    await film.clickOn($("#band-editor").$("button=Even Pages"), 1.2);
+    await film.clickOn($("#band-editor [role=switch]"), 1.6);
+    await film.clickOn($("#band-editor").$("button=Odd pages"), 1.2);
+    await film.clickOn($("#band-editor").$("button=Even pages"), 1.2);
     await film.clickOn($("#band-editor").$("button=Done"), 0.6);
     await film.clickInto("#editor p", 0.3);
     film.hidePointer();

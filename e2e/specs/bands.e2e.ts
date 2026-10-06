@@ -4,12 +4,9 @@ import path from "node:path";
 
 import { browser, $, $$, expect } from "@wdio/globals";
 
-import { TOP_BAR_HEIGHT } from "../../src/chrome.ts";
-
 import {
   clickText,
   editorText,
-  hoverEdge,
   Key,
   pressMod,
   restartApp,
@@ -19,9 +16,27 @@ import {
 
 const strip = () => $("#band-editor");
 const tool = (label: string) => strip().$(`button=${label}`);
-// what a band says, kept in the edge behind the pages, which show it
-const bandText = (band: string, slot: string) =>
-  editorText(`#band-${band} .band-line .${slot}`).then((texts) => texts[0]);
+// the select of what the first page has, and the switch of even pages
+const firstPage = () => strip().$("button.select");
+const evenPages = () => strip().$("[role=switch]");
+// the hint that adds a band, once the pointer is on it
+const hint = async (name: string) => {
+  const button = $(`button.band-hint[aria-label="${name}"]`);
+  await button.moveTo();
+  return button;
+};
+// where an element is in the window
+const rect = (selector: string) =>
+  browser.execute(
+    (selector: string) =>
+      document.querySelector(selector)!.getBoundingClientRect().toJSON() as {
+        top: number;
+        bottom: number;
+        left: number;
+        right: number;
+      },
+    selector,
+  );
 
 describe("header and footer", () => {
   let fixtureDir: string;
@@ -43,21 +58,22 @@ describe("header and footer", () => {
       timeoutMsg: `the file has not been saved, it contains: ${fs.readFileSync(fixturePath, "utf8")}`,
     });
 
-  it("adds page numbers from the hint at the bottom edge", async () => {
+  it("adds page numbers from the hint below the last page", async () => {
     // a page that is the last ends in no mark, and without a footer in
-    // nothing at all
+    // nothing but the hint to add one
     await expect($(".page-frame")).toBeExisting();
     await expect($(".page-end")).not.toExist();
     await expect($(".page-last-footer")).not.toExist();
-    await hoverEdge("bottom");
-    await $("#band-footer").$("button=# Page numbers").click();
+    await (await hint("Add a footer")).click();
 
     await expect(strip()).toBeDisplayed();
-    await expect(strip().$(".slot.center .chip")).toHaveText("page");
+    await expect(strip()).toHaveElementClass("footer");
+    await tool("Page number").click();
+    await $("#context-menu").$('[data-id="{page}"]').click();
+    await expect(strip().$(".slot.center .chip")).toHaveText("Page");
     await tool("Done").click();
 
     await expect(strip()).not.toExist();
-    await expect(bandText("footer", "center")).resolves.toBe("page");
     // below the text of the last page, its footer shows its number, and no
     // line where it would end
     await expect($(".page-last-footer")).toHaveText("1");
@@ -69,12 +85,7 @@ describe("header and footer", () => {
   });
 
   it("opens a strip from the footer below the last page", async () => {
-    // a single click leaves it closed, as a click beside the text does,
-    // also once a double click would have taken
     await $(".page-last-footer").click();
-    await browser.pause(600);
-    await expect(strip()).not.toExist();
-    await $(".page-last-footer").doubleClick();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("footer");
     await browser.keys(Key.Escape);
@@ -82,8 +93,7 @@ describe("header and footer", () => {
   });
 
   it("writes a header with the title and a typed text", async () => {
-    await hoverEdge("top");
-    await $("#band-header").$("button=+ Header").click();
+    await pressMod(Key.Alt, "h");
     await expect(strip()).toBeDisplayed();
 
     await strip().$(".slot.left .ProseMirror").click();
@@ -91,15 +101,15 @@ describe("header and footer", () => {
     await strip().$(".slot.right .ProseMirror").click();
     await type("draft");
     // the page number menu, with its presets as they read
-    await tool("# Page number ▾").click();
+    await tool("Page number").click();
     await $("#context-menu").$('[data-id="Page {page} of {pages}"]').click();
     // none on the first page
-    await tool("First Page ▾").click();
+    await firstPage().click();
     await $("#context-menu").$('[data-id="first-page:plain"]').click();
+    await expect(firstPage()).toHaveText("None");
     await browser.keys(Key.Escape);
 
     await expect(strip()).not.toExist();
-    await expect(bandText("header", "left")).resolves.toBe("report");
     // the first page has none, so nothing shows above its text
     await expect($(".page-first-header")).not.toExist();
     await pressMod("s");
@@ -111,10 +121,16 @@ describe("header and footer", () => {
   it("undoes a strip's changes in one step", async () => {
     await clickText("text.");
     await pressMod("z");
+    await pressMod("s");
+    await saved(
+      '---\npage:\n  footer: {center: "{page}"}\n---\n\n# report\n\ntext.',
+    );
 
-    await expect($("#band-header .band-line")).not.toExist();
     await pressMod(Key.Shift, "z");
-    await expect($("#band-header .band-line")).toExist();
+    await pressMod("s");
+    await saved(
+      '---\npage:\n  footer: {center: "{page}"}\n  header: {left: "{title}", right: "draft Page {page} of {pages}"}\n  first-page: plain\n---\n\n# report\n\ntext.',
+    );
   });
 
   it("opens a strip from the margin of a sheet", async () => {
@@ -140,48 +156,28 @@ describe("header and footer", () => {
     await expect($("body")).not.toHaveElementClass("band-editing");
   });
 
-  it("makes room for the open strips, below the top area and above the status bar", async () => {
-    // where the strip and the page view are, once the strip has slid in
-    const edges = async () => {
-      let last = "";
-      let found: Record<string, number> = {};
-      await browser.waitUntil(
-        async () => {
-          found = await browser.execute(() => {
-            const box = (selector: string) =>
-              document.querySelector(selector)!.getBoundingClientRect();
-            const strip = box("#band-editor .band-inner");
-            const view = box("#page-view");
-            return {
-              stripTop: strip.top,
-              stripBottom: strip.bottom,
-              viewTop: view.top,
-              viewBottom: view.bottom,
-            };
-          });
-          const now = JSON.stringify(found);
-          const settled = now === last;
-          last = now;
-          return settled;
-        },
-        { interval: 200, timeoutMsg: "the strip didn't settle" },
+  it("puts the strip beside the band's slots, in the view", async () => {
+    // beside them, and over neither them nor the bars
+    const beside = async () => {
+      const view = await rect("#page-view");
+      const card = await rect("#band-editor .band-card");
+      const slots = await rect("#band-editor .band-slots");
+      expect(card.bottom <= slots.top + 1 || card.top >= slots.bottom - 1).toBe(
+        true,
       );
-      return found;
+      expect(card.top).toBeGreaterThanOrEqual(view.top);
+      expect(card.bottom).toBeLessThanOrEqual(view.bottom);
     };
-    await pressMod(Key.Alt, "h");
-    await expect(strip()).toBeDisplayed();
-    const header = await edges();
-    expect(header.stripTop).toBeGreaterThanOrEqual(TOP_BAR_HEIGHT - 1);
-    expect(header.viewTop).toBeGreaterThanOrEqual(header.stripBottom - 1);
-    await browser.keys(Key.Escape);
-    await expect(strip()).not.toExist();
-
-    await pressMod(Key.Alt, "f");
-    await expect(strip()).toBeDisplayed();
-    const footer = await edges();
-    expect(footer.viewBottom).toBeLessThanOrEqual(footer.stripTop + 1);
-    await browser.keys(Key.Escape);
-    await expect(strip()).not.toExist();
+    for (const key of ["f", "h"]) {
+      await pressMod(Key.Alt, key);
+      await expect(strip()).toBeDisplayed();
+      try {
+        await beside();
+      } finally {
+        await browser.keys(Key.Escape);
+      }
+      await expect(strip()).not.toExist();
+    }
   });
 
   it("keeps the main text apart from the strip's editors", async () => {
@@ -201,11 +197,13 @@ describe("header and footer", () => {
 
   it("gives even pages their own footer, in roman numerals", async () => {
     await pressMod(Key.Alt, "f");
-    await tool("Odd & Even Pages").click();
+    await evenPages().click();
+    await expect(evenPages()).toHaveAttribute("aria-checked", "true");
     await expect(strip().$("[role=tab][aria-selected=true]")).toHaveText(
-      "Even Pages",
+      "Even pages",
     );
-    await tool("# Page number ▾").click();
+    await expect(tool("Mirror the odd pages")).toBeDisplayed();
+    await tool("Page number").click();
     await $("#context-menu").$('[data-id="number-style:i"]').click();
     await tool("Done").click();
 
@@ -319,6 +317,54 @@ describe("header and footer", () => {
     }
   });
 
+  it("opens the footer of page 2 on its margin, and types into it there", async () => {
+    const file = path.join(fixtureDir, "second.md");
+    fs.writeFileSync(
+      file,
+      "# report\n\ntext.\n\n<!-- pagebreak -->\n\nmore.\n",
+    );
+    await restartApp([file]);
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("pages");
+    const margin = $('.page-frame[data-page="2"] .page-band.footer');
+    await margin.scrollIntoView({ block: "center" });
+    // a click near the margin's left end, away from the hint: the whole
+    // margin opens the band
+    const { width } = await margin.getSize();
+    await browser
+      .action("pointer")
+      .move({ origin: margin, x: -Math.round(width / 2) + 30, y: 0 })
+      .down()
+      .up()
+      .perform();
+    await expect(strip()).toBeDisplayed();
+    await expect(strip()).toHaveElementClass("footer");
+
+    await strip().$(".slot.right .ProseMirror").click();
+    await type("two");
+    // the slot is in page 2's bottom margin
+    const sheet = await rect('.page-frame[data-page="2"]');
+    const footer = await rect('.page-frame[data-page="2"] .page-band.footer');
+    const slot = await rect("#band-editor .slot.right");
+    expect(slot.left).toBeGreaterThanOrEqual(sheet.left);
+    expect(slot.right).toBeLessThanOrEqual(sheet.right);
+    expect(slot.top).toBeGreaterThanOrEqual(footer.top - 8);
+    expect(slot.bottom).toBeLessThanOrEqual(sheet.bottom);
+    await tool("Done").click();
+    await expect(strip()).not.toExist();
+
+    await pressMod("s");
+    await browser.waitUntil(
+      () =>
+        fs
+          .readFileSync(file, "utf8")
+          .startsWith("---\npage:\n  footer: {right: two}\n---"),
+      { timeoutMsg: `not saved: ${fs.readFileSync(file, "utf8")}` },
+    );
+    await pressMod(Key.Alt, "v");
+    await expect($("#page-view")).toHaveElementClass("page-ends");
+  });
+
   it("names the placeholders that come out empty, in both views", async () => {
     // no author, and no heading for a chapter
     const file = path.join(fixtureDir, "unnamed.md");
@@ -340,7 +386,7 @@ describe("header and footer", () => {
     const header = $(".page-first-header");
     await expect(header).toBeDisplayed();
     expect(await names(".page-first-header")).toEqual(["Author", "Chapter"]);
-    await header.doubleClick();
+    await header.click();
     await expect(strip()).toBeDisplayed();
     await expect(strip()).toHaveElementClass("header");
     await tool("Done").click();

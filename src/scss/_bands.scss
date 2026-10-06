@@ -1,0 +1,392 @@
+// Headers and footers on the pages and while they're edited (see
+// .claude/rules/headers-and-footers.md): the bands a click opens and the
+// hints that add one (src/ui/BandTarget.vue), and the header or footer being
+// edited, its slots over the band and the strip beside them
+// (src/ui/BandEditor.vue).
+@use "controls" as *;
+@use "statusbar" as *;
+@use "toparea" as *;
+
+// the header and footer margins of a sheet, which a click anywhere on opens
+// the band, with the hint to add one in their middle
+.page-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+
+  &.header {
+    top: 0;
+  }
+
+  &.footer {
+    bottom: 0;
+  }
+}
+
+// a band where the pages show it, which a click opens: outlined under the
+// pointer, over what it shows
+.band-target,
+.band-hint {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+}
+
+.band-target {
+  border-radius: 4px;
+  text-align: inherit;
+
+  &:hover {
+    outline: 1px dashed var(--line-strong);
+    outline-offset: 2px;
+  }
+}
+
+// on a sheet, the whole margin, outlined under the pointer around the band
+// the engine painted in it
+.page-band {
+  .band-target,
+  .band-hint {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+  }
+
+  .band-target:hover {
+    outline: none;
+  }
+
+  .band-target-line {
+    position: absolute;
+    border-radius: 4px;
+  }
+
+  .band-target:hover .band-target-line {
+    outline: 1px dashed var(--line-strong);
+    outline-offset: 2px;
+  }
+}
+
+// where the document has no such band: "+ Header" or "+ Footer", while the
+// pointer is on the margin or the mark's line
+.page-band .band-hint,
+.page-end .band.band-hint,
+.page-edge-hint {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+// above the first page's text and below the last page's in "page ends"
+.page-edge-hint {
+  position: absolute;
+}
+
+.band-hint-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  // HINT_HEIGHT in src/ui/pageViewModel.ts
+  height: 24px;
+  padding: 0 var(--s2);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-control);
+  font-size: var(--ui-small);
+  letter-spacing: normal;
+  white-space: nowrap;
+  color: var(--muted-on-paper);
+  background: var(--background-color);
+  opacity: 0;
+  transition: opacity var(--fade-in) var(--ease);
+}
+
+.page-band:hover .band-hint-chip,
+.band-hint:hover .band-hint-chip,
+.band-hint:focus-visible .band-hint-chip {
+  opacity: 1;
+}
+
+// none while focus mode has faded the controls (focus-mode.md)
+body.controls-faded .band-hint .band-hint-chip {
+  opacity: 0;
+}
+
+.band-hint:hover .band-hint-chip {
+  border-style: solid;
+  color: var(--color);
+}
+
+// while a band is edited, the pages take no clicks but on the sheets, where
+// a press is done with it, and the view still scrolls, and the strip
+// follows; the veil (.band-veil) dims them
+body.band-editing #page-view .page-desk > :not(.page-sheet) {
+  pointer-events: none;
+}
+
+// without pages, the editor fades instead
+body.band-editing.without-engine #editor {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity var(--fade-out) var(--ease);
+}
+
+// the header or footer being edited: over the page view, which clips its
+// slots and strip, so they never cover the bars around it; it takes no
+// clicks itself, so the pages around them close it
+#band-editor {
+  position: fixed;
+  z-index: 8;
+  overflow: clip;
+  pointer-events: none;
+  @include ui-text;
+  color: var(--color);
+
+  > .band-card,
+  > .band-slots {
+    position: absolute;
+    pointer-events: auto;
+  }
+
+  // the spotlight: in the desk's color, so the rest steps back in every
+  // theme, everything but the band's sheet nearly goes (--spotlight), and
+  // its text half as much, so its edge shows which page and where on it
+  // the band is; the view clips it to itself, under the strip and slots
+  > .band-veil {
+    --veil: color-mix(in srgb, var(--desk-color) var(--spotlight), transparent);
+    position: absolute;
+    overflow: hidden;
+    box-shadow: 0 0 0 100vmax var(--veil);
+    animation: band-veil-in var(--fade-in) var(--ease);
+  }
+
+  // without pages, at the window's edge, the strip with the slots in it
+  &.at-edge {
+    @include popover;
+    left: max(8px, calc(50% - 360px));
+    width: min(720px, calc(100vw - 16px));
+    overflow: hidden;
+    pointer-events: auto;
+
+    &.header {
+      top: $top-bar-height + 8px;
+    }
+
+    &.footer {
+      bottom: $status-height + 8px;
+    }
+
+    .band-card {
+      position: static;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .band-slots {
+      position: static;
+      padding: 0 var(--s3) var(--s3);
+    }
+  }
+}
+
+// the strip, beside the band on the popover surface
+.band-card {
+  @include popover;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  .done {
+    @include text-button;
+    @include text-button-primary;
+  }
+
+  .quiet {
+    @include text-button;
+    @include text-button-quiet;
+  }
+
+  // Remove, an icon button with its name
+  .icon-button.quiet {
+    @include icon-text-button;
+    align-items: center;
+  }
+
+  // only its icon turns red under the pointer: as text, the themes' red is
+  // too faint on the paper (themes.test.ts)
+  .danger#{$enabled}:hover .icon {
+    color: var(--spelling-color);
+  }
+}
+
+// its name, on which pages it is, Remove and Done
+.band-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+
+  > .icon {
+    color: var(--muted);
+  }
+}
+
+.band-card-title {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+
+  b {
+    font-weight: 600;
+  }
+
+  .summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--ui-small);
+    color: var(--muted);
+  }
+}
+
+// a row each to insert, for the pages, and for which pages' band it edits
+.band-card-body {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3);
+}
+
+.band-card-label {
+  @include group-label;
+}
+
+.band-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--s2);
+}
+
+.band-card-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+// a placeholder to insert, as the chips in the slots show it
+.band-card .chip {
+  @include icon-text-button;
+  align-items: center;
+  gap: var(--s1);
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--ui-small);
+  // the sunken ground, which the text reads on in every theme, unlike the
+  // accent's soft fill (themes.test.ts)
+  background: var(--hover);
+
+  &#{$enabled}:hover,
+  &#{$enabled}:active {
+    border-color: var(--accent);
+    background: var(--hover);
+  }
+
+  .icon {
+    width: 14px;
+    height: 14px;
+    color: var(--accent);
+  }
+}
+
+// the three slots over the band, where it prints
+.band-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  box-sizing: border-box;
+  line-height: 18px;
+
+  .slot {
+    position: relative;
+    min-width: 0;
+    box-sizing: border-box;
+    min-height: 28px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 4px;
+    color: var(--color);
+    background: var(--background-color);
+
+    &.center {
+      text-align: center;
+    }
+
+    &.right {
+      text-align: right;
+    }
+
+    // the editor's own sign of focus, like the main editor's caret
+    &:focus-within {
+      border: 1px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    // Left, Center or Right while it's empty
+    &[data-empty="true"]::before {
+      content: attr(data-placeholder);
+      position: absolute;
+      inset: 4px 6px auto;
+      color: var(--muted-on-paper);
+      pointer-events: none;
+    }
+
+    .ProseMirror {
+      min-width: 0;
+      max-width: none;
+      min-height: 18px;
+      margin: 0;
+      padding: 4px 6px;
+      font-size: inherit;
+      line-height: inherit;
+      white-space: pre-wrap;
+    }
+  }
+
+  // a placeholder in a slot, by its name
+  .chip {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.95em;
+    white-space: nowrap;
+    background: var(--hover);
+
+    &.ProseMirror-selectednode {
+      outline: 1px solid var(--accent);
+    }
+  }
+}
+
+// the sheet's text around the slots, under the half of the veil
+.band-veil-hole {
+  position: absolute;
+  border-radius: 4px;
+  box-shadow: 0 0 0 100vmax var(--veil);
+  opacity: 0.5;
+}
+
+@keyframes band-veil-in {
+  from {
+    opacity: 0;
+  }
+}

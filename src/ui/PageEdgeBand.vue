@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { editBand } from "../editor/commands/editBand";
-import { useEditor } from "../editor/handle";
-import { pageEngine } from "../engine/engine";
 import type { FrameLayout } from "../engine/frames";
 import type { Band } from "../layout/bands";
-import { pageBandParts } from "../layout/placeholders";
-import { pageFields, pageLayout, pageLayoutState } from "../state";
+import { bandSlots } from "../layout/placeholders";
+import { pageLayoutState } from "../state";
 import BandSlots from "./BandSlots.vue";
-import { bandTitle, firstHeaderPlace, lastFooterPlace } from "./pageViewModel";
+import { addsBand, pageBands } from "./bandStripsModel";
+import BandTarget from "./BandTarget.vue";
+import {
+  edgeHintPlace,
+  firstHeaderPlace,
+  lastFooterPlace,
+} from "./pageViewModel";
+import { styleOf } from "./rect";
 
 // The first page's header right above its text in "page ends", or the last
 // page's footer right below it: the marks where the pages end show the
@@ -17,13 +21,18 @@ import { bandTitle, firstHeaderPlace, lastFooterPlace } from "./pageViewModel";
 // last page doesn't end in a mark, since the text goes on there. The sheets
 // of "pages" show every header and footer themselves. It isn't there when
 // that page has no such band written, so an empty document shows nothing but
-// the caret; a placeholder that comes out empty shows its name.
+// the caret, and, while the pointer is there, the hint to add one when the
+// document has none (BandTarget.vue); a placeholder that comes out empty
+// shows its name.
 const props = defineProps<{ band: Band; layout: FrameLayout }>();
-const editor = useEditor();
 
 const header = computed(() => props.band === "header");
 const place = computed(() =>
   header.value ? firstHeaderPlace(props.layout) : lastFooterPlace(props.layout),
+);
+// where the hint to add one goes while the document has none
+const hint = computed(() =>
+  addsBand(props.band) ? edgeHintPlace(props.layout, props.band) : null,
 );
 // whether it shows here at all, which changes far less than where
 const here = computed(() => place.value !== null);
@@ -37,38 +46,30 @@ const version = computed(
 // its slots, read from the engine only where it shows, and again only when
 // the page, its version, the page setup or the placeholders' values change
 const slots = computed(() => {
-  const engine = pageEngine;
   void version.value;
-  if (!engine || !here.value) return [];
-  const parts = pageBandParts(
-    pageLayout.value.layout,
-    page.value,
-    pages.value,
-    pageFields.value,
-    engine.bands(page.value),
-  );
-  return header.value ? parts.slice(0, 3) : parts.slice(3, 6);
+  const parts = here.value ? pageBands(page.value, pages.value) : null;
+  return parts ? bandSlots(parts, props.band) : [];
 });
 const shown = computed(() => slots.value.some((parts) => parts.length));
-
-// a double click opens its strip, which takes the focus
-const open = () => editor.run(editBand(props.band), { focus: false });
 </script>
 
 <template>
-  <div
+  <BandTarget
     v-if="place && shown"
     :class="header ? 'page-first-header' : 'page-last-footer'"
-    aria-hidden="true"
-    :title="bandTitle(band)"
-    :style="{
-      left: `${place.left}px`,
-      top: `${place.top}px`,
-      width: `${place.width}px`,
-      height: `${place.height}px`,
-    }"
-    @dblclick="open"
+    :band="band"
+    :page="page"
+    :adding="false"
+    :style="styleOf(place)"
   >
     <BandSlots :slots="slots" />
-  </div>
+  </BandTarget>
+  <BandTarget
+    v-else-if="hint"
+    class="page-edge-hint"
+    :band="band"
+    :page="page"
+    :adding="true"
+    :style="styleOf(hint)"
+  />
 </template>

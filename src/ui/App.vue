@@ -51,7 +51,6 @@ watchFocusMode();
 </script>
 
 <template>
-  <!-- before the toolbar, which paints above a strip it overlaps (both 5) -->
   <BandStrips />
   <PageView />
   <BlockMarks />

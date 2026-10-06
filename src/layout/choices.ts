@@ -14,6 +14,7 @@ import {
   type Margins,
   type Orientation,
   type PageChanges,
+  REMOVE,
   type PageSettings,
   portrait,
   sameMargins,
@@ -59,6 +60,13 @@ export interface Option<T> {
   // as its description
   short?: string;
 }
+
+/**
+ * optionLabel returns what the option of `value` reads, e.g. on the button of
+ * a menu of them
+ */
+export const optionLabel = <T>(options: readonly Option<T>[], value: T) =>
+  options.find((option) => option.value === value)?.label;
 
 /**
  * paperOptions lists the paper to choose from: the paper of the region
@@ -262,7 +270,7 @@ export const changesOf = (
   return Object.fromEntries(
     differences(before, after, locale).map((key) => [
       key,
-      fromDefaults.includes(key) ? after[key] : null,
+      fromDefaults.includes(key) ? after[key] : REMOVE,
     ]),
   );
 };

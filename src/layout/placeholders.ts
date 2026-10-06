@@ -1,4 +1,10 @@
-import { bandsOn, type DocumentFields, fieldValues, hasText } from "./bands";
+import {
+  type Band,
+  bandsOn,
+  type DocumentFields,
+  fieldValues,
+  hasText,
+} from "./bands";
 import type { Layout } from "./resolve";
 import { SLOTS, type Slots } from "./settings";
 import { type Field, segments } from "./tokens";
@@ -9,7 +15,8 @@ import { type Field, segments } from "./tokens";
 // quietly, so the band can still be seen and opened; the PDF and the Word
 // export print the text alone.
 
-// the names of the placeholders, as the strips' buttons call them
+// the names of the placeholders, as the strip's buttons and the slots'
+// chips call them
 export const FIELD_NAMES: Record<Field, string> = {
   page: "Page",
   pages: "Pages",
@@ -19,6 +26,25 @@ export const FIELD_NAMES: Record<Field, string> = {
   date: "Date",
   file: "File",
 };
+
+// what they are called in full, e.g. for screen readers and the strip's
+// tooltips, where the short name would say too little
+export const FIELD_FULL_NAMES: Record<Field, string> = {
+  page: "Page number",
+  pages: "Number of pages",
+  title: "Title",
+  author: "Author",
+  chapter: "Chapter",
+  date: "Date",
+  file: "File name",
+};
+
+/**
+ * bandSlots returns the left, center and right slots of a header or footer
+ * from the six of a page, the header's first
+ */
+export const bandSlots = <T>(slots: readonly T[], band: Band) =>
+  band === "header" ? slots.slice(0, 3) : slots.slice(3, 6);
 
 // a run of text a slot shows, or a placeholder that comes out empty there
 export type BandPart = { text: string } | { field: Field };

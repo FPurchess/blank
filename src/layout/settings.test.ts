@@ -7,6 +7,7 @@ import {
   NO_SLOTS,
   type PageChanges,
   readPageSettings,
+  REMOVE,
   writePageSettings,
 } from "./settings";
 import { type Unit } from "./units";
@@ -178,13 +179,13 @@ describe("writePageSettings", () => {
   it("removes keys, and the page key once it is empty", () => {
     expect(
       write("title: Hi\npage:\n  size: a5\n  orientation: landscape\n", {
-        size: null,
+        size: REMOVE,
       }).yaml,
     ).toBe("title: Hi\npage:\n  orientation: landscape\n");
     expect(
       write("title: Hi\npage:\n  orientation: landscape\n", {
-        orientation: null,
-        margins: null,
+        orientation: REMOVE,
+        margins: REMOVE,
       }).yaml,
     ).toBe("title: Hi\n");
   });
@@ -240,8 +241,20 @@ describe("writePageSettings", () => {
     ).toBe("page:\n  even-pages: {}\n  number-style: 1\n");
   });
 
+  it("writes even pages without their own header and footer as same", () => {
+    // over a user's default that gives them their own, which removing the
+    // key would bring back
+    expect(write("", { evenPages: null }).yaml).toBe(
+      "page:\n  even-pages: same\n",
+    );
+    expect(write("page:\n  even-pages: same\n", { evenPages: null })).toEqual({
+      changed: false,
+      yaml: "page:\n  even-pages: same\n",
+    });
+  });
+
   it("changes nothing to remove what isn't there", () => {
-    expect(write("title: Hi\n", { size: null }).changed).toBe(false);
+    expect(write("title: Hi\n", { size: REMOVE }).changed).toBe(false);
   });
 
   it("leaves a page key it can't read alone", () => {

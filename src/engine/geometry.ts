@@ -21,6 +21,7 @@ import {
   type PageEngine,
 } from "./engine";
 import { READING_LINE, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
+import { sectionAt } from "../readingLine";
 import { cellAt } from "../markdown/tables";
 import { topBlockAt } from "../markdown/topBlock";
 import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
@@ -75,9 +76,9 @@ let cached: {
 
 /**
  * framesNow returns where the page view shows the pages, or null while it
- * isn't shown or nothing is laid out
+ * isn't shown or nothing is laid out; it follows the scrolling
  */
-const framesNow = (): {
+export const framesNow = (): {
   frames: FrameLayout;
   viewport: PageViewport;
 } | null => {
@@ -275,6 +276,18 @@ const pointOnPages = (
   pointOnPage(frames, x - viewport.left, y - viewport.top + viewport.scrollTop);
 
 /**
+ * deskToWindow returns where a box of the page view's desk is in the window
+ */
+export const deskToWindow = <R extends { left: number; top: number }>(
+  viewport: PageViewport,
+  rect: R,
+): R => ({
+  ...rect,
+  left: viewport.left + rect.left,
+  top: viewport.top + rect.top - viewport.scrollTop,
+});
+
+/**
  * toWindow returns where a box of a page is in the window
  */
 const toWindow = (
@@ -284,14 +297,8 @@ const toWindow = (
 ): Box | null => {
   const placed = onDesk(frames, rect);
   if (!placed) return null;
-  const left = viewport.left + placed.left;
-  const top = viewport.top + placed.top - viewport.scrollTop;
-  return {
-    left,
-    top,
-    right: left + placed.width,
-    bottom: top + placed.height,
-  };
+  const { left, top, width, height } = deskToWindow(viewport, placed);
+  return { left, top, right: left + width, bottom: top + height };
 };
 
 /**
@@ -523,6 +530,17 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
  */
 export const pageTops = (): number[] | null =>
   measured() ? null : (deskFrames()?.frames.map((frame) => frame.top) ?? null);
+
+/**
+ * pageInView returns the page the view shows at its reading line, counted
+ * from 0, the one the bottom bar counts; null while no pages show
+ */
+export const pageInView = (): number | null => {
+  const tops = pageTops();
+  const state = scrollState();
+  if (!tops?.length || !state) return null;
+  return sectionAt(tops, state.top, state.height, state.max);
+};
 
 /**
  * scrollState returns how far what shows the text is scrolled, how high it

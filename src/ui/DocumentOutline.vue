@@ -37,7 +37,7 @@ import {
   OUTLINE_DOCK,
   outlinePlacement,
 } from "./outlineModel";
-import { sectionAt } from "./readingLine";
+import { sectionAt } from "../readingLine";
 import { wheelPixels } from "./scrollModel";
 
 // The outline: the document's headings as dashes at the right edge, which

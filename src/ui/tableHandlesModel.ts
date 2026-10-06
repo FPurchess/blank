@@ -1,6 +1,7 @@
 import { roundPercent } from "../markdown/tables";
 import type { Anchor, Point, Span, TableHandlesState } from "../state";
 import { dropAt, movedBy } from "./dragModel";
+import type { Rect } from "./rect";
 
 // What the handles of the table under the mouse (TableHandles.vue) show and
 // do, without their DOM: which row, column or line the mouse is over, where
@@ -283,14 +284,6 @@ export const spanOf = (
   index: number,
 ): Span => selectedSpan(table, axis, index) ?? [index, index + 1];
 
-// where a handle goes, in viewport px
-export interface Rect {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
 /**
  * anchorOf returns the box of a handle as the anchor of the menu it opens
  */
@@ -512,16 +505,3 @@ export const previewOf = (drag: Drag, table: TableHandlesState): Preview => {
     size: `${outcome.cols} × ${outcome.rows}`,
   };
 };
-
-/**
- * styleOf returns the inline style that puts an element at `box`
- */
-export const styleOf = (box: Rect | null) =>
-  box
-    ? {
-        left: `${box.left}px`,
-        top: `${box.top}px`,
-        width: `${box.width}px`,
-        height: `${box.height}px`,
-      }
-    : undefined;

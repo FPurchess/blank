@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import { doc, docWithFrontmatter, h, p } from "../test/editor";
 import { testLayout } from "../test/layout";
 import {
+  BAND,
+  BAND_LINE,
   bandsOn,
+  bandTop,
+  bandVariant,
   documentFields,
   fieldValues,
   fileName,
@@ -54,6 +58,44 @@ describe("bandsOn", () => {
       startNumber: 0,
     });
     expect(bandsOn(layout, 1)).toEqual(NO_BANDS);
+  });
+});
+
+describe("bandTop", () => {
+  const page = (bottom: number) => ({ height: 800, margins: { bottom } });
+
+  it("sets the header and footer a distance from the edges", () => {
+    expect(bandTop(page(72), "header")).toBe(BAND.distance);
+    expect(bandTop(page(72), "footer")).toBeCloseTo(
+      800 - BAND.distance - BAND_LINE,
+    );
+  });
+
+  it("sets the footer where the text ends in a margin too small for it", () => {
+    expect(bandTop(page(20), "footer")).toBe(780);
+  });
+});
+
+describe("bandVariant", () => {
+  const bands = (settings: Partial<Parameters<typeof bandVariant>[0]>) => ({
+    firstPage: "same" as const,
+    evenPages: null,
+    startNumber: 1,
+    ...settings,
+  });
+
+  it("names which header and footer a page has", () => {
+    expect(bandVariant(bands({}), 1)).toBe("every");
+    expect(bandVariant(bands({ firstPage: "plain" }), 1)).toBe("none");
+    expect(bandVariant(bands({ firstPage: letterhead }), 1)).toBe("first");
+    expect(bandVariant(bands({ firstPage: letterhead }), 3)).toBe("every");
+    expect(bandVariant(bands({ evenPages }), 2)).toBe("even");
+    expect(bandVariant(bands({ evenPages }), 3)).toBe("every");
+  });
+
+  it("counts even pages by the number they show", () => {
+    expect(bandVariant(bands({ evenPages, startNumber: 2 }), 1)).toBe("even");
+    expect(bandVariant(bands({ evenPages, startNumber: 2 }), 2)).toBe("every");
   });
 });
 

@@ -29,8 +29,29 @@ export const BAND = {
   distance: 36,
 };
 
+// a band's line, at the natural 1.3 em of IBM Plex Sans, as the layout
+// engine sets it (BAND_LINE in src-tauri/layout/src/bands.rs)
+export const BAND_LINE = BAND.size * 1.3;
+
 // the room a band needs between the edge and the text, in points
-export const BAND_ROOM = BAND.distance + BAND.size * 1.3 + 6;
+export const BAND_ROOM = BAND.distance + BAND_LINE + 6;
+
+/**
+ * bandTop returns where the engine sets the line of a page's header or
+ * footer, in points from the page's top edge: the header `BAND.distance`
+ * below it, and the footer as far above the bottom edge, moved down to where
+ * the text ends where the margin leaves less than that and one line
+ * (band_boxes in src-tauri/layout/src/engine/display.rs)
+ */
+export const bandTop = (
+  page: { height: number; margins: { bottom: number } },
+  band: Band,
+) =>
+  band === "header"
+    ? BAND.distance
+    : page.height -
+      page.margins.bottom +
+      Math.max(0, page.margins.bottom - BAND.distance - BAND_LINE);
 
 // a header or a footer
 export type Band = "header" | "footer";
@@ -52,21 +73,43 @@ export const hasText = (slots: Slots) => SLOTS.some((slot) => slots[slot]);
 export const pageNumber = (layout: Pick<Layout, "startNumber">, page: number) =>
   page + layout.startNumber - 1;
 
+// which header and footer a page has: the first page's own, none, those of
+// even pages or those of every page
+export type BandVariant = "first" | "none" | "even" | "every";
+
 /**
- * bandsOn returns the header and footer of a page: the first page's own or
- * none, those of even pages, or those of every page. Like in Word, a page is
- * even by the number it shows.
+ * bandVariant returns which header and footer a page has: the first page's
+ * own or none, those of even pages, or those of every page. Like in Word, a
+ * page is even by the number it shows.
+ * @param page the page, counted from 1
+ */
+export const bandVariant = (
+  bands: Pick<BandSettings, "firstPage" | "evenPages" | "startNumber">,
+  page: number,
+): BandVariant => {
+  if (page === 1 && bands.firstPage !== "same") {
+    return bands.firstPage === "plain" ? "none" : "first";
+  }
+  if (bands.evenPages && pageNumber(bands, page) % 2 === 0) return "even";
+  return "every";
+};
+
+/**
+ * bandsOn returns the header and footer of a page, see bandVariant
  * @param layout the layout of the document
  * @param page the page, counted from 1
  */
 export const bandsOn = (layout: Layout, page: number): Bands => {
-  if (page === 1 && layout.firstPage !== "same") {
-    return layout.firstPage === "plain" ? NO_BANDS : layout.firstPage;
+  switch (bandVariant(layout, page)) {
+    case "none":
+      return NO_BANDS;
+    case "first":
+      return layout.firstPage as Bands;
+    case "even":
+      return layout.evenPages!;
+    case "every":
+      return { header: layout.header, footer: layout.footer };
   }
-  if (layout.evenPages && pageNumber(layout, page) % 2 === 0) {
-    return layout.evenPages;
-  }
-  return { header: layout.header, footer: layout.footer };
 };
 
 /**

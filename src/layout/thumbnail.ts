@@ -1,4 +1,4 @@
-import { BAND, bandsOn, fieldValues, hasText } from "./bands";
+import { bandsOn, bandTop, fieldValues, hasText } from "./bands";
 import { type Layout, pageGeometry } from "./resolve";
 import { SLOTS, type Slots } from "./settings";
 import { expand } from "./tokens";
@@ -63,11 +63,12 @@ export const thumbnailSvg = (layout: Layout, page = 1): string => {
           })
           .join("")
       : "";
+  // where the pages set them, the text on the line's top
   const { header, footer } = bandsOn(layout, page);
-  const distance = BAND.distance * scale;
+  const baseline = (which: "header" | "footer") =>
+    round(bandTop({ height, margins }, which) * scale + BAND_TEXT);
   const bands =
-    band(header, round(distance + BAND_TEXT)) +
-    band(footer, round(h - distance));
+    band(header, baseline("header")) + band(footer, baseline("footer"));
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">` +

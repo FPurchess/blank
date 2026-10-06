@@ -1,4 +1,4 @@
-import { computed, shallowRef } from "vue";
+import { shallowRef } from "vue";
 
 import { frameLayout, viewAnchor, type ViewAnchor } from "../engine/frames";
 
@@ -83,20 +83,6 @@ export const pageHoverBlock = shallowRef<{ from: number; to: number } | null>(
 
 // true once the editor shows the text itself, without the layout engine (see useFallbackEditor)
 export const engineMissing = shallowRef(false);
-
-// the page the selection's head is on, counted from 1, and how many there
-// are, e.g. for the header or footer of that page; the bottom bar counts the
-// page in view instead (src/ui/PageStatus.vue)
-export const pagePosition = computed(() => {
-  const layout = pageLayoutState.value;
-  if (!layout) return null;
-  const head =
-    pageCaret.value?.page ??
-    pageSelection.value[pageSelection.value.length - 1]?.page ??
-    pageNodeSelection.value[0]?.page ??
-    0;
-  return { page: head + 1, pages: layout.pages };
-});
 
 // asks the page view to bring a spot into view, e.g. the selection's head
 // after a key moved it; with `at`, to show it that many pixels below the top
