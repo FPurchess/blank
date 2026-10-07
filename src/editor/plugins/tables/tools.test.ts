@@ -113,6 +113,7 @@ describe("tableTools", () => {
         width: 800,
         height: 600,
         scrollTop: 40,
+        scrollLeft: 0,
       };
 
       expect(toolbar()).not.toBe(before);

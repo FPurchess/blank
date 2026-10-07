@@ -267,6 +267,7 @@ describe("the outline", () => {
       width: 800,
       height: 600,
       scrollTop: 0,
+      scrollLeft: 0,
     };
     await mount(800);
     outlinePeek.value = "hover";
@@ -320,6 +321,7 @@ describe("the outline", () => {
       width: 1200,
       height: 600,
       scrollTop: 1600,
+      scrollLeft: 0,
     };
     await nextTick();
     await nextTick();
@@ -341,7 +343,13 @@ describe("the outline", () => {
   it("keeps clear of the page view's scrollbar, docked or not", async () => {
     await mount(800);
     // after the page view, which measures jsdom's
-    const viewport = { left: 0, top: 0, height: 600, scrollTop: 0 };
+    const viewport = {
+      left: 0,
+      top: 0,
+      height: 600,
+      scrollTop: 0,
+      scrollLeft: 0,
+    };
     pageViewport.value = { ...viewport, width: 785 };
     await nextTick();
     expect(outline()?.style.getPropertyValue("--scrollbar")).toBe("15px");

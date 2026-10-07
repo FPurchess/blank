@@ -14,7 +14,9 @@ import {
   pageView,
   pageSelection,
   pageViewport,
+  pageZoom,
   transaction,
+  zoomAnchor,
 } from "../state";
 import { EditorView } from "prosemirror-view";
 
@@ -71,6 +73,8 @@ describe("page view", () => {
     pageHeadBox.value = null;
     transaction.value = null;
     pageView.value = "page-ends";
+    pageZoom.value = "fit";
+    zoomAnchor.value = null;
     document.body.replaceChildren();
   });
 
@@ -597,6 +601,53 @@ describe("page view", () => {
     } finally {
       window.innerWidth = width;
     }
+  });
+
+  it("keeps the spot asked for in place when the zoom changes", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    // a spot a quarter down the second page, 100 px into the view
+    zoomAnchor.value = { page: 1, x: 200, y: 400, viewX: 50, viewY: 100 };
+    pageZoom.value = 2;
+    await nextTick();
+    await nextTick();
+    const zoomed = frameLayout(pageLayoutState.value!, "page-ends", 800, 2);
+    const frame = zoomed.frames[1];
+    expect(view().scrollTop).toBeCloseTo(
+      frame.top + (400 - frame.y) * zoomed.scale - 100,
+      0,
+    );
+    expect(view().scrollLeft).toBeCloseTo(
+      frame.left + (200 - frame.x) * zoomed.scale - 50,
+      0,
+    );
+    expect(zoomAnchor.value).toBeNull();
+    // the desk is as wide as the zoomed pages
+    expect(view().querySelector<HTMLElement>(".page-desk")!.style.width).toBe(
+      `${zoomed.width}px`,
+    );
+  });
+
+  it("zooms with Ctrl and the wheel, and scrolls without Ctrl", async () => {
+    layOut();
+    dispose = bootApp(createTestHandle(createState(node, { cursor: 3 })));
+    await nextTick();
+    const turn = (ctrlKey: boolean) => {
+      const event = new WheelEvent("wheel", {
+        deltaY: -100,
+        ctrlKey,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      });
+      view().dispatchEvent(event);
+      return event;
+    };
+    expect(turn(false).defaultPrevented).toBe(false);
+    expect(pageZoom.value).toBe("fit");
+    expect(turn(true).defaultPrevented).toBe(true);
+    expect(pageZoom.value).not.toBe("fit");
   });
 
   it("aligns the input method where the selection's head is painted", async () => {

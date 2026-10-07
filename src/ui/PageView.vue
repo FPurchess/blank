@@ -40,6 +40,8 @@ import {
   pageView,
   pageViewport,
   tabSwitch,
+  viewFrames,
+  zoomAnchor,
 } from "../state";
 import { useResizeObserver } from "./composables/useResizeObserver";
 import { contentBlockAt } from "./blockMarksModel";
@@ -50,10 +52,10 @@ import { drag, edgeStep, press, targetAt } from "./pagePointer";
 import {
   anchorTop,
   type Frame,
-  frameLayout,
   type FrameLayout,
   keptRange,
   onDesk,
+  pointOnPage,
   viewAnchor,
   type ViewAnchor,
   visibleRange,
@@ -64,7 +66,8 @@ import { layerVersions } from "./pageLayers";
 import { PageMarksMemo } from "./pageMarks";
 import { movesPages, selectedOn } from "./pageViewModel";
 import { styleOf } from "./rect";
-import { scrollFor } from "./scrollModel";
+import { scrollFor, zoomWheel } from "./scrollModel";
+import { zoomStep } from "../editor/commands/zoom";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -75,6 +78,7 @@ const ALIGN_DELAY = 80;
 const scroller = useTemplateRef<HTMLElement>("scroller");
 const width = shallowRef(800);
 const scrollTop = shallowRef(0);
+const scrollLeft = shallowRef(0);
 const viewHeight = shallowRef(600);
 
 // the view's box in the window, which only a resize changes, so scrolling
@@ -94,11 +98,13 @@ const measure = (resized = true) => {
     box = { left: rect.left, top: rect.top };
   }
   scrollTop.value = element.scrollTop;
+  scrollLeft.value = element.scrollLeft;
   const next = {
     ...box,
     width: width.value,
     height: viewHeight.value,
     scrollTop: scrollTop.value,
+    scrollLeft: scrollLeft.value,
   };
   const now = pageViewport.value;
   if (
@@ -107,7 +113,8 @@ const measure = (resized = true) => {
     now.top !== next.top ||
     now.width !== next.width ||
     now.height !== next.height ||
-    now.scrollTop !== next.scrollTop
+    now.scrollTop !== next.scrollTop ||
+    now.scrollLeft !== next.scrollLeft
   )
     pageViewport.value = next;
 };
@@ -122,9 +129,7 @@ const measureSoon = () => {
 };
 
 const layout = computed(() =>
-  pageLayoutState.value
-    ? frameLayout(pageLayoutState.value, pageView.value, width.value)
-    : null,
+  pageLayoutState.value ? viewFrames(pageLayoutState.value, width.value) : null,
 );
 
 // the pages near the view, which changes only when other pages come near,
@@ -292,11 +297,13 @@ watch(
  * scrollTo scrolls the view to `top`: the render that follows already shows
  * the pages there, rather than those at the old scroll in the new layout
  */
-const scrollTo = (top: number) => {
+const scrollTo = (top: number, left?: number) => {
   scrollTop.value = top;
+  if (left !== undefined) scrollLeft.value = left;
   void nextTick(() => {
     if (!scroller.value) return;
     scroller.value.scrollTop = top;
+    if (left !== undefined) scroller.value.scrollLeft = left;
     measure(false);
   });
 };
@@ -325,6 +332,19 @@ watch(layout, (next, previous) => {
     if (restore(next, restoring.anchor)) restoring = null;
     return;
   }
+  // the zoom changed: the spot it was asked for stays where it is in the view
+  const kept = zoomAnchor.value;
+  if (kept) {
+    zoomAnchor.value = null;
+    const rect = onDesk(next, { ...kept, width: 0, height: 0 });
+    if (rect) {
+      scrollTo(
+        Math.max(0, rect.top - kept.viewY),
+        Math.max(0, rect.left - kept.viewX),
+      );
+      return;
+    }
+  }
   if (!previous || !movesPages(next, previous)) return;
   const anchor = viewAnchor(previous, element.scrollTop);
   const top = anchor && anchorTop(next, anchor);
@@ -344,10 +364,20 @@ const serve = (request: PageScrollRequest) => {
     request.at !== undefined
       ? Math.max(0, rect.top - request.at)
       : scrollFor(rect, element.scrollTop, element.clientHeight);
-  if (target !== null && target !== element.scrollTop) {
-    element.scrollTop = target;
-    measure(false);
-  }
+  // and across, when the zoom shows the pages wider than the view
+  const across =
+    element.scrollWidth > element.clientWidth
+      ? scrollFor(
+          { top: rect.left, height: rect.width },
+          element.scrollLeft,
+          element.clientWidth,
+          { above: 20, below: 20 },
+        )
+      : null;
+  const down = target !== null && target !== element.scrollTop;
+  if (down) element.scrollTop = target;
+  if (across !== null) element.scrollLeft = across;
+  if (down || across !== null) measure(false);
 };
 
 // a request is served once, and then cleared, so an old one never moves the
@@ -376,7 +406,7 @@ const align = () => {
   timed("align", () =>
     alignHiddenEditor(
       editor.view,
-      box.left + rect.left,
+      box.left + rect.left - element.scrollLeft,
       box.top + rect.top - element.scrollTop,
     ),
   );
@@ -412,6 +442,32 @@ const onScroll = () => {
   requestAnimationFrame(moveAgain);
 };
 
+// Ctrl and the wheel, or a pinch on a touchpad, which the webview sends as
+// that, zoom the pages about the spot under the pointer, not the webview
+const wheelZoom = zoomWheel<WheelEvent>((direction, event) => {
+  if (!layout.value) return;
+  const element = scroller.value!;
+  const box = element.getBoundingClientRect();
+  const { x, y } = deskPoint(event.clientX, event.clientY);
+  const spot = pointOnPage(layout.value, x, y);
+  editor.run(
+    zoomStep(
+      direction,
+      spot && {
+        ...spot,
+        viewX: event.clientX - box.left,
+        viewY: event.clientY - box.top,
+      },
+    ),
+    { focus: false },
+  );
+});
+const onWheel = (event: WheelEvent) => {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  wheelZoom(event);
+};
+
 // how long the view takes to render, for the measurements
 let renderStart = 0;
 onBeforeUpdate(() => (renderStart = performance.now()));
@@ -420,7 +476,10 @@ onUpdated(() => record("render", performance.now() - renderStart));
 const deskPoint = (x: number, y: number) => {
   const element = scroller.value!;
   const box = element.getBoundingClientRect();
-  return { x: x - box.left, y: y - box.top + element.scrollTop };
+  return {
+    x: x - box.left + element.scrollLeft,
+    y: y - box.top + element.scrollTop,
+  };
 };
 
 // what the pointer targets, for the editor's plugins
@@ -665,6 +724,7 @@ onUnmounted(() => {
     ]"
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
+    @wheel="onWheel"
     @mousedown="onMouseDown"
     @mouseup="noPrimaryPaste"
     @pointerdown="onPointerDown"
@@ -682,7 +742,7 @@ onUnmounted(() => {
     <div
       v-if="layout"
       class="page-desk"
-      :style="{ height: `${layout.height}px` }"
+      :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
     >
       <!-- the sheets, then the selection, then the text painted on them,
       which is transparent but for the text -->

@@ -43,13 +43,32 @@ $status-height: 32px;
   margin: 0 var(--s1);
 }
 
-// items only shown where the window is wide enough
+// what gives way as the window narrows: first the misspelling buttons
+// (.status-wide), then the zoom's − and + (.status-narrow), whose zoom stays
+// (see statusbar.test.ts)
+$status-wide: 860px;
+$status-narrow: 720px;
+
 .status-wide {
   display: contents;
 
-  @media (max-width: 860px) {
+  @media (max-width: $status-wide) {
     display: none;
   }
+}
+
+.status-narrow {
+  display: contents;
+
+  @media (max-width: $status-narrow) {
+    display: none;
+  }
+}
+
+// the zoom, "Fit" or "125%", as wide whatever it says
+.zoom-value {
+  min-width: 40px;
+  justify-content: center;
 }
 
 // clip, not hidden: WebKit's WebDriver reads the text of an element that

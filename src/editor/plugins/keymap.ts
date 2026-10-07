@@ -77,6 +77,7 @@ import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
 import { clearRecentFiles } from "../commands/recentFiles";
+import { zoomBy, zoomFit } from "../commands/zoom";
 import { recorded } from "../commandRun";
 
 /**
@@ -199,6 +200,9 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.APP_GUIDE]: openGuide(),
   [CommandIdentifier.APP_ABOUT]: openSettings("about"),
   [CommandIdentifier.FILE_CLEAR_RECENT]: clearRecentFiles(),
+  [CommandIdentifier.VIEW_ZOOM_IN]: zoomBy(1),
+  [CommandIdentifier.VIEW_ZOOM_OUT]: zoomBy(-1),
+  [CommandIdentifier.VIEW_ZOOM_FIT]: zoomFit(),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -206,6 +210,8 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
 const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
   [CommandIdentifier.TAB_NEXT]: ["Ctrl-PageDown"],
   [CommandIdentifier.TAB_PREVIOUS]: ["Ctrl-PageUp"],
+  // + is a key of its own on many keyboards, = with Shift on others
+  [CommandIdentifier.VIEW_ZOOM_IN]: ["Mod-+"],
 };
 
 // the commands as the UI runs them, one per id, so a computed asking whether
@@ -314,8 +320,8 @@ const bindCommands = () => {
 
 // the commands that work wherever the focus is in the window, not only in
 // the editor: the files, printing and exports, the tabs, moving between the
-// parts (F6, and Alt-F10 to the toolbar), the blocks pane, focus mode and the
-// settings
+// parts (F6, and Alt-F10 to the toolbar), the blocks pane, the zoom, focus
+// mode and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
@@ -335,6 +341,9 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
   CommandIdentifier.VIEW_FOCUS_MODE,
   CommandIdentifier.VIEW_BLOCKS,
+  CommandIdentifier.VIEW_ZOOM_IN,
+  CommandIdentifier.VIEW_ZOOM_OUT,
+  CommandIdentifier.VIEW_ZOOM_FIT,
   CommandIdentifier.APP_SETTINGS,
 ];
 

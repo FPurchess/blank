@@ -18,6 +18,8 @@ import {
   pageView,
   type PageViewMode,
   printSettings,
+  pageZoom,
+  isPageZoom,
   recentCommands,
   recentFiles,
   spellcheck,
@@ -317,6 +319,8 @@ export const bootStorage = async () => {
   await restore("blocksPane", blocksPaneOpen, isTrue, false);
   // what the print dialog chose last, the printer at first
   await restore("print", printSettings, isPrintSettings, PRINT_DEFAULTS);
+  // the pages fit to the window until the user zooms
+  await restore("pageZoom", pageZoom, isPageZoom, "fit");
   // the commands and files used last, without what Blank no longer knows
   await restore("recentCommands", recentCommands, isList, []);
   await restore("recentFiles", recentFiles, isList, []);

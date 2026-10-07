@@ -15,8 +15,7 @@ import {
 } from "../../../engine/geometry";
 import { engineless, pageEngine } from "../../../engine/engine";
 import {
-  pageLayoutState,
-  pageView,
+  deskLayout,
   pageViewport,
   type Point,
   tableHandles as handles,
@@ -67,12 +66,7 @@ class Measured {
 
   // what the tables' places in the window depend on
   private keyOf(view: EditorView) {
-    return [
-      view.state.doc,
-      pageLayoutState.value,
-      pageViewport.value,
-      pageView.value,
-    ];
+    return [view.state.doc, deskLayout.value, pageViewport.value];
   }
 
   private fresh(view: EditorView) {

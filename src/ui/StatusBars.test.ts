@@ -126,6 +126,9 @@ describe("language chooser", () => {
       "ui-page",
       "ui-language",
       "ui-spellcheck",
+      "ui-zoom-out",
+      "ui-zoom",
+      "ui-zoom-in",
       "ui-view",
       "ui-focus-mode",
     ]);

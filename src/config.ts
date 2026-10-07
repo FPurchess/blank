@@ -92,6 +92,9 @@ export enum CommandIdentifier {
   APP_GUIDE = "app.guide",
   APP_ABOUT = "app.about",
   FILE_CLEAR_RECENT = "file.clear_recent",
+  VIEW_ZOOM_IN = "view.zoom_in",
+  VIEW_ZOOM_OUT = "view.zoom_out",
+  VIEW_ZOOM_FIT = "view.zoom_fit",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -220,6 +223,9 @@ const defaultConfig: Config = {
     [CommandIdentifier.APP_GUIDE]: "",
     [CommandIdentifier.APP_ABOUT]: "",
     [CommandIdentifier.FILE_CLEAR_RECENT]: "",
+    [CommandIdentifier.VIEW_ZOOM_IN]: "Mod-=",
+    [CommandIdentifier.VIEW_ZOOM_OUT]: "Mod--",
+    [CommandIdentifier.VIEW_ZOOM_FIT]: "",
   },
   autocorrect: {
     arrows: true,

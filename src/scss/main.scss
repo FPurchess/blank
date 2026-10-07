@@ -938,7 +938,8 @@ body.without-engine {
   // first and last lines and the caret
   inset: $top-bar-height 0 $status-height;
   z-index: 1;
-  overflow-x: hidden;
+  // across only when the zoom shows the pages wider than the view
+  overflow-x: auto;
   overflow-y: auto;
   color: var(--color);
   background-color: var(--background-color);

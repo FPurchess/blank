@@ -13,6 +13,8 @@ import {
   onDesk,
   pointOnPage,
   SHEET_GAP,
+  SHEET_SCALE,
+  sheetScale,
   TEXT_SCALE,
   VIEW_BOTTOM,
   VIEW_TOP,
@@ -34,6 +36,25 @@ const layout: PageLayoutState = {
 };
 
 describe("frameLayout", () => {
+  it("shows the pages at a zoom, in both views, as wide as the desk needs", () => {
+    const zoomed = frameLayout(layout, "pages", 648, 1.5);
+    expect(zoomed.scale).toBe(1.5 * SHEET_SCALE);
+    // the sheet and the room beside it are wider than the view
+    expect(zoomed.width).toBe(Math.ceil(600 * 1.5 * SHEET_SCALE + 48));
+    expect(zoomed.frames[0].left).toBe(24);
+    expect(frameLayout(layout, "page-ends", 648, 0.5).scale).toBe(
+      0.5 * SHEET_SCALE,
+    );
+    // Fit leaves the desk as wide as the view
+    expect(frameLayout(layout, "pages", 648).width).toBe(648);
+  });
+
+  it("fits page ends at the editor's text size at most", () => {
+    expect(frameLayout(layout, "page-ends", 4000).scale).toBe(TEXT_SCALE);
+    expect(sheetScale("page-ends", 500, 4000, "fit")).toBe(TEXT_SCALE);
+    expect(sheetScale("pages", 500, 4000, "fit")).toBe(SHEET_SCALE);
+  });
+
   it("places whole sheets one below the other", () => {
     const placed = frameLayout(layout, "pages", 648);
     expect(placed.scale).toBe(1);
@@ -46,8 +67,9 @@ describe("frameLayout", () => {
       w: 600,
       h: 800,
     });
-    // a narrow window shrinks them
-    expect(frameLayout(layout, "pages", 348).scale).toBe(0.5);
+    // a narrow window shrinks them, to half the size they print at
+    expect(frameLayout(layout, "pages", 498).scale).toBe(0.75);
+    expect(frameLayout(layout, "pages", 348).scale).toBe(SHEET_SCALE / 2);
   });
 
   it("places the text of each page, as long as it is, with marks between", () => {
@@ -231,6 +253,7 @@ describe("viewAnchor and anchorTop", () => {
         h: 200,
       },
     ],
+    width: 800,
     height: 1200,
     headerRoom: 0,
     footerRoom: 0,
@@ -238,6 +261,7 @@ describe("viewAnchor and anchorTop", () => {
   const sheets: FrameLayout = {
     mode: "pages",
     scale: 1,
+    width: 800,
     frames: [
       {
         page: 0,

@@ -13,6 +13,14 @@ Blank shows your text the way it prints: every line and every page ends on the s
 
 Blank remembers your choice. The button at the right end of the bar at the bottom switches between the two views too: its icon shows the view you're in. Next to it, the bar tells you which page you're looking at, like _Page 3 of 12_, and counts along as you scroll; click it to jump to another page, listed with the first heading on each. `Page Up` and `Page Down` move a screen at a time, and dragging past the top or bottom of the window scrolls along.
 
+## Zoom {#zoom}
+
+At first, Blank fits your pages to the window: as wide as it allows, and never larger than they print. To see them larger or smaller, press `Mod` `=` (or `Mod` `+`) and `Mod` `-`, or hold `Ctrl` and turn the mouse wheel. On a touchpad, pinch. The zoom goes in steps from 50% to 200%, where 100% is the size the pages print at, in both views. The spot under the pointer stays where it is while you zoom with the wheel, and with the keys, your cursor does.
+
+The bar at the bottom shows the zoom next to the view button, between − and +. A click on it fits the pages to the window again; with _Fit_, its tooltip says the size that gives, like _Fit to window (87%)_. A page wider than the window scrolls sideways. Blank remembers the zoom for the next time you open it.
+
+Only the pages zoom: the bars, menus and dialogs keep their size.
+
 ## Find your way with the outline {#outline}
 
 Once your document has two headings, a short dash for each of them sits at the right edge of the window, longer for a heading 1 and shorter for the levels below. The dash of the section you're reading is in your accent color.

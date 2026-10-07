@@ -7,7 +7,13 @@ import { pageSync } from "../editor/plugins/pageView";
 import { schema } from "../markdown";
 import { computed } from "vue";
 
-import { pageScrollRequest, pageViewport } from "../state";
+import {
+  deskLayout,
+  pageHeadBox,
+  pageScrollRequest,
+  pageViewport,
+  pageZoom,
+} from "../state";
 import { doc, p, table, td, th, tr } from "../test/editor";
 import { hidePages, showPages, TEST_VIEWPORT } from "../test/engine";
 import {
@@ -28,6 +34,7 @@ import {
   setGeometryView,
   tableGeometry,
   viewBox,
+  zoomAnchorNow,
 } from "./geometry";
 import { forgetEngineFailure, useFallbackEditor } from "./engine";
 
@@ -54,6 +61,35 @@ describe("geometry", () => {
   afterEach(() => {
     view.destroy();
     hidePages();
+    pageZoom.value = "fit";
+    pageHeadBox.value = null;
+  });
+
+  it("places the pages at the zoom, and follows a scroll across", () => {
+    const fit = caretBox(3)!;
+    pageZoom.value = 2;
+    expect(deskLayout.value!.width).toBeGreaterThan(TEST_VIEWPORT.width);
+    const zoomed = caretBox(3)!;
+    expect(zoomed.left).toBeGreaterThan(fit.left);
+
+    pageViewport.value = { ...TEST_VIEWPORT, scrollLeft: 100 };
+    expect(caretBox(3)!.left).toBeCloseTo(zoomed.left - 100);
+    // and a point there hits the same text
+    const caret = caretBox(3)!;
+    expect(hitAt(caret.left + 1, caret.top + 2)?.pos).toBe(3);
+  });
+
+  it("keeps the caret in place while zooming, when it's in view", () => {
+    pageHeadBox.value = { page: 0, x: 100, y: 100, width: 0, height: 10 };
+    const anchor = zoomAnchorNow()!;
+    expect(anchor).toMatchObject({ page: 0, x: 100, y: 100 });
+    expect(anchor.viewY).toBeGreaterThanOrEqual(0);
+    // a caret out of view leaves the middle of the view where it is
+    pageHeadBox.value = { page: 5, x: 100, y: 100, width: 0, height: 10 };
+    expect(zoomAnchorNow()).toMatchObject({
+      viewX: TEST_VIEWPORT.width / 2,
+      viewY: TEST_VIEWPORT.height / 2,
+    });
   });
 
   it("gives the caret in the window, and hits it back", () => {

@@ -187,6 +187,27 @@ describe("storage", () => {
     });
   });
 
+  describe("zoom", () => {
+    it("fits the pages on first start and keeps the zoom", async () => {
+      const { pageZoom } = await bootFresh();
+      expect(pageZoom.value).toBe("fit");
+
+      pageZoom.value = 1.25;
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("pageZoom")).toBe(1.25),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.pageZoom.value).toBe(1.25);
+    });
+
+    it("fits the pages for a stored zoom it doesn't know", async () => {
+      await localforage.setItem("pageZoom", 3);
+      const { pageZoom } = await bootFresh();
+      expect(pageZoom.value).toBe("fit");
+    });
+  });
+
   describe("recent commands and files", () => {
     it("are empty on first start and kept", async () => {
       const { recentCommands, recentFiles, recordCommand, rememberFile } =

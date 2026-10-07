@@ -8,6 +8,7 @@ import {
   announcement,
   engineMissing,
   pageView,
+  pageZoom,
   spellcheck,
   spellcheckMessage,
   spellcheckStatus,
@@ -16,6 +17,7 @@ import {
   wordCountCard,
 } from "../state";
 import { createState, createTestHandle, doc, p } from "../test/editor";
+import { hidePages, showPages } from "../test/engine";
 import { bootApp } from "./mount";
 
 // The items of the status bar that only a click reaches: the word count's
@@ -234,5 +236,50 @@ describe("view button", () => {
     await nextTick();
     expect(byId("ui-view")).toBeNull();
     expect(document.querySelector("#ui-bottom .status-sep")).toBeNull();
+  });
+});
+
+describe("zoom", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    showPages("pages");
+    engineMissing.value = false;
+    dispose = bootApp(createTestHandle());
+  });
+  afterEach(() => {
+    hidePages();
+    pageZoom.value = "fit";
+    engineMissing.value = false;
+  });
+
+  it("zooms in and out, and a click on the zoom fits the pages again", async () => {
+    expect(byId("ui-zoom")!.textContent).toBe("Fit");
+    expect(byId("ui-zoom")!.dataset.tip).toMatch(/^Fit to window \(\d+%\)$/);
+
+    byId("ui-zoom-in")!.click();
+    await nextTick();
+    expect(pageZoom.value).not.toBe("fit");
+    byId("ui-zoom-out")!.click();
+    pageZoom.value = 1.25;
+    await nextTick();
+    expect(byId("ui-zoom")!.textContent).toBe("125%");
+    expect(byId("ui-zoom")!.getAttribute("aria-label")).toBe(
+      "Zoom: 125%. Fit to window",
+    );
+    expect(byId("ui-zoom-in")!.dataset.tipKey).toBe(formatShortcut("Mod-="));
+
+    byId("ui-zoom")!.click();
+    expect(pageZoom.value).toBe("fit");
+  });
+
+  it("gives way on a narrow window with its − and +, but not the zoom", () => {
+    expect(byId("ui-zoom-in")!.parentElement!.className).toBe("status-narrow");
+    expect(byId("ui-zoom")!.parentElement!.id).toBe("ui-bottom");
+  });
+
+  it("isn't there without the layout engine", async () => {
+    engineMissing.value = true;
+    await nextTick();
+    expect(byId("ui-zoom")).toBeNull();
   });
 });

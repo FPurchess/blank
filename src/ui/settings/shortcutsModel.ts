@@ -110,6 +110,12 @@ const REFUSED: Refused[] = [
     does: "switches tabs",
     except: ["tab.next", "tab.previous"] as CommandIdentifier[],
   },
+  {
+    // the other key of Zoom in, for keyboards that type + without Shift
+    keys: ["Mod-+"],
+    does: "zooms in",
+    except: ["view.zoom_in"] as CommandIdentifier[],
+  },
   { keys: ["Alt-F4"], does: "closes the window", only: "others" },
   {
     // prosemirror's text keys on macOS (baseKeymap)

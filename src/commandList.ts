@@ -357,6 +357,24 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "pages",
     aliases: ["sheets", "desk", "view", "mode"],
   },
+  [C.VIEW_ZOOM_IN]: {
+    group: "View",
+    label: "Zoom in",
+    icon: "zoom-in",
+    aliases: ["larger", "bigger", "magnify"],
+  },
+  [C.VIEW_ZOOM_OUT]: {
+    group: "View",
+    label: "Zoom out",
+    icon: "zoom-out",
+    aliases: ["smaller"],
+  },
+  [C.VIEW_ZOOM_FIT]: {
+    group: "View",
+    label: "Fit to window",
+    icon: "fit",
+    aliases: ["zoom", "width", "reset"],
+  },
   [C.VIEW_BLOCKS]: {
     group: "View",
     label: "Blocks pane",

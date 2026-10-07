@@ -63,7 +63,10 @@
     "app.shortcuts": "",
     "app.guide": "",
     "app.about": "",
-    "file.clear_recent": ""
+    "file.clear_recent": "",
+    "view.zoom_in": "Mod-=",
+    "view.zoom_out": "Mod--",
+    "view.zoom_fit": ""
   },
   "autocorrect": {
     "arrows": true,
