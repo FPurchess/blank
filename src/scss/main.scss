@@ -1413,30 +1413,9 @@ body.without-engine.blocks-docked {
   padding-left: $blocks-dock;
 }
 
-// the search: a field with the magnifier in it
-.blocks-search {
-  @include field;
-  // the field is paper on the pane's desk
-  --muted: var(--muted-on-paper);
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
+// the search, below the pane's head
+#blocks-pane .search-field {
   margin: 0 var(--s3) var(--s2);
-  color: var(--muted);
-
-  input {
-    flex: 1;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    font: inherit;
-    color: var(--color);
-    background: none;
-
-    &::placeholder {
-      color: var(--muted);
-    }
-  }
 }
 
 .blocks-groups {

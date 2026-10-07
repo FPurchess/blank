@@ -1,31 +1,31 @@
 <script setup lang="ts">
 import { useTemplateRef } from "vue";
 
-import { announce, theme, themes, type ThemeName } from "../../state";
+import {
+  chooseTheme,
+  theme,
+  themeLabel,
+  themes,
+  type ThemeName,
+} from "../../state";
 import { useRovingFocus } from "../composables/useRovingFocus";
-import { themeLabel } from "./settingsModel";
 
 // The themes as cards, each drawn in its own colors: a preview carries
 // data-theme, so the tokens inside it are that theme's. A radio group, whose
 // arrows choose the next.
 const root = useTemplateRef<HTMLElement>("root");
 
-const choose = (name: ThemeName) => {
-  if (theme.value === name) return;
-  theme.value = name;
-  announce(`${themeLabel(name)} theme`);
-};
 const { current, onKeydown, follow } = useRovingFocus(
   () => root.value,
   "[role=radio]",
   themes.indexOf(theme.value),
-  (index) => choose(themes[index]),
+  (index) => chooseTheme(themes[index]),
   "both",
 );
 
 const press = (name: ThemeName, event: MouseEvent) => {
   follow(event.currentTarget);
-  choose(name);
+  chooseTheme(name);
 };
 </script>
 

@@ -27,7 +27,7 @@ import {
 } from "../state";
 import BlockTile from "./BlockTile.vue";
 import { groupsOf, tileStep } from "./blocksPaneModel";
-import IconGlyph from "./components/IconGlyph.vue";
+import SearchField from "./components/SearchField.vue";
 import SidePaneHead from "./components/SidePaneHead.vue";
 import { useBodyClass } from "./composables/useBodyClass";
 import { useDismiss } from "./composables/useDismiss";
@@ -45,7 +45,7 @@ import { tileDrag } from "./tileDrag";
 const editor = useEditor();
 
 const root = useTemplateRef<HTMLElement>("root");
-const search = useTemplateRef<HTMLInputElement>("search");
+const search = useTemplateRef<InstanceType<typeof SearchField>>("search");
 const query = shallowRef("");
 
 const groups = computed(() => groupsOf(blockChoices.value, query.value));
@@ -83,10 +83,7 @@ watch(
   blocksPaneSearch,
   (request) => {
     if (!request) return;
-    void nextTick(() => {
-      search.value?.focus();
-      search.value?.select();
-    });
+    void nextTick(() => search.value?.focus(true));
   },
   { immediate: true },
 );
@@ -225,19 +222,14 @@ const onMouseDown = (event: MouseEvent) => {
       :command="CommandIdentifier.INSERT_BLOCK"
       @hide="hideBlocksPane(editor.view)"
     />
-    <label class="blocks-search">
-      <IconGlyph name="search" />
-      <input
-        ref="search"
-        v-model="query"
-        type="search"
-        placeholder="Search blocks"
-        aria-label="Search blocks"
-        autocomplete="off"
-        :spellcheck="false"
-        @keydown="onSearchKey"
-      />
-    </label>
+    <SearchField
+      ref="search"
+      v-model="query"
+      type="search"
+      placeholder="Search blocks"
+      aria-label="Search blocks"
+      @keydown="onSearchKey"
+    />
     <div
       class="blocks-groups"
       @keydown="onTileKey"

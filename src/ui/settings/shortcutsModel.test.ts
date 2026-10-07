@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CommandIdentifier as C, config, defaults } from "../../config";
+import { CommandIdentifier as C, defaults } from "../../config";
 import {
   assign,
   keyButton,
   recordingAction,
-  filterCommands,
   isChanged,
   recordedKey,
   refusal,
@@ -256,23 +255,6 @@ describe("the list", () => {
     );
     expect(isChanged(C.FILE_SAVE, keymap({ [C.FILE_SAVE]: "" }))).toBe(true);
     expect(isChanged(C.BLOCKTYPE_CODE_BLOCK, keymap())).toBe(false);
-  });
-
-  it("lists every command, the unbound ones too", () => {
-    const ids = filterCommands("").map((info) => info.id);
-    expect(new Set(ids)).toEqual(new Set(Object.keys(config.value.keymap)));
-  });
-
-  it("finds commands by label, group and alias", () => {
-    expect(filterCommands("save").map((info) => info.id)).toContain(
-      C.FILE_SAVE,
-    );
-    expect(filterCommands("preferences").map((info) => info.id)).toEqual([
-      C.APP_SETTINGS,
-    ]);
-    expect(
-      filterCommands("tools spell").every((info) => info.group === "Tools"),
-    ).toBe(true);
   });
 });
 

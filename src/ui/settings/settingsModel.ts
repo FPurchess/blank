@@ -8,7 +8,7 @@ import {
   wholeNumberIn,
 } from "../../config";
 import type { Option } from "../../layout/choices";
-import { announce, type SettingsSection, type ThemeName } from "../../state";
+import { announce, type SettingsSection } from "../../state";
 
 // What the settings dialog (SettingsDialog.vue) shows, besides the keyboard
 // shortcuts (shortcutsModel.ts), your replacements (replacementsModel.ts), your
@@ -34,12 +34,6 @@ export const save = async (changes: SettingChanges, message: string) => {
   if (saved) announce(message);
   return saved;
 };
-
-/**
- * themeLabel returns the name of a theme, e.g. "Dark"
- */
-export const themeLabel = (name: ThemeName) =>
-  name.charAt(0).toUpperCase() + name.slice(1);
 
 /**
  * hideAfterOptions returns the rest times focus mode offers, and `current` if

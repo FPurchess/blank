@@ -490,3 +490,28 @@ textarea:not(:disabled) {
   font-size: var(--ui-small);
   color: var(--muted);
 }
+
+// a field to search or find with, its icon in it (SearchField.vue)
+.search-field {
+  @include field;
+  // the field is paper, also on the desk
+  --muted: var(--muted-on-paper);
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--muted);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    font: inherit;
+    color: var(--color);
+    background: none;
+
+    &::placeholder {
+      color: var(--muted);
+    }
+  }
+}
