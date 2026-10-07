@@ -1,6 +1,11 @@
 import { computed } from "vue";
 
-import { type Anchor, contextMenu, type MenuItem } from "../../state";
+import {
+  type Anchor,
+  contextMenu,
+  type ContextMenuRequest,
+  type MenuLine,
+} from "../../state";
 
 /**
  * useMenuButton makes a button open a menu (ContextMenu.vue) below or above
@@ -26,12 +31,21 @@ export const useMenuButton = (closed: (keyboard: boolean) => void) => {
    * pointer, or below or above the owner; from the keyboard, its first item
    * focused, when the owner has the focus. With `toggles` false, a press on
    * the owner closes the menu rather than counting as inside it, e.g. for
-   * the menu of a tab, whose click shows the tab.
+   * the menu of a tab, whose click shows the tab. `extra` is the rest of the
+   * request, e.g. the main menu's search.
    */
   const openAt = (
     owner: HTMLElement,
-    items: MenuItem[],
-    { anchor, toggles = true }: { anchor?: Anchor; toggles?: boolean } = {},
+    items: MenuLine[],
+    {
+      anchor,
+      toggles = true,
+      extra,
+    }: {
+      anchor?: Anchor;
+      toggles?: boolean;
+      extra?: Pick<ContextMenuRequest, "search" | "fill">;
+    } = {},
   ) => {
     const { left, top, bottom } = owner.getBoundingClientRect();
     keyboard = document.activeElement === owner;
@@ -41,14 +55,28 @@ export const useMenuButton = (closed: (keyboard: boolean) => void) => {
       keyboard,
       close,
       ...(toggles && { owner }),
+      ...extra,
     };
   };
 
   // by a click, or by a key on the button
-  const toggle = (event: Event, items: MenuItem[]) => {
+  const toggle = (
+    event: Event,
+    items: MenuLine[],
+    extra?: Pick<ContextMenuRequest, "search" | "fill">,
+  ) => {
     if (isOpen.value) return close();
-    openAt(event.currentTarget as HTMLElement, items);
+    openAt(event.currentTarget as HTMLElement, items, { extra });
   };
 
-  return { toggle, openAt, isOpen };
+  /**
+   * update shows `items` in the open menu, e.g. once a switch in it changed,
+   * where it is and as it was opened
+   */
+  const update = (items: MenuLine[]) => {
+    const open = contextMenu.value;
+    if (open?.close === close) contextMenu.value = { ...open, items };
+  };
+
+  return { toggle, openAt, update, isOpen };
 };

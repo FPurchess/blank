@@ -40,6 +40,7 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 | Choose language                             | `Mod` `Alt` `L`        |
 | [Focus mode](./writing#focus-mode)          | `Mod` `Shift` `F`      |
 | [Settings](./settings)                      | `Mod` `,`              |
+| [Main menu](./menu)                         | `Mod` `K`              |
 
 ## Tabs and moving around
 
@@ -131,7 +132,7 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Align right          | `Mod` `Shift` `R` |
 | Justify              | `Mod` `Shift` `J` |
 
-The link dialog moved from `Mod` `K` to `Mod` `Alt` `K`.
+The link dialog moved from `Mod` `K` to `Mod` `Alt` `K`: `Mod` `K` opens the [main menu](./menu).
 
 ## Spell check
 

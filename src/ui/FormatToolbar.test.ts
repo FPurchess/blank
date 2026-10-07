@@ -148,7 +148,7 @@ describe("the formatting toolbar", () => {
     insert.focus();
     key("ArrowDown");
     expect(contextMenu.value?.keyboard).toBe(true);
-    const table = contextMenu.value!.items.find(
+    const table = (contextMenu.value!.items as MenuItem[]).find(
       (item) => item !== "separator" && item.id === "insert.table",
     ) as Exclude<MenuItem, "separator">;
     contextMenu.value!.close();

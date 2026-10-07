@@ -423,6 +423,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "settings",
     aliases: ["preferences", "options", "configuration", "blank.json"],
   },
+  [C.MENU_MAIN]: {
+    group: "Tools",
+    label: "Main menu",
+    icon: "menu",
+    aliases: ["commands", "palette", "search", "menu"],
+  },
   [C.APP_SHORTCUTS]: {
     group: "Tools",
     label: "Keyboard shortcuts",

@@ -11,8 +11,8 @@ import { nextMisspelling } from "../plugins/spellcheck";
 /**
  * toggleSpellcheck turns spell check on or off
  */
-export const toggleSpellcheck = (): Command => () => {
-  spellcheck.value = !spellcheck.value;
+export const toggleSpellcheck = (): Command => (_state, dispatch) => {
+  if (dispatch) spellcheck.value = !spellcheck.value;
   return true;
 };
 

@@ -13,6 +13,7 @@ export * from "./focus";
 export * from "./focusMode";
 export * from "./headings";
 export * from "./language";
+export * from "./mainMenu";
 export * from "./messages";
 export * from "./outline";
 export * from "./page";

@@ -1,6 +1,7 @@
 import { shallowRef } from "vue";
 
 import type { CommandIdentifier } from "../config";
+import type { ThemeName } from "./appearance";
 
 // where a popup like a menu is shown: below the cursor, in viewport coordinates
 export interface Anchor {
@@ -158,22 +159,65 @@ export type MenuItem =
       run?: () => void;
       // turns the item into a text field, submitted with Enter
       edit?: { value: string; submit(value: string): void };
+      // the command it runs, whose key its tooltip names
+      command?: CommandIdentifier;
+      // its tooltip, where its label doesn't show, e.g. on an icon of a row,
+      // or why it's disabled
+      tip?: string;
+      // the part of the label a search matched, which shows marked
+      match?: [from: number, to: number];
+      // the menu stays open when it runs, e.g. a switch in the main menu,
+      // which then shows the change
+      stays?: boolean;
+      // the theme it chooses, drawn as a swatch of that theme
+      swatch?: ThemeName;
     }
   | "separator";
 
+// the name of the section of a menu that follows, up to the next separator,
+// shown above it or only read out (`shown` false)
+export interface MenuHead {
+  kind: "head";
+  label: string;
+  shown: boolean;
+}
+
+// a row of a menu that holds items side by side, after its label, e.g. the
+// main menu's View with its switches: ← → move between them
+export interface MenuRow {
+  kind: "row";
+  id: string;
+  label: string;
+  items: Exclude<MenuItem, "separator">[];
+}
+
+// what a level of a menu holds
+export type MenuLine = MenuItem | MenuHead | MenuRow;
+
+// a menu with a search above it, the main menu: what the search finds and
+// what it says when it finds nothing
+export interface MenuSearch {
+  results(query: string): Exclude<MenuItem, "separator">[];
+  empty(query: string): string;
+}
+
 export interface ContextMenuRequest {
-  items: MenuItem[];
+  items: MenuLine[];
   // where to show the menu
   anchor: Anchor;
   // opened with the keyboard, which focuses the first item
   keyboard: boolean;
   // returns the focus to the editor
   close(): void;
-  // the button that opened the menu, e.g. "Page N of M" in the bottom bar or,
-  // later, the main menu's: a press on it isn't outside the menu, so its click
+  // the button that opened the menu, e.g. "Page N of M" in the bottom bar or
+  // the logo, the main menu's: a press on it isn't outside the menu, so its click
   // can close the menu instead of the press closing it and the click opening
   // it again
   owner?: Element;
+  // the search above the menu, which the focus starts in (the main menu)
+  search?: MenuSearch;
+  // the menu takes the window's height below its anchor, and scrolls in it
+  fill?: boolean;
 }
 
 // contextMenu holds the open context menu, or null while it is closed. A new

@@ -15,6 +15,7 @@ import {
 } from "../state";
 import { createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
+import { isEntry } from "./menuModel";
 
 const tab = (id: string, change: Partial<Tab> = {}): Tab => ({
   id,
@@ -186,9 +187,7 @@ describe("the tab row", () => {
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
     );
 
-    const items = contextMenu.value!.items.filter(
-      (item) => item !== "separator",
-    );
+    const items = contextMenu.value!.items.filter(isEntry);
     expect(items.every((item) => item.shortcut === undefined)).toBe(true);
     expect(contextMenu.value?.owner).toBeUndefined();
   });
@@ -265,6 +264,30 @@ describe("the tab row's keys", () => {
 
     press("b", "Enter");
     expect(select).toHaveBeenCalledWith("b");
+  });
+
+  it("goes to the logo before the first tab, and back", async () => {
+    const logo = document.querySelector<HTMLElement>(".logo-button")!;
+    expect(logo.tabIndex).toBe(-1);
+    tabElement("a").focus();
+
+    press("a", "ArrowLeft");
+    await nextTick();
+    expect(document.activeElement).toBe(logo);
+    // the logo is the row's tab stop now, and the row keeps the focus
+    expect(logo.tabIndex).toBe(0);
+    expect(tabElement("a").tabIndex).toBe(-1);
+    expect(tabRowFocused.value).toBe(true);
+
+    logo.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await nextTick();
+    expect(document.activeElement).toBe(tabElement("a"));
   });
 
   it("closes with Delete, opens the menu with Shift+F10 and leaves with Esc", async () => {

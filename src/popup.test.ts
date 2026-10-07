@@ -136,3 +136,18 @@ describe("place at the end", () => {
     expect(element.style.left).toBe("4px");
   });
 });
+
+describe("place, filling the window's height", () => {
+  it("goes below the anchor, never above, as tall as the room there", () => {
+    const element = document.createElement("div");
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
+      width: 300,
+      height: 5000,
+    } as DOMRect);
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(600);
+    place(element, { left: 10, top: 4, bottom: 40 }, { fill: true });
+    expect(element.style.top).toBe("42px");
+    expect(element.style.maxHeight).toBe(`${600 - 42 - 8}px`);
+    expect(element.style.left).toBe("10px");
+  });
+});

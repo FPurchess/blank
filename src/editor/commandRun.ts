@@ -6,6 +6,7 @@ import { recordCommand } from "../state";
 // commands that aren't worth remembering: they only move the focus, open a
 // menu, or clear the very list of recent files
 const UNRECORDED: ReadonlySet<CommandIdentifier> = new Set([
+  CommandIdentifier.MENU_MAIN,
   CommandIdentifier.CONTEXT_MENU,
   CommandIdentifier.VIEW_FOCUS_NEXT,
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,

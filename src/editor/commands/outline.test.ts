@@ -23,17 +23,17 @@ describe("showOutline", () => {
     publishHeadings(doc(h(1, "One"), h(2, "Two")));
     window.innerWidth = 1200;
     const state = createState(doc(h(1, "One"), h(2, "Two")));
-    expect(showOutline()(state)).toBe(true);
+    expect(showOutline()(state, () => {})).toBe(true);
     expect(outlinePinned.value).toBe(true);
     expect(announcement.value?.text).toBe("Outline shown");
-    showOutline()(state);
+    showOutline()(state, () => {});
     expect(outlinePinned.value).toBe(false);
   });
 
   it("floats it over the pages on a narrow window", () => {
     publishHeadings(doc(h(1, "One"), h(2, "Two")));
     window.innerWidth = 800;
-    showOutline()(createState(doc(h(1, "One"))));
+    showOutline()(createState(doc(h(1, "One"))), () => {});
     expect(outlinePeek.value).toBe("sticky");
   });
 });
