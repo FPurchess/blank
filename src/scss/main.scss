@@ -13,6 +13,7 @@
 @use "bands";
 @use "print";
 @use "mainMenu";
+@use "find";
 
 html {
   overflow-y: auto;
@@ -94,6 +95,15 @@ body {
     text-decoration: underline wavy var(--spelling-color);
     text-decoration-skip-ink: none;
     text-underline-offset: 0.2em;
+  }
+
+  // the matches of find, while the editor shows the text itself
+  .find-match {
+    background: var(--find-color);
+  }
+
+  .find-current {
+    background: var(--find-current-color);
   }
 
   // links take the theme's text color, so they fit every theme, and are
@@ -980,6 +990,20 @@ body.without-engine {
 
 .page-canvas {
   display: block;
+  // over the matches of find, which come before it (PageFrame.vue)
+  position: relative;
+}
+
+// a match of find, under the text, and the one find is at
+.page-find {
+  position: absolute;
+  pointer-events: none;
+  background: var(--find-color);
+  border-radius: 2px;
+
+  &.current {
+    background: var(--find-current-color);
+  }
 }
 
 // the selected text in colours of its own over the selection, on a page

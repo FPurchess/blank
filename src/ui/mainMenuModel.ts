@@ -31,7 +31,7 @@ export const FILE_COMMANDS = [
   "export",
 ] as const;
 
-const EDIT_ROW = [C.UNDO, C.REDO] as const;
+const EDIT_ROW = [C.UNDO, C.REDO, C.EDIT_FIND] as const;
 const VIEW_ROW = [
   C.VIEW_BLOCKS,
   C.VIEW_OUTLINE,

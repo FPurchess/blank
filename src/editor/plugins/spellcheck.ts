@@ -13,14 +13,13 @@ import { config } from "../../config";
 import { language, spellchecker } from "../../state";
 import { words, type Word } from "../../spellcheck/tokenize";
 import type { Spellchecker } from "../../spellcheck/types";
+import { changedRanges, type Range, textblocks } from "./changed";
 
 // how long typing pauses before the changed text is checked
 const DELAY = 150;
 
 // textblocks tokenized before yielding to the browser
 const CHUNK = 200;
-
-type Range = [number, number];
 
 interface SpellState {
   decorations: DecorationSet;
@@ -53,42 +52,6 @@ export interface Misspelling {
 }
 
 const tagOf = () => spellchecker.value?.tag ?? language.value;
-
-/**
- * textblocks calls `fn` for every textblock overlapping `ranges`
- */
-const textblocks = (
-  doc: Node,
-  ranges: Range[] | "all",
-  fn: (block: Node, pos: number) => void,
-) => {
-  // dirty ranges overlap, e.g. for every typed char in a word
-  const seen = new Set<number>();
-  const visit = (from: number, to: number) =>
-    doc.nodesBetween(from, to, (node, pos) => {
-      if (!node.isTextblock) return true;
-      if (!seen.has(pos)) fn(node, pos);
-      seen.add(pos);
-      return false;
-    });
-  if (ranges === "all") visit(0, doc.content.size);
-  else
-    ranges.forEach(([from, to]) => visit(from, Math.min(to, doc.content.size)));
-};
-
-/**
- * changedRanges returns the ranges `tr` changed, in positions of its doc
- */
-const changedRanges = (tr: Transaction): Range[] => {
-  const ranges: Range[] = [];
-  tr.mapping.maps.forEach((map, index) => {
-    const rest = tr.mapping.slice(index + 1);
-    map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
-      ranges.push([rest.map(newStart, -1), rest.map(newEnd, 1)]);
-    });
-  });
-  return ranges;
-};
 
 /**
  * wordAtCursor returns the word the cursor is in or at the end of

@@ -13,6 +13,7 @@ import {
   blockTools,
   contextMenu,
   embeds,
+  find,
   focusModeKeys,
   forms,
   headings,
@@ -65,6 +66,8 @@ export const bootEditor = async () => {
         blockRemovals(),
         contextMenu(),
         spellcheck(),
+        // Esc closes the find panel before focus mode would take it
+        find(),
         // Tab and Enter in a form, before autocorrect and the table keys
         forms(),
         embeds(),

@@ -19,6 +19,7 @@ import {
   type PageEngine,
 } from "./engine";
 import { READING_LINE, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
+import { scrollFor } from "../scroll";
 import { sectionAt } from "../readingLine";
 import { cellAt } from "../markdown/tables";
 import { topBlockAt } from "../markdown/topBlock";
@@ -540,13 +541,27 @@ export const scrollState = (): {
 
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
- * top of the view, as far as the view scrolls, without moving the selection
+ * top of the view, as far as the view scrolls, without moving the selection;
+ * without `at`, only as far as it takes to bring it into view, e.g. for a
+ * match of find
  */
-export const scrollToText = (pos: number, at: number) => {
+export const scrollToText = (pos: number, at?: number) => {
   const view = measured();
   if (view) {
     const box = shownCaret(view, pos, false);
-    if (box) window.scrollBy({ top: box.top - TOP_BAR_HEIGHT - at });
+    if (!box) return;
+    if (at !== undefined)
+      return window.scrollBy({ top: box.top - TOP_BAR_HEIGHT - at });
+    // in the document, which scrolls under the top area, into what shows
+    // between the top area and the status bar
+    const height = window.innerHeight - TOP_BAR_HEIGHT - STATUS_HEIGHT;
+    const top = box.top - TOP_BAR_HEIGHT + window.scrollY;
+    const to = scrollFor(
+      { top, height: box.bottom - box.top },
+      window.scrollY,
+      height,
+    );
+    if (to !== null) window.scrollTo({ top: to });
     return;
   }
   const caret = pageEngine?.caret(pos);

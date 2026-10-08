@@ -423,6 +423,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "settings",
     aliases: ["preferences", "options", "configuration", "blank.json"],
   },
+  [C.EDIT_FIND]: {
+    group: "Edit",
+    label: "Find and replace",
+    icon: "search",
+    aliases: ["search", "replace", "find", "regex"],
+  },
   [C.MENU_MAIN]: {
     group: "Tools",
     label: "Main menu",

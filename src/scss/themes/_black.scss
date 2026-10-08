@@ -8,6 +8,10 @@
   --selection-color: #637a9f;
   --selection-text-color: #0a0a0f;
   --selection-inactive-color: #384459;
+  // the matches of find under the text, and the one it's at (see
+  // src/scss/themes.test.ts)
+  --find-color: #30240c;
+  --find-current-color: #513909;
   // the desk the sheets of "pages" lie on, a shade darker the paper, and the
   // sheets' edge and shadow, in black
   --desk-color: #000000;

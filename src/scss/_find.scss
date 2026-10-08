@@ -1,0 +1,55 @@
+// The find panel (src/ui/FindPanel.vue): what floats at the top right of
+// the pages while finding, its fields and toggles in a grid, as the design
+// draft has it.
+@use "controls" as *;
+
+.find-panel {
+  @include popover;
+  @include ui-text;
+  position: fixed;
+  // with the menus, above the pages and the bars
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  box-sizing: border-box;
+  width: min(340px, calc(100% - 16px));
+  padding: 6px;
+
+  .count {
+    @include shortcut;
+    flex: none;
+    color: var(--muted);
+  }
+}
+
+.find-error {
+  margin: 0;
+  font-size: var(--ui-small);
+  color: var(--spelling-color);
+}
+
+.find-toggles {
+  display: flex;
+  gap: 2px;
+
+  .icon-button {
+    padding: 0 6px;
+    font-weight: 500;
+    font-size: var(--ui-small);
+  }
+}
+
+.find-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  .find-spacer {
+    flex: 1;
+  }
+
+  .find-button {
+    @include text-button;
+    margin-left: 4px;
+  }
+}

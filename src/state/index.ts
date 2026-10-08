@@ -9,6 +9,7 @@ export * from "./appearance";
 export * from "./blocksPane";
 export * from "./dialogs";
 export * from "./document";
+export * from "./find";
 export * from "./focus";
 export * from "./focusMode";
 export * from "./headings";

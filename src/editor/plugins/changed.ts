@@ -1,4 +1,8 @@
 import type { Node } from "prosemirror-model";
+import type { Transaction } from "prosemirror-state";
+
+// a range of a document, from its start to its end
+export type Range = [from: number, to: number];
 
 // what a visit is called with: the node, its position and its parent
 type Visit = (node: Node, pos: number, parent: Node | null) => boolean | void;
@@ -35,4 +39,41 @@ export const changedDescendants = (
     }
     offset += child.nodeSize;
   }
+};
+
+/**
+ * textblocks calls `fn` for every textblock overlapping `ranges`, once, e.g.
+ * those a transaction changed, which the spell check and find look at again
+ */
+export const textblocks = (
+  doc: Node,
+  ranges: Range[] | "all",
+  fn: (block: Node, pos: number) => void,
+) => {
+  // the ranges overlap, e.g. for every typed char in a word
+  const seen = new Set<number>();
+  const visit = (from: number, to: number) =>
+    doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isTextblock) return true;
+      if (!seen.has(pos)) fn(node, pos);
+      seen.add(pos);
+      return false;
+    });
+  if (ranges === "all") visit(0, doc.content.size);
+  else
+    ranges.forEach(([from, to]) => visit(from, Math.min(to, doc.content.size)));
+};
+
+/**
+ * changedRanges returns the ranges `tr` changed, in positions of its doc
+ */
+export const changedRanges = (tr: Transaction): Range[] => {
+  const ranges: Range[] = [];
+  tr.mapping.maps.forEach((map, index) => {
+    const rest = tr.mapping.slice(index + 1);
+    map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+      ranges.push([rest.map(newStart, -1), rest.map(newEnd, 1)]);
+    });
+  });
+  return ranges;
 };

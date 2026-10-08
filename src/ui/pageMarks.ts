@@ -1,15 +1,51 @@
 import type { Node } from "prosemirror-model";
-import type { DecorationSet } from "prosemirror-view";
+import type { Decoration, DecorationSet } from "prosemirror-view";
 
 import type { PageEngine } from "../engine/engine";
 import type { PageRect } from "../state";
 
-// What the page view shows over the text besides the selection, on the
-// pages in view: the underlines of misspelled words, from the spell check's
-// decorations, and the label of each page break. Neither is in the PDF,
-// like in the editor.
+// What the page view shows on the text besides the selection, on the pages
+// in view: the underlines of misspelled words, from the spell check's
+// decorations, the matches of find under the text, and the label of each
+// page break. None of them is in the PDF, like in the editor.
 
-export type PageMark = PageRect & { kind: "spelling" | "break" };
+export type MarkKind = "spelling" | "find" | "find-current" | "break";
+export type PageMark = PageRect & { kind: MarkKind };
+
+// the letter of each kind in the string a memo keeps
+const CODES: Record<MarkKind, string> = {
+  spelling: "s",
+  find: "f",
+  "find-current": "c",
+  break: "b",
+};
+const KINDS = Object.fromEntries(
+  Object.entries(CODES).map(([kind, code]) => [code, kind]),
+) as Record<string, MarkKind>;
+
+// the class of a mark of each kind, and whether it shows under the text,
+// like a highlight, or over it
+export const MARK_LOOKS: Record<
+  MarkKind,
+  { className: string; under: boolean }
+> = {
+  spelling: { className: "page-misspelling", under: false },
+  find: { className: "page-find", under: true },
+  "find-current": { className: "page-find current", under: true },
+  break: { className: "page-break-mark", under: false },
+};
+
+// marks from decorations of a plugin: which kind each is, and the range it
+// covers on the page, e.g. a whole formula for a match inside it
+export interface MarkSource {
+  decorations: DecorationSet | undefined;
+  kind: MarkKind;
+  range?: (from: number, to: number) => [from: number, to: number];
+}
+
+// what a source's decoration covers on the page
+const rangeOf = (source: MarkSource, found: Decoration) =>
+  source.range?.(found.from, found.to) ?? [found.from, found.to];
 
 // what makes a page's marks what they are, besides its body's version: the
 // misspelled words and page breaks on it, relative to where its text
@@ -17,7 +53,7 @@ export type PageMark = PageRect & { kind: "spelling" | "break" };
 const signatureOf = (
   engine: PageEngine,
   doc: Node,
-  decorations: DecorationSet | undefined,
+  sources: readonly MarkSource[],
   page: number,
 ) => {
   const span = engine.pageSpan(page);
@@ -25,8 +61,11 @@ const signatureOf = (
   const from = Math.max(0, span.from - 1);
   const to = Math.min(doc.content.size, span.to + 1);
   const parts: string[] = [];
-  for (const found of decorations?.find(from, to) ?? [])
-    parts.push(`s${found.from - span.from}+${found.to - found.from}`);
+  for (const source of sources)
+    for (const found of source.decorations?.find(from, to) ?? [])
+      parts.push(
+        `${CODES[source.kind]}${found.from - span.from}+${found.to - found.from}`,
+      );
   doc.nodesBetween(from, to, (node, pos) => {
     if (node.type.name !== "page_break") return !node.isTextblock;
     parts.push(`b${pos - span.from}`);
@@ -58,19 +97,19 @@ export class PageMarksMemo {
   marksOn(
     engine: PageEngine,
     doc: Node,
-    decorations: DecorationSet | undefined,
+    sources: readonly MarkSource[],
     page: number,
     version: number,
   ): string {
-    const signature = signatureOf(engine, doc, decorations, page);
+    const signature = signatureOf(engine, doc, sources, page);
     if (signature === null) return "";
     const known = this.pages.get(page);
     if (known && known.version === version && known.signature === signature)
       return known.marks;
-    const marks = marksOnPage(engine, doc, decorations, page)
+    const marks = marksOnPage(engine, doc, sources, page)
       .map((mark) =>
         [
-          mark.kind === "spelling" ? "s" : "b",
+          CODES[mark.kind],
           [mark.x, mark.y, mark.width, mark.height]
             .map((value) => Math.round(value * 100) / 100)
             .join(","),
@@ -88,7 +127,7 @@ export class PageMarksMemo {
 const marksOnPage = (
   engine: PageEngine,
   doc: Node,
-  decorations: DecorationSet | undefined,
+  sources: readonly MarkSource[],
   page: number,
 ): PageMark[] => {
   const marks: PageMark[] = [];
@@ -96,10 +135,12 @@ const marksOnPage = (
   if (!span) return marks;
   const from = Math.max(0, span.from - 1);
   const to = Math.min(doc.content.size, span.to + 1);
-  for (const found of decorations?.find(from, to) ?? []) {
-    for (const rect of engine.selection(found.from, found.to)) {
-      if (rect.page !== page) continue;
-      marks.push({ ...rect, kind: "spelling" });
+  for (const source of sources) {
+    for (const found of source.decorations?.find(from, to) ?? []) {
+      for (const rect of engine.selection(...rangeOf(source, found))) {
+        if (rect.page !== page) continue;
+        marks.push({ ...rect, kind: source.kind });
+      }
     }
   }
   doc.nodesBetween(from, to, (node, pos) => {
@@ -114,7 +155,7 @@ const marksOnPage = (
 
 // a mark as a page frame shows it, from the string a memo keeps
 export interface ShownMark {
-  kind: "spelling" | "break";
+  kind: MarkKind;
   x: number;
   y: number;
   width: number;
@@ -133,7 +174,7 @@ export const shownMarks = (marks: string): ShownMark[] =>
         const [kind, box] = mark.split(" ");
         const [x, y, width, height] = box.split(",").map(Number);
         return {
-          kind: kind === "s" ? "spelling" : "break",
+          kind: KINDS[kind],
           x,
           y,
           width,

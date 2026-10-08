@@ -3,6 +3,7 @@ import {
   blocksPaneOpen,
   blockToolbar,
   contextMenu,
+  findPanel,
   controlsFaded,
   focusMode,
   imageDialog,
@@ -33,6 +34,7 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
+import FindPanel from "./FindPanel.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
@@ -94,6 +96,8 @@ watchFocusMode();
     :key="keyOf(settingsDialog)"
     :request="settingsDialog"
   />
+  <!-- not keyed: it stays while the tabs change -->
+  <FindPanel v-if="findPanel" />
   <TocPopover
     v-if="tocPopover"
     :key="keyOf(tocPopover)"

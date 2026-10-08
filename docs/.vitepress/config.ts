@@ -142,6 +142,7 @@ export default defineConfigWithTheme<
           { text: "Install", link: "/guide/install" },
           { text: "Writing in Blank", link: "/guide/writing" },
           { text: "The main menu", link: "/guide/menu" },
+          { text: "Find and replace", link: "/guide/find" },
           { text: "Tables", link: "/guide/tables" },
           { text: "Blocks", link: "/guide/blocks" },
           { text: "Files & formats", link: "/guide/files" },

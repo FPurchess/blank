@@ -31,6 +31,7 @@ import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
   engineMissing,
+  findPanel,
   pageHeadBox,
   pageHoverBlock,
   pageLayoutState,
@@ -63,7 +64,9 @@ import {
 import { pageBitmaps } from "./pageBitmaps";
 import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
-import { PageMarksMemo } from "./pageMarks";
+import { type MarkSource, PageMarksMemo } from "./pageMarks";
+import { findKey, paintedRange } from "../editor/plugins/find/state";
+import { Decoration, DecorationSet } from "prosemirror-view";
 import { movesPages, selectedOn } from "./pageViewModel";
 import { styleOf } from "./rect";
 import { scrollFor, zoomWheel } from "./scrollModel";
@@ -162,6 +165,29 @@ const doc = computed(() => editor.state.value.doc);
 const decorations = computed(
   () => spellcheckKey.getState(editor.state.value)?.decorations,
 );
+// what find found, while its panel is open, and the match it's at
+const found = computed(() => {
+  const value = findKey.getState(editor.state.value);
+  return findPanel.value && value?.active ? value : null;
+});
+const findDecorations = computed(() => found.value?.decorations);
+const currentMatch = computed(() => {
+  const match = found.value?.matches[found.value.current];
+  return match ? `${match.from}-${match.to}` : "";
+});
+const currentDecoration = computed(() => {
+  if (!currentMatch.value) return undefined;
+  const [from, to] = currentMatch.value.split("-").map(Number);
+  return DecorationSet.create(doc.value, [Decoration.inline(from, to, {})]);
+});
+const markSources = computed((): MarkSource[] => {
+  const range = paintedRange(doc.value);
+  return [
+    { decorations: decorations.value, kind: "spelling" },
+    { decorations: findDecorations.value, kind: "find", range },
+    { decorations: currentDecoration.value, kind: "find-current", range },
+  ];
+});
 let marks = new PageMarksMemo();
 
 // a frame as a page frame shows it, all plain values
@@ -210,7 +236,7 @@ const frames = computed(() => {
         ? marks.marksOn(
             pageEngine,
             doc.value,
-            decorations.value,
+            markSources.value,
             frame.page,
             versions.body[frame.page] ?? 0,
           )

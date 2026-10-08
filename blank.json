@@ -67,7 +67,8 @@
     "view.zoom_in": "Mod-=",
     "view.zoom_out": "Mod--",
     "view.zoom_fit": "",
-    "menu.main": "Mod-k"
+    "menu.main": "Mod-k",
+    "edit.find": "Mod-f"
   },
   "autocorrect": {
     "arrows": true,

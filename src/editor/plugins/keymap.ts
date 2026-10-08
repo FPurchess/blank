@@ -79,6 +79,7 @@ import { setTextblock } from "../commands/setTextblock";
 import { clearRecentFiles } from "../commands/recentFiles";
 import { zoomBy, zoomFit } from "../commands/zoom";
 import { openMainMenu } from "../commands/mainMenu";
+import { openFind } from "./find/commands";
 import { recorded } from "../commandRun";
 
 /**
@@ -205,6 +206,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_ZOOM_OUT]: zoomBy(-1),
   [CommandIdentifier.VIEW_ZOOM_FIT]: zoomFit(),
   [CommandIdentifier.MENU_MAIN]: openMainMenu(),
+  [CommandIdentifier.EDIT_FIND]: openFind(),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -323,7 +325,7 @@ const bindCommands = () => {
 // the commands that work wherever the focus is in the window, not only in
 // the editor: the files, printing and exports, the tabs, moving between the
 // parts (F6, and Alt-F10 to the toolbar), the blocks pane, the zoom, focus
-// mode, the main menu and the settings
+// mode, the main menu, find and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
@@ -347,6 +349,7 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_ZOOM_OUT,
   CommandIdentifier.VIEW_ZOOM_FIT,
   CommandIdentifier.MENU_MAIN,
+  CommandIdentifier.EDIT_FIND,
   CommandIdentifier.APP_SETTINGS,
 ];
 

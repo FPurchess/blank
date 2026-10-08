@@ -1,4 +1,5 @@
 export { alignmentGuard } from "./alignment";
+export { find } from "./find";
 export { pastedLinks } from "./pastedLinks";
 export { default as autocomplete } from "./autocomplete";
 export { default as images } from "./images";
