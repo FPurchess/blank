@@ -66,6 +66,9 @@ const crateNotices = () => {
       "generate",
       "--manifest-path",
       "src-tauri/Cargo.toml",
+      // the layout engine too, a member of the workspace, not a dependency
+      // of the app: without it the wasm's crates were left out
+      "--workspace",
       "--config",
       "scripts/notices/about.toml",
       "--frozen",
