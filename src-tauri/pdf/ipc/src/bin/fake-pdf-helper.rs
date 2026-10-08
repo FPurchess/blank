@@ -2,7 +2,10 @@
 //! "PDF" is JSON, `{"pages": ["ok", "slow", …]}`, which says what drawing each
 //! page does: "ok" draws a solid colour, "slow" runs until cancelled, "stuck"
 //! ignores the cancel, "crash" dies, "reserve" asks for more memory than
-//! the helper's limits allow. `--protocol N` says hello with another version.
+//! the helper's limits allow, "short" draws fewer pixels than its size says,
+//! "huge" a page past `MAX_PIXELS`. `--protocol N` says hello with another
+//! version; `--garbage` answers every request with bytes that aren't a frame
+//! and then keeps running.
 
 use std::io;
 use std::sync::Arc;
@@ -93,6 +96,20 @@ impl PdfDoc for FakeDoc {
                 }
                 .into());
             }
+            "short" => {
+                return Ok(Bitmap {
+                    width: 10,
+                    height: 10,
+                    rgba: vec![0; 4],
+                })
+            }
+            "huge" => {
+                return Ok(Bitmap {
+                    width: 1 << 13,
+                    height: 1 << 13,
+                    rgba: vec![],
+                })
+            }
             _ => {}
         }
         let (width, height) = ((10.0 * scale) as u32, (20.0 * scale) as u32);
@@ -120,6 +137,18 @@ fn main() {
         let hello = serde_json::json!({"id": 0, "event": "hello", "protocol": args[at + 1].parse::<u32>().unwrap(), "engine": "fake", "engineVersion": "1", "ops": []});
         frame::write_frame(&mut io::stdout(), &serde_json::to_vec(&hello).unwrap(), &[]).unwrap();
         std::thread::sleep(Duration::from_secs(5));
+        return;
+    }
+    if args.iter().any(|arg| arg == "--garbage") {
+        let hello = serde_json::json!({"id": 0, "event": "hello", "protocol": blank_pdf_ipc::protocol::PROTOCOL, "engine": "fake", "engineVersion": "1", "ops": []});
+        let mut stdout = io::stdout();
+        frame::write_frame(&mut stdout, &serde_json::to_vec(&hello).unwrap(), &[]).unwrap();
+        let mut stdin = io::stdin();
+        while frame::read_frame(&mut stdin, frame::MAX_BODY).is_ok() {
+            io::Write::write_all(&mut stdout, b"not a frame at all").unwrap();
+            io::Write::flush(&mut stdout).unwrap();
+        }
+        std::thread::sleep(Duration::from_secs(60));
         return;
     }
     serve::serve(&Fake, io::stdin(), io::stdout(), || std::process::exit(0)).unwrap();

@@ -37,8 +37,12 @@ impl From<io::Error> for FrameError {
     }
 }
 
-/// writes one frame and flushes it
+/// writes one frame and flushes it; refuses one the other side would refuse
+/// (`InvalidInput`, nothing written)
 pub fn write_frame(output: &mut impl Write, header: &[u8], body: &[u8]) -> io::Result<()> {
+    if header.len() > MAX_HEADER || body.len() as u64 > MAX_BODY {
+        return Err(ErrorKind::InvalidInput.into());
+    }
     let mut head = Vec::with_capacity(16 + header.len());
     head.extend(MAGIC);
     head.extend((header.len() as u32).to_le_bytes());
@@ -121,5 +125,16 @@ mod tests {
         cut.pop();
         assert_eq!(bad(cut, MAX_BODY), "truncated");
         assert_eq!(bad(b"BPF".to_vec(), MAX_BODY), "truncated");
+        let mut huge = framed(b"{}", &[]);
+        huge[8..16].copy_from_slice(&u64::MAX.to_le_bytes());
+        assert_eq!(bad(huge, MAX_BODY), "body too long");
+    }
+
+    #[test]
+    fn refuses_to_write_what_the_other_side_would_refuse() {
+        let mut written = vec![];
+        let error = write_frame(&mut written, &vec![b' '; MAX_HEADER + 1], &[]).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidInput);
+        assert!(written.is_empty());
     }
 }

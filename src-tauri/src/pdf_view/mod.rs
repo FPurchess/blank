@@ -43,16 +43,33 @@ impl PdfTabs {
         self.tabs().get(tab).cloned()
     }
 
-    pub fn insert(&self, tab: String, pdf: PdfTab) {
-        self.tabs().insert(tab, Arc::new(pdf));
+    pub fn insert(&self, tab: String, pdf: Arc<PdfTab>) {
+        self.tabs().insert(tab, pdf);
     }
 
     pub fn remove(&self, tab: &str) {
         self.tabs().remove(tab);
     }
 
+    /// whether `tab` still shows `pdf`: not if it was closed, or opened
+    /// again, while `pdf` opened
+    pub fn holds(&self, tab: &str, pdf: &Arc<PdfTab>) -> bool {
+        self.tabs()
+            .get(tab)
+            .is_some_and(|held| Arc::ptr_eq(held, pdf))
+    }
+
+    /// forgets `tab` if it still shows `pdf`
+    pub fn remove_if(&self, tab: &str, pdf: &Arc<PdfTab>) {
+        let mut tabs = self.tabs();
+        if tabs.get(tab).is_some_and(|held| Arc::ptr_eq(held, pdf)) {
+            tabs.remove(tab);
+        }
+    }
+
     /// stops the helpers unused for `IDLE`, and the least recently used
-    /// past `MAX_LIVE` except `keep`'s
+    /// past `MAX_LIVE` except `keep`'s. Never waits for a request: a helper
+    /// in use is neither idle nor stopped (`Supervisor::idle_since`, `stop`)
     pub fn stop_idle(&self, keep: Option<&str>, now: Instant) {
         let tabs: Vec<(String, Arc<PdfTab>)> = self
             .tabs()

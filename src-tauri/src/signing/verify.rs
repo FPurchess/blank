@@ -756,10 +756,14 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                         ));
                     }
                     "ETSI.RFC3161" => {
+                        // its time only counts when the token covers the ranges
                         let ok = c.econtent.as_deref().and_then(tst_info).is_some_and(
                             |(oid, imprint, t)| {
-                                r.timestamp = Some(t);
-                                hash(&oid, &ranges).is_some_and(|h| h == imprint)
+                                let ok = hash(&oid, &ranges).is_some_and(|h| h == imprint);
+                                if ok {
+                                    r.timestamp = Some(t);
+                                }
+                                ok
                             },
                         );
                         r.checks.push((
@@ -776,7 +780,10 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                     match check_timestamp(&tok, &c.signature) {
                         Some((ok, time)) => {
                             r.checks.push(("signature timestamp", ok, time.clone()));
-                            r.timestamp = Some(time);
+                            // a token that doesn't hold gives no time
+                            if ok {
+                                r.timestamp = Some(time);
+                            }
                         }
                         None => r.timestamp_unreadable = true,
                     }

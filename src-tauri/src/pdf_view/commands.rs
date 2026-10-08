@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use blank_pdf_ipc::client::{PdfError, Supervisor};
-use blank_pdf_ipc::protocol::{Op, PageInfo};
+use blank_pdf_ipc::frame::MAX_BODY;
+use blank_pdf_ipc::protocol::{ErrorKind, Op, PageInfo};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -51,40 +52,53 @@ pub async fn pdf_open(
     path: PathBuf,
 ) -> Result<Opened, String> {
     let read = path.clone();
-    let bytes = tauri::async_runtime::spawn_blocking(move || std::fs::read(read))
-        .await
-        .map_err(|_| "failed".to_string())?
-        .map_err(|error| {
-            log::warn!("PDF: read {}: {}", path.display(), error.kind());
-            "unreadable".to_string()
-        })?;
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        // more than a helper may be given: not worth reading
+        if std::fs::metadata(&read)?.len() > MAX_BODY {
+            return Ok(None);
+        }
+        std::fs::read(read).map(Some)
+    })
+    .await
+    .map_err(|_| "failed".to_string())?
+    .map_err(|error| {
+        log::warn!("PDF: read {}: {}", path.display(), error.kind());
+        "unreadable".to_string()
+    })?
+    .ok_or_else(|| failed("open")(PdfError::Engine(ErrorKind::TooComplex)))?;
     let sha = sha256(&bytes);
     let config = helper_config().map_err(|_| "start".to_string())?;
     let supervisor = Arc::new(Supervisor::new(
         config,
         source(path.clone(), sha.clone(), bytes.into()),
     ));
+    // in the tabs while it opens, so that closing the tab meanwhile is seen
+    let pdf = Arc::new(PdfTab {
+        supervisor: supervisor.clone(),
+        path: path.clone(),
+        sha256: sha.clone(),
+    });
+    tabs.insert(tab.clone(), pdf.clone());
     let opening = supervisor.clone();
-    let (info, pages) = blocking(move || {
+    let opened = blocking(move || {
         let info = opening.open().map_err(failed("open"))?;
-        let pages: Vec<PageInfo> = opening
-            .ask(Op::Pages {
-                from: 0,
-                to: info.pages,
-            })
-            .map_err(failed("pages"))?;
+        let pages = opening.pages(info.pages).map_err(failed("pages"))?;
         Ok((info, pages))
     })
-    .await?;
+    .await;
+    let (info, pages) = match opened {
+        Ok(opened) => opened,
+        Err(error) => {
+            tabs.remove_if(&tab, &pdf);
+            return Err(error);
+        }
+    };
+    if !tabs.holds(&tab, &pdf) {
+        // closed while it opened: its helper goes with the last reference
+        supervisor.stop();
+        return Err("closed".into());
+    }
     log::info!("PDF opened: {}", path.display());
-    tabs.insert(
-        tab.clone(),
-        PdfTab {
-            supervisor,
-            path,
-            sha256: sha.clone(),
-        },
-    );
     tabs.stop_idle(Some(&tab), Instant::now());
     Ok(Opened {
         sha256: sha,

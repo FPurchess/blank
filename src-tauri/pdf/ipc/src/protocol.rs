@@ -6,8 +6,10 @@
 //! - a request: `{"id": n ≥ 1, "op": "…", …}`;
 //! - its answer: `{"id": n, "ok": …}` or `{"id": n, "error": {"kind": "…"}}`.
 //!
-//! Within version 1 a new op is optional: the app checks `Hello::ops`, and
-//! the helper answers `unknownOp`. A breaking change raises `PROTOCOL` and the
+//! Within version 1 a new op is optional: a helper that doesn't know it
+//! answers `unknownOp`. The hello lists the ops the helper knows
+//! (`Hello::ops`); the app doesn't read that list yet, since every op it
+//! asks is in version 1 from the start. A breaking change raises `PROTOCOL` and the
 //! frame's magic. Positions and sizes are display points: from the top left
 //! of the page's crop box after its `/Rotate`, with its UserUnit applied.
 
@@ -19,6 +21,10 @@ pub const PROTOCOL: u32 = 1;
 /// the most pixels a page is drawn with, 16 MP (4096 × 4096): the webview
 /// asks for no more (`MAX_PAGE_PIXELS` in src/pdf/frames.ts)
 pub const MAX_PIXELS: u64 = 1 << 24;
+
+/// the most pages one `pages` request asks for, so that its answer stays
+/// well within a frame's header (`MAX_HEADER`, ~60 bytes a page)
+pub const PAGES_PER_REQUEST: usize = 4096;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "op", rename_all = "camelCase")]
@@ -38,7 +44,12 @@ pub enum Op {
         page: usize,
         scale: f32,
     },
+    /// the form's fields. Not asked by the app yet: it is there for the
+    /// PDF forms of the next step (filling them in), see .claude/rules/pdf.md
     Fields,
+    /// what the signatures say of themselves. Not asked by the app yet: the
+    /// signature check reads the PDF itself (signing/verify.rs); this is for
+    /// placing signature fields in the next step, see .claude/rules/pdf.md
     Signatures,
     /// stops request `target`, which then answers `cancelled`; no answer of
     /// its own
@@ -59,6 +70,19 @@ impl Op {
         "cancel",
         "ping",
     ];
+
+    /// its name, as in the request and in the log
+    pub fn name(&self) -> &'static str {
+        match self {
+            Op::Open { .. } => "open",
+            Op::Pages { .. } => "pages",
+            Op::Render { .. } => "render",
+            Op::Fields => "fields",
+            Op::Signatures => "signatures",
+            Op::Cancel { .. } => "cancel",
+            Op::Ping => "ping",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -82,6 +106,21 @@ pub enum ErrorKind {
     Cancelled,
     /// anything else the engine threw
     Engine,
+}
+
+impl ErrorKind {
+    /// its name, as in the answer
+    pub fn name(self) -> &'static str {
+        match self {
+            ErrorKind::BadRequest => "badRequest",
+            ErrorKind::UnknownOp => "unknownOp",
+            ErrorKind::NeedsPassword => "needsPassword",
+            ErrorKind::Damaged => "damaged",
+            ErrorKind::TooComplex => "tooComplex",
+            ErrorKind::Cancelled => "cancelled",
+            ErrorKind::Engine => "engine",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -271,7 +310,19 @@ mod tests {
                 "cancel" => request["target"] = json!(1),
                 _ => {}
             }
-            assert!(serde_json::from_value::<Request>(request).is_ok(), "{name}");
+            let request = serde_json::from_value::<Request>(request).unwrap();
+            assert_eq!(request.op.name(), name);
+        }
+        for kind in [
+            ErrorKind::BadRequest,
+            ErrorKind::UnknownOp,
+            ErrorKind::NeedsPassword,
+            ErrorKind::Damaged,
+            ErrorKind::TooComplex,
+            ErrorKind::Cancelled,
+            ErrorKind::Engine,
+        ] {
+            assert_eq!(serde_json::to_value(kind).unwrap(), kind.name());
         }
     }
 }

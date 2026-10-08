@@ -203,3 +203,91 @@ fn limits_the_helpers_address_space() {
         PdfError::Engine(ErrorKind::TooComplex)
     );
 }
+
+#[test]
+fn a_helper_outlives_the_thread_that_started_it() {
+    // tokio's blocking threads retire when idle: a helper must not die with
+    // the thread that spawned it (PR_SET_PDEATHSIG would kill it)
+    let pdf = Arc::new(supervisor(&["ok"]));
+    let opening = pdf.clone();
+    std::thread::spawn(move || opening.open().unwrap())
+        .join()
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(render(&pdf, 0).is_ok());
+    assert!(!pdf.failed());
+}
+
+#[test]
+fn asks_for_many_pages_in_batches() {
+    let pages = vec!["ok"; 20_000];
+    let pdf = supervisor(&pages);
+    assert_eq!(pdf.open().unwrap().pages, 20_000);
+    // one answer for all of them would outgrow a frame's header
+    assert_eq!(
+        pdf.ask::<Vec<PageInfo>>(Op::Pages {
+            from: 0,
+            to: 20_000
+        })
+        .unwrap_err(),
+        PdfError::Engine(ErrorKind::TooComplex)
+    );
+    assert_eq!(pdf.pages(20_000).unwrap().len(), 20_000);
+    assert!(!pdf.failed());
+}
+
+#[test]
+fn refuses_pixels_that_dont_match_their_size() {
+    let pdf = supervisor(&["short", "huge", "ok"]);
+    assert_eq!(
+        render(&pdf, 0).unwrap_err(),
+        PdfError::Engine(ErrorKind::Engine)
+    );
+    assert_eq!(
+        render(&pdf, 1).unwrap_err(),
+        PdfError::Engine(ErrorKind::TooComplex)
+    );
+    assert!(render(&pdf, 2).is_ok());
+}
+
+#[test]
+fn a_helper_that_talks_nonsense_is_a_crash_and_is_killed() {
+    let pdf = Supervisor::new(
+        config(&["--garbage"]),
+        Box::new(|| Ok(br#"{"pages": ["ok"]}"#.to_vec().into())),
+    );
+    let started = Instant::now();
+    assert_eq!(pdf.open().unwrap_err(), PdfError::Crashed);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "doesn't wait for the live helper to exit"
+    );
+}
+
+#[test]
+fn doesnt_wait_for_a_request_to_say_whether_it_is_idle() {
+    let pdf = Arc::new(supervisor(&["slow", "ok"]));
+    pdf.open().unwrap();
+    let rendering = pdf.clone();
+    let thread = std::thread::spawn(move || render(&rendering, 0));
+    std::thread::sleep(Duration::from_millis(50));
+    let started = Instant::now();
+    assert!(pdf.idle_since().is_none(), "in use");
+    pdf.stop();
+    assert!(started.elapsed() < Duration::from_millis(50));
+    assert_eq!(thread.join().unwrap().unwrap_err(), PdfError::TimedOut);
+    assert!(pdf.idle_since().is_some(), "not stopped while in use");
+}
+
+#[test]
+fn refuses_a_pdf_bigger_than_a_frame() {
+    let pdf = Supervisor::new(
+        config(&[]),
+        Box::new(|| Ok(vec![b' '; (blank_pdf_ipc::frame::MAX_BODY + 1) as usize].into())),
+    );
+    assert_eq!(
+        pdf.open().unwrap_err(),
+        PdfError::Engine(ErrorKind::TooComplex)
+    );
+    assert!(!pdf.failed());
+}

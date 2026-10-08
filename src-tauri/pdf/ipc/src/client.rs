@@ -21,6 +21,7 @@ use serde_json::Value;
 use crate::frame::{read_frame, write_frame, MAX_BODY};
 use crate::limits::Backstop;
 use crate::protocol::{ErrorKind, Hello, Op, OpenInfo, Outcome, Request, Response, PROTOCOL};
+use crate::protocol::{PageInfo, RenderInfo, MAX_PIXELS, PAGES_PER_REQUEST};
 
 /// why a request got no answer
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,15 +46,7 @@ impl PdfError {
     /// the name the webview and the log get
     pub fn kind(self) -> &'static str {
         match self {
-            PdfError::Engine(kind) => match kind {
-                ErrorKind::BadRequest => "badRequest",
-                ErrorKind::UnknownOp => "unknownOp",
-                ErrorKind::NeedsPassword => "needsPassword",
-                ErrorKind::Damaged => "damaged",
-                ErrorKind::TooComplex => "tooComplex",
-                ErrorKind::Cancelled => "cancelled",
-                ErrorKind::Engine => "engine",
-            },
+            PdfError::Engine(kind) => kind.name(),
             PdfError::TimedOut => "timedOut",
             PdfError::Crashed => "crashed",
             PdfError::Hung => "hung",
@@ -113,8 +106,16 @@ struct Helper {
     stdin: Arc<Mutex<ChildStdin>>,
     answers: Receiver<Incoming>,
     next_id: u64,
-    _backstop: Backstop,
+    backstop: Backstop,
 }
+
+/// how many answers the reader holds before it waits for the client: a
+/// helper that writes frames unasked can't fill the app's memory
+const QUEUED_ANSWERS: usize = 4;
+/// the most a helper's answer may hold: a page's pixels
+const MAX_ANSWER: u64 = MAX_PIXELS * 4;
+/// how long a helper whose stdout closed gets to exit before it's killed
+const EXITING: Duration = Duration::from_millis(500);
 
 fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -143,9 +144,9 @@ impl Helper {
             let _ = child.kill();
             return Err(PdfError::Start);
         };
-        let (send, answers) = mpsc::channel();
+        let (send, answers) = mpsc::sync_channel(QUEUED_ANSWERS);
         thread::spawn(move || {
-            while let Ok(frame) = read_frame(&mut stdout, MAX_BODY) {
+            while let Ok(frame) = read_frame(&mut stdout, MAX_ANSWER) {
                 let Ok(header) = serde_json::from_slice(&frame.header) else {
                     break;
                 };
@@ -160,7 +161,7 @@ impl Helper {
             stdin: Arc::new(Mutex::new(stdin)),
             answers,
             next_id: 1,
-            _backstop: backstop,
+            backstop,
         };
         helper.greet(config.timeouts.start)?;
         Ok(helper)
@@ -187,12 +188,30 @@ impl Helper {
 
     fn kill(&mut self) {
         let _ = self.child.kill();
+        self.backstop.stop();
         let _ = self.child.wait();
     }
 
-    /// how the helper ended, for the log: its exit code or signal
+    /// how the helper ended, for the log: its exit code or signal. Its
+    /// stdout may have closed, or stopped making sense, while it still runs:
+    /// it gets `EXITING` to exit, then it is killed, so this never hangs
     fn ended(&mut self) -> String {
-        match self.child.wait() {
+        let until = Instant::now() + EXITING;
+        let status = loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) => break Ok(status),
+                Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(10)),
+                Ok(None) => {
+                    let _ = self.child.kill();
+                    self.backstop.stop();
+                    break self.child.wait();
+                }
+                Err(error) => break Err(error),
+            }
+        };
+        // reaped (or failing to be): the watcher must not touch its PID
+        self.backstop.stop();
+        match status {
             Ok(status) => {
                 #[cfg(unix)]
                 if let Some(signal) = std::os::unix::process::ExitStatusExt::signal(&status) {
@@ -259,7 +278,7 @@ impl Helper {
                     let _ = write_frame(&mut *locked(&self.stdin), &cancel, &[]);
                 }
                 Err(RecvTimeoutError::Timeout) => {
-                    log::warn!("PDF helper: {}: hang", op_name(op));
+                    log::warn!("PDF helper: {}: hang", op.name());
                     self.kill();
                     return Err(PdfError::Hung);
                 }
@@ -269,7 +288,7 @@ impl Helper {
 
     fn crashed(&mut self, op: &Op) -> PdfError {
         let ended = self.ended();
-        log::warn!("PDF helper: {}: crash, {ended}", op_name(op));
+        log::warn!("PDF helper: {}: crash, {ended}", op.name());
         PdfError::Crashed
     }
 }
@@ -277,18 +296,6 @@ impl Helper {
 impl Drop for Helper {
     fn drop(&mut self) {
         self.kill();
-    }
-}
-
-fn op_name(op: &Op) -> &'static str {
-    match op {
-        Op::Open { .. } => "open",
-        Op::Pages { .. } => "pages",
-        Op::Render { .. } => "render",
-        Op::Fields => "fields",
-        Op::Signatures => "signatures",
-        Op::Cancel { .. } => "cancel",
-        Op::Ping => "ping",
     }
 }
 
@@ -338,15 +345,20 @@ impl Supervisor {
     }
 
     /// whether a helper runs, and since when it was last asked something
+    /// whether a helper runs, and since when it was last asked something;
+    /// `None` while a request runs, which it doesn't wait for: it's in use
     pub fn idle_since(&self) -> Option<Instant> {
-        let state = locked(&self.state);
+        let state = self.state.try_lock().ok()?;
         state.helper.as_ref().map(|_| state.last_used)
     }
 
     /// stops the helper and drops the PDF, e.g. after a while unused; the
-    /// next request starts another. Not a failure
+    /// next request starts another. Not a failure. Doesn't wait for a
+    /// request that runs: a helper in use isn't stopped
     pub fn stop(&self) {
-        let mut state = locked(&self.state);
+        let Ok(mut state) = self.state.try_lock() else {
+            return;
+        };
         state.helper = None;
         state.bytes = None;
     }
@@ -398,7 +410,30 @@ impl Supervisor {
             }
         });
         *locked(&self.in_flight) = None;
+        let result = match (&op, result) {
+            (Op::Render { .. }, Ok((value, pixels))) if !drawn(&value, &pixels) => {
+                log::warn!("PDF helper: render: pixels don't match their size");
+                Err(PdfError::Engine(ErrorKind::Engine))
+            }
+            (_, result) => result,
+        };
         self.settle(&mut state, result)
+    }
+
+    /// every page's size, asked `PAGES_PER_REQUEST` at a time so that no
+    /// answer outgrows a frame's header
+    pub fn pages(&self, count: usize) -> Result<Vec<PageInfo>, PdfError> {
+        let mut pages = Vec::with_capacity(count.min(1 << 16));
+        while pages.len() < count {
+            let from = pages.len();
+            let to = count.min(from + PAGES_PER_REQUEST);
+            let batch: Vec<PageInfo> = self.ask(Op::Pages { from, to })?;
+            if batch.is_empty() {
+                break;
+            }
+            pages.extend(batch);
+        }
+        Ok(pages)
     }
 
     /// asks `op` and reads its answer as `T`
@@ -427,6 +462,10 @@ impl Supervisor {
                 PdfError::Source
             })?,
         };
+        // more than a frame may carry: not the helper's failure
+        if bytes.len() as u64 > MAX_BODY {
+            return Err(PdfError::Engine(ErrorKind::TooComplex));
+        }
         let mut helper = Helper::start(&self.config)?;
         let opened = helper.call(
             &Op::Open { password: None },
@@ -443,4 +482,14 @@ impl Supervisor {
         state.info = Some(info.clone());
         Ok(info)
     }
+}
+
+/// whether a render's answer holds the pixels its size says, within the
+/// most a page is drawn with
+fn drawn(value: &Value, pixels: &[u8]) -> bool {
+    let Ok(info) = serde_json::from_value::<RenderInfo>(value.clone()) else {
+        return false;
+    };
+    let count = info.width as u64 * info.height as u64;
+    count <= MAX_PIXELS && pixels.len() as u64 == count * 4
 }

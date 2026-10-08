@@ -8,7 +8,10 @@
 const ADDRESS_SPACE: u64 = 4 << 30;
 
 /// sets the helper's own limits, first thing in its `main`: on Linux, its
-/// address space, and that the kernel kills it when Blank goes
+/// address space. No `PR_SET_PDEATHSIG`: it fires when the *thread* that
+/// spawned the helper ends, and the app spawns from tokio's blocking pool,
+/// whose threads retire after a few idle seconds. When Blank goes, the
+/// helper's stdin ends and `serve`'s `on_eof` exits it.
 pub fn limit_helper() {
     #[cfg(target_os = "linux")]
     unsafe {
@@ -17,7 +20,6 @@ pub fn limit_helper() {
             rlim_max: ADDRESS_SPACE,
         };
         libc::setrlimit(libc::RLIMIT_AS, &limit);
-        libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
     }
 }
 
@@ -45,8 +47,10 @@ pub fn spawn_options(command: &mut std::process::Command) {
 pub struct Backstop {
     #[cfg(windows)]
     job: windows_sys::Win32::Foundation::HANDLE,
+    /// set before the helper is reaped, under the lock the watcher holds
+    /// while it reads and kills, so it never kills a reused PID
     #[cfg(target_os = "macos")]
-    done: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    done: std::sync::Arc<std::sync::Mutex<bool>>,
 }
 
 impl Backstop {
@@ -84,12 +88,17 @@ impl Backstop {
 
     #[cfg(target_os = "macos")]
     pub fn watch(child: &std::process::Child) -> Backstop {
-        use std::sync::atomic::Ordering;
-        let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let done = std::sync::Arc::new(std::sync::Mutex::new(false));
         let watching = done.clone();
         let pid = child.id() as libc::c_int;
-        std::thread::spawn(move || {
-            while !watching.load(Ordering::Relaxed) {
+        std::thread::spawn(move || loop {
+            {
+                let done = watching
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if *done {
+                    return;
+                }
                 let mut usage: libc::rusage_info_v2 = unsafe { std::mem::zeroed() };
                 let read = unsafe {
                     libc::proc_pid_rusage(
@@ -106,10 +115,21 @@ impl Backstop {
                     unsafe { libc::kill(pid, libc::SIGKILL) };
                     return;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(500));
             }
+            std::thread::sleep(std::time::Duration::from_millis(500));
         });
         Backstop { done }
+    }
+
+    /// stops watching; call it before the helper is reaped (`wait`)
+    pub fn stop(&self) {
+        #[cfg(target_os = "macos")]
+        {
+            *self
+                .done
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
+        }
     }
 }
 
@@ -119,8 +139,7 @@ impl Drop for Backstop {
         if !self.job.is_null() {
             unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };
         }
-        #[cfg(target_os = "macos")]
-        self.done.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.stop();
     }
 }
 

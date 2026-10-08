@@ -20,6 +20,8 @@
 /* the most fields walked, nesting followed and options listed */
 #define MAX_FIELDS 10000
 #define MAX_DEPTH 32
+/* the most fields and kids a walk of the form looks at */
+#define MAX_VISITS 100000
 #define MAX_OPTIONS 1000
 
 typedef struct
@@ -216,14 +218,17 @@ void blank_engine_drop(blank_engine *engine)
 	free(engine);
 }
 
-/* the status of what fz_catch caught */
+/* the status of what fz_catch caught: a cancel is a cancel even when an
+ * allocation was refused on the way (MuPDF may recover from a refusal by
+ * emptying its store and trying again, so `refused` alone doesn't say the
+ * error came of it); then a refusal, or MuPDF's own out of memory or limit */
 static int caught(blank_engine *engine, int otherwise)
 {
 	int code = fz_caught(engine->ctx);
-	if (engine->refused)
-		return BLANK_TOO_COMPLEX;
 	if (code == FZ_ERROR_ABORT)
 		return BLANK_CANCELLED;
+	if (engine->refused || code == FZ_ERROR_SYSTEM || code == FZ_ERROR_LIMIT)
+		return BLANK_TOO_COMPLEX;
 	return otherwise;
 }
 
@@ -407,6 +412,10 @@ int blank_render(blank_doc *doc, int index, float scale, blank_cookie *cookie, u
 		status = caught(engine, BLANK_ENGINE);
 	if (status == BLANK_OK && cookie->cookie.abort)
 		status = BLANK_CANCELLED;
+	/* MuPDF goes on past an error in a page's content and only counts it in
+	 * the cookie: after a refused allocation the page would show half drawn */
+	else if (status == BLANK_OK && cookie->cookie.errors && engine->refused)
+		status = BLANK_TOO_COMPLEX;
 	return status;
 }
 
@@ -481,6 +490,9 @@ typedef struct
 	fz_buffer *out;
 	int signatures;
 	int count;
+	/* the fields and kids looked at: shared kids make a tree of few objects
+	 * that is very wide when walked */
+	int visits;
 	/* every widget of the pages' /Annots, by object number */
 	placed *widgets;
 	int widget_count;
@@ -692,12 +704,13 @@ static void walk_fields(form_walk *walk, pdf_obj *fields, pdf_cycle_list *up, in
 	int i, n = pdf_array_len(ctx, fields);
 	if (depth > MAX_DEPTH)
 		return;
-	for (i = 0; i < n && walk->count < MAX_FIELDS; i++)
+	for (i = 0; i < n && walk->count < MAX_FIELDS && walk->visits < MAX_VISITS; i++)
 	{
 		pdf_cycle_list here;
 		pdf_obj *field = pdf_array_get(ctx, fields, i);
 		pdf_obj *kids;
 		int type;
+		walk->visits++;
 		if (!pdf_is_dict(ctx, field) || pdf_cycle(ctx, &here, up, field))
 			continue;
 		kids = pdf_dict_get(ctx, field, PDF_NAME(Kids));

@@ -12,8 +12,10 @@ use std::thread;
 use serde_json::Value;
 
 use crate::engine::{CancelFlag, EngineError, PdfDoc, PdfEngine};
-use crate::frame::{read_frame, write_frame, Frame, MAX_BODY};
-use crate::protocol::{ErrorKind, Failure, Hello, Op, Outcome, Request, Response, PROTOCOL};
+use crate::frame::{read_frame, write_frame, Frame, MAX_BODY, MAX_HEADER};
+use crate::protocol::{
+    ErrorKind, Failure, Hello, Op, Outcome, Request, Response, MAX_PIXELS, PROTOCOL,
+};
 
 /// the request that runs, and the requests cancelled before they ran
 #[derive(Default)]
@@ -88,7 +90,16 @@ pub fn serve<E: PdfEngine>(
             Ok((value, body)) => (Outcome::Ok(value), body),
             Err(kind) => (Outcome::Error(Failure { kind }), vec![]),
         };
-        let header = serde_json::to_vec(&Response { id, outcome })?;
+        let mut header = serde_json::to_vec(&Response { id, outcome })?;
+        let mut body = body;
+        // an answer too big for a frame: the request asked too much
+        if header.len() > MAX_HEADER || body.len() as u64 > MAX_BODY {
+            let outcome = Outcome::Error(Failure {
+                kind: ErrorKind::TooComplex,
+            });
+            header = serde_json::to_vec(&Response { id, outcome })?;
+            body = vec![];
+        }
         write_frame(&mut output, &header, &body)?;
     }
     Ok(())
@@ -177,6 +188,13 @@ fn answer<E: PdfEngine>(
                 return Err(ErrorKind::BadRequest);
             }
             let bitmap = doc.render(page, scale, cancel).map_err(failed)?;
+            let count = bitmap.width as u64 * bitmap.height as u64;
+            if count > MAX_PIXELS {
+                return Err(ErrorKind::TooComplex);
+            }
+            if bitmap.rgba.len() as u64 != count * 4 {
+                return Err(ErrorKind::Engine);
+            }
             let (value, _) = json(crate::protocol::RenderInfo {
                 width: bitmap.width,
                 height: bitmap.height,
