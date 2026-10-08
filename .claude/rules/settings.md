@@ -10,7 +10,7 @@ paths:
 
 # Settings
 
-The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and every change applies at once. There's no mouse path to it until the main menu exists, which the maintainer decided.
+The settings dialog (`Mod-,`, `app.settings`) changes Blank's settings, and every change applies at once. The main menu (the logo, or `Mod-k`) opens it, also on Keyboard shortcuts (`app.shortcuts`) and About (`app.about`): `openSettings(section)` sets `settingsSection` first.
 
 ## Where a setting lives
 

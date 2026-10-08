@@ -21,6 +21,8 @@ The bar at the bottom shows the zoom next to the view button, between − and +.
 
 Only the pages zoom: the bars, menus and dialogs keep their size.
 
+<Shot src="zoom.gif" alt="The + in the bar at the bottom zooms the pages in twice and − out once; a click on the zoom fits them to the window again; Mod = and Mod - zoom in and out" />
+
 ## Find your way with the outline {#outline}
 
 Once your document has two headings, a short dash for each of them sits at the right edge of the window, longer for a heading 1 and shorter for the levels below. The dash of the section you're reading is in your accent color.

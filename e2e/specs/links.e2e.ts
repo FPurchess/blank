@@ -25,7 +25,7 @@ describe("links", () => {
     await pressMod("n");
   });
 
-  it("links the selected text via Mod+K", async () => {
+  it("links the selected text via Mod+Alt+K", async () => {
     await type("Blank");
     await browser.keys([Key.Shift, Key.Home]);
 

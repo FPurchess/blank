@@ -10,7 +10,7 @@ The menu opens with the cursor in its search field. Type a few letters of what y
 
 The search finds every command, also the ones that aren't in the menu itself, like inserting a table or setting the language. `Esc` clears what you typed, and a second `Esc` closes the menu.
 
-<Shot src="main-menu-search.gif" alt="Mod K opens the main menu; typing pdf lists Export as PDF first, and Enter runs it" />
+<Shot src="main-menu-search.gif" alt="Mod K opens the main menu; typing pages lists Pages / page ends first, with its group and shortcut, and Enter switches the view" />
 
 ## What's in it {#contents}
 

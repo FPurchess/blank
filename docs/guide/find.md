@@ -2,7 +2,7 @@
 
 `Mod` `F` opens a small panel at the top right of your pages. Type what you're looking for: Blank highlights every match on the pages and shows where you are, like _3 of 12_. The panel stays open while you write, so you can look, change something in the text and look on.
 
-<Shot src="find.gif" alt="Mod F opens the find panel; typing chrome highlights three matches and says 1 of 3; Enter goes to the next; Replace all with color replaces all three" />
+<Shot src="find.gif" alt="Mod F opens the find panel; typing chrome highlights both matches and says 1 of 2; Enter goes to the next; Replace all with color replaces both" />
 
 ## Go through the matches {#step}
 

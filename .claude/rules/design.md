@@ -102,6 +102,7 @@ How Blank's controls look and behave, so every part of the UI looks the same wit
   - `aliases` (lower case, for search).
 - **The keys stay in the keymap** (`config.ts`).
 - **Take labels from it** (`commandLabel`) wherever the UI names a command: menus, tooltips, the toolbar. `commandItem` (in `commandList.ts`) makes a menu item of a command, for the context menu and the toolbar's menus. A command may have no key (`""` in the keymap, the code block's by default): the tooltip and the menu then show none.
+- **The main menu and its search** (`main-menu.md`) list every command from it: the search finds a command by its label, group and aliases (`src/commandSearch.ts`, also the settings' list of shortcuts), so give a new command aliases people would type.
 
 ## Icons (`src/icons.ts`, `IconGlyph.vue`)
 
