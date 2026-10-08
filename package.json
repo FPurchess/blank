@@ -28,6 +28,7 @@
     "format:check": "prettier --check --end-of-line=auto \"./**/*.{cjs,js,jsx,ts,tsx,vue,html,css,json}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "dictionaries:update": "bun scripts/build-dictionary-catalog.ts",
     "engine:build": "bash scripts/build-engine.sh",
+    "engine:size": "bash scripts/engine-size.sh",
     "notices": "bun scripts/build-notices.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
