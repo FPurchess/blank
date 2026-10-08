@@ -81,6 +81,10 @@ export const showSignatures = (): Command => (_state, dispatch, view) => {
     announce("Signatures are checked in PDF tabs");
     return true;
   }
+  if (shownPdf.value.signatures === null) {
+    announce("The signatures are still being checked");
+    return true;
+  }
   signaturesPopover.value = { refocus: () => view?.focus() };
   return true;
 };

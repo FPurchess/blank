@@ -26,8 +26,9 @@ import {
 const props = defineProps<{ request: SignaturesPopoverRequest }>();
 
 const root = useTemplateRef<HTMLElement>("root");
+const checked = computed(() => shownPdf.value?.signatures ?? null);
 const list = computed(() =>
-  Array.isArray(shownPdf.value?.signatures) ? shownPdf.value.signatures : [],
+  Array.isArray(checked.value) ? checked.value : [],
 );
 const item = () => document.getElementById("ui-signatures");
 
@@ -79,8 +80,10 @@ const details = (signature: CheckedSignature) =>
         <button type="button" @click="details(signature)">Details…</button>
       </li>
     </ul>
-    <p v-else class="empty">
-      This PDF has no digital signatures. Signing it adds yours.
+    <p v-else-if="checked === 'failed'" class="empty">
+      Blank couldn't check this PDF's signatures.
     </p>
+    <p v-else-if="checked === null" class="empty">Checking the signatures…</p>
+    <p v-else class="empty">This PDF has no digital signatures.</p>
   </div>
 </template>

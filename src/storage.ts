@@ -56,10 +56,18 @@ const maxWait = 1000;
 // stored under `tab:<id>`
 type StoredTab = Omit<Tab, "id">;
 
-// The version of the session this Blank writes. 2 has PDF tabs (`kind`); a
-// Blank that reads only 1 backs a session of 2 up and starts afresh
-// (loadSession), so going back to it loses no tab for good.
+// The version of the session this Blank writes while a PDF tab is open. 2 has
+// PDF tabs (`kind`); a Blank that reads only 1 backs a session of 2 up and
+// starts afresh (loadSession), so going back to it loses no tab for good.
+// Without a PDF tab the session is 1, which that Blank still reads.
 export const SESSION_VERSION = 2;
+
+/**
+ * sessionVersion returns the version a session of `tabs` needs: 2 only with
+ * a PDF tab
+ */
+export const sessionVersion = (stored: Iterable<StoredTab>) =>
+  [...stored].some((tab) => tab.kind === "pdf") ? SESSION_VERSION : 1;
 
 // The open tabs: their order, the active one, and each one's details
 export interface Session {
@@ -99,7 +107,7 @@ const sessionOf = (): Session | null => {
     : list[0].id;
   const anchor = currentViewAnchor();
   return {
-    version: SESSION_VERSION,
+    version: sessionVersion(list),
     order: list.map((tab) => tab.id),
     active,
     tabs: Object.fromEntries(
@@ -440,7 +448,7 @@ const migrate = async (): Promise<Session | null> => {
       (await localforage.getItem<string | null>("importedFrom")) ?? null,
   };
   const session: Session = {
-    version: SESSION_VERSION,
+    version: 1,
     order: [id],
     active: id,
     tabs: {

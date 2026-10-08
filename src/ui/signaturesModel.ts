@@ -50,7 +50,8 @@ export const signaturesLabel = (
 
 /**
  * signatureStatus returns what a signature says of the PDF and its signer,
- * e.g. "Intact · issued by DigiCert"
+ * e.g. "Intact · says it's issued by DigiCert": Blank doesn't check the
+ * issuer, so it only repeats what the certificate claims
  */
 export const signatureStatus = (signature: CheckedSignature) => {
   if (signature.status === "invalid")
@@ -63,7 +64,7 @@ export const signatureStatus = (signature: CheckedSignature) => {
     case "trusted":
       return "Valid · a certificate you trust";
     case "issuedBy":
-      return `Intact · issued by ${signature.trust.issuer}`;
+      return `Intact · says it's issued by ${signature.trust.issuer}`;
     case "unknown":
       return "Intact · signer unknown";
   }

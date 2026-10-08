@@ -449,10 +449,27 @@ describe("storage", () => {
         "session",
       ]);
       expect(await localforage.getItem("session")).toEqual({
-        version: 2,
+        version: 1,
         order: ["a"],
         active: "a",
         tabs: { a: { ...tab("a"), id: undefined } },
+      });
+    });
+
+    // Blank 3.0 reads only version 1, and loses a session of 2
+    it("stores version 2 only while a PDF tab is open", async () => {
+      const { transaction, tabs } = await open("a");
+      transaction.value = replace(doc(p("a")));
+      await tick();
+      expect(await localforage.getItem("session")).toMatchObject({
+        version: 1,
+      });
+
+      tabs.value = [tab("a"), { ...tab("b"), kind: "pdf", path: "/b.pdf" }];
+      await tick();
+
+      expect(await localforage.getItem("session")).toMatchObject({
+        version: 2,
       });
     });
 
@@ -741,7 +758,7 @@ describe("storage", () => {
 
       const id = migrated!.active;
       expect(migrated).toEqual({
-        version: 2,
+        version: 1,
         order: [id],
         active: id,
         tabs: {

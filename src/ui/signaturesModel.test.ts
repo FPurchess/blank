@@ -69,7 +69,7 @@ describe("what Blank says of a PDF's signatures", () => {
       signatureStatus(
         signature({ trust: { kind: "issuedBy", issuer: "DigiCert" } }),
       ),
-    ).toBe("Intact · issued by DigiCert");
+    ).toBe("Intact · says it's issued by DigiCert");
     expect(signatureStatus(signature())).toBe("Intact · signer unknown");
     expect(signatureStatus(signature({ status: "invalid" }))).toMatch(
       /doesn't match the PDF/,

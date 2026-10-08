@@ -95,6 +95,34 @@ describe("the page view of PDFs", () => {
     await flushPromises();
   };
 
+  it("gives the text the focus when a markdown tab shows while it has it", async () => {
+    const handle = createTestHandle();
+    const focus = vi.spyOn(handle, "focus");
+    shownPdf.value = pdf();
+    dispose = bootApp(handle);
+    await flushPromises();
+    view()!.focus();
+    expect(document.activeElement).toBe(view());
+
+    shownPdf.value = null;
+    await flushPromises();
+
+    expect(view()).toBeNull();
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it("lets the bitmaps of a closed PDF tab go while no PDF shows", async () => {
+    await show();
+    expect(pdfBitmaps.size).toBeGreaterThan(0);
+
+    shownPdf.value = null;
+    await flushPromises();
+    tabs.value = [{ ...tabs.value[0], id: "m", kind: "markdown" }];
+    await flushPromises();
+
+    expect(pdfBitmaps.size).toBe(0);
+  });
+
   it("shows nothing in a markdown tab", async () => {
     dispose = bootApp(createTestHandle());
     await flushPromises();

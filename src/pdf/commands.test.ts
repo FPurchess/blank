@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CommandIdentifier } from "../config";
-import { activeTabId, announcement, tabs } from "../state";
-import { forPdf, pdfRefusal } from "./commands";
+import {
+  activeTabId,
+  announcement,
+  shownPdf,
+  signaturesPopover,
+  tabs,
+} from "../state";
+import { forPdf, pdfRefusal, showSignatures } from "./commands";
 
 const run = () => true;
 
@@ -22,6 +28,8 @@ const showTab = (kind: "markdown" | "pdf") => {
 };
 
 afterEach(() => {
+  shownPdf.value = null;
+  signaturesPopover.value = null;
   tabs.value = [];
   activeTabId.value = null;
 });
@@ -50,5 +58,26 @@ describe("commands in a PDF tab", () => {
   it("runs as it does in a markdown tab", () => {
     showTab("markdown");
     expect(forPdf(CommandIdentifier.FORMAT_BOLD, run)({} as never)).toBe(true);
+  });
+});
+
+describe("the signatures command", () => {
+  it("waits for the check before it lists them", () => {
+    shownPdf.value = {
+      path: "/a.pdf",
+      opened: null,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    showSignatures()({} as never, () => {});
+    expect(signaturesPopover.value).toBeNull();
+    expect(announcement.value?.text).toBe(
+      "The signatures are still being checked",
+    );
+
+    shownPdf.value = { ...shownPdf.value, signatures: [] };
+    showSignatures()({} as never, () => {});
+    expect(signaturesPopover.value).not.toBeNull();
   });
 });

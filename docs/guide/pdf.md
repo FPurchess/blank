@@ -20,17 +20,18 @@ Blank draws a PDF's pages with a separate program, `blank-pdf`, one for each PDF
 
 The status bar of a PDF tab says what the PDF's digital signatures say:
 
-| Status bar             | What it means                                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------------------------- |
-| Not signed             | The PDF has no digital signatures.                                                                 |
-| Signed, Signed by 2    | Nothing changed since it was signed, and each certificate is yours or one you trust.               |
+| Status bar             | What it means                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| Not signed             | The PDF has no digital signatures.                                                                    |
+| Signed, Signed by 2    | Nothing changed since it was signed, and each certificate is yours or one you trust.                  |
 | Signed, signer unknown | Nothing changed since it was signed, but Blank doesn't know a certificate: see below how to trust it. |
-| Changed after signing  | Someone changed the PDF after it was signed.                                                       |
-| Signature invalid      | A signature doesn't match the PDF.                                                                 |
+| Changed after signing  | Someone changed the PDF after it was signed.                                                          |
+| Signature invalid      | A signature doesn't match the PDF.                                                                    |
+| Signatures not checked | Blank couldn't read the PDF's signatures. Open the PDF in your PDF app to check them.                 |
 
 Click it to see each signature: who signed, when (_timestamped_ when a timestamp server says so, _computer clock_ when only the signer's computer does), and what Blank found. **Details…** shows the signer's certificate and its fingerprint.
 
-A signature whose certificate a certificate authority issued shows as _Intact · issued by_ that authority. Blank checks that the PDF hasn't changed since, but it doesn't check certificate authorities or whether a certificate was revoked: your PDF app does that, if you need it.
+A signature whose certificate a certificate authority issued shows as _Intact · says it's issued by_ that authority: Blank repeats what the certificate claims. It checks that the PDF hasn't changed since, but it doesn't check certificate authorities or whether a certificate was revoked: your PDF app does that, if you need it.
 
 ### Trust a certificate {#trust}
 

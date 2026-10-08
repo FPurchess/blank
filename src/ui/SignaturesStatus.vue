@@ -8,8 +8,9 @@ import { signaturesLabel } from "./signaturesModel";
 import StatusItem from "./StatusItem.vue";
 
 // What the signatures of the PDF shown say, in the status bar: "Not signed",
-// "Signed", "Signed, signer unknown", "Changed after signing" or "Signature
-// invalid", nothing while they are checked. A click lists them
+// "Signed", "Signed, signer unknown", "Changed after signing", "Signature
+// invalid" or, when the check failed, "Signatures not checked"; nothing while
+// they are checked. A click lists them
 // (SignaturesPopover.vue).
 const editor = useEditor();
 const label = computed(() =>

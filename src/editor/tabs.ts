@@ -384,7 +384,8 @@ const switchTo = async (id: string) => {
 /**
  * changeTab applies what `change` makes of the state of the tab `id`: in the
  * view while it is shown, otherwise to the state it keeps, which is stored
- * and undone like any change once it is shown. A closed tab is left alone.
+ * and undone like any change once it is shown. A closed tab and a PDF tab
+ * are left alone.
  * It waits for the tab changes asked for before, e.g. a switch.
  */
 export const changeTab = (
@@ -392,6 +393,8 @@ export const changeTab = (
   change: (state: EditorState) => Transaction | null,
 ) =>
   enqueue(async () => {
+    // a PDF tab's state holds no text to change (see src/pdf/placeholder.ts)
+    if (documents.get(id)?.pdf) return;
     if (id === activeTabId.value && view) {
       const tr = change(view.state);
       if (tr) view.dispatch(tr);
@@ -525,8 +528,21 @@ export const reopenPdf = (id: string, file?: string) =>
     const document = documents.get(id);
     if (!tab?.path || !document?.pdf) return;
     const path = file === undefined ? tab.path : await canonicalPath(file);
+    // a file found that another tab has open already shows there
+    const other = openTabOf(
+      tabs.value.filter((open) => open.id !== id),
+      path,
+    );
+    if (other) {
+      announce(`“${tabLabel(other)}” is open already`);
+      await switchTo(other.id);
+      return;
+    }
     if (path !== tab.path) updateTab(id, { path });
-    document.pdf = await openPdfDocument(id, path);
+    const pdf = await openPdfDocument(id, path);
+    // the tab closed meanwhile
+    if (documents.get(id) !== document) return;
+    document.pdf = pdf;
     if (id === activeTabId.value) shownPdf.value = document.pdf;
   });
 

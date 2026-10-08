@@ -796,6 +796,31 @@ describe("PDF tabs", () => {
     });
   });
 
+  it("shows the tab of a found PDF that is open already", async () => {
+    await stored([
+      { id: "a", kind: "pdf", path: "/gone.pdf" },
+      { id: "b", kind: "pdf", path: "/c.pdf" },
+    ]);
+    await boot();
+    await activateTab("a");
+
+    await reopenPdf("a", "/c.pdf");
+
+    expect(activeTabId.value).toBe("b");
+    expect(tabs.value.find((tab) => tab.id === "a")?.path).toBe("/gone.pdf");
+  });
+
+  it("leaves a PDF tab alone when asked to change its text", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    const change = vi.fn();
+
+    await changeTab(activeTabId.value!, change);
+
+    expect(change).not.toHaveBeenCalled();
+    expect(activeTab.value?.unsaved).toBe(false);
+  });
+
   it("stops the helper of a PDF tab it closes", async () => {
     await boot();
     await openPaths(["/c.pdf"]);

@@ -67,6 +67,16 @@ describe("a PDF's signatures", () => {
     confirmDialog.value = null;
   });
 
+  it("says when they couldn't be checked, not that there are none", async () => {
+    shownPdf.value = { ...shownPdf.value!, signatures: "failed" };
+    signaturesPopover.value = { refocus: () => {} };
+    await flushPromises();
+
+    expect(
+      document.querySelector("#signatures-popover .empty")?.textContent?.trim(),
+    ).toBe("Blank couldn't check this PDF's signatures.");
+  });
+
   it("lists them from the status bar, and shows one's details", async () => {
     const item = document.getElementById("ui-signatures")!;
     expect(item.textContent?.trim()).toBe("Signed, signer unknown");

@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
   computed,
   nextTick,
+  onBeforeUnmount,
   onMounted,
   onUnmounted,
   shallowRef,
@@ -178,6 +179,11 @@ const queue = new RenderQueue<PageBitmap>({
     const { width, height, pixels } = result.bitmap;
     createImageBitmap(new ImageData(pixels, width, height)).then(
       (bitmap: Bitmap) => {
+        // the tab closed while it was made
+        if (!tabs.value.some((tab) => tab.id === job.tab)) {
+          bitmap.close?.();
+          return;
+        }
         pdfBitmaps.set(job.key, bitmap, job.slot);
         shownKeys.set(job.slot, job.key);
         drawn.value++;
@@ -208,18 +214,11 @@ watch(frames, (list) => {
   );
 });
 
-// the bitmaps of closed PDF tabs go
-watch(
-  tabs,
-  (list) => {
-    const open = new Set(list.filter(isPdfTab).map((tab) => tab.id));
-    for (const key of closedKeys(pdfBitmaps.keys(), open)) {
-      pdfBitmaps.delete(key);
-      shownKeys.delete(key.slice(0, key.lastIndexOf("|")));
-    }
-  },
-  { immediate: true },
-);
+// what pages of closed PDF tabs showed (their bitmaps go in bootApp)
+watch(tabs, (list) => {
+  const open = new Set(list.filter(isPdfTab).map((tab) => tab.id));
+  for (const slot of closedKeys(shownKeys.keys(), open)) shownKeys.delete(slot);
+});
 
 // "Page N of M" in the status bar
 watch(
@@ -338,6 +337,11 @@ const onKeydown = (event: KeyboardEvent) => {
 };
 
 onMounted(measure);
+// a markdown tab shows (or the last PDF tab closed) while the focus is in
+// the pages: it would drop to the body with them, so the text takes it
+onBeforeUnmount(() => {
+  if (scroller.value?.contains(document.activeElement)) editor.focus();
+});
 onUnmounted(() => {
   queue.stop();
   pdfPageInView.value = null;
@@ -348,8 +352,10 @@ const label = computed(() => (pdf.value ? basename(pdf.value.path) : ""));
 const tabId = computed(() => activeTabId.value ?? "");
 const again = () => void reopenPdf(tabId.value);
 const find = async () => {
+  // the tab the dialog is for, which may not show when it closes
+  const id = tabId.value;
   const chosen = await open({ filters: [PDF_FILTER] });
-  if (typeof chosen === "string") await reopenPdf(tabId.value, chosen);
+  if (typeof chosen === "string") await reopenPdf(id, chosen);
 };
 const close = () => void closeTabs([tabId.value]);
 </script>
