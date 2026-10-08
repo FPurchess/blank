@@ -118,7 +118,10 @@ export default (
     exporter: exporterFunc,
     filters?: DialogFilter[],
   ): Command =>
-  (state) => {
+  (state, dispatch) => {
+    // asked whether it can run, e.g. by the main menu: only with something
+    // to export, and nothing done
+    if (!dispatch) return !isEmpty(state);
     if (isEmpty(state)) {
       sendNotification({
         title,

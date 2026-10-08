@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { isRef, type Ref } from "vue";
 
 import { CommandIdentifier, config } from "../../config";
+import * as shared from "../../state";
 import {
   bandEditor,
   imageDialog,
@@ -37,6 +39,31 @@ import { commandFor, commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
 import * as tabs from "../tabs";
 import { bindKeys, withKeymap } from "../../test/keymap";
 import { createState, createTestView, pressKey } from "../../test/editor";
+
+describe("every command", () => {
+  // the main menu and its search ask each command whether it can run, with
+  // no dispatch: it must do nothing then, or opening the menu would, e.g.
+  // open the export's save dialogs
+  it("does nothing when asked without dispatch", async () => {
+    const refs = Object.entries(shared as Record<string, unknown>).filter(
+      (entry): entry is [string, Ref<unknown>] => isRef(entry[1]),
+    );
+    const before = new Map(refs.map(([name, ref]) => [name, ref.value]));
+    const view = createTestView(createState(doc(p("some text"))));
+
+    for (const id of Object.values(CommandIdentifier))
+      commandFor(id)(view.state, undefined, view);
+    await flushPromises();
+
+    expect(save).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+    const changed = refs
+      .filter(([name, ref]) => ref.value !== before.get(name))
+      .map(([name]) => name);
+    expect(changed).toEqual([]);
+  });
+});
 
 describe("plugin.keymap", () => {
   const defaultConfig = config.value;

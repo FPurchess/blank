@@ -154,7 +154,12 @@ describe("word count card", () => {
   it("opens with the Word count command, which reads it out", async () => {
     boot();
     const state = createState(doc(p("one two three")));
+    // asked, it only says it can
     expect(showWordCount()(state)).toBe(true);
+    await nextTick();
+    expect(card()).toBeNull();
+
+    expect(showWordCount()(state, () => {})).toBe(true);
     await nextTick();
 
     expect(card()).not.toBeNull();

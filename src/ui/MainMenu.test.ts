@@ -1,3 +1,5 @@
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
@@ -11,7 +13,7 @@ import {
   recentFiles,
   theme,
 } from "../state";
-import { createTestHandle } from "../test/editor";
+import { createState, createTestHandle, doc, p } from "../test/editor";
 import { bootApp } from "./mount";
 
 // The main menu behind the logo: its search, its rows and its keys, through
@@ -116,6 +118,25 @@ describe("the main menu", () => {
     mainMenuWanted.value = {};
     await settle();
     expect(document.activeElement).toBe(search());
+  });
+
+  it("opens over a document with text, and only asks its commands", async () => {
+    // asked whether they can run, the exports must not open their dialogs
+    dispose();
+    handle = createTestHandle(createState(doc(p("some text"))));
+    dispose = bootApp(handle);
+    await settle();
+
+    logo().click();
+    await settle();
+    expect(isOpen()).toBe(true);
+    expect(line("file.export")).not.toBeNull();
+    await type("export");
+    expect(options().length).toBeGreaterThan(0);
+
+    expect(save).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   it("lists File, the rows and Blank's own, without Recent at first", async () => {
