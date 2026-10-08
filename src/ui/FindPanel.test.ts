@@ -145,6 +145,40 @@ describe("the find panel", () => {
     panel()!.querySelector<HTMLElement>('[aria-label="Close"]')!.click();
     await settle();
     expect(panel()).toBeNull();
+    // the match it was at selected, as Esc does
+    const { from, to } = handle.state.value.selection;
+    expect(handle.state.value.doc.textBetween(from, to)).toBe("the");
+  });
+
+  it("replaces with Enter in its field, and leaves an IME's Enter alone", async () => {
+    await typeInto(field(), "the");
+    const replace = panel()!.querySelector<HTMLInputElement>(
+      '[aria-label="Replace with"]',
+    )!;
+    await typeInto(replace, "a");
+    replace.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        isComposing: true,
+        bubbles: true,
+      }),
+    );
+    await settle();
+    field().dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        isComposing: true,
+        bubbles: true,
+      }),
+    );
+    await settle();
+    expect(handle.state.value.doc.textContent).toBe(
+      "the cat and the hatThe end",
+    );
+    expect(count()).toBe("1 of 3");
+
+    await press(replace, "Enter");
+    expect(handle.state.value.doc.textContent).toBe("a cat and the hatThe end");
   });
 
   it("replaces all, and closes with Esc", async () => {

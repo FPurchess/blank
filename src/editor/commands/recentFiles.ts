@@ -2,6 +2,7 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import type { Command } from "prosemirror-state";
 
+import { logInfo, logWarning } from "../../log";
 import { basename } from "../../paths";
 import { announce, forgetFile, recentFiles } from "../../state";
 import { openPaths } from "../tabs";
@@ -16,9 +17,16 @@ export const openRecentFile =
     if (!dispatch) return true;
     void (async () => {
       // only a file that surely isn't there leaves the list; an error, e.g. a
-      // folder that can't be read, is the opening's to tell
-      const there = await exists(path).catch(() => true);
+      // folder that can't be read, is logged and left to the opening to tell
+      const there = await exists(path).catch((error: unknown) => {
+        logWarning(
+          `can't check whether the recent file ${path} is there`,
+          error,
+        );
+        return true;
+      });
       if (!there) {
+        logInfo(`the recent file ${path} isn't there any more`);
         forgetFile(path);
         sendNotification(`${basename(path)} isn't there any more`);
         return;

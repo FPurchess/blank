@@ -20,15 +20,15 @@ import {
 const NEAR = 0.001;
 
 /**
- * nextZoom returns the step after `factor` in `direction`, or the first or
- * last step if there is none
+ * nextZoom returns the step after `factor` in `direction`, or null past the
+ * last, e.g. out from a Fit below the smallest step
  */
 export const nextZoom = (factor: number, direction: 1 | -1) => {
   const steps = direction > 0 ? ZOOM_STEPS : [...ZOOM_STEPS].reverse();
   const next = steps.find((step) =>
     direction > 0 ? step > factor + NEAR : step < factor - NEAR,
   );
-  return next ?? steps[steps.length - 1];
+  return next ?? null;
 };
 
 /**
@@ -58,12 +58,15 @@ const setZoom =
 /**
  * zoomStep zooms the pages one step in (1) or out (-1), from the zoom they
  * show at, Fit's too, keeping `anchor` where it is, e.g. the spot under the
- * pointer
+ * pointer; past the last step it stays
  */
 export const zoomStep =
   (direction: 1 | -1, anchor: ZoomAnchor | null): Command =>
   (state, dispatch) =>
-    setZoom(nextZoom(zoomFactor.value, direction), anchor)(state, dispatch);
+    setZoom(nextZoom(zoomFactor.value, direction) ?? pageZoom.value, anchor)(
+      state,
+      dispatch,
+    );
 
 /**
  * zoomBy zooms the pages one step in (1) or out (-1), keeping the caret where

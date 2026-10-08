@@ -173,9 +173,27 @@ const found = computed(() => {
   const value = findKey.getState(editor.state.value);
   return findPanel.value && value?.active ? value : null;
 });
-const findDecorations = computed(() => found.value?.decorations);
+// the text selected, if any: find's highlights leave it to the selection,
+// which they'd cover
+const selected = computed(() => {
+  const { from, to } = editor.state.value.selection;
+  return from === to ? null : `${from} ${to}`;
+});
+const outsideSelection = (set: DecorationSet | undefined) => {
+  if (!set || !selected.value) return set;
+  const [from, to] = selected.value.split(" ").map(Number);
+  return set.remove(set.find(from, to));
+};
+const findDecorations = computed(() =>
+  outsideSelection(found.value?.decorations),
+);
 const currentDecoration = computed(() =>
-  DecorationSet.create(doc.value, currentDecorations(found.value ?? undefined)),
+  outsideSelection(
+    DecorationSet.create(
+      doc.value,
+      currentDecorations(found.value ?? undefined),
+    ),
+  ),
 );
 const markSources = computed((): MarkSource[] => {
   const range = paintedRange(doc.value);

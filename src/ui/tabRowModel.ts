@@ -44,8 +44,8 @@ export const tabKey = (
 
 /**
  * logoKey returns what the key of `event` does on the logo, the first stop
- * of the row: → and Home go to the first tab, End to the last, Esc back to
- * the text
+ * of the row: → and Home go to the first tab, ← (around) and End to the
+ * last, Esc back to the text
  */
 export const logoKey = (
   event: Pick<KeyboardEvent, "key" | "ctrlKey" | "altKey" | "metaKey">,

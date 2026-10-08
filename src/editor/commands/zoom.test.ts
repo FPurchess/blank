@@ -22,9 +22,11 @@ describe("nextZoom", () => {
     expect(nextZoom(0.87, -1)).toBe(0.8);
   });
 
-  it("stays at the ends", () => {
-    expect(nextZoom(2, 1)).toBe(2);
-    expect(nextZoom(0.5, -1)).toBe(0.5);
+  it("has none past the ends", () => {
+    expect(nextZoom(2, 1)).toBeNull();
+    expect(nextZoom(0.5, -1)).toBeNull();
+    // never in, out from a Fit below the smallest step
+    expect(nextZoom(0.3, -1)).toBeNull();
   });
 });
 

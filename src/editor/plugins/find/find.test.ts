@@ -1,6 +1,7 @@
+import { info } from "@tauri-apps/plugin-log";
 import { history, undo } from "prosemirror-history";
 import { EditorState, type Transaction } from "prosemirror-state";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { schema } from "../../../markdown";
 import {
@@ -154,6 +155,35 @@ describe("find", () => {
     expect(last.marks).toEqual([]);
   });
 
+  it("keeps the link of a link's whole text it replaces", () => {
+    const link = schema.marks.link.create({ href: "u" });
+    const e = editor(
+      doc(
+        schema.node("paragraph", null, [
+          schema.text("see "),
+          schema.text("Blank", [link]),
+        ]),
+      ),
+    );
+    e.run(openFind());
+    e.run(setFind({ query: "Blank" }));
+    e.run(replaceFound("Blank 2"));
+    const last = e.state.doc.firstChild!.lastChild!;
+    expect(last.text).toBe("Blank 2");
+    expect(last.marks).toEqual([link]);
+  });
+
+  it("undoes each Replace on its own, also right after the last", () => {
+    const e = editor(doc(p("xx")));
+    e.run(openFind());
+    e.run(setFind({ query: "x" }));
+    e.run(replaceFound("y"));
+    e.run(replaceFound("y"));
+    expect(e.text()).toBe("yy");
+    e.undo();
+    expect(e.text()).toBe("yx");
+  });
+
   it("replaces thousands of matches at once, in one step to undo", () => {
     const e = editor(
       doc(...Array.from({ length: 300 }, () => p("a b a b a b a b a b"))),
@@ -191,6 +221,15 @@ describe("find", () => {
     expect(e.found().error).toBeTruthy();
     expect(e.found().matches).toEqual([]);
     expect(e.run(replaceAllFound("x"))).toBe(false);
+    // logged as it turns unreadable, not on the keys after, and never with
+    // the pattern
+    e.run(setFind({ query: "(one)" }));
+    e.run(setFind({ query: "(a: b/" }));
+    e.run(setFind({ query: "(a: b/c" }));
+    expect(vi.mocked(info).mock.calls).toEqual([
+      ["find got a regular expression it can't read: Unterminated group"],
+      ["find got a regular expression it can't read: Unterminated group"],
+    ]);
   });
 
   it("never looks in the frontmatter", () => {

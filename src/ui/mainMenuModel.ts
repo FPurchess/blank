@@ -66,12 +66,17 @@ const MENU_SHOWN: ReadonlySet<C> = new Set<C>([
 // them out when their key ran them
 const TYPING_GROUPS: ReadonlySet<string> = new Set(["Edit", "Format", "Tabs"]);
 
-// what the search never offers: the menu itself, the context menu, and
-// clearing the recent files, which only Open recent offers
+// what the search never offers: the menu itself, the context menu,
+// clearing the recent files, which only Open recent offers, and the keys
+// that move the focus between the window's parts, which the menu, closing,
+// would take back
 const MAIN_MENU_UNSEARCHED: ReadonlySet<C> = new Set([
   C.MENU_MAIN,
   C.CONTEXT_MENU,
   C.FILE_CLEAR_RECENT,
+  C.VIEW_FOCUS_NEXT,
+  C.VIEW_FOCUS_PREVIOUS,
+  C.VIEW_TOOLBAR_FOCUS,
 ]);
 
 // what the menu reads and does, from the window as it is

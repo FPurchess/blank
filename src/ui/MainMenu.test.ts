@@ -293,6 +293,8 @@ describe("the main menu", () => {
     expect(focusedId()).toBe("recent:/docs/a.md");
     await press("k", { ctrlKey: true });
     expect(document.activeElement).toBe(search());
+    // and the submenu closes
+    expect(document.querySelectorAll(".context-menu")).toHaveLength(1);
   });
 
   it("keeps an open submenu when what it lists changes", async () => {

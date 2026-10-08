@@ -7,7 +7,7 @@
 ## Go through the matches {#step}
 
 - `Enter` in the find field goes to the next match, `Shift` `Enter` to the previous one. The arrows below the fields do the same.
-- `F3` and `Shift` `F3` work too, wherever you are, while the panel is open.
+- `F3` and `Shift` `F3` work too while the panel is open, wherever you are but in a dialog or a menu.
 - The pages scroll to show the match you're at, which is highlighted more strongly than the others.
 
 If you selected a word or a few words before pressing `Mod` `F`, Blank looks for them right away. Otherwise the field shows what you looked for last in that document, selected, so you can type over it. Each tab remembers its own search.
@@ -16,7 +16,7 @@ If you selected a word or a few words before pressing `Mod` `F`, Blank looks for
 
 ## Replace {#replace}
 
-Type the new text in the second field. **Replace** changes the match you're at and moves on to the next one; **Replace all** changes every match in the document at once, and says how many it changed. Replace all is one step: `Mod` `Z` undoes all of it.
+Type the new text in the second field. **Replace**, or `Enter` in that field, changes the match you're at and moves on to the next one; **Replace all** changes every match in the document at once, and says how many it changed. Replace all is one step: `Mod` `Z` undoes all of it.
 
 Find and replace looks in your text: paragraphs, headings, lists, quotes, table cells and code. It leaves the [document properties](./pages#frontmatter) at the top of the file alone, and it doesn't search table captions or headers and footers yet.
 

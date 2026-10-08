@@ -826,7 +826,9 @@ $faint-text-opacity: 0.6;
 
   [role="menuitem"],
   [role="menuitemcheckbox"],
-  [role="menuitemradio"] {
+  [role="menuitemradio"],
+  // a result of the main menu's search
+  [role="option"] {
     display: flex;
     align-items: baseline;
     gap: 24px;

@@ -5,6 +5,7 @@ import {
   fieldValues,
   hasText,
 } from "./bands";
+import { escapeRegExp } from "../regExp";
 import type { Layout } from "./resolve";
 import { SLOTS, type Slots } from "./settings";
 import { type Field, segments } from "./tokens";
@@ -48,9 +49,6 @@ export const bandSlots = <T>(slots: readonly T[], band: Band) =>
 
 // a run of text a slot shows, or a placeholder that comes out empty there
 export type BandPart = { text: string } | { field: Field };
-
-const escapeRegExp = (text: string) =>
-  text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * chapterIn returns what {chapter} stands for in `shown`, the text of a

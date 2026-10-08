@@ -1,5 +1,6 @@
 import type { Node } from "prosemirror-model";
 
+import { escapeRegExp } from "../../../regExp";
 import type { FindOptions } from "../../../state";
 import { type Range, textblocks } from "../changed";
 
@@ -35,11 +36,10 @@ export const compile = (
   options: FindOptions,
 ): { regex: RegExp } | { error: string } | null => {
   if (!query) return null;
-  const source = options.regex
-    ? query
-    : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const source = options.regex ? query : escapeRegExp(query);
   try {
-    return { regex: new RegExp(source, options.matchCase ? "gu" : "giu") };
+    // m: ^ and $ at each line of a code block
+    return { regex: new RegExp(source, options.matchCase ? "gmu" : "gimu") };
   } catch (error) {
     return { error: shortReason(error) };
   }
@@ -187,9 +187,12 @@ export const expand = (
     (whole, what: string, name?: string, digits?: string) => {
       if (what === "$") return "$";
       if (what === "&") return text;
-      // a group that matched nothing puts in nothing, as in JavaScript
+      // a group that matched nothing, or no group of that name in a pattern
+      // with named groups, puts in nothing, as in JavaScript
       if (name !== undefined)
-        return name in named ? (named[name] ?? "") : whole;
+        return name in named || match.groups?.named
+          ? (named[name] ?? "")
+          : whole;
       const index = Number(digits);
       // $12 with fewer groups is $1 and a 2, as in JavaScript
       if (index > numbered.length && digits!.length === 2) {

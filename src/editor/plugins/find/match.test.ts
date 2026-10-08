@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { schema } from "../../../markdown";
-import { doc, h, p } from "../../../test/editor";
+import { codeBlock, doc, h, p } from "../../../test/editor";
 import { type FindOptions, NO_FIND_OPTIONS } from "../../../state";
 import { compile, expand, matchIn } from "./match";
 
@@ -124,6 +124,14 @@ describe("matchIn", () => {
   });
 });
 
+describe("line anchors", () => {
+  it("match at each line of a code block", () => {
+    const node = doc(codeBlock("a  \nb \nc"));
+    expect(find(node, "\\s+$", { regex: true }).texts).toEqual(["  ", " "]);
+    expect(find(node, "^\\w", { regex: true }).texts).toEqual(["a", "b", "c"]);
+  });
+});
+
 describe("expand", () => {
   const match = {
     from: 0,
@@ -149,6 +157,12 @@ describe("expand", () => {
         true,
       ),
     ).toBe("[]");
+    // as does a name the pattern's groups don't have; without named groups
+    // it's text
+    expect(expand("[$<other>]", match, "ann@", true)).toBe("[]");
+    expect(
+      expand("[$<other>]", { ...match, groups: { numbered: [] } }, "x", true),
+    ).toBe("[$<other>]");
   });
 
   it("takes plain text as it is", () => {

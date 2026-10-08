@@ -140,16 +140,17 @@ const onSearchKey = (event: KeyboardEvent) => {
   }
 };
 
-// the main menu's key again, while it's open: back to its search, its text
-// selected to type over
-const onMainKey = onCommandKey(CommandIdentifier.MENU_MAIN, () =>
-  field.value?.focus("all"),
-);
+// the main menu's key again, while it's open: back to its search, from a
+// submenu too, its text selected to type over
+const onMainKey = onCommandKey(CommandIdentifier.MENU_MAIN, () => {
+  menu.backToSearch();
+  field.value?.focus("all");
+});
 const searchShortcut = computed(() =>
   commandShortcut(CommandIdentifier.MENU_MAIN),
 );
 
-// the main menu as tall as the window allows below its anchor, its list
+// the main menu at most as tall as the window allows below its anchor, its list
 // fading out at the bottom while there's more of it below
 const more = shallowRef(false);
 const fade = () => {
@@ -158,7 +159,7 @@ const fade = () => {
     !!element &&
     element.scrollTop + element.clientHeight < element.scrollHeight - 2;
 };
-// placed once: it's as tall as the window allows whatever it lists, and a
+// placed once: its height is at most what the window allows, whatever it lists, and a
 // resize closes it
 onMounted(() => {
   if (box.value) place(box.value, props.request.anchor, { fill: true });

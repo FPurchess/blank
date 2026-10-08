@@ -201,6 +201,22 @@ describe("storage", () => {
       expect(restarted.pageZoom.value).toBe(1.25);
     });
 
+    it("logs once a zoom it can't store", async () => {
+      const { pageZoom } = await bootFresh();
+      const error = new Error("quota exceeded");
+      vi.spyOn(localforage, "setItem").mockRejectedValue(error);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      pageZoom.value = 1.5;
+      await vi.waitFor(() =>
+        expect(warn).toHaveBeenCalledWith("can't store pageZoom", error),
+      );
+      // once until a write succeeds, not on every step
+      pageZoom.value = 2;
+      await flushPromises();
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
     it("fits the pages for a stored zoom it doesn't know", async () => {
       await localforage.setItem("pageZoom", 3);
       const { pageZoom } = await bootFresh();

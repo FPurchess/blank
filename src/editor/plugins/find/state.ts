@@ -6,6 +6,7 @@ import {
 } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 
+import { logInfo } from "../../../log";
 import { type FindOptions, NO_FIND_OPTIONS } from "../../../state";
 import { changedRanges, changesAll, type Range, textblocks } from "../changed";
 import { compile, type Match, matchIn } from "./match";
@@ -77,6 +78,18 @@ const firstFrom = (matches: readonly Match[], pos: number) => {
   const index = matches.findIndex((match) => match.from >= pos);
   return index < 0 ? 0 : index;
 };
+
+/**
+ * logInvalid logs that a pattern couldn't be read and why, never the
+ * pattern, which the user typed: a reason that might hold some of it, with
+ * a slash or long, is left out
+ */
+const logInvalid = (reason: string) =>
+  logInfo(
+    reason.includes("/") || reason.length > 80
+      ? "find got a regular expression it can't read"
+      : `find got a regular expression it can't read: ${reason}`,
+  );
 
 /**
  * search looks for `query` with `options` in the whole of `doc`, the match
@@ -206,7 +219,10 @@ export const findApply = (
     const query = meta.query ?? value.query;
     const options = meta.options ?? value.options;
     if (!active) return { ...findIdle, query, options };
-    return search(state.doc, query, options, state.selection.from);
+    const found = search(state.doc, query, options, state.selection.from);
+    // once as it turns unreadable, not on every key typed while it stays so
+    if (found.error && found.error !== value.error) logInvalid(found.error);
+    return found;
   }
   if (!value.active) return value;
   let next = tr.docChanged ? follow(value, tr) : value;

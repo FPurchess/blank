@@ -15,10 +15,16 @@
   }
 }
 
+// why the pattern can't be read: always there, so a screen reader hears it
+// appear, and without a row of the grid while there's nothing to say
 .find-error {
   margin: 0;
   font-size: var(--ui-small);
   color: var(--spelling-color);
+
+  &:empty {
+    margin-top: -6px;
+  }
 }
 
 .find-toggles {

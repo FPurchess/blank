@@ -379,7 +379,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     group: "View",
     label: "Blocks pane",
     icon: "blocks",
-    aliases: ["pane", "sidebar", "insert"],
+    aliases: ["pane", "sidebar"],
   },
   [C.THEME_CYCLE]: {
     group: "View",

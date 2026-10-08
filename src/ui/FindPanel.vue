@@ -112,15 +112,23 @@ const findKeyAgain = onCommandKey(CommandIdentifier.EDIT_FIND, () =>
 );
 const onKeydown = (event: KeyboardEvent) => {
   if (findKeyAgain(event)) return;
-  if (event.key === "Escape") {
+  // the Esc that cancels a composition, e.g. of Japanese, is the IME's
+  if (event.key === "Escape" && !event.isComposing) {
     event.preventDefault();
     close();
   }
 };
 const onFindKey = (event: KeyboardEvent) => {
-  if (event.key !== "Enter") return;
+  // the Enter that confirms a composition is the IME's
+  if (event.key !== "Enter" || event.isComposing) return;
   event.preventDefault();
   step(event.shiftKey ? -1 : 1);
+};
+const replaceOne = () => run(replaceFound(replacement.value));
+const onReplaceKey = (event: KeyboardEvent) => {
+  if (event.key !== "Enter" || event.isComposing) return;
+  event.preventDefault();
+  replaceOne();
 };
 // F3 anywhere while the panel is open, but in what holds its own keys
 listenOnWindow("keydown", (event) => {
@@ -182,7 +190,7 @@ const { onFocusin, onFocusout } = useFocusRegion(
     >
       <span class="count" aria-live="polite">{{ count }}</span>
     </SearchField>
-    <p v-if="error" id="find-error" class="find-error">{{ error }}</p>
+    <p id="find-error" class="find-error" aria-live="polite">{{ error }}</p>
     <div class="find-toggles">
       <IconButton
         v-for="toggleOf in FIND_TOGGLES"
@@ -198,6 +206,7 @@ const { onFocusin, onFocusout } = useFocusRegion(
       icon="replace"
       aria-label="Replace with"
       placeholder="Replace with"
+      @keydown="onReplaceKey"
     />
     <div class="find-actions">
       <IconButton
@@ -212,17 +221,8 @@ const { onFocusin, onFocusout } = useFocusRegion(
         tip-key="Enter"
         @click="step(1)"
       />
-      <IconButton
-        icon="x"
-        label="Close"
-        tip-key="Esc"
-        @click="editor.run(closeFind(false))"
-      />
-      <button
-        type="button"
-        class="find-button"
-        @click="run(replaceFound(replacement))"
-      >
+      <IconButton icon="x" label="Close" tip-key="Esc" @click="close" />
+      <button type="button" class="find-button" @click="replaceOne">
         Replace
       </button>
       <button

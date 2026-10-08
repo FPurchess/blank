@@ -35,6 +35,7 @@ import {
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
 import { CommandIdentifier } from "./config";
+import { logWarning } from "./log";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
 import { sendNotification } from "@tauri-apps/plugin-notification";
@@ -198,6 +199,9 @@ export const exposeStorage = () => {
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// the keys whose last write failed, logged once until one succeeds
+const failing = new Set<string>();
+
 /**
  * persist stores the value of `ref` under `key` whenever it changes
  */
@@ -207,7 +211,15 @@ const persist = <T>(ref: Readonly<Ref<T>>, key: string) =>
     (value) => {
       const stored = localforage
         .setItem(key, value)
-        .then(() => undefined, console.warn)
+        .then(
+          () => void failing.delete(key),
+          (error: unknown) => {
+            // once until it's stored again: a write follows every change
+            if (failing.has(key)) return;
+            failing.add(key);
+            logWarning(`can't store ${key}`, error);
+          },
+        )
         .finally(() => settling.delete(stored));
       settling.add(stored);
     },

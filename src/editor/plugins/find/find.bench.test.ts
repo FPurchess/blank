@@ -8,7 +8,7 @@ import { replaceAllFound, setFind } from "./commands";
 import { find } from "./index";
 
 // How long a keystroke takes while find is open, on a long document: it must
-// stay under about 4 ms (see .claude/rules/find.md). Only with BENCH=1, on a
+// stay under 4 ms, about 3 ms measured (see .claude/rules/find.md). Only with BENCH=1, on a
 // quiet machine.
 const SENTENCE =
   "The quick brown fox jumps over the lazy dog, and then the dog sleeps in the sun. ";

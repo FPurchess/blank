@@ -43,7 +43,7 @@ export const SHEET_SCALE = 96 / 72;
 // the least room a page's text takes in "page ends", one line
 const MIN_TEXT = 16;
 // the smallest Fit goes down to on a narrow window, of the size the pages
-// print at; the zoom's own steps stop at half of it
+// print at: below the smallest step, so Fit never needs a scroll across
 const MIN_FIT = 0.15;
 
 export interface Frame {
@@ -97,7 +97,7 @@ export interface FrameLayout {
 /**
  * sheetScale returns the CSS pixels per point the pages are shown at: for
  * Fit, as wide as the view allows, at most at the size they print at (in
- * "page ends", at the editor's text size) and at least at half of it; for a
+ * "page ends", at the editor's text size) and at least at MIN_FIT of it; for a
  * zoom, that share of the size they print at, in both views
  * @param shown the width of what is shown of a page, in points
  */

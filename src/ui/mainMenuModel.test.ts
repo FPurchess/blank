@@ -162,6 +162,10 @@ describe("mainMenuSearch", () => {
     expect(search.results("main menu").map(({ id }) => id)).not.toContain(
       C.MENU_MAIN,
     );
+    // nor what only moves the focus, which the closing menu takes back
+    expect(search.results("focus").map(({ id }) => id)).not.toContain(
+      C.VIEW_FOCUS_NEXT,
+    );
     expect(search.empty(" xyz ")).toBe(
       "No command for “xyz”. Try “pdf”, “table” or “theme”.",
     );

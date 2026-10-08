@@ -1,3 +1,4 @@
+import { closeHistory } from "prosemirror-history";
 import {
   type Command,
   type EditorState,
@@ -6,6 +7,7 @@ import {
 } from "prosemirror-state";
 
 import { scrollToText } from "../../../engine/geometry";
+import { escapeRegExp } from "../../../regExp";
 import {
   announce,
   type FindOptions,
@@ -33,9 +35,7 @@ const selectedQuery = (state: EditorState) => {
     return null;
   const text = state.doc.textBetween(from, to, "", LEAF);
   if (text.includes(LEAF)) return null;
-  return findOptions.value.regex
-    ? text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    : text;
+  return findOptions.value.regex ? escapeRegExp(text) : text;
 };
 
 /**
@@ -61,8 +61,10 @@ const replace = (
     tr.delete(match.from, match.to);
     return text;
   }
-  const $from = state.doc.resolve(match.from);
-  const marks = $from.marksAcross(state.doc.resolve(match.to)) ?? $from.marks();
+  // the marks of its first character, a link's too, which ends with it
+  const marks =
+    state.doc.nodeAt(match.from)?.marks ??
+    state.doc.resolve(match.from).marks();
   tr.replaceWith(match.from, match.to, state.schema.text(text, marks));
   return text;
 };
@@ -139,7 +141,8 @@ export const replaceFound =
     const match = value?.matches[value.current];
     if (!value || !match) return false;
     if (!dispatch) return true;
-    const tr = state.tr;
+    // a step of its own to undo, also right after the last
+    const tr = closeHistory(state.tr);
     const text = replace(tr, value, match, replacement, state);
     // the next match after it, not what was put in, should it match too
     dispatch(
@@ -159,11 +162,12 @@ export const replaceAllFound =
   (replacement: string): Command =>
   (state, dispatch) => {
     const value = findKey.getState(state);
-    if (!value?.active || value.matches.length === 0) return false;
+    if (!value?.active || !value.regex || value.matches.length === 0)
+      return false;
     if (!dispatch) return true;
-    if (!value.regex) return false;
     const { matches } = matchIn(state.doc, value.regex, value.options);
-    const tr = state.tr;
+    // a step of its own to undo, not one with what was typed just before
+    const tr = closeHistory(state.tr);
     // from the end, so the positions before stay where they are
     for (const match of [...matches].reverse())
       replace(tr, value, match, replacement, state);

@@ -169,7 +169,6 @@ export const useMenuLevels = (
       levels.value = withIndex(depth, index, column);
       focusDepth.value = depth;
     } else if (item.stays) {
-      moved = true;
       focusItem(depth, index, column);
       item.run?.();
     } else {
@@ -217,7 +216,7 @@ export const useMenuLevels = (
     ) {
       // above the first line, the search the menu came from
       handled();
-      show([{ ...level, index: -1 }], 0);
+      backToSearch();
     } else if (key === "ArrowDown" || key === "ArrowUp") {
       handled();
       moveBy(depth, key === "ArrowDown" ? 1 : -1);
@@ -284,6 +283,12 @@ export const useMenuLevels = (
   };
 
   /**
+   * backToSearch closes the submenus and gives the focus to the search above
+   * the menu, no line focused
+   */
+  const backToSearch = () => show([{ ...levels.value[0], index: -1 }], 0);
+
+  /**
    * showLevelZero shows the menu's own lines anew, e.g. what a new search
    * found, the first one focused if `first`
    */
@@ -310,18 +315,23 @@ export const useMenuLevels = (
     const shown: MenuLevel[] = [{ items: lines, ...kept, side: null }];
     // the submenu the user is in stays, with its parent's new items
     const parent = lines[kept.index];
+    const before = items[index];
     if (
       open &&
       isEntry(parent) &&
       parent.children &&
-      isEntry(items[index]) &&
-      (items[index] as { id: string }).id === parent.id
-    )
+      isEntry(before) &&
+      before.id === parent.id
+    ) {
+      const children = parent.children;
+      const at = Math.min(open.index, children.length - 1);
       shown.push({
         ...open,
-        items: parent.children,
-        index: Math.min(open.index, parent.children.length - 1),
+        items: children,
+        // on what's there now, if it can still be chosen
+        index: enabledAt(children, at) ? at : firstEnabled(children),
       });
+    }
     show(shown, Math.min(focusDepth.value, shown.length - 1));
   });
 
@@ -337,6 +347,7 @@ export const useMenuLevels = (
     onKey,
     submitEdit,
     cancelEdit,
+    backToSearch,
     showLevelZero,
   };
 };

@@ -1,4 +1,5 @@
 import { exists } from "@tauri-apps/plugin-fs";
+import { info } from "@tauri-apps/plugin-log";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -42,6 +43,27 @@ describe("the recent files", () => {
     );
     expect(recentFiles.value).toEqual(["/docs/b.md"]);
     expect(openPaths).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      "the recent file /docs/a.md isn't there any more",
+    );
+  });
+
+  it("open a file whose check failed, and log the failure", async () => {
+    const failure = new Error("denied");
+    vi.mocked(exists).mockRejectedValue(failure);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    recentFiles.value = ["/docs/a.md"];
+
+    openRecentFile("/docs/a.md")(state, () => {});
+
+    await vi.waitFor(() =>
+      expect(openPaths).toHaveBeenCalledWith(["/docs/a.md"]),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      "can't check whether the recent file /docs/a.md is there",
+      failure,
+    );
+    expect(recentFiles.value).toEqual(["/docs/a.md"]);
   });
 
   it("are cleared", () => {
