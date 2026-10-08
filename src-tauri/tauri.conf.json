@@ -81,6 +81,15 @@
         "rank": "Alternate",
         "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "contentTypes": ["org.openxmlformats.wordprocessingml.document"]
+      },
+      {
+        "ext": ["pdf"],
+        "name": "PDF document",
+        "description": "PDF document, which Blank shows and checks the signatures of",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "application/pdf",
+        "contentTypes": ["com.adobe.pdf"]
       }
     ],
     "macOS": {

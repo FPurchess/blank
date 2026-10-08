@@ -15,6 +15,7 @@ import OptionGroup from "../components/OptionGroup.vue";
 import SettingRow from "../components/SettingRow.vue";
 import TextField from "../components/TextField.vue";
 import CertificateRows from "./CertificateRows.vue";
+import TrustedRows from "./TrustedRows.vue";
 import { enterInField, save } from "./settingsModel";
 import { dateFormatOptions, MARK_ROWS } from "./signingModel";
 
@@ -122,4 +123,5 @@ const dateFormat = computed({
     :options="options"
   />
   <CertificateRows />
+  <TrustedRows />
 </template>

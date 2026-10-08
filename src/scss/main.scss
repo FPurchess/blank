@@ -1781,3 +1781,84 @@ body.without-engine.blocks-docked {
     transition: none;
   }
 }
+
+// the page view of a PDF tab (PdfView.vue), where the page view is: the
+// PDF's sheets on the desk, white in every theme, as they print
+#pdf-view {
+  position: fixed;
+  inset: $top-bar-height 0 $status-height;
+  z-index: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: var(--color);
+  background-color: var(--desk-color);
+  cursor: default;
+  user-select: none;
+
+  .page-sheet {
+    background-color: white;
+  }
+}
+
+.pdf-page {
+  position: absolute;
+  contain: layout style;
+
+  .page-canvas {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// a page the helper couldn't draw
+.pdf-page-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: var(--ui);
+  color: var(--muted-on-paper);
+  @include ui-text;
+}
+
+// why a PDF tab shows no pages, centred where they would be
+.pdf-problem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  max-width: 420px;
+  margin: 15vh auto 0;
+  padding: 0 var(--s4);
+  text-align: center;
+  font-size: var(--ui);
+  @include ui-text;
+
+  .icon {
+    color: var(--muted);
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.pdf-problem-title {
+  margin-top: var(--s2);
+  color: var(--color);
+}
+
+.pdf-problem-reason {
+  color: var(--muted);
+}
+
+.pdf-problem-actions {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s3);
+
+  button {
+    @include text-button;
+  }
+}

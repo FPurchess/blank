@@ -14,9 +14,21 @@ use sha2::Digest;
 use spki::SubjectPublicKeyInfoOwned;
 use x509_cert::Certificate;
 
-/// what coverage says of a signature whose byte ranges reach the end of
-/// the file
-const WHOLE_FILE: &str = "covers the whole file";
+/// how much of the file a signature covers
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Coverage {
+    /// nothing came after it
+    WholeFile,
+    /// only validation data (a DSS) came after it
+    ValidationData,
+    /// later revisions came, the last of them signed
+    SignedAgainLater,
+    /// later revisions came that no signature covers
+    ChangedAfterSigning,
+    /// its byte ranges can't be read
+    #[default]
+    Unknown,
+}
 
 /// what Blank found of one signature of a PDF
 #[derive(Debug, Default)]
@@ -27,13 +39,24 @@ pub struct SignatureReport {
     /// (check, passed, detail)
     pub checks: Vec<(&'static str, bool, String)>,
     pub signer: Option<CertificateInfo>,
+    /// the signer's certificate, DER
+    pub signer_der: Option<Vec<u8>>,
     pub digest_algorithm: String,
     pub signature_algorithm: String,
+    /// when a timestamp server says it was signed, as its token writes it
+    /// (GeneralizedTime, e.g. "20261008120000Z")
     pub timestamp: Option<String>,
-    /// how much of the file the signature covers, in words: the whole
-    /// file, or what came after it
-    pub coverage: String,
+    /// it has a timestamp token Blank can't read: not a failure, the
+    /// signature itself may be fine
+    pub timestamp_unreadable: bool,
+    pub coverage: Coverage,
     pub signing_time_claimed: Option<String>,
+    /// what the signature's dictionary says of itself: `/Name`, `/Reason`,
+    /// `/Location`, and `/M`, the signer's computer's clock, as written
+    pub name: Option<String>,
+    pub reason: Option<String>,
+    pub location: Option<String>,
+    pub time: Option<String>,
 }
 
 impl SignatureReport {
@@ -47,7 +70,7 @@ impl SignatureReport {
     /// covers_the_whole_file tells whether nothing was added to the file
     /// after this signature
     pub fn covers_the_whole_file(&self) -> bool {
-        self.coverage == WHOLE_FILE
+        self.coverage == Coverage::WholeFile
     }
 }
 
@@ -227,6 +250,7 @@ type Detached<'a> = &'a dyn Fn(&Oid) -> Option<Vec<u8>>;
 struct CmsCheck {
     checks: Vec<(&'static str, bool, String)>,
     signer: Option<CertificateInfo>,
+    signer_der: Option<Vec<u8>>,
     digest_algorithm: Oid,
     signature_algorithm: String,
     signature: Vec<u8>,
@@ -366,7 +390,10 @@ fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
                 id.tag == 0x04 && rest.is_empty() && id.content == ski.0.as_bytes()
             }),
     });
-    let signer = cert.map(|c| CertificateInfo::of(c, &c.to_der().unwrap_or_default()));
+    let signer_der = cert.and_then(|c| c.to_der().ok());
+    let signer = cert
+        .zip(signer_der.as_ref())
+        .map(|(c, der)| CertificateInfo::of(c, der));
     match (cert, &prehash_target) {
         (Some(c), Some((h, ph))) => {
             let r = verify_signature(
@@ -403,6 +430,7 @@ fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
     Ok(CmsCheck {
         checks,
         signer,
+        signer_der,
         digest_algorithm: digest_oid,
         signature_algorithm: oid_name(&si.signature_algorithm.oid),
         signature: si.signature.as_bytes().to_vec(),
@@ -423,31 +451,21 @@ fn tst_info(der_bytes: &[u8]) -> Option<(Oid, Vec<u8>, String)> {
     Some((oid, imprint.get(1)?.content.to_vec(), gen_time))
 }
 
-/// check_timestamp checks an RFC 3161 token over `data`; it returns the
-/// time it gives
-fn check_timestamp(token: &[u8], data: &[u8]) -> (bool, String) {
-    match check_cms(token, None) {
-        Ok(c) => {
-            let Some((oid, imprint, time)) = c.econtent.as_deref().and_then(tst_info) else {
-                return (false, "can't read TSTInfo".into());
-            };
-            let ok_imprint = hash(&oid, &[data]).is_some_and(|h| h == imprint);
-            let ok_cms = c.checks.iter().all(|c| c.1);
-            let tsa = c.signer.map(|s| s.name).unwrap_or_default();
-            (
-                ok_imprint && ok_cms,
-                format!(
-                    "{time} by {tsa}{}",
-                    if ok_imprint {
-                        ""
-                    } else {
-                        " (imprint mismatch)"
-                    }
-                ),
-            )
-        }
-        Err(e) => (false, format!("{e:#}")),
-    }
+/// check_timestamp checks an RFC 3161 token over `data`: whether it holds
+/// and the time it gives, or None for a token that can't be read
+fn check_timestamp(token: &[u8], data: &[u8]) -> Option<(bool, String)> {
+    let c = check_cms(token, None).ok()?;
+    let (oid, imprint, time) = c.econtent.as_deref().and_then(tst_info)?;
+    let ok_imprint = hash(&oid, &[data]).is_some_and(|h| h == imprint);
+    Some((ok_imprint && c.checks.iter().all(|c| c.1), time))
+}
+
+/// text reads a text string of a signature's dictionary
+fn text(sig: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
+    sig.get(key)
+        .ok()
+        .and_then(|value| lopdf::decode_text_string(value).ok())
+        .filter(|value| !value.trim().is_empty())
 }
 
 /// is_ws tells whether `b` is PDF whitespace
@@ -594,6 +612,10 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
             reports.push(r);
             continue;
         };
+        r.name = text(sig, b"Name");
+        r.reason = text(sig, b"Reason");
+        r.location = text(sig, b"Location");
+        r.time = text(sig, b"M");
         r.sub_filter = sig
             .get(b"SubFilter")
             .and_then(Object::as_name)
@@ -721,6 +743,7 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                 r.signature_algorithm = c.signature_algorithm.clone();
                 r.checks.extend(c.checks);
                 r.signer = c.signer;
+                r.signer_der = c.signer_der;
                 r.signing_time_claimed = c.signing_time;
                 match sub.as_str() {
                     "adbe.pkcs7.sha1" => {
@@ -747,10 +770,16 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                     }
                     _ => {}
                 }
+                // a token that can't be read says nothing of the signature
+                // (pkcs7_sha1.pdf of the spike), one that doesn't hold does
                 if let Some(tok) = c.timestamp_token {
-                    let (ok, detail) = check_timestamp(&tok, &c.signature);
-                    r.timestamp = Some(detail.clone());
-                    r.checks.push(("signature timestamp", ok, detail));
+                    match check_timestamp(&tok, &c.signature) {
+                        Some((ok, time)) => {
+                            r.checks.push(("signature timestamp", ok, time.clone()));
+                            r.timestamp = Some(time);
+                        }
+                        None => r.timestamp_unreadable = true,
+                    }
                 }
             }
             Err(e) => r.checks.push(("CMS readable", false, format!("{e:#}"))),
@@ -767,31 +796,22 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     let last_covered = ends.iter().copied().max().unwrap_or(0);
     let tail_dss_only =
         last_covered < effective_len && tail_is_validation_data(&doc, bytes, header, last_covered);
-    let eofs: Vec<usize> = bytes
-        .windows(5)
-        .enumerate()
-        .filter(|(_, w)| *w == b"%%EOF")
-        .map(|(i, _)| i + 5)
-        .collect();
     for r in &mut reports {
         if r.byte_range.len() != 4 || !r.checks.first().is_some_and(|c| c.1) {
-            r.coverage = "unknown (bad ByteRange)".into();
+            r.coverage = Coverage::Unknown;
             continue;
         }
         let end = (r.byte_range[2] + r.byte_range[3]) as usize;
-        let later = eofs.iter().filter(|e| **e > end + 2).count();
         r.coverage = if end >= effective_len {
-            WHOLE_FILE.into()
+            Coverage::WholeFile
         } else if last_covered >= effective_len {
-            format!("signed again later ({later} later revision(s), the last one signed)")
+            Coverage::SignedAgainLater
         } else if tail_dss_only && end == last_covered {
-            "covers the whole file but validation data (DSS) added later".into()
+            Coverage::ValidationData
         } else if tail_dss_only {
-            format!(
-                "signed again later ({later} later revision(s)), then validation data (DSS) added"
-            )
+            Coverage::SignedAgainLater
         } else {
-            format!("CHANGED AFTER SIGNING ({} bytes, {later} revision(s) not covered by any signature)", effective_len - end)
+            Coverage::ChangedAfterSigning
         };
     }
     Ok(reports)

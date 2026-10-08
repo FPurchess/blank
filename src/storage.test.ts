@@ -449,10 +449,24 @@ describe("storage", () => {
         "session",
       ]);
       expect(await localforage.getItem("session")).toEqual({
-        version: 1,
+        version: 2,
         order: ["a"],
         active: "a",
         tabs: { a: { ...tab("a"), id: undefined } },
+      });
+    });
+
+    it("stores no document of a PDF tab, whose PDF is its file", async () => {
+      const { transaction, tabs } = await open("a");
+      tabs.value = [{ ...tab("a"), kind: "pdf", path: "/a.pdf" }];
+      await tick();
+
+      transaction.value = replace(doc(p("placeholder")));
+      await tick();
+
+      expect(await localforage.getItem("tab:a")).toBeNull();
+      expect(await localforage.getItem("session")).toMatchObject({
+        tabs: { a: { kind: "pdf", path: "/a.pdf" } },
       });
     });
 
@@ -647,7 +661,7 @@ describe("storage", () => {
 
   describe("session", () => {
     const session = {
-      version: 1,
+      version: 2,
       order: ["a", "b"],
       active: "b",
       tabs: {
@@ -682,8 +696,17 @@ describe("storage", () => {
       expect((await loadSession())?.active).toBe("a");
     });
 
+    it("reads the session of a Blank before PDF tabs, version 1", async () => {
+      await localforage.setItem("session", { ...session, version: 1 });
+      const { loadSession } = await bootFresh();
+
+      expect((await loadSession())?.order).toEqual(["a", "b"]);
+    });
+
+    // Blank 3.0 reads only version 1: a session of version 2 (with PDF tabs)
+    // takes it this way, as this Blank takes one of version 3
     it("keeps a session it can't read and starts afresh, saying so", async () => {
-      const newer = { ...session, version: 2 };
+      const newer = { ...session, version: 3 };
       await localforage.setItem("session", newer);
       vi.spyOn(console, "warn").mockImplementation(() => {});
       const { loadSession } = await bootFresh();
@@ -718,7 +741,7 @@ describe("storage", () => {
 
       const id = migrated!.active;
       expect(migrated).toEqual({
-        version: 1,
+        version: 2,
         order: [id],
         active: id,
         tabs: {

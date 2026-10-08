@@ -154,6 +154,25 @@ describe("tabMenu", () => {
     expect(item(items, "print").shortcut).toBeUndefined();
   });
 
+  it("offers no saving in a PDF tab, which Blank never changes", () => {
+    const items = tabMenu(
+      { ...tab("/docs/contract.pdf"), kind: "pdf" },
+      0,
+      1,
+      true,
+      actions(),
+      true,
+    );
+
+    expect(ids(items)).toEqual([
+      "close",
+      "close-others",
+      "close-right",
+      "-",
+      "copy-path",
+    ]);
+  });
+
   it("has no path to copy for an untitled tab, nor tabs to close beyond it", () => {
     const items = tabMenu(tab(null), 0, 1, true, actions(), true);
 

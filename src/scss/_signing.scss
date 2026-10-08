@@ -155,3 +155,121 @@
   flex-direction: row;
   gap: var(--s2);
 }
+
+// a PDF's signatures in the status bar (SignaturesStatus.vue): in ink when
+// every one checks out, in the misspellings' color when one doesn't
+#ui-signatures.sig-bad {
+  color: var(--spelling-color);
+}
+
+// the signatures of a PDF above their item (SignaturesPopover.vue)
+.signatures-popover {
+  @include popover;
+  @include ui-text;
+  position: fixed;
+  z-index: 20;
+  width: min(380px, calc(100vw - 16px));
+  padding: 6px;
+  font-size: var(--ui);
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .empty {
+    margin: var(--s1) var(--s2) var(--s2);
+    color: var(--muted);
+  }
+
+  button {
+    @include text-button;
+    @include text-button-quiet;
+  }
+}
+
+.signatures-head {
+  @include group-label;
+  padding: 2px var(--s2) 6px;
+}
+
+.signature-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: var(--s2);
+  border-radius: var(--r-control);
+
+  .icon {
+    margin-top: 2px;
+  }
+
+  .who {
+    font-weight: 500;
+  }
+
+  .meta {
+    color: var(--muted);
+    font-size: var(--ui-small);
+    line-height: 16px;
+  }
+
+  &.bad .icon,
+  &.bad .status {
+    color: var(--spelling-color);
+  }
+}
+
+// the details of a signature (SignatureDetailsDialog.vue)
+.dialog.signature-details {
+  width: min(480px, calc(100% - 32px));
+
+  .signature-verdict {
+    display: flex;
+    gap: var(--s2);
+    align-items: flex-start;
+    margin: 0 0 var(--s3);
+
+    .icon {
+      margin-top: 2px;
+    }
+
+    &.bad {
+      color: var(--spelling-color);
+    }
+  }
+
+  .signature-facts {
+    display: grid;
+    gap: var(--s1);
+    margin: 0;
+
+    > div {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: var(--s2);
+    }
+
+    dt {
+      color: var(--muted);
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  .copy {
+    @include text-button;
+    @include text-button-quiet;
+    margin-left: var(--s1);
+  }
+
+  .note {
+    margin: var(--s3) 0 0;
+    color: var(--muted);
+    font-size: var(--ui-small);
+  }
+}

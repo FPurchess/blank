@@ -18,6 +18,9 @@ import {
   certificateDialog,
   confirmDialog,
   signaturePopover,
+  signatureDetails,
+  signaturesPopover,
+  shownPdf,
   tocPopover,
   unsavedDialog,
 } from "../state";
@@ -37,6 +40,7 @@ import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
+import PdfView from "./PdfView.vue";
 import PrintDialog from "./PrintDialog.vue";
 import SettingsDialog from "./settings/SettingsDialog.vue";
 import TablePicker from "./TablePicker.vue";
@@ -45,6 +49,8 @@ import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
 import FindPanel from "./FindPanel.vue";
 import SignaturePopover from "./SignaturePopover.vue";
+import SignaturesPopover from "./SignaturesPopover.vue";
+import SignatureDetailsDialog from "./SignatureDetailsDialog.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
@@ -61,17 +67,20 @@ useWindowCommands();
 // focus mode: the classes that fade the controls, and when they fade
 useBodyClass("focus-mode", () => focusMode.value);
 useBodyClass("controls-faded", () => controlsFaded.value);
+// a PDF tab shows its pages in place of the page view (see .claude/rules/pdf.md)
+useBodyClass("pdf-tab", () => shownPdf.value !== null);
 watchFocusMode();
 </script>
 
 <template>
   <BandStrips />
-  <PageView />
+  <PageView v-if="!shownPdf" />
+  <PdfView v-if="shownPdf" />
   <BlockMarks />
   <TopArea />
   <BottomBar />
   <DocumentOutline />
-  <BlocksPane v-if="blocksPaneOpen" />
+  <BlocksPane v-if="blocksPaneOpen && !shownPdf" />
   <TableHandles />
   <BlockToolbar v-if="blockToolbar" :state="blockToolbar" />
   <TableToolbar v-if="tableToolbar" :state="tableToolbar" />
@@ -137,6 +146,16 @@ watchFocusMode();
     v-if="signaturePopover"
     :key="keyOf(signaturePopover)"
     :request="signaturePopover"
+  />
+  <SignaturesPopover
+    v-if="signaturesPopover"
+    :key="keyOf(signaturesPopover)"
+    :request="signaturesPopover"
+  />
+  <SignatureDetailsDialog
+    v-if="signatureDetails"
+    :key="keyOf(signatureDetails)"
+    :request="signatureDetails"
   />
   <ContextMenu
     v-if="contextMenu"

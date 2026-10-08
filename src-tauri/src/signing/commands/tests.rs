@@ -81,7 +81,7 @@ fn signed(key: &[u8], pdf: &[u8], options: &SignOptions) -> Vec<u8> {
     let reports = verify_pdf(&signed).unwrap();
     let last = reports.last().unwrap();
     assert!(last.valid(), "{:?}", last.checks);
-    assert!(last.covers_the_whole_file(), "{}", last.coverage);
+    assert!(last.covers_the_whole_file(), "{:?}", last.coverage);
     signed
 }
 
@@ -285,7 +285,10 @@ fn finds_what_was_added_after_signing() {
     // the signature itself still checks out, but not the file
     assert!(reports[0].valid());
     assert!(!reports[0].covers_the_whole_file());
-    assert!(reports[0].coverage.starts_with("CHANGED AFTER SIGNING"));
+    assert_eq!(
+        reports[0].coverage,
+        crate::signing::verify::Coverage::ChangedAfterSigning
+    );
     assert!(check_signed(&signed).is_err());
 }
 

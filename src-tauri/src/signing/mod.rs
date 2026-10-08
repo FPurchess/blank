@@ -9,6 +9,8 @@
 //! - `tsa`: an RFC 3161 timestamp of the signature (B-T)
 //! - `pdf`: loading a PDF for an update, and signing it
 //! - `verify`: checking the signatures of a PDF
+//! - `trust`: whom they're from, as far as Blank can tell, and the
+//!   certificates the user trusts
 //! - `der`: the bits of DER the crates don't do for us
 
 pub mod certificate;
@@ -17,6 +19,7 @@ pub mod commands;
 mod der;
 mod keys;
 mod pdf;
+pub mod trust;
 mod tsa;
 pub mod verify;
 

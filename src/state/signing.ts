@@ -23,6 +23,12 @@ export const signingCertificate = shallowRef<
   CertificateInfo | null | undefined
 >(undefined);
 
+// the certificates the user trusts (Settings ▸ Signing): undefined until
+// read
+export const trustedCertificates = shallowRef<
+  readonly CertificateInfo[] | undefined
+>(undefined);
+
 // how the dates next to signatures are written: Settings ▸ Signing ▸ Date,
 // in the document's language; a new object only when either changes
 export const signingDates = computed((previous?: DateStyle): DateStyle => {

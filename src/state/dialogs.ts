@@ -8,6 +8,7 @@ import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
 import type { Mark, MarkSource, SavedMark } from "../signing/profile";
 import type { SignatureDate } from "../markdown/blocks/atoms";
+import type { CheckedSignature } from "../signing/ipc";
 
 export interface LinkDialogRequest {
   url: string;
@@ -248,6 +249,27 @@ export interface ConfirmDialogRequest {
 // something that can't be undone, or null
 export const confirmDialog = shallowRef<ConfirmDialogRequest | null>(null);
 
+// The popover of a PDF's signatures above the status bar's item
+// (SignaturesPopover.vue), which lists those of the PDF shown; `refocus`
+// gives the focus back once it closes
+export interface SignaturesPopoverRequest {
+  refocus(): void;
+}
+
+export const signaturesPopover = shallowRef<SignaturesPopoverRequest | null>(
+  null,
+);
+
+// The details of one of a PDF's signatures (SignatureDetailsDialog.vue)
+export interface SignatureDetailsRequest {
+  signature: CheckedSignature;
+  refocus(): void;
+}
+
+export const signatureDetails = shallowRef<SignatureDetailsRequest | null>(
+  null,
+);
+
 // the settings open on the section shown last (settingsSection)
 export type SettingsRequest = Record<string, never>;
 
@@ -295,6 +317,8 @@ export const focusTakingDialogs = [
   signDialog,
   certificateDialog,
   confirmDialog,
+  signaturesPopover,
+  signatureDetails,
   unsavedDialog,
   settingsDialog,
   printDialog,

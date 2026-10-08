@@ -3,7 +3,13 @@ import { computed } from "vue";
 
 import { caretPage, pageInView } from "../engine/geometry";
 import { useEditor } from "../editor/handle";
-import { headings, pageLayoutState, pageScrollRequest } from "../state";
+import {
+  headings,
+  pageLayoutState,
+  pageScrollRequest,
+  pdfPageInView,
+  shownPdf,
+} from "../state";
 import { pageLabel } from "./pageViewModel";
 import { useMenuButton } from "./composables/useMenuButton";
 import { firstHeadings, pageMenuItems } from "./statusBarModel";
@@ -16,7 +22,8 @@ import StatusItem from "./StatusItem.vue";
 // it, which goes to that page. Screen readers, which read the text, not the
 // painted pages, are told when the view moves to another page, not when
 // typing changes how many there are: the live region stays in place, so a
-// change is read out, and says only the page.
+// change is read out, and says only the page. In a PDF tab it counts the
+// PDF's pages (PdfView.vue), which have no headings to list.
 
 // how far below the top of the view a page goes to start, above the reading
 // line, so the counter then reads that page
@@ -25,6 +32,12 @@ const PAGE_JUMP_ROOM = 16;
 const editor = useEditor();
 
 const position = computed(() => {
+  const pdfPages = shownPdf.value?.opened?.pages.length;
+  if (shownPdf.value) {
+    return pdfPages && pdfPageInView.value !== null
+      ? { page: pdfPageInView.value + 1, pages: pdfPages }
+      : null;
+  }
   const layout = pageLayoutState.value;
   const page = pageInView();
   if (!layout || page === null) return null;
@@ -52,9 +65,13 @@ const toggleMenu = (event: MouseEvent) =>
   menu.toggle(
     event,
     pageMenuItems(
-      firstHeadings(pageLayoutState.value?.pages ?? 0, headings.value, (pos) =>
-        caretPage(pos + 1),
-      ),
+      shownPdf.value
+        ? Array.from({ length: position.value?.pages ?? 0 }, () => "")
+        : firstHeadings(
+            pageLayoutState.value?.pages ?? 0,
+            headings.value,
+            (pos) => caretPage(pos + 1),
+          ),
       goTo,
     ),
   );

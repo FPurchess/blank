@@ -381,6 +381,13 @@ $tip-key: 75%;
     width: 20px;
     height: 20px;
   }
+
+  // what stands for a whole part of the window, e.g. a PDF tab that can't
+  // show its pages
+  &.huge {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 // the tooltip of the control under the pointer (src/ui/UiTooltip.vue): its

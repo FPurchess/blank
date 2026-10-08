@@ -121,3 +121,41 @@ export const signPdf = async (
       },
     }),
   );
+
+// how far Blank trusts who signed (src-tauri/src/signing/trust.rs): the
+// user's own certificate, one they trusted, one a certificate authority
+// issued (which Blank doesn't check), or an unknown self-signed one
+export type Trust =
+  | { kind: "own" }
+  | { kind: "trusted" }
+  | { kind: "issuedBy"; issuer: string }
+  | { kind: "unknown" };
+
+// what a signature says of the PDF: intact, intact with the later changes
+// signed again, intact but changed later, or not matching the PDF
+export type SignatureStatus =
+  "valid" | "signedAgainLater" | "changedAfterSigning" | "invalid";
+
+// a signature of a PDF, as Blank checked it
+export interface CheckedSignature {
+  field: string;
+  name: string | null;
+  // ISO 8601: the timestamp's time, else the signer's clock
+  time: string | null;
+  timestamped: boolean;
+  reason: string | null;
+  location: string | null;
+  status: SignatureStatus;
+  trust: Trust;
+  certificate: CertificateInfo | null;
+  // the certificate, DER in hex, to trust it
+  certificateDer: string | null;
+}
+
+export const readTrusted = () => invoke<CertificateInfo[]>("signing_trusted");
+
+export const trustCertificate = (der: string) =>
+  invoke<CertificateInfo>("signing_trust", { der });
+
+export const untrustCertificate = (fingerprint: string) =>
+  invoke<void>("signing_untrust", { fingerprint });

@@ -5,6 +5,7 @@ mod logging;
 #[cfg(target_os = "macos")]
 mod menu;
 pub mod open;
+pub mod pdf_view;
 pub mod primary;
 pub mod print;
 pub mod session;
@@ -59,6 +60,7 @@ pub fn run() {
         .manage(fonts::FontState::default())
         .manage(open::OpenQueue::default())
         .manage(session::SessionLock::default())
+        .manage(pdf_view::PdfTabs::default())
         .setup(|app| {
             // first, so what goes wrong while starting is in it
             logging::start(app);
@@ -77,6 +79,8 @@ pub fn run() {
                 app.manage(print::PrintWindows::default());
                 print::close_after_dialog(app.handle());
             }
+            // the PDF tabs' helpers that sit unused are stopped
+            pdf_view::watch_idle(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -95,6 +99,11 @@ pub fn run() {
             open::take_open_paths,
             open::canonical_path,
             session::session_lock,
+            pdf_view::commands::pdf_open,
+            pdf_view::commands::pdf_render,
+            pdf_view::commands::pdf_cancel,
+            pdf_view::commands::pdf_close,
+            pdf_view::commands::pdf_verify,
             signing::commands::signing_certificate,
             signing::commands::signing_create_certificate,
             signing::commands::signing_import,
@@ -102,6 +111,9 @@ pub fn run() {
             signing::commands::signing_remove,
             signing::commands::signing_check_passphrase,
             signing::commands::signing_sign_pdf,
+            signing::commands::signing_trusted,
+            signing::commands::signing_trust,
+            signing::commands::signing_untrust,
         ])
         .build(context)
         .expect("error while building tauri application")

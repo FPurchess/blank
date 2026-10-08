@@ -6,6 +6,7 @@ import {
   viewAnchor,
   type ViewAnchor,
 } from "../engine/frames";
+import { pdfViewAnchor, shownPdf } from "./pdf";
 
 // The page view, which the layout engine paints (see src/engine and
 // src/ui/PageView.vue): the view the user chose, and what the engine laid
@@ -193,9 +194,10 @@ export const zoomFactor = computed(() =>
 /**
  * currentViewAnchor returns the spot of the pages at the top of the view, to
  * come back to it later, e.g. when the tab is shown again; null at the top or
- * without pages
+ * without pages. In a PDF tab, the PDF's (PdfView.vue).
  */
 export const currentViewAnchor = (): ViewAnchor | null => {
+  if (shownPdf.value) return pdfViewAnchor.value;
   const layout = deskLayout.value;
   const viewport = pageViewport.value;
   if (!layout || !viewport) return null;

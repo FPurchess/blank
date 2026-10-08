@@ -1,7 +1,11 @@
 import { computed, shallowRef } from "vue";
 
 import type { ViewAnchor } from "../engine/frames";
-import { MARKDOWN_EXTENSIONS, WORD_EXTENSIONS } from "../formats";
+import {
+  MARKDOWN_EXTENSIONS,
+  PDF_EXTENSIONS,
+  WORD_EXTENSIONS,
+} from "../formats";
 import { basename, extname } from "../paths";
 
 // The open documents, one tab each. The editor shows the active one, and
@@ -12,7 +16,11 @@ import { basename, extname } from "../paths";
 
 export interface Tab {
   readonly id: string;
-  // the markdown file it's saved to, null while it's untitled
+  // what it shows: a markdown document, or a PDF (see src/pdf); markdown
+  // when missing, as in the sessions of Blank before PDF tabs
+  readonly kind?: "markdown" | "pdf";
+  // the markdown file it's saved to, null while it's untitled; a PDF tab's
+  // PDF
   readonly path: string | null;
   // the Word document an untitled tab was imported from
   readonly importedFrom: string | null;
@@ -61,7 +69,17 @@ export const updateTab = (
   );
 };
 
-const DOCUMENT_EXTENSIONS = [...MARKDOWN_EXTENSIONS, ...WORD_EXTENSIONS];
+const DOCUMENT_EXTENSIONS = [
+  ...MARKDOWN_EXTENSIONS,
+  ...WORD_EXTENSIONS,
+  ...PDF_EXTENSIONS,
+];
+
+/**
+ * isPdfTab is whether `tab` shows a PDF
+ */
+export const isPdfTab = (tab: Pick<Tab, "kind"> | null | undefined) =>
+  tab?.kind === "pdf";
 
 // what tabLabel and tabTooltip read of a tab
 type Named = Pick<Tab, "path" | "importedFrom" | "untitledNumber" | "welcome">;

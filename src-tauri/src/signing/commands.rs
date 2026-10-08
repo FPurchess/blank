@@ -15,6 +15,7 @@ use zeroize::Zeroizing;
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::keys::{self, Identity, OpenError};
 use crate::signing::pdf::sign::{sign_pdf, SignRequest};
+use crate::signing::trust::{self, CheckedSignature};
 use crate::signing::verify::verify_pdf;
 use crate::signing::Refusal;
 
@@ -459,6 +460,55 @@ pub async fn signing_sign_pdf(
     .await
     .map_err(|_| SigningError::Failed("Blank couldn't sign the PDF".into()))??;
     Ok(tauri::ipc::Response::new(signed))
+}
+
+/// checked_signatures checks every signature of the PDF `pdf`, and whom it
+/// is from as far as Blank can tell (see trust.rs)
+pub fn checked_signatures(app: &AppHandle, pdf: &[u8]) -> Answer<Vec<CheckedSignature>> {
+    let dir = folder(app)?;
+    let own = std::fs::read(dir.join(CERTIFICATE))
+        .ok()
+        .and_then(|der| CertificateInfo::from_der(&der).ok())
+        .map(|info| info.fingerprint);
+    let trusted = trust::trusted_in(&dir)
+        .into_iter()
+        .map(|info| info.fingerprint)
+        .collect();
+    let reports = verify_pdf(pdf).map_err(failed(
+        "failed to check the signatures of a PDF",
+        "Blank couldn't check the signatures of this PDF",
+    ))?;
+    Ok(reports
+        .into_iter()
+        .map(|report| trust::checked(report, own.as_deref(), &trusted))
+        .collect())
+}
+
+/// signing_trusted returns the certificates the user trusts
+#[tauri::command]
+pub async fn signing_trusted(app: AppHandle) -> Answer<Vec<CertificateInfo>> {
+    Ok(trust::trusted_in(&folder(&app)?))
+}
+
+/// signing_trust trusts the certificate `der` (in hex), once the user
+/// compared its fingerprint with the signer's
+#[tauri::command]
+pub async fn signing_trust(app: AppHandle, der: String) -> Answer<CertificateInfo> {
+    let der = hex::decode(der)
+        .map_err(|_| SigningError::Failed("Blank can't read this certificate".into()))?;
+    trust::trust_in(&folder(&app)?, &der).map_err(|error| {
+        log::warn!("failed to trust a certificate: {}", error.kind());
+        SigningError::Failed("Blank couldn't keep the certificate".into())
+    })
+}
+
+/// signing_untrust stops trusting the certificate of `fingerprint`
+#[tauri::command]
+pub async fn signing_untrust(app: AppHandle, fingerprint: String) -> Answer<()> {
+    trust::untrust_in(&folder(&app)?, &fingerprint).map_err(|error| {
+        log::warn!("failed to forget a trusted certificate: {}", error.kind());
+        SigningError::Failed("Blank couldn't remove the certificate".into())
+    })
 }
 
 #[cfg(test)]

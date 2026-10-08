@@ -5,6 +5,8 @@
 export const MARKDOWN_EXTENSIONS = ["md", "markdown", "mdown", "mkd", "mkdn"];
 // Word documents, which are imported into an untitled markdown document
 export const WORD_EXTENSIONS = ["docx", "docm", "dotx", "dotm"];
+// PDFs, which open in PDF tabs (see .claude/rules/pdf.md)
+export const PDF_EXTENSIONS = ["pdf"];
 // document formats Blank can't read, which aren't markdown either
 export const UNREADABLE_EXTENSIONS = ["doc", "odt", "rtf", "pages"];
 // files that saving markdown into would destroy, e.g. the Word document a
@@ -20,7 +22,8 @@ export const WORD_FILTER = { name: "Word Document", extensions: ["docx"] };
 export const PDF_FILTER = { name: "PDF-File", extensions: ["pdf"] };
 // what the open dialog offers; Linux dialogs start with the first
 export const OPEN_FILTERS = [
-  { name: "Documents", extensions: ["md", "docx"] },
+  { name: "Documents", extensions: ["md", "docx", "pdf"] },
   MARKDOWN_FILTER,
   WORD_FILTER,
+  PDF_FILTER,
 ];

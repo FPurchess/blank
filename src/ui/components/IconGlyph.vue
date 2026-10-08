@@ -2,8 +2,9 @@
 import { iconPath, iconStroke } from "../../icons";
 
 // An icon of src/icons.ts, hidden from screen readers: whatever shows it is
-// labeled itself. 16px, or 20px where it's `large`.
-defineProps<{ name: string; size?: "large" }>();
+// labeled itself. 16px, 20px where it's `large`, or 32px where it stands
+// for a whole part of the window (`huge`).
+defineProps<{ name: string; size?: "large" | "huge" }>();
 </script>
 
 <template>

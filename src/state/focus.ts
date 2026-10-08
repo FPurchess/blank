@@ -3,6 +3,7 @@ import { computed, shallowRef } from "vue";
 import { blocksPaneFocused } from "./blocksPane";
 import { focusTakingDialogs } from "./dialogs";
 import { findFocused } from "./find";
+import { pdfViewFocused } from "./pdf";
 import { contextMenu, tableToolbar } from "./popups";
 import { tabRowFocused } from "./tabs";
 import { toolbarFocused } from "./toolbar";
@@ -10,9 +11,9 @@ import { toolbarFocused } from "./toolbar";
 // uiTakesFocus is whether a part of the UI holds the focus, which the editor
 // leaves it: the dialogs, the header and footer strips, the context menu and
 // the caption field of the table toolbar, and the blocks pane, the tab row,
-// the formatting toolbar and the find panel while the focus is in them. The
-// pickers and the table and block toolbars' buttons never take it, since the
-// editor handles their keys.
+// the formatting toolbar, the find panel and the pages of a PDF while the
+// focus is in them. The pickers and the table and block toolbars' buttons
+// never take it, since the editor handles their keys.
 export const uiTakesFocus = computed(
   () =>
     focusTakingDialogs.some((request) => request.value !== null) ||
@@ -21,6 +22,7 @@ export const uiTakesFocus = computed(
     tabRowFocused.value ||
     toolbarFocused.value ||
     findFocused.value ||
+    pdfViewFocused.value ||
     !!tableToolbar.value?.caption,
 );
 

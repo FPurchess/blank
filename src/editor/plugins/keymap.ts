@@ -80,6 +80,7 @@ import {
 } from "../commands/indent";
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
+import { forPdf, showSignatures } from "../../pdf/commands";
 import { setTextblock } from "../commands/setTextblock";
 import { clearRecentFiles } from "../commands/recentFiles";
 import { zoomBy, zoomFit } from "../commands/zoom";
@@ -197,6 +198,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EDIT_FOOTER]: editBand("footer"),
   [CommandIdentifier.VIEW_PAGES]: togglePageView(),
   [CommandIdentifier.VIEW_OUTLINE]: showOutline(),
+  [CommandIdentifier.VIEW_SIGNATURES]: showSignatures(),
   [CommandIdentifier.VIEW_FOCUS_NEXT]: moveFocus(1),
   [CommandIdentifier.VIEW_FOCUS_PREVIOUS]: moveFocus(-1),
   [CommandIdentifier.VIEW_TOOLBAR_FOCUS]: (_state, dispatch) => {
@@ -238,7 +240,8 @@ const clicked = new Map<CommandIdentifier, Command>();
 export const commandFor = (id: CommandIdentifier): Command => {
   let command = clicked.get(id);
   if (!command) {
-    command = recorded(id, commandMap[id], false);
+    // a command a PDF tab refuses isn't remembered
+    command = forPdf(id, recorded(id, commandMap[id], false));
     clicked.set(id, command);
   }
   return command;
@@ -267,9 +270,10 @@ const keyCommands: Partial<Record<CommandIdentifier, Command>> = {
   ),
 };
 
-// the command the key of `id` runs
+// the command the key of `id` runs, remembered when it runs; in a PDF tab
+// one that doesn't run there says why instead, unremembered
 const keyCommandFor = (id: CommandIdentifier): Command =>
-  keyCommands[id] ?? commandMap[id];
+  forPdf(id, recorded(id, keyCommands[id] ?? commandMap[id], true));
 
 /**
  * bindingsOf binds the commands `ids` to their configured keys, and then to
@@ -290,7 +294,7 @@ const bindingsOf = (
       invalid.push(`${id}: ${binding}`);
       continue;
     }
-    const command = recorded(id, keyCommandFor(id), true);
+    const command = keyCommandFor(id);
     bindings[normalized] = command;
     // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
     // on Windows, where the keymap can't fall back to the key code
@@ -306,7 +310,7 @@ const bindingsOf = (
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
       if (!configured.some((binding) => sameBinding(binding, key)))
-        bindings[key] = recorded(id, keyCommandFor(id), true);
+        bindings[key] = keyCommandFor(id);
     }
   }
   return bindings;

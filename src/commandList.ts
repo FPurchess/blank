@@ -339,6 +339,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "outline",
     aliases: ["headings", "toc", "navigation"],
   },
+  [C.VIEW_SIGNATURES]: {
+    group: "View",
+    label: "Signatures of the PDF",
+    icon: "seal",
+    aliases: ["verify", "check", "signed", "certificate"],
+  },
   [C.VIEW_FOCUS_NEXT]: {
     group: "View",
     label: "Next part of the window",

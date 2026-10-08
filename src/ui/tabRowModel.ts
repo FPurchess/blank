@@ -1,7 +1,7 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { commandItem } from "../commandList";
 import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
-import type { MenuItem, Tab } from "../state";
+import { isPdfTab, type MenuItem, type Tab } from "../state";
 import { scrollFor } from "./scrollModel";
 import { stepTo } from "./rovingModel";
 
@@ -149,23 +149,29 @@ export const tabMenu = (
       disabled: index === count - 1,
       run: () => actions.closeRight(tab.id),
     },
-    "separator",
-    commandItem("save", C.FILE_SAVE, {
-      icon: "save",
-      ...keys,
-      run: () => actions.save(tab.id, false),
-    }),
-    commandItem("save-as", C.FILE_SAVE_AS, {
-      ...keys,
-      run: () => actions.save(tab.id, true),
-    }),
-    commandItem("print", C.FILE_PRINT, {
-      ...keys,
-      disabled: !printable,
-      // says why it's disabled, not only that it is
-      detail: printable ? undefined : PRINT_UNAVAILABLE_SHORT,
-      run: () => actions.print(tab.id),
-    }),
+    // a PDF tab has nothing to save: Blank never changes the PDF. It has
+    // nothing to print from Blank's print dialog yet either.
+    ...(isPdfTab(tab)
+      ? []
+      : [
+          "separator" as const,
+          commandItem("save", C.FILE_SAVE, {
+            icon: "save",
+            ...keys,
+            run: () => actions.save(tab.id, false),
+          }),
+          commandItem("save-as", C.FILE_SAVE_AS, {
+            ...keys,
+            run: () => actions.save(tab.id, true),
+          }),
+          commandItem("print", C.FILE_PRINT, {
+            ...keys,
+            disabled: !printable,
+            // says why it's disabled, not only that it is
+            detail: printable ? undefined : PRINT_UNAVAILABLE_SHORT,
+            run: () => actions.print(tab.id),
+          }),
+        ]),
     ...(tab.path === null
       ? []
       : [
