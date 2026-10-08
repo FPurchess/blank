@@ -506,7 +506,35 @@ interface MupdfLibrary {
   name: string;
   license: string;
   files: string[];
+  // the licence is the files' header, not the whole file
+  header?: boolean;
 }
+
+/**
+ * headerOf returns the licence a source file states near its top: a C
+ * file's comments that hold a copyright or permission notice, or a CMap's
+ * `%%Copyright:` lines, without their markers
+ */
+const headerOf = (text: string, path: string) => {
+  const copyright = text
+    .split("\n")
+    .filter((line) => line.startsWith("%%Copyright:"))
+    .map((line) => line.slice("%%Copyright:".length).replace(/^ /, ""))
+    .filter((line) => !/^-+$/.test(line));
+  if (copyright.length > 0) return copyright.join("\n");
+  const comments = [...text.matchAll(/\/\*([\s\S]*?)\*\//g)]
+    .map(([, body]) =>
+      body
+        .split("\n")
+        .map((line) => line.replace(/^\s*\*?[ \t]?/, "").replace(/\t/g, "  "))
+        .join("\n")
+        .trim(),
+    )
+    .filter((body) => /Copyright|Permission/.test(body));
+  if (comments.length === 0)
+    throw new Error(`${path} states no licence in a comment`);
+  return comments.join("\n\n");
+};
 
 // the licences of what the PDF helper compiles in from the submodule, read
 // from its files, so they follow the version it pins
@@ -515,7 +543,7 @@ const mupdfNotices = () => {
     readFileSync(join(root, "scripts", "notices", "mupdf.toml"), "utf8"),
   ) as { library: MupdfLibrary[] };
   const mupdf = join(root, "src-tauri", "pdf", "mupdf-sys", "mupdf");
-  return list.library.map(({ name, license, files }) => ({
+  return list.library.map(({ name, license, files, header }) => ({
     title: `${name} (${license})`,
     text: files
       .map((file) => {
@@ -525,7 +553,8 @@ const mupdfNotices = () => {
             `${path} is missing: git submodule update --init --recursive, or fix scripts/notices/mupdf.toml`,
           );
         }
-        return readFileSync(path, "utf8").trim();
+        const text = readFileSync(path, "utf8");
+        return (header ? headerOf(text, path) : text).trim();
       })
       .join("\n\n"),
   }));

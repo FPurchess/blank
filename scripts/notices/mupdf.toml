@@ -53,3 +53,54 @@ name = "zlib"
 thirdparty = "zlib"
 license = "Zlib"
 files = ["thirdparty/zlib/LICENSE"]
+
+# Built into MuPDF itself from its sources, each with its licence in its
+# header, which `header = true` quotes (scripts/build-notices.ts).
+# scripts/check-mupdf-notices.ts fails when libmupdf.a compiles a source
+# whose header holds a copyright other than Artifex's that isn't listed here,
+# or the CMaps without them.
+
+[[library]]
+name = "Adobe CMaps (resources/cmaps)"
+license = "BSD-3-Clause"
+# the CMaps of Adobe's cmap-resources carry one of these two notices; the
+# Uni*-X tables MuPDF derives from them carry none of their own
+files = ["resources/cmaps/Adobe-Japan1-UCS2", "resources/cmaps/UniCNS-UTF16-V"]
+header = true
+
+[[library]]
+name = "UCDN (source/fitz/ucdn.c)"
+license = "ISC"
+files = ["source/fitz/ucdn.c"]
+header = true
+
+[[library]]
+name = "Arcfour (source/fitz/crypt-arc4.c)"
+license = "BSD-style"
+files = ["source/fitz/crypt-arc4.c"]
+header = true
+
+[[library]]
+name = "AES, from XySSL (source/fitz/crypt-aes.c)"
+license = "BSD-3-Clause"
+files = ["source/fitz/crypt-aes.c"]
+header = true
+
+[[library]]
+name = "Grisu2 float to string (source/fitz/ftoa.c)"
+license = "MIT"
+files = ["source/fitz/ftoa.c"]
+header = true
+
+[[library]]
+name = "MD5 by Alexander Peslyak (source/fitz/crypt-md5.c)"
+license = "public domain, or a cut-down BSD licence"
+files = ["source/fitz/crypt-md5.c"]
+header = true
+
+[[library]]
+name = "Unicode bidirectional algorithm (source/fitz/bidi.c)"
+# no licence terms of its own; it comes with MuPDF under MuPDF's
+license = "notice only"
+files = ["source/fitz/bidi.c"]
+header = true
