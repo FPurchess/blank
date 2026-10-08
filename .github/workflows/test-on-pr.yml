@@ -83,6 +83,21 @@ jobs:
           echo "the PDF helper's minos: $minos"
           [ "$minos" = 12.0 ]
 
+      # publish.yml builds the Intel release on this Apple Silicon runner: the
+      # PDF helper (MuPDF's C build too) has to cross-build for x86_64, for
+      # macOS 12
+      - name: cross-build the PDF helper for Intel Macs (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          rustup target add x86_64-apple-darwin
+          TAURI_ENV_TARGET_TRIPLE=x86_64-apple-darwin bun run pdf-helper
+          helper=src-tauri/binaries/blank-pdf-x86_64-apple-darwin
+          lipo -archs "$helper" | tee "$RUNNER_TEMP/archs.txt"
+          [ "$(cat "$RUNNER_TEMP/archs.txt")" = x86_64 ]
+          minos=$(vtool -show-build "$helper" | awk '/minos/ { print $2; exit }')
+          echo "the Intel PDF helper's minos: $minos"
+          [ "$minos" = 12.0 ]
+
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
