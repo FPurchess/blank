@@ -10,8 +10,10 @@ import {
   type FlatRecord,
   type FrozenWidths,
   type ImageSizes,
+  type FlattenOptions,
   type SignedBlock,
 } from "./flatten";
+import type { DateStyle } from "../markdown/blocks/signature";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
 import { engineMissing } from "../state/pageView";
@@ -157,9 +159,32 @@ export interface SyncOptions {
   sizesKey?: string;
   // top-level blocks to flatten again, e.g. those whose image loaded
   blocks?: readonly number[];
-  // the signature block a signed export fills in, see flatten
+  // the signature block a signed export fills in, and how signature
+  // blocks write their dates (see FlattenOptions); another than the last
+  // sync's flattens the whole document again, so no block keeps what an
+  // earlier sync filled in
   signed?: SignedBlock | null;
+  dates?: DateStyle;
 }
+
+// a number for each signed block a sync was given, so another one is told
+// apart from the last however alike they are
+const signedIds = new WeakMap<SignedBlock, number>();
+let signedCount = 0;
+
+/**
+ * flatteningKeyOf returns what tells the options a sync flattens with apart
+ */
+const flatteningKeyOf = (
+  signed: SignedBlock | null,
+  dates: DateStyle | undefined,
+) => {
+  if (signed && !signedIds.has(signed)) signedIds.set(signed, ++signedCount);
+  return [
+    signed ? signedIds.get(signed) : "",
+    dates ? `${dates.format}:${dates.language}` : "",
+  ].join("|");
+};
 
 // flattening more blocks than this again costs about as much as flattening
 // all of them, which then compares cheaper
@@ -287,8 +312,10 @@ export class PageEngine {
   private sizesKey = "";
   private settings = "";
   private frozen = "";
-  // the signature block a signed export fills in, see SyncOptions
-  private signed: SignedBlock | null = null;
+  // what the records were flattened with besides the document, see
+  // SyncOptions
+  private flattening: FlattenOptions = {};
+  private flatteningKey = "";
   // what each page's body and bands show, by their own versions
   private bodies = new Map<number, { version: number; display: PageDisplay }>();
   private bandsShown = new Map<
@@ -461,15 +488,21 @@ export class PageEngine {
       sizesKey = "",
       blocks = [],
       signed = null,
+      dates,
     }: SyncOptions,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
-    const same = frozenKey === this.frozen && sizesKey === this.sizesKey;
+    const flatteningKey = flatteningKeyOf(signed, dates);
+    const same =
+      frozenKey === this.frozen &&
+      sizesKey === this.sizesKey &&
+      flatteningKey === this.flatteningKey;
     const unchanged = doc === this.doc;
     if (unchanged && same && blocks.length === 0) return false;
     this.frozen = frozenKey;
     this.sizesKey = sizesKey;
-    this.signed = signed;
+    this.flatteningKey = flatteningKey;
+    this.flattening = { signed, dates };
     // what is still to lay out goes first, so the engine has all of it
     this.finish();
     const ranges = unchanged ? [] : changes?.ranges;
@@ -497,7 +530,7 @@ export class PageEngine {
       doc.childCount,
       sizes,
       frozen,
-      this.signed,
+      this.flattening,
     );
     const records = blocks.flat();
     if (this.doc === null) {
@@ -573,7 +606,7 @@ export class PageEngine {
         to + 1,
         sizes,
         frozen,
-        this.signed,
+        this.flattening,
       );
       const records = fresh.flat();
       const start = this.blockStarts[oldFrom + moved];

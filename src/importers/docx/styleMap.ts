@@ -1,9 +1,9 @@
 import { STYLE_NAMES } from "../../exporters/docx/styleNames";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
-import { ATOM_STYLE } from "./toc";
 import { FORM_STYLE } from "./forms";
 import { EMBED_STYLE } from "./embeds";
 import { ALIGN_CLASS, alignStyle, WORD_ALIGNMENTS } from "./align";
+import { ATOM_STYLE } from "./xml";
 
 // How the styles of Word, LibreOffice, pandoc and Blank's own Word export
 // (src/exporters/docx/template.ts) map to the HTML the markdown schema reads.

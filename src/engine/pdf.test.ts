@@ -170,6 +170,106 @@ describe("the PDF to print", () => {
   );
 });
 
+// a lease whose signature block is on its second page, and the export that
+// fills it in, as Export signed PDF does
+const signedState = () =>
+  EditorState.create({
+    schema,
+    doc: parseMarkdown(
+      [
+        "The tenant rents the flat.",
+        "<!-- pagebreak -->",
+        '<!-- blank:signature@1 role="Tenant" -->',
+      ].join("\n\n"),
+    ),
+  });
+const signedPos = (state: EditorState) => {
+  let pos = -1;
+  state.doc.forEach((node, offset) => {
+    if (node.type.name === "signature") pos = offset;
+  });
+  return pos;
+};
+const exportSigned = (state = signedState()) =>
+  toPDF(state, {
+    docPath: null,
+    layout: testLayout(),
+    signed: {
+      pos: signedPos(state),
+      src: `data:image/png;base64,${IMAGES.png}`,
+      signing: {
+        name: "Ada Lovelace",
+        place: "Berlin",
+        date: new Date(2026, 9, 8),
+        format: "long",
+        language: "en-GB",
+      },
+    },
+  });
+
+describe("a signed PDF", () => {
+  beforeEach(() => testEngine());
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "shows the signature, who signed, where and when in the block, and says where it is",
+    async () => {
+      const { contents, signatureBox } = await exportSigned();
+      const file = join(dir, "signed.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      expect(text).toContain("Ada Lovelace · Tenant");
+      expect(text).toContain("Berlin, 8 October 2026");
+      // the hint is the screen's only
+      expect(text).not.toMatch(/\bSignature\b/);
+      // the picture, once, on the second page
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      const rows = images.split("\n").slice(2).filter(Boolean);
+      expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(["2"]);
+      // the words in the box the signature's field goes over, in points
+      // from the top left of its page
+      expect(signatureBox?.page).toBe(1);
+      const box = signatureBox!;
+      const pages = execFileSync("pdftotext", ["-bbox", file, "-"], {
+        encoding: "utf8",
+      }).split("<page ");
+      for (const word of ["Ada", "Berlin,"]) {
+        const match = new RegExp(
+          `<word xMin="([\\d.]+)" yMin="([\\d.]+)" xMax="([\\d.]+)" yMax="([\\d.]+)">${word}</word>`,
+        ).exec(pages[2]);
+        expect(match, word).not.toBeNull();
+        const [xMin, yMin, xMax, yMax] = match!.slice(1).map(Number);
+        expect(xMin).toBeGreaterThanOrEqual(box.x - 0.5);
+        expect(yMin).toBeGreaterThanOrEqual(box.y - 0.5);
+        expect(xMax).toBeLessThanOrEqual(box.x + box.width + 0.5);
+        expect(yMax).toBeLessThanOrEqual(box.y + box.height + 0.5);
+      }
+    },
+  );
+
+  it("isn't written without the signature's picture", async () => {
+    const state = signedState();
+    await expect(
+      toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+        signed: {
+          pos: signedPos(state),
+          src: "data:image/png;base64,AAAA",
+          signing: {
+            name: "Ada",
+            place: "",
+            date: new Date(),
+            format: "iso",
+            language: "en",
+          },
+        },
+      }),
+    ).rejects.toThrow("your signature's picture can't be read");
+  });
+});
+
 describe("the PDF's fonts", () => {
   beforeEach(() => testEngine());
 
@@ -335,6 +435,15 @@ describe("the PDF export after the engine trapped", () => {
       expect(info).toMatch(/Pages:\s+1\n/);
     },
   );
+
+  it("finds the signed block in the worker's PDF too", async () => {
+    const { signatureBox } = await exportSigned();
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    const fromWorker = await exportSigned();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].signedPos).toBe(signedPos(signedState()));
+    expect(fromWorker.signatureBox).toEqual(signatureBox);
+  });
 
   it("fails on an error of its own that isn't a trap, without a worker", async () => {
     vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(() => {

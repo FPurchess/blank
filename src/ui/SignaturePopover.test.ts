@@ -38,8 +38,14 @@ describe("the settings of a signature block", () => {
   it("opens on the role, with the block's settings", () => {
     expect(document.activeElement).toBe(field("role"));
     expect(field<HTMLInputElement>("role").value).toBe("Tenant");
-    expect(field<HTMLSelectElement>("date").value).toBe("signing");
-    expect(field<HTMLSelectElement>("width").value).toBe("");
+    const checked = (row: string) =>
+      document
+        .querySelector(
+          `#signature-popover [data-row=${row}] [aria-checked=true]`,
+        )!
+        .textContent!.trim();
+    expect(checked("date")).toBe("When signed");
+    expect(checked("width")).toBe("50%");
   });
 
   it("applies each change at once", async () => {
@@ -49,17 +55,22 @@ describe("the settings of a signature block", () => {
     expect(request.apply).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: "Ada Lovelace", role: "Tenant" }),
     );
-    const date = field<HTMLSelectElement>("date");
-    date.value = "fixed";
-    date.dispatchEvent(new Event("change"));
+    const choose = (row: string, label: string) =>
+      [
+        ...document.querySelectorAll<HTMLButtonElement>(
+          `#signature-popover [data-row=${row}] button`,
+        ),
+      ]
+        .find((button) => button.textContent!.trim() === label)!
+        .click();
+    choose("date", "Fixed date");
     await nextTick();
     // a fixed date shows its field, today to start with
     expect(field<HTMLInputElement>("fixed").value).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );
-    const width = field<HTMLSelectElement>("width");
-    width.value = "75%";
-    width.dispatchEvent(new Event("change"));
+    choose("width", "75%");
+    await nextTick();
     expect(request.apply).toHaveBeenLastCalledWith(
       expect.objectContaining({ width: "75%" }),
     );

@@ -3,8 +3,7 @@ import type JSZip from "jszip";
 import { SIGNATURE_TAG } from "../../exporters/docx/forms";
 import { formatAtom, readAtom } from "../../markdown";
 import { SIGNATURE_DEFAULTS } from "../../markdown/blocks/atoms";
-import { ATOM_STYLE } from "./toc";
-import { child, markerParagraph, val, W } from "./xml";
+import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
 
 // Signature blocks from Word, before mammoth, which would keep only their
 // text:
@@ -32,6 +31,31 @@ const hiddenText = (element: Element) =>
     )
     .join("")
     .trim();
+
+/**
+ * ancestor returns the nearest element named `name` in Word's namespace
+ * that holds `element`
+ */
+const ancestor = (element: Element, name: string) => {
+  let current: Element | null = element.parentElement;
+  while (current && !(current.namespaceURI === W && current.localName === name))
+    current = current.parentElement;
+  return current;
+};
+
+/**
+ * holdsMore tells whether `paragraph` holds text or pictures besides `run`
+ */
+const holdsMore = (paragraph: Element, run: Element) =>
+  [
+    ...paragraph.getElementsByTagNameNS(W, "t"),
+    ...paragraph.getElementsByTagNameNS(W, "drawing"),
+    ...paragraph.getElementsByTagNameNS(W, "pict"),
+  ].some(
+    (element) =>
+      !run.contains(element) &&
+      (element.localName !== "t" || !!element.textContent?.trim()),
+  );
 
 /**
  * signatureLine returns the marker line of the signature block a Word
@@ -71,18 +95,18 @@ export const markSignatures = async (zip: JSZip) => {
     changed = true;
   }
   for (const line of [...doc.getElementsByTagNameNS(OFFICE, "signatureline")]) {
-    // the paragraph the signature line's picture stands in
-    let paragraph: Element | null = line;
-    while (
-      paragraph &&
-      !(paragraph.namespaceURI === W && paragraph.localName === "p")
-    ) {
-      paragraph = paragraph.parentElement;
+    // the run holding the signature line's picture, and its paragraph
+    const run = ancestor(line, "r");
+    const paragraph = ancestor(line, "p");
+    if (!run || !paragraph?.parentNode) continue;
+    const marker = markerParagraph(doc, ATOM_STYLE, signatureLine(line));
+    if (holdsMore(paragraph, run)) {
+      // the paragraph's other content stays, the block after it
+      paragraph.after(marker);
+      run.remove();
+    } else {
+      paragraph.replaceWith(marker);
     }
-    if (!paragraph?.parentNode) continue;
-    paragraph.replaceWith(
-      markerParagraph(doc, ATOM_STYLE, signatureLine(line)),
-    );
     changed = true;
   }
   if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));

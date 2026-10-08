@@ -80,8 +80,9 @@ const readSource = (value: unknown): MarkSource | null => {
  * a file that can't be used
  */
 export const readMark = async (mark: Mark): Promise<SavedMark | null> => {
-  const file = await fileOf(mark);
+  let file: string = mark;
   try {
+    file = await fileOf(mark);
     if (!(await exists(file))) return null;
     const saved = JSON.parse(await readTextFile(file)) as Record<
       string,

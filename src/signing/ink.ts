@@ -15,7 +15,7 @@ const lightness = (data: Uint8ClampedArray, offset: number) =>
  * (Otsu's method: the split with the most variance between the two) and
  * returns how light each is on average
  */
-export const otsu = (pixels: Pixels) => {
+const otsu = (pixels: Pixels) => {
   const histogram = new Array<number>(256).fill(0);
   let count = 0;
   for (let offset = 0; offset < pixels.data.length; offset += 4) {
@@ -67,7 +67,7 @@ export const removeBackground = (pixels: Pixels): Pixels => {
  * inkBox returns the box of the pixels that aren't transparent, or null for
  * a picture without ink
  */
-export const inkBox = ({ data, width, height }: Pixels) => {
+const inkBox = ({ data, width, height }: Pixels) => {
   let [left, top, right, bottom] = [width, height, -1, -1];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {

@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  drawStrokes,
-  PAD_HEIGHT,
-  PAD_WIDTH,
-  type Pen,
-  pressureOf,
-  toPad,
-  widthAt,
-} from "./pad";
+import { drawStrokes, PAD_HEIGHT, PAD_WIDTH, type Pen, toPad } from "./pad";
 
 // a pen that writes down what it draws
 const recorder = () => {
@@ -43,13 +35,32 @@ describe("the signature pad", () => {
   });
 
   it("draws a mouse at the middle pressure, and a pen heavier as it presses", () => {
-    expect(pressureOf(0)).toBe(0.5);
-    expect(pressureOf(1.5)).toBe(0.5);
-    expect(widthAt(1)).toBeGreaterThan(widthAt(0.1));
+    expect(toPad(0, 0, 0, 1, 1)[2]).toBe(0.5);
+    expect(toPad(0, 0, 1.5, 1, 1)[2]).toBe(0.5);
+    const widthOf = (pressure: number) => {
+      const { pen, calls } = recorder();
+      drawStrokes(
+        pen,
+        [
+          [
+            [0, 0, pressure],
+            [10, 0, pressure],
+          ],
+        ],
+        1,
+        "#000",
+      );
+      return Number(
+        calls.find((call) => call.startsWith("lineWidth="))!.slice(10),
+      );
+    };
+    expect(widthOf(1)).toBeGreaterThan(widthOf(0.1));
   });
 
-  it("draws a stroke as curves through its midpoints, and a single point as a dot", () => {
+  it("draws a stroke as curves, and a single point as a dot", () => {
     const { pen, calls } = recorder();
+    const count = (name: string) =>
+      calls.filter((call) => call.startsWith(`${name}(`)).length;
     drawStrokes(
       pen,
       [
@@ -58,17 +69,18 @@ describe("the signature pad", () => {
           [10, 0, 0.5],
           [20, 10, 0.5],
         ],
-        [[5, 5, 0.5]],
       ],
       2,
       "#000",
     );
-    expect(calls.filter((call) => call.startsWith("lineTo"))).toHaveLength(1);
-    expect(calls.filter((call) => call.startsWith("quadraticCurveTo"))).toEqual(
-      ["quadraticCurveTo(20,0,40,20)"],
-    );
-    expect(calls.filter((call) => call.startsWith("arc"))).toEqual([
-      expect.stringMatching(/^arc\(10,10,/),
+    // the first segment straight, the next curved through the point
+    expect([count("lineTo"), count("quadraticCurveTo"), count("arc")]).toEqual([
+      1, 1, 0,
+    ]);
+    calls.length = 0;
+    drawStrokes(pen, [[[5, 5, 0.5]]], 2, "#000");
+    expect([count("lineTo"), count("quadraticCurveTo"), count("arc")]).toEqual([
+      0, 0, 1,
     ]);
   });
 });

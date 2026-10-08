@@ -8,12 +8,14 @@ import {
 } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import TextField from "./components/TextField.vue";
-import { checkCertificate } from "./certificateDialogModel";
+import { busyNote, checkCertificate } from "./certificateDialogModel";
 
 // Makes the user a certificate to sign with, or opens a key file they have
 // (Settings ▸ Signing, or the Sign dialog): the passphrase that protects
 // their key, and for a new one their name and email. What goes wrong, a
 // wrong passphrase above all, is said in the dialog, which stays open.
+// Making or opening a key takes a few seconds, which the dialog says; it
+// can't be cancelled meanwhile, since the certificate would still come.
 const props = defineProps<{ request: CertificateDialogRequest }>();
 
 const creating = props.request.mode === "create";
@@ -42,6 +44,14 @@ onMounted(() => (nameField.value ?? passphraseField.value)!.select());
 
 const close = (callback: () => void) =>
   closeDialog(certificateDialog, callback);
+const cancel = () => {
+  if (!working.value) close(props.request.cancel);
+};
+// which field what's wrong is about
+const errorFor = (field: "name" | "passphrase" | "again") =>
+  error.value && (check.value.field ?? "passphrase") === field
+    ? "certificate-dialog-error"
+    : undefined;
 const typed = () => {
   failure.value = "";
 };
@@ -56,7 +66,7 @@ const submit = async () => {
       passphrase: passphrase.value,
     })) ?? "";
   working.value = false;
-  if (!failure.value) close(() => undefined);
+  if (!failure.value) close(props.request.done);
 };
 </script>
 
@@ -66,7 +76,7 @@ const submit = async () => {
     :title="creating ? 'Create certificate' : 'Import certificate'"
     form-class="certificate-dialog"
     @submit="submit"
-    @cancel="close(request.cancel)"
+    @cancel="cancel"
   >
     <template v-if="creating">
       <TextField
@@ -74,9 +84,7 @@ const submit = async () => {
         ref="nameField"
         v-model="name"
         label="Name"
-        :error-id="
-          check.field === 'name' ? 'certificate-dialog-error' : undefined
-        "
+        :error-id="errorFor('name')"
         @input="typed"
       />
       <TextField
@@ -94,9 +102,7 @@ const submit = async () => {
       v-model="passphrase"
       type="password"
       label="Passphrase"
-      :error-id="
-        error && check.field !== 'name' ? 'certificate-dialog-error' : undefined
-      "
+      :error-id="errorFor('passphrase')"
       @input="typed"
     />
     <TextField
@@ -105,19 +111,31 @@ const submit = async () => {
       v-model="again"
       type="password"
       label="Passphrase again"
+      :error-id="errorFor('again')"
       @input="typed"
     />
     <p id="certificate-dialog-error" class="error" aria-live="polite">
       {{ error }}
+    </p>
+    <p id="certificate-dialog-status" class="note" aria-live="polite">
+      {{ working ? busyNote(creating) : "" }}
     </p>
     <p v-if="creating" class="note">
       Blank keeps your key on this computer, protected by the passphrase. Blank
       can't recover a forgotten passphrase, so back up your key.
     </p>
     <template #actions>
-      <button type="button" @click="close(request.cancel)">Cancel</button>
+      <button type="button" :disabled="working" @click="cancel">Cancel</button>
       <button type="submit" :disabled="working">
-        {{ creating ? "Create" : "Import" }}
+        {{
+          working
+            ? creating
+              ? "Creating…"
+              : "Importing…"
+            : creating
+              ? "Create"
+              : "Import"
+        }}
       </button>
     </template>
   </BaseDialog>

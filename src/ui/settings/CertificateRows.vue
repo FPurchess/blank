@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from "vue";
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  shallowRef,
+  useTemplateRef,
+} from "vue";
 
 import { config } from "../../config";
+import { focusBack } from "../../dom";
+import { logWarning } from "../../log";
 import { signingCertificate } from "../../state";
 import {
-  forgetCertificate,
+  confirmRemoval,
   loadCertificate,
   openCertificateDialog,
   saveCertificate,
@@ -26,11 +34,41 @@ onMounted(() => void loadCertificate());
 const summary = computed(() =>
   signingCertificate.value ? certificateSummary(signingCertificate.value) : "",
 );
+// the first button of the certificate's row, which takes the focus when
+// the button that had it goes, e.g. Create… once the certificate is made
+const certificateButton = () =>
+  document.querySelector<HTMLElement>("#settings-certificate .edit");
+const create = (mode: "create" | "import", event: Event) =>
+  void openCertificateDialog(
+    mode,
+    focusBack(event.currentTarget, certificateButton),
+  );
+const remove = (event: Event) =>
+  confirmRemoval(focusBack(event.currentTarget, certificateButton));
+
+// "Copied" for a moment, or until the button is left
 const copied = shallowRef(false);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+const uncopied = () => {
+  clearTimeout(copiedTimer);
+  copied.value = false;
+};
+onUnmounted(uncopied);
+const fingerprint = useTemplateRef<HTMLElement>("fingerprint");
 const copy = async () => {
   if (!signingCertificate.value) return;
-  await navigator.clipboard.writeText(signingCertificate.value.fingerprint);
+  try {
+    await navigator.clipboard.writeText(signingCertificate.value.fingerprint);
+  } catch (error) {
+    // the clipboard refused: the fingerprint selected, to copy by hand
+    logWarning("failed to copy the fingerprint", error);
+    const code = fingerprint.value;
+    if (code) window.getSelection()?.selectAllChildren(code);
+    return;
+  }
   copied.value = true;
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(uncopied, 2000);
 };
 
 // the server as typed, saved when it's left or Enter is pressed
@@ -71,9 +109,7 @@ const usePreset = () => {
         <button type="button" class="edit" @click="saveCertificate(true)">
           Back up key…
         </button>
-        <button type="button" class="edit" @click="forgetCertificate">
-          Remove
-        </button>
+        <button type="button" class="edit" @click="remove">Remove</button>
       </div>
     </SettingRow>
     <SettingRow
@@ -83,10 +119,10 @@ const usePreset = () => {
       description="Tell it to those you send signed PDFs, so they can trust your certificate"
     >
       <div class="signing-mark">
-        <code class="fingerprint">{{
+        <code ref="fingerprint" class="fingerprint">{{
           groupFingerprint(signingCertificate.fingerprint)
         }}</code>
-        <button type="button" class="edit" @click="copy">
+        <button type="button" class="edit" @click="copy" @blur="uncopied">
           {{ copied ? "Copied" : "Copy" }}
         </button>
       </div>
@@ -100,18 +136,10 @@ const usePreset = () => {
     description="Signs your PDFs digitally, so anyone can check that you signed them and nothing changed since"
   >
     <div class="signing-mark">
-      <button
-        type="button"
-        class="edit"
-        @click="openCertificateDialog('create')"
-      >
+      <button type="button" class="edit" @click="create('create', $event)">
         Create…
       </button>
-      <button
-        type="button"
-        class="edit"
-        @click="openCertificateDialog('import')"
-      >
+      <button type="button" class="edit" @click="create('import', $event)">
         Import…
       </button>
     </div>
@@ -146,12 +174,7 @@ const usePreset = () => {
       </button>
     </div>
   </SettingRow>
-  <p
-    v-if="serverError"
-    id="settings-timestamp-error"
-    class="error"
-    role="alert"
-  >
+  <p id="settings-timestamp-error" class="error" aria-live="polite">
     {{ serverError }}
   </p>
 </template>

@@ -16,7 +16,8 @@ import { localeUnit } from "../../layout/paper";
 import { frontmatterOf } from "../../markdown";
 import { extname } from "../../paths";
 import { engineStatus } from "../../engine/engine";
-import { announce, path } from "../../state";
+import { announce, importedFrom, path } from "../../state";
+import type { DocumentFile } from "../document";
 import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
 import { logError } from "../../log";
@@ -30,12 +31,19 @@ export const PDF_UNAVAILABLE =
   "The PDF export needs the page layout, which couldn't start.";
 
 /**
- * isEmpty checks whether the document has neither text nor images
+ * isEmpty checks whether the document shows nothing: no text, no images,
+ * no blocks of their own like a rule, a signature block or a table of
+ * contents, no forms
  */
 export const isEmpty = (state: EditorState) => {
   let empty = state.doc.textContent.trim().length === 0;
   state.doc.descendants((node) => {
-    if (node.type.name === "image") empty = false;
+    if (
+      node.type.name === "image" ||
+      node.type.name === "form_block" ||
+      (node.isBlock && node.isAtom)
+    )
+      empty = false;
     return empty;
   });
   return empty;
@@ -51,24 +59,27 @@ export interface ExportRequest {
   // more of the context: the pages chosen to print, or the signature block
   // a signed PDF fills in
   context?: Pick<ExportContext, "pages" | "signed">;
-  // told the file it wrote, e.g. to remember where the user signed
-  written?: (dest: string) => void;
+  // told once the file is written, e.g. to remember where the user signed
+  written?: () => void;
   // what is written instead of the export's contents, e.g. the PDF signed
   finish?: (result: ExportResult) => Promise<Uint8Array>;
 }
 
 /**
- * canExport tells whether the document can be exported, and says why not:
- * an empty document, or a PDF without the page layout
+ * exportProblem tells why the document can't be exported, and says so: an
+ * empty document, or a PDF without the page layout; null when it can be
  */
-export const canExport = (state: EditorState, request: ExportRequest) => {
+export const exportProblem = (
+  state: EditorState,
+  request: ExportRequest,
+): "empty" | "noEngine" | null => {
   const { title, filters } = request;
   if (isEmpty(state)) {
     sendNotification({
       title,
       body: "Your document is empty. There is nothing to export.",
     });
-    return false;
+    return "empty";
   }
   // the PDF is written from the engine's layout. After the engine failed
   // while Blank ran, the export still works with one of its own (see
@@ -80,30 +91,29 @@ export const canExport = (state: EditorState, request: ExportRequest) => {
   ) {
     sendNotification({ title, body: PDF_UNAVAILABLE });
     announce(PDF_UNAVAILABLE);
-    return false;
+    return "noEngine";
   }
-  return true;
+  return null;
 };
 
 /**
  * runExport asks where to write the file, then exports the document there
  * and says how it went. The save dialog comes first, so cancelling it costs
  * nothing.
- * @param docPath the document's file, read before anything awaits, since
- *   another tab may show by then
+ * @param file where the document comes from, read before anything awaits,
+ *   since another tab may show by then
  */
 export const runExport = async (
   state: EditorState,
-  docPath: string | null,
+  file: DocumentFile,
   { title, exporter, filters, suffix, context, written, finish }: ExportRequest,
 ) => {
   const extension = filters?.[0]?.extensions[0];
+  const docPath = file.path;
   try {
     const dest = await save({
       filters,
-      defaultPath: extension
-        ? suggestPath(extension, undefined, suffix)
-        : undefined,
+      defaultPath: extension ? suggestPath(extension, file, suffix) : undefined,
     });
     if (dest === null) return;
 
@@ -122,7 +132,7 @@ export const runExport = async (
     const result = await exporter(state, { docPath, layout, ...context });
     const { warnings, pages } = result;
     await writeFile(dest, finish ? await finish(result) : result.contents);
-    written?.(dest);
+    written?.();
 
     // e.g. "Exported 3 A4 pages", or for Word, which lays out the pages
     // itself, "Exported on A4 pages"
@@ -152,8 +162,14 @@ export default (
     // to export, and nothing done
     if (!dispatch) return !isEmpty(state);
     const request = { title, exporter, filters };
-    if (!canExport(state, request)) return isEmpty(state) ? false : true;
+    // an empty document leaves the key to others
+    const problem = exportProblem(state, request);
+    if (problem) return problem !== "empty";
     // the document's file now, before another tab may show
-    void runExport(state, path.value, request);
+    void runExport(
+      state,
+      { path: path.value, importedFrom: importedFrom.value },
+      request,
+    );
     return true;
   };

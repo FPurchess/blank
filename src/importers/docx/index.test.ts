@@ -110,18 +110,34 @@ describe("importers.docx", () => {
       expect(await roundTrip(markdown)).toBe(markdown);
     });
 
-    it("come from Word's signature lines", async () => {
-      const bytes = await rewriteDocx(
-        await exportDocx("Sign here:\n\nline"),
-        "word/document.xml",
-        (xml = "") =>
-          xml.replace(
-            /<w:p>(?:(?!<w:p>).)*?line(?:(?!<w:p>).)*?<\/w:p>/s,
-            '<w:p><w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><v:shape><o:signatureline v:ext="edit" o:suggestedsigner="Ada Lovelace" o:suggestedsigner2="Tenant"/></v:shape></w:pict></w:r></w:p>',
+    const PICT =
+      '<w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><v:shape><o:signatureline v:ext="edit" o:suggestedsigner="Ada Lovelace" o:suggestedsigner2="Tenant"/></v:shape></w:pict></w:r>';
+    const withLine = async (paragraph: string) =>
+      (
+        await toMarkdown(
+          await rewriteDocx(
+            await exportDocx("Sign here:\n\nline"),
+            "word/document.xml",
+            (xml = "") =>
+              xml.replace(
+                /<w:p>(?:(?!<w:p>).)*?line(?:(?!<w:p>).)*?<\/w:p>/s,
+                paragraph,
+              ),
           ),
-      );
-      expect((await toMarkdown(bytes)).markdown).toBe(
+        )
+      ).markdown;
+
+    it("come from Word's signature lines", async () => {
+      expect(await withLine(`<w:p>${PICT}</w:p>`)).toBe(
         'Sign here:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
+      );
+    });
+
+    it("keep the text beside a signature line", async () => {
+      expect(
+        await withLine(`<w:p><w:r><w:t>Tenant:</w:t></w:r>${PICT}</w:p>`),
+      ).toBe(
+        'Sign here:\n\nTenant:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
       );
     });
   });

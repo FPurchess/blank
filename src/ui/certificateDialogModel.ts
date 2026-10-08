@@ -1,8 +1,20 @@
 // The dialog that makes or imports the user's certificate
 // (CertificateDialog.vue).
 
+/**
+ * busyNote says what the dialog is doing while the native side works on
+ * the key, which takes a few seconds
+ */
+export const busyNote = (creating: boolean) =>
+  creating
+    ? "Making your key. This takes a few seconds."
+    : "Opening your key file. This takes a few seconds.";
+
 // the shortest passphrase Blank takes for a new key
-export const MIN_PASSPHRASE = 8;
+const MIN_PASSPHRASE = 8;
+
+// the field what's wrong is about
+type Field = "name" | "passphrase" | "again";
 
 /**
  * checkCertificate says what's wrong with what's typed, once the user tries
@@ -16,8 +28,8 @@ export const checkCertificate = (
     again: string;
     submitted: boolean;
   },
-): { valid: boolean; error: string; field?: "name" | "passphrase" } => {
-  const problem = (field: "name" | "passphrase", error: string) => ({
+): { valid: boolean; error: string; field?: Field } => {
+  const problem = (field: Field, error: string) => ({
     valid: false,
     error: fields.submitted ? error : "",
     field: fields.submitted ? field : undefined,
@@ -33,7 +45,7 @@ export const checkCertificate = (
     );
   }
   if (creating && fields.passphrase !== fields.again) {
-    return problem("passphrase", "The passphrases aren't the same.");
+    return problem("again", "The passphrases aren't the same.");
   }
   return { valid: true, error: "" };
 };

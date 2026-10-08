@@ -51,16 +51,18 @@ const tab = shallowRef<PadTab>(start.tab);
 const strokes = shallowRef<Stroke[]>(start.strokes);
 const text = shallowRef(start.text);
 const font = shallowRef<SignatureFont>(start.font);
-const image = shallowRef<string | null>(
-  start.tab === "image" ? (props.request.saved?.png ?? null) : null,
-);
+// the saved picture shows on Image as it was saved, and saving it again
+// unchanged keeps it, rather than cleaning the cleaned picture once more
+const savedImage =
+  start.tab === "image" ? (props.request.saved?.png ?? null) : null;
+const image = shallowRef<string | null>(savedImage);
 const clean = shallowRef(true);
 const choosing = shallowRef(false);
 const saving = shallowRef(false);
 const submitted = shallowRef(false);
 const problem = computed(() =>
   submitted.value
-    ? problemOf(tab.value, {
+    ? problemOf(tab.value, props.request.mark, {
         strokes: strokes.value,
         text: text.value,
         image: image.value,
@@ -70,14 +72,15 @@ const problem = computed(() =>
 
 onMounted(() => void loadSignatureFonts());
 
-// the font choices are a radio group: ↑↓ choose the next
+// the font choices are a radio group in a column: every arrow chooses the
+// next or the one before
 const fonts = useTemplateRef<HTMLElement>("fonts");
 const { onKeydown: moveFont, follow: followFont } = useRovingFocus(
   () => fonts.value,
   "[role=radio]",
   SIGNATURE_FONTS.indexOf(start.font),
   (index) => (font.value = SIGNATURE_FONTS[index]),
-  "vertical",
+  "both",
 );
 // the dialog may close while the native file dialog is open
 let closed = false;
@@ -105,6 +108,11 @@ const sourceOf = (): MarkSource =>
 const submit = async () => {
   submitted.value = true;
   if (problem.value || saving.value) return;
+  // the saved picture, as it was: nothing to make again
+  if (tab.value === "image" && image.value === savedImage) {
+    close(props.request.done);
+    return;
+  }
   saving.value = true;
   const chosen =
     tab.value === "image" && image.value
@@ -117,8 +125,13 @@ const submit = async () => {
       return false;
     });
   saving.value = false;
-  if (saved && !closed) close(() => undefined);
+  if (saved && !closed) close(props.request.done);
 };
+// what is wrong, for the field or control it is about
+const errorId = computed(() =>
+  problem.value ? "signature-dialog-error" : undefined,
+);
+const what = props.request.mark;
 </script>
 
 <template>
@@ -133,11 +146,8 @@ const submit = async () => {
     <div v-if="tab === 'draw'" class="signature-panel">
       <SignaturePad
         v-model="strokes"
-        :label="
-          request.mark === 'signature'
-            ? 'Draw your signature'
-            : 'Draw your initials'
-        "
+        :label="`Draw your ${what}`"
+        :error-id="errorId"
       />
       <div class="signature-panel-foot">
         <button
@@ -155,6 +165,7 @@ const submit = async () => {
         id="signature-dialog-name"
         v-model="text"
         :label="request.mark === 'signature' ? 'Name' : 'Initials'"
+        :error-id="errorId"
       />
       <div
         ref="fonts"
@@ -190,11 +201,16 @@ const submit = async () => {
     </div>
     <div v-else class="signature-panel">
       <div class="signature-image">
-        <img v-if="image" :src="image" alt="Your signature as chosen" />
+        <img v-if="image" :src="image" :alt="`Your ${what} as chosen`" />
         <span v-else class="note"
-          >A photo or scan of your signature on white paper.</span
+          >A photo or scan of your {{ what }} on white paper.</span
         >
-        <button type="button" :disabled="choosing" @click="chooseFile">
+        <button
+          type="button"
+          :disabled="choosing"
+          :aria-describedby="errorId"
+          @click="chooseFile"
+        >
           {{ image ? "Choose another image…" : "Choose image…" }}
         </button>
       </div>

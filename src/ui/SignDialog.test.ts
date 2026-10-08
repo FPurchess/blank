@@ -20,8 +20,8 @@ describe("the dialog that signs", () => {
     request = {
       title: "lease",
       targets: [
-        { pos: 3, label: "Bea · Landlord" },
-        { pos: 9, label: "Tenant" },
+        { pos: 3, name: "Bea", label: "Bea · Landlord" },
+        { pos: 9, name: "", label: "Tenant" },
       ],
       chosen: 9,
       place: "Berlin",
@@ -60,7 +60,7 @@ describe("the dialog that signs", () => {
 
   it("offers no choice with one block, and shows its warnings", async () => {
     await open({
-      targets: [{ pos: 3, label: "Tenant" }],
+      targets: [{ pos: 3, name: "", label: "Tenant" }],
       chosen: 3,
       warnings: ["Check every page."],
     });
@@ -84,16 +84,28 @@ describe("the dialog that signs", () => {
     expect(signDialog.value).toBeNull();
   });
 
+  const CERTIFICATE = {
+    name: "Ada Lovelace",
+    issuer: "Ada Lovelace",
+    notBefore: "2026-10-08",
+    notAfter: "2031-10-08",
+    selfSigned: true,
+    fingerprint: "AB".repeat(32),
+  };
+
+  it("signs digitally with a certificate made from it", async () => {
+    signingCertificate.value = null;
+    await open();
+    expect(document.querySelector("#sign-dialog-passphrase")).toBeNull();
+    signingCertificate.value = CERTIFICATE;
+    await flushPromises();
+    expect(document.activeElement?.id).toBe("sign-dialog-passphrase");
+    signingCertificate.value = undefined;
+  });
+
   describe("with a certificate", () => {
     beforeEach(() => {
-      signingCertificate.value = {
-        name: "Ada Lovelace",
-        issuer: "Ada Lovelace",
-        notBefore: "2026-10-08",
-        notAfter: "2031-10-08",
-        selfSigned: true,
-        fingerprint: "AB".repeat(32),
-      };
+      signingCertificate.value = CERTIFICATE;
     });
     afterEach(() => {
       signingCertificate.value = undefined;
@@ -114,10 +126,21 @@ describe("the dialog that signs", () => {
       expect(
         document.getElementById("sign-dialog-error")!.textContent,
       ).toContain("Enter the passphrase");
-      request.check = vi.fn(async () => "The passphrase is wrong");
+      let answer: (failure: string | null) => void = () => {};
+      request.check = vi.fn(
+        () => new Promise<string | null>((resolve) => (answer = resolve)),
+      );
       passphrase().value = "wrong";
       passphrase().dispatchEvent(new Event("input"));
       submit();
+      await nextTick();
+      // checking takes a moment, which can't be cancelled
+      const [cancel, sign] = dialog()!.querySelectorAll<HTMLButtonElement>(
+        ".dialog-foot > button",
+      );
+      expect(sign.textContent!.trim()).toBe("Checking…");
+      expect(cancel.disabled).toBe(true);
+      answer("The passphrase is wrong");
       await flushPromises();
       expect(
         document.getElementById("sign-dialog-error")!.textContent,

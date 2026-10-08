@@ -37,6 +37,12 @@ export const recordingContext = (
     beginPath: () => calls.push(["beginPath"]),
     rect: (...args: number[]) => calls.push(["clipRect", ...args]),
     clip: () => calls.push(["clip"]),
+    // the pen of a signature pad
+    moveTo: (...args: number[]) => calls.push(["moveTo", ...args]),
+    lineTo: (...args: number[]) => calls.push(["lineTo", ...args]),
+    quadraticCurveTo: (...args: number[]) => calls.push(["curve", ...args]),
+    arc: (...args: number[]) => calls.push(["arc", ...args]),
+    stroke: () => calls.push(["stroke"]),
   };
   return { context: context as unknown as CanvasRenderingContext2D, calls };
 };

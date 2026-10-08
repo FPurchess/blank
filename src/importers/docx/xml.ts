@@ -47,6 +47,12 @@ export const val = (element: Element | undefined, name = "val") =>
 export const isOn = (element: Element | undefined) =>
   element !== undefined && !["0", "false", "off"].includes(val(element) ?? "");
 
+// the style of the marker paragraphs of blocks of one line, matched by its
+// id in styleMap.ts: tables of contents (./toc.ts) and signature blocks
+// (./signatures.ts); the paragraph holds the block's marker line
+// (src/markdown/blocks/atoms.ts)
+export const ATOM_STYLE = "BlankAtom";
+
 /**
  * markerParagraph returns a paragraph in the style `style`, holding `text`:
  * what the rewrites before mammoth mark what it would lose with, for

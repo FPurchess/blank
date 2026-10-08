@@ -30,6 +30,7 @@ describe("the dialog of the user's certificate", () => {
       name: "Ada Lovelace",
       file: "ada.p12",
       submit: vi.fn(async () => null),
+      done: vi.fn(),
       cancel: vi.fn(),
     };
     certificateDialog.value = request;
@@ -54,6 +55,7 @@ describe("the dialog of the user's certificate", () => {
     submit();
     await nextTick();
     expect(error()).toBe("The passphrases aren't the same.");
+    expect(field("again").getAttribute("aria-invalid")).toBe("true");
     expect(request.submit).not.toHaveBeenCalled();
     type("again", "correct horse");
     type("email", "ada@example.org");
@@ -65,6 +67,35 @@ describe("the dialog of the user's certificate", () => {
       passphrase: "correct horse",
     });
     expect(certificateDialog.value).toBeNull();
+    expect(request.done).toHaveBeenCalled();
+  });
+
+  it("says it's busy while the key is made, and can't be cancelled meanwhile", async () => {
+    await open("create");
+    let finish: (failure: string | null) => void = () => {};
+    request.submit = vi.fn(
+      () => new Promise<string | null>((resolve) => (finish = resolve)),
+    );
+    type("passphrase", "correct horse");
+    type("again", "correct horse");
+    submit();
+    await nextTick();
+    const [cancel, create] = dialog()!.querySelectorAll<HTMLButtonElement>(
+      ".dialog-foot > button",
+    );
+    expect(create.textContent!.trim()).toBe("Creating…");
+    expect(create.disabled && cancel.disabled).toBe(true);
+    expect(
+      document.getElementById("certificate-dialog-status")!.textContent,
+    ).toContain("Making your key");
+    dialog()!
+      .querySelector("form")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(certificateDialog.value).not.toBeNull();
+    finish(null);
+    await flushPromises();
+    expect(certificateDialog.value).toBeNull();
+    expect(request.cancel).not.toHaveBeenCalled();
   });
 
   it("stays open with what went wrong", async () => {

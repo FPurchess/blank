@@ -1,6 +1,6 @@
 // How the date next to a signature is written, in the document's language:
-// "8 October 2026", the short form of the language ("08.10.2026",
-// "10/8/2026"), or "2026-10-08". One place for every signature, stamp and
+// the long form ("8 October 2026" in British English, "October 8, 2026" in
+// American), the short form ("08.10.2026", "10/08/2026"), or "2026-10-08". One place for every signature, stamp and
 // preview, so they never disagree.
 
 export const DATE_FORMATS = ["long", "short", "iso"] as const;

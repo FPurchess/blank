@@ -43,7 +43,7 @@
     "tab.move_right": "Ctrl-Shift-PageDown",
     "export.pdf": "Mod-Alt-p",
     "export.docx": "Mod-Alt-w",
-    "export.signed_pdf": "",
+    "export.signed_pdf": "Mod-Alt-Shift-p",
     "signing.signature": "",
     "signing.initials": "",
     "theme.cycle": "Mod-Alt-t",

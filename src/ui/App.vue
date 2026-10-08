@@ -16,6 +16,7 @@ import {
   signatureDialog,
   signDialog,
   certificateDialog,
+  confirmDialog,
   signaturePopover,
   tocPopover,
   unsavedDialog,
@@ -30,6 +31,7 @@ import ImageDialog from "./ImageDialog.vue";
 import SignatureDialog from "./SignatureDialog.vue";
 import SignDialog from "./SignDialog.vue";
 import CertificateDialog from "./CertificateDialog.vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
@@ -120,6 +122,11 @@ watchFocusMode();
     v-if="certificateDialog"
     :key="keyOf(certificateDialog)"
     :request="certificateDialog"
+  />
+  <ConfirmDialog
+    v-if="confirmDialog"
+    :key="keyOf(confirmDialog)"
+    :request="confirmDialog"
   />
   <TocPopover
     v-if="tocPopover"

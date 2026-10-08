@@ -1,9 +1,12 @@
-//! Keys and certificates: a P-256 self-signed certificate made with rcgen and
-//! kept in a PKCS#12 file (p12-keystore), and reading any PKCS#12 a user has.
+//! keys and certificates: a P-256 key and a self-signed certificate made
+//! with rcgen and kept in a PKCS#12 file (p12-keystore), and reading any
+//! PKCS#12 file a user has.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::Result;
 use der::{Decode, Encode};
+use p12_keystore::error::Error as P12Error;
 use p12_keystore::{EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, PrivateKeyChain};
+use pkcs12::pfx::Pfx;
 use rcgen::{
     CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose, SanType,
     PKCS_ECDSA_P256_SHA256,
@@ -11,22 +14,14 @@ use rcgen::{
 use sha2::{Digest, Sha256};
 use x509_cert::Certificate;
 
+/// a private key Blank can sign with
 pub enum Key {
     P256(p256::ecdsa::SigningKey),
     P384(p384::ecdsa::SigningKey),
     Rsa(rsa::RsaPrivateKey),
 }
 
-impl Key {
-    pub fn describe(&self) -> &'static str {
-        match self {
-            Key::P256(_) => "ECDSA P-256",
-            Key::P384(_) => "ECDSA P-384",
-            Key::Rsa(_) => "RSA",
-        }
-    }
-}
-
+/// a key and its certificate, as a key file holds them
 pub struct Identity {
     pub key: Key,
     /// DER of the signer's certificate
@@ -35,29 +30,63 @@ pub struct Identity {
     pub chain: Vec<Vec<u8>>,
 }
 
-/// id-kp-documentSigning (RFC 9336)
-pub const DOCUMENT_SIGNING: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 36];
-/// Microsoft Document Signing
-pub const MS_DOCUMENT_SIGNING: &[u64] = &[1, 3, 6, 1, 4, 1, 311, 10, 3, 12];
-
-/// Makes a P-256 key and a self-signed certificate for signing documents, and
-/// returns them as a PKCS#12 file (AES-256-CBC + PBKDF2, HMAC-SHA256 MAC).
-pub fn create_certificate(name: &str, email: Option<&str>, passphrase: &str) -> Result<Vec<u8>> {
-    create_certificate_with(name, email, passphrase, ITERATIONS)
+/// why a key file doesn't open. Its text is fixed, so it may be logged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenError {
+    /// the passphrase doesn't open the file
+    WrongPassphrase,
+    /// a PKCS#12 file, but not one Blank can sign with: an algorithm it
+    /// doesn't know, no key, no certificate for the key
+    Unsupported,
+    /// not a PKCS#12 file, or a broken one
+    Malformed,
 }
+
+impl std::fmt::Display for OpenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            OpenError::WrongPassphrase => "wrong passphrase",
+            OpenError::Unsupported => "a key file Blank can't use",
+            OpenError::Malformed => "not a key file Blank can read",
+        })
+    }
+}
+
+impl std::error::Error for OpenError {}
+
+/// id-kp-documentSigning (RFC 9336)
+const DOCUMENT_SIGNING: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 36];
+/// Microsoft Document Signing
+const MS_DOCUMENT_SIGNING: &[u64] = &[1, 3, 6, 1, 4, 1, 311, 10, 3, 12];
 
 /// the rounds of PBKDF2 that protect the key file: OWASP's advice for
 /// PBKDF2-HMAC-SHA256, about a second to open the file
 const ITERATIONS: u64 = 600_000;
 
-/// create_certificate with the rounds of PBKDF2 given, which the tests keep
-/// low
+/// the most rounds of a key file's MAC Blank goes through: more is no
+/// protection but a file that takes hours to open
+const MAX_ITERATIONS: i32 = 10_000_000;
+
+/// create_certificate makes a P-256 key and a self-signed certificate for
+/// signing documents. It returns them as a PKCS#12 file (AES-256-CBC and
+/// PBKDF2, an HMAC-SHA256 MAC) that `passphrase` opens, and as the identity
+/// the file holds, so they needn't be read back from it.
+pub fn create_certificate(
+    name: &str,
+    email: Option<&str>,
+    passphrase: &str,
+) -> Result<(Vec<u8>, Identity)> {
+    create_certificate_with(name, email, passphrase, ITERATIONS)
+}
+
+/// create_certificate_with is create_certificate with the rounds of PBKDF2
+/// given, which the tests keep low
 pub fn create_certificate_with(
     name: &str,
     email: Option<&str>,
     passphrase: &str,
     iterations: u64,
-) -> Result<Vec<u8>> {
+) -> Result<(Vec<u8>, Identity)> {
     let key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?;
     let mut params = CertificateParams::new(Vec::<String>::new())?;
     params.distinguished_name.push(DnType::CommonName, name);
@@ -84,6 +113,10 @@ pub fn create_certificate_with(
 
     let cert_der = cert.der().to_vec();
     let key_der = key.serialize_der();
+    let signing_key = {
+        use p256::pkcs8::DecodePrivateKey;
+        p256::ecdsa::SigningKey::from_pkcs8_der(&key_der)?
+    };
     let local_key_id = Sha256::digest(&cert_der)[..20].to_vec();
     let chain = PrivateKeyChain::new(
         key_der,
@@ -99,32 +132,35 @@ pub fn create_certificate_with(
         .mac_algorithm(MacAlgorithm::HmacSha256)
         .mac_iterations(iterations)
         .write()?;
-    Ok(p12)
+    let identity = Identity {
+        key: Key::P256(signing_key),
+        cert: cert_der,
+        chain: vec![],
+    };
+    Ok((p12, identity))
 }
 
-pub fn load_p12(data: &[u8], passphrase: &str) -> Result<Identity> {
-    let store = match KeyStore::from_pkcs12(data, passphrase) {
-        Ok(s) => s,
-        Err(e) if e.to_string().contains("indefinite length") => {
-            // BER, as NSS (Firefox, Thunderbird) writes it: check the MAC on the
-            // original bytes, convert to DER, MAC it again for p12-keystore
-            let der = normalize_ber_p12(data, passphrase)?;
-            KeyStore::from_pkcs12(&der, passphrase)
-                .map_err(|e| anyhow!("can't open the PKCS#12 file: {e}"))?
-        }
-        Err(e) => bail!("can't open the PKCS#12 file: {e}"),
-    };
-    let (_, chain) = store
-        .private_key_chain()
-        .ok_or_else(|| anyhow!("the PKCS#12 file holds no private key"))?;
-    let certs: Vec<Vec<u8>> = chain.chain().iter().map(|c| c.as_der().to_vec()).collect();
-    if certs.is_empty() {
-        bail!("the PKCS#12 file holds a key but no certificate for it");
+/// load_p12 opens the PKCS#12 file `data` with `passphrase`: its key, the
+/// certificate of that key, and the other certificates as its chain
+pub fn load_p12(data: &[u8], passphrase: &str) -> Result<Identity, OpenError> {
+    let pfx = Pfx::from_der(data).ok();
+    if pfx.as_ref().is_some_and(|pfx| !rounds_allowed(pfx)) {
+        return Err(OpenError::Unsupported);
     }
-    let key = parse_pkcs8(chain.key())?;
+    let has_mac = pfx.is_some_and(|pfx| pfx.mac_data.is_some());
+    let store = match KeyStore::from_pkcs12(data, passphrase) {
+        Ok(store) => store,
+        Err(P12Error::DerError(error)) if error.kind() == der::ErrorKind::IndefiniteLength => {
+            open_ber(data, passphrase)?
+        }
+        Err(error) => return Err(classify(error, has_mac)),
+    };
+    let (_, chain) = store.private_key_chain().ok_or(OpenError::Unsupported)?;
+    let mut certs: Vec<Vec<u8>> = chain.chain().iter().map(|c| c.as_der().to_vec()).collect();
+    let key = parse_pkcs8(chain.key()).ok_or(OpenError::Unsupported)?;
     // the signer's certificate is the one whose public key matches the key
-    let spki = public_key_der(&key)?;
-    let idx = certs
+    let spki = public_key_der(&key).ok_or(OpenError::Malformed)?;
+    let index = certs
         .iter()
         .position(|c| {
             Certificate::from_der(c)
@@ -132,9 +168,8 @@ pub fn load_p12(data: &[u8], passphrase: &str) -> Result<Identity> {
                 .and_then(|c| c.tbs_certificate.subject_public_key_info.to_der().ok())
                 .is_some_and(|d| d == spki)
         })
-        .context("no certificate in the file matches its private key")?;
-    let mut certs = certs;
-    let cert = certs.remove(idx);
+        .ok_or(OpenError::Unsupported)?;
+    let cert = certs.remove(index);
     Ok(Identity {
         key,
         cert,
@@ -142,98 +177,95 @@ pub fn load_p12(data: &[u8], passphrase: &str) -> Result<Identity> {
     })
 }
 
-fn parse_pkcs8(der: &[u8]) -> Result<Key> {
+/// classify tells why p12-keystore couldn't open a file; `has_mac`, whether
+/// the file has a MAC, which says whether the passphrase is right before
+/// anything is decrypted
+fn classify(error: P12Error, has_mac: bool) -> OpenError {
+    use P12Error as E;
+    match error {
+        E::MacError(_) => OpenError::WrongPassphrase,
+        // without a MAC, only decrypting tells: what the wrong key decrypts
+        // isn't padded right
+        E::UnpadError | E::Pkcs5Error(_) if !has_mac => OpenError::WrongPassphrase,
+        E::UnsupportedEncryptionScheme
+        | E::UnsupportedMacAlgorithm
+        | E::UnsupportedContentType
+        | E::UnsupportedCertificateType
+        | E::Pkcs5Error(_) => OpenError::Unsupported,
+        _ => OpenError::Malformed,
+    }
+}
+
+/// rounds_allowed tells whether the rounds of the file's MAC are sensible
+fn rounds_allowed(pfx: &Pfx) -> bool {
+    pfx.mac_data
+        .as_ref()
+        .is_none_or(|mac| (1..=MAX_ITERATIONS).contains(&mac.iterations))
+}
+
+/// parse_pkcs8 reads a PKCS#8 private key of a kind Blank signs with
+fn parse_pkcs8(der: &[u8]) -> Option<Key> {
     use p256::pkcs8::DecodePrivateKey;
     if let Ok(k) = p256::ecdsa::SigningKey::from_pkcs8_der(der) {
-        return Ok(Key::P256(k));
+        return Some(Key::P256(k));
     }
     if let Ok(k) = p384::ecdsa::SigningKey::from_pkcs8_der(der) {
-        return Ok(Key::P384(k));
+        return Some(Key::P384(k));
     }
-    if let Ok(k) = rsa::RsaPrivateKey::from_pkcs8_der(der) {
-        return Ok(Key::Rsa(k));
-    }
-    bail!("unsupported private key type (only P-256, P-384 and RSA)")
+    rsa::RsaPrivateKey::from_pkcs8_der(der).ok().map(Key::Rsa)
 }
 
-fn public_key_der(key: &Key) -> Result<Vec<u8>> {
+/// public_key_der is the SubjectPublicKeyInfo of `key`, as DER
+fn public_key_der(key: &Key) -> Option<Vec<u8>> {
     use spki::EncodePublicKey;
-    Ok(match key {
-        Key::P256(k) => k.verifying_key().to_public_key_der()?.into_vec(),
-        Key::P384(k) => k.verifying_key().to_public_key_der()?.into_vec(),
-        Key::Rsa(k) => k.to_public_key().to_public_key_der()?.into_vec(),
-    })
-}
-
-pub fn fingerprint(cert_der: &[u8]) -> String {
-    hex::encode_upper(Sha256::digest(cert_der))
-}
-
-fn pkcs12_mac(
-    alg: &[u8],
-    password: &str,
-    salt: &[u8],
-    iterations: i32,
-    data: &[u8],
-) -> Result<Vec<u8>> {
-    use hmac::{Hmac, Mac};
-    use pkcs12::kdf::{derive_key_utf8, Pkcs12KeyType};
-    macro_rules! mac {
-        ($h:ty, $n:expr) => {{
-            let key = derive_key_utf8::<$h>(password, salt, Pkcs12KeyType::Mac, iterations, $n)?;
-            let mut m = <Hmac<$h>>::new_from_slice(&key)?;
-            m.update(data);
-            m.finalize().into_bytes().to_vec()
-        }};
-    }
-    Ok(match alg {
-        // OID content bytes of SHA-1 and SHA-256
-        [0x2b, 0x0e, 0x03, 0x02, 0x1a] => mac!(sha1::Sha1, 20),
-        [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01] => mac!(sha2::Sha256, 32),
-        [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02] => mac!(sha2::Sha384, 48),
-        [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03] => mac!(sha2::Sha512, 64),
-        _ => bail!("unsupported PKCS#12 MAC algorithm"),
-    })
-}
-
-/// PFX ::= SEQUENCE { version, authSafe ContentInfo, macData MacData }
-fn normalize_ber_p12(data: &[u8], password: &str) -> Result<Vec<u8>> {
-    use crate::signing::der as d;
-    let bad = || anyhow!("malformed PKCS#12 file");
-    let shallow = d::ber_to_der(data, false, true).ok_or_else(bad)?;
-    let (pfx, _) = d::read(&shallow).ok_or_else(bad)?;
-    let parts = d::children(pfx.content).ok_or_else(bad)?;
-    let [version, auth_safe, mac_data] = parts.as_slice() else {
-        bail!("PKCS#12 file without a MAC")
+    let der = match key {
+        Key::P256(k) => k.verifying_key().to_public_key_der(),
+        Key::P384(k) => k.verifying_key().to_public_key_der(),
+        Key::Rsa(k) => k.to_public_key().to_public_key_der(),
     };
-    let ci = d::children(auth_safe.content).ok_or_else(bad)?;
-    let explicit = ci.get(1).ok_or_else(bad)?;
-    let (octets, _) = d::read(explicit.content).ok_or_else(bad)?;
-    let original = octets.content;
-
-    // MacData ::= SEQUENCE { mac DigestInfo, macSalt OCTET STRING, iterations INTEGER DEFAULT 1 }
-    let md = d::children(mac_data.content).ok_or_else(bad)?;
-    let digest_info = d::children(md.first().ok_or_else(bad)?.content).ok_or_else(bad)?;
-    let alg = d::children(digest_info.first().ok_or_else(bad)?.content).ok_or_else(bad)?;
-    let alg_oid = alg.first().ok_or_else(bad)?.content;
-    let tag = digest_info.get(1).ok_or_else(bad)?.content;
-    let salt = md.get(1).ok_or_else(bad)?.content;
-    let iterations = md
-        .get(2)
-        .map(|i| i.content.iter().fold(0i32, |a, b| (a << 8) | *b as i32))
-        .unwrap_or(1);
-    if pkcs12_mac(alg_oid, password, salt, iterations, original)? != tag {
-        bail!("can't open the PKCS#12 file: MAC tag mismatch (wrong passphrase?)");
-    }
-    let inner = d::ber_to_der(original, true, true).ok_or_else(bad)?;
-    let new_tag = pkcs12_mac(alg_oid, password, salt, iterations, &inner)?;
-    let new_mac = d::seq(&[
-        &d::seq(&[digest_info[0].raw, &d::octets(&new_tag)]),
-        &md[1..]
-            .iter()
-            .flat_map(|t| t.raw.to_vec())
-            .collect::<Vec<u8>>(),
-    ]);
-    let new_ci = d::seq(&[ci[0].raw, &d::tlv(0xa0, &d::octets(&inner))]);
-    Ok(d::seq(&[version.raw, &new_ci, &new_mac]))
+    der.ok().map(|der| der.into_vec())
 }
+
+/// open_ber opens a PKCS#12 file in BER, as NSS (Firefox, Thunderbird)
+/// writes them, which p12-keystore reads only as DER
+fn open_ber(data: &[u8], passphrase: &str) -> Result<KeyStore, OpenError> {
+    use crate::signing::der as d;
+    let bad = OpenError::Malformed;
+    // the outer layers as DER, the content as it is: the MAC is over the
+    // content's bytes, BER or not
+    let shallow = d::ber_to_der(data, false, true).ok_or(bad)?;
+    let pfx = Pfx::from_der(&shallow).map_err(|_| bad)?;
+    if pfx.mac_data.is_none() {
+        // without a MAC, the BER can't be checked before it is converted
+        return Err(OpenError::Unsupported);
+    }
+    if !rounds_allowed(&pfx) {
+        return Err(OpenError::Unsupported);
+    }
+    // p12-keystore checks the MAC, and then can't read the BER inside: that
+    // the passphrase is right. (Its KDF is optimized in debug builds, see
+    // Cargo.toml; one called from here wouldn't be.)
+    match KeyStore::from_pkcs12(&shallow, passphrase) {
+        Ok(store) => return Ok(store),
+        Err(P12Error::DerError(_)) => {}
+        Err(error) => return Err(classify(error, true)),
+    }
+    // PFX ::= SEQUENCE { version, authSafe ContentInfo, macData MacData
+    // OPTIONAL }: the content made DER, without the MAC, which would only
+    // be checked again
+    let (outer, _) = d::read(&shallow).ok_or(bad)?;
+    let parts = d::children(outer.content).ok_or(bad)?;
+    let [version, auth_safe, _] = parts.as_slice() else {
+        return Err(bad);
+    };
+    let ci = d::children(auth_safe.content).ok_or(bad)?;
+    let explicit = ci.get(1).ok_or(bad)?;
+    let (octets, _) = d::read(explicit.content).ok_or(bad)?;
+    let inner = d::ber_to_der(octets.content, true, true).ok_or(bad)?;
+    let new_ci = d::seq(&[ci[0].raw, &d::tlv(0xa0, &d::octets(&inner))]);
+    let der = d::seq(&[version.raw, &new_ci]);
+    KeyStore::from_pkcs12(&der, passphrase).map_err(|error| classify(error, true))
+}
+
+#[cfg(test)]
+mod tests;

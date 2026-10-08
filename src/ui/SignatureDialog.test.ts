@@ -36,6 +36,7 @@ describe("the dialog of the user's signature", () => {
         name: "scan.png",
       })),
       submit: vi.fn(async () => true),
+      done: vi.fn(),
       cancel: vi.fn(),
     };
     signatureDialog.value = request;
@@ -58,12 +59,70 @@ describe("the dialog of the user's signature", () => {
     );
   });
 
+  it("cancels on Esc", () => {
+    dialog()
+      .querySelector("form")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(request.cancel).toHaveBeenCalled();
+    expect(signatureDialog.value).toBeNull();
+  });
+
+  it("switches between drawing, typing and an image with the arrow keys", async () => {
+    tab("Draw").focus();
+    tab("Draw").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+    );
+    await nextTick();
+    expect(tab("Type").getAttribute("aria-selected")).toBe("true");
+    expect(dialog().querySelector("#signature-dialog-name")).not.toBeNull();
+  });
+
+  it("saves what was drawn on the pad", async () => {
+    const canvas = dialog().querySelector("canvas")!;
+    canvas.setPointerCapture = () => {};
+    const press = (type: string, x: number) =>
+      canvas.dispatchEvent(
+        new PointerEvent(type, {
+          clientX: x,
+          clientY: 10,
+          button: 0,
+          pointerType: "mouse",
+        }),
+      );
+    // each in a task of its own, as a pointer's events come
+    for (const [type, x] of [
+      ["pointerdown", 10],
+      ["pointermove", 20],
+      ["pointerup", 20],
+    ] as const) {
+      press(type, x);
+      await nextTick();
+    }
+    expect(document.getElementById("signature-pad-state")!.textContent).toBe(
+      "Drawn",
+    );
+    submit();
+    await flushPromises();
+    // one stroke of the two points drawn
+    expect(request.submit).toHaveBeenCalledWith(
+      {
+        kind: "draw",
+        strokes: [[expect.any(Array), expect.any(Array)]],
+      },
+      undefined,
+    );
+    expect(request.done).toHaveBeenCalled();
+  });
+
   it("says what's missing instead of saving an empty pad", async () => {
     submit();
     await nextTick();
     expect(request.submit).not.toHaveBeenCalled();
     expect(document.getElementById("signature-dialog-error")!.textContent).toBe(
       "Draw your signature first.",
+    );
+    expect(dialog().querySelector("canvas")!.getAttribute("aria-invalid")).toBe(
+      "true",
     );
   });
 
@@ -77,10 +136,10 @@ describe("the dialog of the user's signature", () => {
       ...dialog().querySelectorAll<HTMLButtonElement>("[role=radio]"),
     ];
     expect(fonts.map((font) => font.textContent)).toEqual([
-      expect.stringContaining("Formal · Pinyon Script"),
-      expect.stringContaining("Quick · Ms Madi"),
-      expect.stringContaining("Legible · Dancing Script"),
-      expect.stringContaining("Handwritten · Caveat"),
+      expect.stringContaining("Pinyon Script"),
+      expect.stringContaining("Ms Madi"),
+      expect.stringContaining("Dancing Script"),
+      expect.stringContaining("Caveat"),
     ]);
     // ↓ chooses the next
     fonts[0].focus();
@@ -113,5 +172,23 @@ describe("the dialog of the user's signature", () => {
       { kind: "image" },
       { src: "data:image/png;base64,AAAA", clean: false },
     );
+  });
+
+  it("keeps a saved picture as it is when saved again unchanged", async () => {
+    signatureDialog.value = {
+      ...request,
+      saved: {
+        source: { kind: "image" },
+        png: "data:image/png;base64,SAVED",
+        width: 1,
+        height: 1,
+      },
+    };
+    await nextTick();
+    submit();
+    await flushPromises();
+    expect(request.submit).not.toHaveBeenCalled();
+    expect(request.done).toHaveBeenCalled();
+    expect(signatureDialog.value).toBeNull();
   });
 });

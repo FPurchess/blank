@@ -15,7 +15,8 @@ import { useResizeObserver } from "./composables/useResizeObserver";
 // paper's colour, a dashed line to write on, the strokes in the page's ink.
 // Its strokes are in the pad's own units (src/signing/pad.ts), so they come
 // out the same whatever size the pad has on the screen.
-const props = defineProps<{ label: string }>();
+// `errorId`: the message that says what is wrong, while something is
+const props = defineProps<{ label: string; errorId?: string | undefined }>();
 const strokes = defineModel<Stroke[]>({ required: true });
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
@@ -78,6 +79,10 @@ onMounted(paint);
       ref="canvas"
       role="img"
       :aria-label="props.label"
+      :aria-describedby="
+        ['signature-pad-state', props.errorId].filter(Boolean).join(' ')
+      "
+      :aria-invalid="props.errorId ? true : undefined"
       :width="PAD_WIDTH"
       :height="PAD_HEIGHT"
       @pointerdown="down"
@@ -85,6 +90,9 @@ onMounted(paint);
       @pointerup="up"
       @pointercancel="up"
     />
+    <span id="signature-pad-state" class="visually-hidden">{{
+      strokes.length === 0 ? "Empty" : "Drawn"
+    }}</span>
     <span class="signature-pad-line" aria-hidden="true" />
     <span v-if="strokes.length === 0" class="signature-pad-hint">
       Draw with the mouse, trackpad or pen

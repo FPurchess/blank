@@ -182,7 +182,7 @@ describe("the engine's contract", () => {
         language: "en-GB",
       },
     };
-    const items = flatten(withForm, sizes, null, signed).map((record) =>
+    const items = flatten(withForm, sizes, null, { signed }).map((record) =>
       record.build(),
     );
     const { layout } = resolveLayout(

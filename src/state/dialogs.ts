@@ -7,6 +7,7 @@ import type { Destination, PrintPlan } from "../print/printModel";
 import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
 import type { Mark, MarkSource, SavedMark } from "../signing/profile";
+import type { SignatureDate } from "../markdown/blocks/atoms";
 
 export interface LinkDialogRequest {
   url: string;
@@ -108,8 +109,7 @@ export interface SignatureSettings {
   role: string;
   name: string;
   place: string;
-  // "signing", "none" or a date, YYYY-MM-DD
-  date: string;
+  date: SignatureDate;
   // a share of the text's width, "50%", or null for the default
   width: string | null;
 }
@@ -142,6 +142,10 @@ export interface SignatureDialogRequest {
   // makes and saves the picture of what was drawn, typed or chosen; false
   // when there's nothing to save (an empty pad)
   submit(source: MarkSource, image?: ChosenMarkImage): Promise<boolean>;
+  // once it's saved and the dialog closed: gives the focus back to where
+  // the dialog was opened from, and goes on, e.g. to signing
+  done(): void;
+  // gives the focus back
   cancel(): void;
 }
 
@@ -168,6 +172,10 @@ export interface CertificateDialogRequest {
     email: string;
     passphrase: string;
   }): Promise<string | null>;
+  // once it's there and the dialog closed: gives the focus back to where
+  // the dialog was opened from
+  done(): void;
+  // gives the focus back
   cancel(): void;
 }
 
@@ -180,7 +188,9 @@ export const certificateDialog = shallowRef<CertificateDialogRequest | null>(
 // a signature block a signed export can fill in
 export interface SignTarget {
   pos: number;
-  // e.g. "Tenant · Ada Lovelace", or "Signature" for one that names none
+  // who it names, "" for whoever signs
+  name: string;
+  // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
   label: string;
 }
 
@@ -196,8 +206,9 @@ export interface SignDialogRequest {
   warnings: string[];
   // whether `passphrase` opens the user's key: what's wrong, or null
   check(passphrase: string): Promise<string | null>;
-  // opens the dialog that makes the user a certificate
-  createCertificate(): void;
+  // opens the dialog that makes the user a certificate, which gives the
+  // focus back to `opener`
+  createCertificate(opener: EventTarget | null): void;
   // fills in the block at `pos`, asks where to save the signed PDF and, with
   // the key's passphrase, signs it digitally too
   submit(pos: number, place: string, passphrase: string | null): void;
@@ -218,6 +229,24 @@ export interface UnsavedDialogRequest {
 // unsavedDialog holds the request of the open question whether to save a
 // tab's changes before it closes, or null while none is asked
 export const unsavedDialog = shallowRef<UnsavedDialogRequest | null>(null);
+
+export interface ConfirmDialogRequest {
+  // e.g. "Remove your certificate?"
+  title: string;
+  // what it means, e.g. that it can't be undone
+  text: string;
+  // the button that does it, e.g. "Remove"
+  action: string;
+  // what else the dialog offers on its left, which leaves it open, e.g.
+  // backing up what is to be removed
+  secondary?: { label: string; run(): void };
+  confirm(): void;
+  cancel(): void;
+}
+
+// confirmDialog holds the request of the open question whether to do
+// something that can't be undone, or null
+export const confirmDialog = shallowRef<ConfirmDialogRequest | null>(null);
 
 // the settings open on the section shown last (settingsSection)
 export type SettingsRequest = Record<string, never>;
@@ -265,6 +294,7 @@ export const focusTakingDialogs = [
   signatureDialog,
   signDialog,
   certificateDialog,
+  confirmDialog,
   unsavedDialog,
   settingsDialog,
   printDialog,

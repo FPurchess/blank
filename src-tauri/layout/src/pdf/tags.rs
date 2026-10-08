@@ -253,15 +253,18 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             leaves(ids, Part::Label { item: index }),
         )),
         Content::Table { .. } => Some(table_node(engine, index, ids)),
-        Content::Signature {
-            src, alt, lines, ..
-        } => {
+        Content::Signature { alt, lines, .. } => {
             // the signature as a figure, then the lines under it
             let mut children = vec![];
             let image = leaves(ids, Part::Image { item: index });
             if !image.is_empty() {
-                let alt = if alt.is_empty() { src } else { alt };
-                children.push(group(Tag::Figure(Some(alt.clone())), image));
+                // src is the PNG as a data URL: no words for a screen reader
+                let alt = if alt.is_empty() {
+                    "Signature".to_string()
+                } else {
+                    alt.clone()
+                };
+                children.push(group(Tag::Figure(Some(alt)), image));
             }
             for extra in 0..lines.len() {
                 let line = leaves(ids, Part::Extra { item: index, extra });

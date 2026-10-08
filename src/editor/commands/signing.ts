@@ -1,9 +1,11 @@
-import type { Command, EditorState } from "prosemirror-state";
+import type { Command } from "prosemirror-state";
+import type { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../../config";
+import { focusBack } from "../../dom";
 import { errorMessage } from "../../errors";
-import { logError } from "../../log";
+import { logError, logWarning } from "../../log";
 import { fromDataUrl } from "../../images/dataUrl";
 import {
   announce,
@@ -14,22 +16,32 @@ import {
   signatureDialog,
   signDialog,
   signingPlace,
-  type SignTarget,
 } from "../../state";
 import { basename } from "../../paths";
 import { PDF_FILTER } from "../../formats";
 import { toPDF } from "../../exporters";
-import { signatureLines } from "../../markdown/blocks/signature";
-import { canExport, isEmpty, runExport } from "./exportAs";
+import {
+  exportProblem,
+  type ExportRequest,
+  isEmpty,
+  runExport,
+} from "./exportAs";
 import type { ExportResult } from "../../exporters";
-import { checkPassphrase, signingMessage, signPdf } from "../../signing/ipc";
+import {
+  checkPassphrase,
+  signingKind,
+  signingMessage,
+  signPdf,
+} from "../../signing/ipc";
 import {
   loadCertificate,
   openCertificateDialog,
+  reportSigningFailure,
 } from "../../signing/certificate";
 import { loadMarks, saveMark } from "../../signing/marks";
 import type { Mark } from "../../signing/profile";
 import { renderMark } from "../../signing/render";
+import { chosenOf, targetsOf } from "../../signing/targets";
 import { chooseImageFile } from "./editImage";
 
 // The user's signature and initials: the dialog that makes them, which
@@ -37,13 +49,21 @@ import { chooseImageFile } from "./editImage";
 
 /**
  * openSignatureDialog opens the dialog of the user's signature or initials,
- * as saved; `saved` is told once it is saved
+ * as saved. Once it closes, `refocus` gives the focus back to where it was
+ * opened from; once it's saved, `then` goes on, e.g. to signing.
  */
 export const openSignatureDialog = async (
   mark: Mark,
-  saved: () => void = () => undefined,
+  refocus: () => void,
+  then: () => void = () => undefined,
 ) => {
-  await loadMarks();
+  try {
+    await loadMarks();
+  } catch (error) {
+    logError(`failed to read the ${mark}`, error);
+    sendNotification(`Failed to read your ${mark}: ${errorMessage(error)}`);
+    return refocus();
+  }
   signatureDialog.value = {
     mark,
     saved: savedMarks.value?.[mark] ?? null,
@@ -64,10 +84,13 @@ export const openSignatureDialog = async (
         return false;
       }
       announce(mark === "signature" ? "Signature saved" : "Initials saved");
-      saved();
       return true;
     },
-    cancel: () => undefined,
+    done: () => {
+      refocus();
+      then();
+    },
+    cancel: refocus,
   };
 };
 
@@ -87,71 +110,45 @@ export const editMark =
 const TITLE = "Signed PDF";
 
 /**
- * targetsOf returns the signature blocks of a document, by position
- */
-const targetsOf = (state: EditorState): SignTarget[] => {
-  const targets: SignTarget[] = [];
-  state.doc.forEach((node, pos) => {
-    if (node.type.name !== "signature") return;
-    const label =
-      signatureLines(node.attrs).length > 1
-        ? signatureLines(node.attrs)[0]
-        : "";
-    targets.push({ pos, label: label || `Signature ${targets.length + 1}` });
-  });
-  return targets;
-};
-
-/**
- * chosenOf returns the block the user most likely signs: the one with their
- * name, else one that names nobody, else the first
- */
-const chosenOf = (state: EditorState, targets: SignTarget[], name: string) => {
-  const named = (pos: number) => state.doc.nodeAt(pos)?.attrs.name as string;
-  return (
-    targets.find((target) => name && named(target.pos) === name) ??
-    targets.find((target) => !named(target.pos)) ??
-    targets[0]
-  ).pos;
-};
-
-/**
  * exportSigned exports the document as a PDF with the user's signature in
  * one of its signature blocks, with their name, where they sign and today's
  * date. It makes their signature first if they have none yet.
  */
-export const exportSigned = (): Command => (state, dispatch) => {
+export const exportSigned = (): Command => (state, dispatch, view) => {
   // asked whether it can run, e.g. by the main menu: with something to
   // export, and nothing done
   if (!dispatch) return !isEmpty(state);
-  const request = {
+  const request: ExportRequest = {
     title: TITLE,
     exporter: toPDF,
     filters: [PDF_FILTER],
     suffix: " signed",
   };
-  if (!canExport(state, request)) return true;
-  const targets = targetsOf(state);
-  if (targets.length === 0) {
+  if (exportProblem(state, request)) return true;
+  if (targetsOf(state.doc).length === 0) {
     sendNotification({
       title: TITLE,
       body: "This document has no signature block. Insert one from the blocks pane, under Signing.",
     });
     return true;
   }
+  if (!view) return true;
   // the document's file now, before another tab may show
-  const docPath = path.value;
-  const file = path.value ?? importedFrom.value;
+  const file = { path: path.value, importedFrom: importedFrom.value };
+  const refocus = () => view.focus();
   const sign = () => {
     const signature = savedMarks.value?.signature;
-    if (!signature) return;
-    const { name, dateFormat } = config.value.signing;
+    // the document as it is once the user's signature is there
+    const targets = targetsOf(view.state.doc);
+    if (!signature || targets.length === 0) return;
+    const name = config.value.signing.name;
+    const named = file.path ?? file.importedFrom;
     signDialog.value = {
-      title: file ? basename(file).replace(/\.[^.]+$/, "") : "Untitled",
+      title: named ? basename(named).replace(/\.[^.]+$/, "") : "Untitled",
       targets,
-      chosen: chosenOf(state, targets, name),
+      chosen: chosenOf(targets, name),
       place: signingPlace.value,
-      warnings: importedFrom.value
+      warnings: file.importedFrom
         ? [
             "Blank’s layout of this Word document can differ from Word’s. Check every page before you send it, or ask the sender for a PDF.",
           ]
@@ -161,56 +158,112 @@ export const exportSigned = (): Command => (state, dispatch) => {
           await checkPassphrase(passphrase);
           return null;
         } catch (error) {
-          return signingMessage(error);
+          logWarning("the passphrase didn't open the key", signingKind(error));
+          return signingMessage(error, "Blank couldn't open your key");
         }
       },
-      createCertificate: () => void openCertificateDialog("create"),
+      createCertificate: (opener) =>
+        void openCertificateDialog("create", focusBack(opener)),
       submit: (pos, place, passphrase) => {
-        if (place) signingPlace.value = place;
-        const signer = (state.doc.nodeAt(pos)?.attrs.name as string) || name;
-        void runExport(state, docPath, {
-          ...request,
-          context: {
-            signed: {
-              pos,
-              src: signature.png,
-              signing: {
-                name: signer,
-                place,
-                date: new Date(),
-                format: dateFormat,
-                language: language.value,
-              },
-            },
-          },
-          written: () => announce("Signed and saved"),
-          ...(passphrase === null
-            ? {}
-            : {
-                finish: (result) =>
-                  signExport(result, passphrase, {
-                    name: signer,
-                    place,
-                  }),
-              }),
+        refocus();
+        signNow(view, file, request, {
+          pos,
+          index: targets.findIndex((target) => target.pos === pos),
+          png: signature.png,
+          place,
+          passphrase,
         });
       },
-      cancel: () => undefined,
+      cancel: refocus,
     };
   };
-  void Promise.all([loadMarks(), loadCertificate()]).then(() => {
-    if (savedMarks.value?.signature) sign();
-    // their signature first, then on to signing
-    else void openSignatureDialog("signature", sign);
-  });
+  void Promise.all([loadMarks(), loadCertificate()])
+    .then(() => {
+      if (savedMarks.value?.signature) sign();
+      // their signature first, then on to signing
+      else void openSignatureDialog("signature", refocus, sign);
+    })
+    .catch((error: unknown) =>
+      reportSigningFailure(
+        "failed to read the signature",
+        error,
+        "Blank couldn't read your signature",
+        TITLE,
+      ),
+    );
   return true;
 };
 
 /**
- * signExport signs an exported PDF with the user's key: its field over the
- * signature block the export filled in, or invisible without one. A
- * failure stops the export with what went wrong, so nothing unsigned is
- * written under the signed name.
+ * signNow exports the document as it is now, the dialogs closed, with the
+ * block chosen filled in: the one still at `pos`, else the one of its
+ * number among them
+ */
+const signNow = (
+  view: EditorView,
+  file: { path: string | null; importedFrom: string | null },
+  request: ExportRequest,
+  {
+    pos,
+    index,
+    png,
+    place,
+    passphrase,
+  }: {
+    pos: number;
+    index: number;
+    png: string;
+    place: string;
+    passphrase: string | null;
+  },
+) => {
+  const state = view.state;
+  const targets = targetsOf(state.doc);
+  const { name, dateFormat } = config.value.signing;
+  const target =
+    targets.find((target) => target.pos === pos) ??
+    targets[index] ??
+    targets[0];
+  if (!target) {
+    sendNotification({
+      title: TITLE,
+      body: "The signature block is gone. Nothing was signed.",
+    });
+    return;
+  }
+  const signer = target.name || name;
+  void runExport(state, file, {
+    ...request,
+    context: {
+      signed: {
+        pos: target.pos,
+        src: png,
+        signing: {
+          name: signer,
+          place,
+          date: new Date(),
+          format: dateFormat,
+          language: language.value,
+        },
+      },
+    },
+    written: () => {
+      if (place) signingPlace.value = place;
+      announce("Signed and saved");
+    },
+    ...(passphrase === null
+      ? {}
+      : {
+          finish: (result: ExportResult) =>
+            signExport(result, passphrase, { name: signer, place }),
+        }),
+  });
+};
+
+/**
+ * signExport signs an exported PDF with the user's key, its field over the
+ * signature block the export filled in. A failure stops the export with
+ * what went wrong, so nothing unsigned is written under the signed name.
  */
 const signExport = async (
   result: ExportResult,
@@ -218,16 +271,19 @@ const signExport = async (
   { name, place }: { name: string; place: string },
 ) => {
   const box = result.signatureBox;
+  if (!box) throw new Error("the signature block isn't in the PDF");
   try {
     return await signPdf(result.contents, passphrase, {
-      page: (box?.page ?? 0) + 1,
-      rect: box ? [box.x, box.y, box.width, box.height] : null,
+      page: box.page + 1,
+      rect: [box.x, box.y, box.width, box.height],
       name: name || null,
       location: place || null,
       reason: null,
       timestampServer: config.value.signing.timestampServer || null,
     });
   } catch (error) {
-    throw new Error(signingMessage(error), { cause: error });
+    throw new Error(signingMessage(error, "Blank couldn't sign the PDF"), {
+      cause: error,
+    });
   }
 };

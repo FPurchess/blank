@@ -1,7 +1,8 @@
-//! Checking every signature of a PDF: the byte ranges against the usual
+//! checking every signature of a PDF: the byte ranges against the usual
 //! attacks (USF, signature wrapping), the digest, the CMS signature, the
-//! signer, and whether the file changed after signing.
+//! signer, and whether the file changed after signing
 
+use crate::signing::certificate::CertificateInfo;
 use crate::signing::der as d;
 use anyhow::{Context, Result};
 use cms::content_info::ContentInfo;
@@ -11,21 +12,13 @@ use der::{Decode, Encode};
 use lopdf::{Document, Object, ObjectId};
 use sha2::Digest;
 use spki::SubjectPublicKeyInfoOwned;
-use x509_cert::name::Name;
 use x509_cert::Certificate;
 
-#[derive(Debug, Default)]
-pub struct CertInfo {
-    pub subject: String,
-    pub issuer: String,
-    pub serial: String,
-    pub not_before: String,
-    pub not_after: String,
-    pub self_signed: bool,
-    pub sha256: String,
-    pub key: String,
-}
+/// what coverage says of a signature whose byte ranges reach the end of
+/// the file
+const WHOLE_FILE: &str = "covers the whole file";
 
+/// what Blank found of one signature of a PDF
 #[derive(Debug, Default)]
 pub struct SignatureReport {
     pub field: String,
@@ -33,26 +26,32 @@ pub struct SignatureReport {
     pub byte_range: Vec<i64>,
     /// (check, passed, detail)
     pub checks: Vec<(&'static str, bool, String)>,
-    pub signer: Option<CertInfo>,
+    pub signer: Option<CertificateInfo>,
     pub digest_algorithm: String,
     pub signature_algorithm: String,
     pub timestamp: Option<String>,
+    /// how much of the file the signature covers, in words: the whole
+    /// file, or what came after it
     pub coverage: String,
     pub signing_time_claimed: Option<String>,
 }
 
 impl SignatureReport {
+    /// valid tells whether every check passed: the signature is intact and
+    /// signs the bytes it names. It doesn't say whether those bytes are the
+    /// whole file; that is covers_the_whole_file.
     pub fn valid(&self) -> bool {
         !self.checks.is_empty() && self.checks.iter().all(|c| c.1)
     }
+
+    /// covers_the_whole_file tells whether nothing was added to the file
+    /// after this signature
+    pub fn covers_the_whole_file(&self) -> bool {
+        self.coverage == WHOLE_FILE
+    }
 }
 
-pub fn common_name(n: &Name) -> Option<String> {
-    let s = n.to_string();
-    s.split(',')
-        .find_map(|p| p.trim().strip_prefix("CN=").map(|v| v.to_string()))
-}
-
+/// oid_name names an OID, or writes it in dots
 fn oid_name(o: &Oid) -> String {
     const_oid::db::DB
         .by_oid(o)
@@ -60,7 +59,8 @@ fn oid_name(o: &Oid) -> String {
         .unwrap_or_else(|| o.to_string())
 }
 
-pub fn hash(oid: &Oid, parts: &[&[u8]]) -> Option<Vec<u8>> {
+/// hash hashes `parts` with the digest algorithm `oid`, if Blank knows it
+fn hash(oid: &Oid, parts: &[&[u8]]) -> Option<Vec<u8>> {
     macro_rules! h {
         ($t:ty) => {{
             let mut h = <$t>::new();
@@ -79,7 +79,8 @@ pub fn hash(oid: &Oid, parts: &[&[u8]]) -> Option<Vec<u8>> {
     }
 }
 
-/// The digest algorithm a signature algorithm names, if it names one.
+/// sig_alg_hash returns the digest algorithm a signature algorithm names,
+/// if it names one
 fn sig_alg_hash(o: &Oid) -> Option<Oid> {
     let s = match o.to_string().as_str() {
         "1.2.840.10045.4.1" | "1.2.840.113549.1.1.5" => "1.3.14.3.2.26",
@@ -91,7 +92,8 @@ fn sig_alg_hash(o: &Oid) -> Option<Oid> {
     Some(Oid::new_unwrap(s))
 }
 
-/// Checks a signature given the hash (`prehash`, made with `hash_oid`) of what was signed.
+/// verify_signature checks a signature given the hash (`prehash`, made with
+/// `hash_oid`) of what was signed
 fn verify_signature(
     spki: &SubjectPublicKeyInfoOwned,
     sig_alg: &spki::AlgorithmIdentifierOwned,
@@ -201,23 +203,9 @@ fn verify_signature(
     }
 }
 
-pub fn cert_info(c: &Certificate, der_bytes: &[u8]) -> CertInfo {
-    let tbs = &c.tbs_certificate;
-    CertInfo {
-        subject: tbs.subject.to_string(),
-        issuer: tbs.issuer.to_string(),
-        serial: hex::encode_upper(tbs.serial_number.as_bytes()),
-        not_before: tbs.validity.not_before.to_string(),
-        not_after: tbs.validity.not_after.to_string(),
-        self_signed: tbs.subject == tbs.issuer,
-        sha256: hex::encode_upper(sha2::Sha256::digest(der_bytes)),
-        key: oid_name(&tbs.subject_public_key_info.algorithm.oid),
-    }
-}
-
-/// The raw [0] IMPLICIT signedAttrs of the first SignerInfo, re-tagged as a
-/// SET (what the signature covers), taken from the bytes so that a signer's
-/// encoding is kept even if it isn't sorted.
+/// raw_signed_attrs returns the raw [0] IMPLICIT signedAttrs of the first
+/// SignerInfo, re-tagged as a SET (what the signature covers), taken from
+/// the bytes so that a signer's encoding is kept even if it isn't sorted
 fn raw_signed_attrs(content_info: &[u8]) -> Option<Vec<u8>> {
     let (ci, _) = d::read(content_info)?;
     let ci = d::children(ci.content)?;
@@ -232,23 +220,24 @@ fn raw_signed_attrs(content_info: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-pub struct CmsCheck {
-    pub checks: Vec<(&'static str, bool, String)>,
-    pub signer: Option<CertInfo>,
-    pub digest_algorithm: Oid,
-    pub signature_algorithm: String,
-    pub signature: Vec<u8>,
-    pub econtent: Option<Vec<u8>>,
-    pub timestamp_token: Option<Vec<u8>>,
-    pub signing_time: Option<String>,
+/// hashes the content a detached signature signs with a digest algorithm
+type Detached<'a> = &'a dyn Fn(&Oid) -> Option<Vec<u8>>;
+
+/// what check_cms found
+struct CmsCheck {
+    checks: Vec<(&'static str, bool, String)>,
+    signer: Option<CertificateInfo>,
+    digest_algorithm: Oid,
+    signature_algorithm: String,
+    signature: Vec<u8>,
+    econtent: Option<Vec<u8>>,
+    timestamp_token: Option<Vec<u8>>,
+    signing_time: Option<String>,
 }
 
-/// Checks a CMS SignedData. `detached` hashes the external content with a
-/// given digest algorithm (None: the content is inside).
-pub fn check_cms(
-    der_bytes: &[u8],
-    detached: Option<&dyn Fn(&Oid) -> Option<Vec<u8>>>,
-) -> Result<CmsCheck> {
+/// check_cms checks a CMS SignedData. `detached` hashes the external
+/// content with a given digest algorithm (None: the content is inside).
+fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
     let ci = match ContentInfo::from_der(der_bytes) {
         Ok(ci) => ci,
         Err(e) => {
@@ -275,6 +264,10 @@ pub fn check_cms(
         Err(e) if e.to_string().contains("SET") => {
             // duplicate or unsorted certificates (NSS)
             let fixed = d::fix_cms_sets(der_bytes).context("can't parse SignedData")?;
+            if fixed == der_bytes {
+                // sorting didn't help: reading it again would loop
+                return Err(e).context("can't parse SignedData");
+            }
             return check_cms(&fixed, detached).map(|mut c| {
                 c.checks.insert(
                     0,
@@ -311,8 +304,7 @@ pub fn check_cms(
     };
     let signing_time =
         attr("1.2.840.113549.1.9.5").map(|v| String::from_utf8_lossy(&v).to_string());
-    let prehash_target: Option<(Oid, Vec<u8>)>;
-    if si.signed_attrs.is_some() {
+    let prehash_target = if let Some(signed_attrs) = &si.signed_attrs {
         let md = attr("1.2.840.113549.1.9.4");
         match (&content_hash, &md) {
             (Some(h), Some(m)) => {
@@ -330,7 +322,7 @@ pub fn check_cms(
             )),
         }
         let raw = raw_signed_attrs(der_bytes).context("can't find the signed attributes")?;
-        let reencoded = si.signed_attrs.as_ref().unwrap().to_der()?;
+        let reencoded = signed_attrs.to_der()?;
         if raw != reencoded {
             checks.push((
                 "signed attributes are DER",
@@ -339,10 +331,10 @@ pub fn check_cms(
             ));
         }
         let h = sig_alg_hash(&si.signature_algorithm.oid).unwrap_or(digest_oid);
-        prehash_target = hash(&h, &[&raw]).map(|p| (h, p));
+        hash(&h, &[&raw]).map(|p| (h, p))
     } else {
-        prehash_target = content_hash.clone().map(|p| (digest_oid, p));
-    }
+        content_hash.clone().map(|p| (digest_oid, p))
+    };
 
     // the signer's certificate
     let certs: Vec<Certificate> = sd
@@ -367,9 +359,14 @@ pub fn check_cms(
             .extensions
             .as_ref()
             .and_then(|exts| exts.iter().find(|e| e.extn_id.to_string() == "2.5.29.14"))
-            .is_some_and(|e| e.extn_value.as_bytes().ends_with(ski.0.as_bytes())),
+            // SubjectKeyIdentifier ::= KeyIdentifier (OCTET STRING), in the
+            // extension's OCTET STRING
+            .and_then(|e| d::read(e.extn_value.as_bytes()))
+            .is_some_and(|(id, rest)| {
+                id.tag == 0x04 && rest.is_empty() && id.content == ski.0.as_bytes()
+            }),
     });
-    let signer = cert.map(|c| cert_info(c, &c.to_der().unwrap_or_default()));
+    let signer = cert.map(|c| CertificateInfo::of(c, &c.to_der().unwrap_or_default()));
     match (cert, &prehash_target) {
         (Some(c), Some((h, ph))) => {
             let r = verify_signature(
@@ -415,8 +412,8 @@ pub fn check_cms(
     })
 }
 
-/// TSTInfo: (imprint hash algorithm, imprint, genTime)
-pub fn tst_info(der_bytes: &[u8]) -> Option<(Oid, Vec<u8>, String)> {
+/// tst_info reads a TSTInfo: (imprint hash algorithm, imprint, genTime)
+fn tst_info(der_bytes: &[u8]) -> Option<(Oid, Vec<u8>, String)> {
     let (tst, _) = d::read(der_bytes)?;
     let parts = d::children(tst.content)?;
     let imprint = d::children(parts.get(2)?.content)?;
@@ -426,7 +423,8 @@ pub fn tst_info(der_bytes: &[u8]) -> Option<(Oid, Vec<u8>, String)> {
     Some((oid, imprint.get(1)?.content.to_vec(), gen_time))
 }
 
-/// Checks an RFC 3161 token over `data`; returns the time it gives.
+/// check_timestamp checks an RFC 3161 token over `data`; it returns the
+/// time it gives
 fn check_timestamp(token: &[u8], data: &[u8]) -> (bool, String) {
     match check_cms(token, None) {
         Ok(c) => {
@@ -435,7 +433,7 @@ fn check_timestamp(token: &[u8], data: &[u8]) -> (bool, String) {
             };
             let ok_imprint = hash(&oid, &[data]).is_some_and(|h| h == imprint);
             let ok_cms = c.checks.iter().all(|c| c.1);
-            let tsa = c.signer.map(|s| s.subject).unwrap_or_default();
+            let tsa = c.signer.map(|s| s.name).unwrap_or_default();
             (
                 ok_imprint && ok_cms,
                 format!(
@@ -452,15 +450,19 @@ fn check_timestamp(token: &[u8], data: &[u8]) -> (bool, String) {
     }
 }
 
+/// is_ws tells whether `b` is PDF whitespace
 fn is_ws(b: u8) -> bool {
     matches!(b, b' ' | b'\n' | b'\r' | b'\t' | b'\x0c' | 0)
 }
 
+/// a signature field and its signature dictionary
 struct SigDict {
     field: String,
     id: Option<ObjectId>,
 }
 
+/// collect_sig_fields finds the signed signature fields, in /AcroForm and
+/// on the pages
 fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
     let mut out = vec![];
     let Some(form) = doc
@@ -565,6 +567,8 @@ fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
     out
 }
 
+/// verify_pdf checks every signature of the PDF `bytes`, in the order of
+/// its form's fields
 pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     let doc = Document::load_mem(bytes).context("can't read the PDF")?;
     let header = bytes.windows(5).position(|w| w == b"%PDF-").unwrap_or(0);
@@ -613,7 +617,7 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
             && br[1] > 0
             && br[2] > br[1]
             && br[3] >= 0
-            && br[2] + br[3] <= len;
+            && br[2].checked_add(br[3]).is_some_and(|end| end <= len);
         r.checks.push((
             "ByteRange starts at 0 and lies in the file",
             br_ok,
@@ -640,9 +644,9 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
         let (obj_ok, obj_detail) = match entry {
             Some(lopdf::xref::XrefEntry::Normal { offset, .. }) => {
                 let start = header + offset as usize;
-                let end = bytes[start..]
-                    .windows(6)
-                    .position(|w| w == b"endobj")
+                let end = bytes
+                    .get(start..)
+                    .and_then(|object| object.windows(6).position(|w| w == b"endobj"))
                     .map(|p| start + p + 6)
                     .unwrap_or(bytes.len());
                 // the /Contents key right before the gap, inside this object
@@ -751,7 +755,6 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
             }
             Err(e) => r.checks.push(("CMS readable", false, format!("{e:#}"))),
         }
-        r.coverage = String::new();
         reports.push(r);
     }
 
@@ -778,7 +781,7 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
         let end = (r.byte_range[2] + r.byte_range[3]) as usize;
         let later = eofs.iter().filter(|e| **e > end + 2).count();
         r.coverage = if end >= effective_len {
-            "covers the whole file".into()
+            WHOLE_FILE.into()
         } else if last_covered >= effective_len {
             format!("signed again later ({later} later revision(s), the last one signed)")
         } else if tail_dss_only && end == last_covered {
@@ -794,9 +797,10 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     Ok(reports)
 }
 
-/// Whether everything written after `from` is PAdES validation data: a DSS
-/// dictionary, VRI entries, certificates/OCSP/CRL streams and the catalog that
-/// points to them, unchanged but for its /DSS. (A heuristic.)
+/// tail_is_validation_data tells whether everything written after `from`
+/// is PAdES validation data: a DSS dictionary, VRI entries,
+/// certificates/OCSP/CRL streams and the catalog that points to them,
+/// unchanged but for its /DSS. (A heuristic.)
 fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: usize) -> bool {
     use lopdf::xref::XrefEntry;
     let in_tail = |off: u32| header + off as usize >= from;

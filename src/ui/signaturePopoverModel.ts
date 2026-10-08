@@ -1,5 +1,6 @@
 import type { Option } from "../layout/choices";
 import type { SignatureSettings } from "../state";
+import { calendarDate, type SignatureDate } from "../markdown/blocks/atoms";
 
 // The settings of a signature block (SignaturePopover.vue).
 
@@ -10,16 +11,22 @@ export type DateChoice = "signing" | "none" | "fixed";
 export const DATE_OPTIONS: Option<DateChoice>[] = [
   { value: "signing", label: "When signed" },
   { value: "none", label: "Leave blank" },
-  { value: "fixed", label: "Fixed…" },
+  { value: "fixed", label: "Fixed date" },
 ];
 
-// how wide it is: as wide as it starts, or a share of the text's width
+// how wide it is, a share of the text's width: half by default, which the
+// file leaves out ("")
 export const WIDTH_OPTIONS: Option<string>[] = [
-  { value: "", label: "Fit" },
-  { value: "50%", label: "50%" },
+  { value: "", label: "50%" },
   { value: "75%", label: "75%" },
   { value: "100%", label: "100%" },
 ];
+
+/**
+ * widthChoiceOf returns the choice a block's width is: 50% is the default
+ */
+export const widthChoiceOf = (width: string | null) =>
+  !width || width === "50%" ? "" : width;
 
 /**
  * dateChoiceOf returns the choice a block's date is
@@ -54,10 +61,9 @@ export const settingsOf = (fields: {
   place: fields.place.trim(),
   date:
     fields.date === "fixed"
-      ? /^\d{4}-\d{2}-\d{2}$/.test(fields.fixed) &&
-        !Number.isNaN(Date.parse(fields.fixed))
-        ? fields.fixed
-        : today()
+      ? calendarDate(fields.fixed)
+        ? (fields.fixed as SignatureDate)
+        : (today() as SignatureDate)
       : fields.date,
   width: fields.width || null,
 });

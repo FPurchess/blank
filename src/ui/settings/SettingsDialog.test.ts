@@ -91,6 +91,8 @@ beforeEach(async () => {
 afterEach(() => {
   dispose();
   settingsDialog.value = null;
+  signatureDialog.value = null;
+  signingCertificate.value = undefined;
   config.value = defaults;
   theme.value = "light";
   spellcheck.value = false;
@@ -611,7 +613,20 @@ describe("the settings dialog", () => {
       button("Add…", row("initials")).click();
       await settle();
       expect(signatureDialog.value?.mark).toBe("initials");
-      signatureDialog.value = null;
+    });
+
+    it("gets the focus back once the signature's dialog above it closes", async () => {
+      await open("signing");
+      const add = button("Add…", row("signature"));
+      add.click();
+      await settle();
+      document
+        .querySelector("#signature-dialog form")!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await settle();
+      expect(signatureDialog.value).toBeNull();
+      expect(document.activeElement).toBe(add);
+      expect(dialog()!.contains(document.activeElement)).toBe(true);
     });
 
     it("saves the name under the signature", async () => {
@@ -638,10 +653,11 @@ describe("the settings dialog", () => {
       await settle();
       expect(panel().textContent).toContain("Enter a web address");
       expect(files[CONFIG]).toBeUndefined();
-      button("Use DigiCert", row("timestamp"))?.click();
-      await type(input, "http://timestamp.digicert.com");
-      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      // an empty field offers a server
+      await type(input, "");
+      button("Use DigiCert", row("timestamp")).click();
       await settle();
+      expect(input.value).toBe("http://timestamp.digicert.com");
       expect(written()).toEqual({
         signing: { timestampServer: "http://timestamp.digicert.com" },
       });
@@ -661,7 +677,6 @@ describe("the settings dialog", () => {
         "Made by Blank, valid until 2031-10-08",
       );
       expect(row("fingerprint").textContent).toContain("ABCD ABCD");
-      signingCertificate.value = undefined;
     });
 
     it("writes the date as chosen, shown in the document's language", async () => {

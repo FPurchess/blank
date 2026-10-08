@@ -21,8 +21,13 @@ import {
   settingsOf,
 } from "./engine";
 import { fallbackFonts, findFonts } from "./fallback";
-import { language } from "../state";
-import { flatten, type ImageSizes, type SignedBlock } from "./flatten";
+import { language, signingDates } from "../state";
+import {
+  flatten,
+  type FlattenOptions,
+  type ImageSizes,
+  SIGNATURE_IMAGE,
+} from "./flatten";
 import { fromDataUrl } from "../images/dataUrl";
 import { probeSize } from "../images/mime";
 import { fittedSize } from "./images";
@@ -59,7 +64,8 @@ interface Prepared {
   images: Map<string, PreparedImage>;
   sizes: ImageSizes;
   output: Output;
-  signed: SignedBlock | null;
+  // the signed block, if any, and how dates are written
+  flattening: FlattenOptions;
 }
 
 /**
@@ -73,15 +79,16 @@ const onSharedEngine = async ({
   images,
   sizes,
   output,
-  signed,
+  flattening,
 }: Prepared): Promise<PdfResult> => {
+  const { signed } = flattening;
   const engine = await newEngine(true);
   try {
     for (const [src, image] of images) {
       engine.addImage(src, image.bytes, image.mime === "image/jpeg");
     }
     engine.setSettings(layout, fields);
-    engine.sync(doc, sizes, { signed });
+    engine.sync(doc, sizes, flattening);
     // fonts for what Blank's fonts lack, e.g. emoji pasted just now, which
     // the engine lays out again with
     const missing = engine.missing();
@@ -182,7 +189,7 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes, output, signed }: Prepared,
+  { doc, layout, fields, images, sizes, output, flattening }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
@@ -194,7 +201,7 @@ const jobOf = (
   })),
   settings: JSON.stringify(settingsOf(layout, fields)),
   items: JSON.stringify(
-    flatten(doc, sizes, null, signed).map((record) => record.build()),
+    flatten(doc, sizes, null, flattening).map((record) => record.build()),
   ),
   title: fields.title,
   author: fields.author,
@@ -203,7 +210,7 @@ const jobOf = (
   ...("sheets" in output
     ? { sheets: JSON.stringify(output.sheets) }
     : { pages: output.pages }),
-  ...(signed ? { signedPos: signed.pos } : {}),
+  ...(flattening.signed ? { signedPos: flattening.signed.pos } : {}),
 });
 
 /**
@@ -315,14 +322,20 @@ const write = async (
     "image/png",
     "image/jpeg",
   ]);
-  // the signature's picture, which a signed PDF shows in its block
-  const signature = signed ? fromDataUrl(signed.src) : null;
-  const signatureSize = signature && probeSize(signature.bytes, "image/png");
-  if (signed && signature && signatureSize) {
-    images.set(signed.src, {
+  // the signature's picture, which a signed PDF shows in its block: a PDF
+  // without it is never written as signed
+  if (signed) {
+    const signature = fromDataUrl(signed.src);
+    const size = signature && probeSize(signature.bytes, "image/png");
+    if (!signature || !size) {
+      throw new Error(
+        "your signature's picture can't be read. Make it again in Settings ▸ Signing",
+      );
+    }
+    images.set(SIGNATURE_IMAGE, {
       bytes: signature.bytes,
       mime: "image/png",
-      ...signatureSize,
+      ...size,
     });
   }
   const prepared: Prepared = {
@@ -332,7 +345,7 @@ const write = async (
     images,
     sizes: sizesOf(images, layout),
     output,
-    signed: signed ?? null,
+    flattening: { signed: signed ?? null, dates: signingDates.value },
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {

@@ -1,18 +1,20 @@
-//! Signing a PDF in an incremental update: a new /Sig field and widget, the
-//! signature dictionary with a reserved /Contents, then the byte ranges are
-//! patched in, hashed and signed.
+//! signing a PDF in an incremental update: a new /Sig field and widget,
+//! the signature dictionary with a reserved /Contents, then the byte ranges
+//! are patched in, hashed and signed
 
 use super::{
     clean_trailer, docmdp_permission, load_for_update, page_id, reals, text_string, PageGeometry,
 };
 use crate::signing::cms::sign_detached;
 use crate::signing::keys::Identity;
+use crate::signing::Refusal;
 use anyhow::{bail, Context, Result};
 use lopdf::{
     dictionary, Dictionary, Document, IncrementalDocument, Object, ObjectId, Stream, StringFormat,
 };
 use sha2::{Digest, Sha256};
 
+/// what to sign with, and where the signature goes
 pub struct SignRequest<'a> {
     pub identity: &'a Identity,
     /// 1-based page of the signature widget
@@ -27,35 +29,51 @@ pub struct SignRequest<'a> {
     pub reserve: usize,
 }
 
-pub struct Signed {
-    pub bytes: Vec<u8>,
-    pub warnings: Vec<String>,
-    pub xref_stream: bool,
-    pub hybrid: bool,
+/// the most room for a signature: a long chain and a timestamp token fit
+/// many times over
+const MAX_RESERVE: usize = 256 * 1024;
+
+/// how a signing went: signed, or the signature needed more room
+enum Attempt {
+    Signed(Vec<u8>),
+    /// the DER signature's length, more than the room reserved
+    TooLarge(usize),
 }
 
 const BR_PLACEHOLDER: [i64; 4] = [0, 1_111_111_111, 2_222_222_222, 3_333_333_333];
 
-pub fn sign_pdf(original: &[u8], req: &SignRequest) -> Result<Signed> {
-    match sign_once(original, req, req.reserve) {
-        Err(e) if e.to_string().contains("signature too large") && req.reserve < 32 * 1024 => {
-            sign_once(original, req, 32 * 1024)
+/// sign_pdf signs `original` as `req` asks, and returns it with the
+/// signature appended; a signature larger than `req.reserve` is made again
+/// with room for it
+pub fn sign_pdf(original: &[u8], req: &SignRequest) -> Result<Vec<u8>> {
+    if let Some(rect) = req.rect {
+        if !rect.iter().all(|value| value.is_finite()) || rect[2] <= 0. || rect[3] <= 0. {
+            bail!("the signature's place isn't a rectangle");
         }
-        r => r,
+    }
+    match sign_once(original, req, req.reserve)? {
+        Attempt::Signed(signed) => Ok(signed),
+        // a new signature, and a new timestamp, may be a little longer
+        Attempt::TooLarge(length) if length + 2048 <= MAX_RESERVE => {
+            match sign_once(original, req, length + 2048)? {
+                Attempt::Signed(signed) => Ok(signed),
+                Attempt::TooLarge(_) => bail!("the signature doesn't fit"),
+            }
+        }
+        Attempt::TooLarge(_) => bail!("the signature doesn't fit"),
     }
 }
 
-/// The names of the form's fields, and whether one is a signed /Sig field.
-fn fields(doc: &Document) -> (Vec<Vec<u8>>, bool) {
+/// fields returns the names of the form's fields
+fn fields(doc: &Document) -> Vec<Vec<u8>> {
     let mut names = vec![];
-    let mut signed = false;
     let Some(form) = doc
         .catalog()
         .ok()
         .and_then(|c| c.get(b"AcroForm").ok())
         .and_then(|o| super::resolve(doc, o))
     else {
-        return (names, signed);
+        return names;
     };
     let Some(list) = form
         .as_dict()
@@ -63,7 +81,7 @@ fn fields(doc: &Document) -> (Vec<Vec<u8>>, bool) {
         .and_then(|f| f.get(b"Fields").ok())
         .and_then(|o| super::resolve(doc, o))
     else {
-        return (names, signed);
+        return names;
     };
     let mut stack: Vec<&Object> = list
         .as_array()
@@ -81,9 +99,6 @@ fn fields(doc: &Document) -> (Vec<Vec<u8>>, bool) {
         if let Ok(t) = f.get(b"T").and_then(Object::as_str) {
             names.push(t.to_vec());
         }
-        if f.get(b"FT").and_then(Object::as_name).ok() == Some(b"Sig") && f.has(b"V") {
-            signed = true;
-        }
         if let Ok(kids) = f
             .get(b"Kids")
             .and_then(|k| doc.dereference(k).map(|(_, o)| o))
@@ -92,13 +107,10 @@ fn fields(doc: &Document) -> (Vec<Vec<u8>>, bool) {
             stack.extend(kids.iter());
         }
     }
-    (names, signed)
+    names
 }
 
-pub fn is_signed(doc: &Document) -> bool {
-    fields(doc).1
-}
-
+/// pdf_date is now, as a PDF date
 fn pdf_date() -> String {
     let t = time::OffsetDateTime::now_utc();
     format!(
@@ -112,7 +124,7 @@ fn pdf_date() -> String {
     )
 }
 
-/// Adds `widget` to the page's /Annots, wherever that array lives.
+/// add_annot adds `widget` to the page's /Annots, wherever that array lives
 fn add_annot(incr: &mut IncrementalDocument, page: ObjectId, widget: ObjectId) -> Result<()> {
     let annots = incr
         .get_prev_documents()
@@ -143,7 +155,7 @@ fn add_annot(incr: &mut IncrementalDocument, page: ObjectId, widget: ObjectId) -
     Ok(())
 }
 
-/// Adds the field to /AcroForm /Fields and sets /SigFlags 3.
+/// add_field adds the field to /AcroForm /Fields and sets /SigFlags 3
 fn add_field(incr: &mut IncrementalDocument, field: ObjectId) -> Result<()> {
     let root = incr
         .get_prev_documents()
@@ -200,9 +212,10 @@ fn add_field(incr: &mut IncrementalDocument, field: ObjectId) -> Result<()> {
     Ok(())
 }
 
-/// The widget's appearance: an empty form. What the signature looks like
-/// is in the page content (a signature block Blank drew), or there is none
-/// (an invisible signature); Blank draws no frame around a signature.
+/// appearance is the widget's appearance: an empty form. What the
+/// signature looks like is in the page content (a signature block Blank
+/// drew), or there is none (an invisible signature); Blank draws no frame
+/// around a signature.
 fn appearance(incr: &mut IncrementalDocument, geo: &PageGeometry, w: f64, h: f64) -> ObjectId {
     let dict = dictionary! {
         "Type" => "XObject", "Subtype" => "Form", "BBox" => reals(&[0., 0., w, h]),
@@ -211,21 +224,17 @@ fn appearance(incr: &mut IncrementalDocument, geo: &PageGeometry, w: f64, h: f64
     incr.new_document.add_object(Stream::new(dict, Vec::new()))
 }
 
-fn sign_once(original: &[u8], req: &SignRequest, reserve: usize) -> Result<Signed> {
-    let loaded = load_for_update(original.to_vec())?;
-    if docmdp_permission(&loaded.doc) == Some(1) {
-        bail!("This PDF doesn't allow any changes, not even signatures");
+/// sign_once signs `original` with `reserve` bytes of room for the DER
+/// signature
+fn sign_once(original: &[u8], req: &SignRequest, reserve: usize) -> Result<Attempt> {
+    let doc = load_for_update(original)?;
+    // P=2 allows signing, though Acrobat may count the new field as a
+    // change it didn't allow
+    if docmdp_permission(&doc) == Some(1) {
+        return Err(Refusal::Certified.into());
     }
-    let mut warnings = loaded.warnings.clone();
-    if docmdp_permission(&loaded.doc) == Some(2) {
-        warnings.push(
-            "certified with P=2: a new signature field may count as a disallowed change in Acrobat"
-                .into(),
-        );
-    }
-    let (names, _) = fields(&loaded.doc);
-    let (xref_stream, hybrid) = (loaded.xref_stream, loaded.hybrid);
-    let mut incr = IncrementalDocument::create_from(loaded.bytes, loaded.doc);
+    let names = fields(&doc);
+    let mut incr = IncrementalDocument::create_from(original.to_vec(), doc);
     clean_trailer(&mut incr);
 
     let page = page_id(incr.get_prev_documents(), req.page)?;
@@ -322,19 +331,16 @@ fn sign_once(original: &[u8], req: &SignRequest, reserve: usize) -> Result<Signe
         &digest,
         req.tsa
             .as_ref()
-            .map(|_| &stamp as &dyn Fn(&[u8]) -> Result<Vec<u8>>),
+            .map(|_| &stamp as crate::signing::cms::Stamp),
     )?;
     if cms.len() > reserve {
-        bail!("signature too large ({} bytes for {reserve})", cms.len());
+        return Ok(Attempt::TooLarge(cms.len()));
     }
     let hex = hex::encode_upper(&cms);
     out[gap_start + 1..gap_start + 1 + hex.len()].copy_from_slice(hex.as_bytes());
 
-    debug_assert!(out.starts_with(original));
-    Ok(Signed {
-        bytes: out,
-        warnings,
-        xref_stream,
-        hybrid,
-    })
+    if !out.starts_with(original) {
+        bail!("the update changed the bytes before it");
+    }
+    Ok(Attempt::Signed(out))
 }

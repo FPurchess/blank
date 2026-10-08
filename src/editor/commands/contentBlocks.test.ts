@@ -14,6 +14,7 @@ import {
   blocksPaneFocused,
   blocksPaneOpen,
   blocksPaneSearch,
+  signaturePopover,
   tocPopover,
 } from "../../state";
 import {
@@ -29,6 +30,7 @@ import {
   ul,
 } from "../../test/editor";
 import {
+  editSignature,
   editToc,
   insertBlock,
   insertTopBlock,
@@ -298,6 +300,72 @@ describe("editToc", () => {
     const before = view.state.doc;
     tocPopover.value!.apply(5, "Gone");
     expect(view.state.doc).toBe(before);
+  });
+});
+
+describe("editSignature", () => {
+  const signature = (attrs = {}) => schema.node("signature", attrs);
+  const selected = () => {
+    const state = createState(
+      doc(p("a"), signature({ role: "Tenant" }), p("b")),
+    );
+    return createTestView(
+      state.apply(state.tr.setSelection(NodeSelection.create(state.doc, 3))),
+    );
+  };
+  const settings = (changes = {}) => ({
+    role: "Tenant",
+    name: "",
+    place: "",
+    date: "signing" as const,
+    width: null,
+    ...changes,
+  });
+
+  afterEach(() => {
+    signaturePopover.value = null;
+  });
+
+  it("does nothing unless a signature block is selected", () => {
+    const view = createTestView(
+      createState(doc(p("a"), signature(), p("b")), { cursor: 2 }),
+    );
+    expect(editSignature()(view.state, view.dispatch, view)).toBe(false);
+    expect(signaturePopover.value).toBeNull();
+  });
+
+  it("changes it at once, and keeps it selected", () => {
+    const view = selected();
+    expect(editSignature()(view.state, view.dispatch, view)).toBe(true);
+    expect(signaturePopover.value?.settings).toEqual(settings());
+    signaturePopover.value!.apply(settings({ name: "Ada", width: "75%" }));
+    expect(view.state.doc.child(1).attrs).toMatchObject({
+      role: "Tenant",
+      name: "Ada",
+      width: "75%",
+    });
+    expect(view.state.selection).toBeInstanceOf(NodeSelection);
+  });
+
+  it("changes nothing for settings it has, or once it is gone", () => {
+    const view = selected();
+    editSignature()(view.state, view.dispatch, view);
+    const before = view.state;
+    signaturePopover.value!.apply(settings());
+    expect(view.state).toBe(before);
+    view.dispatch(view.state.tr.delete(3, 4));
+    const doc = view.state.doc;
+    signaturePopover.value!.apply(settings({ name: "Gone" }));
+    expect(view.state.doc).toBe(doc);
+  });
+
+  it("closes its settings when asked again", () => {
+    const view = selected();
+    editSignature()(view.state, view.dispatch, view);
+    const close = vi.spyOn(signaturePopover.value!, "close");
+    expect(editSignature()(view.state, view.dispatch, view)).toBe(true);
+    expect(signaturePopover.value).toBeNull();
+    expect(close).toHaveBeenCalled();
   });
 });
 

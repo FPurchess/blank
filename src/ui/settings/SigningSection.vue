@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef } from "vue";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../../config";
+import { focusBack } from "../../dom";
+import { errorMessage } from "../../errors";
+import { logError } from "../../log";
 import { language, savedMarks } from "../../state";
 import { openSignatureDialog } from "../../editor/commands/signing";
 import { forgetMark, loadMarks } from "../../signing/marks";
@@ -15,12 +19,31 @@ import { enterInField, save } from "./settingsModel";
 import { dateFormatOptions, MARK_ROWS } from "./signingModel";
 
 // Signing: your signature and initials, the name under them, and how the
-// date next to them is written.
-onMounted(() => void loadMarks());
+// date next to them is written. Removing them asks nothing: they're made
+// again in a moment, unlike the certificate (CertificateRows.vue).
+onMounted(() =>
+  loadMarks().catch((error: unknown) =>
+    logError("failed to read the signature", error),
+  ),
+);
 
-const edit = (mark: Mark) => void openSignatureDialog(mark);
-const remove = async (mark: Mark) => {
-  await forgetMark(mark);
+// the dialog gives the focus back to the button that opened it
+const edit = (mark: Mark, event: Event) =>
+  void openSignatureDialog(mark, focusBack(event.currentTarget));
+const remove = async (mark: Mark, event: Event) => {
+  // the focus goes on to Add…, which takes the place of Edit…
+  const refocus = focusBack(
+    (event.currentTarget as HTMLElement).parentElement?.querySelector(
+      "button",
+    ) ?? null,
+  );
+  try {
+    await forgetMark(mark);
+  } catch (error) {
+    logError(`failed to remove the ${mark}`, error);
+    sendNotification(`Failed to remove your ${mark}: ${errorMessage(error)}`);
+  }
+  refocus();
 };
 
 // the name as typed, saved when the field is left or Enter is pressed
@@ -62,14 +85,14 @@ const dateFormat = computed({
         :src="savedMarks[row.mark]!.png"
         :alt="row.label"
       />
-      <button type="button" class="edit" @click="edit(row.mark)">
+      <button type="button" class="edit" @click="edit(row.mark, $event)">
         {{ savedMarks?.[row.mark] ? "Edit…" : "Add…" }}
       </button>
       <button
         v-if="savedMarks?.[row.mark]"
         type="button"
         class="edit"
-        @click="remove(row.mark)"
+        @click="remove(row.mark, $event)"
       >
         Remove
       </button>

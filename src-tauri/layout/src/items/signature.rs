@@ -41,6 +41,9 @@ pub fn signature_units(fonts: &mut Fonts, spec: SignatureSpec, indent: f32, inne
     } else {
         SIGNATURE_SHARE
     };
+    // a width that isn't a number lays the block out as if it had none,
+    // rather than panic in clamp
+    let inner = inner.max(0.0);
     let width = (inner * share).clamp(20.0_f32.min(inner), inner);
     let mut decos = vec![];
     let mut label = None;
@@ -167,5 +170,27 @@ mod tests {
         assert!((y + h + IMAGE_GAP - SIGNATURE_ROOM).abs() < 0.01);
         // its aspect kept
         assert!((w / h - 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn lays_out_without_a_width_instead_of_panicking() {
+        let mut fonts = repository_fonts();
+        for inner in [f32::NAN, -5.0] {
+            let laid = signature_units(
+                &mut fonts,
+                SignatureSpec {
+                    src: "",
+                    width: 0.0,
+                    height: 0.0,
+                    alt: "",
+                    lines: &[],
+                    hint: "Signature",
+                    share: 0.0,
+                },
+                0.0,
+                inner,
+            );
+            assert_eq!(laid.units.len(), 1);
+        }
     }
 }

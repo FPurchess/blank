@@ -219,7 +219,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.TAB_MOVE_RIGHT]: "Ctrl-Shift-PageDown",
     [CommandIdentifier.EXPORT_PDF]: "Mod-Alt-p",
     [CommandIdentifier.EXPORT_DOCX]: "Mod-Alt-w",
-    [CommandIdentifier.EXPORT_SIGNED_PDF]: "",
+    [CommandIdentifier.EXPORT_SIGNED_PDF]: "Mod-Alt-Shift-p",
     [CommandIdentifier.SIGNING_SIGNATURE]: "",
     [CommandIdentifier.SIGNING_INITIALS]: "",
     [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",

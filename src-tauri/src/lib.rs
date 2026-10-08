@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod fonts;
+mod http;
 mod logging;
 #[cfg(target_os = "macos")]
 mod menu;

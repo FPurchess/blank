@@ -2,7 +2,7 @@ import type JSZip from "jszip";
 
 import { TOC_NAME } from "../../exporters/docx/template";
 import { formatAtom } from "../../markdown";
-import { child, markerParagraph, val, W } from "./xml";
+import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
 
 // A table of contents in a Word document is a field, TOC, whose result is
 // its entries as Word last laid them out, usually in a content control from
@@ -14,11 +14,6 @@ import { child, markerParagraph, val, W } from "./xml";
 
 const DOCUMENT = "word/document.xml";
 
-// the style of the marker paragraphs of blocks of one line, matched by its
-// id in styleMap.ts: tables of contents, and signature blocks
-// (./signatures.ts); the paragraph holds the block's marker line
-// (src/markdown/blocks/atoms.ts)
-export const ATOM_STYLE = "BlankAtom";
 // the style of a table of contents' title, Word's own
 const TITLE_STYLE = "TOCHeading";
 

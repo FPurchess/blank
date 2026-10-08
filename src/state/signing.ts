@@ -1,4 +1,8 @@
-import { shallowRef } from "vue";
+import { computed, shallowRef } from "vue";
+
+import { config } from "../config";
+import type { DateStyle } from "../markdown/blocks/signature";
+import { language } from "./language";
 
 import type { CertificateInfo } from "../signing/ipc";
 import type { Mark, SavedMark } from "../signing/profile";
@@ -18,3 +22,10 @@ export const signingPlace = shallowRef("");
 export const signingCertificate = shallowRef<
   CertificateInfo | null | undefined
 >(undefined);
+
+// how the dates next to signatures are written: Settings ▸ Signing ▸ Date,
+// in the document's language; a new object only when either changes
+export const signingDates = computed((): DateStyle => ({
+  format: config.value.signing.dateFormat,
+  language: language.value,
+}));

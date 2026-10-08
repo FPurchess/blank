@@ -428,6 +428,35 @@ describe("incremental layout", () => {
     const flattened = vi.spyOn(flattening, "flattenBlocks");
     const other = doc(p("one"), p("two!"));
     engine.sync(other, noSizes, { changes: { from: other, ranges: [] } });
-    expect(flattened).toHaveBeenCalledWith(other, 0, 2, noSizes, null, null);
+    expect(flattened).toHaveBeenCalledWith(other, 0, 2, noSizes, null, {
+      signed: null,
+      dates: undefined,
+    });
+  });
+
+  it("never keeps what an earlier sync filled in", () => {
+    const node = doc(p("a"), schema.node("signature"));
+    const engine = testEngine();
+    engine.setSettings(testLayout(), documentFields(node));
+    const signed = {
+      pos: 3,
+      src: "data:image/png;base64,",
+      signing: {
+        name: "Ada",
+        place: "",
+        date: new Date(2026, 9, 8),
+        format: "iso" as const,
+        language: "en",
+      },
+    };
+    const lines = () =>
+      recordsOf(engine)
+        .map((record) => record.build())
+        .flatMap((item) => (item.kind === "signature" ? item.lines : []));
+    engine.sync(node, noSizes, { signed });
+    expect(lines()).toEqual(["Ada", "2026-10-08"]);
+    // the same document, unsigned
+    engine.sync(node, noSizes);
+    expect(lines()).toEqual(["Place, date: ____________"]);
   });
 });

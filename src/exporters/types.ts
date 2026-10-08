@@ -1,7 +1,8 @@
 import { EditorState } from "prosemirror-state";
 
 import type { Layout } from "../layout/resolve";
-import type { Signing } from "../markdown/blocks/signature";
+import type { PageBox } from "../engine/boxes";
+import type { SignedBlock } from "../engine/flatten";
 
 export interface ExportContext {
   // path of the document, to resolve relative images; null if unsaved
@@ -11,9 +12,8 @@ export interface ExportContext {
   // the pages to export, by their index, if not all (a PDF of the pages
   // chosen to print)
   pages?: number[];
-  // for a signed PDF: the signature block to fill in, at `pos`, with the
-  // picture of the signature (a data: URL) and who signs where and when
-  signed?: { pos: number; src: string; signing: Signing };
+  // for a signed PDF: the signature block to fill in
+  signed?: SignedBlock;
 }
 
 export interface ExportResult {
@@ -24,13 +24,7 @@ export interface ExportResult {
   pages?: number;
   // for a signed PDF: where the filled in signature block is, in points
   // from the top left of its page (counted from 0)
-  signatureBox?: {
-    page: number;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  signatureBox?: PageBox;
 }
 
 export type exporterFunc = (

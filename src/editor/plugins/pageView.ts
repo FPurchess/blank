@@ -60,6 +60,7 @@ import {
   pageScrollRequest,
   pageSelection,
   path,
+  signingDates,
   transaction,
 } from "../../state";
 
@@ -265,6 +266,7 @@ const sync = (
       : null,
     // the room images are fitted into, and the folder relative ones are in
     sizesKey: `${contentWidth}x${contentHeight}:${path.value ?? ""}`,
+    dates: signingDates.value,
   });
   // an engine that failed has given up, and shows nothing
   if (engine.broken) return;
@@ -491,9 +493,10 @@ export const pageSync = () => {
             { flush: "sync" },
           );
           // the page setup, the fields of headers and footers, loaded
-          // images, and the document's folder, which relative images are in
+          // images, the document's folder, which relative images are in,
+          // and how signature blocks write dates
           watch(
-            [pageLayout, pageFields, loadedImages, path],
+            [pageLayout, pageFields, loadedImages, path, signingDates],
             ([, , loaded], [, , previousLoaded, previousPath]) => {
               if (path.value !== previousPath) forgetFailures();
               const fresh = new Set(

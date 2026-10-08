@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, useTemplateRef } from "vue";
+import {
+  computed,
+  nextTick,
+  onMounted,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from "vue";
 
 import { config } from "../config";
 import {
@@ -32,9 +39,22 @@ const digital = computed(
 const note = computed(() => timeNote(config.value.signing.timestampServer));
 
 const placeField = useTemplateRef<InstanceType<typeof TextField>>("placeField");
+const passphraseField =
+  useTemplateRef<InstanceType<typeof TextField>>("passphraseField");
 onMounted(() => placeField.value!.select());
 
+// a certificate made from here signs at once: on to its passphrase
+watch(signingCertificate, (now, before) => {
+  if (!now || before) return;
+  how.value = "digital";
+  void nextTick(() => passphraseField.value?.select());
+});
+
 const close = (callback: () => void) => closeDialog(signDialog, callback);
+// the passphrase being checked can't be cancelled, the PDF would still come
+const cancel = () => {
+  if (!checking.value) close(props.request.cancel);
+};
 const submit = async () => {
   if (checking.value) return;
   if (digital.value) {
@@ -59,14 +79,14 @@ const submit = async () => {
     :title="`Sign “${request.title}”`"
     form-class="sign-dialog"
     @submit="submit"
-    @cancel="close(request.cancel)"
+    @cancel="cancel"
   >
     <OptionGroup
       v-if="request.targets.length > 1"
       id="sign-dialog-target"
       v-model="chosen"
       name="target"
-      label="Sign in"
+      label="Block"
       :options="
         request.targets.map((target) => ({
           value: target.pos,
@@ -92,6 +112,7 @@ const submit = async () => {
     <TextField
       v-if="digital"
       id="sign-dialog-passphrase"
+      ref="passphraseField"
       v-model="passphrase"
       type="password"
       label="Passphrase"
@@ -100,6 +121,9 @@ const submit = async () => {
     />
     <p id="sign-dialog-error" class="error" aria-live="polite">
       {{ failure }}
+    </p>
+    <p id="sign-dialog-status" class="note" aria-live="polite">
+      {{ checking ? "Checking your passphrase." : "" }}
     </p>
     <p v-for="warning in request.warnings" :key="warning" class="warning">
       {{ warning }}
@@ -111,13 +135,18 @@ const submit = async () => {
     </p>
     <p v-else class="note">The PDF shows your signature as a picture.</p>
     <template v-if="!signingCertificate" #secondary>
-      <button type="button" @click="request.createCertificate">
+      <button
+        type="button"
+        @click="request.createCertificate($event.currentTarget)"
+      >
         Create certificate…
       </button>
     </template>
     <template #actions>
-      <button type="button" @click="close(request.cancel)">Cancel</button>
-      <button type="submit" :disabled="checking">Sign…</button>
+      <button type="button" :disabled="checking" @click="cancel">Cancel</button>
+      <button type="submit" :disabled="checking">
+        {{ checking ? "Checking…" : "Sign…" }}
+      </button>
     </template>
   </BaseDialog>
 </template>

@@ -20,6 +20,7 @@
   }
 
   .quiet {
+    @include text-button;
     @include text-button-quiet;
   }
 
@@ -51,6 +52,10 @@
   }
 
   .signature-font-sample {
+    // script fonts draw swashes past their letters, which the padding keeps
+    // inside what overflow clips
+    padding-inline: 0.4em;
+    margin-inline: -0.4em;
     overflow: hidden;
     font-size: 30px;
     line-height: 40px;

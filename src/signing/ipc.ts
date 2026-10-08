@@ -24,7 +24,7 @@ export type SigningError =
 /**
  * isSigningError tells whether `error` is one the native side sent
  */
-export const isSigningError = (error: unknown): error is SigningError =>
+const isSigningError = (error: unknown): error is SigningError =>
   !!error &&
   typeof error === "object" &&
   "kind" in error &&
@@ -33,10 +33,19 @@ export const isSigningError = (error: unknown): error is SigningError =>
   );
 
 /**
- * signingMessage says what went wrong, in words for the user
+ * signingKind returns what kind of error the native side sent, for the
+ * log, which never gets more of it: "other" for an error of the webview
  */
-export const signingMessage = (error: unknown) => {
-  if (!isSigningError(error)) return "Blank couldn't sign the PDF";
+export const signingKind = (error: unknown) =>
+  isSigningError(error) ? error.kind : "other";
+
+/**
+ * signingMessage says what went wrong, in words for the user, `fallback`
+ * (e.g. "Blank couldn't back up your key") for what the native side didn't
+ * say
+ */
+export const signingMessage = (error: unknown, fallback: string) => {
+  if (!isSigningError(error)) return fallback;
   switch (error.kind) {
     case "wrongPassphrase":
       return "The passphrase is wrong";

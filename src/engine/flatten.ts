@@ -12,6 +12,7 @@ import { parseLength } from "../layout/units";
 import { unknownLabel } from "../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../markdown/blocks/embeds";
 import {
+  type DateStyle,
   SIGNATURE_HINT,
   type Signing,
   signatureLabel,
@@ -427,26 +428,37 @@ interface Space {
   after: number;
 }
 
-// the signature block a signed export fills in: where it is, the image of
-// the signature, and who signs where and when
+// the signature block a signed export fills in: where it is, the picture
+// of the signature (a data: URL), and who signs where and when
 export interface SignedBlock {
   pos: number;
   src: string;
   signing: Signing;
 }
 
+// the image a signed block shows, by this key: the export adds the picture
+// of `SignedBlock.src` under it
+export const SIGNATURE_IMAGE = "blank:signature";
+
+// what else the items depend on besides the document
+export interface FlattenOptions {
+  // the signature block to fill in, for a signed export
+  signed?: SignedBlock | null;
+  // how the dates of signature blocks are written, ISO without
+  dates?: DateStyle;
+}
+
 /**
  * flatten returns the records of a document's items in order
  * @param sizes the sizes of the images that are loaded
- * @param signed the signature block to fill in, for a signed export
  */
 export const flatten = (
   doc: Node,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
-  signed: SignedBlock | null = null,
+  options: FlattenOptions = {},
 ): FlatRecord[] =>
-  flattenBlocks(doc, 0, doc.childCount, sizes, frozen, signed).flat();
+  flattenBlocks(doc, 0, doc.childCount, sizes, frozen, options).flat();
 
 /**
  * flattenBlocks returns the records of the document's top-level blocks from
@@ -460,7 +472,7 @@ export const flattenBlocks = (
   to: number,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
-  signed: SignedBlock | null = null,
+  { signed = null, dates }: FlattenOptions = {},
 ): FlatRecord[][] => {
   const records: FlatRecord[] = [];
   const quoteOf: number[][] = [];
@@ -590,8 +602,11 @@ export const flattenBlocks = (
     if (name === "signature") {
       // filled in for a signed export, else room to sign by hand
       const filled = signed?.pos === pos ? signed : null;
-      const size = filled ? sizes(filled.src) : undefined;
-      const lines = signatureLines(node.attrs, filled?.signing);
+      const size = filled ? sizes(SIGNATURE_IMAGE) : undefined;
+      const lines = signatureLines(node.attrs, {
+        dates,
+        signing: filled?.signing,
+      });
       push(
         node,
         pos,
@@ -600,7 +615,7 @@ export const flattenBlocks = (
         () => ({
           kind: "signature",
           pos,
-          src: filled?.src ?? "",
+          src: filled ? SIGNATURE_IMAGE : "",
           width: size?.width ?? 0,
           height: size?.height ?? 0,
           alt: signatureLabel(node.attrs),
@@ -610,7 +625,7 @@ export const flattenBlocks = (
         }),
         {
           key: [
-            filled?.src ?? "",
+            filled ? SIGNATURE_IMAGE : "",
             size ? `${size.width}x${size.height}` : "",
             ...lines,
           ].join("|"),

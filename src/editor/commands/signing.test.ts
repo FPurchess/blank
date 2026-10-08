@@ -12,6 +12,7 @@ import {
   signDialog,
   signingPlace,
 } from "../../state";
+import { config } from "../../config";
 import { flushPromises } from "../../test/async";
 import { createState, createTestView, doc, p } from "../../test/editor";
 import type { SavedMark } from "../../signing/profile";
@@ -40,6 +41,7 @@ vi.mock("../../signing/ipc", async (importOriginal) => ({
 vi.mock("../../signing/certificate", () => ({
   loadCertificate: vi.fn(async () => {}),
   openCertificateDialog: vi.fn(),
+  reportSigningFailure: vi.fn(),
 }));
 
 const SIGNATURE: SavedMark = {
@@ -52,10 +54,19 @@ const SIGNATURE: SavedMark = {
 const signature = (attrs: Record<string, unknown> = {}) =>
   schema.nodes.signature.create(attrs);
 
+let view = createTestView(createState(doc(p())));
 const run = (...blocks: Parameters<typeof doc>) => {
   const state = createState(doc(...blocks));
-  const view = createTestView(state);
+  view = createTestView(state);
   return exportSigned()(state, view.dispatch, view);
+};
+const BOX = { page: 0, x: 70, y: 600, width: 230, height: 70 };
+
+const withName = (name: string) => {
+  config.value = {
+    ...config.value,
+    signing: { ...config.value.signing, name },
+  };
 };
 
 describe("signing", () => {
@@ -78,6 +89,7 @@ describe("signing", () => {
     signDialog.value = null;
     signatureDialog.value = null;
     savedMarks.value = undefined;
+    withName("");
   });
 
   it("does nothing when only asked whether it can run", () => {
@@ -140,12 +152,50 @@ describe("signing", () => {
     expect(signingPlace.value).toBe("Hamburg");
   });
 
+  it("remembers the place only once the PDF is written", async () => {
+    vi.mocked(save).mockResolvedValue(null);
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(signDialog.value!.targets[0].pos, "Hamburg", null);
+    await flushPromises();
+    expect(signingPlace.value).toBe("Berlin");
+  });
+
+  it("chooses the block with the user's name, which signs as them", async () => {
+    withName("Ada Lovelace");
+    run(
+      p("Text"),
+      signature({ role: "Landlord" }),
+      signature({ name: "Ada Lovelace" }),
+    );
+    await flushPromises();
+    const request = signDialog.value!;
+    expect(request.chosen).toBe(request.targets[1].pos);
+    // a block that names nobody is signed in the user's name
+    request.submit(request.targets[0].pos, "", null);
+    await flushPromises();
+    expect(toPDF.mock.calls[0][1].signed.signing.name).toBe("Ada Lovelace");
+  });
+
+  it("signs the document as it is once the dialog closes", async () => {
+    run(p("Text"), signature({ role: "Tenant" }));
+    await flushPromises();
+    const { targets } = signDialog.value!;
+    // typed meanwhile, before the block
+    view.dispatch(view.state.tr.insertText("More ", 1));
+    signDialog.value!.submit(targets[0].pos, "", null);
+    await flushPromises();
+    const [state, context] = toPDF.mock.calls[0];
+    expect(state.doc).toBe(view.state.doc);
+    expect(state.doc.nodeAt(context.signed.pos).type.name).toBe("signature");
+  });
+
   it("signs digitally with the passphrase: the field over the filled in block", async () => {
     toPDF.mockResolvedValue({
       contents: new Uint8Array([1]),
       warnings: [],
       pages: 1,
-      signatureBox: { page: 0, x: 70, y: 600, width: 230, height: 70 },
+      signatureBox: BOX,
     });
     ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
     ipc.checkPassphrase.mockRejectedValue({ kind: "wrongPassphrase" });
@@ -173,6 +223,12 @@ describe("signing", () => {
   });
 
   it("writes nothing when signing fails, and says why", async () => {
+    toPDF.mockResolvedValue({
+      contents: new Uint8Array([1]),
+      warnings: [],
+      pages: 1,
+      signatureBox: BOX,
+    });
     ipc.signPdf.mockRejectedValue({
       kind: "failed",
       message: "The timestamp server didn't answer",
@@ -187,6 +243,15 @@ describe("signing", () => {
         body: "Failed to export file: The timestamp server didn't answer",
       }),
     );
+  });
+
+  it("never signs a PDF without the block's place for the signature", async () => {
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    await flushPromises();
+    expect(ipc.signPdf).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
   });
 
   it("warns that an imported Word document's layout can differ", async () => {
@@ -212,6 +277,7 @@ describe("signing", () => {
     expect(
       await signatureDialog.value!.submit({ kind: "draw", strokes: [] }),
     ).toBe(true);
+    signatureDialog.value!.done();
     expect(signDialog.value).not.toBeNull();
   });
 
@@ -227,7 +293,7 @@ describe("signing", () => {
   });
 
   it("saves nothing when there's no ink", async () => {
-    await openSignatureDialog("signature");
+    await openSignatureDialog("signature", () => {});
     renderMark.mockResolvedValue(null);
     expect(
       await signatureDialog.value!.submit({ kind: "draw", strokes: [] }),

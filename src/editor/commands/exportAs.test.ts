@@ -61,14 +61,40 @@ describe("command.exportAs", () => {
     },
   );
 
-  it("exports a document that only has an image", () => {
-    const image = schema.node("image", { src: "a.png" });
-    const onlyImage = createState(doc(schema.node("paragraph", null, [image])));
+  it.each([
+    [
+      "an image",
+      () =>
+        schema.node("paragraph", null, [
+          schema.node("image", { src: "a.png" }),
+        ]),
+    ],
+    ["a signature block", () => schema.node("signature")],
+    ["a table of contents", () => schema.node("toc")],
+  ])("exports a document that only has %s", (_, block) => {
+    const only = createState(doc(p(), block(), p()));
     vi.mocked(save).mockResolvedValue(null);
 
-    expect(
-      exportAs(title, createExporter(), filters)(onlyImage, dispatch),
-    ).toBe(true);
+    expect(exportAs(title, createExporter(), filters)(only, dispatch)).toBe(
+      true,
+    );
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("suggests the name of the document it was asked for, not the one shown later", async () => {
+    path.value = "/docs/report.md";
+    let choose: (dest: string | null) => void = () => {};
+    vi.mocked(save).mockReturnValue(
+      new Promise((resolve) => (choose = resolve)),
+    );
+    exportAs(title, createExporter(), filters)(state, dispatch);
+    path.value = "/docs/other.md";
+    choose(null);
+    await flushPromises();
+
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultPath: "/docs/report.pdf" }),
+    );
   });
 
   it("exports the document to the chosen file", async () => {

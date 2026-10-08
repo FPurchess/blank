@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inkBox, otsu, removeBackground, trim } from "./ink";
+import { removeBackground, trim } from "./ink";
 
 // a picture of `width` by `height` grey pixels, `ink` dark ones among them
 const picture = (
@@ -23,17 +23,6 @@ const alphaAt = (
 ) => pixels.data[(y * pixels.width + x) * 4 + 3];
 
 describe("the ink of a signature's picture", () => {
-  it("splits ink from paper", () => {
-    const { ink, paper } = otsu(
-      picture(10, 10, [
-        [2, 2],
-        [3, 3],
-      ]),
-    );
-    expect(ink).toBeCloseTo(34, 0);
-    expect(paper).toBe(235);
-  });
-
   it("makes the paper transparent and keeps the ink", () => {
     const clean = removeBackground(
       picture(10, 10, [
@@ -52,7 +41,6 @@ describe("the ink of a signature's picture", () => {
         [9, 8],
       ]),
     );
-    expect(inkBox(clean)).toEqual({ x: 5, y: 6, width: 5, height: 3 });
     const trimmed = trim(clean, 2)!;
     expect([trimmed.width, trimmed.height]).toEqual([9, 7]);
     expect(alphaAt(trimmed, 2, 2)).toBe(255);

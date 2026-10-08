@@ -1,46 +1,35 @@
 <script setup lang="ts">
-import { onMounted, onUpdated, shallowRef, useTemplateRef } from "vue";
+import { shallowRef, watch } from "vue";
 
-import { place } from "../popup";
 import {
   closeDialog,
   signaturePopover,
   type SignaturePopoverRequest,
 } from "../state";
-import { useDismiss } from "./composables/useDismiss";
-import { anchorOf, SETTINGS_BUTTON } from "./tocPopoverModel";
+import BlockPopover from "./components/BlockPopover.vue";
+import OptionGroup from "./components/OptionGroup.vue";
 import {
   DATE_OPTIONS,
   dateChoiceOf,
   settingsOf,
   today,
   WIDTH_OPTIONS,
+  widthChoiceOf,
 } from "./signaturePopoverModel";
 
-// The settings of a signature block, below the toolbar's settings button
-// (Enter or a click on it, see src/editor/commands/contentBlocks.ts): who
-// signs and as what, where and when, and how wide it is. Each change
-// applies at once, as one undo step; Esc, Enter in a field or a click
-// elsewhere closes them, and the focus goes back to the block.
+// The settings of a signature block (Enter or the toolbar's settings
+// button, see src/editor/commands/contentBlocks.ts): who signs and as what,
+// where and when, and how wide it is. Each change applies at once, as one
+// undo step.
 const props = defineProps<{ request: SignaturePopoverRequest }>();
 
-const root = useTemplateRef<HTMLElement>("root");
-const roleField = useTemplateRef<HTMLInputElement>("roleField");
 const start = props.request.settings;
 const role = shallowRef(start.role);
 const name = shallowRef(start.name);
 const where = shallowRef(start.place);
 const date = shallowRef(dateChoiceOf(start.date));
 const fixed = shallowRef(date.value === "fixed" ? start.date : today());
-const width = shallowRef(start.width ?? "");
-
-const placeIt = () =>
-  place(root.value!, anchorOf(props.request.anchor), { align: "end" });
-onMounted(() => {
-  placeIt();
-  roleField.value!.focus();
-});
-onUpdated(placeIt);
+const width = shallowRef(widthChoiceOf(start.width));
 
 const apply = () =>
   props.request.apply(
@@ -53,37 +42,21 @@ const apply = () =>
       width: width.value,
     }),
   );
+// the choices apply at once, as typing does
+watch([date, width], apply);
 const close = () => closeDialog(signaturePopover, props.request.close);
-
-// Enter in a text field closes them
-const onKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
-    event.preventDefault();
-    close();
-  }
-};
-
-// as the table of contents' settings, see TocPopover.vue
-useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
-  escape: true,
-  resize: true,
-});
 </script>
 
 <template>
-  <div
+  <BlockPopover
     id="signature-popover"
-    ref="root"
-    class="signature-popover"
-    role="dialog"
-    aria-labelledby="signature-popover-title"
-    @keydown="onKeyDown"
+    title="Signature"
+    :anchor="request.anchor"
+    @close="close"
   >
-    <h2 id="signature-popover-title">Signature</h2>
     <label for="signature-popover-role">Role</label>
     <input
       id="signature-popover-role"
-      ref="roleField"
       v-model="role"
       type="text"
       autocomplete="off"
@@ -109,16 +82,13 @@ useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
       placeholder="Where you sign"
       @input="apply"
     />
-    <label for="signature-popover-date">Date</label>
-    <select id="signature-popover-date" v-model="date" @change="apply">
-      <option
-        v-for="option in DATE_OPTIONS"
-        :key="option.value"
-        :value="option.value"
-      >
-        {{ option.label }}
-      </option>
-    </select>
+    <OptionGroup
+      id="signature-popover-date"
+      v-model="date"
+      name="date"
+      label="Date"
+      :options="DATE_OPTIONS"
+    />
     <input
       v-if="date === 'fixed'"
       id="signature-popover-fixed"
@@ -127,15 +97,12 @@ useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
       aria-label="Fixed date"
       @change="apply"
     />
-    <label for="signature-popover-width">Width</label>
-    <select id="signature-popover-width" v-model="width" @change="apply">
-      <option
-        v-for="option in WIDTH_OPTIONS"
-        :key="option.value"
-        :value="option.value"
-      >
-        {{ option.label }}
-      </option>
-    </select>
-  </div>
+    <OptionGroup
+      id="signature-popover-width"
+      v-model="width"
+      name="width"
+      label="Width"
+      :options="WIDTH_OPTIONS"
+    />
+  </BlockPopover>
 </template>

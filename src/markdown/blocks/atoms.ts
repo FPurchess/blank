@@ -51,20 +51,35 @@ const SIGNATURE_ARGS = ["role", "name", "place", "date", "width"] as const;
 
 // when a signature block's date is filled in: when it is signed, never (a
 // line to write it by hand), or a date fixed in the file, as YYYY-MM-DD
-export type SignatureDate = "signing" | "none" | string;
+export type SignatureDate =
+  "signing" | "none" | `${number}-${number}-${number}`;
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const SHARE = /^(?:[1-9]\d?|100)%$/;
+
+/**
+ * calendarDate returns the day a YYYY-MM-DD date is, at noon local time, or
+ * null for what isn't one, e.g. "2026-02-30"
+ */
+export const calendarDate = (value: string) => {
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  return date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+    ? date
+    : null;
+};
 
 /**
  * isSignatureDate tells whether `value` is a date a signature block can say
  */
-export const isSignatureDate = (value: unknown): value is SignatureDate =>
+const isSignatureDate = (value: unknown): value is SignatureDate =>
   value === "signing" ||
   value === "none" ||
-  (typeof value === "string" &&
-    ISO_DATE.test(value) &&
-    !Number.isNaN(Date.parse(value)));
+  (typeof value === "string" && calendarDate(value) !== null);
 
 // a signature block as it starts: one line to sign, dated when signed
 export const SIGNATURE_DEFAULTS = {
@@ -109,6 +124,15 @@ export const ATOMS: Record<string, AtomSpec> = {
     node: "signature",
     order: SIGNATURE_ARGS,
     read: (args) => {
+      // a paste's arguments come from JSON, which may hold anything
+      const known = args as Record<string, unknown>;
+      if (
+        SIGNATURE_ARGS.some(
+          (key) => known[key] !== undefined && typeof known[key] !== "string",
+        )
+      ) {
+        return null;
+      }
       const date = args.date ?? SIGNATURE_DEFAULTS.date;
       const width = args.width ?? null;
       if (!isSignatureDate(date) || (width !== null && !SHARE.test(width))) {

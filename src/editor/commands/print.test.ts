@@ -134,7 +134,7 @@ describe("command.print", () => {
 
     expect(runExport).toHaveBeenCalledWith(
       view.state,
-      null,
+      { path: null, importedFrom: null },
       expect.objectContaining({
         exporter: toPDF,
         filters: [PDF_FILTER],

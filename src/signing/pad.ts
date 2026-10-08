@@ -21,13 +21,13 @@ const THICK = 7;
  * pressureOf returns the pressure of a pointer event's point: the pen's, or
  * the default for a mouse or a pen that says none
  */
-export const pressureOf = (pressure: number) =>
+const pressureOf = (pressure: number) =>
   pressure > 0 && pressure <= 1 ? pressure : DEFAULT_PRESSURE;
 
 /**
  * widthAt returns how wide the line is at `pressure`
  */
-export const widthAt = (pressure: number) =>
+const widthAt = (pressure: number) =>
   THIN + (THICK - THIN) * pressureOf(pressure);
 
 /**

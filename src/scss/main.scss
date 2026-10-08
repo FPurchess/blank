@@ -252,6 +252,29 @@ body {
     margin: 0 0 12px;
   }
 
+  // what is wrong, what the dialog notes, and what to watch out for, in
+  // small print below the fields. What is wrong and what the dialog is
+  // doing are live regions that are always there: empty, they take no room.
+  p.error,
+  p.note,
+  p.warning {
+    margin: var(--s2) 0 0;
+    font-size: var(--ui-small);
+    line-height: 16px;
+
+    &:empty {
+      margin: 0;
+    }
+  }
+
+  p.error {
+    color: var(--spelling-color);
+  }
+
+  p.note {
+    color: var(--muted);
+  }
+
   label {
     color: var(--muted);
   }
@@ -1541,10 +1564,9 @@ body.without-engine.blocks-docked {
   font-size: var(--ui-small);
 }
 
-// the settings of a table of contents or a signature block, below its
-// toolbar (src/ui/TocPopover.vue, src/ui/SignaturePopover.vue)
-.toc-popover,
-.signature-popover {
+// the settings of a block below its toolbar (src/ui/components/
+// BlockPopover.vue): a table of contents', a signature block's
+.block-popover {
   position: fixed;
   // with the pickers and menus
   z-index: 20;
@@ -1570,6 +1592,24 @@ body.without-engine.blocks-docked {
   select,
   input {
     @include field;
+  }
+
+  // a row of choices: its label above, the choices as one segmented
+  // control (OptionGroup.vue)
+  .setting {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+    margin-top: var(--s1);
+  }
+
+  .setting-label {
+    color: var(--muted);
+  }
+
+  .options {
+    @include segmented;
+    flex-wrap: wrap;
   }
 }
 

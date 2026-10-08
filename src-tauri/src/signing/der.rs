@@ -1,7 +1,8 @@
-//! A few lines of DER: enough to hand-encode what the `cms` crate has no type
-//! for (ESS signing-certificate-v2, RFC 3161 requests) and to walk structures
-//! whose raw bytes matter (signed attributes, TSTInfo).
+//! a few lines of DER: enough to hand-encode what the `cms` crate has no
+//! type for (ESS signing-certificate-v2, RFC 3161 requests) and to walk
+//! structures whose raw bytes matter (signed attributes, TSTInfo)
 
+/// len encodes a length
 pub fn len(n: usize) -> Vec<u8> {
     if n < 0x80 {
         vec![n as u8]
@@ -18,6 +19,7 @@ pub fn len(n: usize) -> Vec<u8> {
     }
 }
 
+/// tlv encodes `content` with `tag`
 pub fn tlv(tag: u8, content: &[u8]) -> Vec<u8> {
     let mut out = vec![tag];
     out.extend(len(content.len()));
@@ -25,15 +27,17 @@ pub fn tlv(tag: u8, content: &[u8]) -> Vec<u8> {
     out
 }
 
+/// seq encodes a SEQUENCE of `parts`
 pub fn seq(parts: &[&[u8]]) -> Vec<u8> {
     tlv(0x30, &parts.concat())
 }
 
+/// octets encodes an OCTET STRING
 pub fn octets(b: &[u8]) -> Vec<u8> {
     tlv(0x04, b)
 }
 
-/// An unsigned INTEGER from big-endian bytes.
+/// uint encodes an unsigned INTEGER from big-endian bytes
 pub fn uint(b: &[u8]) -> Vec<u8> {
     let mut v: Vec<u8> = b.iter().copied().skip_while(|x| *x == 0).collect();
     if v.is_empty() || v[0] & 0x80 != 0 {
@@ -42,6 +46,7 @@ pub fn uint(b: &[u8]) -> Vec<u8> {
     tlv(0x02, &v)
 }
 
+/// a DER value as read: its tag, content and all its bytes
 #[derive(Clone, Copy, Debug)]
 pub struct Tlv<'a> {
     pub tag: u8,
@@ -50,7 +55,7 @@ pub struct Tlv<'a> {
     pub raw: &'a [u8],
 }
 
-/// Reads one definite-length TLV; returns it and the rest.
+/// read reads one definite-length TLV; it returns it and the rest
 pub fn read(data: &[u8]) -> Option<(Tlv<'_>, &[u8])> {
     let tag = *data.first()?;
     if tag & 0x1f == 0x1f {
@@ -84,7 +89,7 @@ pub fn read(data: &[u8]) -> Option<(Tlv<'_>, &[u8])> {
     ))
 }
 
-/// All TLVs inside a constructed value.
+/// children reads all TLVs inside a constructed value
 pub fn children(mut data: &[u8]) -> Option<Vec<Tlv<'_>>> {
     let mut out = vec![];
     while !data.is_empty() {
@@ -95,17 +100,19 @@ pub fn children(mut data: &[u8]) -> Option<Vec<Tlv<'_>>> {
     Some(out)
 }
 
-/// A parsed BER element (definite or indefinite length).
+/// a parsed BER element (definite or indefinite length)
 struct Ber<'a> {
     tag: u8,
     content: BerContent<'a>,
 }
 
+/// what a BER element holds
 enum BerContent<'a> {
     Primitive(&'a [u8]),
     Constructed(Vec<Ber<'a>>),
 }
 
+/// parse_ber reads one BER element, nested at most 64 deep
 fn parse_ber(data: &[u8], depth: usize) -> Option<(Ber<'_>, &[u8])> {
     if depth > 64 {
         return None;
@@ -164,7 +171,7 @@ fn parse_ber(data: &[u8], depth: usize) -> Option<(Ber<'_>, &[u8])> {
     }
 }
 
-/// The octets of a (possibly constructed) string.
+/// flatten returns the octets of a (possibly constructed) string
 fn flatten(b: &Ber) -> Vec<u8> {
     match &b.content {
         BerContent::Primitive(c) => c.to_vec(),
@@ -172,6 +179,8 @@ fn flatten(b: &Ber) -> Vec<u8> {
     }
 }
 
+/// encode_der writes a BER element as DER; see ber_to_der for `deep` and
+/// `p12`
 fn encode_der(b: &Ber, deep: bool, p12: bool) -> Vec<u8> {
     match (&b.content, b.tag) {
         (BerContent::Primitive(c), 0x04) => tlv(0x04, &maybe_deep(c, deep, p12)),
@@ -212,7 +221,7 @@ fn encode_der(b: &Ber, deep: bool, p12: bool) -> Vec<u8> {
     }
 }
 
-/// For reading CMS that NSS wrote: the certificates [0] of a SignedData
+/// fix_cms_sets is for reading CMS that NSS wrote: the certificates [0] of a SignedData
 /// (whose second element is the digestAlgorithms SET) can hold the same
 /// certificate twice and be unsorted, which the `der` crate rejects. The
 /// certificates aren't signed, so sort and dedupe them.
@@ -244,6 +253,8 @@ pub fn fix_cms_sets(der: &[u8]) -> Option<Vec<u8>> {
     walk(&t, 0)
 }
 
+/// maybe_deep converts the content of an OCTET STRING too, with `deep`,
+/// when it holds a SEQUENCE
 fn maybe_deep(c: &[u8], deep: bool, p12: bool) -> Vec<u8> {
     // NSS nests BER (an indefinite SEQUENCE) inside OCTET STRINGs, and
     // SafeContents (DER) hold the AlgorithmIdentifiers to fix; anything that
@@ -258,9 +269,10 @@ fn maybe_deep(c: &[u8], deep: bool, p12: bool) -> Vec<u8> {
     c.to_vec()
 }
 
-/// BER to DER: definite lengths, primitive strings. With `deep`, OCTET
-/// STRINGs that hold a SEQUENCE are converted too; `p12` adds the PKCS#12
-/// fix-ups (implicit encryptedContent, HMAC PRF parameters).
+/// ber_to_der turns BER into DER: definite lengths, primitive strings.
+/// With `deep`, OCTET STRINGs that hold a SEQUENCE are converted too;
+/// `p12` adds the PKCS#12 fix-ups (implicit encryptedContent, HMAC PRF
+/// parameters).
 pub fn ber_to_der(data: &[u8], deep: bool, p12: bool) -> Option<Vec<u8>> {
     let (b, rest) = parse_ber(data, 0)?;
     if !rest.iter().all(|x| *x == 0) {

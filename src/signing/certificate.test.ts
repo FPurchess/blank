@@ -2,8 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { announcement, certificateDialog, signingCertificate } from "../state";
 import {
+  announcement,
+  certificateDialog,
+  confirmDialog,
+  signingCertificate,
+} from "../state";
+import { flushPromises } from "../test/async";
+import {
+  confirmRemoval,
   forgetCertificate,
   loadCertificate,
   openCertificateDialog,
@@ -36,6 +43,7 @@ describe("the user's certificate", () => {
   beforeEach(() => {
     resetCertificate();
     certificateDialog.value = null;
+    confirmDialog.value = null;
   });
 
   it("is read once", async () => {
@@ -46,7 +54,7 @@ describe("the user's certificate", () => {
   });
 
   it("is made in its dialog, which says what went wrong", async () => {
-    await openCertificateDialog("create");
+    await openCertificateDialog("create", () => {});
     const request = certificateDialog.value!;
     expect(request.mode).toBe("create");
     ipc.createCertificate.mockRejectedValue({
@@ -79,7 +87,7 @@ describe("the user's certificate", () => {
 
   it("is imported from a key file, once its passphrase opens it", async () => {
     vi.mocked(open).mockResolvedValue("/keys/ada.p12");
-    await openCertificateDialog("import");
+    await openCertificateDialog("import", () => {});
     const request = certificateDialog.value!;
     expect(request.file).toBe("ada.p12");
     ipc.importKey.mockRejectedValue({ kind: "wrongPassphrase" });
@@ -90,7 +98,7 @@ describe("the user's certificate", () => {
 
   it("asks nothing when no key file is chosen", async () => {
     vi.mocked(open).mockResolvedValue(null);
-    await openCertificateDialog("import");
+    await openCertificateDialog("import", () => {});
     expect(certificateDialog.value).toBeNull();
   });
 
@@ -115,11 +123,28 @@ describe("the user's certificate", () => {
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
     await forgetCertificate();
-    expect(sendNotification).toHaveBeenCalledWith(
-      "Blank couldn't remove your certificate",
-    );
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "Certificate",
+      body: "Blank couldn't remove your certificate",
+    });
     ipc.removeCertificate.mockResolvedValue(undefined);
     await forgetCertificate();
+    expect(signingCertificate.value).toBeNull();
+  });
+
+  it("is removed only once the user confirms it", async () => {
+    signingCertificate.value = INFO;
+    const refocus = vi.fn();
+    ipc.removeCertificate.mockResolvedValue(undefined);
+    confirmRemoval(refocus);
+    expect(confirmDialog.value?.title).toBe("Remove your certificate?");
+    confirmDialog.value!.cancel();
+    expect(ipc.removeCertificate).not.toHaveBeenCalled();
+    expect(refocus).toHaveBeenCalled();
+    confirmRemoval(refocus);
+    confirmDialog.value!.confirm();
+    await flushPromises();
+    expect(ipc.removeCertificate).toHaveBeenCalled();
     expect(signingCertificate.value).toBeNull();
   });
 });

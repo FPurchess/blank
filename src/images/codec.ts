@@ -147,3 +147,21 @@ export const encodePng = async ({ data, width, height }: Pixels) => {
   if (!blob) throw new Error("could not encode the image as image/png");
   return new Uint8Array(await blob.arrayBuffer());
 };
+
+/**
+ * inkOfText returns how far `text` in the CSS `font` reaches from where it
+ * is drawn: left of it and right of it, above the baseline and below it, in
+ * pixels. Script fonts reach well past their letters' widths.
+ */
+export const inkOfText = (font: string, text: string) => {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) throw new Error("canvas is not available");
+  context.font = font;
+  const box = context.measureText(text);
+  return {
+    left: box.actualBoundingBoxLeft,
+    right: box.actualBoundingBoxRight,
+    ascent: box.actualBoundingBoxAscent,
+    descent: box.actualBoundingBoxDescent,
+  };
+};

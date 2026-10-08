@@ -1,5 +1,6 @@
-//! A CAdES-BES detached CMS SignedData over a PDF's byte ranges (PAdES B-B),
-//! with the RustCrypto `cms` builder; optionally a signature timestamp (B-T).
+//! a CAdES-BES detached CMS SignedData over a PDF's byte ranges (PAdES
+//! B-B), with the RustCrypto `cms` builder; optionally a signature
+//! timestamp (B-T)
 
 use crate::signing::der as d;
 use crate::signing::keys::{Identity, Key};
@@ -17,14 +18,18 @@ use spki::AlgorithmIdentifierOwned;
 use x509_cert::attr::Attribute;
 use x509_cert::Certificate;
 
-pub const SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
-pub const SIGNING_CERTIFICATE_V2: ObjectIdentifier =
+/// id-sha256
+const SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
+/// id-aa-signingCertificateV2
+const SIGNING_CERTIFICATE_V2: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.16.2.47");
-pub const SIGNATURE_TIME_STAMP_TOKEN: ObjectIdentifier =
+/// id-aa-signatureTimeStampToken
+const SIGNATURE_TIME_STAMP_TOKEN: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.16.2.14");
 
-/// ESS signing-certificate-v2 (RFC 5035) with SHA-256 (the default, so the
-/// algorithm is left out) and the issuer and serial.
+/// signing_certificate_v2 is the ESS signing-certificate-v2 attribute (RFC
+/// 5035) with SHA-256 (the default, so the algorithm is left out) and the
+/// issuer and serial
 fn signing_certificate_v2(cert_der: &[u8], cert: &Certificate) -> Result<Attribute> {
     let hash = Sha256::digest(cert_der);
     let issuer = cert.tbs_certificate.issuer.to_der()?;
@@ -42,12 +47,16 @@ fn signing_certificate_v2(cert_der: &[u8], cert: &Certificate) -> Result<Attribu
     })
 }
 
-/// Signs `digest` (SHA-256 of the PDF's byte ranges). `timestamp` gets the
-/// signature value and returns an RFC 3161 token (DER ContentInfo).
+/// gets a signature value and returns an RFC 3161 token over it
+pub type Stamp<'a> = &'a dyn Fn(&[u8]) -> Result<Vec<u8>>;
+
+/// sign_detached signs `digest` (SHA-256 of the PDF's byte ranges).
+/// `timestamp` gets the signature value and returns an RFC 3161 token (DER
+/// ContentInfo).
 pub fn sign_detached(
     id: &Identity,
     digest: &[u8; 32],
-    timestamp: Option<&dyn Fn(&[u8]) -> Result<Vec<u8>>>,
+    timestamp: Option<Stamp>,
 ) -> Result<Vec<u8>> {
     let cert = Certificate::from_der(&id.cert)?;
     let sid = SignerIdentifier::IssuerAndSerialNumber(IssuerAndSerialNumber {
@@ -127,6 +136,7 @@ pub fn sign_detached(
     Ok(ci.to_der()?)
 }
 
+/// e turns an error of the cms builder into an anyhow::Error
 fn e(err: impl std::fmt::Debug) -> anyhow::Error {
     anyhow!("cms: {err:?}")
 }

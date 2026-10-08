@@ -30,6 +30,7 @@ import { unknownWarning } from "../../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../../markdown/blocks/embeds";
 import {
   SIGNATURE_ROOM,
+  SIGNATURE_SHARE,
   signatureLabel,
   signatureLines,
   signatureShare,
@@ -50,6 +51,7 @@ import {
   usedDefinitions,
 } from "../../markdown";
 import { pageEngine } from "../../engine/engine";
+import { signingDates } from "../../state/signing";
 import { parseLength, POINTS_PER_PIXEL } from "../../layout/units";
 import {
   cellShare,
@@ -685,7 +687,9 @@ class Serializer {
    */
   private signature(node: Node): Block[] {
     const label = signatureLabel(node.attrs);
-    const width = Math.round(this.contentWidth * signatureShare(node.attrs));
+    const width = Math.round(
+      this.contentWidth * (signatureShare(node.attrs) || SIGNATURE_SHARE),
+    );
     const room: Block = {
       children: [
         new this.docx.TextRun({
@@ -702,16 +706,16 @@ class Serializer {
       indent: { right: this.contentWidth - width },
       border: { bottom: SIGNATURE_LINE },
     };
-    const lines: Block[] = signatureLines(node.attrs).map(
-      (line, index, all) => ({
-        style: STYLE.small,
-        children: [new this.docx.TextRun(line)],
-        spacing: {
-          before: index === 0 ? 60 : 0,
-          after: index === all.length - 1 ? BLOCK_SPACING : 0,
-        },
-      }),
-    );
+    const lines: Block[] = signatureLines(node.attrs, {
+      dates: signingDates.value,
+    }).map((line, index, all) => ({
+      style: STYLE.small,
+      children: [new this.docx.TextRun(line)],
+      spacing: {
+        before: index === 0 ? 60 : 0,
+        after: index === all.length - 1 ? BLOCK_SPACING : 0,
+      },
+    }));
     return [
       this.control({ tag: SIGNATURE_TAG, alias: label }),
       room,

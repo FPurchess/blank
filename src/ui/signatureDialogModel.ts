@@ -54,11 +54,17 @@ export const startOf = (mark: Mark, saved: SavedMark | null, name: string) => {
  */
 export const problemOf = (
   tab: PadTab,
+  mark: Mark,
   fields: { strokes: unknown[]; text: string; image: string | null },
 ) => {
+  const what = mark === "signature" ? "signature" : "initials";
   if (tab === "draw" && fields.strokes.length === 0)
-    return "Draw your signature first.";
-  if (tab === "type" && !fields.text.trim()) return "Type your name first.";
-  if (tab === "image" && !fields.image) return "Choose an image first.";
+    return `Draw your ${what} first.`;
+  if (tab === "type" && !fields.text.trim())
+    return mark === "signature"
+      ? "Type your name first."
+      : "Type your initials first.";
+  if (tab === "image" && !fields.image)
+    return `Choose an image of your ${what} first.`;
   return "";
 };
