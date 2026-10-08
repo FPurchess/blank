@@ -18,7 +18,8 @@ export const wheelPixels = (
 
 // how far a touchpad's pinch, or a smooth wheel, goes for one step of zoom,
 // in pixels, and how long it rests before a new gesture starts
-const ZOOM_PIXELS = 50;
+// a notch of a mouse wheel is 40 px in WebKitGTK, 100 elsewhere
+const ZOOM_PIXELS = 40;
 const ZOOM_REST = 200;
 
 /**

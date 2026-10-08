@@ -43,10 +43,6 @@ export const tabKey = (
 };
 
 /**
- * middleCloses is whether a middle click closes a tab: let go over the tab
- * it was pressed on
- */
-/**
  * logoKey returns what the key of `event` does on the logo, the first stop
  * of the row: → and Home go to the first tab, End to the last, Esc back to
  * the text
@@ -57,13 +53,17 @@ export const logoKey = (
 ): TabKey => {
   if (event.ctrlKey || event.altKey || event.metaKey || count === 0)
     return null;
-  if (event.key === "ArrowRight") return { move: 0 };
+  if (event.key === "ArrowRight" || event.key === "Home") return { move: 0 };
   if (event.key === "End" || event.key === "ArrowLeft")
     return { move: count - 1 };
   if (event.key === "Escape") return "leave";
   return null;
 };
 
+/**
+ * middleCloses is whether a middle click closes a tab: let go over the tab
+ * it was pressed on
+ */
 export const middleCloses = (pressed: string | null, released: string | null) =>
   pressed !== null && pressed === released;
 

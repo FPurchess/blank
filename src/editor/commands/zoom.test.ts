@@ -77,6 +77,13 @@ describe("the zoom commands", () => {
     expect(announcement.value?.text).toBe("The zoom is at 200%");
   });
 
+  it("keep no spot for later when the zoom stays, e.g. Fit again", () => {
+    run(zoomFit());
+    expect(pageZoom.value).toBe("fit");
+    expect(zoomAnchor.value).toBeNull();
+    expect(announcement.value?.text).toMatch(/^The zoom is at Fit, \d+%$/);
+  });
+
   it("say they need the pages without the engine", () => {
     useFallbackEditor("failed");
     run(zoomBy(1));

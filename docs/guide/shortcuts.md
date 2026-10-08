@@ -34,6 +34,7 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 | [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`        |
 | [Zoom in](./pages#zoom)                     | `Mod` `=` or `Mod` `+` |
 | [Zoom out](./pages#zoom)                    | `Mod` `-`              |
+| [Fit to window](./pages#zoom)               | (none)                 |
 | [Outline](./pages#outline)                  | `Mod` `Alt` `O`        |
 | [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`        |
 | Cycle themes                                | `Mod` `Alt` `T`        |

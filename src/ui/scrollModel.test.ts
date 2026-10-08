@@ -40,13 +40,16 @@ describe("zoomWheel", () => {
   it("adds a pinch's small turns up to a step", () => {
     const steps: number[] = [];
     const turn = zoomWheel((direction) => steps.push(direction));
-    for (let i = 0; i < 4; i++) turn(wheel(-10, i * 10));
+    for (let i = 0; i < 4; i++) turn(wheel(-8, i * 10));
     expect(steps).toEqual([]);
-    turn(wheel(-10, 50));
+    turn(wheel(-8, 50));
     expect(steps).toEqual([1]);
     // a new gesture after a rest starts from nothing
-    turn(wheel(40, 100));
-    turn(wheel(40, 400));
+    turn(wheel(30, 100));
+    turn(wheel(30, 400));
     expect(steps).toEqual([1]);
+    // a notch of WebKitGTK's wheel is a step of its own
+    turn(wheel(40, 800));
+    expect(steps).toEqual([1, -1]);
   });
 });

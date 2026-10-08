@@ -36,6 +36,12 @@ export class BitmapCache {
    * set keeps `bitmap` by `key`, in place of what `slot` held before
    */
   set(key: string, bitmap: Bitmap, slot?: string) {
+    // one that would take more than a third of the room isn't worth keeping
+    if (bitmap.width * bitmap.height * 4 > this.limit / 3) {
+      if (slot !== undefined) this.delete(this.slots.get(slot) ?? "");
+      bitmap.close?.();
+      return;
+    }
     if (slot !== undefined) {
       const before = this.slots.get(slot);
       if (before !== undefined && before !== key) this.delete(before);
@@ -159,7 +165,8 @@ export class PaintQueue {
   }
 }
 
-// at 2× an A4 sheet is about 14 MB; this keeps a dozen or so
+// at 2× an A4 sheet is about 14 MB at Fit and 57 MB at a zoom of 200%: this
+// keeps a dozen or so, or three of the largest
 export const BITMAP_LIMIT = 192 * 1024 * 1024;
 
 export const pageBitmaps = new BitmapCache(BITMAP_LIMIT);

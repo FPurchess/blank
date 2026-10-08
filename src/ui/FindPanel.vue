@@ -12,12 +12,13 @@ import {
 import { TOP_BAR_HEIGHT } from "../chrome";
 import { CommandIdentifier } from "../config";
 import { viewBox } from "../engine/geometry";
-import { commandKey } from "../editor/keyBindings";
+import { onCommandKey } from "../editor/keyBindings";
 import { useEditor } from "../editor/handle";
 import {
   closeFind,
   replaceAllFound,
   replaceFound,
+  revealFound,
   setFind,
   stepFind,
 } from "../editor/plugins/find/commands";
@@ -25,6 +26,8 @@ import { findKey } from "../editor/plugins/find/state";
 import { place } from "../popup";
 import { listenOnWindow } from "../scope";
 import {
+  contextMenu,
+  focusTakingDialogs,
   FOCUS_ORDER,
   type FindOptions,
   findFocused,
@@ -39,6 +42,7 @@ import {
   countText,
   errorText,
   FIND_TOGGLES,
+  isStepKey,
   panelAnchor,
 } from "./findPanelModel";
 
@@ -60,9 +64,11 @@ const error = computed(() => errorText(found.value));
 const run = (command: Parameters<typeof editor.run>[0]) =>
   editor.run(command, { focus: false });
 
-// what's typed is looked for at once
+// what's typed is looked for at once, and the match it's at shown
 watch(query, (value) => {
-  if (value !== found.value?.query) run(setFind({ query: value }));
+  if (value === found.value?.query) return;
+  run(setFind({ query: value }));
+  run(revealFound);
 });
 const toggle = (option: keyof FindOptions) => {
   findOptions.value = {
@@ -79,26 +85,34 @@ watch(
   (request) => {
     if (!request) return;
     query.value = found.value?.query ?? query.value;
-    void nextTick(() => field.value?.focus(true));
+    void nextTick(() => field.value?.focus("all"));
   },
   { immediate: true },
 );
 watch(tabSwitch, () => {
-  run(setFind({ options: findOptions.value }));
+  // a tab that never looked for anything looks for what the panel shows
+  run(
+    setFind({
+      options: findOptions.value,
+      query: found.value?.query || query.value,
+    }),
+  );
   query.value = found.value?.query ?? "";
 });
 
 const step = (direction: 1 | -1) => run(stepFind(direction));
+// a dialog or a menu keeps its keys, F3 too
+const ownKeysOpen = () =>
+  focusTakingDialogs.some((request) => request.value !== null) ||
+  contextMenu.value !== null;
 const close = () => editor.run(closeFind(true));
 
-const findKeyAgain = commandKey(CommandIdentifier.EDIT_FIND, () => {
-  field.value?.focus(true);
-  return true;
-});
+const findKeyAgain = onCommandKey(CommandIdentifier.EDIT_FIND, () =>
+  field.value?.focus("all"),
+);
 const onKeydown = (event: KeyboardEvent) => {
-  if (findKeyAgain({} as never, event)) {
-    event.preventDefault();
-  } else if (event.key === "Escape") {
+  if (findKeyAgain(event)) return;
+  if (event.key === "Escape") {
     event.preventDefault();
     close();
   }
@@ -108,35 +122,31 @@ const onFindKey = (event: KeyboardEvent) => {
   event.preventDefault();
   step(event.shiftKey ? -1 : 1);
 };
-// F3 anywhere while the panel is open
+// F3 anywhere while the panel is open, but in what holds its own keys
 listenOnWindow("keydown", (event) => {
-  if (event.key !== "F3" || event.ctrlKey || event.altKey || event.metaKey)
-    return;
-  event.preventDefault();
-  step(event.shiftKey ? -1 : 1);
+  if (!isStepKey(event) || ownKeysOpen()) return;
+  if (step(event.shiftKey ? -1 : 1)) event.preventDefault();
 });
 
 // at the top right of the pages, again when the page view moves, not when
 // it scrolls
-const viewPlace = computed(() => {
-  const box = viewBox();
-  return box ? `${box.top},${box.right}` : "";
-});
-const placePanel = () => {
-  const [top, right] = viewPlace.value.split(",").map(Number);
+const viewTop = computed(() => viewBox()?.top ?? null);
+const viewRight = computed(() => viewBox()?.right ?? null);
+const placePanel = () =>
   place(
     root.value!,
     panelAnchor(
-      viewPlace.value ? { top, right } : null,
+      viewTop.value === null || viewRight.value === null
+        ? null
+        : { top: viewTop.value, right: viewRight.value },
       window.innerWidth,
       TOP_BAR_HEIGHT,
     ),
     { align: "end" },
   );
-};
 onMounted(placePanel);
 onUpdated(placePanel);
-watch(viewPlace, placePanel);
+watch([viewTop, viewRight], placePanel);
 listenOnWindow("resize", placePanel);
 
 const { onFocusin, onFocusout } = useFocusRegion(
@@ -145,7 +155,7 @@ const { onFocusin, onFocusout } = useFocusRegion(
   {
     id: "find",
     order: FOCUS_ORDER.find,
-    focus: () => field.value?.focus(true),
+    focus: () => field.value?.focus("all"),
   },
 );
 </script>
@@ -164,7 +174,6 @@ const { onFocusin, onFocusout } = useFocusRegion(
     <SearchField
       ref="field"
       v-model="query"
-      class="find-field"
       aria-label="Find"
       placeholder="Find"
       :aria-invalid="error ? true : undefined"
@@ -203,7 +212,12 @@ const { onFocusin, onFocusout } = useFocusRegion(
         tip-key="Enter"
         @click="step(1)"
       />
-      <span class="find-spacer" />
+      <IconButton
+        icon="x"
+        label="Close"
+        tip-key="Esc"
+        @click="editor.run(closeFind(false))"
+      />
       <button
         type="button"
         class="find-button"

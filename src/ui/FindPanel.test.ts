@@ -4,7 +4,14 @@ import { nextTick } from "vue";
 import { find } from "../editor/plugins/find";
 import { openFind } from "../editor/plugins/find/commands";
 import { findKey } from "../editor/plugins/find/state";
-import { controlsStay, findOptions, findPanel, uiTakesFocus } from "../state";
+import {
+  controlsStay,
+  findOptions,
+  findPanel,
+  NO_FIND_OPTIONS,
+  settingsDialog,
+  uiTakesFocus,
+} from "../state";
 import { createEditorHandle } from "../editor/handle";
 import { createState, createTestView, doc, p } from "../test/editor";
 import { bootApp } from "./mount";
@@ -47,7 +54,7 @@ describe("the find panel", () => {
 
   beforeEach(async () => {
     document.body.replaceChildren();
-    findOptions.value = { matchCase: false, wholeWord: false, regex: false };
+    findOptions.value = NO_FIND_OPTIONS;
     // a handle whose state follows what's dispatched, as the app's does
     const view = createTestView(
       createState(doc(p("the cat and the hat"), p("The end")), {
@@ -127,6 +134,17 @@ describe("the find panel", () => {
     );
     expect(field().getAttribute("aria-invalid")).toBe("true");
     expect(count()).toBe("");
+  });
+
+  it("closes with its ×, and leaves F3 to an open dialog", async () => {
+    await typeInto(field(), "the");
+    settingsDialog.value = {};
+    await press(document.body, "F3");
+    expect(count()).toBe("1 of 3");
+    settingsDialog.value = null;
+    panel()!.querySelector<HTMLElement>('[aria-label="Close"]')!.click();
+    await settle();
+    expect(panel()).toBeNull();
   });
 
   it("replaces all, and closes with Esc", async () => {

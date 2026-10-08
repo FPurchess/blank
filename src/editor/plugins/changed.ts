@@ -64,10 +64,24 @@ export const textblocks = (
     ranges.forEach(([from, to]) => visit(from, Math.min(to, doc.content.size)));
 };
 
+// how many steps a transaction may have before it counts as changing all
+// of the document: mapping each step's range through the rest takes as
+// long as the steps squared, e.g. for a Replace all of thousands
+const MANY_STEPS = 100;
+
 /**
- * changedRanges returns the ranges `tr` changed, in positions of its doc
+ * changesAll tells whether `tr` counts as changing all of the document, as
+ * one of many steps does
+ */
+export const changesAll = (tr: Transaction) =>
+  tr.mapping.maps.length > MANY_STEPS;
+
+/**
+ * changedRanges returns the ranges `tr` changed, in positions of its doc;
+ * the whole document for a transaction of many steps
  */
 export const changedRanges = (tr: Transaction): Range[] => {
+  if (changesAll(tr)) return [[0, tr.doc.content.size]];
   const ranges: Range[] = [];
   tr.mapping.maps.forEach((map, index) => {
     const rest = tr.mapping.slice(index + 1);

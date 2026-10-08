@@ -49,6 +49,8 @@ describe("the controls' global rules", () => {
       "#blocks-pane",
       ".context-menu",
       ".toc-popover",
+      ".main-menu",
+      ".find-panel",
       ".toolbar",
       ".table-picker",
       ".dialog",

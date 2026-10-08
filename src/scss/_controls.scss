@@ -190,6 +190,18 @@ $tip-key: 75%;
   color: var(--muted);
 }
 
+// a panel that floats over the window, with the menus: the main menu and
+// the find panel, 340 px wide but on a narrow window
+@mixin floating-panel {
+  @include popover;
+  @include ui-text;
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  width: min(340px, calc(100% - 16px));
+  padding: 6px;
+}
+
 // the UI's text, at 13/20: set on the roots of the chrome (the top area, the
 // side panes, what floats), never on the editor, whose type is the document's
 @mixin ui-text {

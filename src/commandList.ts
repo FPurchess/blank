@@ -437,7 +437,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
   },
   [C.APP_SHORTCUTS]: {
     group: "Tools",
-    label: "Keyboard shortcuts",
+    label: "Keyboard shortcuts…",
     icon: "keyboard",
     aliases: ["keys", "keymap", "bindings"],
   },
@@ -449,7 +449,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
   },
   [C.APP_ABOUT]: {
     group: "Tools",
-    label: "About Blank",
+    label: "About Blank…",
     icon: "logo",
     aliases: ["version", "licenses", "website"],
   },

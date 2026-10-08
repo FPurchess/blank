@@ -45,8 +45,9 @@ describe("frameLayout", () => {
     expect(frameLayout(layout, "page-ends", 648, 0.5).scale).toBe(
       0.5 * SHEET_SCALE,
     );
-    // Fit leaves the desk as wide as the view
-    expect(frameLayout(layout, "pages", 648).width).toBe(648);
+    // Fit leaves the desk as wide as the view, at any width
+    for (let width = 300; width < 2000; width++)
+      expect(frameLayout(layout, "pages", width).width).toBe(width);
   });
 
   it("fits page ends at the editor's text size at most", () => {
@@ -67,9 +68,10 @@ describe("frameLayout", () => {
       w: 600,
       h: 800,
     });
-    // a narrow window shrinks them, to half the size they print at
+    // a narrow window shrinks them, down to a small share of their size
     expect(frameLayout(layout, "pages", 498).scale).toBe(0.75);
-    expect(frameLayout(layout, "pages", 348).scale).toBe(SHEET_SCALE / 2);
+    expect(frameLayout(layout, "pages", 348).scale).toBe(0.5);
+    expect(frameLayout(layout, "pages", 60).scale).toBeCloseTo(0.2);
   });
 
   it("places the text of each page, as long as it is, with marks between", () => {

@@ -136,8 +136,13 @@ const marksOnPage = (
   const from = Math.max(0, span.from - 1);
   const to = Math.min(doc.content.size, span.to + 1);
   for (const source of sources) {
+    // a range a source widens, e.g. a formula two matches are in, once
+    const seen = new Set<string>();
     for (const found of source.decorations?.find(from, to) ?? []) {
-      for (const rect of engine.selection(...rangeOf(source, found))) {
+      const range = rangeOf(source, found);
+      if (seen.has(range.join())) continue;
+      seen.add(range.join());
+      for (const rect of engine.selection(...range)) {
         if (rect.page !== page) continue;
         marks.push({ ...rect, kind: source.kind });
       }

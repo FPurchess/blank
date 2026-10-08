@@ -42,8 +42,9 @@ export const TEXT_SCALE = 18 / 11;
 export const SHEET_SCALE = 96 / 72;
 // the least room a page's text takes in "page ends", one line
 const MIN_TEXT = 16;
-// the smallest zoom Fit goes down to, of the size the pages print at
-const MIN_FIT = 0.5;
+// the smallest Fit goes down to on a narrow window, of the size the pages
+// print at; the zoom's own steps stop at half of it
+const MIN_FIT = 0.15;
 
 export interface Frame {
   page: number;
@@ -152,7 +153,8 @@ export const frameLayout = (
       mode,
       scale,
       frames: frames.map(snapped),
-      width: Math.max(width, Math.ceil(sheetWidth + 2 * DESK_SIDE)),
+      // rounded, so Fit's own width, a hair over the view's, scrolls nothing
+      width: Math.max(width, Math.round(sheetWidth + 2 * DESK_SIDE)),
       height,
       headerRoom: 0,
       footerRoom: 0,
@@ -185,7 +187,7 @@ export const frameLayout = (
     mode,
     scale,
     frames: frames.map(snapped),
-    width: Math.max(width, Math.ceil(shown * scale + DESK_SIDE)),
+    width: Math.max(width, Math.round(shown * scale + DESK_SIDE)),
     // no mark after the last page, only its footer if it has one
     height: top - MARK_HEIGHT + footerRoom + VIEW_BOTTOM,
     headerRoom,

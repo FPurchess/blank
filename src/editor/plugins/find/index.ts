@@ -1,9 +1,15 @@
 import { Plugin } from "prosemirror-state";
-import { Decoration } from "prosemirror-view";
 
+import { engineless } from "../../../engine/engine";
 import { findPanel } from "../../../state";
 import { closeFind } from "./commands";
-import { findApply, findIdle, findKey, type FindState } from "./state";
+import {
+  currentDecorations,
+  findApply,
+  findIdle,
+  findKey,
+  type FindState,
+} from "./state";
 
 /**
  * find looks for what the find panel asks for in the text of the tab, and
@@ -14,19 +20,13 @@ export const find = () =>
     key: findKey,
     state: { init: () => findIdle, apply: findApply },
     props: {
-      // the matches show in the editor itself only without the engine; the
-      // page view paints them from the same set (src/ui/pageMarks.ts)
+      // the matches show in the editor itself only without the engine, and
+      // while the panel is open; the page view paints them from the same
+      // set (src/ui/pageMarks.ts)
       decorations: (state) => {
         const value = findKey.getState(state);
-        if (!value?.active) return null;
-        const current = value.matches[value.current];
-        return current
-          ? value.decorations.add(state.doc, [
-              Decoration.inline(current.from, current.to, {
-                class: "find-current",
-              }),
-            ])
-          : value.decorations;
+        if (!value?.active || !findPanel.value || !engineless()) return null;
+        return value.decorations.add(state.doc, currentDecorations(value));
       },
       handleKeyDown: (view, event) => {
         if (event.key !== "Escape" || !findPanel.value) return false;

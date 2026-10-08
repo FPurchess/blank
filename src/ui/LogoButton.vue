@@ -52,7 +52,7 @@ const deps = (): MainMenuDeps => ({
   recent: recentCommands.value,
   files: recentFiles.value,
   openFile: (path) => editor.run(openRecentFile(path)),
-  zoom: zoomLabel(pageZoom.value, zoomFactor.value).text,
+  zoom: zoomLabel(pageZoom.value, zoomFactor.value),
   pages: !engineMissing.value,
   theme: theme.value,
   chooseTheme,
@@ -67,7 +67,7 @@ const request = () => {
   const now = deps();
   return {
     items: mainMenuItems(now),
-    extra: { search: mainMenuSearch(now), fill: true },
+    extra: { search: mainMenuSearch(now) },
   };
 };
 
@@ -98,7 +98,9 @@ watch(
     engineMissing,
   ],
   () => {
-    if (menu.isOpen.value) menu.update(request().items);
+    if (!menu.isOpen.value) return;
+    const { items, extra } = request();
+    menu.update(items, extra);
   },
 );
 
@@ -112,9 +114,11 @@ defineExpose({ focus: () => element()?.focus() });
     label="Main menu"
     :command="C.MENU_MAIN"
     :tabindex="tabindex"
-    aria-haspopup="menu"
+    aria-haspopup="dialog"
+    aria-controls="main-menu"
     :aria-expanded="menu.isOpen.value"
     @click="toggle"
+    @keydown.down.prevent="toggle"
   >
     <BlankLogo />
   </IconButton>

@@ -83,7 +83,7 @@ watch(
   blocksPaneSearch,
   (request) => {
     if (!request) return;
-    void nextTick(() => search.value?.focus(true));
+    void nextTick(() => search.value?.focus("all"));
   },
   { immediate: true },
 );

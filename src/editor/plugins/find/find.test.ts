@@ -3,7 +3,12 @@ import { EditorState, type Transaction } from "prosemirror-state";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { schema } from "../../../markdown";
-import { announcement, findOptions, findPanel } from "../../../state";
+import {
+  announcement,
+  findOptions,
+  findPanel,
+  NO_FIND_OPTIONS,
+} from "../../../state";
 import { doc, docWithFrontmatter, p } from "../../../test/editor";
 import {
   closeFind,
@@ -47,7 +52,7 @@ const editor = (node = doc(p("one two one"), p("one"))) => {
 };
 
 beforeEach(() => {
-  findOptions.value = { matchCase: false, wholeWord: false, regex: false };
+  findOptions.value = NO_FIND_OPTIONS;
 });
 
 afterEach(() => {
@@ -94,14 +99,15 @@ describe("find", () => {
     expect(e.texts()).toHaveLength(3);
   });
 
-  it("stops following once the panel closed in another tab", () => {
+  it("keeps following edits while the panel is closed in another tab", () => {
     const e = editor();
     e.run(openFind());
     e.run(setFind({ query: "one" }));
     findPanel.value = null;
-    e.type("x", 1);
-    expect(e.found()).toMatchObject({ active: false, query: "one" });
-    expect(e.found().matches).toEqual([]);
+    e.type("one ", 1);
+    // the page view and the editor show none of it without the panel
+    expect(e.found()).toMatchObject({ active: true, query: "one" });
+    expect(e.texts()).toHaveLength(4);
   });
 
   it("replaces the current match and moves on, also when the new text matches", () => {
@@ -123,6 +129,41 @@ describe("find", () => {
     expect(announcement.value?.text).toBe("Replaced 3");
     e.undo();
     expect(e.text()).toBe("one two oneone");
+  });
+
+  it("replaces in the marks of the text, not the ones stored for typing", () => {
+    const bold = schema.marks.strong.create();
+    const e = editor(
+      doc(
+        schema.node("paragraph", null, [
+          schema.text("one", [bold]),
+          schema.text(" two"),
+        ]),
+      ),
+    );
+    e.run(openFind());
+    e.run(setFind({ query: "two" }));
+    // as after Mod-B with an empty selection
+    e.run((state, dispatch) => {
+      dispatch?.(state.tr.setStoredMarks([bold]));
+      return true;
+    });
+    e.run(replaceAllFound("2"));
+    const last = e.state.doc.firstChild!.lastChild!;
+    expect(last.text).toBe(" 2");
+    expect(last.marks).toEqual([]);
+  });
+
+  it("replaces thousands of matches at once, in one step to undo", () => {
+    const e = editor(
+      doc(...Array.from({ length: 300 }, () => p("a b a b a b a b a b"))),
+    );
+    e.run(openFind());
+    e.run(setFind({ query: "a" }));
+    e.run(replaceAllFound("c"));
+    expect(e.text()).not.toContain("a");
+    e.undo();
+    expect(e.text()).not.toContain("c");
   });
 
   it("replaces with the groups of a regular expression", () => {

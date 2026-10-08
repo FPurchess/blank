@@ -41,7 +41,7 @@ import {
   pageView,
   pageViewport,
   tabSwitch,
-  viewFrames,
+  deskLayout,
   zoomAnchor,
 } from "../state";
 import { useResizeObserver } from "./composables/useResizeObserver";
@@ -65,8 +65,12 @@ import { pageBitmaps } from "./pageBitmaps";
 import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
 import { type MarkSource, PageMarksMemo } from "./pageMarks";
-import { findKey, paintedRange } from "../editor/plugins/find/state";
-import { Decoration, DecorationSet } from "prosemirror-view";
+import {
+  currentDecorations,
+  findKey,
+  paintedRange,
+} from "../editor/plugins/find/state";
+import { DecorationSet } from "prosemirror-view";
 import { movesPages, selectedOn } from "./pageViewModel";
 import { styleOf } from "./rect";
 import { scrollFor, zoomWheel } from "./scrollModel";
@@ -131,9 +135,8 @@ const measureSoon = () => {
   });
 };
 
-const layout = computed(() =>
-  pageLayoutState.value ? viewFrames(pageLayoutState.value, width.value) : null,
-);
+// where the pages are shown, the same layout the geometry measures with
+const layout = deskLayout;
 
 // the pages near the view, which changes only when other pages come near,
 // not on every scroll
@@ -171,15 +174,9 @@ const found = computed(() => {
   return findPanel.value && value?.active ? value : null;
 });
 const findDecorations = computed(() => found.value?.decorations);
-const currentMatch = computed(() => {
-  const match = found.value?.matches[found.value.current];
-  return match ? `${match.from}-${match.to}` : "";
-});
-const currentDecoration = computed(() => {
-  if (!currentMatch.value) return undefined;
-  const [from, to] = currentMatch.value.split("-").map(Number);
-  return DecorationSet.create(doc.value, [Decoration.inline(from, to, {})]);
-});
+const currentDecoration = computed(() =>
+  DecorationSet.create(doc.value, currentDecorations(found.value ?? undefined)),
+);
 const markSources = computed((): MarkSource[] => {
   const range = paintedRange(doc.value);
   return [
@@ -342,7 +339,8 @@ const scrollTo = (top: number, left?: number) => {
 const restore = (next: FrameLayout, anchor: ViewAnchor | null) => {
   const top = anchor ? anchorTop(next, anchor) : 0;
   if (top === null && pageEngine?.laying) return false;
-  scrollTo(top ?? 0);
+  // from the left edge, if the zoom shows the pages wider than the view
+  scrollTo(top ?? 0, 0);
   return true;
 };
 
@@ -352,6 +350,9 @@ const restore = (next: FrameLayout, anchor: ViewAnchor | null) => {
 // so the scroll is still the one the old layout was shown at; typing lays
 // out anew on every key, but keeps the view and the scale.
 watch(layout, (next, previous) => {
+  // the spot the zoom asked to keep, which is for this layout only
+  const kept = zoomAnchor.value;
+  zoomAnchor.value = null;
   const element = scroller.value;
   if (!element || !next) return;
   if (restoring) {
@@ -359,9 +360,7 @@ watch(layout, (next, previous) => {
     return;
   }
   // the zoom changed: the spot it was asked for stays where it is in the view
-  const kept = zoomAnchor.value;
   if (kept) {
-    zoomAnchor.value = null;
     const rect = onDesk(next, { ...kept, width: 0, height: 0 });
     if (rect) {
       scrollTo(
@@ -391,8 +390,10 @@ const serve = (request: PageScrollRequest) => {
       ? Math.max(0, rect.top - request.at)
       : scrollFor(rect, element.scrollTop, element.clientHeight);
   // and across, when the zoom shows the pages wider than the view
+  // the desk's own width: right after a zoom, the wider desk may not be
+  // rendered yet
   const across =
-    element.scrollWidth > element.clientWidth
+    layout.value.width > element.clientWidth
       ? scrollFor(
           { top: rect.left, height: rect.width },
           element.scrollLeft,
@@ -468,8 +469,8 @@ const onScroll = () => {
   requestAnimationFrame(moveAgain);
 };
 
-// Ctrl and the wheel, or a pinch on a touchpad, which the webview sends as
-// that, zoom the pages about the spot under the pointer, not the webview
+// Ctrl and the wheel zoom the pages about the spot under the pointer, not
+// the webview (and a pinch, where the webview sends it as that)
 const wheelZoom = zoomWheel<WheelEvent>((direction, event) => {
   if (!layout.value) return;
   const element = scroller.value!;
@@ -489,10 +490,26 @@ const wheelZoom = zoomWheel<WheelEvent>((direction, event) => {
   );
 });
 const onWheel = (event: WheelEvent) => {
-  if (!event.ctrlKey) return;
+  if (!event.ctrlKey || event.deltaY === 0) return;
   event.preventDefault();
   wheelZoom(event);
 };
+// The listener can't be passive, as it keeps the webview from zooming, and
+// one that isn't makes every scroll wait for the page; so it listens only
+// while Ctrl is held
+const ctrlHeld = (event: KeyboardEvent | MouseEvent) => {
+  const element = scroller.value;
+  if (!element) return;
+  if (event.ctrlKey) element.addEventListener("wheel", onWheel);
+  else element.removeEventListener("wheel", onWheel);
+};
+listenOnWindow("keydown", ctrlHeld);
+listenOnWindow("keyup", ctrlHeld);
+const stopWheel = () => scroller.value?.removeEventListener("wheel", onWheel);
+listenOnWindow("blur", stopWheel);
+onUnmounted(stopWheel);
+// a pinch on a touchpad comes as a wheel with Ctrl, without its key
+listenOnWindow("wheel", ctrlHeld, { capture: true, passive: true });
 
 // how long the view takes to render, for the measurements
 let renderStart = 0;
@@ -703,16 +720,21 @@ const dragTo = (x: number, y: number) => {
   );
 };
 
-// while a drag is beyond the top or bottom edge, the view scrolls, the
-// faster the farther
+// while a drag is beyond an edge, the view scrolls, the faster the farther
 const scrollAtEdges = () => {
   edgeScroll = undefined;
   const element = scroller.value;
   if ((anchor === null && !move.dragging) || !dragAt || !element) return;
   const box = element.getBoundingClientRect();
   const step = edgeStep(dragAt.y, box.top, box.bottom);
-  if (step === 0) return;
+  // across too, when the zoom shows the pages wider than the view
+  const across =
+    element.scrollWidth > element.clientWidth
+      ? edgeStep(dragAt.x, box.left, box.right)
+      : 0;
+  if (step === 0 && across === 0) return;
   element.scrollTop += step;
+  element.scrollLeft += across;
   measure(false);
   if (anchor !== null) dragTo(dragAt.x, dragAt.y);
   else moveAgain();
@@ -750,7 +772,6 @@ onUnmounted(() => {
     ]"
     :title="hoverLink ? linkHint(hoverLink) : undefined"
     @scroll="onScroll"
-    @wheel="onWheel"
     @mousedown="onMouseDown"
     @mouseup="noPrimaryPaste"
     @pointerdown="onPointerDown"

@@ -17,23 +17,28 @@ const bitmap = (width: number, height: number) => ({
 
 describe("BitmapCache", () => {
   it("keeps the recently used bitmaps within its limit", () => {
-    // room for two of 10 × 10 pixels
-    const cache = new BitmapCache(2 * 10 * 10 * 4);
+    // room for three of 10 × 10 pixels
+    const cache = new BitmapCache(3 * 10 * 10 * 4);
     const a = bitmap(10, 10);
     const b = bitmap(10, 10);
     const c = bitmap(10, 10);
+    const d = bitmap(10, 10);
     cache.set("a", a);
     cache.set("b", b);
+    cache.set("c", c);
     // "a" is used again, so "b" is the oldest
     expect(cache.get("a")).toBe(a);
-    cache.set("c", c);
+    cache.set("d", d);
     expect(cache.get("b")).toBeUndefined();
     expect(b.close).toHaveBeenCalled();
-    expect(cache.size).toBe(2);
-    expect(cache.used).toBe(800);
-    // one too large for the limit is kept alone
-    cache.set("big", bitmap(20, 20));
-    expect(cache.size).toBe(1);
+    expect(cache.size).toBe(3);
+    expect(cache.used).toBe(1200);
+    // one larger than a third of the room isn't kept
+    const big = bitmap(20, 20);
+    cache.set("big", big);
+    expect(cache.get("big")).toBeUndefined();
+    expect(big.close).toHaveBeenCalled();
+    expect(cache.size).toBe(3);
     cache.clear();
     expect(cache.used).toBe(0);
   });

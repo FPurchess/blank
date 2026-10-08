@@ -44,6 +44,7 @@ describe("tabKey", () => {
 
   it("moves from the logo to the tabs, or back to the text", () => {
     expect(logoKey(key("ArrowRight"), 3)).toEqual({ move: 0 });
+    expect(logoKey(key("Home"), 3)).toEqual({ move: 0 });
     expect(logoKey(key("End"), 3)).toEqual({ move: 2 });
     expect(logoKey(key("ArrowLeft"), 3)).toEqual({ move: 2 });
     expect(logoKey(key("Escape"), 3)).toBe("leave");

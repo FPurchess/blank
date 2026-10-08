@@ -12,7 +12,7 @@
 
 If you selected a word or a few words before pressing `Mod` `F`, Blank looks for them right away. Otherwise the field shows what you looked for last in that document, selected, so you can type over it. Each tab remembers its own search.
 
-`Esc` closes the panel and selects the match you were at, so you can go on typing there.
+`Esc` in the panel closes it and selects the match you were at, so you can go on typing there; in your text, `Esc` just closes the panel. The × does the same with the mouse.
 
 ## Replace {#replace}
 
@@ -22,11 +22,13 @@ Find and replace looks in your text: paragraphs, headings, lists, quotes, table 
 
 ## Options {#options}
 
-Three buttons under the find field change how it looks. Blank remembers them until you close it.
+Three buttons under the find field change how it looks. Blank remembers them until you quit it.
 
 - **Aa**, match case: _Blank_ finds only _Blank_, not _blank_. Without it, upper and lower case don't matter.
 - **ab|**, whole word: _the_ finds _the_, but not _theme_ or _bathe_.
 - **.\***, regular expression: the field takes a JavaScript regular expression. If Blank can't read it, the panel says why.
+
+A regular expression runs as you type, on every line: a pattern that takes long, like `(a+)+$` on a long run of a's, can hold Blank up.
 
 With a regular expression, the replacement can use what it matched: `$&` is the whole match, `$1`, `$2` … are its groups in parentheses, and `$<name>` a named group. For example:
 

@@ -5,15 +5,9 @@
 @use "controls" as *;
 
 .main-menu {
-  @include popover;
-  @include ui-text;
-  position: fixed;
-  z-index: 20;
+  @include floating-panel;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-  width: min(340px, calc(100% - 8px));
-  padding: 6px;
   overflow: hidden;
   user-select: none;
 
@@ -138,8 +132,14 @@
     box-shadow: none;
     color: inherit;
 
-    &:focus {
+    // the item the keys are on; a switch that is on keeps its look, ringed
+    &:focus:not([aria-checked="true"]) {
       background: var(--hover);
+    }
+
+    &[aria-checked="true"]:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 1px;
     }
   }
 

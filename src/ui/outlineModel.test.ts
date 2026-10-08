@@ -58,9 +58,10 @@ describe("freeRight", () => {
     expect(freeRight(1400, a4, "page-ends", false)).toBeCloseTo(290, 0);
   });
 
-  it("follows the zoom", () => {
-    pageZoom.value = 0.5;
-    expect(freeRight(1400, a4, "pages", false)).toBeCloseTo(502, 0);
+  it("is the room at Fit, whatever the zoom", () => {
+    const fit = freeRight(1400, a4, "pages", false);
+    pageZoom.value = 2;
+    expect(freeRight(1400, a4, "pages", false)).toBe(fit);
   });
 
   it("is none on a window narrower than the pages", () => {

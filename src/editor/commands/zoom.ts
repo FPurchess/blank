@@ -43,8 +43,10 @@ const setZoom =
       announce(ZOOM_NEEDS_PAGES);
       return true;
     }
-    if (zoom === pageZoom.value && zoom !== "fit") {
-      announce(`The zoom is at ${zoomLabel(zoom, zoom).text}`);
+    // nothing changes, e.g. at the last step, or Fit again
+    if (zoom === pageZoom.value) {
+      const { spoken } = zoomLabel(zoom, zoomFactor.value);
+      announce(`The zoom is at ${spoken}`);
       return true;
     }
     zoomAnchor.value = anchor;

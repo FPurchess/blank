@@ -17,7 +17,7 @@ const deps = (over: Partial<MainMenuDeps> = {}): MainMenuDeps => ({
   recent: [],
   files: [],
   openFile: vi.fn(),
-  zoom: "Fit",
+  zoom: { text: "Fit", tip: "Fit to window (87%)" },
   pages: true,
   theme: "light",
   chooseTheme: vi.fn(),
@@ -107,12 +107,16 @@ describe("mainMenuItems", () => {
   });
 
   it("shows the zoom between − and +, disabled without pages", () => {
-    const zoom = row(mainMenuItems(deps({ zoom: "125%" })), "Zoom");
+    const zoom = row(
+      mainMenuItems(deps({ zoom: { text: "125%", tip: "Fit to window" } })),
+      "Zoom",
+    );
     expect(zoom.items.map(({ label }) => label)).toEqual([
       "Zoom out",
       "125%",
       "Zoom in",
     ]);
+    expect(zoom.items[1].tip).toBe("Fit to window");
     const without = row(mainMenuItems(deps({ pages: false })), "Zoom");
     expect(without.items.every((item) => item.disabled)).toBe(true);
     expect(without.items[0].tip).toBe(ZOOM_NEEDS_PAGES);

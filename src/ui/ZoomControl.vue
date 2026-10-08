@@ -34,7 +34,7 @@ const run = (id: CommandIdentifier) =>
     <StatusItem
       id="ui-zoom"
       class="zoom-value"
-      :label="`Zoom: ${label.spoken}. ${label.tip}`"
+      :label="`Zoom: ${label.spoken}`"
       :tip="label.tip"
       :command="C.VIEW_ZOOM_FIT"
       @click="run(C.VIEW_ZOOM_FIT)"

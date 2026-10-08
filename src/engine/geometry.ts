@@ -79,13 +79,6 @@ export const framesNow = (): {
   return frames && viewport ? { frames, viewport } : null;
 };
 
-/**
- * deskFrames returns where the page view shows the pages, like framesNow,
- * without following the scrolling: a computed that measures with it isn't
- * worked out again on every scroll
- */
-const deskFrames = (): FrameLayout | null => deskLayout.value;
-
 // the editor, which the geometry measures without the engine
 let editorView: EditorView | null = null;
 
@@ -480,7 +473,7 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
       // the window scrolls under the top area
       return box ? box.top + window.scrollY - TOP_BAR_HEIGHT : null;
     });
-  const frames = deskFrames();
+  const frames = deskLayout.value;
   const engine = pageEngine;
   if (!frames || !engine) return positions.map(() => null);
   return positions.map((pos) => {
@@ -495,7 +488,9 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
  * doesn't follow the scrolling.
  */
 export const pageTops = (): number[] | null =>
-  measured() ? null : (deskFrames()?.frames.map((frame) => frame.top) ?? null);
+  measured()
+    ? null
+    : (deskLayout.value?.frames.map((frame) => frame.top) ?? null);
 
 /**
  * pageInView returns the page the view shows at its reading line, counted
@@ -530,7 +525,7 @@ export const scrollState = (): {
     };
   }
   const viewport = pageViewport.value;
-  const frames = deskFrames();
+  const frames = deskLayout.value;
   if (!viewport || !frames) return null;
   return {
     top: viewport.scrollTop,

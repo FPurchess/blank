@@ -49,12 +49,13 @@ const APP_COMMANDS = [
   C.APP_GUIDE,
   C.APP_ABOUT,
 ] as const;
-const EXPORTS = [C.EXPORT_PDF, C.EXPORT_DOCX] as const;
+// Export ▸, top to bottom; "Export signed PDF…" joins it once it's there
+export const EXPORT_COMMANDS = [C.EXPORT_PDF, C.EXPORT_DOCX] as const;
 
 // the commands the menu shows anyway, which Recent leaves out
-export const MENU_SHOWN: ReadonlySet<C> = new Set<C>([
+const MENU_SHOWN: ReadonlySet<C> = new Set<C>([
   ...FILE_COMMANDS.filter((id) => id !== "recent" && id !== "export"),
-  ...EXPORTS,
+  ...EXPORT_COMMANDS,
   ...EDIT_ROW,
   ...VIEW_ROW,
   ...ZOOM_COMMANDS,
@@ -67,7 +68,7 @@ const TYPING_GROUPS: ReadonlySet<string> = new Set(["Edit", "Format", "Tabs"]);
 
 // what the search never offers: the menu itself, the context menu, and
 // clearing the recent files, which only Open recent offers
-export const MAIN_MENU_UNSEARCHED: ReadonlySet<C> = new Set([
+const MAIN_MENU_UNSEARCHED: ReadonlySet<C> = new Set([
   C.MENU_MAIN,
   C.CONTEXT_MENU,
   C.FILE_CLEAR_RECENT,
@@ -83,7 +84,7 @@ export interface MainMenuDeps {
   files: readonly string[];
   openFile(path: string): void;
   // the zoom as it shows, and whether there are pages to zoom
-  zoom: string;
+  zoom: { text: string; tip: string };
   pages: boolean;
   theme: ThemeName;
   chooseTheme(name: ThemeName): void;
@@ -98,17 +99,17 @@ export interface MainMenuDeps {
 export const recentForMenu = (
   recent: readonly RecentCommand[],
   can: (id: C) => boolean,
-) =>
-  recent
-    .filter(
-      ({ id, byKey }) =>
-        !MENU_SHOWN.has(id) &&
-        !MAIN_MENU_UNSEARCHED.has(id) &&
-        !(byKey && TYPING_GROUPS.has(commandInfo(id).group)) &&
-        can(id),
-    )
-    .map(({ id }) => id)
-    .slice(0, RECENT_SHOWN);
+) => {
+  const shown: C[] = [];
+  // asking a command whether it can run runs it, so only as far as needed
+  for (const { id, byKey } of recent) {
+    if (shown.length === RECENT_SHOWN) break;
+    if (MENU_SHOWN.has(id)) continue;
+    if (byKey && TYPING_GROUPS.has(commandInfo(id).group)) continue;
+    if (can(id)) shown.push(id);
+  }
+  return shown;
+};
 
 /**
  * commandEntry returns the item of a command, with its label, icon and key,
@@ -175,7 +176,7 @@ const fileItem = (
       id: "file.export",
       label: "Export",
       icon: "export",
-      children: EXPORTS.map((command) => commandEntry(deps, command)),
+      children: EXPORT_COMMANDS.map((command) => commandEntry(deps, command)),
     };
   return commandEntry(deps, id);
 };
@@ -186,9 +187,13 @@ const fileItem = (
  */
 export const mainMenuItems = (deps: MainMenuDeps): MenuLine[] => {
   const recent = recentForMenu(deps.recent, deps.can);
-  // a switch in a row: its icon, on or off, the menu staying open
+  // a switch in a row: its icon, on or off, the menu staying open; but for
+  // the blocks pane, which opens with the focus in its search
   const toggle = (id: C) =>
-    commandEntry(deps, id, { checked: !!deps.on[id], stays: true });
+    commandEntry(deps, id, {
+      checked: !!deps.on[id],
+      stays: id !== C.VIEW_BLOCKS,
+    });
   return [
     ...(recent.length > 0
       ? [
@@ -215,7 +220,9 @@ export const mainMenuItems = (deps: MainMenuDeps): MenuLine[] => {
       items: [
         commandEntry(deps, C.VIEW_ZOOM_OUT, { stays: true }),
         commandEntry(deps, C.VIEW_ZOOM_FIT, {
-          label: deps.zoom,
+          label: deps.zoom.text,
+          // what a click does, but why it can't without the pages
+          ...(deps.pages && { tip: deps.zoom.tip }),
           icon: undefined,
           look: "value",
           stays: true,

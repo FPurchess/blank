@@ -34,7 +34,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
 | `print.ts` | `printSettings`, what the print dialog remembers (persisted, see `print.md`) |
 | `settingsDialog.ts` | `SettingsSection` and `settingsSection`, the section the settings open on (see `settings.md`) |
 | `recent.ts` | the commands and files used last (`recentCommands`, `recentFiles`, persisted), written through `recordCommand`, `rememberFile` and `forgetFile` (see `main-menu.md`) |
-| `mainMenu.ts` | `mainMenuWanted` (the main menu's key asks the logo for it) and `mainMenuOpen` |
+| `mainMenu.ts` | `mainMenuWanted` (the main menu's key asks the logo for it, a new object each time) |
 | `find.ts` | the find panel: `findPanel` (its request), `findOptions` (for the session) and `findFocused` (part of `uiTakesFocus`); what each tab found is in its editor state (see `find.md`) |
 | `focusMode.ts` | `focusMode`, `controlsFaded`, `controlsStay` (what the controls stay for), `setFocusMode()`, `leaveFocusMode()` (Esc) and `focusModeMessage()` (see `focus-mode.md`) |
 | `focus.ts` | `uiTakesFocus`, whether a dialog, the context menu, the caption field, the blocks pane, the tab row or the formatting toolbar holds the focus; the parts F6 moves through (`registerFocusStop`, `cycleFocus`) |

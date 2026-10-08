@@ -1,4 +1,9 @@
-import { type Command, TextSelection } from "prosemirror-state";
+import {
+  type Command,
+  type EditorState,
+  TextSelection,
+  type Transaction,
+} from "prosemirror-state";
 
 import { scrollToText } from "../../../engine/geometry";
 import {
@@ -7,13 +12,60 @@ import {
   findOptions,
   findPanel,
 } from "../../../state";
-import { compile, expand, matchIn } from "./match";
-import { type FindMeta, findKey } from "./state";
+import { expand, type Match, matchIn } from "./match";
+import { type FindMeta, findKey, type FindState } from "./state";
 
 // What the find panel (src/ui/FindPanel.vue) and its keys do. See
 // .claude/rules/find.md.
 
 let asked = 0;
+
+// what a leaf in the selection reads as, which a query can never match
+const LEAF = "\uFFFC";
+
+/**
+ * selectedQuery returns the selected text to look for: within one
+ * textblock and without an inline node; escaped for a regular expression
+ */
+const selectedQuery = (state: EditorState) => {
+  const { from, to, $from, $to } = state.selection;
+  if (from === to || !$from.sameParent($to) || !$from.parent.isTextblock)
+    return null;
+  const text = state.doc.textBetween(from, to, "", LEAF);
+  if (text.includes(LEAF)) return null;
+  return findOptions.value.regex
+    ? text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    : text;
+};
+
+/**
+ * replace replaces `match` in `tr` with `replacement` ($1 and the like in a
+ * regular expression), in the marks of the text it replaces, not the ones
+ * stored for typing
+ * @returns what it put in
+ */
+const replace = (
+  tr: Transaction,
+  value: FindState,
+  match: Match,
+  replacement: string,
+  state: EditorState,
+) => {
+  const text = expand(
+    replacement,
+    match,
+    state.doc.textBetween(match.from, match.to),
+    value.options.regex,
+  );
+  if (!text) {
+    tr.delete(match.from, match.to);
+    return text;
+  }
+  const $from = state.doc.resolve(match.from);
+  const marks = $from.marksAcross(state.doc.resolve(match.to)) ?? $from.marks();
+  tr.replaceWith(match.from, match.to, state.schema.text(text, marks));
+  return text;
+};
 
 /**
  * openFind opens the find panel, the focus in its field, with the selected
@@ -21,14 +73,9 @@ let asked = 0;
  */
 export const openFind = (): Command => (state, dispatch) => {
   if (!dispatch) return true;
-  const { from, to, $from, $to } = state.selection;
-  const selected =
-    from < to && $from.sameParent($to) && $from.parent.isTextblock
-      ? state.doc.textBetween(from, to)
-      : null;
   const meta: FindMeta = {
     type: "set",
-    query: selected ?? findKey.getState(state)?.query ?? "",
+    query: selectedQuery(state) ?? findKey.getState(state)?.query ?? "",
     options: findOptions.value,
     active: true,
   };
@@ -55,9 +102,10 @@ export const setFind =
   };
 
 /**
- * revealCurrent scrolls the current match of `state` into view
+ * revealFound scrolls the match find is at into view, e.g. once a query
+ * found it
  */
-const revealCurrent: Command = (state) => {
+export const revealFound: Command = (state) => {
   const value = findKey.getState(state);
   const match = value?.matches[value.current];
   if (match) scrollToText(match.from);
@@ -77,7 +125,7 @@ export const stepFind =
     dispatch(
       state.tr.setMeta(findKey, { type: "step", direction } satisfies FindMeta),
     );
-    return revealCurrent(view?.state ?? state);
+    return revealFound(view?.state ?? state);
   };
 
 /**
@@ -91,15 +139,8 @@ export const replaceFound =
     const match = value?.matches[value.current];
     if (!value || !match) return false;
     if (!dispatch) return true;
-    const text = expand(
-      replacement,
-      match,
-      state.doc.textBetween(match.from, match.to),
-      value.options.regex,
-    );
-    const tr = text
-      ? state.tr.insertText(text, match.from, match.to)
-      : state.tr.delete(match.from, match.to);
+    const tr = state.tr;
+    const text = replace(tr, value, match, replacement, state);
     // the next match after it, not what was put in, should it match too
     dispatch(
       tr.setMeta(findKey, {
@@ -107,7 +148,7 @@ export const replaceFound =
         pos: match.from + text.length,
       } satisfies FindMeta),
     );
-    return revealCurrent(view?.state ?? state);
+    return revealFound(view?.state ?? state);
   };
 
 /**
@@ -120,21 +161,12 @@ export const replaceAllFound =
     const value = findKey.getState(state);
     if (!value?.active || value.matches.length === 0) return false;
     if (!dispatch) return true;
-    const compiled = compile(value.query, value.options);
-    if (!compiled || "error" in compiled) return false;
-    const { matches } = matchIn(state.doc, compiled.regex, value.options);
+    if (!value.regex) return false;
+    const { matches } = matchIn(state.doc, value.regex, value.options);
     const tr = state.tr;
     // from the end, so the positions before stay where they are
-    for (const match of [...matches].reverse()) {
-      const text = expand(
-        replacement,
-        match,
-        state.doc.textBetween(match.from, match.to),
-        value.options.regex,
-      );
-      if (text) tr.insertText(text, match.from, match.to);
-      else tr.delete(match.from, match.to);
-    }
+    for (const match of [...matches].reverse())
+      replace(tr, value, match, replacement, state);
     dispatch(tr);
     announce(`Replaced ${matches.length}`);
     return true;

@@ -18,6 +18,8 @@ const DIALOGS = new Set([
   CommandIdentifier.EXPORT_DOCX,
   CommandIdentifier.INSERT_IMAGE,
   CommandIdentifier.FORMAT_LINK,
+  CommandIdentifier.APP_SHORTCUTS,
+  CommandIdentifier.APP_ABOUT,
   CommandIdentifier.PAGE_SETUP,
   CommandIdentifier.APP_SETTINGS,
 ]);

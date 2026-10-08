@@ -7,12 +7,6 @@ import { type Range, textblocks } from "../changed";
 // never across two of them, and never across an inline node. See
 // .claude/rules/find.md.
 
-export const NO_OPTIONS: FindOptions = {
-  matchCase: false,
-  wholeWord: false,
-  regex: false,
-};
-
 // a match: where it is, and in a regular expression what its groups caught,
 // for $1 and $<name> in what replaces it
 export interface Match {
@@ -83,8 +77,25 @@ const runsOf = (block: Node, pos: number): Run[] => {
   return runs;
 };
 
-const isWordAt = (text: string, index: number) =>
-  index >= 0 && index < text.length && WORD_CHAR.test(text[index]);
+// how many UTF-16 units the character at `index` of `text` takes
+const unitsAt = (text: string, index: number) =>
+  (text.codePointAt(index) ?? 0) > 0xffff ? 2 : 1;
+
+/**
+ * wordBefore and wordAfter tell whether a letter, a digit or _ is right
+ * before or after `index` of `text`, also one beyond the BMP, e.g. 𝐀
+ */
+const wordAfter = (text: string, index: number) =>
+  index < text.length &&
+  WORD_CHAR.test(String.fromCodePoint(text.codePointAt(index)!));
+const wordBefore = (text: string, index: number) => {
+  if (index <= 0) return false;
+  const low = text.charCodeAt(index - 1);
+  // the second half of a pair: the character starts one unit earlier
+  const start =
+    low >= 0xdc00 && low <= 0xdfff && index >= 2 ? index - 2 : index - 1;
+  return wordAfter(text, start);
+};
 
 /**
  * matchRun adds the matches of `regex` in `run` to `found`, at most `limit`
@@ -101,16 +112,21 @@ const matchRun = (
   for (let hit = regex.exec(run.text); hit; hit = regex.exec(run.text)) {
     const start = hit.index;
     const end = start + hit[0].length;
-    // what matches nothing would match again at once
+    // what matches nothing would match again at once: on to the next
+    // character, a whole one, or V8 steps back into it for ever
     if (end === start) {
-      regex.lastIndex++;
+      regex.lastIndex = end + unitsAt(run.text, end);
       continue;
     }
+    // a part of a word: the next try starts within it, e.g. "a-a" in
+    // "ba-a-a" at its second a
     if (
       options.wholeWord &&
-      (isWordAt(run.text, start - 1) || isWordAt(run.text, end))
-    )
+      (wordBefore(run.text, start) || wordAfter(run.text, end))
+    ) {
+      regex.lastIndex = start + unitsAt(run.text, start);
       continue;
+    }
     // one more than it may keep: there are more
     if (found.length >= limit) return true;
     found.push({
@@ -171,7 +187,9 @@ export const expand = (
     (whole, what: string, name?: string, digits?: string) => {
       if (what === "$") return "$";
       if (what === "&") return text;
-      if (name !== undefined) return named[name] ?? whole;
+      // a group that matched nothing puts in nothing, as in JavaScript
+      if (name !== undefined)
+        return name in named ? (named[name] ?? "") : whole;
       const index = Number(digits);
       // $12 with fewer groups is $1 and a 2, as in JavaScript
       if (index > numbered.length && digits!.length === 2) {

@@ -263,9 +263,7 @@ describe("zoom", () => {
     pageZoom.value = 1.25;
     await nextTick();
     expect(byId("ui-zoom")!.textContent).toBe("125%");
-    expect(byId("ui-zoom")!.getAttribute("aria-label")).toBe(
-      "Zoom: 125%. Fit to window",
-    );
+    expect(byId("ui-zoom")!.getAttribute("aria-label")).toBe("Zoom: 125%");
     expect(byId("ui-zoom-in")!.dataset.tipKey).toBe(formatShortcut("Mod-="));
 
     byId("ui-zoom")!.click();

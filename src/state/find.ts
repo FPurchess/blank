@@ -17,12 +17,15 @@ export interface FindOptions {
 // each time; null while it's closed. It stays open while the tabs change.
 export const findPanel = shallowRef<{ id: number } | null>(null);
 
-// the options of the panel, for the session, the same in every tab
-export const findOptions = shallowRef<FindOptions>({
+// all off: case doesn't matter, any part of a word, plain text
+export const NO_FIND_OPTIONS: FindOptions = {
   matchCase: false,
   wholeWord: false,
   regex: false,
-});
+};
+
+// the options of the panel, for the session, the same in every tab
+export const findOptions = shallowRef<FindOptions>(NO_FIND_OPTIONS);
 
 // whether the focus is in the panel, which the editor then leaves it (see
 // uiTakesFocus)

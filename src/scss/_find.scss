@@ -4,16 +4,9 @@
 @use "controls" as *;
 
 .find-panel {
-  @include popover;
-  @include ui-text;
-  position: fixed;
-  // with the menus, above the pages and the bars
-  z-index: 20;
+  @include floating-panel;
   display: grid;
   gap: 6px;
-  box-sizing: border-box;
-  width: min(340px, calc(100% - 16px));
-  padding: 6px;
 
   .count {
     @include shortcut;
@@ -44,12 +37,13 @@
   align-items: center;
   gap: 2px;
 
-  .find-spacer {
-    flex: 1;
-  }
-
   .find-button {
     @include text-button;
     margin-left: 4px;
+  }
+
+  // the arrows at the left end, the buttons at the right
+  .icon-button + .find-button {
+    margin-left: auto;
   }
 }

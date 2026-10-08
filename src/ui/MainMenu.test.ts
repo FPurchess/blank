@@ -5,7 +5,6 @@ import { CommandIdentifier as C } from "../config";
 import {
   announcement,
   contextMenu,
-  mainMenuOpen,
   mainMenuWanted,
   pageView,
   recentCommands,
@@ -17,6 +16,9 @@ import { bootApp } from "./mount";
 
 // The main menu behind the logo: its search, its rows and its keys, through
 // the app as the user meets them
+
+// whether the main menu is open: the menu with a search
+const isOpen = () => !!contextMenu.value?.search;
 
 const settle = async () => {
   await nextTick();
@@ -82,24 +84,24 @@ describe("the main menu", () => {
 
   it("opens from the logo, with the focus in its search", async () => {
     expect(logo().getAttribute("aria-label")).toBe("Main menu");
-    expect(logo().getAttribute("aria-haspopup")).toBe("menu");
+    expect(logo().getAttribute("aria-haspopup")).toBe("dialog");
     expect(logo().dataset.tip).toBe("Main menu");
 
     logo().click();
     await settle();
 
-    expect(mainMenuOpen.value).toBe(true);
+    expect(isOpen()).toBe(true);
     expect(logo().getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement).toBe(search());
     expect(search().getAttribute("role")).toBe("combobox");
     // a click on the logo again closes it
     logo().click();
     await settle();
-    expect(mainMenuOpen.value).toBe(false);
+    expect(isOpen()).toBe(false);
   });
 
   it("opens with its key, from anywhere", async () => {
-    mainMenuWanted.value = { id: 1 };
+    mainMenuWanted.value = {};
     await settle();
     expect(document.activeElement).toBe(search());
   });
@@ -130,7 +132,7 @@ describe("the main menu", () => {
 
     await press("Enter", {}, search());
     expect(pageView.value).toBe("pages");
-    expect(mainMenuOpen.value).toBe(false);
+    expect(isOpen()).toBe(false);
   });
 
   it("moves through what it found with the arrows, the focus staying", async () => {
@@ -175,9 +177,9 @@ describe("the main menu", () => {
     await type("save");
     await press("Escape", {}, search());
     expect(search().value).toBe("");
-    expect(mainMenuOpen.value).toBe(true);
+    expect(isOpen()).toBe(true);
     await press("Escape", {}, search());
-    expect(mainMenuOpen.value).toBe(false);
+    expect(isOpen()).toBe(false);
     expect(handle.focus).toHaveBeenCalled();
   });
 
@@ -211,7 +213,7 @@ describe("the main menu", () => {
     line(C.VIEW_PAGES)!.click();
     await settle();
     expect(pageView.value).toBe("pages");
-    expect(mainMenuOpen.value).toBe(true);
+    expect(isOpen()).toBe(true);
     expect(line(C.VIEW_PAGES)!.getAttribute("aria-checked")).toBe("true");
 
     const dark = line("theme:dark")!;
@@ -221,7 +223,7 @@ describe("the main menu", () => {
     await settle();
     expect(theme.value).toBe("dark");
     expect(line("theme:dark")!.getAttribute("aria-checked")).toBe("true");
-    expect(mainMenuOpen.value).toBe(true);
+    expect(isOpen()).toBe(true);
   });
 
   it("takes the focus back to its search on its key while it's open", async () => {
@@ -269,5 +271,53 @@ describe("the main menu", () => {
     // not Bold, typed by its key, nor Save, which File shows
     expect(line(C.PAGE_SETUP)).not.toBeNull();
     expect(line(C.FORMAT_BOLD)).toBeNull();
+  });
+
+  it("goes into the menu at its end with ↑, and back to the search above it", async () => {
+    logo().click();
+    await settle();
+    await press("ArrowUp", {}, search());
+    expect(focusedId()).toBe(C.APP_ABOUT);
+    await press("ArrowDown", {}, search());
+    expect(focusedId()).toBe(C.FILE_NEW);
+    await press("ArrowUp");
+    expect(document.activeElement).toBe(search());
+  });
+
+  it("takes its key back to the search from a submenu too", async () => {
+    recentFiles.value = ["/docs/a.md"];
+    logo().click();
+    await settle();
+    line("file.recent")!.click();
+    await settle();
+    expect(focusedId()).toBe("recent:/docs/a.md");
+    await press("k", { ctrlKey: true });
+    expect(document.activeElement).toBe(search());
+  });
+
+  it("keeps an open submenu when what it lists changes", async () => {
+    recentFiles.value = ["/docs/a.md"];
+    logo().click();
+    await settle();
+    line("file.recent")!.click();
+    await settle();
+    recentFiles.value = ["/docs/b.md", "/docs/a.md"];
+    await settle();
+    const submenu = document.querySelector<HTMLElement>(".submenu")!;
+    expect(submenu.textContent).toContain("b.md");
+  });
+
+  it("closes for the blocks pane, which takes the focus to its search", async () => {
+    logo().click();
+    await settle();
+    line(C.VIEW_BLOCKS)!.click();
+    await settle();
+    expect(isOpen()).toBe(false);
+  });
+
+  it("opens from the logo with ↓", async () => {
+    logo().focus();
+    await press("ArrowDown", {}, logo());
+    expect(document.activeElement).toBe(search());
   });
 });

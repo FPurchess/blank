@@ -237,3 +237,10 @@ export const labelParts = (item: MenuEntry) => {
  */
 export const foundText = (count: number) =>
   count === 1 ? "1 command" : `${count} commands`;
+
+/**
+ * optionId returns the id of the line at `index` of the level at `depth`,
+ * which the main menu's search names as the active one
+ */
+export const optionId = (depth: number, index: number) =>
+  `menu-${depth}-${index}`;

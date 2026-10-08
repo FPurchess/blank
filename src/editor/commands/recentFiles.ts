@@ -15,7 +15,9 @@ export const openRecentFile =
   (_state, dispatch) => {
     if (!dispatch) return true;
     void (async () => {
-      const there = await exists(path).catch(() => false);
+      // only a file that surely isn't there leaves the list; an error, e.g. a
+      // folder that can't be read, is the opening's to tell
+      const there = await exists(path).catch(() => true);
       if (!there) {
         forgetFile(path);
         sendNotification(`${basename(path)} isn't there any more`);

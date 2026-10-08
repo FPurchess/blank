@@ -12,6 +12,7 @@ import {
   isHead,
   isRow,
   type MenuGroup,
+  optionId,
 } from "./menuModel";
 
 // One level of a menu: the menu itself, or a submenu next to the item it
@@ -64,9 +65,6 @@ const placeMenu = () => {
 onMounted(placeMenu);
 onUpdated(placeMenu);
 
-// the id of a line, which the search refers to as the active one
-const optionId = (index: number) => `menu-${props.depth}-${index}`;
-
 // the places of a section's lines in the menu
 const linesOf = (group: MenuGroup) =>
   Array.from({ length: group.end - group.start }, (_, i) => group.start + i);
@@ -88,7 +86,7 @@ const lineProps = (index: number) => ({
   editing: props.editing,
   checks: checks.value,
   found: !!props.found,
-  optionId: optionId(index),
+  optionId: optionId(props.depth, index),
 });
 const lineEvents = {
   hover: (index: number, column: number) => emit("hover", index, column),
@@ -109,7 +107,6 @@ defineExpose({
     line.scrollIntoView?.({ block: "nearest" });
   },
   rowRect: (index: number) => lineAt(index).getBoundingClientRect(),
-  optionId,
   // shows the line at `index` while the focus stays in the search
   reveal: (index: number) =>
     index >= 0 && lineAt(index).scrollIntoView?.({ block: "nearest" }),
@@ -137,7 +134,6 @@ defineExpose({
         <div
           :role="group.head ? 'group' : 'none'"
           :aria-label="group.head?.label"
-          class="menu-group"
         >
           <MenuLineView
             v-for="index in linesOf(group)"

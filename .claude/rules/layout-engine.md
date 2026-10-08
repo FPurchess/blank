@@ -37,10 +37,12 @@ Blank lays a document out once, with its own engine, and that one layout is both
 
 ## Zoom
 
-- `pageZoom` (`src/state/pageView.ts`) is `"fit"` or a step of `ZOOM_STEPS` (50% to 200%), a share of the size the pages print at in both views, for the window and kept across restarts. Fit is as wide as the view allows, at most the printed size (in "page ends" the editor's text size, `TEXT_SCALE`, so it may read about 123%) and at least half of it. `sheetScale` (`frames.ts`) works it out.
+- `pageZoom` (`src/state/pageView.ts`) is `"fit"` or a step of `ZOOM_STEPS` (50% to 200%), a share of the size the pages print at in both views, for the window and kept across restarts. Fit is as wide as the view allows, at most the printed size (in "page ends" the editor's text size, `TEXT_SCALE`, so it may read about 123%), down to `MIN_FIT` on a narrow window, so it never scrolls across; the desk's width is rounded, so Fit's own is never a pixel over the view's. `sheetScale` (`frames.ts`) works it out.
 - **One source:** `viewFrames(state, width)` is the one place that reads the view and the zoom, and `deskLayout` its computed for the page view's width. Every frame layout comes from them: `PageView.vue`'s, the geometry's (`framesNow`, `deskFrames`), `currentViewAnchor`, the outline's `freeRight`, the table handles' cache key and `followLayout`. Everything else reads `layout.scale` (the frames, `onDesk`, `pointOnPage`, `PageFrame`'s margins and marks, the band slots, the painter and the bitmap cache, which keys by it). `zoomFactor` is the zoom shown, Fit's too; `zoomLabel` how the status bar, the menu and the announcements say it.
 - Wider than the view, the desk is as wide as the pages (`FrameLayout.width`) and scrolls across: `PageViewport.scrollLeft`, which `deskToWindow`, `pointOnPages`, `deskPoint` and the IME's `align` count in, and `serve` scrolls across too.
-- The spot under the pointer (Ctrl+wheel, `zoomWheel` in `scrollModel.ts`) or the caret in view (`zoomAnchorNow`) stays where it is: `zoomAnchor`, which the page view uses once when the new layout comes.
+- The spot under the pointer (Ctrl+wheel, `zoomWheel` in `scrollModel.ts`: a notch of 40 px or more is a step, smaller turns add up) or the caret in view (`zoomAnchorNow`) stays where it is: `zoomAnchor`, which the page view uses, and clears, on the next layout, whatever that is. A zoom that doesn't change sets none. The wheel listener can't be passive, so it's on the page view only while Ctrl is held.
+- Dragging past an edge scrolls across too; a tab shown again starts at the left; the outline places itself by the room at Fit, so zooming in doesn't dock it.
+- A page keeps one bitmap of a layer, at any scale (`pageLayer.ts`), and the cache skips one larger than a third of its room: at 200% on a 2× screen an A4 sheet is about 57 MB.
 - What the page view draws in CSS pixels doesn't zoom: the marks where a page ends, its labels and the gaps between the sheets.
 
 ## The seam

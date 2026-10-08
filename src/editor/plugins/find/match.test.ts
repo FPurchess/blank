@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { schema } from "../../../markdown";
 import { doc, h, p } from "../../../test/editor";
-import type { FindOptions } from "../../../state";
-import { compile, expand, matchIn, NO_OPTIONS } from "./match";
+import { type FindOptions, NO_FIND_OPTIONS } from "../../../state";
+import { compile, expand, matchIn } from "./match";
 
 // a paragraph of these pieces: text, marked text or an inline node
 const para = (...pieces: (string | [string, string] | "break")[]) =>
@@ -25,7 +25,7 @@ const find = (
   options: Partial<FindOptions> = {},
   limit = Infinity,
 ) => {
-  const all = { ...NO_OPTIONS, ...options };
+  const all = { ...NO_FIND_OPTIONS, ...options };
   const compiled = compile(query, all);
   if (!compiled || "error" in compiled) throw new Error("no pattern");
   const { matches, more } = matchIn(node, compiled.regex, all, "all", limit);
@@ -38,8 +38,8 @@ const find = (
 
 describe("compile", () => {
   it("finds nothing for nothing, and says why a pattern can't be read", () => {
-    expect(compile("", NO_OPTIONS)).toBeNull();
-    const broken = compile("(a", { ...NO_OPTIONS, regex: true });
+    expect(compile("", NO_FIND_OPTIONS)).toBeNull();
+    const broken = compile("(a", { ...NO_FIND_OPTIONS, regex: true });
     expect(broken).toMatchObject({ error: expect.any(String) });
     expect((broken as { error: string }).error).not.toContain("(a");
   });
@@ -90,6 +90,21 @@ describe("matchIn", () => {
     expect(find(doc(p("abc")), "x*", { regex: true }).texts).toEqual([]);
   });
 
+  it("steps over empty matches, also next to an emoji, without stopping", () => {
+    expect(find(doc(p("😀a😀")), "x*", { regex: true }).texts).toEqual([]);
+    expect(find(doc(p("😀ab")), "\\b", { regex: true }).texts).toEqual([]);
+  });
+
+  it("finds whole words also where a candidate overlaps the one before", () => {
+    expect(
+      find(doc(p("ba-a-a")), "a-a", { wholeWord: true }).matches,
+    ).toHaveLength(1);
+    // a letter beyond the BMP is a letter too
+    expect(
+      find(doc(p("𝐀the the")), "the", { wholeWord: true }).matches,
+    ).toHaveLength(1);
+  });
+
   it("stops at the limit and says there are more", () => {
     const { matches, more } = find(doc(p("a a a a")), "a", {}, 2);
     expect(matches).toHaveLength(2);
@@ -99,11 +114,11 @@ describe("matchIn", () => {
 
   it("looks only at the textblocks of the ranges given", () => {
     const node = doc(p("one"), p("one"));
-    const compiled = compile("one", NO_OPTIONS) as { regex: RegExp };
+    const compiled = compile("one", NO_FIND_OPTIONS) as { regex: RegExp };
     // where the second paragraph starts
     const second = node.child(0).nodeSize;
     expect(
-      matchIn(node, compiled.regex, NO_OPTIONS, [[second + 1, second + 1]])
+      matchIn(node, compiled.regex, NO_FIND_OPTIONS, [[second + 1, second + 1]])
         .matches,
     ).toEqual([{ from: second + 1, to: second + 4 }]);
   });
@@ -122,6 +137,18 @@ describe("expand", () => {
       "[ann@] $ ann $9",
     );
     expect(expand("$10", match, "ann@", true)).toBe("ann0");
+    // a named group that matched nothing puts in nothing
+    expect(
+      expand(
+        "[$<gone>]",
+        {
+          ...match,
+          groups: { numbered: [], named: { gone: undefined as never } },
+        },
+        "x",
+        true,
+      ),
+    ).toBe("[]");
   });
 
   it("takes plain text as it is", () => {

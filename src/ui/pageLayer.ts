@@ -227,8 +227,9 @@ export const layerOf = ({
     // freed once the copy is taken
     painter.snapshot(kept).then(
       (snapshot) => {
-        // in place of what the layer showed before at this scale
-        if (snapshot) pageBitmaps.set(key, snapshot, `${job()}:${frame.scale}`);
+        // in place of what the layer showed before, at any scale: the zoom
+        // changes it, and bitmaps of the old one would only crowd the cache
+        if (snapshot) pageBitmaps.set(key, snapshot, job());
         painter.release(kept);
       },
       () => painter.release(kept),

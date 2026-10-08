@@ -74,7 +74,8 @@ export const rankCommands = (
   recent: readonly CommandIdentifier[],
   exclude: ReadonlySet<CommandIdentifier> = new Set(),
 ): RankedCommand[] => {
-  const wanted = queryWords(query).join(" ");
+  const words = queryWords(query);
+  const wanted = words.join(" ");
   if (!wanted) return [];
   const recency = (id: CommandIdentifier) => {
     const index = recent.indexOf(id);
@@ -83,15 +84,18 @@ export const rankCommands = (
   return matchCommands(query)
     .filter((info) => !exclude.has(info.id))
     .map((info, order) => {
-      const { rank, at } = rankOf(info.label, wanted);
-      return { info, rank, at, order, recency: recency(info.id) };
+      // the whole query, or else its best word, e.g. "pdf" of "export pdf"
+      const { rank, at, length } = [wanted, ...words]
+        .map((part) => ({ ...rankOf(info.label, part), length: part.length }))
+        .reduce((best, next) => (next.rank < best.rank ? next : best));
+      return { info, rank, at, length, order, recency: recency(info.id) };
     })
     .sort(
       (a, b) => a.rank - b.rank || a.recency - b.recency || a.order - b.order,
     )
     .slice(0, SEARCH_LIMIT)
-    .map(({ info, at }) => ({
+    .map(({ info, at, length }) => ({
       info,
-      match: at >= 0 ? [at, at + wanted.length] : null,
+      match: at >= 0 ? [at, at + length] : null,
     }));
 };

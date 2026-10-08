@@ -47,9 +47,9 @@ export const freeRight = (
 ) => {
   if (engineless) return width - Math.min(width, FALLBACK_TEXT_WIDTH);
   if (!state) return 0;
-  // every frame is as wide and as far left as the first, in the view and at
-  // the zoom chosen
-  const frame = viewFrames(state, width).frames[0];
+  // every frame is as wide and as far left as the first, in the view chosen;
+  // at Fit, so zooming in, which scrolls the pages across, doesn't dock it
+  const frame = viewFrames(state, width, "fit").frames[0];
   return frame ? width - (frame.left + frame.width) : 0;
 };
 

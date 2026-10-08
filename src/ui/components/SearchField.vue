@@ -13,12 +13,16 @@ const value = defineModel<string>({ required: true });
 
 const input = useTemplateRef<HTMLInputElement>("input");
 defineExpose({
-  // focuses the field, and with `all` selects what's in it, to type over it
-  focus: (all = false) => {
-    input.value?.focus();
-    if (all) input.value?.select();
+  // focuses the field: with "all", what's in it selected, to type over it;
+  // with "end", the cursor after it, to type on
+  focus: (at?: "all" | "end") => {
+    const element = input.value;
+    if (!element) return;
+    element.focus();
+    if (at === "all") element.select();
+    else if (at === "end")
+      element.setSelectionRange(element.value.length, element.value.length);
   },
-  input: () => input.value,
 });
 </script>
 

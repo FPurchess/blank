@@ -10,7 +10,7 @@ import {
 } from "vue";
 
 import { CommandIdentifier } from "../config";
-import { commandKey, commandShortcut } from "../editor/keyBindings";
+import { commandShortcut, onCommandKey } from "../editor/keyBindings";
 import { place } from "../popup";
 import { listenOnWindow } from "../scope";
 import {
@@ -24,7 +24,7 @@ import { useDismiss } from "./composables/useDismiss";
 import { useMenuLevels } from "./composables/useMenuLevels";
 import { useResizeObserver } from "./composables/useResizeObserver";
 import MenuList from "./MenuList.vue";
-import { firstEnabled, foundText } from "./menuModel";
+import { firstEnabled, foundText, lastEnabled, optionId } from "./menuModel";
 
 // A menu: the context menu, which replaces the webview's (see
 // src/editor/plugins/contextMenu.ts for when it opens and
@@ -68,7 +68,7 @@ const menu = useMenuLevels(
         focusSearch: () => field.value?.focus(),
         onPrintable: (key) => {
           query.value += key;
-          field.value?.focus();
+          field.value?.focus("end");
         },
       }
     : {},
@@ -98,7 +98,7 @@ onUnmounted(() => clearTimeout(announcing));
 const active = computed(() => {
   if (!searching.value) return undefined;
   const index = levels.value[0].index;
-  return index >= 0 ? `menu-0-${index}` : undefined;
+  return index >= 0 ? optionId(0, index) : undefined;
 });
 watch(
   () => levels.value[0].index,
@@ -119,9 +119,14 @@ const onSearchKey = (event: KeyboardEvent) => {
   const { index } = levels.value[0];
   if (key === "ArrowDown" || key === "ArrowUp") {
     handled();
+    const items = levels.value[0].items;
     if (searching.value) menu.moveBy(0, key === "ArrowDown" ? 1 : -1);
-    else if (key === "ArrowDown")
-      menu.focusItem(0, firstEnabled(levels.value[0].items));
+    // into the menu, at its top or, going up, at its bottom
+    else
+      menu.focusItem(
+        0,
+        key === "ArrowDown" ? firstEnabled(items) : lastEnabled(items),
+      );
   } else if (key === "Enter") {
     handled();
     if (searching.value && index >= 0) menu.activate(0, index);
@@ -137,17 +142,9 @@ const onSearchKey = (event: KeyboardEvent) => {
 
 // the main menu's key again, while it's open: back to its search, its text
 // selected to type over
-const searchKey = commandKey(CommandIdentifier.MENU_MAIN, () => {
-  field.value?.focus(true);
-  return true;
-});
-const onMainKey = (event: KeyboardEvent) => {
-  // the key's handler runs no command on the editor, so it needs no view
-  if (searchKey({} as never, event)) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-};
+const onMainKey = onCommandKey(CommandIdentifier.MENU_MAIN, () =>
+  field.value?.focus("all"),
+);
 const searchShortcut = computed(() =>
   commandShortcut(CommandIdentifier.MENU_MAIN),
 );
@@ -161,12 +158,13 @@ const fade = () => {
     !!element &&
     element.scrollTop + element.clientHeight < element.scrollHeight - 2;
 };
-const placeBox = () => {
+// placed once: it's as tall as the window allows whatever it lists, and a
+// resize closes it
+onMounted(() => {
   if (box.value) place(box.value, props.request.anchor, { fill: true });
-  fade();
-};
-onMounted(placeBox);
-onUpdated(placeBox);
+});
+onMounted(fade);
+onUpdated(fade);
 useResizeObserver(() => [scroller.value], fade);
 
 onMounted(menu.focusCurrent);
@@ -192,13 +190,20 @@ watch([spellcheck, language], close);
 </script>
 
 <template>
-  <div ref="container" class="context-menus">
+  <!-- the main menu's key takes the focus back to its search, also from a
+  submenu -->
+  <div
+    ref="container"
+    class="context-menus"
+    @keydown.capture="search && onMainKey($event)"
+  >
     <div
       v-if="search"
       id="main-menu"
       ref="box"
       class="main-menu"
-      @keydown.capture="onMainKey"
+      role="dialog"
+      aria-label="Main menu"
     >
       <SearchField
         ref="field"
@@ -236,6 +241,9 @@ watch([spellcheck, language], close);
           @hover="(index, column) => menu.hover(0, index, column)"
           @activate="(index, column) => menu.activate(0, index, column)"
           @key="menu.onKey(0, $event)"
+          @edit-submit="menu.submitEdit(0, $event)"
+          @edit-cancel="menu.cancelEdit"
+          @close="close"
         />
         <p v-if="searching && levels[0].items.length === 0" class="menu-foot">
           {{ search.empty(query) }}

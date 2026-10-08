@@ -15,7 +15,7 @@ Blank remembers your choice. The button at the right end of the bar at the botto
 
 ## Zoom {#zoom}
 
-At first, Blank fits your pages to the window: as wide as it allows, and never larger than they print. To see them larger or smaller, press `Mod` `=` (or `Mod` `+`) and `Mod` `-`, or hold `Ctrl` and turn the mouse wheel. On a touchpad, pinch. The zoom goes in steps from 50% to 200%, where 100% is the size the pages print at, in both views. The spot under the pointer stays where it is while you zoom with the wheel, and with the keys, your cursor does.
+At first, Blank fits your pages to the window: as wide as it allows, at most the size they print at (in page ends, the size of your text in the editor, a little larger). To see them larger or smaller, press `Mod` `=` (or `Mod` `+`) and `Mod` `-`, or hold `Ctrl` and turn the mouse wheel. The zoom goes in steps from 50% to 200%, where 100% is the size the pages print at, in both views. The spot under the pointer stays where it is while you zoom with the wheel, and with the keys, your cursor does.
 
 The bar at the bottom shows the zoom next to the view button, between − and +. A click on it fits the pages to the window again; with _Fit_, its tooltip says the size that gives, like _Fit to window (87%)_. A page wider than the window scrolls sideways. Blank remembers the zoom for the next time you open it.
 

@@ -27,9 +27,24 @@ export const countText = (state: FindState | undefined) => {
   if (!state?.active || !state.query || state.error) return "";
   const count = state.matches.length;
   if (count === 0) return "No matches";
-  const total = count > COUNT_CAP || state.more ? `${COUNT_CAP}+` : `${count}`;
+  // past what it counts, as many as it's at
+  const total =
+    count > COUNT_CAP || state.more
+      ? `${Math.max(COUNT_CAP, state.current + 1)}+`
+      : `${count}`;
   return `${state.current + 1} of ${total}`;
 };
+
+/**
+ * isStepKey tells whether `event` is F3 (the next match) or Shift+F3 (the
+ * previous), which work anywhere while the panel is open
+ */
+export const isStepKey = (event: KeyboardEvent) =>
+  event.key === "F3" &&
+  !event.defaultPrevented &&
+  !event.ctrlKey &&
+  !event.altKey &&
+  !event.metaKey;
 
 /**
  * errorText returns what the panel says about a pattern it can't read

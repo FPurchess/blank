@@ -159,6 +159,8 @@ export const useMenuLevels = (
   ) => {
     const item = activeItem(levels.value[depth].items, index, column);
     if (!item || item.disabled) return;
+    // what the user chose stays chosen through an update
+    moved = true;
     if (item.children) {
       openSubmenu(depth, index, true);
     } else if (item.edit) {
@@ -207,7 +209,16 @@ export const useMenuLevels = (
     const { items, index, column } = level;
     const line = items[index];
 
-    if (key === "ArrowDown" || key === "ArrowUp") {
+    if (
+      key === "ArrowUp" &&
+      depth === 0 &&
+      options.focusSearch &&
+      index === firstEnabled(items)
+    ) {
+      // above the first line, the search the menu came from
+      handled();
+      show([{ ...level, index: -1 }], 0);
+    } else if (key === "ArrowDown" || key === "ArrowUp") {
       handled();
       moveBy(depth, key === "ArrowDown" ? 1 : -1);
     } else if (key === "Home" || key === "End") {
@@ -286,7 +297,7 @@ export const useMenuLevels = (
   // are known or a switch of the main menu changed, updates it: the item the
   // user moved to keeps the focus, submenus and a text field close
   watch(request, (next) => {
-    const { items, index, column } = levels.value[0];
+    const [{ items, index, column }, open] = levels.value;
     editing.value = null;
     const lines = levelZero();
     const kept = indexAfterUpdate(
@@ -296,12 +307,26 @@ export const useMenuLevels = (
       { items: lines, keyboard: next.keyboard && !searchFirst() },
       column,
     );
-    show([{ items: lines, ...kept, side: null }], 0);
+    const shown: MenuLevel[] = [{ items: lines, ...kept, side: null }];
+    // the submenu the user is in stays, with its parent's new items
+    const parent = lines[kept.index];
+    if (
+      open &&
+      isEntry(parent) &&
+      parent.children &&
+      isEntry(items[index]) &&
+      (items[index] as { id: string }).id === parent.id
+    )
+      shown.push({
+        ...open,
+        items: parent.children,
+        index: Math.min(open.index, parent.children.length - 1),
+      });
+    show(shown, Math.min(focusDepth.value, shown.length - 1));
   });
 
   return {
     levels,
-    focusDepth,
     editing,
     close,
     focusCurrent,

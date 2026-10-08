@@ -210,14 +210,12 @@ export interface ContextMenuRequest {
   // returns the focus to the editor
   close(): void;
   // the button that opened the menu, e.g. "Page N of M" in the bottom bar or
-  // the logo, the main menu's: a press on it isn't outside the menu, so its click
-  // can close the menu instead of the press closing it and the click opening
-  // it again
+  // the logo, the main menu's: a press on it isn't outside the menu, so its
+  // click can close the menu instead of the press closing it and the click
+  // opening it again
   owner?: Element;
   // the search above the menu, which the focus starts in (the main menu)
   search?: MenuSearch;
-  // the menu takes the window's height below its anchor, and scrolls in it
-  fill?: boolean;
 }
 
 // contextMenu holds the open context menu, or null while it is closed. A new

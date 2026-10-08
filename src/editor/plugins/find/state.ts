@@ -6,9 +6,9 @@ import {
 } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 
-import { type FindOptions, findPanel } from "../../../state";
-import { changedRanges, type Range, textblocks } from "../changed";
-import { compile, type Match, matchIn, NO_OPTIONS } from "./match";
+import { type FindOptions, NO_FIND_OPTIONS } from "../../../state";
+import { changedRanges, changesAll, type Range, textblocks } from "../changed";
+import { compile, type Match, matchIn } from "./match";
 
 // What find and replace looks for in the text of a tab and what it found,
 // kept in each tab's editor state, so switching tabs keeps them. It follows
@@ -55,7 +55,7 @@ export const findKey = new PluginKey<FindState>("find");
 
 export const findIdle: FindState = {
   query: "",
-  options: NO_OPTIONS,
+  options: NO_FIND_OPTIONS,
   active: false,
   regex: null,
   error: null,
@@ -117,6 +117,9 @@ const search = (
 const follow = (value: FindState, tr: Transaction): FindState => {
   const { regex, options } = value;
   if (!regex) return value;
+  // e.g. a Replace all: looking again is quicker than following every step
+  if (changesAll(tr))
+    return search(tr.doc, value.query, options, tr.selection.from);
   const blocks: Range[] = [];
   textblocks(tr.doc, changedRanges(tr), (block, pos) =>
     blocks.push([pos, pos + block.nodeSize]),
@@ -131,7 +134,7 @@ const follow = (value: FindState, tr: Transaction): FindState => {
     const moved = { ...match, from: from.pos, to: to.pos };
     if (!inChanged(moved)) kept.push(moved);
   }
-  let found = matchIn(tr.doc, regex, options, blocks).matches;
+  let found = matchIn(tr.doc, regex, options, blocks, STORE_CAP + 1).matches;
   // with more than are kept, what's found past the last one kept waits for
   // the next search, so the kept ones stay the first in the document
   const last = value.matches[value.matches.length - 1];
@@ -140,6 +143,9 @@ const follow = (value: FindState, tr: Transaction): FindState => {
     found = found.filter((match) => match.from < end);
   }
   let matches = merged(kept, found);
+  // fewer than are kept now, and more somewhere after them: look again
+  if (value.more && matches.length < STORE_CAP)
+    return search(tr.doc, value.query, options, currentPos(value, tr));
   let more = value.more;
   // the decorations move along too, but in the textblocks matched again
   const mapped = value.decorations.map(tr.mapping, tr.doc);
@@ -148,8 +154,11 @@ const follow = (value: FindState, tr: Transaction): FindState => {
     .add(tr.doc, found.map(matchDecoration));
   if (matches.length > STORE_CAP) {
     const beyond = matches[STORE_CAP].from;
+    // not the last one kept, which may end where the next starts
     decorations = decorations.remove(
-      decorations.find(beyond, tr.doc.content.size),
+      decorations
+        .find(beyond, tr.doc.content.size)
+        .filter((decoration) => decoration.from >= beyond),
     );
     matches = matches.slice(0, STORE_CAP);
     more = true;
@@ -199,8 +208,6 @@ export const findApply = (
     if (!active) return { ...findIdle, query, options };
     return search(state.doc, query, options, state.selection.from);
   }
-  // the panel closed elsewhere, e.g. in another tab: nothing to follow
-  if (value.active && !findPanel.value) return { ...findIdle, ...pick(value) };
   if (!value.active) return value;
   let next = tr.docChanged ? follow(value, tr) : value;
   if (meta?.type === "step" && next.matches.length > 0) {
@@ -214,9 +221,6 @@ export const findApply = (
   }
   return next;
 };
-
-// what stays of the search while it rests: its query and options
-const pick = ({ query, options }: FindState) => ({ query, options });
 
 /**
  * paintedRange returns what the page view highlights for a match in `doc`
@@ -232,3 +236,14 @@ export const paintedRange =
       ? [$from.before(), $from.after()]
       : [from, to];
   };
+
+/**
+ * currentDecorations returns the decoration of the match `value` is at, for
+ * the editor and the page view, which show it apart; none without one
+ */
+export const currentDecorations = (value: FindState | undefined) => {
+  const match = value?.matches[value.current];
+  return match
+    ? [Decoration.inline(match.from, match.to, { class: "find-current" })]
+    : [];
+};

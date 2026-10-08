@@ -18,21 +18,21 @@ paths:
 
 # The main menu
 
-The logo at the left of the tab row (`LogoButton.vue`) opens the main menu, as `Mod-k` (`menu.main`) does from anywhere. It's the context menu (`ContextMenu.vue`) with a search above it: one `ContextMenuRequest` with `search` (what it finds, and what it says when it finds nothing) and `fill` (as tall as the window allows below the logo; `place()` sets the height before it measures, and a resize closes it). There's no second menu component: what the main menu adds is in the item kinds, `useMenuLevels` and `MenuList`'s `embedded` and `found`.
+The logo at the left of the tab row (`LogoButton.vue`) opens the main menu, as `Mod-k` (`menu.main`) does from anywhere. It's the context menu (`ContextMenu.vue`) with a search above it: one `ContextMenuRequest` with `search` (what it finds, and what it says when it finds nothing). Its box (`#main-menu`, a dialog named "Main menu", which the logo's `aria-haspopup` says) is placed once with `place(…, { fill: true })`: as tall as the window allows below the logo (`place()` sets the height before it measures), and a resize closes it. There's no second menu component: what the main menu adds is in the item kinds, `useMenuLevels` and `MenuList`'s `embedded` and `found`.
 
 ## What it lists (`mainMenuItems`, `src/ui/mainMenuModel.ts`)
 
 Top to bottom, sections between separators:
 
 1. **Recent**: up to 3 of the commands used last that can run now (`recentForMenu`), without what the menu shows anyway (`MENU_SHOWN`) and without the Edit, Format and Tabs commands their key ran (typing, not choosing). The section is left out while there are none.
-2. **File** (`FILE_COMMANDS`, one array): New, Open, Open recent ▸, Save, Save as, Export ▸ (PDF, Word). Print goes after Export when it's there.
+2. **File** (`FILE_COMMANDS`, one array): New, Open, Open recent ▸, Save, Save as, Export ▸ (`EXPORT_COMMANDS`: PDF, Word). Print goes after Export, and Export signed PDF into Export, when they're there; whichever lands second adds its row with a test.
 3. **Edit** row: Undo, Redo, Find and replace.
-4. **View** row: the blocks pane, the outline, pages / page ends, focus mode, as switches (`menuitemcheckbox`).
+4. **View** row: the blocks pane, the outline, pages / page ends, focus mode, as switches (`menuitemcheckbox`). The blocks pane closes the menu, since it opens with the focus in its search.
 5. **Zoom** row: −, the zoom (a click fits), +; disabled without the engine (`ZOOM_NEEDS_PAGES`).
 6. **Theme** row: a swatch per theme (`menuitemradio`, drawn with `data-theme` in that theme's paper and ink).
 7. Settings…, Keyboard shortcuts, Guide (the website's guide, `GUIDE` in `src/links.ts`), About Blank.
 
-The View, Zoom and Theme items `stay`: the menu stays open when they run, without the editor taking the focus, and `LogoButton` re-issues its request (`useMenuButton.update`) when what they change changes, so they show it at once. Undo, Redo and Find close it.
+The View (but the blocks pane), Zoom and Theme items `stay`: the menu stays open when they run, without the editor taking the focus, and `LogoButton` re-issues its request, the search's too (`useMenuButton.update`), when what they change changes, so they show it at once; an open submenu stays through it. Undo, Redo and Find close it. A switch that is on keeps its look when focused, with the focus ring.
 
 ## Item kinds (`src/state/popups.ts`)
 
@@ -43,7 +43,7 @@ A level holds `MenuLine`s: items (`MenuItem`), separators, a `MenuHead` (the nam
 ## The search
 
 - `src/commandSearch.ts` searches the command list (`commandList.ts`) by label, group and aliases: `matchCommands` in the list's order (the settings' shortcuts), `rankCommands` ranked (the label starts with the query, then a word of it, then the label contains it, then only an alias or the group), the commands used last first within a rank, at most `SEARCH_LIMIT`. It never offers `menu.main`, `menu.context` or `file.clear_recent` (`MAIN_MENU_UNSEARCHED`).
-- The field is a combobox (`SearchField`) whose popup, while it searches, is a `listbox` of `option`s with `aria-activedescendant`: the focus stays in the field, ↑↓ move the active one, Enter runs it, the pointer makes one active. ↓ in the empty field goes into the menu. Esc clears the query, then closes; Esc in the list closes. `menu.main`'s key while it's open goes back to the search (handled by the menu, since the window's keys rest while a menu is open). The number found is announced once typing rests.
+- The field is a combobox (`SearchField`, which can put the cursor at the end of what it holds) whose popup, while it searches, is a `listbox` of `option`s with `aria-activedescendant`: the focus stays in the field, ↑↓ move the active one, Enter runs it, the pointer makes one active. ↓ in the empty field goes into the menu at its top, ↑ at its bottom, and ↑ on the first line back to the search. Esc clears the query, then closes; Esc in the list closes. `menu.main`'s key while it's open, in a submenu too, goes back to the search (`onCommandKey` on the menus' container, since the window's keys rest while a menu is open). The number found is announced once typing rests.
 
 ## Recent commands and files (`src/state/recent.ts`)
 
@@ -53,4 +53,4 @@ A level holds `MenuLine`s: items (`MenuItem`), separators, a `MenuHead` (the nam
 
 ## The logo in the tab row
 
-The logo is the first stop of the tab row's roving focus: ← on the first tab and Home go to it (`tabKey` → `"logo"`), → Home End and Esc leave it (`logoKey`). A menu opened from the logo with the keyboard gives it the focus back when it closes; one opened by a click or the key gives it to the text.
+The logo is the first stop of the tab row's roving focus: ← on the first tab and Home go to it (`tabKey` → `"logo"`), → Home End and Esc leave it (`logoKey`), and Enter, Space or ↓ open the menu. A menu opened from the logo with the keyboard gives it the focus back when it closes; one opened by a click or the key gives it to the text.

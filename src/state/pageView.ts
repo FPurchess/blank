@@ -163,8 +163,11 @@ export const pageViewport = shallowRef<PageViewport | null>(null);
  * the view and at the zoom chosen: where every place the pages are shown
  * comes from (see .claude/rules/layout-engine.md, "Zoom")
  */
-export const viewFrames = (state: PageLayoutState, width: number) =>
-  frameLayout(state, pageView.value, width, pageZoom.value);
+export const viewFrames = (
+  state: PageLayoutState,
+  width: number,
+  zoom: PageZoom = pageZoom.value,
+) => frameLayout(state, pageView.value, width, zoom);
 
 // the page view's width alone, which notifies only when it changes, not on
 // every scroll as pageViewport does

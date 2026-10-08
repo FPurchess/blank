@@ -1,10 +1,10 @@
-import { EditorState } from "prosemirror-state";
+import { EditorState, type Transaction } from "prosemirror-state";
 import { describe, expect, it } from "vitest";
 
 import { schema } from "../../../markdown";
 import { findPanel } from "../../../state";
 import { doc, p } from "../../../test/editor";
-import { setFind } from "./commands";
+import { replaceAllFound, setFind } from "./commands";
 import { find } from "./index";
 
 // How long a keystroke takes while find is open, on a long document: it must
@@ -40,4 +40,18 @@ describe.runIf(process.env.BENCH)("find on a long document", () => {
       findPanel.value = null;
     },
   );
+
+  it("replaces thousands of matches quickly", () => {
+    const long = doc(...Array.from({ length: 3000 }, () => p(SENTENCE)));
+    let state = EditorState.create({ schema, doc: long, plugins: [find()] });
+    findPanel.value = { id: 1 };
+    const dispatch = (tr: Transaction) => (state = state.apply(tr));
+    setFind({ query: "the" })(state, dispatch);
+    const start = performance.now();
+    replaceAllFound("a")(state, dispatch);
+    const took = performance.now() - start;
+    console.log(`replace all of 12000: ${took.toFixed(0)} ms`);
+    expect(took).toBeLessThan(2000);
+    findPanel.value = null;
+  });
 });

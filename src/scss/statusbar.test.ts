@@ -11,9 +11,13 @@ describe("the status bar on a narrow window", () => {
     expect(narrow).toBeLessThan(wide);
   });
 
-  it("keeps the zoom's − and + at 800 px, and drops both at 640 px", () => {
-    expect(800).toBeLessThanOrEqual(wide);
-    expect(800).toBeGreaterThan(narrow);
-    expect(640).toBeLessThanOrEqual(narrow);
+  // the window Blank opens at, and a narrow one, where the order matters
+  const DEFAULT_WIDTH = 800;
+  const NARROW_WIDTH = 640;
+
+  it("keeps the zoom's − and + at the default width, and drops both narrow", () => {
+    expect(DEFAULT_WIDTH).toBeLessThanOrEqual(wide);
+    expect(DEFAULT_WIDTH).toBeGreaterThan(narrow);
+    expect(NARROW_WIDTH).toBeLessThanOrEqual(narrow);
   });
 });

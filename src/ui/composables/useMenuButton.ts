@@ -44,7 +44,7 @@ export const useMenuButton = (closed: (keyboard: boolean) => void) => {
     }: {
       anchor?: Anchor;
       toggles?: boolean;
-      extra?: Pick<ContextMenuRequest, "search" | "fill">;
+      extra?: Pick<ContextMenuRequest, "search">;
     } = {},
   ) => {
     const { left, top, bottom } = owner.getBoundingClientRect();
@@ -63,19 +63,23 @@ export const useMenuButton = (closed: (keyboard: boolean) => void) => {
   const toggle = (
     event: Event,
     items: MenuLine[],
-    extra?: Pick<ContextMenuRequest, "search" | "fill">,
+    extra?: Pick<ContextMenuRequest, "search">,
   ) => {
     if (isOpen.value) return close();
     openAt(event.currentTarget as HTMLElement, items, { extra });
   };
 
   /**
-   * update shows `items` in the open menu, e.g. once a switch in it changed,
-   * where it is and as it was opened
+   * update shows `items` (and `extra`, e.g. the main menu's search) in the
+   * open menu, e.g. once a switch in it changed, where it is and as it was
+   * opened
    */
-  const update = (items: MenuLine[]) => {
+  const update = (
+    items: MenuLine[],
+    extra?: Pick<ContextMenuRequest, "search">,
+  ) => {
     const open = contextMenu.value;
-    if (open?.close === close) contextMenu.value = { ...open, items };
+    if (open?.close === close) contextMenu.value = { ...open, items, ...extra };
   };
 
   return { toggle, openAt, update, isOpen };
