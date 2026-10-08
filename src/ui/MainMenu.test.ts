@@ -100,6 +100,18 @@ describe("the main menu", () => {
     expect(isOpen()).toBe(false);
   });
 
+  it("stays open when the pages scroll, e.g. as a zoom in it keeps the caret in view", async () => {
+    const now = Date.now();
+    logo().click();
+    await settle();
+    vi.spyOn(Date, "now").mockReturnValue(now + 1000);
+    const pages = document.createElement("div");
+    document.body.append(pages);
+    pages.dispatchEvent(new Event("scroll"));
+    await settle();
+    expect(isOpen()).toBe(true);
+  });
+
   it("opens with its key, from anywhere", async () => {
     mainMenuWanted.value = {};
     await settle();

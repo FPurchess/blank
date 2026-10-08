@@ -172,7 +172,9 @@ onMounted(menu.focusCurrent);
 
 // what closes the menu while it's open: a press or a scroll outside it and
 // the button that opened it, whose own click closes it, but for the scroll
-// the menu's own opening caused
+// the menu's own opening caused. The main menu hangs from the logo, which
+// never scrolls, so a scroll leaves it open: its zoom and switches scroll
+// the pages themselves.
 const { contains } = useDismiss(
   () => [container.value, props.request.owner],
   close,
@@ -181,7 +183,11 @@ const { contains } = useDismiss(
 listenOnWindow(
   "scroll",
   (event) => {
-    if (Date.now() - openedAt > SCROLL_GRACE && !contains(event.target)) {
+    if (
+      !props.request.search &&
+      Date.now() - openedAt > SCROLL_GRACE &&
+      !contains(event.target)
+    ) {
       close();
     }
   },

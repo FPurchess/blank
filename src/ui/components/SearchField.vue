@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { useTemplateRef } from "vue";
+import { computed, useAttrs, useTemplateRef } from "vue";
 
 import IconGlyph from "./IconGlyph.vue";
 
 // A field to search or find with, its icon in it: the blocks pane's search,
-// the main menu's and the find panel's fields. The attributes (its name,
-// role, keys) go on the input; the slot shows after it, inside the field,
-// e.g. a key or a count.
+// the main menu's and the find panel's fields. Its class and style go on the
+// field, the other attributes (its name, role, keys) on the input; the slot
+// shows after it, inside the field, e.g. a key or a count.
 defineOptions({ inheritAttrs: false });
 withDefaults(defineProps<{ icon?: string }>(), { icon: "search" });
 const value = defineModel<string>({ required: true });
+const attrs = useAttrs();
+const inputAttrs = computed(() =>
+  Object.fromEntries(
+    Object.entries(attrs).filter(
+      ([name]) => name !== "class" && name !== "style",
+    ),
+  ),
+);
 
 const input = useTemplateRef<HTMLInputElement>("input");
 defineExpose({
@@ -27,7 +35,7 @@ defineExpose({
 </script>
 
 <template>
-  <label class="search-field">
+  <label class="search-field" :class="attrs.class" :style="attrs.style">
     <IconGlyph :name="icon" />
     <input
       ref="input"
@@ -35,7 +43,7 @@ defineExpose({
       type="text"
       autocomplete="off"
       :spellcheck="false"
-      v-bind="$attrs"
+      v-bind="inputAttrs"
     />
     <slot />
   </label>

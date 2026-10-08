@@ -513,11 +513,18 @@ textarea:not(:disabled) {
   gap: var(--s2);
   color: var(--muted);
 
+  // the field shows the focus, ringed on its border, not the input in it
+  &:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: -1px;
+  }
+
   input {
     flex: 1;
     min-width: 0;
     padding: 0;
     border: 0;
+    outline: none;
     font: inherit;
     color: var(--color);
     background: none;

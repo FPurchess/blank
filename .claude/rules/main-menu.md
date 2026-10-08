@@ -18,7 +18,7 @@ paths:
 
 # The main menu
 
-The logo at the left of the tab row (`LogoButton.vue`) opens the main menu, as `Mod-k` (`menu.main`) does from anywhere. It's the context menu (`ContextMenu.vue`) with a search above it: one `ContextMenuRequest` with `search` (what it finds, and what it says when it finds nothing). Its box (`#main-menu`, a dialog named "Main menu", which the logo's `aria-haspopup` says) is placed once with `place(…, { fill: true })`: at most as tall as the window allows below the logo (`place()` sets its `max-height` before it measures), and a resize closes it. There's no second menu component: what the main menu adds is in the item kinds, `useMenuLevels` and `MenuList`'s `embedded` and `found`.
+The logo at the left of the tab row (`LogoButton.vue`) opens the main menu, as `Mod-k` (`menu.main`) does from anywhere. It's the context menu (`ContextMenu.vue`) with a search above it: one `ContextMenuRequest` with `search` (what it finds, and what it says when it finds nothing). Its box (`#main-menu`, a dialog named "Main menu", which the logo's `aria-haspopup` says) is placed once with `place(…, { fill: true })`: at most as tall as the window allows below the logo (`place()` sets its `max-height` before it measures), and a resize closes it. A scroll doesn't, unlike the context menu's: the logo never moves, and its zoom and switches scroll the pages themselves. There's no second menu component: what the main menu adds is in the item kinds, `useMenuLevels` and `MenuList`'s `embedded` and `found`.
 
 ## What it lists (`mainMenuItems`, `src/ui/mainMenuModel.ts`)
 
