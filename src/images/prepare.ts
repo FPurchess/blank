@@ -5,6 +5,18 @@ import { decodeSize, rasterize } from "./codec";
 import { loadImage } from "./load";
 import { type ImageMime, type Size, jpegOrientation, probeSize } from "./mime";
 
+/**
+ * imageSource names an image for the log: its file, or only its kind for a
+ * web or embedded image, whose address is the document's text (see
+ * .claude/rules/logging.md)
+ */
+const imageSource = (src: string) =>
+  src.startsWith("data:")
+    ? "an embedded image"
+    : /^https?:/i.test(src)
+      ? "an image from the web"
+      : `the image ${src}`;
+
 export interface PreparedImage extends Size {
   bytes: Uint8Array;
   mime: ImageMime;
@@ -28,7 +40,7 @@ const prepare = async (
 ): Promise<PreparedImage | null> => {
   const loaded = await loadImage(src, docPath);
   if ("error" in loaded) {
-    console.warn(`failed to load image ${src}: ${loaded.error}`);
+    console.warn(`failed to load ${imageSource(src)}: ${loaded.error}`);
     return null;
   }
   const { bytes, mime } = loaded;
@@ -79,7 +91,7 @@ export const prepareImages = async (
   await Promise.all(
     [...nodes].map(async ([src, label]) => {
       const image = await prepare(src, docPath, accepted).catch((err) => {
-        console.warn(`failed to convert image ${src}`, err);
+        console.warn(`failed to convert ${imageSource(src)}`, err);
         return null;
       });
       if (image) images.set(src, image);

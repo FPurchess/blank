@@ -20,6 +20,13 @@ import {
 } from "./layout/settings";
 import type { Unit } from "./layout/units";
 
+/**
+ * configError is what the log says of an error reading blank.json: JSON's
+ * own message quotes what it couldn't read, which may be a header's text
+ */
+const configError = (error: unknown) =>
+  error instanceof SyntaxError ? "it isn't valid JSON" : error;
+
 export enum CommandIdentifier {
   UNDO = "undo",
   REDO = "redo",
@@ -300,9 +307,9 @@ const getUserConfig = async (): Promise<Record<string, unknown>> => {
   try {
     const parsed: unknown = JSON.parse(await readTextFile(configFile));
     if (isRecord(parsed)) return parsed;
-    console.error("config file is not an object", parsed);
+    console.error(`blank.json holds ${typeof parsed}, not settings`);
   } catch (error) {
-    console.error("failed to read config file", error);
+    console.error("failed to read blank.json", configError(error));
   }
   return {};
 };
@@ -627,7 +634,7 @@ const writeSettings = async (
     if (await exists(configFile))
       settings = JSON.parse(await readTextFile(configFile));
   } catch (error) {
-    console.error("failed to read blank.json", error);
+    console.error("failed to read blank.json", configError(error));
     return "Blank couldn't read blank.json, so it left the file as it is";
   }
   // overwriting would lose what the user wrote

@@ -15,6 +15,7 @@ import { engineStatus } from "../../engine/engine";
 import { announce, path } from "../../state";
 import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
+import { logError } from "../../log";
 
 // what the PDF export says while the layout engine couldn't start, e.g.
 // where the webview can't run it, or when the user switched it off
@@ -102,6 +103,7 @@ export default (
         if (messages) sendNotification({ title, body: messages.join(". ") });
       })
       .catch((err: unknown) => {
+        logError(`failed to export as ${extension ?? "a file"}`, err);
         sendNotification({
           title,
           body: `Failed to export file: ${errorMessage(err)}`,

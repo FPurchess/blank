@@ -10,6 +10,7 @@ import type { DocumentFile } from "../document";
 import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
 import { MARKDOWN_FILTER, NOT_MARKDOWN } from "../../formats";
+import { logError } from "../../log";
 
 const isMarkdownTarget = (target: string) =>
   !NOT_MARKDOWN.includes(extname(target));
@@ -57,6 +58,7 @@ export const _saveFile = async (
     sendNotification("Your file has been saved");
     return target;
   } catch (err) {
+    logError("failed to save the file", err);
     sendNotification(`Failed to save file: ${errorMessage(err)}`);
     return null;
   }

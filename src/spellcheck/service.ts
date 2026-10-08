@@ -8,6 +8,7 @@ import { bootScope } from "../scope";
 import * as ipc from "./ipc";
 import type { Spellchecker } from "./types";
 import { dictionaryKey, forms, readWords, writeWords } from "./userDictionary";
+import { logError } from "../log";
 
 // words checked per call to the engine at most
 const BATCH_SIZE = 5000;
@@ -94,6 +95,7 @@ const createSpellchecker = (
     try {
       await writeWords(key, entries);
     } catch (error) {
+      logError("failed to save the personal dictionary", error);
       sendNotification(
         `Failed to save your dictionary: ${errorMessage(error)}`,
       );
@@ -218,6 +220,7 @@ export const update = async () => {
     spellcheckStatus.value = { state: "ready", tag };
   } catch (error) {
     if (stale()) return;
+    logError(`spell check for ${tag} failed`, error);
     const message = errorMessage(error);
     spellcheckStatus.value = { state: "error", tag, message };
     sendNotification(

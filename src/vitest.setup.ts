@@ -34,6 +34,12 @@ vi.mock("@tauri-apps/plugin-fs", async (importOriginal) => {
   };
 });
 
+vi.mock("@tauri-apps/plugin-log", () => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
   save: vi.fn(),

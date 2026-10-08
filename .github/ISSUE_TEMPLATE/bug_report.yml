@@ -35,7 +35,7 @@ body:
     attributes:
       label: Logs
       description: |
-        Optional if provided reproduction. Please try not to insert an image but copy paste the log text.
+        The end of Blank's log, if something went wrong: see [where to find it](https://blank-writer.xyz/guide/faq#log). It names files and folders but never holds what you wrote; look it over before you paste it. Please paste the text rather than a screenshot.
 
         ````
         <details>

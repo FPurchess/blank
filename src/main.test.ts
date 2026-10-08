@@ -10,6 +10,7 @@ import { bootStorage, exposeStorage } from "./storage";
 import { bootEditor } from "./editor";
 import { bootUI } from "./ui";
 import { bootEngine, exposeEngineHooks } from "./engine/engine";
+import { bootLog, logInfo } from "./log";
 import { exposeGeometry } from "./engine/geometry";
 import { deferred, flushPromises } from "./test/async";
 import { createTestHandle, doc, p } from "./test/editor";
@@ -20,9 +21,12 @@ vi.mock("./editor", () => ({ bootEditor: vi.fn() }));
 vi.mock("./ui", () => ({ bootUI: vi.fn() }));
 vi.mock("./engine/engine", () => ({
   bootEngine: vi.fn(),
+  engineStatus: () => "ready",
   exposeEngineHooks: vi.fn(),
   useFallbackEditor: () => document.body.classList.add("without-engine"),
 }));
+// the log is tested in log.test.ts; here the console stays the tests' spy
+vi.mock("./log", () => ({ bootLog: vi.fn(), logInfo: vi.fn() }));
 vi.mock("./engine/geometry", () => ({ exposeGeometry: vi.fn() }));
 
 // the handle the mocked bootEditor returns
@@ -75,6 +79,16 @@ describe("main", () => {
       expect(order).toEqual([...order].sort((a, b) => a - b));
     },
   );
+  it("starts the log first, and logs the engine's state once it's known", async () => {
+    await importMain();
+    await flushPromises();
+
+    expect(vi.mocked(bootLog).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(bootEngine).mock.invocationCallOrder[0],
+    );
+    expect(logInfo).toHaveBeenCalledWith("the page layout is ready");
+  });
+
   it("boots the editor and the UI while the engine still loads", async () => {
     const engine = deferred();
     vi.mocked(bootEngine).mockReturnValue(engine.promise as never);

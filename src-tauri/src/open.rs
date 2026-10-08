@@ -42,6 +42,7 @@ fn instance_suffix(value: Option<String>) -> Option<String> {
         && value.len() <= 32
         && value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
     if !valid {
+        // before the log starts: a second Blank asks for it before its setup
         eprintln!("ignoring BLANK_INSTANCE_ID={value}, it must be 1 to 32 letters, digits or _");
     }
     valid.then_some(value)
@@ -129,7 +130,7 @@ pub fn deliver<R: Runtime>(app: &AppHandle<R>, paths: Vec<String>) {
     let send = app.state::<OpenQueue>().0.lock().unwrap().push(paths);
     if let Some(paths) = send {
         if let Err(error) = app.emit("open-paths", paths) {
-            eprintln!("can't open the files: {error}");
+            log::error!("can't open the files: {error}");
         }
     }
 }
@@ -157,7 +158,7 @@ fn args_paths<R: Runtime>(app: &AppHandle<R>, argv: Vec<String>, cwd: &Path) -> 
             .map(|path| resolve(cwd, path).to_string_lossy().into_owned())
             .collect(),
         Err(error) => {
-            eprintln!("ignoring the command line: {error}");
+            log::warn!("ignoring the command line: {error}");
             Vec::new()
         }
     }

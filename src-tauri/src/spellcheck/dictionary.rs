@@ -75,7 +75,8 @@ pub fn parse(aff: &str, dic: &str) -> Result<Dictionary, String> {
 pub fn add_words(dict: &mut Dictionary, words: &[String]) {
     for word in words.iter().filter(|word| !word.contains('/')) {
         if let Err(error) = dict.add(word) {
-            eprintln!("failed to add {word:?} to the dictionary: {error}");
+            // the word itself is the user's, and stays out of the log
+            log::warn!("failed to add a word to the dictionary: {error}");
         }
     }
 }

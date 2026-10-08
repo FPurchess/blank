@@ -23,15 +23,30 @@ pub struct LayoutEngine {
 extern "C" {
     #[wasm_bindgen(js_namespace = console, js_name = error)]
     fn console_error(message: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = debug)]
+    fn console_debug(message: &str);
 }
 
 /// writes a panic to the console before the instance traps: with `panic =
-/// "abort"` it would trap without a word, and every later call would throw
+/// "abort"` it would trap without a word, and every later call would throw.
+/// console.error goes to Blank's log (src/log.ts), so it gets where the
+/// panic happened and only a fixed message: a formatted one, like Rust's
+/// own of slicing a string, may quote the document. The whole of it goes to
+/// console.debug, which stays in the webview's console.
 fn report_panics() {
     static HOOK: std::sync::Once = std::sync::Once::new();
     HOOK.call_once(|| {
         std::panic::set_hook(Box::new(|info| {
-            console_error(&format!("the layout engine panicked: {info}"));
+            let at = info
+                .location()
+                .map(|location| format!(" at {}:{}", location.file(), location.line()))
+                .unwrap_or_default();
+            let message = info
+                .payload()
+                .downcast_ref::<&str>()
+                .map_or("its message is withheld", |message| message);
+            console_error(&format!("the layout engine panicked{at}: {message}"));
+            console_debug(&format!("the layout engine panicked: {info}"));
         }));
     });
 }
