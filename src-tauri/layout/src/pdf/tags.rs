@@ -253,7 +253,9 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             leaves(ids, Part::Label { item: index }),
         )),
         Content::Table { .. } => Some(table_node(engine, index, ids)),
-        Content::Signature { src, alt, lines, .. } => {
+        Content::Signature {
+            src, alt, lines, ..
+        } => {
             // the signature as a figure, then the lines under it
             let mut children = vec![];
             let image = leaves(ids, Part::Image { item: index });

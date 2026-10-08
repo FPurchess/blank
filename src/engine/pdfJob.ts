@@ -1,4 +1,5 @@
 import type { LayoutEngine } from "./wasm/blank_layout.js";
+import { type PageBox, rectsOf } from "./boxes";
 
 // A PDF written by an engine of its own, from what the main thread prepared:
 // the fonts, the images, the settings and the flattened items. The PDF
@@ -24,6 +25,9 @@ export interface PdfJob {
   pages?: number[];
   // or the sheets to print instead, as JSON (see PageEngine.printPdf)
   sheets?: string;
+  // the position of the signature block a signed PDF fills in, whose box
+  // the result gives
+  signedPos?: number;
 }
 
 // what a PDF left out: an image it couldn't decode, which shows its alt
@@ -41,6 +45,8 @@ export interface PdfResult {
   // the characters no font had, for a second job with more fonts
   missing: string;
   warnings: PdfWarning[];
+  // where the filled in signature block is, for the signature's field
+  signatureBox?: PageBox;
 }
 
 /**
@@ -92,10 +98,14 @@ export const writePdf = (
             ),
             pages: job.pages?.length ?? engine.pageCount(),
           };
+    const signed = job.signedPos;
     return {
       ...written,
       missing: engine.missing(),
       warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],
+      ...(signed === undefined
+        ? {}
+        : { signatureBox: rectsOf(engine.boxes(signed, signed + 1))[0] }),
     };
   } finally {
     try {

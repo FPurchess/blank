@@ -5,7 +5,11 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../../config";
-import { type ExportContext, type exporterFunc } from "../../exporters";
+import {
+  type ExportContext,
+  type ExportResult,
+  type exporterFunc,
+} from "../../exporters";
 import { describePaper, layoutWarnings } from "../../layout/describe";
 import { resolveLayout } from "../../layout/resolve";
 import { localeUnit } from "../../layout/paper";
@@ -49,6 +53,8 @@ export interface ExportRequest {
   context?: Pick<ExportContext, "pages" | "signed">;
   // told the file it wrote, e.g. to remember where the user signed
   written?: (dest: string) => void;
+  // what is written instead of the export's contents, e.g. the PDF signed
+  finish?: (result: ExportResult) => Promise<Uint8Array>;
 }
 
 /**
@@ -89,7 +95,7 @@ export const canExport = (state: EditorState, request: ExportRequest) => {
 export const runExport = async (
   state: EditorState,
   docPath: string | null,
-  { title, exporter, filters, suffix, context, written }: ExportRequest,
+  { title, exporter, filters, suffix, context, written, finish }: ExportRequest,
 ) => {
   const extension = filters?.[0]?.extensions[0];
   try {
@@ -113,12 +119,9 @@ export const runExport = async (
       frontmatterOf(state.doc),
       config.value.layout.page,
     );
-    const { contents, warnings, pages } = await exporter(state, {
-      docPath,
-      layout,
-      ...context,
-    });
-    await writeFile(dest, contents);
+    const result = await exporter(state, { docPath, layout, ...context });
+    const { warnings, pages } = result;
+    await writeFile(dest, finish ? await finish(result) : result.contents);
     written?.(dest);
 
     // e.g. "Exported 3 A4 pages", or for Word, which lays out the pages

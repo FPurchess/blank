@@ -10,6 +10,7 @@ import { DATE_FORMATS, type DateFormat } from "../../signing/date";
 import OptionGroup from "../components/OptionGroup.vue";
 import SettingRow from "../components/SettingRow.vue";
 import TextField from "../components/TextField.vue";
+import CertificateRows from "./CertificateRows.vue";
 import { enterInField, save } from "./settingsModel";
 import { dateFormatOptions, MARK_ROWS } from "./signingModel";
 
@@ -97,4 +98,5 @@ const dateFormat = computed({
     aria-describedby="settings-date-format-description"
     :options="options"
   />
+  <CertificateRows />
 </template>

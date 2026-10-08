@@ -109,6 +109,9 @@ const onSharedEngine = async ({
       ...written,
       missing: engine.missing(),
       warnings: engine.pdfWarnings(),
+      ...(signed
+        ? { signatureBox: engine.boxes(signed.pos, signed.pos + 1)[0] }
+        : {}),
     };
   } finally {
     engine.free();
@@ -200,6 +203,7 @@ const jobOf = (
   ...("sheets" in output
     ? { sheets: JSON.stringify(output.sheets) }
     : { pages: output.pages }),
+  ...(signed ? { signedPos: signed.pos } : {}),
 });
 
 /**
@@ -353,6 +357,7 @@ const write = async (
       ),
     ],
     pages: result.pages,
+    signatureBox: result.signatureBox,
   };
 };
 

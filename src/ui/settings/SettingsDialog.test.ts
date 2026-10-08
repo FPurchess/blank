@@ -10,6 +10,7 @@ import {
   settingsDialog,
   settingsSection,
   signatureDialog,
+  signingCertificate,
   spellcheck,
   theme,
 } from "../../state";
@@ -623,6 +624,44 @@ describe("the settings dialog", () => {
       await settle();
       expect(written()).toEqual({ signing: { name: "Ada Lovelace" } });
       expect(announcement.value?.text).toBe("Your name is Ada Lovelace");
+    });
+
+    it("offers to make or import a certificate, and takes a timestamp server", async () => {
+      await open("signing");
+      expect(button("Create…", row("certificate"))).toBeDefined();
+      expect(button("Import…", row("certificate"))).toBeDefined();
+      const input = panel().querySelector<HTMLInputElement>(
+        "#settings-timestamp",
+      )!;
+      await type(input, "timestamp");
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await settle();
+      expect(panel().textContent).toContain("Enter a web address");
+      expect(files[CONFIG]).toBeUndefined();
+      button("Use DigiCert", row("timestamp"))?.click();
+      await type(input, "http://timestamp.digicert.com");
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await settle();
+      expect(written()).toEqual({
+        signing: { timestampServer: "http://timestamp.digicert.com" },
+      });
+    });
+
+    it("shows the certificate with its fingerprint", async () => {
+      signingCertificate.value = {
+        name: "Ada Lovelace",
+        issuer: "Ada Lovelace",
+        notBefore: "2026-10-08",
+        notAfter: "2031-10-08T00:00:00Z",
+        selfSigned: true,
+        fingerprint: "ABCD".repeat(16),
+      };
+      await open("signing");
+      expect(row("certificate").textContent).toContain(
+        "Made by Blank, valid until 2031-10-08",
+      );
+      expect(row("fingerprint").textContent).toContain("ABCD ABCD");
+      signingCertificate.value = undefined;
     });
 
     it("writes the date as chosen, shown in the document's language", async () => {

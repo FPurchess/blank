@@ -22,6 +22,15 @@ export interface ExportResult {
   warnings: string[];
   // the number of pages written, if the format has a fixed one
   pages?: number;
+  // for a signed PDF: where the filled in signature block is, in points
+  // from the top left of its page (counted from 0)
+  signatureBox?: {
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export type exporterFunc = (

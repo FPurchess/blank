@@ -14,9 +14,9 @@ use crate::model::{Content, Item, Settings, Text, TextKind};
 use crate::style::{MARKER_GAP, RULE};
 use crate::text::{align_offset, alignment_of, TextBox};
 
+pub use signature::{SignatureSpec, SIGNATURE_ROOM, SIGNATURE_SHARE};
 use table::table_units;
 pub use table::{TableSpec, MAX_COLUMNS};
-pub use signature::{SignatureSpec, SIGNATURE_ROOM, SIGNATURE_SHARE};
 pub use toc::{leaders, number_text, TocLaid, TocLine};
 
 /// what the colours of the screen and the PDF stand for

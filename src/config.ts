@@ -152,6 +152,9 @@ export interface SigningConfig {
   name: string;
   // how the date next to a signature is written, see src/signing/date.ts
   dateFormat: DateFormat;
+  // an RFC 3161 server that proves when a digital signature was made; ""
+  // for the computer's clock
+  timestampServer: string;
 }
 
 export interface LayoutConfig {
@@ -275,6 +278,7 @@ const defaultConfig: Config = {
   signing: {
     name: "",
     dateFormat: "long",
+    timestampServer: "",
   },
 };
 

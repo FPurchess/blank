@@ -106,6 +106,7 @@
   },
   "signing": {
     "name": "",
-    "dateFormat": "long"
+    "dateFormat": "long",
+    "timestampServer": ""
   }
 }

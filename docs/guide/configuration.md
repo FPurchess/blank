@@ -98,6 +98,7 @@ In [focus mode](./writing#focus-mode), the bars fade when you type, and also onc
 `signing` is what [signing](./signing) puts under your signature. **Settings ▸ Signing** writes it for you:
 
 - `name`: your name, for signature blocks that don't name who signs.
+- `timestampServer`: the web address of a timestamp server (RFC 3161), which proves when you signed a PDF with your certificate, e.g. `http://timestamp.digicert.com`. Empty, the PDF has your computer's time. Blank sends the server only a fingerprint of your signature, never the document.
 - `dateFormat`: how the date is written in the document's language, `"long"` (8 October 2026, the default), `"short"` (08.10.2026 in German, 10/08/2026 in American English) or `"iso"` (2026-10-08).
 
 ```json

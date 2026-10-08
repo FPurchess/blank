@@ -40,8 +40,25 @@ The block shows your signature, your name and the place and today's date, writte
 
 A Word document you opened in Blank is signed the same way. Blank lays the pages out a little differently from Word, so check every page before you send it, or ask the sender for a PDF.
 
+## Digital signatures {#digital}
+
+A picture of a signature is easy to copy. A digital signature isn't: your certificate signs the PDF, so anyone can check in their PDF app that you signed it and that nothing changed since.
+
+1. **Create your certificate** in **Settings ▸ Signing ▸ Certificate**, with your name and a passphrase that protects it (at least 8 characters). Or **Import…** a key file (`.p12` or `.pfx`) you already have, e.g. from your employer or a certificate authority.
+2. When you sign, choose **Digital, with your certificate** and type your passphrase. Blank signs the PDF after exporting it; the signature block shows your signature as before.
+
+Your key never leaves your computer and is kept in the `signing` folder, protected by your passphrase. Blank can't recover a forgotten passphrase: use **Back up key…** to keep a copy somewhere safe. **Export…** saves your certificate alone (a `.cer` file), which you can send to people who should trust your signatures.
+
+### How others check your signature {#check}
+
+- **Acrobat Reader** shows the signature in its signature panel. A certificate Blank made is your own, not one a certificate authority vouches for, so Acrobat says the signer's identity is _unknown_ until the reader trusts it: they open the signature's properties, compare its fingerprint with yours (**Settings ▸ Signing ▸ Fingerprint**, by phone or in person), and add it to their trusted certificates. From then on, your signatures show as valid.
+- **LibreOffice**, **Okular** and `pdfsig` show the signature the same way.
+- The EU's free [validator](https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation) checks it too.
+
+A **timestamp server** (**Settings ▸ Signing**) proves when you signed, instead of your computer's clock. Blank sends it only a fingerprint of your signature, never the document. **Use DigiCert** fills in a free one Acrobat trusts.
+
 ## What a signature from Blank is worth {#legal}
 
-A signature from Blank is an electronic signature: a picture of your signature on the document, the way most e-signing services sign. In the EU (eIDAS), Switzerland, the US (ESIGN and UETA) and the UK, it can't be refused just because it's electronic, and it's enough for most agreements, forms and letters.
+A signature from Blank is an electronic signature: a picture of your signature on the document, the way most e-signing services sign. With your certificate, it is also an advanced one in the sense of eIDAS: only you hold the key, and any change after signing shows. In the EU (eIDAS), Switzerland, the US (ESIGN and UETA) and the UK, it can't be refused just because it's electronic, and it's enough for most agreements, forms and letters.
 
 It is not a _qualified_ electronic signature (QES), which counts as handwritten wherever the law asks for a handwritten signature. Some documents need one, or still need ink: in Germany, for example, ending a job (§ 623 BGB), a guarantee (§ 766 BGB), and promises or acknowledgements of a debt (§§ 780, 781 BGB). When in doubt, sign those by hand.

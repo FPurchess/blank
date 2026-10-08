@@ -29,6 +29,18 @@ const marks = vi.hoisted(() => ({
   saveMark: vi.fn(),
 }));
 vi.mock("../../signing/marks", () => marks);
+const ipc = vi.hoisted(() => ({
+  checkPassphrase: vi.fn(),
+  signPdf: vi.fn(),
+}));
+vi.mock("../../signing/ipc", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...ipc,
+}));
+vi.mock("../../signing/certificate", () => ({
+  loadCertificate: vi.fn(async () => {}),
+  openCertificateDialog: vi.fn(),
+}));
 
 const SIGNATURE: SavedMark = {
   source: { kind: "draw", strokes: [] },
@@ -110,7 +122,7 @@ describe("signing", () => {
     run(p("Text"), signature({ role: "Tenant" }));
     await flushPromises();
     const { targets } = signDialog.value!;
-    signDialog.value!.submit(targets[0].pos, "Hamburg");
+    signDialog.value!.submit(targets[0].pos, "Hamburg", null);
     await flushPromises();
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ defaultPath: "/docs/lease signed.pdf" }),
@@ -126,6 +138,55 @@ describe("signing", () => {
       new Uint8Array([1]),
     );
     expect(signingPlace.value).toBe("Hamburg");
+  });
+
+  it("signs digitally with the passphrase: the field over the filled in block", async () => {
+    toPDF.mockResolvedValue({
+      contents: new Uint8Array([1]),
+      warnings: [],
+      pages: 1,
+      signatureBox: { page: 0, x: 70, y: 600, width: 230, height: 70 },
+    });
+    ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
+    ipc.checkPassphrase.mockRejectedValue({ kind: "wrongPassphrase" });
+    run(p("Text"), signature({ role: "Tenant" }));
+    await flushPromises();
+    const request = signDialog.value!;
+    expect(await request.check("wrong")).toBe("The passphrase is wrong");
+    ipc.checkPassphrase.mockResolvedValue(undefined);
+    expect(await request.check("right")).toBeNull();
+    request.submit(request.targets[0].pos, "Hamburg", "right");
+    await flushPromises();
+    expect(ipc.signPdf).toHaveBeenCalledWith(new Uint8Array([1]), "right", {
+      page: 1,
+      rect: [70, 600, 230, 70],
+      name: null,
+      location: "Hamburg",
+      reason: null,
+      timestampServer: null,
+    });
+    // the signed PDF is what is written
+    expect(writeFile).toHaveBeenCalledWith(
+      "/docs/lease signed.pdf",
+      new Uint8Array([2]),
+    );
+  });
+
+  it("writes nothing when signing fails, and says why", async () => {
+    ipc.signPdf.mockRejectedValue({
+      kind: "failed",
+      message: "The timestamp server didn't answer",
+    });
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    await flushPromises();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "Failed to export file: The timestamp server didn't answer",
+      }),
+    );
   });
 
   it("warns that an imported Word document's layout can differ", async () => {

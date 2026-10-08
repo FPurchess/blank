@@ -137,3 +137,16 @@
   max-width: 160px;
   max-height: 40px;
 }
+
+// the certificate's fingerprint, to read it out in groups of four
+.fingerprint {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--ui-small);
+  overflow-wrap: anywhere;
+}
+
+// the timestamp server's field, with the button that fills it in
+.signing-server {
+  flex-direction: row;
+  gap: var(--s2);
+}

@@ -1,5 +1,6 @@
 import { shallowRef } from "vue";
 
+import type { CertificateInfo } from "../signing/ipc";
 import type { Mark, SavedMark } from "../signing/profile";
 
 // The user's signature and initials (src/signing/profile.ts), once read:
@@ -11,3 +12,9 @@ export const savedMarks = shallowRef<
 
 // where the user signed last, which a signature's place starts as
 export const signingPlace = shallowRef("");
+
+// the user's certificate as the native side has it (src/signing/ipc.ts):
+// undefined until read, null for none
+export const signingCertificate = shallowRef<
+  CertificateInfo | null | undefined
+>(undefined);

@@ -21,6 +21,12 @@ import { PDF_FILTER } from "../../formats";
 import { toPDF } from "../../exporters";
 import { signatureLines } from "../../markdown/blocks/signature";
 import { canExport, isEmpty, runExport } from "./exportAs";
+import type { ExportResult } from "../../exporters";
+import { checkPassphrase, signingMessage, signPdf } from "../../signing/ipc";
+import {
+  loadCertificate,
+  openCertificateDialog,
+} from "../../signing/certificate";
 import { loadMarks, saveMark } from "../../signing/marks";
 import type { Mark } from "../../signing/profile";
 import { renderMark } from "../../signing/render";
@@ -150,8 +156,18 @@ export const exportSigned = (): Command => (state, dispatch) => {
             "Blank’s layout of this Word document can differ from Word’s. Check every page before you send it, or ask the sender for a PDF.",
           ]
         : [],
-      submit: (pos, place) => {
+      check: async (passphrase) => {
+        try {
+          await checkPassphrase(passphrase);
+          return null;
+        } catch (error) {
+          return signingMessage(error);
+        }
+      },
+      createCertificate: () => void openCertificateDialog("create"),
+      submit: (pos, place, passphrase) => {
         if (place) signingPlace.value = place;
+        const signer = (state.doc.nodeAt(pos)?.attrs.name as string) || name;
         void runExport(state, docPath, {
           ...request,
           context: {
@@ -159,7 +175,7 @@ export const exportSigned = (): Command => (state, dispatch) => {
               pos,
               src: signature.png,
               signing: {
-                name: (state.doc.nodeAt(pos)?.attrs.name as string) || name,
+                name: signer,
                 place,
                 date: new Date(),
                 format: dateFormat,
@@ -168,15 +184,50 @@ export const exportSigned = (): Command => (state, dispatch) => {
             },
           },
           written: () => announce("Signed and saved"),
+          ...(passphrase === null
+            ? {}
+            : {
+                finish: (result) =>
+                  signExport(result, passphrase, {
+                    name: signer,
+                    place,
+                  }),
+              }),
         });
       },
       cancel: () => undefined,
     };
   };
-  void loadMarks().then(() => {
+  void Promise.all([loadMarks(), loadCertificate()]).then(() => {
     if (savedMarks.value?.signature) sign();
     // their signature first, then on to signing
     else void openSignatureDialog("signature", sign);
   });
   return true;
+};
+
+/**
+ * signExport signs an exported PDF with the user's key: its field over the
+ * signature block the export filled in, or invisible without one. A
+ * failure stops the export with what went wrong, so nothing unsigned is
+ * written under the signed name.
+ */
+const signExport = async (
+  result: ExportResult,
+  passphrase: string,
+  { name, place }: { name: string; place: string },
+) => {
+  const box = result.signatureBox;
+  try {
+    return await signPdf(result.contents, passphrase, {
+      page: (box?.page ?? 0) + 1,
+      rect: box ? [box.x, box.y, box.width, box.height] : null,
+      name: name || null,
+      location: place || null,
+      reason: null,
+      timestampServer: config.value.signing.timestampServer || null,
+    });
+  } catch (error) {
+    throw new Error(signingMessage(error), { cause: error });
+  }
 };

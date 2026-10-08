@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
-import { signDialog, type SignDialogRequest } from "../state";
+import {
+  signDialog,
+  type SignDialogRequest,
+  signingCertificate,
+} from "../state";
+import { flushPromises } from "../test/async";
 import { createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 
@@ -21,6 +26,8 @@ describe("the dialog that signs", () => {
       chosen: 9,
       place: "Berlin",
       warnings: [],
+      check: vi.fn(async () => null),
+      createCertificate: vi.fn(),
       submit: vi.fn(),
       cancel: vi.fn(),
       ...changes,
@@ -72,7 +79,69 @@ describe("the dialog that signs", () => {
     dialog()!
       .querySelector("form")!
       .dispatchEvent(new Event("submit", { cancelable: true }));
-    expect(request.submit).toHaveBeenCalledWith(9, "Hamburg");
+    // without a certificate, a picture only
+    expect(request.submit).toHaveBeenCalledWith(9, "Hamburg", null);
     expect(signDialog.value).toBeNull();
+  });
+
+  describe("with a certificate", () => {
+    beforeEach(() => {
+      signingCertificate.value = {
+        name: "Ada Lovelace",
+        issuer: "Ada Lovelace",
+        notBefore: "2026-10-08",
+        notAfter: "2031-10-08",
+        selfSigned: true,
+        fingerprint: "AB".repeat(32),
+      };
+    });
+    afterEach(() => {
+      signingCertificate.value = undefined;
+    });
+
+    const submit = () =>
+      dialog()!
+        .querySelector("form")!
+        .dispatchEvent(new Event("submit", { cancelable: true }));
+    const passphrase = () =>
+      document.querySelector<HTMLInputElement>("#sign-dialog-passphrase")!;
+
+    it("signs digitally once the passphrase opens the key", async () => {
+      await open();
+      expect(passphrase().type).toBe("password");
+      submit();
+      await flushPromises();
+      expect(
+        document.getElementById("sign-dialog-error")!.textContent,
+      ).toContain("Enter the passphrase");
+      request.check = vi.fn(async () => "The passphrase is wrong");
+      passphrase().value = "wrong";
+      passphrase().dispatchEvent(new Event("input"));
+      submit();
+      await flushPromises();
+      expect(
+        document.getElementById("sign-dialog-error")!.textContent,
+      ).toContain("The passphrase is wrong");
+      expect(request.submit).not.toHaveBeenCalled();
+      request.check = vi.fn(async () => null);
+      submit();
+      await flushPromises();
+      expect(request.submit).toHaveBeenCalledWith(9, "Berlin", "wrong");
+    });
+
+    it("signs with a picture only when chosen", async () => {
+      await open();
+      const options = [
+        ...dialog()!.querySelectorAll<HTMLButtonElement>(
+          "[data-row=how] button",
+        ),
+      ];
+      options[1].click();
+      await nextTick();
+      expect(document.querySelector("#sign-dialog-passphrase")).toBeNull();
+      submit();
+      await flushPromises();
+      expect(request.submit).toHaveBeenCalledWith(9, "Berlin", null);
+    });
   });
 });

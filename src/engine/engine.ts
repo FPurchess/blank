@@ -42,14 +42,8 @@ export interface Move extends Hit {
 const toHit = (values: Float64Array): Hit | null =>
   values.length === 2 ? { node: values[0] === 1, pos: values[1] } : null;
 
-// a box on a page, in points from its top left corner
-export interface PageBox {
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import { type PageBox, rectsOf } from "./boxes";
+export type { PageBox } from "./boxes";
 
 // a table as laid out: where each column starts on the page and where the
 // last ends, and each row placed on a page
@@ -64,20 +58,6 @@ export interface EngineTableGrid {
     repeat: boolean;
   }[];
 }
-
-const rectsOf = (values: Float32Array): PageBox[] => {
-  const rects: PageBox[] = [];
-  for (let index = 0; index + 4 < values.length; index += 5) {
-    rects.push({
-      page: values[index],
-      x: values[index + 1],
-      y: values[index + 2],
-      width: values[index + 3],
-      height: values[index + 4],
-    });
-  }
-  return rects;
-};
 
 // what a page shows, as the engine writes it (see wasm.rs `page`)
 export interface PageDisplay {

@@ -133,7 +133,10 @@ mod tests {
         let unit = &laid.units[0];
         // the hint, but no image
         assert!(laid.label.is_some());
-        assert!(!unit.decos.iter().any(|deco| matches!(deco, Deco::Image { .. })));
+        assert!(!unit
+            .decos
+            .iter()
+            .any(|deco| matches!(deco, Deco::Image { .. })));
         let line = unit
             .decos
             .iter()

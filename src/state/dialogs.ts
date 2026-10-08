@@ -155,6 +155,28 @@ export interface ChosenMarkImage {
 // signature or initials, or null while it's closed
 export const signatureDialog = shallowRef<SignatureDialogRequest | null>(null);
 
+export interface CertificateDialogRequest {
+  // make a new certificate, or import a key file the user has
+  mode: "create" | "import";
+  // the name a new certificate starts with
+  name: string;
+  // the key file to import, as the dialog names it
+  file: string;
+  // makes or imports it: what went wrong in words, or null once done
+  submit(fields: {
+    name: string;
+    email: string;
+    passphrase: string;
+  }): Promise<string | null>;
+  cancel(): void;
+}
+
+// certificateDialog holds the request of the open dialog that makes or
+// imports the user's certificate, or null
+export const certificateDialog = shallowRef<CertificateDialogRequest | null>(
+  null,
+);
+
 // a signature block a signed export can fill in
 export interface SignTarget {
   pos: number;
@@ -172,8 +194,13 @@ export interface SignDialogRequest {
   // the notes the dialog shows, e.g. that an imported Word document's
   // layout can differ from Word's
   warnings: string[];
-  // fills in the block at `pos` and asks where to save the signed PDF
-  submit(pos: number, place: string): void;
+  // whether `passphrase` opens the user's key: what's wrong, or null
+  check(passphrase: string): Promise<string | null>;
+  // opens the dialog that makes the user a certificate
+  createCertificate(): void;
+  // fills in the block at `pos`, asks where to save the signed PDF and, with
+  // the key's passphrase, signs it digitally too
+  submit(pos: number, place: string, passphrase: string | null): void;
   cancel(): void;
 }
 
@@ -237,6 +264,7 @@ export const focusTakingDialogs = [
   signaturePopover,
   signatureDialog,
   signDialog,
+  certificateDialog,
   unsavedDialog,
   settingsDialog,
   printDialog,
