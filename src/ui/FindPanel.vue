@@ -42,9 +42,11 @@ import {
   countText,
   errorText,
   FIND_TOGGLES,
+  hasMatches,
   isStepKey,
   panelAnchor,
 } from "./findPanelModel";
+import { tipAttrs } from "./tooltipModel";
 
 // Find and replace: a panel at the top right of the pages, which stays open
 // while the text is edited (it isn't modal). Enter and Shift+Enter in its
@@ -60,6 +62,8 @@ const query = shallowRef(found.value?.query ?? "");
 const replacement = shallowRef("");
 const count = computed(() => countText(found.value));
 const error = computed(() => errorText(found.value));
+// the arrows and Replace are off without a match, focusable still
+const noMatch = computed(() => !hasMatches(found.value));
 
 const run = (command: Parameters<typeof editor.run>[0]) =>
   editor.run(command, { focus: false });
@@ -106,6 +110,7 @@ const ownKeysOpen = () =>
   focusTakingDialogs.some((request) => request.value !== null) ||
   contextMenu.value !== null;
 const close = () => editor.run(closeFind(true));
+const doneTip = tipAttrs({ name: "Close", key: "Esc" });
 
 const findKeyAgain = onCommandKey(CommandIdentifier.EDIT_FIND, () =>
   field.value?.focus("all"),
@@ -213,24 +218,35 @@ const { onFocusin, onFocusout } = useFocusRegion(
         icon="chevron-left"
         label="Previous match"
         tip-key="Shift+Enter"
+        :disabled="noMatch"
         @click="step(-1)"
       />
       <IconButton
         icon="chevron-right"
         label="Next match"
         tip-key="Enter"
+        :disabled="noMatch"
         @click="step(1)"
       />
-      <IconButton icon="x" label="Close" tip-key="Esc" @click="close" />
-      <button type="button" class="find-button" @click="replaceOne">
+      <button
+        type="button"
+        class="find-button"
+        :aria-disabled="noMatch || undefined"
+        @click="replaceOne"
+      >
         Replace
       </button>
       <button
         type="button"
         class="find-button"
+        :aria-disabled="noMatch || undefined"
         @click="run(replaceAllFound(replacement))"
       >
         Replace all
+      </button>
+      <!-- closes as Esc does, the match it's at selected in the text -->
+      <button type="button" class="find-done" v-bind="doneTip" @click="close">
+        Done
       </button>
     </div>
   </div>

@@ -43,9 +43,15 @@
   align-items: center;
   gap: 2px;
 
-  .find-button {
+  .find-button,
+  .find-done {
     @include text-button;
     margin-left: 4px;
+  }
+
+  // closing is no action of its own: no border, as in the dialogs' bars
+  .find-done {
+    @include text-button-quiet;
   }
 
   // the arrows at the left end, the buttons at the right

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 
 import { find } from "../editor/plugins/find";
-import { openFind } from "../editor/plugins/find/commands";
+import { openFind, setFind } from "../editor/plugins/find/commands";
 import { findKey } from "../editor/plugins/find/state";
 import {
   controlsStay,
@@ -15,7 +15,12 @@ import {
 import { createEditorHandle } from "../editor/handle";
 import { createState, createTestView, doc, p } from "../test/editor";
 import { bootApp } from "./mount";
-import { countText, errorText, panelAnchor } from "./findPanelModel";
+import {
+  countText,
+  errorText,
+  hasMatches,
+  panelAnchor,
+} from "./findPanelModel";
 
 // The find panel through the app: its field, its count, its toggles and its
 // keys
@@ -136,13 +141,41 @@ describe("the find panel", () => {
     expect(count()).toBe("");
   });
 
-  it("closes with its ×, and leaves F3 to an open dialog", async () => {
+  it("turns its arrows and Replace off without a match, never Done", async () => {
+    const off = () =>
+      [
+        ...panel()!.querySelectorAll<HTMLElement>(
+          ".find-actions button[aria-disabled='true']",
+        ),
+      ].map(
+        (button) =>
+          button.getAttribute("aria-label") ?? button.textContent!.trim(),
+      );
+    const all = ["Previous match", "Next match", "Replace", "Replace all"];
+
+    expect(off()).toEqual(all);
+    await typeInto(field(), "the");
+    expect(off()).toEqual([]);
+    await typeInto(field(), "zebra");
+    expect(off()).toEqual(all);
+    // a pattern that can't be read finds nothing either
+    findOptions.value = { ...NO_FIND_OPTIONS, regex: true };
+    handle.run(setFind({ query: "(the", options: findOptions.value }));
+    await settle();
+    expect(off()).toEqual(all);
+  });
+
+  it("closes with Done, and leaves F3 to an open dialog", async () => {
     await typeInto(field(), "the");
     settingsDialog.value = {};
     await press(document.body, "F3");
     expect(count()).toBe("1 of 3");
     settingsDialog.value = null;
-    panel()!.querySelector<HTMLElement>('[aria-label="Close"]')!.click();
+    const done = panel()!.querySelector<HTMLElement>(".find-done")!;
+    expect(done.textContent?.trim()).toBe("Done");
+    expect(done.dataset.tip).toBe("Close");
+    expect(panel()!.querySelector('[aria-label="Close"]')).toBeNull();
+    done.click();
     await settle();
     expect(panel()).toBeNull();
     // the match it was at selected, as Esc does
@@ -203,6 +236,7 @@ describe("findPanelModel", () => {
   it("says nothing before a query or for a pattern it can't read", () => {
     expect(countText(undefined)).toBe("");
     expect(errorText(undefined)).toBe("");
+    expect(hasMatches(undefined)).toBe(false);
   });
 
   it("sits at the top right of the pages, or of the window without them", () => {

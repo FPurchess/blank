@@ -53,6 +53,13 @@ export const errorText = (state: FindState | undefined) =>
   state?.error ? `That pattern can't be read: ${state.error}` : "";
 
 /**
+ * hasMatches returns whether there's a match to go to or replace: none for
+ * no query, or a pattern that can't be read
+ */
+export const hasMatches = (state: FindState | undefined) =>
+  !!state?.matches.length;
+
+/**
  * panelAnchor returns where the panel sits: at the top right of the page
  * view below the toolbar, or of the window below the top area without it
  * @param view the page view's box in the window, if it shows

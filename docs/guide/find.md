@@ -12,11 +12,11 @@
 
 If you selected a word or a few words before pressing `Mod` `F`, Blank looks for them right away. Otherwise the field shows what you looked for last in that document, selected, so you can type over it. Each tab remembers its own search.
 
-`Esc` in the panel closes it and selects the match you were at, so you can go on typing there; in your text, `Esc` just closes the panel. The × does the same with the mouse.
+`Esc` in the panel closes it and selects the match you were at, so you can go on typing there; in your text, `Esc` just closes the panel. **Done** does the same with the mouse.
 
 ## Replace {#replace}
 
-Type the new text in the second field. **Replace**, or `Enter` in that field, changes the match you're at and moves on to the next one; **Replace all** changes every match in the document at once, and says how many it changed. Replace all is one step: `Mod` `Z` undoes all of it.
+Type the new text in the second field. Without a match, the arrows, **Replace** and **Replace all** are greyed out. **Replace**, or `Enter` in that field, changes the match you're at and moves on to the next one; **Replace all** changes every match in the document at once, and says how many it changed. Replace all is one step: `Mod` `Z` undoes all of it.
 
 Find and replace looks in your text: paragraphs, headings, lists, quotes, table cells and code. It leaves the [document properties](./pages#frontmatter) at the top of the file alone, and it doesn't search table captions or headers and footers yet.
 
