@@ -1,7 +1,11 @@
 import type { Node } from "prosemirror-model";
 import type { EditorState } from "prosemirror-state";
 
-import type { ExportResult, exporterFunc } from "../exporters/types";
+import type {
+  ExportContext,
+  ExportResult,
+  exporterFunc,
+} from "../exporters/types";
 import {
   failureWarning,
   type PreparedImage,
@@ -18,7 +22,9 @@ import {
 } from "./engine";
 import { fallbackFonts, findFonts } from "./fallback";
 import { language } from "../state";
-import { flatten, type ImageSizes } from "./flatten";
+import { flatten, type ImageSizes, type SignedBlock } from "./flatten";
+import { fromDataUrl } from "../images/dataUrl";
+import { probeSize } from "../images/mime";
 import { fittedSize } from "./images";
 import type { PdfJob, PdfResult, PdfWarning } from "./pdfJob";
 import type { PrintSheet } from "./types";
@@ -53,6 +59,7 @@ interface Prepared {
   images: Map<string, PreparedImage>;
   sizes: ImageSizes;
   output: Output;
+  signed: SignedBlock | null;
 }
 
 /**
@@ -66,6 +73,7 @@ const onSharedEngine = async ({
   images,
   sizes,
   output,
+  signed,
 }: Prepared): Promise<PdfResult> => {
   const engine = await newEngine(true);
   try {
@@ -73,7 +81,7 @@ const onSharedEngine = async ({
       engine.addImage(src, image.bytes, image.mime === "image/jpeg");
     }
     engine.setSettings(layout, fields);
-    engine.sync(doc, sizes);
+    engine.sync(doc, sizes, { signed });
     // fonts for what Blank's fonts lack, e.g. emoji pasted just now, which
     // the engine lays out again with
     const missing = engine.missing();
@@ -171,7 +179,7 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes, output }: Prepared,
+  { doc, layout, fields, images, sizes, output, signed }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
@@ -182,7 +190,9 @@ const jobOf = (
     jpeg: image.mime === "image/jpeg",
   })),
   settings: JSON.stringify(settingsOf(layout, fields)),
-  items: JSON.stringify(flatten(doc, sizes).map((record) => record.build())),
+  items: JSON.stringify(
+    flatten(doc, sizes, null, signed).map((record) => record.build()),
+  ),
   title: fields.title,
   author: fields.author,
   language: pdfLanguage(),
@@ -290,18 +300,27 @@ export const describeWarnings = (
 /**
  * write writes `output` of the document as a PDF, on an engine that shares
  * the page view's fonts, or in a worker once the page view's wasm trapped,
- * with what it left out in plain words
+ * with what it left out in plain words; `signed` fills in a signature block
  */
 const write = async (
   state: EditorState,
-  docPath: string | null,
-  layout: Layout,
+  { docPath, layout, signed }: Omit<ExportContext, "pages">,
   output: Output,
 ): Promise<ExportResult> => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
     "image/png",
     "image/jpeg",
   ]);
+  // the signature's picture, which a signed PDF shows in its block
+  const signature = signed ? fromDataUrl(signed.src) : null;
+  const signatureSize = signature && probeSize(signature.bytes, "image/png");
+  if (signed && signature && signatureSize) {
+    images.set(signed.src, {
+      bytes: signature.bytes,
+      mime: "image/png",
+      ...signatureSize,
+    });
+  }
   const prepared: Prepared = {
     doc: state.doc,
     layout,
@@ -309,6 +328,7 @@ const write = async (
     images,
     sizes: sizesOf(images, layout),
     output,
+    signed: signed ?? null,
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {
@@ -339,8 +359,8 @@ const write = async (
 /**
  * toPDF exports the document's pages, all or those of `pages`, as a PDF/A
  */
-const toPDF: exporterFunc = (state, { docPath, layout, pages }) =>
-  write(state, docPath, layout, { pages });
+const toPDF: exporterFunc = (state, { pages, ...context }) =>
+  write(state, context, { pages });
 
 /**
  * printPDF writes the PDF to print: `sheets` with the document's pages
@@ -353,6 +373,6 @@ export const printPDF = (
     layout,
     sheets,
   }: { docPath: string | null; layout: Layout; sheets: readonly PrintSheet[] },
-) => write(state, docPath, layout, { sheets });
+) => write(state, { docPath, layout }, { sheets });
 
 export default toPDF;

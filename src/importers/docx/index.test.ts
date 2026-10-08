@@ -100,6 +100,32 @@ describe("importers.docx", () => {
     expect(await roundTrip(markdown)).toBe("1. first\n2. second");
   });
 
+  describe("signature blocks", { timeout: 20_000 }, () => {
+    it("come back from Blank's own Word export", async () => {
+      const markdown = [
+        "Both sign below.",
+        '<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" place="Berlin" date="none" width="75%" -->',
+        '<!-- blank:signature@1 role="Landlord" -->',
+      ].join("\n\n");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("come from Word's signature lines", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx("Sign here:\n\nline"),
+        "word/document.xml",
+        (xml = "") =>
+          xml.replace(
+            /<w:p>(?:(?!<w:p>).)*?line(?:(?!<w:p>).)*?<\/w:p>/s,
+            '<w:p><w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><v:shape><o:signatureline v:ext="edit" o:suggestedsigner="Ada Lovelace" o:suggestedsigner2="Tenant"/></v:shape></w:pict></w:r></w:p>',
+          ),
+      );
+      expect((await toMarkdown(bytes)).markdown).toBe(
+        'Sign here:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
+      );
+    });
+  });
+
   // each test writes a .docx and reads it back through docx, JSZip and
   // mammoth, about 110 ms here; give them room on a machine under heavy load
   describe("tables of contents", { timeout: 20_000 }, () => {

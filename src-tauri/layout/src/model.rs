@@ -308,6 +308,32 @@ pub enum Content {
         #[serde(default)]
         entries: Vec<TocEntry>,
     },
+    /// a signature block: room for a signature, a line to sign on, and the
+    /// lines under it (who signs, where and when)
+    Signature {
+        pos: u32,
+        /// the signature's image, empty while the block isn't signed
+        #[serde(default)]
+        src: String,
+        /// the image's size in points; 0 while it isn't loaded
+        #[serde(default)]
+        width: f32,
+        #[serde(default)]
+        height: f32,
+        #[serde(default)]
+        alt: String,
+        /// the lines under the line to sign on
+        #[serde(default)]
+        lines: Vec<String>,
+        /// what the room for the signature says while there's none, on the
+        /// screen only
+        #[serde(default)]
+        hint: String,
+        /// how much of the width of the text it takes, from 0 to 1; 0 for
+        /// `SIGNATURE_SHARE`
+        #[serde(default)]
+        share: f32,
+    },
     Image {
         pos: u32,
         src: String,
@@ -707,6 +733,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => *pos,
             Content::Table { pos, .. } => *pos,
         }
@@ -720,6 +747,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => pos.saturating_add(1),
             Content::Table { end, .. } => *end,
         }
@@ -770,6 +798,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => moved(pos),
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
@@ -825,6 +854,22 @@ impl Item {
             }) => truncate(hint, MAX_LABEL),
             Content::Image { width, height, .. } => image_size(width, height),
             Content::Boxed { label, .. } => truncate(label, MAX_LABEL),
+            Content::Signature {
+                width,
+                height,
+                lines,
+                hint,
+                share,
+                ..
+            } => {
+                image_size(width, height);
+                lines.truncate(MAX_SIGNATURE_LINES);
+                for line in lines {
+                    truncate(line, MAX_LABEL);
+                }
+                truncate(hint, MAX_LABEL);
+                *share = finite(*share, 0.0, 0.0, 1.0);
+            }
             Content::Toc {
                 title,
                 depth,
@@ -900,6 +945,8 @@ pub const MAX_BARS: usize = 64;
 pub const MAX_LABEL: usize = 500;
 /// the most entries of a table of contents, far more than a book has
 pub const MAX_TOC_ENTRIES: usize = 10_000;
+/// the lines a signature block has under its line, at most
+pub const MAX_SIGNATURE_LINES: usize = 8;
 
 /// cuts `text` to at most `max` characters
 fn truncate(text: &mut String, max: usize) {

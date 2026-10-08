@@ -276,11 +276,30 @@ figure.embed {
   }
 }
 
+// a signature block: room to sign, the line, and who signs where and when
+// below it in small print, as the pages draw it
+div.signature-block {
+  width: 50%;
+  margin: 0;
+
+  .signature-room {
+    display: block;
+    height: 3.5em;
+    border-bottom: 1px solid var(--color);
+  }
+
+  p {
+    margin: 0.2em 0 0;
+    font-size: 0.8em;
+  }
+}
+
 // a content block the cursor selected, as a page break
 :is(
   nav.toc,
   section.form,
   figure.embed,
+  div.signature-block,
   pre.unknown-block
 ).ProseMirror-selectednode {
   outline: 2px solid var(--color);

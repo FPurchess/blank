@@ -9,6 +9,7 @@ import {
   language,
   settingsDialog,
   settingsSection,
+  signatureDialog,
   spellcheck,
   theme,
 } from "../../state";
@@ -69,7 +70,8 @@ const open = async (section?: Parameters<typeof showSection>[0]) => {
   if (section) await showSection(section);
 };
 const showSection = async (
-  key: "appearance" | "writing" | "spelling" | "shortcuts" | "about",
+  key:
+    "appearance" | "writing" | "spelling" | "shortcuts" | "signing" | "about",
 ) => {
   tab(key).click();
   await settle();
@@ -596,6 +598,47 @@ describe("the settings dialog", () => {
           (row) => row.dataset.command,
         ),
       ).toEqual([C.APP_SETTINGS]);
+    });
+  });
+
+  describe("Signing", () => {
+    it("offers to add the signature and initials", async () => {
+      await open("signing");
+      expect(row("signature").textContent).toContain(
+        "Draw it, type it, or take a picture of it on paper",
+      );
+      button("Add…", row("initials")).click();
+      await settle();
+      expect(signatureDialog.value?.mark).toBe("initials");
+      signatureDialog.value = null;
+    });
+
+    it("saves the name under the signature", async () => {
+      await open("signing");
+      const input = panel().querySelector<HTMLInputElement>(
+        "#settings-signing-name",
+      )!;
+      await type(input, " Ada Lovelace ");
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await settle();
+      expect(written()).toEqual({ signing: { name: "Ada Lovelace" } });
+      expect(announcement.value?.text).toBe("Your name is Ada Lovelace");
+    });
+
+    it("writes the date as chosen, shown in the document's language", async () => {
+      language.value = "de";
+      await open("signing");
+      const options = [
+        ...row("date-format").querySelectorAll<HTMLButtonElement>("button"),
+      ];
+      expect(options.map((option) => option.textContent!.trim())).toEqual([
+        "8. Oktober 2026",
+        "08.10.2026",
+        "2026-10-08",
+      ]);
+      options[1].click();
+      await settle();
+      expect(written()).toEqual({ signing: { dateFormat: "short" } });
     });
   });
 

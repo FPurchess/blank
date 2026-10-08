@@ -28,6 +28,9 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 | [Print](./print)                            | `Mod` `P`              |
 | Export as PDF                               | `Mod` `Alt` `P`        |
 | Export as Word                              | `Mod` `Alt` `W`        |
+| [Export signed PDF](./signing)              | (none)                 |
+| [Your signature](./signing#your-signature)  | (none)                 |
+| [Your initials](./signing#your-signature)   | (none)                 |
 | Page setup                                  | `Mod` `Alt` `U`        |
 | Edit header                                 | `Mod` `Alt` `H`        |
 | Edit footer                                 | `Mod` `Alt` `F`        |
@@ -92,6 +95,7 @@ Add `Shift` to the last three to select as you go. When a block like a table of 
 | Page break                      | `Mod` `Enter`   |
 | Table                           | `Mod` `T`       |
 | [Insert a block](./blocks#pane) | `Mod` `Alt` `B` |
+| [Signature block](./signing)    | (none)          |
 
 ## Forms
 

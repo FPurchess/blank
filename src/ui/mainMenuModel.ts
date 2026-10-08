@@ -52,7 +52,11 @@ const APP_COMMANDS = [
   C.APP_ABOUT,
 ] as const;
 // Export ▸, top to bottom; "Export signed PDF…" joins it once it's there
-export const EXPORT_COMMANDS = [C.EXPORT_PDF, C.EXPORT_DOCX] as const;
+export const EXPORT_COMMANDS = [
+  C.EXPORT_PDF,
+  C.EXPORT_DOCX,
+  C.EXPORT_SIGNED_PDF,
+] as const;
 
 // the commands the menu shows anyway, which Recent leaves out
 const MENU_SHOWN: ReadonlySet<C> = new Set<C>([

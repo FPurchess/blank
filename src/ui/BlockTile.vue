@@ -69,6 +69,15 @@ const boxes = computed(() =>
           :height="box.height"
         />
       </template>
+      <template v-else-if="choice.group === 'signing'">
+        <g class="lines">
+          <path d="M7 36h26 M7 41h16" />
+        </g>
+        <path
+          class="ink-line"
+          d="M8 32c3-4 4-10 6-10s0 10 3 10c2 0 3-4 5-4s1 3 3 3 3-2 5-3"
+        />
+      </template>
       <g v-else class="lines">
         <rect x="7" y="18" width="11" height="11" />
         <circle cx="28" cy="23.5" r="5.5" />

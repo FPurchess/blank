@@ -13,6 +13,9 @@ import {
   settingsDialog,
   tablePicker,
   tableToolbar,
+  signatureDialog,
+  signDialog,
+  signaturePopover,
   tocPopover,
   unsavedDialog,
 } from "../state";
@@ -23,6 +26,8 @@ import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
+import SignatureDialog from "./SignatureDialog.vue";
+import SignDialog from "./SignDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
@@ -35,6 +40,7 @@ import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
 import FindPanel from "./FindPanel.vue";
+import SignaturePopover from "./SignaturePopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
@@ -98,10 +104,25 @@ watchFocusMode();
   />
   <!-- not keyed: it stays while the tabs change -->
   <FindPanel v-if="findPanel" />
+  <SignatureDialog
+    v-if="signatureDialog"
+    :key="keyOf(signatureDialog)"
+    :request="signatureDialog"
+  />
+  <SignDialog
+    v-if="signDialog"
+    :key="keyOf(signDialog)"
+    :request="signDialog"
+  />
   <TocPopover
     v-if="tocPopover"
     :key="keyOf(tocPopover)"
     :request="tocPopover"
+  />
+  <SignaturePopover
+    v-if="signaturePopover"
+    :key="keyOf(signaturePopover)"
+    :request="signaturePopover"
   />
   <ContextMenu
     v-if="contextMenu"

@@ -1,6 +1,7 @@
 import { schema as base } from "prosemirror-markdown";
 import {
   type AttributeSpec,
+  type DOMOutputSpec,
   type MarkSpec,
   type Node,
   NodeSpec,
@@ -9,7 +10,13 @@ import {
 import { tableNodes } from "prosemirror-tables";
 
 import { oneOf, textAlignment } from "./alignment";
-import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
+import {
+  ATOMS,
+  extraArgs,
+  isDepth,
+  SIGNATURE_DEFAULTS,
+  TOC_DEFAULTS,
+} from "./blocks/atoms";
 import {
   checkEmbed,
   EMBED_ARGS,
@@ -17,6 +24,7 @@ import {
   embedLabel,
   embedSrc,
 } from "./blocks/embeds";
+import { signatureLabel, signatureLines } from "./blocks/signature";
 
 const ALIGNMENTS = ["left", "center", "right"] as const;
 
@@ -148,6 +156,64 @@ const toc: NodeSpec = {
       "data-title": node.attrs.title as string,
       "data-extra": JSON.stringify(node.attrs.extra),
     },
+  ],
+};
+
+// a line for one person to sign on (ATOMS.signature), which the layout
+// engine draws. Its DOM holds its arguments as the file writes them, so a
+// copy keeps them, and says whose signature it is, for screen readers and
+// the view without the engine.
+const signature: NodeSpec = {
+  group: "top_block",
+  atom: true,
+  selectable: true,
+  attrs: {
+    role: { default: SIGNATURE_DEFAULTS.role },
+    name: { default: SIGNATURE_DEFAULTS.name },
+    place: { default: SIGNATURE_DEFAULTS.place },
+    date: { default: SIGNATURE_DEFAULTS.date },
+    width: { default: SIGNATURE_DEFAULTS.width },
+    extra: { default: {} },
+  },
+  parseDOM: [
+    {
+      tag: "div[data-blank-signature]",
+      getAttrs: (dom) => {
+        try {
+          const args: unknown = JSON.parse(
+            dom.getAttribute("data-blank-signature") ?? "{}",
+          );
+          return (
+            (args &&
+              typeof args === "object" &&
+              ATOMS.signature.read(args as Record<string, string>)) ||
+            false
+          );
+        } catch {
+          return false;
+        }
+      },
+    },
+  ],
+  toDOM: (node) => [
+    "div",
+    {
+      class: "signature-block",
+      "data-blank-signature": JSON.stringify(ATOMS.signature.write(node.attrs)),
+    },
+    [
+      "p",
+      [
+        "span",
+        {
+          class: "signature-room",
+          role: "img",
+          "aria-label": signatureLabel(node.attrs),
+        },
+        "",
+      ],
+    ],
+    ...signatureLines(node.attrs).map((line) => ["p", line] as DOMOutputSpec),
   ],
 };
 
@@ -308,6 +374,7 @@ const nodes = base.spec.nodes
   })
   .addBefore("image", "page_break", pageBreak)
   .addBefore("image", "toc", toc)
+  .addBefore("image", "signature", signature)
   .addBefore("image", "form_block", formBlock)
   .addBefore("image", "form_field", formField)
   .addBefore("image", "embed", embed)
@@ -377,6 +444,7 @@ export const NODE_NAMES = [
   "table_cell",
   "table_header",
   "toc",
+  "signature",
   "form_block",
   "form_field",
   "embed",

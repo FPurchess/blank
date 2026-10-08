@@ -8,7 +8,7 @@ import {
   HORIZONTAL_LINE_CLASS,
   PAGE_BREAK_CLASS,
   TABLE_HEADING_CLASS,
-  TOC_CLASS,
+  ATOM_CLASS,
   EMBED_CLASS,
   FORM_CLASS,
 } from "./styleMap";
@@ -231,14 +231,15 @@ const emptyParagraphs = (doc: Document) => {
 };
 
 /**
- * tocs turns the marker paragraphs of tables of contents (see toc.ts) into
- * the element the schema reads one from. Before `links`: the entries of a
+ * atoms turns the marker paragraphs of blocks of one line (tables of
+ * contents, see toc.ts, and signature blocks, see signatures.ts) into the
+ * element the schema reads one from. Before `links`: the entries of a
  * table of contents are gone by then, and with them their links to the
  * headings' bookmarks, which `links` would unwrap.
  */
-const tocs = (doc: Document) => {
+const atoms = (doc: Document) => {
   const serializer = DOMSerializer.fromSchema(schema);
-  doc.querySelectorAll(`p.${TOC_CLASS}`).forEach((paragraph) => {
+  doc.querySelectorAll(`p.${ATOM_CLASS}`).forEach((paragraph) => {
     const atom = readAtom(paragraph.textContent ?? "");
     if (atom) {
       const node = schema.nodes[atom.node].create(atom.attrs);
@@ -315,7 +316,7 @@ export const cleanup = (doc: Document): CleanupReport => {
   // first, so the markers' text counts nowhere, e.g. as an empty
   // paragraph's
   alignments(doc);
-  tocs(doc);
+  atoms(doc);
   forms(doc);
   embeds(doc);
   codeLineBreaks(doc);

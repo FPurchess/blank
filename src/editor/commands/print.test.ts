@@ -23,10 +23,10 @@ import printCommand, { openPrint } from "./print";
 const printDocument = vi.hoisted(() => vi.fn());
 const printingNow = vi.hoisted(() => vi.fn());
 vi.mock("../../print/job", () => ({ printDocument, printingNow }));
-const exportFile = vi.hoisted(() => vi.fn());
+const runExport = vi.hoisted(() => vi.fn());
 vi.mock("./exportAs", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./exportAs")>()),
-  exportFile,
+  runExport,
 }));
 const openPageSetup = vi.hoisted(() => vi.fn());
 vi.mock("./pageSetup", () => ({ openPageSetup }));
@@ -132,12 +132,13 @@ describe("command.print", () => {
 
     request().savePdf([1]);
 
-    expect(exportFile).toHaveBeenCalledWith(
+    expect(runExport).toHaveBeenCalledWith(
+      view.state,
+      null,
       expect.objectContaining({
         exporter: toPDF,
         filters: [PDF_FILTER],
-        state: view.state,
-        pages: [1],
+        context: { pages: [1] },
       }),
     );
   });

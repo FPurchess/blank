@@ -93,6 +93,24 @@ In [focus mode](./writing#focus-mode), the bars fade when you type, and also onc
 }
 ```
 
+## Signing {#signing}
+
+`signing` is what [signing](./signing) puts under your signature. **Settings ▸ Signing** writes it for you:
+
+- `name`: your name, for signature blocks that don't name who signs.
+- `dateFormat`: how the date is written in the document's language, `"long"` (8 October 2026, the default), `"short"` (08.10.2026 in German, 10/08/2026 in American English) or `"iso"` (2026-10-08).
+
+```json
+{
+  "signing": {
+    "name": "Ada Lovelace",
+    "dateFormat": "short"
+  }
+}
+```
+
+Your signature and initials themselves aren't in `blank.json`: they're images in the `signing` folder next to it.
+
 ## Forms {#forms}
 
 Your own forms are form definitions, YAML files in the `forms` folder next to `blank.json`. See [Your own forms](./blocks#your-own-forms) for what they say.

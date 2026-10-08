@@ -150,6 +150,12 @@ const rich = docWithFrontmatter(
     alt: "A sketch",
     svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"/>',
   }),
+  schema.nodes.signature.create({
+    role: "Tenant",
+    name: "Ann Example",
+    place: "Berlin",
+    width: "75%",
+  }),
   form(),
 );
 const withForm = rich.type.create(
@@ -160,7 +166,25 @@ const withForm = rich.type.create(
 describe("the engine's contract", () => {
   it("sends every key the engine reads", async () => {
     const sizes = () => ({ width: 120, height: 80 });
-    const items = flatten(withForm, sizes).map((record) => record.build());
+    // the signature block filled in, as a signed export does
+    let pos = -1;
+    withForm.forEach((node, offset) => {
+      if (node.type.name === "signature") pos = offset;
+    });
+    const signed = {
+      pos,
+      src: "signature.png",
+      signing: {
+        name: "Ann Example",
+        place: "Berlin",
+        date: new Date("2026-10-08T12:00:00Z"),
+        format: "long" as const,
+        language: "en-GB",
+      },
+    };
+    const items = flatten(withForm, sizes, null, signed).map((record) =>
+      record.build(),
+    );
     const { layout } = resolveLayout(
       rich.attrs.frontmatter as string,
       DEFAULT_PAGE,

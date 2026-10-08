@@ -22,6 +22,13 @@ describe("command.suggestPath", () => {
     expect(suggestPath("pdf")).toBe("/docs/report.pdf");
   });
 
+  it("puts a suffix before the extension", () => {
+    path.value = "/docs/report.v2.md";
+    expect(suggestPath("pdf", undefined, " signed")).toBe(
+      "/docs/report.v2 signed.pdf",
+    );
+  });
+
   it("suggests nothing for an untitled document", () => {
     expect(suggestPath("pdf")).toBeUndefined();
   });

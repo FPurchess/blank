@@ -47,6 +47,34 @@ export const TOC_DEFAULTS = { depth: 3, title: "Contents" } as const;
 export const isDepth = (depth: unknown): depth is number =>
   Number.isInteger(depth) && (depth as number) >= 1 && (depth as number) <= 6;
 
+const SIGNATURE_ARGS = ["role", "name", "place", "date", "width"] as const;
+
+// when a signature block's date is filled in: when it is signed, never (a
+// line to write it by hand), or a date fixed in the file, as YYYY-MM-DD
+export type SignatureDate = "signing" | "none" | string;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SHARE = /^(?:[1-9]\d?|100)%$/;
+
+/**
+ * isSignatureDate tells whether `value` is a date a signature block can say
+ */
+export const isSignatureDate = (value: unknown): value is SignatureDate =>
+  value === "signing" ||
+  value === "none" ||
+  (typeof value === "string" &&
+    ISO_DATE.test(value) &&
+    !Number.isNaN(Date.parse(value)));
+
+// a signature block as it starts: one line to sign, dated when signed
+export const SIGNATURE_DEFAULTS = {
+  role: "",
+  name: "",
+  place: "",
+  date: "signing",
+  width: null,
+} as const;
+
 export const ATOMS: Record<string, AtomSpec> = {
   // a table of contents: the headings up to `depth`, under `title`
   toc: {
@@ -72,6 +100,44 @@ export const ATOMS: Record<string, AtomSpec> = {
       depth: String(attrs.depth),
       title: attrs.title as string,
     }),
+  },
+  // a line for one person to sign on: who (`name`, empty for whoever
+  // signs) and as what (`role`), where (`place`, empty for where they sign)
+  // and when (`date`), as wide as `width` says of the text's
+  signature: {
+    format: 1,
+    node: "signature",
+    order: SIGNATURE_ARGS,
+    read: (args) => {
+      const date = args.date ?? SIGNATURE_DEFAULTS.date;
+      const width = args.width ?? null;
+      if (!isSignatureDate(date) || (width !== null && !SHARE.test(width))) {
+        return null;
+      }
+      return {
+        role: args.role ?? "",
+        name: args.name ?? "",
+        place: args.place ?? "",
+        date,
+        width,
+        extra: extraArgs(args, SIGNATURE_ARGS),
+      };
+    },
+    // what is empty or as it starts is left out
+    write: (attrs) =>
+      Object.fromEntries(
+        Object.entries({
+          ...extraArgs(attrs.extra, SIGNATURE_ARGS),
+          role: attrs.role as string,
+          name: attrs.name as string,
+          place: attrs.place as string,
+          date:
+            attrs.date === SIGNATURE_DEFAULTS.date
+              ? ""
+              : (attrs.date as string),
+          width: (attrs.width as string | null) ?? "",
+        }).filter(([, value]) => value !== ""),
+      ),
   },
 };
 

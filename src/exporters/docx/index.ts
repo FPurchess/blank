@@ -29,6 +29,13 @@ import {
 import { unknownWarning } from "../../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../../markdown/blocks/embeds";
 import {
+  SIGNATURE_ROOM,
+  signatureLabel,
+  signatureLines,
+  signatureShare,
+} from "../../markdown/blocks/signature";
+import { formatAtom } from "../../markdown/blocks/atoms";
+import {
   definitionOf,
   type Definitions,
   docDefinitions,
@@ -62,6 +69,7 @@ import {
   fieldTag,
   formTag,
   GRID_TAG,
+  SIGNATURE_TAG,
 } from "./forms";
 import { FRONTMATTER_PROPERTY } from "./properties";
 import {
@@ -73,6 +81,7 @@ import {
   LIST_ITEM_SPACING,
   QUOTE_BORDER,
   QUOTE_INDENT,
+  SIGNATURE_LINE,
   STYLE,
   GRID_BORDERS,
   TABLE_BORDERS,
@@ -359,6 +368,9 @@ class Serializer {
 
       case "embed":
         return this.embed(node);
+
+      case "signature":
+        return this.signature(node);
 
       // blocks() turns page breaks into "page break before"; Word gets
       // nothing of a block Blank can't show (see unknownWarning); the others
@@ -661,6 +673,49 @@ class Serializer {
     return [
       this.control({ tag: embedTag(node.attrs.id as string), alias: label }),
       { children: [picture] },
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * signature writes a signature block as Word's content control: room to
+   * sign, a line as wide as the block, and the lines under it in small print.
+   * Its marker line is hidden text in the control, which the import reads it
+   * back from (src/importers/docx/signatures.ts).
+   */
+  private signature(node: Node): Block[] {
+    const label = signatureLabel(node.attrs);
+    const width = Math.round(this.contentWidth * signatureShare(node.attrs));
+    const room: Block = {
+      children: [
+        new this.docx.TextRun({
+          text: formatAtom("signature", node.attrs),
+          vanish: true,
+        }),
+      ],
+      spacing: {
+        before: 0,
+        after: 0,
+        line: twips(SIGNATURE_ROOM),
+        lineRule: "exact",
+      },
+      indent: { right: this.contentWidth - width },
+      border: { bottom: SIGNATURE_LINE },
+    };
+    const lines: Block[] = signatureLines(node.attrs).map(
+      (line, index, all) => ({
+        style: STYLE.small,
+        children: [new this.docx.TextRun(line)],
+        spacing: {
+          before: index === 0 ? 60 : 0,
+          after: index === all.length - 1 ? BLOCK_SPACING : 0,
+        },
+      }),
+    );
+    return [
+      this.control({ tag: SIGNATURE_TAG, alias: label }),
+      room,
+      ...lines,
       { style: CONTROL_CLOSE },
     ];
   }

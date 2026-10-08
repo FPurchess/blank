@@ -1,6 +1,7 @@
 //! Laying out one item of the flow: its textblocks, and the units the
 //! pagination places, which are lines for text and rows for tables.
 
+mod signature;
 mod table;
 mod toc;
 
@@ -15,6 +16,7 @@ use crate::text::{align_offset, alignment_of, TextBox};
 
 use table::table_units;
 pub use table::{TableSpec, MAX_COLUMNS};
+pub use signature::{SignatureSpec, SIGNATURE_ROOM, SIGNATURE_SHARE};
 pub use toc::{leaders, number_text, TocLaid, TocLine};
 
 /// what the colours of the screen and the PDF stand for
@@ -227,6 +229,29 @@ impl Laid {
             Content::Toc { title, entries, .. } => {
                 toc::toc_units(fonts, title, entries, indent, inner, settings)
             }
+            Content::Signature {
+                src,
+                width: image_width,
+                height,
+                alt,
+                lines,
+                hint,
+                share,
+                ..
+            } => signature::signature_units(
+                fonts,
+                SignatureSpec {
+                    src,
+                    width: *image_width,
+                    height: *height,
+                    alt,
+                    lines,
+                    hint,
+                    share: *share,
+                },
+                indent,
+                inner,
+            ),
             Content::Image {
                 src,
                 width: image_width,

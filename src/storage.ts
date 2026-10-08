@@ -13,6 +13,7 @@ import {
   currentViewAnchor,
   language,
   outlinePinned,
+  signingPlace,
   PAGE_VIEW_MODES,
   pageLayoutState,
   pageView,
@@ -343,6 +344,13 @@ export const bootStorage = async () => {
   recentFiles.value = cleaned(
     recentFiles.value,
     cleanRecentFiles(recentFiles.value),
+  );
+  // where the user signed last, which the next signature starts with
+  await restore(
+    "signingPlace",
+    signingPlace,
+    (value): value is string => typeof value === "string",
+    "",
   );
 
   sessionKept = await ownSession();

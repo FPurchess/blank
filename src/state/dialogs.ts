@@ -6,6 +6,7 @@ import type { Unit } from "../layout/units";
 import type { Destination, PrintPlan } from "../print/printModel";
 import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
+import type { Mark, MarkSource, SavedMark } from "../signing/profile";
 
 export interface LinkDialogRequest {
   url: string;
@@ -102,6 +103,83 @@ export interface TocPopoverRequest {
 // or null while they are closed
 export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
 
+// what a signature block's settings change (ATOMS.signature)
+export interface SignatureSettings {
+  role: string;
+  name: string;
+  place: string;
+  // "signing", "none" or a date, YYYY-MM-DD
+  date: string;
+  // a share of the text's width, "50%", or null for the default
+  width: string | null;
+}
+
+export interface SignaturePopoverRequest {
+  // the button or block it opens below, at its right end
+  anchor: BoxAnchor;
+  settings: SignatureSettings;
+  // changes the signature block at once, as one undo step
+  apply(settings: SignatureSettings): void;
+  // gives the editor the focus back, on the signature block
+  close(): void;
+}
+
+// signaturePopover holds the request of the open settings of a signature
+// block, or null while they are closed
+export const signaturePopover = shallowRef<SignaturePopoverRequest | null>(
+  null,
+);
+
+export interface SignatureDialogRequest {
+  // the signature or the initials
+  mark: Mark;
+  // what is saved now, which the dialog opens as it was made
+  saved: SavedMark | null;
+  // the name a typed signature starts with
+  name: string;
+  // lets the user pick a picture of their signature, as a data: URL
+  chooseFile(): Promise<{ src: string; name: string } | null>;
+  // makes and saves the picture of what was drawn, typed or chosen; false
+  // when there's nothing to save (an empty pad)
+  submit(source: MarkSource, image?: ChosenMarkImage): Promise<boolean>;
+  cancel(): void;
+}
+
+// a picture chosen for a signature, and whether its background goes
+export interface ChosenMarkImage {
+  src: string;
+  clean: boolean;
+}
+
+// signatureDialog holds the request of the open dialog of the user's
+// signature or initials, or null while it's closed
+export const signatureDialog = shallowRef<SignatureDialogRequest | null>(null);
+
+// a signature block a signed export can fill in
+export interface SignTarget {
+  pos: number;
+  // e.g. "Tenant · Ada Lovelace", or "Signature" for one that names none
+  label: string;
+}
+
+export interface SignDialogRequest {
+  // what is signed, e.g. the document's name
+  title: string;
+  // the signature blocks the document has, the one to fill in chosen
+  targets: SignTarget[];
+  chosen: number;
+  place: string;
+  // the notes the dialog shows, e.g. that an imported Word document's
+  // layout can differ from Word's
+  warnings: string[];
+  // fills in the block at `pos` and asks where to save the signed PDF
+  submit(pos: number, place: string): void;
+  cancel(): void;
+}
+
+// signDialog holds the request of the open dialog that signs, or null
+export const signDialog = shallowRef<SignDialogRequest | null>(null);
+
 export interface UnsavedDialogRequest {
   // the tab's name, e.g. "notes"
   label: string;
@@ -156,6 +234,9 @@ export const focusTakingDialogs = [
   pageSetup,
   bandEditor,
   tocPopover,
+  signaturePopover,
+  signatureDialog,
+  signDialog,
   unsavedDialog,
   settingsDialog,
   printDialog,

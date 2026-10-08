@@ -8,6 +8,7 @@ import { markAlignment } from "./align";
 import { markTocs } from "./toc";
 import { markForms, readDefinitions } from "./forms";
 import { markEmbeds, readEmbeds } from "./embeds";
+import { markSignatures } from "./signatures";
 import type { Definitions } from "../../markdown";
 import { parsePart } from "./xml";
 
@@ -81,6 +82,7 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const layout = await readWordLayout(zip);
   const definitions = await readDefinitions(zip);
   const embeds = await markEmbeds(zip, await readEmbeds(zip));
+  const signatures = await markSignatures(zip);
   // before the page breaks, which split paragraphs a field may span
   const tocs = await markTocs(zip);
   const forms = await markForms(zip, definitions);
@@ -90,7 +92,13 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const aligned = await markAlignment(zip);
   return {
     bytes:
-      tocs || forms || embeds || numbering || pageBreaks || aligned
+      tocs ||
+      forms ||
+      embeds ||
+      signatures ||
+      numbering ||
+      pageBreaks ||
+      aligned
         ? await zip.generateAsync({ type: "uint8array" })
         : bytes,
     properties,

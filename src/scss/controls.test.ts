@@ -48,7 +48,7 @@ describe("the controls' global rules", () => {
       "#outline",
       "#blocks-pane",
       ".context-menu",
-      ".toc-popover",
+      ".toc-popover,.signature-popover",
       ".main-menu",
       ".find-panel",
       ".toolbar",

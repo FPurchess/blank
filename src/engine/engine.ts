@@ -10,6 +10,7 @@ import {
   type FlatRecord,
   type FrozenWidths,
   type ImageSizes,
+  type SignedBlock,
 } from "./flatten";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
@@ -176,6 +177,8 @@ export interface SyncOptions {
   sizesKey?: string;
   // top-level blocks to flatten again, e.g. those whose image loaded
   blocks?: readonly number[];
+  // the signature block a signed export fills in, see flatten
+  signed?: SignedBlock | null;
 }
 
 // flattening more blocks than this again costs about as much as flattening
@@ -304,6 +307,8 @@ export class PageEngine {
   private sizesKey = "";
   private settings = "";
   private frozen = "";
+  // the signature block a signed export fills in, see SyncOptions
+  private signed: SignedBlock | null = null;
   // what each page's body and bands show, by their own versions
   private bodies = new Map<number, { version: number; display: PageDisplay }>();
   private bandsShown = new Map<
@@ -475,6 +480,7 @@ export class PageEngine {
       changes = null,
       sizesKey = "",
       blocks = [],
+      signed = null,
     }: SyncOptions,
   ) {
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
@@ -483,6 +489,7 @@ export class PageEngine {
     if (unchanged && same && blocks.length === 0) return false;
     this.frozen = frozenKey;
     this.sizesKey = sizesKey;
+    this.signed = signed;
     // what is still to lay out goes first, so the engine has all of it
     this.finish();
     const ranges = unchanged ? [] : changes?.ranges;
@@ -504,7 +511,14 @@ export class PageEngine {
     frozen: FrozenWidths | null,
     progressive: boolean,
   ) {
-    const blocks = flattenBlocks(doc, 0, doc.childCount, sizes, frozen);
+    const blocks = flattenBlocks(
+      doc,
+      0,
+      doc.childCount,
+      sizes,
+      frozen,
+      this.signed,
+    );
     const records = blocks.flat();
     if (this.doc === null) {
       const first = progressive ? records.slice(0, FIRST_ITEMS) : records;
@@ -573,7 +587,14 @@ export class PageEngine {
     // how many blocks the groups before added, to find the next one's
     let moved = 0;
     for (const { from, to, oldFrom, oldTo } of groups) {
-      const fresh = flattenBlocks(doc, from, to + 1, sizes, frozen);
+      const fresh = flattenBlocks(
+        doc,
+        from,
+        to + 1,
+        sizes,
+        frozen,
+        this.signed,
+      );
       const records = fresh.flat();
       const start = this.blockStarts[oldFrom + moved];
       const end = this.blockStarts[oldTo + 1 + moved];

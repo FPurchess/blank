@@ -21,6 +21,7 @@ export const SECTIONS: { key: SettingsSection; label: string; icon: string }[] =
     { key: "writing", label: "Writing", icon: "pencil" },
     { key: "spelling", label: "Spelling", icon: "spell" },
     { key: "shortcuts", label: "Keyboard shortcuts", icon: "keyboard" },
+    { key: "signing", label: "Signing", icon: "signature" },
     { key: "about", label: "About", icon: "info" },
   ];
 

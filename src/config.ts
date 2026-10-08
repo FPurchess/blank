@@ -19,6 +19,7 @@ import {
   readPageSettings,
 } from "./layout/settings";
 import type { Unit } from "./layout/units";
+import { type DateFormat, isDateFormat } from "./signing/date";
 
 /**
  * configError is what the log says of an error reading blank.json: JSON's
@@ -45,6 +46,7 @@ export enum CommandIdentifier {
   INSERT_TABLE = "insert.table",
   INSERT_PAGE_BREAK = "insert.page_break",
   INSERT_BLOCK = "insert.block",
+  INSERT_SIGNATURE = "insert.signature",
   FORMAT_INDENT = "format.indent",
   FORMAT_UNINDENT = "format.unindent",
   FORMAT_BOLD = "format.bold",
@@ -70,6 +72,9 @@ export enum CommandIdentifier {
   TAB_MOVE_RIGHT = "tab.move_right",
   EXPORT_PDF = "export.pdf",
   EXPORT_DOCX = "export.docx",
+  EXPORT_SIGNED_PDF = "export.signed_pdf",
+  SIGNING_SIGNATURE = "signing.signature",
+  SIGNING_INITIALS = "signing.initials",
   THEME_CYCLE = "theme.cycle",
   LANGUAGE_CHOOSE = "language.choose",
   SPELLCHECK_TOGGLE = "spellcheck.toggle",
@@ -142,6 +147,13 @@ export interface FocusModeConfig {
 const MIN_HIDE_AFTER = 0;
 const MAX_HIDE_AFTER = 60;
 
+export interface SigningConfig {
+  // the name under a signature, e.g. in a signature block that names none
+  name: string;
+  // how the date next to a signature is written, see src/signing/date.ts
+  dateFormat: DateFormat;
+}
+
 export interface LayoutConfig {
   // the page setup of documents that don't have their own
   page: PageSettings;
@@ -154,6 +166,7 @@ export interface Config {
   editor: EditorConfig;
   focusMode: FocusModeConfig;
   layout: LayoutConfig;
+  signing: SigningConfig;
 }
 
 const defaultConfig: Config = {
@@ -177,6 +190,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.INSERT_TABLE]: "Mod-t",
     [CommandIdentifier.INSERT_PAGE_BREAK]: "Mod-Enter",
     [CommandIdentifier.INSERT_BLOCK]: "Mod-Alt-b",
+    [CommandIdentifier.INSERT_SIGNATURE]: "",
     [CommandIdentifier.FORMAT_INDENT]: "Tab",
     [CommandIdentifier.FORMAT_UNINDENT]: "Shift-Tab",
     [CommandIdentifier.FORMAT_BOLD]: "Mod-b",
@@ -202,6 +216,9 @@ const defaultConfig: Config = {
     [CommandIdentifier.TAB_MOVE_RIGHT]: "Ctrl-Shift-PageDown",
     [CommandIdentifier.EXPORT_PDF]: "Mod-Alt-p",
     [CommandIdentifier.EXPORT_DOCX]: "Mod-Alt-w",
+    [CommandIdentifier.EXPORT_SIGNED_PDF]: "",
+    [CommandIdentifier.SIGNING_SIGNATURE]: "",
+    [CommandIdentifier.SIGNING_INITIALS]: "",
     [CommandIdentifier.THEME_CYCLE]: "Mod-Alt-t",
     [CommandIdentifier.LANGUAGE_CHOOSE]: "Mod-Alt-l",
     [CommandIdentifier.SPELLCHECK_TOGGLE]: "Mod-Alt-s",
@@ -254,6 +271,10 @@ const defaultConfig: Config = {
   },
   layout: {
     page: DEFAULT_PAGE,
+  },
+  signing: {
+    name: "",
+    dateFormat: "long",
   },
 };
 
@@ -478,6 +499,21 @@ const mergeFocusMode = (user: unknown, problems: string[]): FocusModeConfig => {
 };
 
 /**
+ * mergeSigning takes the user's signing settings that are valid and keeps
+ * the defaults for the rest
+ */
+const mergeSigning = (user: unknown, problems: string[]): SigningConfig => {
+  const signing = mergeFlat("signing", defaultConfig.signing, user, problems, [
+    "dateFormat",
+  ]);
+  if (isRecord(user) && user.dateFormat !== undefined) {
+    if (isDateFormat(user.dateFormat)) signing.dateFormat = user.dateFormat;
+    else problems.push("signing.dateFormat");
+  }
+  return signing;
+};
+
+/**
  * mergeLayout reads the user's page setup over Blank's, like the frontmatter
  * of a document over the user's, see src/layout/resolve.ts
  */
@@ -515,6 +551,7 @@ const mergeConfig = (user: Record<string, unknown>) => {
     editor: mergeEditor(user.editor, problems),
     focusMode: mergeFocusMode(user.focusMode, problems),
     layout: mergeLayout(user.layout, problems),
+    signing: mergeSigning(user.signing, problems),
   };
   return { config: merged, problems };
 };

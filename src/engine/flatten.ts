@@ -11,6 +11,13 @@ import { isListed, listedHeadings } from "../markdown/headings";
 import { parseLength } from "../layout/units";
 import { unknownLabel } from "../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../markdown/blocks/embeds";
+import {
+  SIGNATURE_HINT,
+  type Signing,
+  signatureLabel,
+  signatureLines,
+  signatureShare,
+} from "../markdown/blocks/signature";
 import { tableGrid } from "../exporters/table";
 import {
   BLOCK_AFTER,
@@ -420,15 +427,26 @@ interface Space {
   after: number;
 }
 
+// the signature block a signed export fills in: where it is, the image of
+// the signature, and who signs where and when
+export interface SignedBlock {
+  pos: number;
+  src: string;
+  signing: Signing;
+}
+
 /**
  * flatten returns the records of a document's items in order
  * @param sizes the sizes of the images that are loaded
+ * @param signed the signature block to fill in, for a signed export
  */
 export const flatten = (
   doc: Node,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
-): FlatRecord[] => flattenBlocks(doc, 0, doc.childCount, sizes, frozen).flat();
+  signed: SignedBlock | null = null,
+): FlatRecord[] =>
+  flattenBlocks(doc, 0, doc.childCount, sizes, frozen, signed).flat();
 
 /**
  * flattenBlocks returns the records of the document's top-level blocks from
@@ -442,6 +460,7 @@ export const flattenBlocks = (
   to: number,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
+  signed: SignedBlock | null = null,
 ): FlatRecord[][] => {
   const records: FlatRecord[] = [];
   const quoteOf: number[][] = [];
@@ -565,6 +584,37 @@ export const flattenBlocks = (
           alt: embedLabel(node),
         }),
         { key: height ? `${width}x${height}` : "?" },
+      );
+      return;
+    }
+    if (name === "signature") {
+      // filled in for a signed export, else room to sign by hand
+      const filled = signed?.pos === pos ? signed : null;
+      const size = filled ? sizes(filled.src) : undefined;
+      const lines = signatureLines(node.attrs, filled?.signing);
+      push(
+        node,
+        pos,
+        context,
+        space,
+        () => ({
+          kind: "signature",
+          pos,
+          src: filled?.src ?? "",
+          width: size?.width ?? 0,
+          height: size?.height ?? 0,
+          alt: signatureLabel(node.attrs),
+          lines,
+          hint: SIGNATURE_HINT,
+          share: signatureShare(node.attrs),
+        }),
+        {
+          key: [
+            filled?.src ?? "",
+            size ? `${size.width}x${size.height}` : "",
+            ...lines,
+          ].join("|"),
+        },
       );
       return;
     }

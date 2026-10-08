@@ -37,6 +37,8 @@ const FIELD_TAG = "blank:field:";
 export const GRID_TAG = "blank:grid";
 // the tag of an embed's picture, before its id
 const EMBED_TAG = "blank:embed@1:";
+// the tag of a signature block, which holds its marker line as hidden text
+export const SIGNATURE_TAG = "blank:signature@1";
 
 export const formTag = (def: string) => `${FORM_TAG}${def}`;
 export const embedTag = (id: string) => `${EMBED_TAG}${id}`;

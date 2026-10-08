@@ -226,7 +226,10 @@ impl Engine {
                         };
                     // what an empty text says is the screen's only
                     let part = match item.content {
-                        Content::Text(_) => Part::Hint { item: frag.item },
+                        // and what an unsigned signature block says
+                        Content::Text(_) | Content::Signature { .. } => {
+                            Part::Hint { item: frag.item }
+                        }
                         _ => Part::Label { item: frag.item },
                     };
                     for line in 0..label.line_count() {
@@ -650,6 +653,48 @@ mod tests {
         assert!(engine.laid[0].texts.is_empty());
         assert_eq!((engine.items[0].from(), engine.items[0].to()), (1, 2));
         assert!(engine.laid[0].units[0].height > 16.0);
+    }
+
+    #[test]
+    fn signs_a_signature_block_on_paper_and_on_the_screen_alike() {
+        let block = |src: &str| Item {
+            content: Content::Signature {
+                pos: 1,
+                src: src.into(),
+                width: 300.0,
+                height: 100.0,
+                alt: "Signature of Ada".into(),
+                lines: vec!["Ada Lovelace · Tenant".into()],
+                hint: "Signature".into(),
+                share: 0.5,
+            },
+            ..paragraph(0, "")
+        };
+        let parts = |engine: &Engine| -> Vec<(Role, Part)> {
+            engine
+                .body_parts(0)
+                .into_iter()
+                .filter_map(|(op, part)| match op {
+                    Op::Glyphs { role, .. } => Some((role, part)),
+                    _ => None,
+                })
+                .collect()
+        };
+        // unsigned: the hint, on the screen only, and the line under it as
+        // the block's own text
+        let unsigned = engine(vec![block("")]);
+        let glyphs = parts(&unsigned);
+        assert!(glyphs.contains(&(Role::Hint, Part::Hint { item: 0 })));
+        assert!(glyphs.contains(&(Role::Text, Part::Extra { item: 0, extra: 0 })));
+        // signed: the image instead of the hint
+        let signed = engine(vec![block("signature.png")]);
+        assert!(!parts(&signed).iter().any(|(role, _)| *role == Role::Hint));
+        assert!(signed
+            .body_parts(0)
+            .iter()
+            .any(|(op, part)| matches!(op, Op::Image { .. }) && *part == Part::Image { item: 0 }));
+        // one position, like a rule
+        assert_eq!((signed.items[0].from(), signed.items[0].to()), (1, 2));
     }
 
     #[test]

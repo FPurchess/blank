@@ -21,6 +21,8 @@ import {
   blocksPaneFocused,
   blocksPaneOpen,
   focusBlocksSearch,
+  type SignatureSettings,
+  signaturePopover,
   tocPopover,
 } from "../../state";
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
@@ -47,6 +49,15 @@ const TOC: Choice = {
   description: "The headings, with the pages they start on",
   insert: (view, at) =>
     insertTopBlock(view, schema.nodes.toc.create(), undefined, at),
+};
+
+const SIGNATURE: Choice = {
+  id: "signature",
+  group: "signing",
+  label: "Signature",
+  description: "A line to sign on, with name, place and date",
+  insert: (view, at) =>
+    insertTopBlock(view, schema.nodes.signature.create(), undefined, at),
 };
 
 /**
@@ -164,6 +175,7 @@ export const readBlocks = () =>
       const choices = [
         TOC,
         ...forms.map(formChoice),
+        SIGNATURE,
         ...embedTypes().map(embedChoice),
       ];
       offered = new Map(choices.map((choice) => [choice.id, choice]));
@@ -244,7 +256,8 @@ export const insertBlock =
  * editBlock edits the selected content block: a table of contents in its
  * dialog, an embed with its type, if Blank has it
  */
-export const editBlock = (): Command => chainCommands(editToc(), editEmbed());
+export const editBlock = (): Command =>
+  chainCommands(editToc(), editSignature(), editEmbed());
 
 /**
  * removeTopBlock removes the content block at `pos`, the cursor going where
@@ -330,5 +343,58 @@ export const editToc = (): Command => (state, dispatch, view) => {
     },
     close: () => view.focus(),
   };
+  return true;
+};
+
+/**
+ * editSignature opens the settings of the selected signature block below
+ * it: who signs and as what, where and when, and its width, which change it
+ * at once; or closes them while they are open
+ */
+export const editSignature = (): Command => (state, dispatch, view) => {
+  const { selection } = state;
+  if (
+    !(selection instanceof NodeSelection) ||
+    selection.node.type !== schema.nodes.signature
+  ) {
+    return false;
+  }
+  if (!dispatch || !view) return true;
+  const open = signaturePopover.value;
+  if (open) {
+    signaturePopover.value = null;
+    open.close();
+    return true;
+  }
+  const { node, from: pos } = selection;
+  const box = boxOnCaretPage(view, pos, node.nodeSize);
+  if (!box) return true;
+  const { role, name, place, date, width } = node.attrs;
+  signaturePopover.value = {
+    anchor: box,
+    settings: { role, name, place, date, width } as SignatureSettings,
+    apply: (settings) => {
+      const at = view.state.doc.nodeAt(pos);
+      if (at?.type !== schema.nodes.signature) return;
+      const changed = (
+        Object.keys(settings) as (keyof SignatureSettings)[]
+      ).some((key) => at.attrs[key] !== settings[key]);
+      if (!changed) return;
+      const tr = view.state.tr.setNodeMarkup(pos, null, {
+        ...at.attrs,
+        ...settings,
+      });
+      view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
+    },
+    close: () => view.focus(),
+  };
+  return true;
+};
+
+/**
+ * insertSignature inserts a signature block where the cursor is
+ */
+export const insertSignature = (): Command => (_state, dispatch, view) => {
+  if (dispatch && view) SIGNATURE.insert!(view);
   return true;
 };

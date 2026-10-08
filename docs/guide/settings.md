@@ -48,10 +48,16 @@ The sections are listed on the left; `↑` and `↓` move between them, and the 
 
 Every command, with its shortcut. Type into the search to find one by its name. Click a shortcut, or press `Enter` on it, and press the new keys: they work at once, in every tab. If another command has them already, Blank says which one, and a second press moves them over. A changed shortcut has a button next to it that brings back Blank's own, and **Reset all** does that for every command. See [Change a shortcut](./shortcuts#change-a-shortcut) for the keys you can use.
 
+## Signing
+
+- **Signature** and **Initials:** your [signature](./signing#your-signature) and initials as Blank signs with them. **Add…** or **Edit…** opens the dialog to draw, type or choose them, and **Remove** forgets them.
+- **Your name:** the name under your signature, in a [signature block](./signing#blocks) that doesn't name who signs.
+- **Date:** how the date next to your signature is written: the long form of the document's language (8 October 2026), its short form (08.10.2026 in German, 10/08/2026 in American English) or 2026-10-08.
+
 ## About
 
 Blank's version, its license, links to the website and the source code, and the licenses of the software Blank is built with.
 
 ## Where the settings are kept
 
-The theme, the language and whether spell check is on are kept with your documents. Everything else is written to [blank.json](./configuration), which only holds what you changed. You can still edit that file by hand; then restart Blank to use what you wrote.
+The theme, the language, whether spell check is on and where you signed last are kept with your documents. Your signature and initials are in the `signing` folder next to blank.json. Everything else is written to [blank.json](./configuration), which only holds what you changed. You can still edit that file by hand; then restart Blank to use what you wrote.

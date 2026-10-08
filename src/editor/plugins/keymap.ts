@@ -56,7 +56,12 @@ import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { toggleBlocks, toggleBlocksPane } from "../commands/contentBlocks";
+import {
+  insertSignature,
+  toggleBlocks,
+  toggleBlocksPane,
+} from "../commands/contentBlocks";
+import { editMark, exportSigned } from "../commands/signing";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import {
@@ -138,6 +143,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),
   [CommandIdentifier.INSERT_BLOCK]: toggleBlocksPane(),
+  [CommandIdentifier.INSERT_SIGNATURE]: insertSignature(),
   // the lines of a code block first, then list items, then lines of text;
   // their keys do a little more, see keyCommands
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
@@ -177,6 +183,9 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EXPORT_DOCX]: exportAs("Word-Export", exporters.toDOCX, [
     WORD_FILTER,
   ]),
+  [CommandIdentifier.EXPORT_SIGNED_PDF]: exportSigned(),
+  [CommandIdentifier.SIGNING_SIGNATURE]: editMark("signature"),
+  [CommandIdentifier.SIGNING_INITIALS]: editMark("initials"),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
   [CommandIdentifier.SPELLCHECK_TOGGLE]: toggleSpellcheck(),

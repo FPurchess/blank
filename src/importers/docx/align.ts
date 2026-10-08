@@ -3,7 +3,7 @@ import type JSZip from "jszip";
 import { EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
-import { TOC_STYLE } from "./toc";
+import { ATOM_STYLE } from "./toc";
 import { child, children, DOCUMENT_PART, parsePart, val, W } from "./xml";
 
 // mammoth reads a paragraph's alignment (w:jc) but writes it nowhere in its
@@ -111,7 +111,7 @@ const MARKER_STYLES = new Set([
   EMBED_STYLE,
   FORM_STYLE,
   PAGE_BREAK_STYLE,
-  TOC_STYLE,
+  ATOM_STYLE,
 ]);
 
 /**

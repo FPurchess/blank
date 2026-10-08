@@ -147,11 +147,12 @@ describe("the blocks pane", () => {
     expect(blocksPaneOpen.value).toBe(false);
   });
 
-  it("offers the table of contents and Blank's forms", async () => {
+  it("offers the table of contents, Blank's forms and a signature block", async () => {
     const choices = await read();
     expect(choices.map(({ id, group }) => [id, group])).toEqual([
       ["toc", "contents"],
       ["blank/recipe", "forms"],
+      ["signature", "signing"],
     ]);
     // a form's tile draws its definition
     expect(choices[1].definition?.name).toBe("Recipe");

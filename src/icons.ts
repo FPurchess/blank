@@ -111,6 +111,11 @@ const ICONS: Record<string, string> = {
   chart: "M3 3v18h18 M8 17v-5 M13 17V8 M18 17v-9",
   book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5",
   qr: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h3v3h-3z M20.5 14v.01 M14 20.5h.01 M17 17h4v4h-4z",
+  // a signature on its line, for signing
+  signature:
+    "M3 16c2-3 3-8 5-8s0 8 2 8c1.5 0 2-3 3.5-3s1 2 2 2 2-1 3.5-2 M3 20h18",
+  initials:
+    "M3 17 6.5 7l3.5 10 M4.4 13h4.2 M14 7h2.5a2.5 2.5 0 0 1 0 5H14z M14 12h3a2.5 2.5 0 0 1 0 5h-3z M3 21h18",
   pin: "M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z M12 7.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z",
   embed:
     "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M10 9l5 3-5 3z",

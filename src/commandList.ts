@@ -125,6 +125,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "doc",
     aliases: ["export", "docx", "office"],
   },
+  [C.EXPORT_SIGNED_PDF]: {
+    group: "Export",
+    label: "Export signed PDF…",
+    icon: "signature",
+    aliases: ["sign", "signature", "contract"],
+  },
   [C.UNDO]: { group: "Edit", label: "Undo", icon: "undo", aliases: [] },
   [C.REDO]: { group: "Edit", label: "Redo", icon: "redo", aliases: [] },
   [C.CONTEXT_MENU]: {
@@ -162,6 +168,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Insert a block",
     icon: "blocks",
     aliases: ["table of contents", "toc", "form", "recipe", "drawing", "embed"],
+  },
+  [C.INSERT_SIGNATURE]: {
+    group: "Insert",
+    label: "Signature block",
+    icon: "signature",
+    aliases: ["sign", "signature line", "contract"],
   },
   [C.BLOCKTYPE_PARAGRAPH]: {
     group: "Format",
@@ -410,6 +422,18 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Previous misspelling",
     icon: "chevron-left",
     aliases: ["spelling", "error"],
+  },
+  [C.SIGNING_SIGNATURE]: {
+    group: "Tools",
+    label: "Your signature…",
+    icon: "signature",
+    aliases: ["sign", "draw", "handwriting"],
+  },
+  [C.SIGNING_INITIALS]: {
+    group: "Tools",
+    label: "Your initials…",
+    icon: "initials",
+    aliases: ["sign", "initial", "paraph"],
   },
   [C.TOOLS_STATS]: {
     group: "Tools",

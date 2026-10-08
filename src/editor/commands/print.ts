@@ -28,7 +28,7 @@ import {
   printDialog,
   tabLabel,
 } from "../../state";
-import { exportFile, isEmpty, PDF_EXPORT } from "./exportAs";
+import { isEmpty, PDF_EXPORT, runExport } from "./exportAs";
 import { openPageSetup } from "./pageSetup";
 
 /**
@@ -104,13 +104,11 @@ export const openPrint = (
     },
     savePdf: (pages) => {
       view.focus();
-      exportFile({
+      void runExport(state, docPath, {
         title: PDF_EXPORT,
         exporter: toPDF,
         filters: [PDF_FILTER],
-        state,
-        docPath,
-        pages,
+        context: { pages },
       });
     },
     pageSetup: () => openPageSetup(view),

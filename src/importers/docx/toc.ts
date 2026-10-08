@@ -14,9 +14,11 @@ import { child, markerParagraph, val, W } from "./xml";
 
 const DOCUMENT = "word/document.xml";
 
-// the style of the marker paragraphs, matched by its id in styleMap.ts; the
-// paragraph holds the table of contents' marker line (src/markdown/blocks)
-export const TOC_STYLE = "BlankToc";
+// the style of the marker paragraphs of blocks of one line, matched by its
+// id in styleMap.ts: tables of contents, and signature blocks
+// (./signatures.ts); the paragraph holds the block's marker line
+// (src/markdown/blocks/atoms.ts)
+export const ATOM_STYLE = "BlankAtom";
 // the style of a table of contents' title, Word's own
 const TITLE_STYLE = "TOCHeading";
 
@@ -54,7 +56,7 @@ const instructionsIn = (element: Element) =>
 const marker = (doc: Document, depth: number, title: string) =>
   markerParagraph(
     doc,
-    TOC_STYLE,
+    ATOM_STYLE,
     formatAtom("toc", { depth, title, extra: {} }),
   );
 

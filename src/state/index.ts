@@ -23,6 +23,7 @@ export * from "./popups";
 export * from "./print";
 export * from "./recent";
 export * from "./settingsDialog";
+export * from "./signing";
 export * from "./spellcheck";
 export * from "./tabs";
 export * from "./toolbar";

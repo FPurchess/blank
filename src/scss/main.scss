@@ -10,6 +10,7 @@
 @use "tabs";
 @use "formatToolbar";
 @use "settings";
+@use "signing";
 @use "bands";
 @use "print";
 @use "mainMenu";
@@ -1520,6 +1521,15 @@ body.without-engine.blocks-docked {
     .dots {
       stroke-dasharray: 0.1 2;
     }
+
+    // a signature, on its line
+    .ink-line {
+      fill: none;
+      stroke: var(--color);
+      stroke-width: 1.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
   }
 }
 
@@ -1531,9 +1541,10 @@ body.without-engine.blocks-docked {
   font-size: var(--ui-small);
 }
 
-// the settings of a table of contents, below its toolbar
-// (src/ui/TocPopover.vue)
-.toc-popover {
+// the settings of a table of contents or a signature block, below its
+// toolbar (src/ui/TocPopover.vue, src/ui/SignaturePopover.vue)
+.toc-popover,
+.signature-popover {
   position: fixed;
   // with the pickers and menus
   z-index: 20;

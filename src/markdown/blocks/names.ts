@@ -2,6 +2,7 @@ import type { Node } from "prosemirror-model";
 
 import { formDefinition } from "./definitions";
 import { embedLabel } from "./embeds";
+import { SIGNATURE_HINT } from "./signature";
 
 // What a content block is called where Blank speaks of it: its toolbar, and
 // what Blank says when one is inserted or removed.
@@ -20,6 +21,8 @@ export const blockName = (doc: Node, node: Node) => {
   switch (node.type.name) {
     case "toc":
       return "Table of contents";
+    case "signature":
+      return SIGNATURE_HINT;
     case "form_block":
       return formDefinition(doc, node)?.name ?? "Form";
     case "embed":

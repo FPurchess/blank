@@ -50,6 +50,7 @@ const blockAt = (state: EditorState) => {
 const ICONS: Record<string, string> = {
   toc: "toc",
   form_block: "form",
+  signature: "signature",
   embed: "embed",
   unknown_block: "info",
 };
