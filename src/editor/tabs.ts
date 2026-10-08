@@ -313,6 +313,10 @@ const leaveComposition = async () => {
   await Promise.race([ended, new Promise((r) => setTimeout(r, 100))]);
 };
 
+// what a PDF tab publishes as the shown document's file: nothing that saves
+// or exports markdown sees its path
+const NO_FILE = { path: null, importedFrom: null } as const;
+
 /**
  * showTab shows the tab `id` in the view. The shown document's globals
  * change before the view gets the new state: the page view lays it out right
@@ -342,8 +346,7 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
   wanted = id;
   activeTabId.value = id;
   tabSwitch.value = { id, anchor: tab.viewAnchor };
-  // nothing that saves or exports markdown sees a PDF tab's path
-  showDocument(next.state, next.pdf ? { path: null, importedFrom: null } : tab);
+  showDocument(next.state, next.pdf ? NO_FILE : tab);
   shownPdf.value = next.pdf ?? null;
   timed("switch", () => v.updateState(next.state));
   if (next.checker !== spellchecker.value) {
@@ -838,10 +841,7 @@ export const restoreTabs = async (start: EditorState): Promise<EditorState> => {
   tabs.value = list;
   activeTabId.value = tab.id;
   const document = await ensureLoaded(tab);
-  showDocument(
-    document.state,
-    document.pdf ? { path: null, importedFrom: null } : tabById(tab.id)!,
-  );
+  showDocument(document.state, document.pdf ? NO_FILE : tabById(tab.id)!);
   shownPdf.value = document.pdf ?? null;
   return document.state;
 };

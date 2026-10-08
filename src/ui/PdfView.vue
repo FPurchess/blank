@@ -166,8 +166,14 @@ const queue = new RenderQueue<PageBitmap>({
     cancelRender(job.tab, ticket).catch(() => {});
   },
   done: (job, result) => {
-    // a tab that isn't shown any more learns it when it shows again
-    if (job.tab !== activeTabId.value || !pdf.value) return;
+    // a tab that isn't shown any more learns it when it shows again, and a
+    // PDF opened again (Find it…) has pages of its own
+    if (
+      job.tab !== activeTabId.value ||
+      !pdf.value?.opened ||
+      job.slot !== pageSlot(job.tab, pdf.value.opened.sha256, job.page)
+    )
+      return;
     if ("failure" in result) {
       if (result.failure === "closed") return;
       pdf.value =
@@ -293,8 +299,14 @@ watch(
       : null,
   async (tab) => {
     if (!tab || !pdf.value) return;
+    const sha256 = pdf.value.opened?.sha256;
     const checked = await checkSignatures(tab, pdf.value);
-    if (activeTabId.value === tab && pdf.value?.signatures === null)
+    // the same PDF still, not one opened again from elsewhere meanwhile
+    if (
+      activeTabId.value === tab &&
+      pdf.value?.signatures === null &&
+      pdf.value.opened?.sha256 === sha256
+    )
       pdf.value = { ...pdf.value, signatures: checked.signatures };
   },
   { immediate: true },
