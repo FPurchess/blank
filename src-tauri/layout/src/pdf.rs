@@ -1,7 +1,7 @@
 //! The PDF, written with krilla from the same layout the screen paints:
 //! every glyph where the engine placed it, in the embedded, subset fonts.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
@@ -14,12 +14,13 @@ use krilla::image::Image;
 use krilla::metadata::{DateTime, Metadata};
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
-use krilla::paint::Fill;
+use krilla::paint::{Fill, FillRule};
 use krilla::surface::Surface;
 use krilla::tagging::{Artifact, ArtifactType, ContentTag, SpanTag};
 use krilla::text::{Font, GlyphId, KrillaGlyph, Tag};
 use krilla::{Document, SerializeSettings};
 use parley::Alignment;
+use serde::Deserialize;
 
 use crate::engine::{Engine, Op, Part};
 use crate::fonts::{Fonts, INSTANCE_BASE};
@@ -401,6 +402,33 @@ fn archival_reason(
     }
 }
 
+/// what a PDF holds: some of the document's pages, as they are, tagged and
+/// with bookmarks; or sheets to print, with pages placed on them
+enum Output<'a> {
+    Pages(&'a [usize]),
+    Print(&'a [PrintSheet]),
+}
+
+/// a sheet of paper to print, in points, with the pages placed on it
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintSheet {
+    pub width: f32,
+    pub height: f32,
+    pub placements: Vec<Placement>,
+}
+
+/// a page on a sheet: where its top left corner is, in points, and how much
+/// it is scaled
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Placement {
+    pub page: usize,
+    pub x: f32,
+    pub y: f32,
+    pub scale: f32,
+}
+
 /// writes the document's pages as a PDF/A-2u in `language` (a BCP 47 tag,
 /// or empty for none), with what went wrong: an image that can't be decoded
 /// shows its alt text, and a font that can't be embedded is left out, so
@@ -413,20 +441,93 @@ pub fn write_with(
     info: &Info,
     language: &str,
 ) -> Result<Written, String> {
+    let pages: Vec<usize> = (0..engine.pages.len()).collect();
+    write_output(engine, images, info, language, Output::Pages(&pages))
+}
+
+/// the first of `pages` that isn't one of the document's, as an error
+fn check_pages(engine: &Engine, mut pages: impl Iterator<Item = usize>) -> Result<(), String> {
+    match pages.find(|&page| page >= engine.pages.len()) {
+        Some(page) => Err(format!("there is no page {}", page + 1)),
+        None => Ok(()),
+    }
+}
+
+/// writes some of the document's pages, by their index in ascending order,
+/// as `write_with` writes them all: the bookmarks and the links of tables
+/// of contents lead only to the pages written
+pub fn write_pages(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+    language: &str,
+    pages: &[usize],
+) -> Result<Written, String> {
+    if pages.is_empty() {
+        return Err("there are no pages to write".into());
+    }
+    check_pages(engine, pages.iter().copied())?;
+    if pages.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err("the pages aren't in order".into());
+    }
+    write_output(engine, images, info, language, Output::Pages(pages))
+}
+
+/// writes sheets to print, with the pages placed on them as the sheets say:
+/// what the pages print (see Engine::printed_parts), without the structure,
+/// bookmarks, links and PDF/A a printer has no use for
+pub fn write_print(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+    sheets: &[PrintSheet],
+) -> Result<Written, String> {
+    if sheets.is_empty() {
+        return Err("there are no sheets to print".into());
+    }
+    let placements = || sheets.iter().flat_map(|sheet| &sheet.placements);
+    check_pages(engine, placements().map(|placement| placement.page))?;
+    let sizes = sheets.iter().flat_map(|sheet| [sheet.width, sheet.height]);
+    let places = placements().flat_map(|placement| [placement.x, placement.y]);
+    if sizes.chain(places).any(|value| !value.is_finite())
+        || placements().any(|placement| !(placement.scale.is_finite() && placement.scale > 0.0))
+    {
+        return Err("a sheet's size or a page's place on it can't be used".into());
+    }
+    write_output(engine, images, info, "", Output::Print(sheets))
+}
+
+/// writes `output`, again without what krilla fails on: krilla tells what
+/// it fails on only once it writes the document, so it writes it again
+/// without that, once for each image and font at most, and once more as a
+/// normal PDF
+fn write_output(
+    engine: &mut Engine,
+    images: &HashMap<String, ImageData>,
+    info: &Info,
+    language: &str,
+    output: Output,
+) -> Result<Written, String> {
     let mut skipped = Skipped::default();
     let date = parse_date(&info.date);
-    // why it isn't PDF/A, once it isn't
-    let mut not_archival = match date {
-        Some(_) => None,
-        None if info.date.is_empty() => Some("it has no date".to_string()),
-        None => Some(format!("its date {} can't be read", info.date)),
+    // only the document's pages are written as a PDF/A, never the sheets to
+    // print; why they aren't one, once that is known
+    let archives = matches!(output, Output::Pages(_));
+    let mut not_archival = if archives {
+        match date {
+            Some(_) => None,
+            None if info.date.is_empty() => Some("it has no date".to_string()),
+            None => Some(format!("its date {} can't be read", info.date)),
+        }
+    } else {
+        None
     };
-    // krilla tells what it fails on only once it writes the document, so
-    // write it again without that, once for each image and font at most,
-    // and once more as a normal PDF
     for _ in 0..attempts(images.len(), &engine.fonts) + 1 {
-        let archival = not_archival.is_none();
-        match attempt(engine, images, info, date, language, archival, &skipped) {
+        let archival = archives && not_archival.is_none();
+        let written = attempt(
+            engine, images, info, date, language, archival, &skipped, &output,
+        );
+        match written {
             Ok((bytes, undecoded)) => {
                 let mut warnings: Vec<Warning> = vec![];
                 for src in undecoded.into_iter().chain(skipped.images.iter().cloned()) {
@@ -545,6 +646,109 @@ fn archival_settings() -> Option<SerializeSettings> {
     })
 }
 
+/// the fonts whose missing glyph `ops` show, for what no font has
+fn missing_fonts<'a>(ops: impl IntoIterator<Item = &'a (Op, Part)>) -> Vec<usize> {
+    let mut missing: Vec<usize> = vec![];
+    for (op, _) in ops {
+        if let Op::Glyphs { run, .. } = op {
+            if run.glyphs.iter().any(|glyph| glyph.id == 0) && !missing.contains(&run.font) {
+                missing.push(run.font);
+            }
+        }
+    }
+    missing
+}
+
+/// draws what the pages show into a PDF: the fonts and images it has, and
+/// the images it couldn't decode
+struct Drawing<'a> {
+    fonts: PdfFonts,
+    images: &'a HashMap<String, ImageData>,
+    skipped: &'a Skipped,
+    loaded: HashMap<String, Option<Image>>,
+    undecoded: Vec<String>,
+}
+
+impl<'a> Drawing<'a> {
+    fn new(fonts: &Fonts, images: &'a HashMap<String, ImageData>, skipped: &'a Skipped) -> Self {
+        Drawing {
+            fonts: PdfFonts::new(fonts, &skipped.fonts),
+            images,
+            skipped,
+            loaded: HashMap::new(),
+            undecoded: vec![],
+        }
+    }
+
+    /// whether `op` can be drawn: a rectangle with a size, and glyphs in a
+    /// font the PDF has
+    fn drawable(&self, op: &Op) -> bool {
+        match op {
+            Op::Rect { x, y, w, h, .. } => page_rect(*x, *y, *w, *h).is_some(),
+            Op::Glyphs { run, .. } => self.fonts.get(run.font).is_some(),
+            Op::Image { .. } => true,
+            Op::Link { .. } => false,
+        }
+    }
+
+    /// unmaps the missing glyph of the fonts `missing` (see
+    /// `unmap_missing_glyph`), once, on the PDF's first page
+    fn unmap_missing(&self, surface: &mut Surface, missing: &[usize]) {
+        for font in missing.iter().filter_map(|&font| self.fonts.get(font)) {
+            unmap_missing_glyph(surface, font.clone());
+        }
+    }
+
+    /// draws a rectangle, glyphs or an image (or its alt text) on `surface`:
+    /// the one place that draws what the pages show, for the document's PDF
+    /// and the print PDF alike
+    fn draw(&mut self, surface: &mut Surface, engine_fonts: &mut Fonts, op: &Op) {
+        match op {
+            &Op::Rect { x, y, w, h, role } => {
+                let mut builder = PathBuilder::new();
+                if let Some(rect) = page_rect(x, y, w, h) {
+                    builder.push_rect(rect);
+                }
+                if let Some(path) = builder.finish() {
+                    surface.set_fill(Some(fill(role)));
+                    surface.draw_path(&path);
+                }
+            }
+            Op::Glyphs { run, role, text } => {
+                // a font that can't be embedded is left out
+                if let Some(font) = self.fonts.get(run.font) {
+                    surface.set_fill(Some(fill(*role)));
+                    draw_run(surface, &run.glyphs, font, text, run.size);
+                }
+            }
+            &Op::Image {
+                ref src,
+                ref alt,
+                x,
+                y,
+                w,
+                h,
+            } => {
+                let image = self.loaded.entry(src.clone()).or_insert_with(|| {
+                    load_image(src, self.images, self.skipped, &mut self.undecoded)
+                });
+                match (image.clone(), Size::from_wh(w, h)) {
+                    (Some(image), Some(size)) => {
+                        surface.push_transform(&Transform::from_translate(x, y));
+                        surface.draw_image(image, size);
+                        surface.pop();
+                    }
+                    _ => {
+                        let alt = if alt.is_empty() { src } else { alt };
+                        paint_alt(surface, engine_fonts, &self.fonts, alt, x, y, w, h);
+                    }
+                }
+            }
+            Op::Link { .. } => {}
+        }
+    }
+}
+
 /// writes the PDF once, as a PDF/A-2u when `archival`, leaving out what is
 /// skipped: its bytes and the images it couldn't decode, or what it failed
 /// on
@@ -557,42 +761,99 @@ fn attempt(
     language: &str,
     archival: bool,
     skipped: &Skipped,
+    output: &Output,
 ) -> Result<(Vec<u8>, Vec<String>), Failed> {
-    let mut document = if archival {
-        let settings = archival_settings()
-            .ok_or_else(|| Failed::Archival("krilla can't write PDF/A-2u".into()))?;
-        Document::new_with(settings)
-    } else {
-        Document::new()
+    let mut document = match output {
+        Output::Pages(_) if archival => {
+            let settings = archival_settings()
+                .ok_or_else(|| Failed::Archival("krilla can't write PDF/A-2u".into()))?;
+            Document::new_with(settings)
+        }
+        Output::Pages(_) => Document::new(),
+        // a printer needs no structure: without tagging, krilla leaves the
+        // tags out
+        Output::Print(_) => Document::new_with(SerializeSettings {
+            enable_tagging: false,
+            ..SerializeSettings::default()
+        }),
     };
-    let fonts = PdfFonts::new(&engine.fonts, &skipped.fonts);
-    let mut loaded: HashMap<String, Option<Image>> = HashMap::new();
-    let mut undecoded: Vec<String> = vec![];
+    let mut drawing = Drawing::new(&engine.fonts, images, skipped);
+    match output {
+        Output::Pages(pages) => draw_pages(&mut document, engine, &mut drawing, language, pages)?,
+        Output::Print(sheets) => draw_sheets(&mut document, engine, &mut drawing, sheets)?,
+    }
+    let mut metadata = Metadata::new().creator("Blank".into());
+    if !info.title.is_empty() {
+        metadata = metadata.title(info.title.clone());
+    }
+    if !info.author.is_empty() {
+        metadata = metadata.authors(vec![info.author.clone()]);
+    }
+    if !language.is_empty() {
+        metadata = metadata.language(language.to_string());
+    }
+    if let Some(date) = date {
+        metadata = metadata.creation_date(date);
+    }
+    document.set_metadata(metadata);
+    let Drawing {
+        fonts,
+        loaded,
+        undecoded,
+        ..
+    } = drawing;
+    match document.finish() {
+        Ok(bytes) => Ok((bytes, undecoded)),
+        Err(KrillaError::Image(image, ..)) => {
+            let src = loaded
+                .iter()
+                .find(|(_, loaded)| loaded.as_ref() == Some(&image))
+                .map(|(src, _)| src.clone());
+            match src {
+                Some(src) => Err(Failed::Image(src)),
+                None => Err(Failed::Other("an image can't be written".into())),
+            }
+        }
+        Err(KrillaError::Font(font, message)) => match fonts.index_of(&font) {
+            Some(index) => Err(Failed::Font(index)),
+            None => Err(Failed::Other(format!(
+                "a font can't be embedded: {message}"
+            ))),
+        },
+        Err(KrillaError::Validation(errors)) => {
+            Err(Failed::Archival(archival_reason(&errors, &fonts, engine)))
+        }
+        Err(error) => Err(Failed::Other(format!("{error:?}"))),
+    }
+}
+
+/// draws the document's `pages` as the PDF's pages, tagged, with the links
+/// and the bookmarks that lead to them
+fn draw_pages(
+    document: &mut Document,
+    engine: &mut Engine,
+    drawing: &mut Drawing,
+    language: &str,
+    pages: &[usize],
+) -> Result<(), Failed> {
     let mut ids = tags::Ids::new();
     // the order everything is drawn in, for the structure
     let mut order = 0usize;
     let (width, height) = (engine.settings.width, engine.settings.height);
-    // what each page draws, with what of the document it is: its body, then
-    // its header and footer
-    let pages: Vec<Vec<(Op, Part)>> = (0..engine.pages.len())
-        .map(|page| {
-            let mut ops = engine.body_parts(page);
-            ops.extend(engine.band_parts(page));
-            ops
-        })
-        .collect();
-    // the fonts whose missing glyph the document shows, for what no font has
-    let mut missing: Vec<usize> = vec![];
-    for (op, _) in pages.iter().flatten() {
-        if let Op::Glyphs { run, .. } = op {
-            if run.glyphs.iter().any(|glyph| glyph.id == 0) && !missing.contains(&run.font) {
-                missing.push(run.font);
-            }
-        }
+    // where each of the document's pages is in the PDF, if it is
+    let mut new_index: Vec<Option<usize>> = vec![None; engine.pages.len()];
+    for (index, &page) in pages.iter().enumerate() {
+        new_index[page] = Some(index);
     }
+    // what each page draws, with what of the document it is
+    let drawn: Vec<Vec<(Op, Part)>> = pages
+        .iter()
+        .map(|&page| engine.printed_parts(page))
+        .collect();
+    let missing = missing_fonts(drawn.iter().flatten());
     // where the entries of tables of contents link to
     let listed = engine.listed_headings();
-    for (page_index, ops) in pages.into_iter().enumerate() {
+    for (page_index, ops) in drawn.into_iter().enumerate() {
         let settings = PageSettings::from_wh(width, height)
             .ok_or_else(|| Failed::Other("the page has no size".into()))?;
         let mut page = document.start_page_with(settings);
@@ -600,16 +861,16 @@ fn attempt(
         {
             let mut surface = page.surface();
             if page_index == 0 {
-                for font in missing.iter().filter_map(|&font| fonts.get(font).cloned()) {
-                    unmap_missing_glyph(&mut surface, font);
-                }
+                drawing.unmap_missing(&mut surface, &missing);
             }
             for (op, part) in ops {
-                if matches!(part, Part::Hint { .. }) {
-                    continue;
-                }
                 if let Op::Link { href, x, y, w, h } = op {
                     links.push((href, x, y, w, h, part));
+                    continue;
+                }
+                // what can't be drawn is left out before its tag opens: a
+                // tagged section must be closed on every path
+                if !drawing.drawable(&op) {
                     continue;
                 }
                 // what isn't content of the document is an artifact, and the
@@ -619,65 +880,12 @@ fn attempt(
                     Some(kind) => ContentTag::Artifact(Artifact::new(kind, None)),
                     None => ContentTag::Span(SpanTag::empty()),
                 };
-                // what can't be drawn is left out before its tag opens: a
-                // tagged section must be closed on every path
-                let drawable = match &op {
-                    Op::Rect { x, y, w, h, .. } => page_rect(*x, *y, *w, *h).is_some(),
-                    Op::Glyphs { run, .. } => fonts.get(run.font).is_some(),
-                    _ => true,
-                };
-                if !drawable {
-                    continue;
-                }
                 let id = surface.start_tagged(tag);
                 if artifact.is_none() {
                     order += 1;
                     ids.entry(part).or_default().push((order, id));
                 }
-                match op {
-                    Op::Rect { x, y, w, h, role } => {
-                        let rect = page_rect(x, y, w, h);
-                        let mut builder = PathBuilder::new();
-                        if let Some(rect) = rect {
-                            builder.push_rect(rect);
-                        }
-                        if let Some(path) = builder.finish() {
-                            surface.set_fill(Some(fill(role)));
-                            surface.draw_path(&path);
-                        }
-                    }
-                    Op::Glyphs { run, role, text } => {
-                        // a font that can't be embedded is left out (above)
-                        if let Some(font) = fonts.get(run.font) {
-                            surface.set_fill(Some(fill(role)));
-                            draw_run(&mut surface, &run.glyphs, font, &text, run.size);
-                        }
-                    }
-                    Op::Image {
-                        src,
-                        alt,
-                        x,
-                        y,
-                        w,
-                        h,
-                    } => {
-                        let image = loaded
-                            .entry(src.clone())
-                            .or_insert_with(|| load_image(&src, images, skipped, &mut undecoded));
-                        match (image.clone(), Size::from_wh(w, h)) {
-                            (Some(image), Some(size)) => {
-                                surface.push_transform(&Transform::from_translate(x, y));
-                                surface.draw_image(image, size);
-                                surface.pop();
-                            }
-                            _ => {
-                                let alt = if alt.is_empty() { &src } else { &alt };
-                                paint_alt(&mut surface, &mut engine.fonts, &fonts, alt, x, y, w, h);
-                            }
-                        }
-                    }
-                    Op::Link { .. } => {}
-                }
+                drawing.draw(&mut surface, &mut engine.fonts, &op);
                 surface.end_tagged();
             }
             surface.finish();
@@ -686,9 +894,11 @@ fn attempt(
             if let Some(rect) = page_rect(x, y, w, h) {
                 let target = match part {
                     // to the heading of a table of contents' entry, on its
-                    // page; none for a heading that isn't there
+                    // page; none for a heading that isn't there, or whose
+                    // page isn't written
                     Part::TocLink { item, entry } => {
-                        match engine.toc_target(item, entry, &listed) {
+                        let target = engine.toc_target(item, entry, &listed);
+                        match target.and_then(|(page, top)| Some((new_index[page]?, top))) {
                             Some((page, top)) => Target::Destination(
                                 XyzDestination::new(
                                     page,
@@ -729,50 +939,75 @@ fn attempt(
         page.finish();
     }
     document.set_tag_tree(tags::tag_tree(engine, &mut ids, language));
-    document.set_outline(tags::outline(engine));
-    let mut metadata = Metadata::new().creator("Blank".into());
-    if !info.title.is_empty() {
-        metadata = metadata.title(info.title.clone());
+    document.set_outline(tags::outline(engine, &new_index));
+    Ok(())
+}
+
+/// draws `sheets`, each with its pages placed and scaled on it, and clipped
+/// to the page, so a page never reaches into its neighbor
+fn draw_sheets(
+    document: &mut Document,
+    engine: &mut Engine,
+    drawing: &mut Drawing,
+    sheets: &[PrintSheet],
+) -> Result<(), Failed> {
+    let (width, height) = (engine.settings.width, engine.settings.height);
+    let page_clip = {
+        let mut builder = PathBuilder::new();
+        if let Some(rect) = Rect::from_xywh(0.0, 0.0, width, height) {
+            builder.push_rect(rect);
+        }
+        builder
+            .finish()
+            .ok_or_else(|| Failed::Other("the page has no size".into()))?
+    };
+    // what each page placed on a sheet prints, read once however often it
+    // is placed, in page order, so the same sheets give the same PDF
+    let mut printed: BTreeMap<usize, Vec<(Op, Part)>> = BTreeMap::new();
+    for placement in sheets.iter().flat_map(|sheet| &sheet.placements) {
+        printed
+            .entry(placement.page)
+            .or_insert_with(|| engine.printed_parts(placement.page));
     }
-    if !info.author.is_empty() {
-        metadata = metadata.authors(vec![info.author.clone()]);
-    }
-    if !language.is_empty() {
-        metadata = metadata.language(language.to_string());
-    }
-    if let Some(date) = date {
-        metadata = metadata.creation_date(date);
-    }
-    document.set_metadata(metadata);
-    match document.finish() {
-        Ok(bytes) => Ok((bytes, undecoded)),
-        Err(KrillaError::Image(image, ..)) => {
-            let src = loaded
-                .iter()
-                .find(|(_, loaded)| loaded.as_ref() == Some(&image))
-                .map(|(src, _)| src.clone());
-            match src {
-                Some(src) => Err(Failed::Image(src)),
-                None => Err(Failed::Other("an image can't be written".into())),
+    let missing = missing_fonts(printed.values().flatten());
+    for (sheet_index, sheet) in sheets.iter().enumerate() {
+        let settings = PageSettings::from_wh(sheet.width, sheet.height)
+            .ok_or_else(|| Failed::Other("the sheet has no size".into()))?;
+        let mut page = document.start_page_with(settings);
+        let mut surface = page.surface();
+        if sheet_index == 0 {
+            drawing.unmap_missing(&mut surface, &missing);
+        }
+        for placement in &sheet.placements {
+            let scale = placement.scale;
+            surface.push_transform(&Transform::from_row(
+                scale,
+                0.0,
+                0.0,
+                scale,
+                placement.x,
+                placement.y,
+            ));
+            surface.push_clip_path(&page_clip, &FillRule::NonZero);
+            for (op, _) in &printed[&placement.page] {
+                if drawing.drawable(op) {
+                    drawing.draw(&mut surface, &mut engine.fonts, op);
+                }
             }
+            surface.pop();
+            surface.pop();
         }
-        Err(KrillaError::Font(font, message)) => match fonts.index_of(&font) {
-            Some(index) => Err(Failed::Font(index)),
-            None => Err(Failed::Other(format!(
-                "a font can't be embedded: {message}"
-            ))),
-        },
-        Err(KrillaError::Validation(errors)) => {
-            Err(Failed::Archival(archival_reason(&errors, &fonts, engine)))
-        }
-        Err(error) => Err(Failed::Other(format!("{error:?}"))),
+        surface.finish();
+        page.finish();
     }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::test_support::{engine, paragraph};
+    use crate::engine::test_support::{document, engine, heading, paragraph};
+    use crate::engine::Word;
     use crate::model::{Content, Item};
 
     /// a red pixel
@@ -814,6 +1049,15 @@ mod tests {
     /// must be, so the checks can't pass by skipping (`missing_tool` in
     /// tests/exact.rs, which can't share this, does the same)
     fn poppler(tool: &str, args: &[&std::ffi::OsStr]) -> Option<std::process::Output> {
+        run_tool(tool, "poppler-utils", args)
+    }
+
+    /// runs `tool` of `package` with `args`, if it is there, as `poppler`
+    fn run_tool(
+        tool: &str,
+        package: &str,
+        args: &[&std::ffi::OsStr],
+    ) -> Option<std::process::Output> {
         match std::process::Command::new(tool).args(args).output() {
             Ok(out) => {
                 assert!(
@@ -824,7 +1068,7 @@ mod tests {
                 Some(out)
             }
             Err(_) if std::env::var_os("CI").is_some() => {
-                panic!("{tool} is missing: install poppler-utils, CI doesn't skip the check")
+                panic!("{tool} is missing: install {package}, CI doesn't skip the check")
             }
             Err(_) => None,
         }
@@ -999,6 +1243,7 @@ mod tests {
             "",
             true,
             &skipped,
+            &Output::Pages(&[0]),
         );
         assert!(written.is_ok());
     }
@@ -1270,5 +1515,265 @@ mod tests {
         ] {
             assert_eq!(parse_date(wrong), None, "{wrong}");
         }
+    }
+
+    /// writes `pdf` to a file of the temporary folder named after `name`
+    fn temp_pdf(pdf: &[u8], name: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("blank-layout-unit-{name}.pdf"));
+        std::fs::write(&path, pdf).unwrap();
+        path
+    }
+
+    /// what pdfinfo says of a PDF, if pdfinfo is there
+    fn info_of(pdf: &[u8], name: &str) -> Option<String> {
+        let path = temp_pdf(pdf, name);
+        let out = poppler("pdfinfo", &[path.as_os_str()])?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// the PDF's objects as text, uncompressed, if qpdf is there
+    fn objects_of(pdf: &[u8], name: &str) -> Option<String> {
+        let path = temp_pdf(pdf, name);
+        let out = run_tool(
+            "qpdf",
+            "qpdf",
+            &[
+                "--qdf".as_ref(),
+                "--object-streams=disable".as_ref(),
+                path.as_os_str(),
+                "-".as_ref(),
+            ],
+        )?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// the words of a PDF with their page (from 0) and left edge, as
+    /// `pdftotext -bbox` reads them, if it is there
+    fn boxed_words(pdf: &[u8], name: &str) -> Option<Vec<(usize, f32, String)>> {
+        let path = temp_pdf(pdf, name);
+        let out = poppler(
+            "pdftotext",
+            &["-bbox".as_ref(), path.as_os_str(), "-".as_ref()],
+        )?;
+        let html = String::from_utf8_lossy(&out.stdout).into_owned();
+        let mut page = None;
+        let mut words = vec![];
+        for line in html.lines().map(str::trim) {
+            if line.starts_with("<page") {
+                page = Some(page.map_or(0, |page| page + 1));
+            } else if let Some(rest) = line.strip_prefix("<word xMin=\"") {
+                let x: f32 = rest[..rest.find('"').unwrap()].parse().unwrap();
+                let text = &line[line.find('>').unwrap() + 1..line.rfind("</word>").unwrap()];
+                words.push((page.unwrap(), x, text.to_string()));
+            }
+        }
+        Some(words)
+    }
+
+    /// three pages with a heading each, the first with a table of contents
+    /// of all three
+    fn three_chapters() -> Engine {
+        let entries = ["One", "Two", "Three"]
+            .map(|text| crate::model::TocEntry {
+                level: 1,
+                text: text.into(),
+            })
+            .to_vec();
+        let toc = Item {
+            content: Content::Toc {
+                pos: 1,
+                title: "Contents".into(),
+                depth: 3,
+                entries,
+            },
+            ..paragraph(1, "")
+        };
+        let mut two = heading(8, 1, "Two");
+        two.page_start = true;
+        let mut three = heading(13, 1, "Three");
+        three.page_start = true;
+        let engine = engine(vec![toc, heading(3, 1, "One"), two, three]);
+        assert_eq!(engine.pages.len(), 3);
+        engine
+    }
+
+    #[test]
+    fn writes_only_the_chosen_pages() {
+        let mut engine = three_chapters();
+        let written = write_pages(&mut engine, &HashMap::new(), &info(), "en", &[0, 2]).unwrap();
+        let pdf = written.bytes;
+        assert!(written.warnings.is_empty());
+        assert!(says_pdfa(&pdf));
+        if let Some(info) = info_of(&pdf, "subset") {
+            assert!(info.contains("Pages:           2"), "{info}");
+            assert!(info.contains("Tagged:          yes"), "{info}");
+        }
+        if let Some(text) = text_of(&pdf, "subset") {
+            // the table of contents lists Two, but its page isn't there
+            let headings: Vec<&str> = text.lines().filter(|line| *line == "Two").collect();
+            assert_eq!(headings.len(), 1, "{text}");
+            assert!(text.contains("Three"));
+        }
+        if let Some(objects) = objects_of(&pdf, "subset") {
+            // bookmarks and links only to the pages written
+            assert!(objects.contains("/Title (One)"));
+            assert!(objects.contains("/Title (Three)"));
+            assert!(!objects.contains("/Title (Two)"));
+            assert_eq!(objects.matches("/Subtype /Link").count(), 2);
+        }
+    }
+
+    #[test]
+    fn rejects_pages_that_dont_exist() {
+        let mut engine = three_chapters();
+        let images = HashMap::new();
+        let error = write_pages(&mut engine, &images, &info(), "", &[1, 3]).err();
+        assert_eq!(error.as_deref(), Some("there is no page 4"));
+        assert!(write_pages(&mut engine, &images, &info(), "", &[2, 1]).is_err());
+        assert!(write_pages(&mut engine, &images, &info(), "", &[]).is_err());
+    }
+
+    /// two pages side by side on a landscape sheet, as the print dialog
+    /// places them
+    fn two_up(engine: &Engine, pages: [usize; 2]) -> PrintSheet {
+        let (width, height) = (engine.settings.height, engine.settings.width);
+        let gutter = 18.0;
+        let cell = (width - 3.0 * gutter) / 2.0;
+        let scale =
+            (cell / engine.settings.width).min((height - 2.0 * gutter) / engine.settings.height);
+        let y = (height - engine.settings.height * scale) / 2.0;
+        PrintSheet {
+            width,
+            height,
+            placements: pages
+                .iter()
+                .enumerate()
+                .map(|(index, &page)| Placement {
+                    page,
+                    x: gutter + index as f32 * (cell + gutter),
+                    y,
+                    scale,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn prints_two_pages_per_sheet() {
+        let mut items = document(&["Alpha", "Beta", "Gamma"]);
+        for item in &mut items[1..] {
+            item.page_start = true;
+        }
+        let mut engine = engine(items);
+        let sheets = vec![
+            two_up(&engine, [0, 1]),
+            PrintSheet {
+                placements: vec![two_up(&engine, [2, 2]).placements[0].clone()],
+                ..two_up(&engine, [2, 2])
+            },
+        ];
+        let laid: Vec<Word> = engine.words();
+        let written = write_print(&mut engine, &HashMap::new(), &info(), &sheets).unwrap();
+        let pdf = written.bytes;
+        assert!(written.warnings.is_empty());
+        assert!(!says_pdfa(&pdf));
+        if let Some(info) = info_of(&pdf, "two-up") {
+            assert!(info.contains("Pages:           2"), "{info}");
+            assert!(
+                info.contains("Page size:       841.89 x 595.28 pts"),
+                "{info}"
+            );
+            assert!(info.contains("Tagged:          no"), "{info}");
+        }
+        let Some(words) = boxed_words(&pdf, "two-up") else {
+            return;
+        };
+        // each word where its page's placement puts it
+        for heading in ["Alpha", "Beta", "Gamma"] {
+            let word = laid.iter().find(|word| word.text == heading).unwrap();
+            let sheet = if word.page == 2 { 1 } else { 0 };
+            let placement = sheets[sheet]
+                .placements
+                .iter()
+                .find(|placement| placement.page == word.page)
+                .unwrap();
+            let expected = placement.x + word.left * placement.scale;
+            let (page, x, _) = words.iter().find(|(_, _, text)| text == heading).unwrap();
+            assert_eq!(*page, sheet, "{heading}");
+            assert!((x - expected).abs() < 0.1, "{heading}: {x} vs {expected}");
+        }
+    }
+
+    #[test]
+    fn prints_the_same_sheets_the_same_way() {
+        // a character no font has, in two fonts, whose missing glyphs are
+        // unmapped on the first sheet in the order of the pages
+        let mut items = document(&["Alpha \u{13000}", "Beta"]);
+        items[1] = heading(9, 1, "Beta \u{13000}");
+        items[1].page_start = true;
+        let mut engine = engine(items);
+        let sheets = [two_up(&engine, [1, 0])];
+        let first = write_print(&mut engine, &HashMap::new(), &info(), &sheets).unwrap();
+        let again = write_print(&mut engine, &HashMap::new(), &info(), &sheets).unwrap();
+        assert!(first.bytes == again.bytes);
+        if let Some(text) = text_of(&first.bytes, "missing-glyph") {
+            assert!(text.contains('\u{13000}'), "{text}");
+        }
+    }
+
+    #[test]
+    fn rejects_placements_that_cant_be_drawn() {
+        let mut engine = three_chapters();
+        let mut sheet = two_up(&engine, [0, 1]);
+        sheet.placements[1].scale = 0.0;
+        let error = write_print(&mut engine, &HashMap::new(), &info(), &[sheet]).err();
+        assert_eq!(
+            error.as_deref(),
+            Some("a sheet's size or a page's place on it can't be used")
+        );
+    }
+
+    #[test]
+    fn prints_no_hints() {
+        let mut field = paragraph(1, "");
+        if let Content::Text(text) = &mut field.content {
+            text.hint = Some("Your name".into());
+        }
+        let mut engine = engine(vec![field, paragraph(3, "Signed")]);
+        let sheet = PrintSheet {
+            width: engine.settings.width,
+            height: engine.settings.height,
+            placements: vec![Placement {
+                page: 0,
+                x: 0.0,
+                y: 0.0,
+                scale: 1.0,
+            }],
+        };
+        let pdf = write_print(&mut engine, &HashMap::new(), &info(), &[sheet])
+            .unwrap()
+            .bytes;
+        if let Some(text) = text_of(&pdf, "no-hints") {
+            assert!(text.contains("Signed"));
+            assert!(!text.contains("Your name"), "{text}");
+        }
+    }
+
+    #[test]
+    fn rejects_sheets_with_pages_that_dont_exist() {
+        let mut engine = three_chapters();
+        let sheet = PrintSheet {
+            width: 100.0,
+            height: 100.0,
+            placements: vec![Placement {
+                page: 5,
+                x: 0.0,
+                y: 0.0,
+                scale: 1.0,
+            }],
+        };
+        let error = write_print(&mut engine, &HashMap::new(), &info(), &[sheet]).err();
+        assert_eq!(error.as_deref(), Some("there is no page 6"));
+        assert!(write_print(&mut engine, &HashMap::new(), &info(), &[]).is_err());
     }
 }

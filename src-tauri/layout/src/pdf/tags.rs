@@ -87,6 +87,14 @@ fn text_nodes(ids: &mut Ids, item: usize, text: usize) -> Vec<Node> {
     nodes
 }
 
+/// whether anything drawn is in `node`
+fn has_leaf(node: &Node) -> bool {
+    match node {
+        Node::Leaf(_) => true,
+        Node::Group(group) => group.children.iter().any(has_leaf),
+    }
+}
+
 fn group(tag: impl Into<TagKind>, children: Vec<Node>) -> Node {
     TagGroup::with_children(tag, children).into()
 }
@@ -266,6 +274,11 @@ fn toc_node(index: usize, entries: usize, ids: &mut Ids) -> Node {
         let mut content = leaves(ids, extra);
         content.extend(leaves(ids, Part::TocNumber { item: index, entry }));
         let annotation = leaves(ids, Part::TocLink { item: index, entry });
+        // an entry always shows its text, so one with nothing drawn is on a
+        // page left out
+        if content.is_empty() && annotation.is_empty() {
+            continue;
+        }
         // a link to its heading, unless the heading isn't there
         let child = if annotation.is_empty() {
             group(Tag::P, content)
@@ -380,6 +393,14 @@ pub(super) fn tag_tree(engine: &Engine, ids: &mut Ids, language: &str) -> TagTre
             let label = leaves(ids, Part::Marker { item: index });
             (label, marker.trim_end().ends_with('.'))
         });
+        // an item with nothing drawn (an empty paragraph, or an item on a
+        // page left out) has no place in the structure. Within a table, rows
+        // and cells stay, empty or not, to keep its rows and columns: a row
+        // of a page left out can't be told from an empty one.
+        let drawn = has_leaf(&node) || marker.as_ref().is_some_and(|(label, _)| !label.is_empty());
+        if !drawn {
+            continue;
+        }
         builder.place(item.bars.len(), item.indent, marker, node);
     }
     builder.close_all();
@@ -416,8 +437,10 @@ pub fn outline_entries(engine: &Engine) -> Vec<(u8, String, usize, f32)> {
         .collect()
 }
 
-/// the bookmarks, nested by the headings' levels
-pub(super) fn outline(engine: &Engine) -> Outline {
+/// the bookmarks, nested by the headings' levels, to the headings on the
+/// pages written: `new_index` gives each of the document's pages its page
+/// in the PDF, if it is there
+pub(super) fn outline(engine: &Engine, new_index: &[Option<usize>]) -> Outline {
     let left = engine.settings.margins.left;
     let mut outline = Outline::new();
     let mut open: Vec<(u8, OutlineNode)> = vec![];
@@ -430,6 +453,9 @@ pub(super) fn outline(engine: &Engine) -> Outline {
         }
     };
     for (level, text, page, y) in outline_entries(engine) {
+        let Some(page) = new_index.get(page).copied().flatten() else {
+            continue;
+        };
         while open
             .last()
             .is_some_and(|(open_level, _)| *open_level >= level)

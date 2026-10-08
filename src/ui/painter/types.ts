@@ -13,8 +13,12 @@ export interface PaintOptions {
   // the page's point at the canvas' top left corner
   x: number;
   y: number;
-  // the theme's text colour, as CSS
-  color: string;
+  // the theme's text color, as CSS, or a color for each role instead,
+  // opaque, e.g. the colors on paper
+  color?: string;
+  colors?: readonly string[];
+  // what the canvas is filled with first, transparent if none
+  background?: string;
   // only within these rectangles of the page, in points, over `fill`: the
   // selected text in its own colour over the selection
   within?: { x: number; y: number; width: number; height: number }[];

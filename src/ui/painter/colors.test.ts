@@ -5,7 +5,7 @@ import { TABLE_COLORS } from "../../exporters/table";
 import { LIGHT_TEXT, onPaper } from "../../layout/paperColors";
 import { parseColor, themeVariables } from "../../scss/contrast";
 import { testEngine } from "../../test/engine";
-import { ROLE_OPACITY } from "./canvas2d";
+import { PAPER_COLORS, ROLE_OPACITY } from "./canvas2d";
 
 // The PDF and the Word export show on paper what the pages show on screen:
 // the text colour at the opacity of each role, mixed onto white.
@@ -58,5 +58,12 @@ describe("the colours on paper", () => {
     expect([0, 7, 8].map(pdf)).toEqual(["#000000", "#000000", "#000000"]);
     expect(pdf(1)).toBe("#666666");
     expect(engine.raw.roleColor(9)).toBeUndefined();
+  });
+
+  it("are what the print preview paints, role by role", () => {
+    expect(PAPER_COLORS).toHaveLength(ROLE_OPACITY.length);
+    PAPER_COLORS.forEach((color, role) =>
+      expect(color, `role ${role}`).toBe(pdf(role)),
+    );
   });
 });

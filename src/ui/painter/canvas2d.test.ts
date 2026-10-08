@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { paintCalls, recordingContext } from "../../test/canvas";
-import { Canvas2DPainter, ROLE_OPACITY } from "./canvas2d";
+import { Canvas2DPainter, PAPER_COLORS, ROLE_OPACITY } from "./canvas2d";
 
 const DISPLAY = {
   r: [[10, 20, 30, 0.1, 0]],
@@ -53,6 +53,35 @@ describe("Canvas2DPainter", () => {
     const styles = calls.filter((call) => call[0] === "style");
     expect(styles).toContainEqual(["style", "black", ROLE_OPACITY[0]]);
     expect(styles.every((call) => call[1] === "black")).toBe(true);
+  });
+
+  it("paints on paper in the colours of each role, as the PDF prints", () => {
+    const { painter, surface, calls } = setUp();
+    const display = {
+      ...DISPLAY,
+      // a table line, and glyphs of a header
+      r: [[10, 20, 30, 1, 3]],
+      g: [[0, 10, 1, 42, 12, 30]],
+    };
+    painter.paint(surface, display, {
+      scale: 1,
+      ratio: 1,
+      x: 0,
+      y: 0,
+      color: "",
+      colors: PAPER_COLORS,
+      background: "#fff",
+    });
+    // the paper first, then each role opaque in its colour
+    expect(calls.slice(2, 4)).toEqual([
+      ["rect", 0, 0, 200, 100],
+      ["style", "#fff", 1],
+    ]);
+    const styles = calls.filter((call) => call[0] === "style").slice(1);
+    expect(styles).toEqual([
+      ["style", PAPER_COLORS[3], 1],
+      ["style", PAPER_COLORS[1], 1],
+    ]);
   });
 
   it("paints nothing without an engine", () => {

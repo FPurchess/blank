@@ -74,6 +74,22 @@ describe("OptionGroup", () => {
     expect(buttons()[0].getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("shows an option's icon and tooltip", async () => {
+    unmount = await mount(
+      [
+        { value: "a", label: "All" },
+        { value: "p", label: "Printer", icon: "print", tip: "Page 3" },
+      ],
+      shallowRef("a"),
+    );
+
+    expect(buttons()[0].querySelector("svg")).toBeNull();
+    expect(buttons()[0].dataset.tip).toBeUndefined();
+    expect(buttons()[1].querySelector("svg.icon")).not.toBeNull();
+    expect(buttons()[1].textContent?.trim()).toBe("Printer");
+    expect(buttons()[1].dataset.tip).toBe("Page 3");
+  });
+
   it("keeps the checked option in the tab order when the value changes from outside", async () => {
     const value = shallowRef("s");
     unmount = await mount(sizes, value);

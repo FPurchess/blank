@@ -1,5 +1,5 @@
-// the pictures of docs/guide/pages.md and docs/guide/themes.md, and the
-// themes on the home page (see shots.ts)
+// the pictures of docs/guide/pages.md, docs/guide/print.md and
+// docs/guide/themes.md, and the themes on the home page (see shots.ts)
 import { $, browser } from "@wdio/globals";
 
 import { Key, paste, pressMod, type } from "../helpers.ts";
@@ -35,6 +35,16 @@ describe("docs shots: pages and themes", () => {
     await browser.keys(Key.ArrowDown);
     await browser.keys(Key.ArrowRight);
     await shot("page-setup");
+    await type(Key.Escape);
+  });
+
+  it("captures the print dialog", async () => {
+    await pressMod("p");
+    await $("#print").waitForDisplayed();
+    // with pages per sheet, scale and the paper
+    await $("#print button.disclosure").click();
+    await $("#print-more").waitForDisplayed();
+    await shot("print");
     await type(Key.Escape);
   });
 

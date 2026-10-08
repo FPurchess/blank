@@ -89,11 +89,3 @@ export const steppedPaper = <T>(
   by: 1 | -1,
 ) =>
   options[options.findIndex((option) => option.value === current) + by]?.value;
-
-/**
- * appliesOnEnter tells whether Enter on `target` applies the dialog instead
- * of pressing it: on an option it does, while it opens the paper's list
- */
-export const appliesOnEnter = (target: EventTarget | null) =>
-  target instanceof HTMLButtonElement &&
-  target.getAttribute("aria-haspopup") !== "menu";

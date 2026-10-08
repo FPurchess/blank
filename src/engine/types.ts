@@ -171,3 +171,21 @@ export interface EngineColumn {
   // the room between two columns, in points
   gap: number;
 }
+
+// a sheet of paper to print, in points, with the pages placed on it (see
+// printSheets in src/print/sheets.ts, and PrintSheet in
+// src-tauri/layout/src/pdf.rs)
+export interface PrintSheet {
+  width: number;
+  height: number;
+  placements: Placement[];
+}
+
+// a page on a sheet: its index, where its top left corner is and how much
+// it is scaled
+export interface Placement {
+  page: number;
+  x: number;
+  y: number;
+  scale: number;
+}

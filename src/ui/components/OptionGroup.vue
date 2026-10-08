@@ -11,6 +11,7 @@ import {
 } from "../optionGroupModel";
 import { tipAttrs } from "../tooltipModel";
 import { useRovingFocus } from "../composables/useRovingFocus";
+import IconGlyph from "./IconGlyph.vue";
 import SettingRow from "./SettingRow.vue";
 
 // A labelled row of options, drawn as one segmented control. With a value,
@@ -20,7 +21,8 @@ import SettingRow from "./SettingRow.vue";
 // tab order at a time, so Tab leaves the row, and the dialog can move between
 // rows with ↑↓ (`[data-row] button:not([tabindex="-1"])`). An option with a
 // `short` label shows it and is named by it, as voice control finds it, with
-// its label as its tooltip, which describes it.
+// its label as its tooltip, which describes it. An option's `tip` is its
+// tooltip instead, and its `icon` shows before its label.
 const props = defineProps<{
   // the label's id, which names the row for screen readers
   id: string;
@@ -62,9 +64,12 @@ const press = (index: number, event: MouseEvent) => {
   if (!toggles) (event.currentTarget as HTMLButtonElement).focus();
 };
 
-// a short label shows the long one as the tooltip
+// a short label shows the long one as the tooltip, unless the option has a
+// tooltip of its own
 const tipped = (option: Option<T>) =>
-  option.short === undefined ? {} : tipAttrs({ name: option.label });
+  option.short === undefined && option.tip === undefined
+    ? {}
+    : tipAttrs({ name: option.tip ?? option.label });
 </script>
 
 <template>
@@ -90,6 +95,7 @@ const tipped = (option: Option<T>) =>
         v-bind="tipped(option)"
         @click="press(index, $event)"
       >
+        <IconGlyph v-if="option.icon" :name="option.icon" />
         {{ option.short ?? option.label }}
       </button>
     </div>

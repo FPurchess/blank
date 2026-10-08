@@ -825,9 +825,10 @@ fn verapdf(path: &str) {
     assert!(report.starts_with("PASS"), "veraPDF: {report}");
 }
 
-#[test]
-fn pdf_is_tagged() {
-    use blank_layout::pdf::write_with;
+/// the chapters with a table of contents, tables with blocks in their
+/// cells, a quote and an image that isn't loaded: every role of the
+/// structure
+fn tagged_document() -> Engine {
     let mut items = sample_with_toc();
     let end = items.last().unwrap().to();
     items.extend(table_with_blocks().into_iter().map(|mut item| {
@@ -854,6 +855,13 @@ fn pdf_is_tagged() {
     let mut engine = Engine::new(repository_fonts());
     engine.set_settings(settings());
     engine.set_items(items);
+    engine
+}
+
+#[test]
+fn pdf_is_tagged() {
+    use blank_layout::pdf::write_with;
+    let mut engine = tagged_document();
     let written = write_with(
         &mut engine,
         &Default::default(),
@@ -928,6 +936,52 @@ fn pdf_is_tagged() {
     }
     // and its text is where it was laid out, as without tags
     compare(&mut engine, "tagged-layout");
+}
+
+#[test]
+fn pdf_of_some_pages_is_tagged() {
+    use blank_layout::pdf::write_pages;
+    let mut engine = tagged_document();
+    // every other page, so lists, tables and the table of contents lose
+    // what was on the pages left out
+    let pages: Vec<usize> = (0..engine.pages.len()).step_by(2).collect();
+    assert!(pages.len() > 1);
+    let written = write_pages(
+        &mut engine,
+        &Default::default(),
+        &Info {
+            title: "Sample".into(),
+            author: "".into(),
+            date: "2026-10-01T09:30:00+02:00".into(),
+        },
+        "en-GB",
+        &pages,
+    )
+    .unwrap();
+    assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+    let xmp = String::from_utf8_lossy(&written.bytes);
+    assert!(xmp.contains("<pdfaid:part>2</pdfaid:part><pdfaid:conformance>U</pdfaid:conformance>"));
+    let path = std::env::temp_dir().join("blank-layout-tagged-pages.pdf");
+    std::fs::write(&path, &written.bytes).unwrap();
+    let path = path.to_str().unwrap();
+    verapdf(path);
+    let Some(info) = run("pdfinfo", &[path]) else {
+        eprintln!("pdfinfo is missing, skipping the check");
+        return;
+    };
+    let tagged = info.lines().find(|line| line.starts_with("Tagged:"));
+    assert!(tagged.is_some_and(|line| line.ends_with("yes")), "{info}");
+    let count = info.lines().find(|line| line.starts_with("Pages:"));
+    assert!(
+        count.is_some_and(|line| line.ends_with(&format!(" {}", pages.len()))),
+        "{info}"
+    );
+    if let Some(check) = run("qpdf", &["--check", path]) {
+        assert!(
+            check.contains("No syntax or stream encoding errors"),
+            "{check}"
+        );
+    }
 }
 
 #[test]

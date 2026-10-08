@@ -1,0 +1,204 @@
+// The print dialog (src/ui/PrintDialog.vue): the sheets that print on the
+// desk's color on the left, the options on the right, which scroll. Below
+// 720px the preview stacks above the options. Its rows are the dialogs'
+// setting rows (SettingRow.vue, main.scss), with the label above the control.
+@use "controls" as *;
+
+.dialog.print {
+  width: min(880px, calc(100% - 32px));
+  max-width: none;
+
+  .dialog-body {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .print-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+
+    @media (max-width: 720px) {
+      flex-direction: column;
+    }
+  }
+
+  // the preview: the sheet on the desk, and the pager below it
+  .print-preview {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--desk-color);
+    border-right: 1px solid var(--line);
+
+    @media (max-width: 720px) {
+      flex: none;
+      height: 220px;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+
+  // the room for the sheet, which it doesn't hold open itself, so the
+  // dialog follows the options' height both ways
+  .stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    padding: var(--s5) var(--s5) var(--s2);
+  }
+
+  // the paper as the printer prints it: white whatever the theme (PAPER in
+  // src/ui/painter/canvas2d.ts), on the desk like the pages
+  .sheet {
+    position: absolute;
+    inset: var(--s5) var(--s5) var(--s2);
+    margin: auto;
+    overflow: hidden;
+    background: #fff;
+    box-shadow:
+      0 0 0 1px var(--sheet-edge),
+      0 2px 0 1px var(--sheet-shadow);
+
+    canvas {
+      position: absolute;
+    }
+  }
+
+  .empty {
+    margin: 0;
+    padding-top: 40%;
+    text-align: center;
+  }
+
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s3);
+    padding: 0 0 var(--s3);
+
+    p {
+      min-width: 160px;
+      margin: 0;
+      text-align: center;
+      white-space: nowrap;
+    }
+  }
+
+  .print-options {
+    flex: none;
+    width: 320px;
+    box-sizing: border-box;
+    padding: var(--s2) var(--s5) var(--s4);
+    overflow: auto;
+
+    @media (max-width: 720px) {
+      flex: 1;
+      width: auto;
+      min-height: 0;
+    }
+  }
+
+  // the label above the control, which takes the width
+  .setting {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s2);
+    border-bottom: 0;
+  }
+
+  // segments never wrap, so "Current page" stays on one line
+  .options {
+    flex-wrap: nowrap;
+
+    > button {
+      flex: 1;
+    }
+  }
+
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+
+    input {
+      width: 56px;
+      margin: 0;
+      text-align: center;
+    }
+  }
+
+  .switch-row {
+    margin-bottom: var(--s2);
+  }
+
+  .custom {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    label {
+      font-size: var(--ui-small);
+    }
+  }
+
+  // what is wrong with the pages typed, as page setup says it
+  .error p {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: var(--s2) 0 0;
+    font-size: var(--ui-small);
+    color: var(--spelling-color);
+  }
+
+  .disclosure {
+    @include text-button;
+    @include text-button-quiet;
+    gap: 6px;
+    margin: var(--s2) 0;
+    padding-left: var(--s2);
+  }
+
+  // the paper in words, and the way to the page setup on its right
+  [data-row="paper"] {
+    flex-flow: row wrap;
+    align-items: center;
+
+    .setting-text {
+      flex-basis: 100%;
+    }
+  }
+
+  .paper {
+    flex: 1;
+  }
+
+  .link {
+    @include text-button;
+  }
+
+  // what a row's choice means, below it
+  .hint {
+    margin: 0 0 var(--s2);
+  }
+
+  .note {
+    margin: var(--s3) 0 0;
+    font-size: var(--ui-small);
+    color: var(--muted);
+
+    &.warning {
+      color: inherit;
+    }
+  }
+
+  .summary {
+    align-self: center;
+    margin: 0;
+    color: var(--muted);
+  }
+}

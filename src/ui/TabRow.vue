@@ -8,6 +8,7 @@ import {
   closeOtherTabs,
   closeTabsToRight,
   newFile,
+  print,
   saveFile,
   selectTab,
 } from "../editor/commands";
@@ -16,7 +17,9 @@ import {
   toggleBlocksPane,
 } from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
-import { closeTabs, moveTab } from "../editor/tabs";
+import { activateTab, closeTabs, moveTab } from "../editor/tabs";
+import { engineless } from "../engine/engine";
+import { logError } from "../log";
 import {
   activeTabId,
   blocksPaneOpen,
@@ -117,8 +120,19 @@ const openMenu = (id: string, element: HTMLElement, at?: MouseEvent) => {
       closeOthers: (tabId) => run(closeOtherTabs(tabId)),
       closeRight: (tabId) => run(closeTabsToRight(tabId)),
       save: (tabId, force) => run(saveFile({ force }, tabId)),
+      // after the switch, which closes the dialogs of the tab shown before,
+      // unless another switch came after it
+      print: (tabId) =>
+        void activateTab(tabId)
+          .then(() => {
+            if (activeTabId.value === tabId) run(print());
+          })
+          .catch((error: unknown) =>
+            logError("failed to open the print dialog of a tab", error),
+          ),
       copyPath: (path) => void writeText(path).catch(console.error),
     },
+    !engineless(),
   );
   menu.openAt(element, items, {
     anchor: at && { left: at.clientX, top: at.clientY, bottom: at.clientY },

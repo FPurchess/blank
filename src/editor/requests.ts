@@ -10,6 +10,7 @@ import {
   linkDialog,
   outlinePeek,
   pageSetup,
+  printDialog,
   tablePicker,
   tableToolbar,
   tocPopover,
@@ -38,6 +39,7 @@ export const closeRequests = () => {
   close(linkDialog, (request) => request.cancel());
   close(imageDialog, (request) => request.cancel());
   close(pageSetup, (request) => request.cancel());
+  close(printDialog, (request) => request.cancel());
   close(unsavedDialog, (request) => request.cancel());
   close(tocPopover, (request) => request.close());
   close(contextMenu, (request) => request.close());

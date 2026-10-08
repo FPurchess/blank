@@ -214,6 +214,7 @@ describe("the tab row", () => {
       "-",
       "Save",
       "Save as…",
+      "Print…",
       "-",
       "Copy path",
     ]);

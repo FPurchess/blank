@@ -45,3 +45,11 @@ export const firstStop = <T extends OptionValue>(
         0,
         options.findIndex((option) => option.value === chosen),
       );
+
+/**
+ * appliesOnEnter tells whether Enter on `target` applies the dialog instead
+ * of pressing it: on an option of a row it does, as a dialog's Enter applies
+ * what its options say, while other buttons (a list, a stepper) take it
+ */
+export const appliesOnEnter = (target: EventTarget | null) =>
+  target instanceof HTMLButtonElement && target.closest(".options") !== null;

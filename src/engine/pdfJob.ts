@@ -20,6 +20,10 @@ export interface PdfJob {
   language?: string;
   // when the PDF was made, see pdfDate
   date: string;
+  // the pages to write, by their index, if not all
+  pages?: number[];
+  // or the sheets to print instead, as JSON (see PageEngine.printPdf)
+  sheets?: string;
 }
 
 // what a PDF left out: an image it couldn't decode, which shows its alt
@@ -32,6 +36,7 @@ export type PdfWarning =
 
 export interface PdfResult {
   pdf: Uint8Array;
+  // the pages of the PDF written: the document's, or the sheets to print
   pages: number;
   // the characters no font had, for a second job with more fonts
   missing: string;
@@ -71,9 +76,24 @@ export const writePdf = (
       engine.addImage(image.src, image.bytes, image.jpeg);
     engine.setSettings(job.settings);
     engine.setItems(job.items);
+    const written =
+      job.sheets !== undefined
+        ? {
+            pdf: engine.printPdf(job.sheets, job.title),
+            pages: (JSON.parse(job.sheets) as unknown[]).length,
+          }
+        : {
+            pdf: engine.pdf(
+              job.title,
+              job.author,
+              job.language ?? null,
+              job.date,
+              job.pages ? Uint32Array.from(job.pages) : null,
+            ),
+            pages: job.pages?.length ?? engine.pageCount(),
+          };
     return {
-      pdf: engine.pdf(job.title, job.author, job.language ?? null, job.date),
-      pages: engine.pageCount(),
+      ...written,
       missing: engine.missing(),
       warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],
     };

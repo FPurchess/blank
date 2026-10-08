@@ -65,6 +65,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "save",
     aliases: ["rename", "copy"],
   },
+  [C.FILE_PRINT]: {
+    group: "File",
+    label: "Print…",
+    icon: "print",
+    aliases: ["printer", "paper"],
+  },
   [C.TAB_CLOSE]: {
     group: "Tabs",
     label: "Close tab",
@@ -105,7 +111,7 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     group: "Export",
     label: "Export as PDF…",
     icon: "pdf",
-    aliases: ["export", "print", "portable"],
+    aliases: ["export", "portable"],
   },
   [C.EXPORT_DOCX]: {
     group: "Export",

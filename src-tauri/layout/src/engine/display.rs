@@ -123,6 +123,25 @@ impl Engine {
             .collect()
     }
 
+    /// what a page prints, its body and its header and footer, with the
+    /// part of the document each op draws: what the screen shows, without
+    /// the hints only the screen shows (see Part::Hint). The PDF and the
+    /// print preview both draw this.
+    pub fn printed_parts(&mut self, page: usize) -> Vec<(Op, Part)> {
+        let mut ops = self.body_parts(page);
+        ops.extend(self.band_parts(page));
+        ops.retain(|(_, part)| !matches!(part, Part::Hint { .. }));
+        ops
+    }
+
+    /// what a page prints, as `printed_parts` gives it
+    pub fn printed_ops(&mut self, page: usize) -> Vec<Op> {
+        self.printed_parts(page)
+            .into_iter()
+            .map(|(op, _)| op)
+            .collect()
+    }
+
     /// what a page shows besides its header and footer, with the part of
     /// the document each op draws
     pub fn body_parts(&self, page: usize) -> Vec<(Op, Part)> {
@@ -703,6 +722,39 @@ mod tests {
         assert_eq!(boxes, vec![Part::Hint { item: 0 }]);
         // the caret is in the empty text, at the box's top
         assert!(laid.texts[0].empty());
+        // and none of it prints
+        let mut engine = engine;
+        assert!(engine.printed_ops(0).is_empty());
+    }
+
+    #[test]
+    fn prints_a_boxed_label_but_no_hint() {
+        let mut empty = paragraph(1, "");
+        if let Content::Text(text) = &mut empty.content {
+            text.hint = Some("Your name".into());
+        }
+        // a block Blank can't show: its label looks like a hint, but it is
+        // the document's
+        let boxed = Item {
+            content: Content::Boxed {
+                pos: 3,
+                label: "A chart".into(),
+            },
+            ..paragraph(3, "")
+        };
+        let mut engine = engine(vec![empty, boxed]);
+        let printed: Vec<(Role, Part)> = engine
+            .printed_parts(0)
+            .into_iter()
+            .filter_map(|(op, part)| match op {
+                Op::Glyphs { role, .. } => Some((role, part)),
+                _ => None,
+            })
+            .collect();
+        assert!(!printed.is_empty());
+        assert!(printed
+            .iter()
+            .all(|printed| *printed == (Role::Hint, Part::Label { item: 1 })));
     }
 
     #[test]
