@@ -783,6 +783,30 @@ describe("PDF tabs", () => {
     expect(shownPdf.value?.opened?.sha256).toBe("c1");
   });
 
+  it("starts while a restored PDF tab still opens, and shows it once open", async () => {
+    let opened = () => {};
+    vi.mocked(openPdf).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          opened = () =>
+            resolve({
+              sha256: "c1",
+              pages: [{ width: 595, height: 842, rotation: 0 }],
+              repaired: false,
+              encrypted: false,
+            });
+        }),
+    );
+    await stored([{ id: "a", kind: "pdf", path: "/c.pdf" }]);
+
+    await boot();
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+
+    opened();
+    await flushPromises();
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+  });
+
   it("opens a PDF again from where the user found it", async () => {
     await stored([{ id: "a", kind: "pdf", path: "/c-old.pdf" }]);
     await boot();

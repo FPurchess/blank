@@ -397,6 +397,9 @@ const close = () => void closeTabs([tabId.value]);
         <button type="button" @click="close">Close tab</button>
       </div>
     </div>
+    <p v-else-if="!pdf.opened" class="pdf-problem pdf-opening" role="status">
+      Opening {{ label }}…
+    </p>
     <div
       v-else-if="layout"
       class="page-desk"

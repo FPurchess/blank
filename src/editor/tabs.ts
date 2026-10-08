@@ -9,6 +9,7 @@ import { onScopeDispose, type Ref, watch } from "vue";
 
 import { forgetImages } from "../engine/images";
 import {
+  openingPdf,
   openPdfDocument,
   type PdfTabDocument,
   problemText,
@@ -258,9 +259,21 @@ const storedDocument = async (tab: Tab): Promise<Node | undefined> => {
  * stored
  */
 const loadTab = async (tab: Tab): Promise<TabDocument> => {
-  // the file, read again: a PDF that can't be opened shows why
-  if (isPdfTab(tab) && tab.path !== null)
-    return keptPdf(await openPdfDocument(tab.id, tab.path));
+  // the file, read again, in the background: the tab shows that it opens,
+  // so a slow helper never holds up the start or a switch; a PDF that can't
+  // be opened shows why
+  if (isPdfTab(tab) && tab.path !== null) {
+    const document = keptPdf(openingPdf(tab.path));
+    void openPdfDocument(tab.id, tab.path).then((pdf) => {
+      // the tab closed, or was opened again, meanwhile
+      const now = document.pdf;
+      if (documents.get(tab.id) !== document || now?.opened || now?.problem)
+        return;
+      document.pdf = pdf;
+      if (tab.id === activeTabId.value) shownPdf.value = pdf;
+    });
+    return document;
+  }
   if (tab.path !== null && !tab.unsaved) {
     const loaded = await readDocument(tab.path, true);
     if (loaded) return kept(stateOf(loaded.doc));

@@ -83,6 +83,18 @@ export const withFailedPage = (
     : { ...doc, failedPages: [...doc.failedPages, page] };
 
 /**
+ * openingPdf returns the PDF at `path` while its helper opens it: nothing
+ * opened yet, and no problem
+ */
+export const openingPdf = (path: string): PdfTabDocument => ({
+  path,
+  opened: null,
+  problem: null,
+  failedPages: [],
+  signatures: null,
+});
+
+/**
  * openPdfDocument opens the PDF at `path` in the tab `tab`. It never throws:
  * a PDF that can't be opened gives a document with its problem, which is
  * logged by its kind.
@@ -91,13 +103,7 @@ export const openPdfDocument = async (
   tab: string,
   path: string,
 ): Promise<PdfTabDocument> => {
-  const doc = {
-    path,
-    opened: null,
-    problem: null,
-    failedPages: [],
-    signatures: null,
-  };
+  const doc = openingPdf(path);
   try {
     if (!(await exists(path))) return withProblem(doc, "missing");
     return { ...doc, opened: await openPdf(tab, path) };
