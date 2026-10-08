@@ -1,0 +1,30 @@
+[package]
+name = "blank-pdf"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Blank's PDF helper: draws a PDF's pages and reads its form with MuPDF, in a process of its own"
+publish = false
+
+[lib]
+name = "blank_pdf"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blank-pdf"
+path = "src/main.rs"
+
+[dependencies]
+blank-pdf-ipc = { path = "../ipc" }
+blank-system-fonts = { path = "../../system-fonts" }
+# MuPDF itself, built from the submodule (see ../mupdf-sys): only linked,
+# the helper calls MuPDF through its own shim (shim/blank_mupdf.c). Without
+# the default features, with the URW base 14 fonts, which PDFs use unembedded
+mupdf-sys = { version = "0.8.0", default-features = false, features = ["base14-fonts"] }
+serde = "1"
+serde_json = "1"
+# keeps stdout for the frames (src/main.rs)
+libc = "0.2"
+
+[build-dependencies]
+cc = "1"

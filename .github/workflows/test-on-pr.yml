@@ -20,6 +20,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # MuPDF, which the PDF helper is built from
+          submodules: recursive
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
@@ -47,7 +50,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      # tauri-action builds the frontend through beforeBuildCommand
+      # tauri-action builds the frontend and the PDF helper through
+      # beforeBuildCommand
       - name: install app dependencies
         run: bun install
 
@@ -62,13 +66,32 @@ jobs:
       - name: run rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p blank
 
+      # the PDF helper, next to the app (bundle.externalBin), runs
+      - name: run the PDF helper
+        shell: bash
+        run: |
+          helper=src-tauri/target/release/blank-pdf
+          [ -f "$helper" ] || helper="$helper.exe"
+          "$helper" --version | tee "$RUNNER_TEMP/helper.txt"
+          grep -q "MuPDF 1.28.5" "$RUNNER_TEMP/helper.txt"
+
+      # the helper is built for macOS 12, as the app is
+      - name: check the PDF helper's macOS version (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          minos=$(vtool -show-build src-tauri/target/release/blank-pdf | awk '/minos/ { print $2; exit }')
+          echo "the PDF helper's minos: $minos"
+          [ "$minos" = 12.0 ]
+
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
-          echo "highest required glibc symbol: $max"
-          [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          for binary in blank blank-pdf; do
+            max=$(objdump -T src-tauri/target/release/$binary | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+            echo "$binary: highest required glibc symbol: $max"
+            [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          done
 
       - name: check desktop entry and AppStream metadata in the packages (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -80,6 +103,8 @@ jobs:
           cat "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop"
           grep -qx 'Exec=blank %F' "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop" ||
             { echo "::error::the .deb's desktop entry doesn't pass the files to blank"; exit 1; }
+          test -x "$RUNNER_TEMP/deb/usr/bin/blank-pdf" || { echo "::error::the .deb has no usr/bin/blank-pdf"; exit 1; }
           sudo apt-get install -y rpm
           rpm -qlp src-tauri/target/release/bundle/rpm/*.rpm | tee "$RUNNER_TEMP/rpm.txt"
           grep -qx "/$meta" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /$meta"; exit 1; }
+          grep -qx "/usr/bin/blank-pdf" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /usr/bin/blank-pdf"; exit 1; }

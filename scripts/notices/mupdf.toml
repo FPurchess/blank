@@ -1,0 +1,55 @@
+# What the PDF helper (blank-pdf) compiles in from MuPDF's sources, the
+# submodule src-tauri/pdf/mupdf-sys/mupdf, with the licence files in it:
+# MuPDF itself, the URW base 14 fonts it builds in, and the libraries of its
+# thirdparty/ folder that its build compiles. scripts/build-notices.ts writes
+# their licences into the notices from these files, so they follow the
+# version the submodule pins; scripts/check-mupdf-notices.ts (the `pdf` job
+# of the Tests workflow) fails when the build compiles a library of
+# thirdparty/ that isn't listed here, or one listed isn't compiled.
+
+[[library]]
+name = "MuPDF"
+license = "AGPL-3.0-or-later"
+files = ["COPYING"]
+
+[[library]]
+name = "URW base 14 fonts (Nimbus, Standard Symbols, Dingbats)"
+license = "OFL-1.1"
+files = ["resources/fonts/urw/OFL.txt"]
+
+[[library]]
+name = "FreeType"
+thirdparty = "freetype"
+license = "FTL"
+files = ["thirdparty/freetype/docs/FTL.TXT"]
+
+[[library]]
+name = "jbig2dec"
+thirdparty = "jbig2dec"
+license = "AGPL-3.0-or-later"
+files = ["thirdparty/jbig2dec/LICENSE"]
+
+[[library]]
+name = "Little CMS (lcms2mt)"
+thirdparty = "lcms2"
+license = "MIT"
+files = ["thirdparty/lcms2/LICENSE"]
+
+[[library]]
+name = "libjpeg (Independent JPEG Group)"
+thirdparty = "libjpeg"
+license = "IJG"
+# its licence is the README's "LEGAL ISSUES"
+files = ["thirdparty/libjpeg/README"]
+
+[[library]]
+name = "OpenJPEG"
+thirdparty = "openjpeg"
+license = "BSD-2-Clause"
+files = ["thirdparty/openjpeg/LICENSE"]
+
+[[library]]
+name = "zlib"
+thirdparty = "zlib"
+license = "Zlib"
+files = ["thirdparty/zlib/LICENSE"]

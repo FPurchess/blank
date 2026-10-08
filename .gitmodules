@@ -1,0 +1,4 @@
+[submodule "src-tauri/pdf/mupdf-sys/mupdf"]
+	path = src-tauri/pdf/mupdf-sys/mupdf
+	url = https://github.com/ArtifexSoftware/mupdf
+	shallow = true

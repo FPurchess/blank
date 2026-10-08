@@ -1,0 +1,78 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 13 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 14 0 R] >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<<  /Length 172 >>
+stream
+BT /F1 12 Tf 100 760 Td (Contract) Tj ET
+BT /F1 10 Tf 100 470 Td (Unterschrift) Tj ET
+0.5 w 100 490 m 300 490 l S
+BT /F1 10 Tf 350 470 Td (Ort, Datum: ______________) Tj ET
+endstream
+endobj
+6 0 obj
+<< /FT /Tx /T (name) /TU (Your name) /Type /Annot /Subtype /Widget /Rect [100 700 300 720] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) /MaxLen 40 >>
+endobj
+7 0 obj
+<< /FT /Btn /T (agree) /V /Off /AS /Off /Type /Annot /Subtype /Widget /Rect [100 650 115 665] /P 3 0 R /F 4 /AP << /N << /Yes 8 0 R /Off 9 0 R >> >> >>
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 15 15] /Length 16 >>
+stream
+0 g 3 3 9 9 re f
+endstream
+endobj
+9 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 15 15] /Length 0 >>
+stream
+
+endstream
+endobj
+10 0 obj
+<< /FT /Ch /Ff 131072 /T (color) /Opt [(Red) (Green) (Blue)] /V (Green) /Type /Annot /Subtype /Widget /Rect [100 600 250 620] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>
+endobj
+11 0 obj
+<< /FT /Sig /T (signature) /Type /Annot /Subtype /Widget /Rect [100 500 300 550] /P 3 0 R /F 4 >>
+endobj
+12 0 obj
+<< /FT /Tx /Ff 1 /T (id) /V (A-17) /Type /Annot /Subtype /Widget /Rect [350 700 500 720] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>
+endobj
+13 0 obj
+<< /FT /Tx /T (address) /Kids [14 0 R] >>
+endobj
+14 0 obj
+<< /T (street) /Parent 13 0 R /Type /Annot /Subtype /Widget /Rect [100 550 300 570] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>
+endobj
+xref
+0 15
+0000000000 65535 f 
+0000000016 00000 n 
+0000000187 00000 n 
+0000000244 00000 n 
+0000000420 00000 n 
+0000000490 00000 n 
+0000000714 00000 n 
+0000000870 00000 n 
+0000001037 00000 n 
+0000001151 00000 n 
+0000001248 00000 n 
+0000001429 00000 n 
+0000001543 00000 n 
+0000001687 00000 n 
+0000001745 00000 n 
+trailer
+<< /Size 15 /Root 1 0 R >>
+startxref
+1883
+%%EOF

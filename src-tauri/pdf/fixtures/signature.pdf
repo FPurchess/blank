@@ -1,0 +1,30 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R] /SigFlags 3 >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Annots [4 0 R] >>
+endobj
+4 0 obj
+<< /FT /Sig /T (Signature1) /V 5 0 R /Type /Annot /Subtype /Widget /Rect [72 72 272 122] /P 3 0 R /F 132 >>
+endobj
+5 0 obj
+<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /ETSI.CAdES.detached /Name (Ada Lovelace) /Reason (I agree) /Location (London) /M (D:20261008120000Z) /ByteRange [0 0 0 0] /Contents <00> >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000108 00000 n 
+0000000165 00000 n 
+0000000252 00000 n 
+0000000375 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+579
+%%EOF

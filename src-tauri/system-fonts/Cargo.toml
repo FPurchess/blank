@@ -1,0 +1,14 @@
+[package]
+name = "blank-system-fonts"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "The system's fonts for what Blank's own fonts lack, for the layout engine and the PDF helper"
+publish = false
+
+[dependencies]
+fontique = "0.11"
+unicode-script = "0.5"
+# the version fontique uses; reads a font's licence (fsType) and outlines
+read-fonts = "0.41"
+serde = { version = "1", features = ["derive"] }

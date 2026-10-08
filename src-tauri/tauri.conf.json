@@ -4,9 +4,9 @@
   "version": "3.0.0",
   "identifier": "com.github.fpurchess.blank",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run pdf-helper && bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "bun run pdf-helper && bun run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -55,6 +55,7 @@
     "license": "AGPL-3.0-only",
     "licenseFile": "../LICENSE",
     "targets": "all",
+    "externalBin": ["binaries/blank-pdf"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

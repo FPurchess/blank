@@ -30,6 +30,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # MuPDF, which the PDF helper is built from
+          submodules: recursive
 
       - uses: ./.github/actions/webkit-deps
 
@@ -79,13 +82,15 @@ jobs:
           path: e2e/screenshots
           if-no-files-found: ignore
 
-      # the debug build embeds the frontend and the built-in dictionaries, so the binary is all
-      # the Screenshots workflow needs
+      # the debug build embeds the frontend and the built-in dictionaries, so the binary and
+      # the PDF helper next to it are all the Screenshots workflow needs
       - name: upload the app for the screenshots
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
-          path: src-tauri/target/debug/blank
+          path: |
+            src-tauri/target/debug/blank
+            src-tauri/target/debug/blank-pdf
           retention-days: 1
           if-no-files-found: error

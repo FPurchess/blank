@@ -96,7 +96,7 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: |
           # artifacts lose the executable bit
-          chmod +x "$RUNNER_TEMP/app/blank"
+          chmod +x "$RUNNER_TEMP/app/blank" "$RUNNER_TEMP/app/blank-pdf"
           # the spec files side by side, each in an app, a display and a session bus of its own
           bash scripts/docs-shots.sh
         env:
