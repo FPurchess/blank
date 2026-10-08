@@ -1,4 +1,4 @@
-import type { CertificateInfo, CheckedSignature, Trust } from "../signing/ipc";
+import type { CheckedSignature, Trust } from "../signing/ipc";
 
 // What the status bar, the signatures popover and a signature's details say
 // of a PDF's signatures (SignaturesStatus.vue, SignaturesPopover.vue,
@@ -102,29 +102,8 @@ export const signedWhen = (signature: CheckedSignature, locale?: string) => {
 };
 
 /**
- * certificateLine returns how the details name a certificate, e.g.
- * "Acme GmbH · issued by DigiCert" or "Maria Keller · self-signed"
- */
-export const certificateLine = (certificate: CertificateInfo) =>
-  `${certificate.name} · ${certificate.selfSigned ? "self-signed" : `issued by ${certificate.issuer}`}`;
-
-/**
  * canTrust is whether the details offer to trust a signature's certificate:
  * one Blank doesn't trust yet, of a signature that is intact
  */
 export const canTrust = (signature: CheckedSignature) =>
   lookOf(signature) === "unknown" && signature.certificateDer !== null;
-
-/**
- * validity returns how long a certificate is valid, e.g. "Oct 2026 – Oct
- * 2031", in `locale`; a date that can't be read as it was written
- */
-export const validity = (certificate: CertificateInfo, locale?: string) => {
-  const month = (text: string) => {
-    const date = new Date(text);
-    return Number.isNaN(date.getTime())
-      ? text
-      : date.toLocaleDateString(locale, { month: "short", year: "numeric" });
-  };
-  return `${month(certificate.notBefore)} – ${month(certificate.notAfter)}`;
-};

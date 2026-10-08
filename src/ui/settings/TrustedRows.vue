@@ -3,7 +3,7 @@ import { computed, onMounted } from "vue";
 
 import { trustedCertificates } from "../../state";
 import { loadTrusted, untrust } from "../../signing/trusted";
-import { groupFingerprint } from "./signingModel";
+import { groupFingerprint } from "../certificateModel";
 import EntryList from "./EntryList.vue";
 
 // Settings ▸ Signing, the certificates the user trusts: each with the start

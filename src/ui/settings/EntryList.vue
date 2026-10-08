@@ -8,7 +8,8 @@ import { filterEntries, FILTER_FROM } from "./settingsModel";
 // The list of an inner page of the settings, e.g. your dictionary's words:
 // sorted, each with Remove, and a filter once there are more than a few. The
 // default slot shows an entry, its key by default. After a remove, the focus
-// goes to the Remove next to it, or back to the page's first field.
+// goes to the Remove next to it, or back to the page's first field, or,
+// outside an inner page, to the list itself, so it never drops to the body.
 interface Entry {
   key: string;
   // what it becomes, for a replacement
@@ -45,7 +46,8 @@ watch(
     const buttons = root.value!.querySelectorAll<HTMLElement>(".entry button");
     const next =
       buttons[Math.min(removedAt, entries.length - 1)] ??
-      root.value!.closest(".inner-page")?.querySelector<HTMLElement>("input");
+      root.value!.closest(".inner-page")?.querySelector<HTMLElement>("input") ??
+      root.value!.querySelector<HTMLElement>("ul");
     removedAt = null;
     next?.focus();
   },
@@ -63,7 +65,7 @@ watch(
         placeholder="Filter"
       />
     </div>
-    <ul :id="id" :aria-label="label">
+    <ul :id="id" :aria-label="label" tabindex="-1">
       <li v-for="(entry, index) in shown" :key="entry.key" class="entry">
         <span class="entry-text"
           ><slot :entry="entry">{{ entry.key }}</slot></span

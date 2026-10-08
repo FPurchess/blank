@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { CheckedSignature } from "../signing/ipc";
 import {
   canTrust,
-  certificateLine,
   signatureStatus,
   signaturesLabel,
   signedWhen,
-  validity,
 } from "./signaturesModel";
 
 const certificate = {
@@ -83,18 +81,6 @@ describe("what Blank says of a PDF's signatures", () => {
     expect(signedWhen(signature({ time: null, timestamped: true }))).toBe(
       "timestamped",
     );
-  });
-
-  it("describes the certificate", () => {
-    expect(certificateLine(certificate)).toBe("Maria Keller · self-signed");
-    expect(
-      certificateLine({
-        ...certificate,
-        selfSigned: false,
-        issuer: "DigiCert",
-      }),
-    ).toBe("Maria Keller · issued by DigiCert");
-    expect(validity(certificate, "en-GB")).toBe("Oct 2026 – Oct 2031");
   });
 
   it("offers to trust only an intact signature of an unknown certificate", () => {

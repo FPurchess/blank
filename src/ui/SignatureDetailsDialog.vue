@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, useTemplateRef } from "vue";
 
-import { logWarning } from "../log";
 import { confirmTrust } from "../signing/trusted";
 import {
   closeDialog,
@@ -10,15 +9,18 @@ import {
 } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import IconGlyph from "./components/IconGlyph.vue";
-import { groupFingerprint } from "./settings/signingModel";
+import CopyFingerprint from "./components/CopyFingerprint.vue";
+import {
+  certificateLine,
+  groupFingerprint,
+  validity,
+} from "./certificateModel";
 import {
   canTrust,
-  certificateLine,
   lookOf,
   signatureVerdict,
   signedWhen,
   signerName,
-  validity,
 } from "./signaturesModel";
 
 // The details of one of a PDF's signatures: what Blank found, when it was
@@ -42,13 +44,6 @@ const trust = () =>
   closeDialog(signatureDetails, () =>
     confirmTrust(signature.value, fingerprint.value, props.request.refocus),
   );
-const copy = async () => {
-  try {
-    await navigator.clipboard.writeText(fingerprint.value);
-  } catch (error) {
-    logWarning("failed to copy the fingerprint", error);
-  }
-};
 </script>
 
 <template>
@@ -85,8 +80,10 @@ const copy = async () => {
         <div>
           <dt>Fingerprint</dt>
           <dd>
-            <span class="fingerprint">{{ fingerprint }}</span>
-            <button type="button" class="copy" @click="copy">Copy</button>
+            <CopyFingerprint
+              :fingerprint="certificate.fingerprint"
+              button-class="copy"
+            />
           </dd>
         </div>
       </template>
