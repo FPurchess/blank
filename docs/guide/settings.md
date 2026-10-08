@@ -54,6 +54,7 @@ Every command, with its shortcut. Type into the search to find one by its name. 
 - **Your name:** the name under your signature, in a [signature block](./signing#blocks) that doesn't name who signs.
 - **Certificate:** your [certificate](./signing#digital) for digital signatures: **Create…** a new one or **Import…** a key file. Once you have one: who made it and until when it's valid, **Export…** (the certificate alone, for others to trust), **Back up key…** and **Remove** (which asks first), and its **fingerprint** with **Copy**.
 - **Timestamp server:** a server that proves when you signed; **Use DigiCert** fills in a free one.
+- **Trusted certificates:** the certificates of others you [trust](./pdf#trust), whose signatures then show as **Signed** in PDFs, each with the start of its fingerprint and **Remove**.
 - **Date:** how the date next to your signature is written: the long form of the document's language (8 October 2026), its short form (08.10.2026 in German, 10/08/2026 in American English) or 2026-10-08.
 
 ## About

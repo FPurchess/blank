@@ -13,11 +13,12 @@ paths:
   - "src/markdown/blocks/signature.ts"
   - "src/importers/docx/signatures.ts"
   - "src-tauri/layout/src/items/signature.rs"
+  - "src-tauri/src/signing/**"
 ---
 
 # Signing
 
-Blank signs what the user writes by exporting a signed PDF; a markdown file never holds a signature. The plan and its later parts (certificates, PAdES, signing received PDFs) are in the e-signing plan; this is what is built.
+Blank signs what the user writes by exporting a signed PDF; a markdown file never holds a signature. It also checks the signatures of the PDFs it opens in PDF tabs, and keeps the certificates the user trusts (`trust.rs`, see `pdf.md`). The plan and its later parts (certificates, PAdES, signing received PDFs) are in the e-signing plan; this is what is built.
 
 ## The user's signature and initials
 

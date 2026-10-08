@@ -34,9 +34,13 @@ On Linux, middle-click pastes as in your other apps: the text you select in Blan
 
 You can open it with `Mod` `O`: Blank turns it into a markdown document and leaves the Word file as it is. When you're done, save it as markdown with `Mod` `S`, or send it back as a Word document with `Mod` `Alt` `W`. Blank never writes markdown into a .docx, so the original can't get lost by accident. See [Back and forth with Word users](./files#back-and-forth) for how it works and what comes along.
 
+## What is `blank-pdf`?
+
+The program that draws the pages of the [PDFs](./pdf) you open in Blank, with [MuPDF](https://mupdf.com). It comes with Blank, next to it, and runs once for each PDF tab, so a PDF that crashes it takes down only its tab. It never sends anything anywhere.
+
 ## Which open source software does Blank use?
 
-Blank is open source itself, and builds on the work of many others: its fonts, the editor, the layout engine and their libraries. The [third-party notices](https://github.com/FPurchess/blank/blob/main/public/THIRD-PARTY-NOTICES.txt) list them all, with their licences.
+Blank is open source itself, and builds on the work of many others: its fonts, the editor, the layout engine and their libraries. The [third-party notices](https://github.com/FPurchess/blank/blob/main/public/THIRD-PARTY-NOTICES.txt) list them all, with their licences. `blank-pdf` is built from MuPDF 1.28.5, under the GNU AGPL like Blank: its source is Artifex's release of MuPDF together with the code around it in Blank's repository (`src-tauri/pdf`).
 
 ## I found a bug or have an idea
 

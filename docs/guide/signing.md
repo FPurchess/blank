@@ -53,6 +53,7 @@ Your key never leaves your computer and is kept in the `signing` folder, protect
 
 - **Acrobat Reader** shows the signature in its signature panel. A certificate Blank made is your own, not one a certificate authority vouches for, so Acrobat says the signer's identity is _unknown_ until the reader trusts it: they open the signature's properties, compare its fingerprint with yours (**Settings ▸ Signing ▸ Fingerprint**, by phone or in person), and add it to their trusted certificates. From then on, your signatures show as valid.
 - **LibreOffice**, **Okular** and `pdfsig` show the signature the same way.
+- **Blank** shows it in the status bar of the PDF's tab, see [Check the signatures](./pdf#check-the-signatures).
 - The EU's free [validator](https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/validation) checks it too. With a certificate Blank made, it finds the signature intact, but reports it as _indeterminate_: no authority it trusts vouches for your certificate.
 
 A **timestamp server** (**Settings ▸ Signing**) proves when you signed, instead of your computer's clock. Blank sends it only a fingerprint of your signature, never the document. **Use DigiCert** fills in a free one Acrobat trusts.

@@ -19,32 +19,33 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 
 ## Files
 
-| Command                                     | Shortcut                |
-| ------------------------------------------- | ----------------------- |
-| New document                                | `Mod` `N`               |
-| Open file                                   | `Mod` `O`               |
-| Save                                        | `Mod` `S`               |
-| Save as                                     | `Mod` `Shift` `S`       |
-| [Print](./print)                            | `Mod` `P`               |
-| Export as PDF                               | `Mod` `Alt` `P`         |
-| Export as Word                              | `Mod` `Alt` `W`         |
-| [Export signed PDF](./signing#export)       | `Mod` `Alt` `Shift` `P` |
-| [Your signature](./signing#your-signature)  | (none)                  |
-| [Your initials](./signing#your-signature)   | (none)                  |
-| Page setup                                  | `Mod` `Alt` `U`         |
-| Edit header                                 | `Mod` `Alt` `H`         |
-| Edit footer                                 | `Mod` `Alt` `F`         |
-| [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`         |
-| [Zoom in](./pages#zoom)                     | `Mod` `=` or `Mod` `+`  |
-| [Zoom out](./pages#zoom)                    | `Mod` `-`               |
-| [Fit to window](./pages#zoom)               | (none)                  |
-| [Outline](./pages#outline)                  | `Mod` `Alt` `O`         |
-| [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`         |
-| Cycle themes                                | `Mod` `Alt` `T`         |
-| Choose language                             | `Mod` `Alt` `L`         |
-| [Focus mode](./writing#focus-mode)          | `Mod` `Shift` `F`       |
-| [Settings](./settings)                      | `Mod` `,`               |
-| [Main menu](./menu)                         | `Mod` `K`               |
+| Command                                             | Shortcut                |
+| --------------------------------------------------- | ----------------------- |
+| New document                                        | `Mod` `N`               |
+| Open file                                           | `Mod` `O`               |
+| Save                                                | `Mod` `S`               |
+| Save as                                             | `Mod` `Shift` `S`       |
+| [Print](./print)                                    | `Mod` `P`               |
+| Export as PDF                                       | `Mod` `Alt` `P`         |
+| Export as Word                                      | `Mod` `Alt` `W`         |
+| [Export signed PDF](./signing#export)               | `Mod` `Alt` `Shift` `P` |
+| [Your signature](./signing#your-signature)          | (none)                  |
+| [Your initials](./signing#your-signature)           | (none)                  |
+| Page setup                                          | `Mod` `Alt` `U`         |
+| Edit header                                         | `Mod` `Alt` `H`         |
+| Edit footer                                         | `Mod` `Alt` `F`         |
+| [Pages or page ends](./pages#on-the-screen)         | `Mod` `Alt` `V`         |
+| [Zoom in](./pages#zoom)                             | `Mod` `=` or `Mod` `+`  |
+| [Zoom out](./pages#zoom)                            | `Mod` `-`               |
+| [Fit to window](./pages#zoom)                       | (none)                  |
+| [Outline](./pages#outline)                          | `Mod` `Alt` `O`         |
+| [Word count](./writing#the-status-bar)              | `Mod` `Alt` `C`         |
+| [Signatures of the PDF](./pdf#check-the-signatures) | (none)                  |
+| Cycle themes                                        | `Mod` `Alt` `T`         |
+| Choose language                                     | `Mod` `Alt` `L`         |
+| [Focus mode](./writing#focus-mode)                  | `Mod` `Shift` `F`       |
+| [Settings](./settings)                              | `Mod` `,`               |
+| [Main menu](./menu)                                 | `Mod` `K`               |
 
 ## Tabs and moving around
 

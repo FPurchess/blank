@@ -31,6 +31,7 @@ Blank keeps several documents open, one tab each, in the one ProseMirror view: e
 - **`src/editor/commands/tabs.ts`:** the commands of the keymap and the tab row, which start one of those and return `true`.
 - **`src/ui/TabRow.vue`** (keys, menu and fit in `tabRowModel.ts`, dragging in `tabDrag.ts`), `DocumentTab.vue`, `UnsavedDialog.vue`; the keys of the window outside the editor in `composables/useWindowCommands.ts`, which `App.vue` uses.
 - `path`, `importedFrom` and `transaction` (`src/state/document.ts`) stay what everything reads, and always mean the active tab.
+- **PDF tabs** (`Tab.kind: "pdf"`, see `pdf.md`): a `.pdf` opens in a tab of its own (`pdfTab`, which opens it with its helper first and adds no tab for one it can't open). Its `TabDocument` keeps its `pdf` and an empty placeholder state; a switch publishes `shownPdf`, and `path` and `importedFrom` as null. Closing it stops its helper (`closePdf`). A restored PDF tab opens its file again when it's first shown, and one that can't be opened stays, showing why.
 
 ## Rules
 
@@ -48,7 +49,7 @@ Blank keeps several documents open, one tab each, in the one ProseMirror view: e
 
 ## Storage (`src/storage.ts`)
 
-- `session` holds the order, the active tab and each tab without its document; `tab:<id>` holds each tab's `doc.toJSON()`. Only changed documents are written, at most a second after a change; the documents first, then the session, then the closed tabs' keys are removed, so the session never lists a document that isn't stored.
+- `session` holds the order, the active tab and each tab without its document; `tab:<id>` holds each tab's `doc.toJSON()`, a markdown tab's only: a PDF tab's PDF is its file. The session is `version: 2` since PDF tabs (`SESSION_VERSION`); this Blank reads 1 and 2, and an older Blank, which reads only 1, keeps a session of 2 as `session-backup` and starts afresh. Only changed documents are written, at most a second after a change; the documents first, then the session, then the closed tabs' keys are removed, so the session never lists a document that isn't stored.
 - Every tab has its document stored, a saved file's too: it is what shows when the file has gone. A tab without unsaved changes reads its file again when it's first shown; one with changes keeps them and reads the file in the background as its baseline.
 - Restored tabs load when first shown, except the active one.
 - An earlier Blank's `doc`, `path` and `importedFrom` become the first tab (`migrate`), marked unsaved until its file says otherwise. A stored document that can't be read is kept as `tab-backup:<id>`, a session that can't be read (e.g. a newer Blank's) as `session-backup`.
