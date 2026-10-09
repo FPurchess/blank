@@ -64,7 +64,8 @@ describe("find and replace", () => {
     await type(Key.Escape);
     await expect(panel()).not.toExist();
     await pressMod("z");
-    await expectEditorText("#editor p", "the cat and the hat. the end");
+    // as typed, which autocorrect capitalized
+    await expectEditorText("#editor p", "The cat and the hat. The end");
   });
 
   it("replaces with the groups of a regular expression", async () => {
@@ -75,7 +76,8 @@ describe("find and replace", () => {
     await expect(count()).toHaveText(expect.stringMatching(/ of 2$/));
     await fill("Replace with", "$1 at ");
     await button("Replace all").click();
-    await expectEditorText("#editor p", "ann at home bob at work");
+    // autocorrect capitalized the sentence
+    await expectEditorText("#editor p", "Ann at home bob at work");
     // off again for the next
     await $('#find-panel [aria-label="Regular expression"]').click();
   });

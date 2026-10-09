@@ -846,7 +846,8 @@ $faint-text-opacity: 0.6;
 
     .label {
       flex: 1;
-      overflow: hidden;
+      // clip, not hidden, as for .detail below
+      overflow: clip;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
