@@ -69,6 +69,12 @@ const boxes = computed(() =>
           :height="box.height"
         />
       </template>
+      <g v-else-if="choice.id === 'diagram'" class="lines">
+        <rect x="12" y="9" width="16" height="7" rx="1.5" />
+        <rect x="12" y="24.5" width="16" height="7" rx="1.5" />
+        <rect x="12" y="40" width="16" height="7" rx="3.5" />
+        <path d="M20 16v8.5 M20 31.5v8.5" />
+      </g>
       <g v-else class="lines">
         <rect x="7" y="18" width="11" height="11" />
         <circle cx="28" cy="23.5" r="5.5" />

@@ -28,6 +28,7 @@ const openDialog = async (request: Partial<ImageDialogRequest> = {}) => {
   const full: ImageDialogRequest = {
     src: "",
     alt: "",
+    width: null,
     isEdit: false,
     chooseFile: vi.fn().mockResolvedValue(null),
     submit: vi.fn(),
@@ -83,7 +84,11 @@ describe("imageDialog", () => {
 
     await submit();
 
-    expect(request.submit).toHaveBeenCalledWith("images/chart.png", "Chart");
+    expect(request.submit).toHaveBeenCalledWith(
+      "images/chart.png",
+      "Chart",
+      null,
+    );
     expect(imageDialog.value).toBeNull();
     expect(dialog()).toBeNull();
   });
@@ -126,7 +131,7 @@ describe("imageDialog", () => {
     expect(document.activeElement).toBe(altInput());
 
     await submit();
-    expect(request.submit).toHaveBeenCalledWith(EMBEDDED, "chart");
+    expect(request.submit).toHaveBeenCalledWith(EMBEDDED, "chart", null);
   });
 
   it("keeps a description that was already typed", async () => {
@@ -199,7 +204,7 @@ describe("imageDialog", () => {
     expect(hint().textContent).toBe("Embedded in the document");
 
     await submit();
-    expect(request.submit).toHaveBeenCalledWith(EMBEDDED, "Chart");
+    expect(request.submit).toHaveBeenCalledWith(EMBEDDED, "Chart", null);
   });
 
   it("drops an embedded image on any typing, even one that changes nothing", async () => {
@@ -236,7 +241,29 @@ describe("imageDialog", () => {
     expect(request.submit).toHaveBeenCalledWith(
       "https://example.com/a.png",
       "",
+      null,
     );
+  });
+
+  it("gives the image the width chosen, and keeps one of another app", async () => {
+    const request = await openDialog({
+      src: "a.png",
+      isEdit: true,
+      width: "300",
+    });
+    const option = (label: string) =>
+      [
+        ...dialog()!.querySelectorAll<HTMLButtonElement>(
+          '[data-row="width"] button',
+        ),
+      ].find((button) => button.textContent?.trim() === label)!;
+    expect(dialog()!.querySelector("[aria-checked='true']")).toBeNull();
+    await submit();
+    expect(request.submit).toHaveBeenLastCalledWith("a.png", "", "300");
+    const again = await openDialog({ src: "a.png", isEdit: true });
+    option("50%").click();
+    await submit();
+    expect(again.submit).toHaveBeenLastCalledWith("a.png", "", "50%");
   });
 
   it("removes an existing image", async () => {

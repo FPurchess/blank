@@ -1531,9 +1531,9 @@ body.without-engine.blocks-docked {
   font-size: var(--ui-small);
 }
 
-// the settings of a table of contents, below its toolbar
-// (src/ui/TocPopover.vue)
-.toc-popover {
+// the settings of a block, below its toolbar: a table of contents', a
+// diagram's (src/ui/components/BlockPopover.vue)
+.block-popover {
   position: fixed;
   // with the pickers and menus
   z-index: 20;
@@ -1559,6 +1559,19 @@ body.without-engine.blocks-docked {
   select,
   input {
     @include field;
+  }
+
+  // a row of options: its label above it, as the fields have theirs
+  .setting {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s1);
+    margin-top: var(--s1);
+  }
+
+  .setting-label {
+    color: var(--muted);
   }
 }
 

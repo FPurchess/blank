@@ -960,6 +960,7 @@ mod tests {
         assert!(ops.iter().any(|op| matches!(
             op,
             Op::Glyphs {
+                paint: None,
                 role: Role::Band,
                 ..
             }

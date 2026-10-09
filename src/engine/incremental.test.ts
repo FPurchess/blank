@@ -428,6 +428,6 @@ describe("incremental layout", () => {
     const flattened = vi.spyOn(flattening, "flattenBlocks");
     const other = doc(p("one"), p("two!"));
     engine.sync(other, noSizes, { changes: { from: other, ranges: [] } });
-    expect(flattened).toHaveBeenCalledWith(other, 0, 2, noSizes, null);
+    expect(flattened).toHaveBeenCalledWith(other, 0, 2, noSizes, null, {});
   });
 });

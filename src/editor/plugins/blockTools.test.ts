@@ -113,7 +113,7 @@ describe("blockTools", () => {
     expect(ids()).toEqual(["block-edit", "block-remove"]);
     // the tooltips name what the buttons do, with the keys that do the same
     expect(blockToolbar.value!.items).toMatchObject([
-      { label: "Settings", key: "Enter" },
+      { label: "Settings", key: "Shift+Enter" },
       {
         label: "Remove Table of contents",
         tip: "Remove block",
@@ -166,7 +166,7 @@ describe("blockTools", () => {
       view.someProp("handleKeyDown", (f) => f(view, keyEvent("Enter")));
     select((doc) => NodeSelection.create(doc, posOf("toc")));
     expect(enter()).toBe(true);
-    expect(tocPopover.value?.depth).toBe(2);
+    expect(tocPopover.value?.values.depth).toBe(2);
     // an embed of a type Blank doesn't have: Enter is the editor's
     select((doc) => NodeSelection.create(doc, posOf("embed")));
     expect(enter()).toBeFalsy();

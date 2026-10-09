@@ -14,7 +14,7 @@ use krilla::image::Image;
 use krilla::metadata::{DateTime, Metadata};
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, FillRule};
+use krilla::paint::{Fill, FillRule, LineCap, LineJoin, Stroke, StrokeDash};
 use krilla::surface::Surface;
 use krilla::tagging::{Artifact, ArtifactType, ContentTag, SpanTag};
 use krilla::text::{Font, GlyphId, KrillaGlyph, Tag};
@@ -22,6 +22,7 @@ use krilla::{Document, SerializeSettings};
 use parley::Alignment;
 use serde::Deserialize;
 
+use crate::drawing::{Cap, Join, LineStyle, Paint, PathCmd};
 use crate::engine::{Engine, Op, Part};
 use crate::fonts::{Fonts, INSTANCE_BASE};
 use crate::items::Role;
@@ -33,7 +34,24 @@ mod tags;
 /// an image's file, by its src
 pub struct ImageData {
     pub bytes: Vec<u8>,
-    pub jpeg: bool,
+    pub kind: ImageKind,
+}
+
+/// what an image's file is
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ImageKind {
+    Png,
+    Jpeg,
+}
+
+impl ImageKind {
+    /// the kind the webview sends: 1 for JPEG, PNG otherwise
+    pub fn from_code(code: u8) -> ImageKind {
+        match code {
+            1 => ImageKind::Jpeg,
+            _ => ImageKind::Png,
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -146,6 +164,96 @@ fn fill(role: Role) -> Fill {
     }
 }
 
+/// draws a drawing's shape (`Op::Path`): its commands scaled by `scale` and
+/// placed at `x`, `y`, filled or stroked in `role`'s colour at the paint's
+/// strength, or in the author's colour
+fn draw_path(
+    surface: &mut Surface,
+    (x, y, scale): (f32, f32, f32),
+    d: &[PathCmd],
+    stroke: Option<f32>,
+    (role, paint): (Role, Paint),
+    style: &LineStyle,
+) {
+    let mut builder = PathBuilder::new();
+    let at = |px: f32, py: f32| (x + px * scale, y + py * scale);
+    for command in d {
+        match *command {
+            PathCmd::Move(px, py) => {
+                let (px, py) = at(px, py);
+                builder.move_to(px, py)
+            }
+            PathCmd::Line(px, py) => {
+                let (px, py) = at(px, py);
+                builder.line_to(px, py)
+            }
+            PathCmd::Quad(x1, y1, px, py) => {
+                let ((x1, y1), (px, py)) = (at(x1, y1), at(px, py));
+                builder.quad_to(x1, y1, px, py)
+            }
+            PathCmd::Cubic(x1, y1, x2, y2, px, py) => {
+                let ((x1, y1), (x2, y2), (px, py)) = (at(x1, y1), at(x2, y2), at(px, py));
+                builder.cubic_to(x1, y1, x2, y2, px, py)
+            }
+            PathCmd::Close => builder.close(),
+        }
+    }
+    let Some(path) = builder.finish() else {
+        return;
+    };
+    let (paint_color, opacity) = painted(role, paint);
+    match stroke {
+        Some(width) => {
+            surface.set_fill(None);
+            surface.set_stroke(Some(Stroke {
+                paint: paint_color.into(),
+                width,
+                opacity,
+                line_cap: match style.cap {
+                    Cap::Butt => LineCap::Butt,
+                    Cap::Round => LineCap::Round,
+                    Cap::Square => LineCap::Square,
+                },
+                line_join: match style.join {
+                    Join::Miter => LineJoin::Miter,
+                    Join::Round => LineJoin::Round,
+                    Join::Bevel => LineJoin::Bevel,
+                },
+                dash: style.dash.as_ref().map(|dash| StrokeDash {
+                    array: dash.iter().map(|length| length * scale).collect(),
+                    offset: style.offset * scale,
+                }),
+                ..Default::default()
+            }));
+            surface.draw_path(&path);
+            surface.set_stroke(None);
+        }
+        None => {
+            surface.set_fill(Some(Fill {
+                paint: paint_color.into(),
+                opacity,
+                rule: if style.evenodd {
+                    FillRule::EvenOdd
+                } else {
+                    FillRule::NonZero
+                },
+            }));
+            surface.draw_path(&path);
+        }
+    }
+}
+
+/// a drawing's paint in the PDF: the author's colour, or the role's (the
+/// ink, black), at its strength
+fn painted(role: Role, paint: Paint) -> (rgb::Color, NormalizedF32) {
+    let paint_color = match paint.color {
+        Some([red, green, blue]) => rgb::Color::new(red, green, blue),
+        None => color(role),
+    };
+    let opacity = NormalizedF32::new(paint.alpha.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ONE);
+    (paint_color, opacity)
+}
+
 /// the image `src` stands for, None for one left out or that can't be
 /// decoded, which is noted in `undecoded`
 fn load_image(
@@ -158,12 +266,11 @@ fn load_image(
         return None;
     }
     let data = images.get(src)?;
-    let bytes = data.bytes.clone().into();
     // PDF/A forbids smoothing images, and a normal PDF looks the same
-    let image = if data.jpeg {
-        Image::from_jpeg(bytes, false)
-    } else {
-        Image::from_png(bytes, false)
+    let bytes = data.bytes.clone().into();
+    let image = match data.kind {
+        ImageKind::Jpeg => Image::from_jpeg(bytes, false),
+        ImageKind::Png => Image::from_png(bytes, false),
     };
     if image.is_err() {
         undecoded.push(src.to_string());
@@ -686,7 +793,7 @@ impl<'a> Drawing<'a> {
         match op {
             Op::Rect { x, y, w, h, .. } => page_rect(*x, *y, *w, *h).is_some(),
             Op::Glyphs { run, .. } => self.fonts.get(run.font).is_some(),
-            Op::Image { .. } => true,
+            Op::Image { .. } | Op::Path { .. } => true,
             Op::Link { .. } => false,
         }
     }
@@ -699,7 +806,8 @@ impl<'a> Drawing<'a> {
         }
     }
 
-    /// draws a rectangle, glyphs or an image (or its alt text) on `surface`:
+    /// draws a rectangle, glyphs, a drawing's path or an image (or its alt
+    /// text) on `surface`:
     /// the one place that draws what the pages show, for the document's PDF
     /// and the print PDF alike
     fn draw(&mut self, surface: &mut Surface, engine_fonts: &mut Fonts, op: &Op) {
@@ -714,13 +822,47 @@ impl<'a> Drawing<'a> {
                     surface.draw_path(&path);
                 }
             }
-            Op::Glyphs { run, role, text } => {
+            Op::Glyphs {
+                run,
+                role,
+                text,
+                paint,
+            } => {
                 // a font that can't be embedded is left out
                 if let Some(font) = self.fonts.get(run.font) {
-                    surface.set_fill(Some(fill(*role)));
+                    // a drawing's glyphs in their paint: the ink at a
+                    // strength, or the author's colour
+                    surface.set_fill(Some(match paint {
+                        Some(paint) => {
+                            let (paint_color, opacity) = painted(*role, *paint);
+                            Fill {
+                                paint: paint_color.into(),
+                                opacity,
+                                rule: Default::default(),
+                            }
+                        }
+                        None => fill(*role),
+                    }));
                     draw_run(surface, &run.glyphs, font, text, run.size);
                 }
             }
+            Op::Path {
+                x,
+                y,
+                scale,
+                d,
+                stroke,
+                role,
+                paint,
+                style,
+            } => draw_path(
+                surface,
+                (*x, *y, *scale),
+                d,
+                *stroke,
+                (*role, *paint),
+                style,
+            ),
             &Op::Image {
                 ref src,
                 ref alt,
@@ -1032,6 +1174,8 @@ mod tests {
                 height: 60.0,
                 alt: format!("the picture {src}"),
                 align: None,
+                share: None,
+                caption: None,
             },
             ..paragraph(0, "")
         }
@@ -1113,7 +1257,13 @@ mod tests {
             ("corrupt.png", CORRUPT_PNG.to_vec()),
             ("garbage.png", b"not a picture".to_vec()),
         ] {
-            images.insert(src.to_string(), ImageData { bytes, jpeg: false });
+            images.insert(
+                src.to_string(),
+                ImageData {
+                    bytes,
+                    kind: ImageKind::Png,
+                },
+            );
         }
         let written = write_with(&mut engine, &images, &info(), "").unwrap();
         // the ones handed over that can't be decoded, each once; the absent
@@ -1160,6 +1310,58 @@ mod tests {
         }
         out.extend(data);
         out
+    }
+
+    /// a box with "Idea" in it, as a module draws one: in the engine's
+    /// first font, its glyphs by their characters
+    const DRAWING: &str = r#"{"width":160,"height":60,"ops":[
+        {"op":"path","d":"M2 2L158 2L158 58L2 58Z","paint":{"alpha":0.1}},
+        {"op":"path","d":"M2 2L158 2L158 58L2 58Z","stroke":1,"paint":{"color":[200,30,30]}},
+        {"op":"glyphs","font":0,"chars":true,"size":16,
+         "glyphs":[[73,60,36],[100,65,36],[101,75,36],[97,84,36]],"text":"Idea"}
+    ]}"#;
+
+    #[test]
+    fn draws_a_drawing_with_its_text_as_text_and_no_picture() {
+        let mut item = image(9, "blank-vector:diagram:1");
+        if let Content::Image {
+            width,
+            height,
+            caption,
+            ..
+        } = &mut item.content
+        {
+            (*width, *height) = (160.0, 60.0);
+            *caption = Some("The plan".into());
+        }
+        let mut engine = engine(vec![paragraph(1, "before"), item]);
+        engine.drawings.insert(
+            "blank-vector:diagram:1".into(),
+            crate::drawing::Drawing::read(DRAWING).unwrap(),
+        );
+        let ops = engine.body_parts(0);
+        assert_eq!(
+            ops.iter()
+                .filter(|(op, _)| matches!(op, Op::Path { .. }))
+                .count(),
+            2
+        );
+        assert!(!ops.iter().any(|(op, _)| matches!(op, Op::Image { .. })));
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "").unwrap();
+        assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+        if let Some(text) = text_of(&written.bytes, "drawing") {
+            assert!(text.contains("Idea"), "{text:?}");
+            assert!(text.contains("The plan"), "{text:?}");
+        }
+        let path = std::env::temp_dir().join("blank-layout-unit-drawing-images.pdf");
+        std::fs::write(&path, &written.bytes).unwrap();
+        if let Some(out) = poppler("pdfimages", &["-list".as_ref(), path.as_os_str()]) {
+            let listed = String::from_utf8_lossy(&out.stdout);
+            assert_eq!(listed.lines().count(), 2, "no picture: {listed}");
+        }
+        if let Some(structure) = structure_of(&written.bytes, "drawing") {
+            assert!(structure.contains("Figure"), "{structure}");
+        }
     }
 
     #[test]
@@ -1381,6 +1583,7 @@ mod tests {
             indent: 18.0,
             marker: Some("•".into()),
             bars: vec![],
+            share: None,
         };
         let cell = Cell {
             blocks: vec![image],
@@ -1398,7 +1601,7 @@ mod tests {
             "pixel.png".to_string(),
             ImageData {
                 bytes: PNG.to_vec(),
-                jpeg: false,
+                kind: ImageKind::Png,
             },
         );
         let pdf = write(&mut engine, &images, &info()).unwrap();
@@ -1424,7 +1627,7 @@ mod tests {
             "red.png".to_string(),
             ImageData {
                 bytes: PNG.to_vec(),
-                jpeg: false,
+                kind: ImageKind::Png,
             },
         );
         engine.set_items(vec![paragraph(1, "hello"), image(8, "red.png")]);

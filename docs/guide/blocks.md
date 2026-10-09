@@ -1,6 +1,6 @@
 # Blocks
 
-Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
+Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, diagrams you write as text, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
 
 ## The Blocks pane {#pane}
 
@@ -20,9 +20,9 @@ A new block is selected once it's in, and the status bar says so. Start typing i
 
 ## Working with a block {#working}
 
-Click a block to select it: a ring in your accent color shows it's selected, and a toolbar above its right end names it.
+Click a block to select it: a ring in your accent color shows it's selected, and a toolbar above its right end names it. A diagram opens for you to change it instead; `Escape` then selects it.
 
-- **Change it:** the pencil on its toolbar opens its settings, as `Enter` does. A table of contents has settings; a form you change by filling it in.
+- **Change it:** the pencil on its toolbar opens its settings, as `Shift` `Enter` does. A table of contents and a diagram have settings; a form you change by filling it in.
 - **Remove it:** the bin on its toolbar, `Backspace` or `Delete`. The status bar says what was removed, and `Mod` `Z` brings it back.
 - **Move it:** drag the selected block to another place on your pages. The same line shows where it will go. Hold `Ctrl` (`⌥` on a Mac) to copy it instead.
 - **Copy it:** `Mod` `C` copies it whole, with everything it needs, so it pastes the same into any document in Blank.
@@ -36,7 +36,7 @@ A table of contents lists your headings with the page each one starts on, and ke
 <Shot src="toc.gif" alt="Mod Alt B and Enter insert a table of contents, which lists the headings with their pages and follows a heading as it is renamed" />
 
 - **Insert it** from the pane, or type `[toc]` (or `[TOC]`, or GitLab's `[[_TOC_]]`) on an empty line and press `Enter`, though not inside a list or a quote.
-- **Its settings:** select it and click the pencil, or press `Enter`. **Headings it lists** goes from headings 1 only down to all six levels (1 – 3 is where it starts), and **Title** is what stands above it. Every change shows at once, and `Mod` `Z` takes it back. `Escape` or a click elsewhere closes them.
+- **Its settings:** select it and click the pencil, or press `Enter` or `Shift` `Enter`. **Headings it lists** goes from headings 1 only down to all six levels (1 – 3 is where it starts), and **Title** is what stands above it. Every change shows at once, and `Mod` `Z` takes it back. `Escape` or a click elsewhere closes them.
 - **Jump to a heading:** `Mod` + Click on an entry scrolls to its heading, as a link opens. The [outline](./pages#outline) does the same from the keyboard.
 
 It lists the headings the outline lists: those at the top of your document, not in a list or a quote, and not an empty one.
@@ -145,6 +145,28 @@ layout:
 - **`x` and `y`** are measured from the page's left and top edges, **`width`** is how wide the frame is, and **`height`** how high it is at least: a frame grows when its field holds more.
 - A frame holds one field, which can't be a table. Its lines stand one below the other without space between them, as an address's do.
 
+## Diagrams {#diagrams}
+
+A diagram is a flowchart, a sequence of messages, a timeline or one of many other drawings, written as a few lines of text in [Mermaid](https://mermaid.js.org/intro/), the language GitHub, GitLab, Obsidian and Typora draw diagrams from. You write what's connected to what; Blank lays it out and draws it, on your pages, in your PDF and in Word.
+
+```mermaid
+flowchart LR
+  Idea --> Draft --> Done
+```
+
+<Shot src="diagram.gif" alt="Mod Alt B, diagram and Enter insert a flowchart of three steps with the cursor in its text; a fourth step is typed and the drawing follows; Escape closes it" />
+
+- **Insert one** from the pane, where **Diagram** is under **Drawings**, or type ` ```mermaid ` on an empty line and press `Enter`. Blank opens it with the cursor in its text.
+- **Write it:** while the cursor is in a diagram, your page shows its text as code, with the diagram below it, which follows what you type as soon as you pause. While a line has a mistake, the diagram you had stays, and below it Blank says what's wrong and on which line.
+- **Leave it:** `Escape` closes it, and the diagram stays selected. The arrow keys at its first or last line take you out too.
+- **Change it again:** click it. With the keyboard, select it with the arrow keys and press `Enter`, or just start typing: you go on at the end of its text. `↑` and `↓` move over a selected diagram without opening it.
+- **Its settings:** select it, or put the cursor in it, and click the pencil or press `Shift` `Enter`. **Width** is **Fit** (as large as it is, at most as wide as your text), or half, three quarters or all of your text's width. **Caption** is a line below it, and **Description** says what it shows, for people who can't see it; left empty, it's its kind, such as "Flowchart".
+- **Align it** like a paragraph: left, centered or right, with the buttons on the toolbar or their keys.
+
+Blank draws diagrams in the color of your text, which follows the theme, unless you give a color yourself. A color you give stays exactly as you wrote it in every theme and in the PDF, so a dark color can be hard to read on a dark theme. You give one with `style` or `classDef`. The first diagram you open takes a moment to draw; the ones after it come at once.
+
+In your PDF, a diagram stays sharp at any zoom, and its words can be found and copied. In Word, it's a picture that stays sharp too. A diagram that can't be drawn goes into an export as its text, and Blank tells you.
+
 ## Drawings of other apps {#embeds}
 
 A document can hold a drawing of another app, such as a diagram of draw.io or a sketch of Excalidraw. Apps will bring their drawings to Blank as plugins, which aren't there yet; once one is, the pane lists its drawings under **Drawings**. Blank already shows, prints and exports the drawings a document holds, the same everywhere, and keeps them as they were.
@@ -156,7 +178,7 @@ A document can hold a drawing of another app, such as a diagram of draw.io or a 
 
 Blocks go wherever your document goes: Blank keeps them in each format so that they come back whole.
 
-- **In your PDF**, a block is what it shows. Every entry of a table of contents is a link to its heading, and readers that read aloud know it as a table of contents.
-- **In Word**, a table of contents becomes Word's own, with the page numbers of your pages in Blank and links to the headings. Word lays the pages out a little differently, so to number them as Word does, right-click it and choose **Update Field**. A table of contents from Word, LibreOffice or pandoc comes into Blank as a table of contents too. A form becomes Word's content controls, one for the form and one for each field, named after it: Word users fill them in, but can't take them apart, and an empty field shows its placeholder. Fields side by side stand in the cells of a table without lines, and fields at a place of the page in Word's frames. A drawing is a picture. What Blank needs to bring a block back (a form's definition, a drawing's data) travels inside the Word file as custom XML, so Blank opens such a document with its blocks again.
-- **In a markdown file**, a block is marked by lines like `<!-- blank:toc@1 depth="3" title="Contents" -->` or `<!-- blank:form@1 def="blank/recipe@2#…" -->` … `<!-- /blank:form -->`, which other markdown apps don't show. A table of contents is that one line: Blank writes its entries anew every time, so your file never holds an outdated list. A form's fields stand between them as plain markdown, and at the end of the file Blank keeps a copy of each form's definition, so the file opens the same everywhere. A drawing keeps its app's data and its drawing as SVG, in plain text, so you can see what changed from one version to the next.
+- **In your PDF**, a block is what it shows. A diagram is drawn with lines and text, so it stays sharp and its words can be searched. Every entry of a table of contents is a link to its heading, and readers that read aloud know it as a table of contents.
+- **In Word**, a table of contents becomes Word's own, with the page numbers of your pages in Blank and links to the headings. Word lays the pages out a little differently, so to number them as Word does, right-click it and choose **Update Field**. A table of contents from Word, LibreOffice or pandoc comes into Blank as a table of contents too. A form becomes Word's content controls, one for the form and one for each field, named after it: Word users fill them in, but can't take them apart, and an empty field shows its placeholder. Fields side by side stand in the cells of a table without lines, and fields at a place of the page in Word's frames. A drawing is a picture, and so is a diagram, with its caption below it in Word's caption style. What Blank needs to bring a block back (a form's definition, a drawing's data, a diagram's text and settings) travels inside the Word file as custom XML, so Blank opens such a document with its blocks again.
+- **In a markdown file**, a block is marked by lines like `<!-- blank:toc@1 depth="3" title="Contents" -->` or `<!-- blank:form@1 def="blank/recipe@2#…" -->` … `<!-- /blank:form -->`, which other markdown apps don't show. A table of contents is that one line: Blank writes its entries anew every time, so your file never holds an outdated list. A form's fields stand between them as plain markdown, and at the end of the file Blank keeps a copy of each form's definition, so the file opens the same everywhere. A drawing keeps its app's data and its drawing as SVG, in plain text, so you can see what changed from one version to the next. A diagram is the text you wrote, in a ` ```mermaid ` block, exactly as GitHub and the other apps write it, so they draw it too; only a diagram with settings also gets a line like `<!-- blank:diagram@1 width="50%" caption="The plan" -->` before it and `<!-- /blank:diagram -->` after it. Its alignment is the `<div align="center">` around it, as for paragraphs.
 - **OpenDocument (.odt)** files will keep blocks once Blank writes them.

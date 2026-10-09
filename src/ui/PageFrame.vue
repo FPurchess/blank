@@ -11,6 +11,8 @@ import {
 import { BLEED } from "../engine/frames";
 import { pageEngine } from "../engine/engine";
 import { imagesLoaded, loadedImage } from "../engine/images";
+import { isVector } from "../engine/vectors";
+import { vectorPictures } from "../state/drawings";
 import { FIELD_NAMES } from "../layout/placeholders";
 import { pageLayout, pageLayoutState, path, theme } from "../state";
 import BandSlots from "./BandSlots.vue";
@@ -93,9 +95,19 @@ const imagesShown = computed(() => {
   const engine = pageEngine;
   void imagesLoaded.value;
   if (!engine) return "";
-  return layerDisplay(engine, "body", props.page, props.bodyVersion)
-    .i.map(([src]) => (loadedImage(src, path.value) ? "1" : "0"))
-    .join("");
+  const shown = layerDisplay(engine, "body", props.page, props.bodyVersion).i;
+  // a drawing of Blank's has a picture per ink (src/engine/vectors.ts),
+  // so the page paints again when any of them is ready
+  const drawings = shown.some(([src]) => isVector(src))
+    ? `:${vectorPictures.value}`
+    : "";
+  return (
+    shown
+      .map(([src]) =>
+        isVector(src) || loadedImage(src, path.value) ? "1" : "0",
+      )
+      .join("") + drawings
+  );
 });
 
 /**

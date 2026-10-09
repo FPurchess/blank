@@ -1,10 +1,5 @@
 import type { Node, Slice } from "prosemirror-model";
-import {
-  type Command,
-  type EditorState,
-  NodeSelection,
-  TextSelection,
-} from "prosemirror-state";
+import { type Command, NodeSelection, TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { chainCommands } from "prosemirror-commands";
 
@@ -21,14 +16,21 @@ import {
   blocksPaneFocused,
   blocksPaneOpen,
   focusBlocksSearch,
+  diagramPopover,
   tocPopover,
 } from "../../state";
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
 import { topBlockAt } from "../../markdown/topBlock";
 import { embedTypes, type EmbedType } from "../../embeds/registry";
 import { type Form, loadForms } from "../../forms/library";
-import { boxOnCaretPage } from "../plugins/followLayout";
 import { editEmbed, makeEmbed } from "./embeds";
+import {
+  createSourceBlock,
+  isSourceBlock,
+} from "../../markdown/blocks/sourceBlock";
+import { enterSource } from "../plugins/sourceBlocks";
+import { sourceKind } from "../../sources/registry";
+import { editBlockSettings } from "./blockSettings";
 
 // Content blocks: blocks Blank makes besides the text, see
 // src/markdown/blocks. They stand at the top of the document, never in a
@@ -47,6 +49,26 @@ const TOC: Choice = {
   description: "The headings, with the pages they start on",
   insert: (view, at) =>
     insertTopBlock(view, schema.nodes.toc.create(), undefined, at),
+};
+
+// what a new diagram says, so it shows something to change at once
+export const DIAGRAM_STARTER = "flowchart LR\n  Idea --> Draft --> Done";
+
+const DIAGRAM: Choice = {
+  id: "diagram",
+  group: "drawings",
+  label: "Diagram",
+  description: "Flowcharts, sequences and timelines from text",
+  insert: (view, at) => {
+    insertTopBlock(
+      view,
+      createSourceBlock(schema, "diagram", DIAGRAM_STARTER),
+      undefined,
+      at,
+    );
+    // into its source, to change it
+    enterSource(view.state, view.dispatch);
+  },
 };
 
 /**
@@ -164,6 +186,7 @@ export const readBlocks = () =>
       const choices = [
         TOC,
         ...forms.map(formChoice),
+        DIAGRAM,
         ...embedTypes().map(embedChoice),
       ];
       offered = new Map(choices.map((choice) => [choice.id, choice]));
@@ -244,7 +267,23 @@ export const insertBlock =
  * editBlock edits the selected content block: a table of contents in its
  * dialog, an embed with its type, if Blank has it
  */
-export const editBlock = (): Command => chainCommands(editToc(), editEmbed());
+export const editBlock = (): Command =>
+  chainCommands(editToc(), editDiagram(), editEmbed());
+
+/**
+ * blockSettings opens the settings of the selected block, or of the source
+ * block being typed (Shift+Enter): those of editBlock. On a selected block
+ * without settings it does nothing, rather than let the key put a line
+ * break in its place.
+ */
+export const blockSettings = (): Command => (state, dispatch, view) => {
+  if (editBlock()(state, dispatch, view)) return true;
+  const { selection } = state;
+  return (
+    selection instanceof NodeSelection &&
+    (isContentBlock(selection.node) || isSourceBlock(selection.node))
+  );
+};
 
 /**
  * removeTopBlock removes the content block at `pos`, the cursor going where
@@ -277,58 +316,37 @@ export const pasteTopBlocks = (view: EditorView, slice: Slice) => {
 };
 
 /**
- * selectedToc returns the table of contents the selection is on, with its
- * position, or null
- */
-const selectedToc = (state: EditorState) => {
-  const { selection } = state;
-  return selection instanceof NodeSelection &&
-    selection.node.type === schema.nodes.toc
-    ? { node: selection.node, pos: selection.from }
-    : null;
-};
-
-/**
  * editToc opens the settings of the selected table of contents below it:
  * how deep it lists the headings and its title, which change it at once; or
  * closes them while they are open
  */
-export const editToc = (): Command => (state, dispatch, view) => {
-  const selected = selectedToc(state);
-  if (!selected) return false;
-  if (!dispatch || !view) return true;
-  // the settings button again closes them
-  const open = tocPopover.value;
-  if (open) {
-    tocPopover.value = null;
-    open.close();
-    return true;
-  }
-  const { node, pos } = selected;
-  // the table of contents still where the settings opened it
-  const at = (state: EditorState) =>
-    state.doc.nodeAt(pos)?.type === schema.nodes.toc ? pos : null;
-  // nowhere to open them while it isn't shown, e.g. before the first
-  // layout; Enter still does nothing else to it
-  const box = boxOnCaretPage(view, pos, node.nodeSize);
-  if (!box) return true;
-  tocPopover.value = {
-    anchor: box,
-    depth: node.attrs.depth as number,
-    title: node.attrs.title as string,
-    apply: (depth, title) => {
-      const pos = at(view.state);
-      if (pos === null) return;
-      const attrs = view.state.doc.nodeAt(pos)!.attrs;
-      if (attrs.depth === depth && attrs.title === title) return;
-      const tr = view.state.tr.setNodeMarkup(pos, null, {
-        ...attrs,
-        depth,
-        title,
-      });
-      view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
-    },
-    close: () => view.focus(),
-  };
-  return true;
-};
+export const editToc = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.toc,
+    popover: tocPopover,
+    values: (node) => ({
+      depth: node.attrs.depth as number,
+      title: node.attrs.title as string,
+    }),
+    attrs: (node, { depth, title }) => ({ ...node.attrs, depth, title }),
+  });
+
+/**
+ * editDiagram opens the settings of the selected diagram, or of the one
+ * being typed, below it: its width, caption and description; or closes them
+ * while they are open
+ */
+export const editDiagram = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.diagram,
+    popover: diagramPopover,
+    values: (node) => ({
+      width: node.attrs.width as string | null,
+      caption: node.attrs.caption as string,
+      alt: node.attrs.alt as string,
+    }),
+    attrs: (node, values) => ({ ...node.attrs, ...values }),
+    more: (node) => ({
+      label: sourceKind("diagram")?.label(node.textContent) ?? "Diagram",
+    }),
+  });

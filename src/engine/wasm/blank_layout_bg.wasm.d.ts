@@ -2,6 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_layoutengine_free: (a: number, b: number) => void;
+export const layoutengine_addDrawing: (a: number, b: number, c: number, d: number, e: number) => number;
 export const layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
 export const layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const layoutengine_bandMetrics: (a: number) => [number, number];
@@ -30,6 +31,7 @@ export const layoutengine_pdf: (a: number, b: number, c: number, d: number, e: n
 export const layoutengine_pdfWarnings: (a: number) => [number, number];
 export const layoutengine_printDisplay: (a: number, b: number) => [number, number];
 export const layoutengine_printPdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+export const layoutengine_removeDrawing: (a: number, b: number, c: number) => void;
 export const layoutengine_roleColor: (a: number, b: number) => number;
 export const layoutengine_selection: (a: number, b: number, c: number) => [number, number];
 export const layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
