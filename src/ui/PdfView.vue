@@ -15,15 +15,7 @@ import { CommandIdentifier } from "../config";
 import { closeTabs, reopenPdf } from "../editor/tabs";
 import { commandKeys, WINDOW_COMMANDS } from "../editor/plugins/keymap";
 import { useEditor } from "../editor/handle";
-import {
-  anchorTop,
-  keptRange,
-  onDesk,
-  sheetLayout,
-  viewAnchor,
-  type ViewAnchor,
-  visibleRange,
-} from "../engine/frames";
+import { sheetLayout, viewAnchor } from "../engine/frames";
 import { PDF_FILTER } from "../formats";
 import { basename } from "../paths";
 import {
@@ -40,15 +32,14 @@ import {
   activeTab,
   activeTabId,
   isPdfTab,
-  pageScrollRequest,
   pdfPageInView,
   pdfViewAnchor,
   pdfViewFocused,
   shownPdf,
   tabs,
-  tabSwitch,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
+import { useDeskScroll } from "./composables/useDeskScroll";
 import { useFocusRegion } from "./composables/useFocusRegion";
 import { useResizeObserver } from "./composables/useResizeObserver";
 import { type Bitmap, pdfBitmaps } from "./pageBitmaps";
@@ -61,7 +52,6 @@ import {
   scrollBy,
   closedKeys,
 } from "./pdfViewModel";
-import { scrollFor } from "./scrollModel";
 
 // The pages of the PDF tab shown, as its helper draws them (see
 // .claude/rules/pdf.md): sheets one below the other at the scale that fits
@@ -106,24 +96,19 @@ listenOnWindow("resize", () => {
   measure();
 });
 
-// the pages mounted: within a view's height of it, kept until two views away
-let kept = "";
-const range = computed(() => {
-  if (!layout.value) return (kept = "");
-  const near = visibleRange(layout.value, scrollTop.value, viewHeight.value);
-  const far = visibleRange(
-    layout.value,
-    scrollTop.value,
-    viewHeight.value,
-    2 * viewHeight.value,
-  );
-  return (kept = keptRange(kept, near, far));
+// the pages mounted and those in view, and where the view scrolls to: back
+// to the tab's spot once its pages are there, also the one shown when it
+// mounts, keeping the spot when a resize shows them at another scale, and
+// to a page the status bar's menu goes to
+const { range, inView } = useDeskScroll({
+  scroller: () => scroller.value,
+  layout,
+  scrollTop,
+  viewHeight,
+  measure,
+  startAt: () => activeTab.value?.viewAnchor ?? null,
+  switched: () => queue.stop(),
 });
-const inView = computed(() =>
-  layout.value
-    ? visibleRange(layout.value, scrollTop.value, viewHeight.value, 0)
-    : "",
-);
 
 // the bitmap each page showed last, by its slot
 const shownKeys = new Map<string, string>();
@@ -235,57 +220,6 @@ watch(
       : null;
   },
   { immediate: true },
-);
-
-// another tab shows: the view goes back to where it was on it, also the
-// one shown when it mounts
-let restoring: { anchor: ViewAnchor | null } | null = {
-  anchor: activeTab.value?.viewAnchor ?? null,
-};
-watch(
-  tabSwitch,
-  (change) => {
-    queue.stop();
-    kept = "";
-    restoring = change && { anchor: change.anchor };
-  },
-  { flush: "sync" },
-);
-watch(
-  layout,
-  (next, previous) => {
-    const element = scroller.value;
-    if (!element || !next) return;
-    const anchor = restoring
-      ? restoring.anchor
-      : previous && viewAnchor(previous, element.scrollTop);
-    restoring = null;
-    void nextTick(() => {
-      element.scrollTop = anchor ? (anchorTop(next, anchor) ?? 0) : 0;
-      measure();
-    });
-  },
-  { flush: "post" },
-);
-
-// a page the status bar's menu goes to
-watch(
-  pageScrollRequest,
-  (request) => {
-    const element = scroller.value;
-    if (!request || !element || !layout.value) return;
-    const rect = onDesk(layout.value, { ...request, width: 0 });
-    if (rect) {
-      element.scrollTop =
-        request.at !== undefined
-          ? Math.max(0, rect.top - request.at)
-          : (scrollFor(rect, element.scrollTop, element.clientHeight) ??
-            element.scrollTop);
-      measure();
-    }
-    pageScrollRequest.value = null;
-  },
-  { flush: "post" },
 );
 
 const focusRegion = useFocusRegion(() => scroller.value, pdfViewFocused);

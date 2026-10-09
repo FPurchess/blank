@@ -59,7 +59,7 @@ Blank's modules share state through Vue refs in `src/state/`, instead of importi
   - the plugin views (`plugins/images.ts`, `plugins/spellcheck.ts`, `plugins/pageView.ts`) and `followLayout` (`plugins/followLayout.ts`), which dispatch, measure or publish while the editor's state they follow is current;
   - the message timers (`bootMessages`), which restart on every message.
 
-  Components rarely need watchers, since their templates react by themselves; one watches only for effects outside its own DOM, e.g. `PageView.vue` scrolling after a render (`flush: "post"`) or the body's classes (`useBodyClass`). In tests, `await nextTick()` after a write that a default-flush watcher follows.
+  Components rarely need watchers, since their templates react by themselves; one watches only for effects outside its own DOM, e.g. `useDeskScroll` serving a scroll request after a render (`flush: "post"`) or the body's classes (`useBodyClass`). In tests, `await nextTick()` after a write that a default-flush watcher follows.
 - **Several refs, one effect:** `watch([a, b], fn, …)` rather than two watchers.
 - **Plugin views** start their watchers in `view()` and stop them in `destroy()` (see `plugins/images.ts`, `plugins/spellcheck.ts`).
 
