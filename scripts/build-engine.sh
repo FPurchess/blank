@@ -15,8 +15,14 @@
 # - bun, which runs binaryen's wasm-opt in BINARYEN_VERSION
 # ALLOW_OTHER_TOOLCHAIN=1 builds with another rustc, into a wasm that won't
 # match. The paths of this machine are mapped to fixed ones.
+# ENGINE_OUT_DIR writes elsewhere than src/engine/wasm, and ENGINE_STAGES=1
+# also keeps the stages scripts/engine-size.sh reports on: the wasm-bindgen
+# output before wasm-opt (blank_layout_bg.pre-opt.wasm) and wasm-opt's output
+# with the name section (blank_layout_bg.named.wasm), whose code and data are
+# the same as the shipped wasm's.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+out="${ENGINE_OUT_DIR:-src/engine/wasm}"
 
 fail() { echo "error: $*" >&2; exit 1; }
 
@@ -72,14 +78,18 @@ export RUSTFLAGS="${RUSTFLAGS% }"
 
 cargo build --manifest-path src-tauri/Cargo.toml -p blank-layout --lib \
   --target wasm32-unknown-unknown --profile wasm
-wasm-bindgen --target web --out-dir src/engine/wasm --out-name blank_layout \
+wasm-bindgen --target web --out-dir "$out" --out-name blank_layout \
   "$target/wasm32-unknown-unknown/wasm/blank_layout.wasm"
+[ -z "${ENGINE_STAGES:-}" ] || cp "$out/blank_layout_bg.wasm" "$out/blank_layout_bg.pre-opt.wasm"
 # binaryen's optimizer takes off about a fifth. It also drops the producers
 # section, where wasm-bindgen writes its version and, when prebuilt as on CI,
 # its git commit, which would make the file differ by how it was installed
-bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt -O3 --enable-bulk-memory \
-  --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals \
-  --enable-reference-types --enable-multivalue --strip-producers \
-  src/engine/wasm/blank_layout_bg.wasm -o src/engine/wasm/blank_layout_bg.wasm
-bun scripts/wasm-producers.ts src/engine/wasm/blank_layout_bg.wasm
-ls -l src/engine/wasm/blank_layout_bg.wasm
+opt=(-O3 --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext
+  --enable-mutable-globals --enable-reference-types --enable-multivalue --strip-producers)
+bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" \
+  "$out/blank_layout_bg.wasm" -o "$out/blank_layout_bg.wasm"
+bun scripts/wasm-producers.ts "$out/blank_layout_bg.wasm"
+# -g keeps the names and changes nothing else
+[ -z "${ENGINE_STAGES:-}" ] || bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" -g \
+  "$out/blank_layout_bg.pre-opt.wasm" -o "$out/blank_layout_bg.named.wasm"
+ls -l "$out/blank_layout_bg.wasm"
