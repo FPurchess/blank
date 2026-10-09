@@ -1,74 +1,32 @@
 <script setup lang="ts">
-import { onMounted, onUpdated, shallowRef, useTemplateRef } from "vue";
+import { shallowRef } from "vue";
 
-import { place } from "../popup";
 import { closeDialog, tocPopover, type TocPopoverRequest } from "../state";
-import { useDismiss } from "./composables/useDismiss";
-import {
-  anchorOf,
-  DEPTH_OPTIONS,
-  SETTINGS_BUTTON,
-  titleOf,
-} from "./tocPopoverModel";
+import BlockPopover from "./components/BlockPopover.vue";
+import { DEPTH_OPTIONS, titleOf } from "./tocPopoverModel";
 
-// The settings of a table of contents, below the toolbar's settings button
-// (Enter or a click on it, see src/editor/commands/contentBlocks.ts): how
-// deep it lists the headings, and its title. Each change applies at once,
-// as one undo step; Esc, Enter in the title or a click elsewhere closes
-// them, and the focus goes back to the table of contents.
+// The settings of a table of contents (Enter, Shift+Enter or the toolbar's
+// settings button, see src/editor/commands/contentBlocks.ts): how deep it
+// lists the headings, and its title.
 const props = defineProps<{ request: TocPopoverRequest }>();
 
-const root = useTemplateRef<HTMLElement>("root");
-const depthField = useTemplateRef<HTMLSelectElement>("depth");
-const depth = shallowRef(props.request.depth);
-const title = shallowRef(props.request.title);
+const depth = shallowRef(props.request.values.depth);
+const title = shallowRef(props.request.values.title);
 
-const placeIt = () =>
-  place(root.value!, anchorOf(props.request.anchor), { align: "end" });
-onMounted(() => {
-  placeIt();
-  depthField.value!.focus();
-});
-onUpdated(placeIt);
-
-const apply = () => props.request.apply(depth.value, titleOf(title.value));
+const apply = () =>
+  props.request.apply({ depth: depth.value, title: titleOf(title.value) });
 const close = () => closeDialog(tocPopover, props.request.close);
-
-// Enter in the title closes them
-const onKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
-    event.preventDefault();
-    close();
-  }
-};
-
-// a press elsewhere, Esc or resizing the window closes them; a press on the
-// settings button is theirs, which closes them through it. Not the window's
-// blur: WebKitGTK shows the list of a select as a menu of its own, which
-// takes the window's focus.
-useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
-  escape: true,
-  resize: true,
-});
 </script>
 
 <template>
-  <div
+  <BlockPopover
     id="toc-popover"
-    ref="root"
-    class="toc-popover"
-    role="dialog"
-    aria-labelledby="toc-popover-title"
-    @keydown="onKeyDown"
+    title="Table of contents"
+    :anchor="request.anchor"
+    @close="close"
   >
-    <h2 id="toc-popover-title">Table of contents</h2>
     <label for="toc-popover-depth">Headings it lists</label>
-    <select
-      id="toc-popover-depth"
-      ref="depth"
-      v-model.number="depth"
-      @change="apply"
-    >
+    <select id="toc-popover-depth" v-model.number="depth" @change="apply">
       <option
         v-for="option in DEPTH_OPTIONS"
         :key="option.value"
@@ -86,5 +44,5 @@ useDismiss(() => [root.value, document.querySelector(SETTINGS_BUTTON)], close, {
       :spellcheck="false"
       @input="apply"
     />
-  </div>
+  </BlockPopover>
 </template>

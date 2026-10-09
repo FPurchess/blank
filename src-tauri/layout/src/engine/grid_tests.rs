@@ -126,6 +126,8 @@ fn keeps_a_band_whole_when_only_one_of_its_items_is_sent_again() {
         height: 150.0,
         alt: String::new(),
         align: None,
+        share: None,
+        caption: None,
     };
     engine.update(1, 1, vec![picture], 1 - 3);
     let (page, _, first_y, _) = engine.caret(at[0][0], false).unwrap();

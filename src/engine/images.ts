@@ -4,6 +4,7 @@ import { displaySrc } from "../editor/plugins/images";
 import { fitBox } from "../images/fit";
 import type { Size } from "../images/mime";
 import { POINTS_PER_PIXEL } from "../layout/units";
+import { isVector, vectorOf } from "./vectors";
 
 // The images of the page view: loaded by the webview once, for their size,
 // which the engine lays out with, and for painting them. They are known by
@@ -84,7 +85,8 @@ export const fittedSize = (
 export const imageSizes =
   (docPath: string | null, room: { width: number; height: number }) =>
   (src: string) => {
-    const loaded = loadedImage(src, docPath);
+    // a drawing of Blank's (./vectors.ts) is no file to load
+    const loaded = isVector(src) ? vectorOf(src) : loadedImage(src, docPath);
     return loaded ? fittedSize(loaded, room) : undefined;
   };
 

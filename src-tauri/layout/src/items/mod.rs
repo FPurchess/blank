@@ -201,6 +201,34 @@ pub struct CellImage {
     pub h: f32,
 }
 
+/// the room between a picture or table and its caption
+pub const CAPTION_GAP: f32 = 4.0;
+
+/// a caption, in the caption style, at `indent`, `width` wide
+pub(crate) fn caption_box(fonts: &mut Fonts, caption: &str, width: f32, indent: f32) -> TextBox {
+    let text = Text {
+        pos: 0,
+        text: caption.to_string(),
+        style: TextKind::Caption,
+        ..Default::default()
+    };
+    let mut boxed = TextBox::new(fonts, &text, width, Alignment::Start);
+    boxed.x = indent;
+    boxed
+}
+
+/// how much a picture of `size` is scaled to stand in a room `width` wide
+/// and `height` tall: to its `share` of the width, which may enlarge it,
+/// or else to its own size; never wider or taller than the room
+pub(crate) fn picture_scale(size: (f32, f32), width: f32, height: f32, share: Option<f32>) -> f32 {
+    let (w, h) = size;
+    let fit = (width / w).min(height / h);
+    match share {
+        Some(share) => (width * share / w).min(height / h),
+        None => fit.min(1.0),
+    }
+}
+
 impl Laid {
     /// lays out an item in the width of the text on the page, or of its
     /// column; rows of a table taller than the text on a page are sliced
@@ -233,14 +261,26 @@ impl Laid {
                 height,
                 alt,
                 align,
+                share,
+                caption,
                 ..
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
-                    // an image never is wider than the room it has, nor
-                    // taller than a page's
-                    let scale = (inner / image_width).min(room / height).min(1.0);
+                    // its caption under it, kept on its page
+                    let caption = caption
+                        .as_deref()
+                        .map(|caption| caption_box(fonts, caption, inner, indent));
+                    let below = caption
+                        .as_ref()
+                        .map_or(0.0, |boxed| boxed.height() + CAPTION_GAP);
+                    let scale = picture_scale(
+                        (*image_width, *height),
+                        inner,
+                        (room - below).max(room / 2.0),
+                        *share,
+                    );
                     let (w, h) = (image_width * scale, height * scale);
-                    Laid::single(
+                    let mut laid = Laid::single(
                         h,
                         vec![Deco::Image {
                             src: src.clone(),
@@ -251,7 +291,19 @@ impl Laid {
                             w,
                             h,
                         }],
-                    )
+                    );
+                    if let Some(mut boxed) = caption {
+                        boxed.y = h + CAPTION_GAP;
+                        laid.units[0].keep_next = true;
+                        laid.units.push(Unit {
+                            top: h,
+                            height: below,
+                            extras: 0..1,
+                            ..Default::default()
+                        });
+                        laid.extras.push((boxed, Role::Text));
+                    }
+                    laid
                 } else {
                     // until it is loaded, or if it can't be: its alt text,
                     // or else its src, in italics

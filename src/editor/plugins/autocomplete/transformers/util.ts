@@ -1,4 +1,4 @@
-import type { NodeType } from "prosemirror-model";
+import type { Node, NodeType } from "prosemirror-model";
 import {
   type Command,
   TextSelection,
@@ -37,22 +37,30 @@ export const applyBlockCommand = (
 
 /**
  * replaceLineWith replaces the paragraph holding the cursor with a node of
- * `type`, e.g. a rule, and an empty paragraph after it for the cursor. A
- * single undo restores the line as typed.
+ * `type` (or `node`, as made), e.g. a rule, and an empty paragraph after it.
+ * The cursor goes into that paragraph, or `cursor` positions into the node,
+ * e.g. into a diagram's source. A single undo restores the line as typed.
  * @returns whether the line was replaced
  */
-export const replaceLineWith = (view: EditorView, type: NodeType): boolean => {
+export const replaceLineWith = (
+  view: EditorView,
+  type: NodeType | Node,
+  { cursor }: { cursor?: number } = {},
+): boolean => {
   const { $cursor } = view.state.selection as TextSelection;
   if (!$cursor || $cursor.parent.type !== schema.nodes.paragraph) {
     return false;
   }
+  const node = "nodeSize" in type ? type : type.createAndFill();
+  if (!node) return false;
   const from = $cursor.before();
   const tr = view.state.tr.replaceWith(from, $cursor.after(), [
-    type.create(),
+    node,
     schema.nodes.paragraph.create(),
   ]);
-  // the new paragraph starts after the node (size 1) and its own opening
-  tr.setSelection(TextSelection.create(tr.doc, from + 2));
+  // into the node, or else into the paragraph after it, past its opening
+  const at = cursor === undefined ? from + node.nodeSize + 1 : from + cursor;
+  tr.setSelection(TextSelection.create(tr.doc, at));
   dispatchCorrection(view, tr);
   return true;
 };

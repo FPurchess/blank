@@ -39,13 +39,13 @@ const indentation = (column: number, tabs: boolean, size: number) =>
 
 const leading = (line: string) => /^[\t ]*/.exec(line)![0];
 
-// the code block a text selection is in, from and to, or null
+// the code block (or a source, e.g. a diagram's) a text selection is in,
+// from and to, or null
 const codeBlockOf = (state: EditorState) => {
   const { selection } = state;
   if (!(selection instanceof TextSelection)) return null;
   const { $from, $to } = selection;
-  if ($from.parent.type.name !== "code_block" || !$from.sameParent($to))
-    return null;
+  if (!$from.parent.type.spec.code || !$from.sameParent($to)) return null;
   return $from;
 };
 

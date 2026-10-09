@@ -320,6 +320,7 @@
                   "width": 120,
                   "height": 80,
                   "alt": "an image",
+                  "share": 0.5,
                   "indent": 0,
                   "bars": []
                 },
@@ -534,6 +535,22 @@
         ],
         "gap": 17.007874015748033
       }
+    },
+    {
+      "kind": "image",
+      "pos": 279,
+      "src": "blank-vector:diagram:dabf6fd8-22",
+      "width": 120,
+      "height": 80,
+      "alt": "",
+      "align": "center",
+      "share": 0.75,
+      "caption": "A diagram",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
     }
   ],
   "settings": {

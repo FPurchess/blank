@@ -1,67 +1,91 @@
 import type JSZip from "jszip";
 
-import { EMBEDS_NAMESPACE, readTag } from "../../exporters/docx/forms";
-import { child, children, customParts, markerParagraph, val, W } from "./xml";
+import {
+  DIAGRAMS_NAMESPACE,
+  EMBEDS_NAMESPACE,
+} from "../../exporters/docx/forms";
+import { customParts, markerParagraph, rewriteControls, tagOf } from "./xml";
 
-// Embeds from Word: Blank's Word export writes an embed as a picture of its
-// drawing in a content control tagged with its id, and its attributes in a
-// Custom XML part (see src/exporters/docx/forms.ts). Before mammoth, which
-// forgets the tags, each such control becomes a marker paragraph holding
-// the embed's attributes as JSON, which styleMap.ts and cleanup.ts turn into
-// the figure the schema reads an embed from, checking it as a paste is. A
-// control whose embed isn't in the part stays its picture.
+// Embeds and diagrams from Word: Blank's Word export writes each as a
+// picture in a content control tagged with its id, and what makes it again
+// in a Custom XML part (see src/exporters/docx/forms.ts): an embed's
+// attributes, a diagram's source and settings. Before mammoth, which forgets
+// the tags, each such control becomes a marker paragraph holding that as
+// JSON, which styleMap.ts and cleanup.ts turn into the figure the schema
+// reads it from, checking it as a paste is. A control whose block isn't in
+// the part stays its picture.
 
-const DOCUMENT = "word/document.xml";
-
-// the style of the marker paragraphs, matched by its id in styleMap.ts
+// the styles of the marker paragraphs, matched by their ids in styleMap.ts
 export const EMBED_STYLE = "BlankEmbedMarker";
+export const DIAGRAM_STYLE = "BlankDiagramMarker";
+
+/**
+ * readPart returns what Blank's Custom XML part `root` of the package
+ * holds, by id
+ */
+const readPart = async (
+  zip: JSZip,
+  namespace: string,
+  root: string,
+): Promise<Record<string, unknown>> => {
+  const read: Record<string, unknown> = {};
+  for (const text of await customParts(zip, namespace, root)) {
+    try {
+      const part: unknown = JSON.parse(text);
+      if (part && typeof part === "object") Object.assign(read, part);
+    } catch {
+      // not Blank's, or broken: the pictures stay pictures
+    }
+  }
+  return read;
+};
 
 /**
  * readEmbeds returns the attributes of the embeds the package holds, by
  * their ids
  */
-export const readEmbeds = async (
+export const readEmbeds = (zip: JSZip) =>
+  readPart(zip, EMBEDS_NAMESPACE, "embeds");
+
+/**
+ * readDiagrams returns the sources and settings of the diagrams the package
+ * holds, by their ids
+ */
+export const readDiagrams = (zip: JSZip) =>
+  readPart(zip, DIAGRAMS_NAMESPACE, "diagrams");
+
+/**
+ * markControls rewrites word/document.xml with a marker paragraph in `style`
+ * for each content control of `kind` that `blocks` holds, see the comment
+ * on top
+ * @param zip the unpacked .docx file, changed in place
+ * @param blocks what makes each block again, by its id
+ * @returns whether it had to be rewritten
+ */
+const markControls = (
   zip: JSZip,
-): Promise<Record<string, unknown>> => {
-  const embeds: Record<string, unknown> = {};
-  for (const text of await customParts(zip, EMBEDS_NAMESPACE, "embeds")) {
-    try {
-      const read: unknown = JSON.parse(text);
-      if (read && typeof read === "object") Object.assign(embeds, read);
-    } catch {
-      // not Blank's, or broken: the pictures stay pictures
-    }
-  }
-  return embeds;
+  kind: "embed" | "diagram",
+  blocks: Record<string, unknown>,
+  style: string,
+) => {
+  if (Object.keys(blocks).length === 0) return Promise.resolve(false);
+  return rewriteControls(zip, (sdt, doc) => {
+    const tag = tagOf(sdt) as Record<string, unknown> | null;
+    const id = tag?.[kind];
+    if (typeof id !== "string" || !Object.hasOwn(blocks, id)) return false;
+    sdt.replaceWith(markerParagraph(doc, style, JSON.stringify(blocks[id])));
+    return true;
+  });
 };
 
 /**
- * markEmbeds rewrites word/document.xml with a marker paragraph for each
- * embed of Blank's, see the comment on top
- * @param zip the unpacked .docx file, changed in place
- * @param embeds the attributes of the embeds, by their ids
- * @returns whether it had to be rewritten
+ * markEmbeds marks the embeds of Blank's, see markControls
  */
-export const markEmbeds = async (
-  zip: JSZip,
-  embeds: Record<string, unknown>,
-) => {
-  const xml = await zip.file(DOCUMENT)?.async("string");
-  if (xml === undefined || Object.keys(embeds).length === 0) return false;
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) return false;
-  const body = doc.getElementsByTagNameNS(W, "body")[0];
-  let changed = false;
-  for (const sdt of children(body, "sdt")) {
-    const tag = readTag(val(child(child(sdt, "sdtPr"), "tag")));
-    if (!tag || !("embed" in tag) || !Object.hasOwn(embeds, tag.embed)) {
-      continue;
-    }
-    sdt.replaceWith(
-      markerParagraph(doc, EMBED_STYLE, JSON.stringify(embeds[tag.embed])),
-    );
-    changed = true;
-  }
-  if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));
-  return changed;
-};
+export const markEmbeds = (zip: JSZip, embeds: Record<string, unknown>) =>
+  markControls(zip, "embed", embeds, EMBED_STYLE);
+
+/**
+ * markDiagrams marks the diagrams of Blank's, see markControls
+ */
+export const markDiagrams = (zip: JSZip, diagrams: Record<string, unknown>) =>
+  markControls(zip, "diagram", diagrams, DIAGRAM_STYLE);

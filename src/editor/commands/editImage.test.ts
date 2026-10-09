@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
-import { NodeSelection } from "prosemirror-state";
+import { NodeSelection, TextSelection } from "prosemirror-state";
 import { schema } from "../../markdown";
 
 import { open } from "@tauri-apps/plugin-dialog";
@@ -134,7 +134,7 @@ describe("command.editImage", () => {
   it("inserts an image at the cursor", () => {
     const view = setup(doc(para(text("abcd"))), { cursor: 3 });
 
-    openDialog(view).submit("images/my chart.png", " Chart ");
+    openDialog(view).submit("images/my chart.png", " Chart ", null);
 
     expect(view.state.doc.toJSON()).toEqual(
       doc(
@@ -145,13 +145,28 @@ describe("command.editImage", () => {
     expect(view.focus).toHaveBeenCalled();
   });
 
+  it("gives the image its width, and shows the one it has", () => {
+    const view = setup(doc(para(text("abcd"))), { cursor: 3 });
+    openDialog(view).submit("a.png", "", "50%");
+    let width: unknown;
+    view.state.doc.descendants((node) => {
+      if (node.type.name === "image") width = node.attrs.width;
+    });
+    expect(width).toBe("50%");
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)),
+    );
+    imageDialog.value = null;
+    expect(openDialog(view).width).toBe("50%");
+  });
+
   it("edits the image at the cursor, keeping its title", () => {
     const view = setup(withImage(image("a.png", "A", "Title")), { cursor: 3 });
     const request = openDialog(view);
 
     expect(request).toMatchObject({ src: "a.png", alt: "A", isEdit: true });
     const embedded = dataUrl("image/png", IMAGES.png);
-    request.submit(embedded, "");
+    request.submit(embedded, "", null);
 
     expect(view.state.doc.toJSON()).toEqual(
       withImage(image(embedded, null, "Title")).toJSON(),
@@ -170,7 +185,7 @@ describe("command.editImage", () => {
     const view = setup(doc(para(text("ab"))), { cursor: 2 });
     const before = view.state.doc;
 
-    openDialog(view).submit("  ", "alt");
+    openDialog(view).submit("  ", "alt", null);
 
     expect(view.state.doc).toBe(before);
     expect(view.focus).toHaveBeenCalled();
@@ -182,7 +197,7 @@ describe("command.editImage", () => {
     view.dispatch(view.state.tr.insertText("x", 1));
     const changed = view.state.doc;
 
-    request.submit("a.png", "");
+    request.submit("a.png", "", null);
 
     expect(view.state.doc).toBe(changed);
     expect(sendNotification).toHaveBeenCalledWith(

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds the layout engine (src-tauri/layout) for the webview into
-# src/engine/wasm/. The build is reproducible, so CI can check that the
+# src/engine/wasm/, and the modules it loads only when a document needs them
+# (src-tauri/drawings, diagrams) into src/engine/wasm/<module>/. The build is
+# reproducible, so CI can check that the
 # committed wasm is what the sources build (.github/actions/engine). That
 # needs the same tools everywhere, which this script checks before it builds:
 # - Rust RUST_VERSION with the wasm32-unknown-unknown target
@@ -76,20 +78,29 @@ RUSTFLAGS=""
 for map in "${remap[@]}"; do RUSTFLAGS+="--remap-path-prefix=$map "; done
 export RUSTFLAGS="${RUSTFLAGS% }"
 
-cargo build --manifest-path src-tauri/Cargo.toml -p blank-layout --lib \
-  --target wasm32-unknown-unknown --profile wasm
-wasm-bindgen --target web --out-dir "$out" --out-name blank_layout \
-  "$target/wasm32-unknown-unknown/wasm/blank_layout.wasm"
-[ -z "${ENGINE_STAGES:-}" ] || cp "$out/blank_layout_bg.wasm" "$out/blank_layout_bg.pre-opt.wasm"
-# binaryen's optimizer takes off about a fifth. It also drops the producers
-# section, where wasm-bindgen writes its version and, when prebuilt as on CI,
-# its git commit, which would make the file differ by how it was installed
+# builds the crate $1 into $out/$2 as $3_bg.wasm with its glue ($2 "." for
+# the engine itself, a folder of its own for a module)
+build() {
+  local crate=$1 dir="$out/$2" name=$3
+  cargo build --manifest-path src-tauri/Cargo.toml -p "$crate" --lib \
+    --target wasm32-unknown-unknown --profile wasm
+  wasm-bindgen --target web --out-dir "$dir" --out-name "$name" \
+    "$target/wasm32-unknown-unknown/wasm/$name.wasm"
+  [ -z "${ENGINE_STAGES:-}" ] || cp "$dir/${name}_bg.wasm" "$dir/${name}_bg.pre-opt.wasm"
+  # binaryen's optimizer takes off about a fifth. It also drops the producers
+  # section, where wasm-bindgen writes its version and, when prebuilt as on
+  # CI, its git commit, which would make the file differ by how it was
+  # installed
+  bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" \
+    "$dir/${name}_bg.wasm" -o "$dir/${name}_bg.wasm"
+  bun scripts/wasm-producers.ts "$dir/${name}_bg.wasm"
+  # -g keeps the names and changes nothing else
+  [ -z "${ENGINE_STAGES:-}" ] || bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" -g \
+    "$dir/${name}_bg.pre-opt.wasm" -o "$dir/${name}_bg.named.wasm"
+  ls -l "$dir/${name}_bg.wasm"
+}
+
 opt=(-O3 --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext
   --enable-mutable-globals --enable-reference-types --enable-multivalue --strip-producers)
-bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" \
-  "$out/blank_layout_bg.wasm" -o "$out/blank_layout_bg.wasm"
-bun scripts/wasm-producers.ts "$out/blank_layout_bg.wasm"
-# -g keeps the names and changes nothing else
-[ -z "${ENGINE_STAGES:-}" ] || bunx --package "binaryen@$BINARYEN_VERSION" wasm-opt "${opt[@]}" -g \
-  "$out/blank_layout_bg.pre-opt.wasm" -o "$out/blank_layout_bg.named.wasm"
-ls -l "$out/blank_layout_bg.wasm"
+build blank-layout . blank_layout
+build blank-drawings drawings blank_drawings

@@ -18,7 +18,7 @@ import {
 } from "vitest";
 
 import { parseMarkdown, schema } from "../markdown";
-import { IMAGES } from "../test/images";
+import { bytesOf, IMAGES } from "../test/images";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
@@ -45,6 +45,14 @@ import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
 import * as pdfJob from "./pdfJob";
 import { baseFonts, pageEngine, setPageEngine } from "./engine";
+import { recolor } from "../diagrams/recolor";
+import { sized } from "../diagrams/render";
+import { registerSource } from "../sources/registry";
+import { forgetRendered } from "../sources/store";
+import { forgetVectors } from "./vectors";
+import { setDiagramModuleLoader } from "./diagramModule";
+import { useTestDiagramModule } from "../test/diagramModule";
+import * as codec from "../images/codec";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -698,4 +706,147 @@ describe("pdfDate", () => {
     const minutes = String(Math.abs(offset) % 60).padStart(2, "0");
     expect(date.endsWith(`${sign}${hours}:${minutes}`)).toBe(true);
   });
+});
+
+describe("the PDF's diagrams", () => {
+  // a flowchart Mermaid drew (src/diagrams/__fixtures__), in ink
+  const drawn = sized(
+    recolor(
+      readFileSync(
+        join(import.meta.dirname, "../diagrams/__fixtures__/flowchart.svg"),
+        "utf8",
+      ),
+      "",
+    ),
+  )!;
+  let unregister: () => void;
+  beforeEach(() => {
+    testEngine();
+    useTestDiagramModule();
+    unregister = registerSource({
+      node: "diagram",
+      lang: "mermaid",
+      label: () => "Flowchart",
+      render: (source) =>
+        source.includes("error")
+          ? { ok: false, error: "Parse error on line 1" }
+          : { ok: true, data: drawn },
+    });
+  });
+  afterEach(() => {
+    unregister();
+    forgetRendered();
+    forgetVectors();
+    setDiagramModuleLoader(null);
+  });
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "holds a diagram as vectors, its labels as text, and its caption",
+    async () => {
+      const doc = parseMarkdown(
+        [
+          "Before",
+          '<!-- blank:diagram@1 caption="The plan" -->',
+          "```mermaid\nflowchart LR\n  A --> B\n```",
+          "<!-- /blank:diagram -->",
+        ].join("\n\n"),
+      );
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([]);
+      const file = join(dir, "diagram.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      for (const label of ["Idea", "Choice", "Draft", "Group", "The plan"]) {
+        expect(text).toContain(label);
+      }
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      expect(images.trim().split("\n")).toHaveLength(2);
+    },
+  );
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "prints a diagram as vectors with its labels as text",
+    async () => {
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  A --> B\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await printPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+        sheets: [sideBySide([0])],
+      });
+      expect(warnings).toEqual([]);
+      const { text } = pdfInfo(contents, "print-diagram.pdf");
+      for (const label of ["Idea", "Choice", "Draft"]) {
+        expect(text).toContain(label);
+      }
+      const images = execFileSync(
+        "pdfimages",
+        ["-list", join(dir, "print-diagram.pdf")],
+        { encoding: "utf8" },
+      );
+      // the header and its rule only: no picture of the diagram
+      expect(images.trim().split("\n")).toHaveLength(2);
+    },
+  );
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "holds a picture of a diagram when the diagram module doesn't load",
+    async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      setDiagramModuleLoader(async () => {
+        throw new TypeError("failed to fetch");
+      });
+      // the webview's canvas, which jsdom hasn't
+      const rasterized = vi.spyOn(codec, "rasterize").mockResolvedValue({
+        bytes: bytesOf(IMAGES.png),
+        mime: "image/png",
+        size: { width: 3, height: 2 },
+      });
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  A --> B\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([]);
+      expect(rasterized).toHaveBeenCalledOnce();
+      expect(logged).toHaveBeenCalledWith(
+        "the diagram module didn't load",
+        "TypeError",
+      );
+      const file = join(dir, "picture.pdf");
+      writeFileSync(file, contents);
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      // the header, its rule and the picture
+      expect(images.trim().split("\n")).toHaveLength(3);
+    },
+  );
+
+  it.runIf(has("pdftotext"))(
+    "writes a diagram that can't be drawn as its source, and says so",
+    async () => {
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  error -->\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([
+        "1 diagram couldn't be drawn and is written as its source in the PDF",
+      ]);
+      const file = join(dir, "broken.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      expect(text).toContain("error -->");
+      expect(text).not.toContain("Parse error");
+    },
+  );
 });

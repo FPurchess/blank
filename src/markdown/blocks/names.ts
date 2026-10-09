@@ -24,6 +24,8 @@ export const blockName = (doc: Node, node: Node) => {
       return formDefinition(doc, node)?.name ?? "Form";
     case "embed":
       return embedLabel(node);
+    case "diagram":
+      return "Diagram";
     default:
       return "Block Blank can't show";
   }

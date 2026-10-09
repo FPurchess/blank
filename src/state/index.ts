@@ -8,6 +8,7 @@ import { bootMessages } from "./messages";
 export * from "./appearance";
 export * from "./blocksPane";
 export * from "./dialogs";
+export * from "./drawings";
 export * from "./document";
 export * from "./find";
 export * from "./focus";

@@ -1,0 +1,19 @@
+[package]
+name = "blank-drawings"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Blank's module for diagrams: an SVG as a drawing of paths and glyphs, which the layout engine draws"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# no system fonts: the module only knows the font files it is given, the
+# layout engine's own, in its order
+usvg = { version = "0.47", default-features = false, features = ["text"] }
+# usvg's own, to ask which characters a face has
+ttf-parser = { version = "0.25", default-features = false }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

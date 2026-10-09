@@ -12,6 +12,8 @@ mod grid_tests;
 mod incremental_tests;
 mod navigate;
 mod paginate;
+#[cfg(test)]
+mod picture_tests;
 mod select;
 #[cfg(test)]
 pub(crate) mod test_support;
@@ -100,6 +102,9 @@ pub struct Engine {
     /// the page numbers as set in tables of contents, by number and style
     number_boxes: std::collections::HashMap<(String, &'static str), crate::text::TextBox>,
     pub stats: Stats,
+    /// the drawings of modules (diagrams, maths), by the src of the image
+    /// they stand in, see `crate::drawing`
+    pub drawings: std::collections::HashMap<String, std::sync::Arc<crate::drawing::Drawing>>,
     next_version: u32,
     /// how many items miss each character, in the order the characters
     /// came, see `missing`
@@ -120,6 +125,7 @@ impl Engine {
             toc_labels: vec![],
             number_boxes: Default::default(),
             stats: Stats::default(),
+            drawings: std::collections::HashMap::new(),
             next_version: 1,
             missing_chars: Default::default(),
         };

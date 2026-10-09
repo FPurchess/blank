@@ -11,6 +11,8 @@ import {
 import { closeDialog, imageDialog, type ImageDialogRequest } from "../state";
 import BaseDialog from "./components/BaseDialog.vue";
 import TextField from "./components/TextField.vue";
+import OptionGroup from "./components/OptionGroup.vue";
+import { WIDTH_OPTIONS, widthChosen, widthWritten } from "./widthOptions";
 import {
   checkImage,
   describeFile,
@@ -30,6 +32,7 @@ const embedded = shallowRef(
 );
 const source = shallowRef(embedded.value ? "" : props.request.src);
 const alt = shallowRef(props.request.alt);
+const width = shallowRef(widthChosen(props.request.width));
 // an empty source only says so once the user tries to insert it
 const submitted = shallowRef(false);
 const choosing = shallowRef(false);
@@ -84,7 +87,13 @@ const submit = () => {
   submitted.value = true;
   if (check.value.valid) {
     const src = embedded.value ?? source.value;
-    close(() => props.request.submit(src, alt.value));
+    close(() =>
+      props.request.submit(
+        src,
+        alt.value,
+        widthWritten(width.value, props.request.width),
+      ),
+    );
   }
 };
 </script>
@@ -120,6 +129,14 @@ const submit = () => {
       ref="altField"
       v-model="alt"
       label="Description"
+    />
+    <OptionGroup
+      id="image-dialog-width"
+      name="width"
+      label="Width"
+      :options="WIDTH_OPTIONS"
+      :model-value="width"
+      @update:model-value="(chosen) => (width = String(chosen))"
     />
     <template v-if="request.isEdit" #secondary>
       <button type="button" @click="close(request.remove)">Remove</button>

@@ -56,7 +56,11 @@ import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { toggleBlocks, toggleBlocksPane } from "../commands/contentBlocks";
+import {
+  blockSettings,
+  toggleBlocks,
+  toggleBlocksPane,
+} from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import {
@@ -138,6 +142,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),
   [CommandIdentifier.INSERT_BLOCK]: toggleBlocksPane(),
+  [CommandIdentifier.BLOCK_SETTINGS]: blockSettings(),
   // the lines of a code block first, then list items, then lines of text;
   // their keys do a little more, see keyCommands
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
@@ -392,25 +397,35 @@ export const keymap = () => {
   bindCommands();
   return new Plugin({
     props: {
-      handleKeyDown: liveKeys(() => ({
-        ...baseKeymap,
+      handleKeyDown: liveKeys(() => {
+        const bound = bindingsOf(
+          Object.keys(commandMap) as CommandIdentifier[],
+        );
+        return {
+          ...baseKeymap,
 
-        ...bindingsOf(Object.keys(commandMap) as CommandIdentifier[]),
+          ...bound,
 
-        // baseKeymap's Enter, but a paragraph after an aligned block, made at
-        // its end, is aligned like it, as in Word
-        Enter: chainCommands(
-          enterEmptyItem,
-          splitListItem(schema.nodes.list_item),
-          newlineInCode,
-          createParagraphNear,
-          liftEmptyBlock,
-          splitBlockAs(keepAlignment),
-        ),
-        "Shift-Enter": insertNode(schema.nodes.hard_break),
-        Backspace: backspace,
-        "Shift-Backspace": backspace,
-      })),
+          // baseKeymap's Enter, but a paragraph after an aligned block, made at
+          // its end, is aligned like it, as in Word
+          Enter: chainCommands(
+            enterEmptyItem,
+            splitListItem(schema.nodes.list_item),
+            newlineInCode,
+            createParagraphNear,
+            liftEmptyBlock,
+            splitBlockAs(keepAlignment),
+          ),
+          // a line break, unless a command has the key, e.g. a selected
+          // block's settings
+          "Shift-Enter": chainCommands(
+            ...(bound["Shift-Enter"] ? [bound["Shift-Enter"]] : []),
+            insertNode(schema.nodes.hard_break),
+          ),
+          Backspace: backspace,
+          "Shift-Backspace": backspace,
+        };
+      }),
     },
   });
 };

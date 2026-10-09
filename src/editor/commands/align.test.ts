@@ -1,5 +1,5 @@
 import { history, undo } from "prosemirror-history";
-import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { CellSelection } from "prosemirror-tables";
 import { wrapInList } from "prosemirror-schema-list";
 import { describe, expect, it } from "vitest";
@@ -24,6 +24,7 @@ import { alignmentGuard } from "../plugins/alignment";
 import { keymap } from "../plugins/keymap";
 import { pressKey } from "../../test/editor";
 import { alignmentAt, alignText } from "./align";
+import { diagram } from "../../test/sources";
 import { setTextblock } from "./setTextblock";
 
 const aligns = (state: EditorState) =>
@@ -192,5 +193,50 @@ describe("alignmentGuard", () => {
     const state = withGuard(doc(aligned("center", p("a")), p("b")));
     const typed = state.apply(state.tr.insertText("x", 2));
     expect(typed.doc.firstChild!.attrs.align).toBe("center");
+  });
+});
+
+describe("aligning blocks", () => {
+  const withDiagram = () =>
+    createState(doc(p("one"), diagram("A --> B"), p("two")), { cursor: 2 });
+  const selectDiagram = (state: EditorState) =>
+    state.apply(state.tr.setSelection(NodeSelection.create(state.doc, 5)));
+
+  it("aligns a selected diagram, and back to the left", () => {
+    const { done, state } = run(
+      selectDiagram(withDiagram()),
+      alignText("center"),
+    );
+    expect(done).toBe(true);
+    expect(state.doc.child(1).attrs.align).toBe("center");
+    expect(alignmentAt(state)).toBe("center");
+    const back = run(state, alignText("center")).state;
+    expect(back.doc.child(1).attrs.align).toBeNull();
+  });
+
+  it("aligns a diagram while its source is typed", () => {
+    const state = withDiagram();
+    const typing = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, 8)),
+    );
+    expect(run(typing, alignText("right")).state.doc.child(1).attrs.align).toBe(
+      "right",
+    );
+  });
+
+  it("never justifies a diagram", () => {
+    expect(run(selectDiagram(withDiagram()), alignText("justify")).done).toBe(
+      false,
+    );
+  });
+
+  it("aligns an image's paragraph when the image is selected", () => {
+    const image = schema.nodes.image.create({ src: "a.png" });
+    const state = createState(doc(schema.node("paragraph", null, [image])));
+    const selected = state.apply(
+      state.tr.setSelection(NodeSelection.create(state.doc, 1)),
+    );
+    const { state: after } = run(selected, alignText("center"));
+    expect(after.doc.child(0).attrs.align).toBe("center");
   });
 });

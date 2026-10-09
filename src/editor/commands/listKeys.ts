@@ -38,7 +38,7 @@ const itemAtStart = (state: EditorState) => {
   const { selection } = state;
   if (!(selection instanceof TextSelection) || !selection.empty) return -1;
   const { $from } = selection;
-  if ($from.parent.type === schema.nodes.code_block) return -1;
+  if ($from.parent.type.spec.code) return -1;
   return listItemStart($from);
 };
 

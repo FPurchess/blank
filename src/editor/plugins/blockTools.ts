@@ -19,6 +19,9 @@ import {
 } from "../commands/contentBlocks";
 import { boxOnCaretPage, followLayout } from "./followLayout";
 import { fieldEntry } from "./forms";
+import { CommandIdentifier } from "../../config";
+import { commandShortcut } from "../keyBindings";
+import { enterSource, openBlock } from "./sourceBlocks";
 
 // The toolbar of a content block, for the mouse: over a form while the
 // cursor is in one, and over a table of contents or an embed while it is
@@ -39,6 +42,11 @@ const blockAt = (state: EditorState) => {
       ? { node, pos, name: blockName(doc, node) }
       : null;
   }
+  // a source block whose source is open, e.g. a diagram being typed
+  const open = openBlock(state);
+  if (open) {
+    return { node: open.node, pos: open.pos, name: blockName(doc, open.node) };
+  }
   if (isInTable(state)) return null;
   const at = fieldAt(selection.$head);
   return (
@@ -51,6 +59,7 @@ const ICONS: Record<string, string> = {
   toc: "toc",
   form_block: "form",
   embed: "embed",
+  diagram: "flow",
   unknown_block: "info",
 };
 
@@ -74,6 +83,13 @@ const enterForm: Command = (state, dispatch) => {
 };
 
 /**
+ * enterBlock goes into the selected block: a form's first field, or a
+ * source block's source, which opens it
+ */
+const enterBlock: Command = (state, dispatch) =>
+  enterForm(state, dispatch) || enterSource(state, dispatch);
+
+/**
  * blockTools shows the toolbar of the content block the cursor is in or on
  */
 export const blockTools = () => {
@@ -86,15 +102,15 @@ export const blockTools = () => {
     name: string,
     selected: boolean,
   ): ToolbarItem[] => [
-    // a table of contents, and an embed whose type Blank has, which are
-    // selected then
+    // a table of contents, a diagram, and an embed whose type Blank has:
+    // Shift+Enter (block.settings) opens them
     ...(editBlock()(view.state)
       ? [
           {
             id: "block-edit",
             label: "Settings",
             icon: "pencil",
-            key: "Enter",
+            key: commandShortcut(CommandIdentifier.BLOCK_SETTINGS),
             enabled: true,
             run: () => {
               editBlock()(view.state, view.dispatch, view);
@@ -165,19 +181,25 @@ export const blockTools = () => {
       // content blocks pasted into a table, list or quote go after it, at
       // the top of the document
       handlePaste: (view, _event, slice) => pasteTopBlocks(view, slice),
-      // Enter edits the selected block, or goes into a selected form
+      // Enter opens a selected source block, edits the selected block, or
+      // goes into a selected form
       handleKeyDown: (view, event) =>
         event.key === "Enter" &&
         !event.shiftKey &&
         !event.ctrlKey &&
         !event.metaKey &&
         !event.altKey &&
-        (editBlock()(view.state, view.dispatch, view) ||
+        (enterSource(view.state, view.dispatch) ||
+          // the settings of a selected block only: in an open source block
+          // Enter starts a new line (Shift+Enter opens its settings there)
+          (view.state.selection instanceof NodeSelection &&
+            editBlock()(view.state, view.dispatch, view)) ||
           enterForm(view.state, view.dispatch)),
       // typing on a selected form, as after inserting it, fills its first
-      // field rather than replacing the form
+      // field rather than replacing the form; on a selected source block, it
+      // goes on at the end of its source
       handleTextInput: (view, _from, _to, text) => {
-        if (!enterForm(view.state, view.dispatch)) return false;
+        if (!enterBlock(view.state, view.dispatch)) return false;
         view.dispatch(view.state.tr.insertText(text));
         return true;
       },
