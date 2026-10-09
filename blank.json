@@ -33,6 +33,7 @@
     "file.save": "Mod-s",
     "file.save_as": "Mod-Shift-s",
     "file.open": "Mod-o",
+    "file.print": "Mod-p",
     "tab.close": "Mod-w",
     "tab.next": "Ctrl-Tab",
     "tab.previous": "Ctrl-Shift-Tab",

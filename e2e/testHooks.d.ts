@@ -1,8 +1,10 @@
 // The test hooks a debug build of the app puts on `window` (__TEST_HOOKS__):
 // `blankGeometry` (exposeGeometry in src/engine/geometry.ts),
 // `blankPageViewPerf` (src/engine/perf.ts), `blankBootTimes`,
-// `blankBreakEngine` and `blankSetTheme` (src/state/appearance.ts). Written out here, since E2E's type check can't compile
-// the app's sources; keep them in step.
+// `blankBreakEngine` and `blankSetTheme` (src/state/appearance.ts), and
+// `blankPrintCapture` (src/print/job.ts), which a test sets itself. Written
+// out here, since E2E's type check can't compile the app's sources; keep them
+// in step.
 
 interface BlankBox {
   left: number;
@@ -50,4 +52,7 @@ interface Window {
   // switches to a theme, as the settings do; the docs shots capture each
   // frame in light and dark with it
   blankSetTheme: (name: string) => void;
+  // set by a test: what Print hands to the system's print dialog lands
+  // here instead, since that dialog can't be automated
+  blankPrintCapture?: { sent: { sheets: number; pdf: string }[] };
 }

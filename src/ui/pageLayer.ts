@@ -16,6 +16,25 @@ import { painter, type Surface } from "./painter";
 // its version changes, from the queue and, for the text, from a kept bitmap
 // (pageBitmaps.ts).
 
+/**
+ * sizeCanvas gives a canvas `width` × `height` device pixels, shown at
+ * exactly that size, so nothing scales it and blurs the text
+ * @returns whether its size changed, which clears it
+ */
+export const sizeCanvas = (
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  ratio: number,
+) => {
+  if (canvas.width === width && canvas.height === height) return false;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${width / ratio}px`;
+  canvas.style.height = `${height / ratio}px`;
+  return true;
+};
+
 // what of the frame a layer paints by: the page and where it is shown
 export interface LayerFrame {
   page: number;
@@ -139,13 +158,7 @@ export const layerOf = ({
     const top = place ? Math.round(place.top * ratio) / ratio : 0;
     const width = Math.round(frame.width * ratio);
     const height = Math.round((place ? place.height : frame.height) * ratio);
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-      canvas.style.width = `${width / ratio}px`;
-      canvas.style.height = `${height / ratio}px`;
-      shown = "";
-    }
+    if (sizeCanvas(canvas, width, height, ratio)) shown = "";
     if (place) canvas.style.top = `${top}px`;
     const shows = lookOf(canvas);
     const key = bitmapKey({

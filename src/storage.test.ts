@@ -10,6 +10,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { doc, docWithFrontmatter, h, p } from "./test/editor";
 import { deferred, flushPromises } from "./test/async";
+import { PRINT_DEFAULTS } from "./print/printModel";
 
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
 
@@ -158,6 +159,30 @@ describe("storage", () => {
       );
       const restarted = await bootFresh();
       expect(restarted.blocksPaneOpen.value).toBe(true);
+    });
+  });
+
+  describe("print settings", () => {
+    it("start with the printer and keep what was chosen", async () => {
+      const { printSettings } = await bootFresh();
+      expect(printSettings.value).toEqual(PRINT_DEFAULTS);
+
+      const chosen = { ...PRINT_DEFAULTS, perSheet: 2 as const, more: true };
+      printSettings.value = chosen;
+
+      await vi.waitFor(async () =>
+        expect(await localforage.getItem("print")).toEqual(chosen),
+      );
+      const restarted = await bootFresh();
+      expect(restarted.printSettings.value).toEqual(chosen);
+    });
+
+    it("ignore what they don't know", async () => {
+      await localforage.setItem("print", { destination: "fax" });
+
+      const { printSettings } = await bootFresh();
+
+      expect(printSettings.value).toEqual(PRINT_DEFAULTS);
     });
   });
 

@@ -38,9 +38,8 @@ import OptionGroup from "./components/OptionGroup.vue";
 import SettingRow from "./components/SettingRow.vue";
 import LengthFields from "./LengthFields.vue";
 import { radioItems } from "./menuModel";
-import type { Chosen } from "./optionGroupModel";
+import { appliesOnEnter, type Chosen } from "./optionGroupModel";
 import {
-  appliesOnEnter,
   MARGIN_FIELDS,
   PAPER_FIELDS,
   problemId,

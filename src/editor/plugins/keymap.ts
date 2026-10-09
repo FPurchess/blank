@@ -38,6 +38,7 @@ import {
   toggleSpellcheck,
   tableKey,
   pageSetup,
+  print,
   editBand,
   showOutline,
   showWordCount,
@@ -52,6 +53,7 @@ import { inCell } from "./tables/util";
 import { normalizeBinding, sameBinding } from "../../keyNames";
 import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
+import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import { toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
@@ -156,13 +158,14 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.FILE_SAVE]: saveFile(),
   [CommandIdentifier.FILE_SAVE_AS]: saveFile({ force: true }),
   [CommandIdentifier.FILE_OPEN]: openFile(),
+  [CommandIdentifier.FILE_PRINT]: print(),
   [CommandIdentifier.TAB_CLOSE]: closeTab(),
   [CommandIdentifier.TAB_NEXT]: cycleTabs(1),
   [CommandIdentifier.TAB_PREVIOUS]: cycleTabs(-1),
   [CommandIdentifier.TAB_REOPEN]: reopenTab(),
   [CommandIdentifier.TAB_MOVE_LEFT]: moveTab(-1),
   [CommandIdentifier.TAB_MOVE_RIGHT]: moveTab(1),
-  [CommandIdentifier.EXPORT_PDF]: exportAs("PDF-Export", exporters.toPDF, [
+  [CommandIdentifier.EXPORT_PDF]: exportAs(PDF_EXPORT, exporters.toPDF, [
     PDF_FILTER,
   ]),
   [CommandIdentifier.EXPORT_DOCX]: exportAs("Word-Export", exporters.toDOCX, [
@@ -291,13 +294,14 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files, the tabs, moving between the parts (F6, and Alt-F10
-// to the toolbar), focus mode and the settings
+// the editor: the files and printing, the tabs, moving between the parts
+// (F6, and Alt-F10 to the toolbar), focus mode and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
   CommandIdentifier.FILE_SAVE,
   CommandIdentifier.FILE_SAVE_AS,
+  CommandIdentifier.FILE_PRINT,
   CommandIdentifier.TAB_CLOSE,
   CommandIdentifier.TAB_NEXT,
   CommandIdentifier.TAB_PREVIOUS,

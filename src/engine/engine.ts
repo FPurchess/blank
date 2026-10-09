@@ -18,7 +18,7 @@ import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
 import { packFonts, type PdfWarning } from "./pdfJob";
-import type { EngineItem } from "./types";
+import type { EngineItem, PrintSheet } from "./types";
 
 // The layout engine (src-tauri/layout, built for the webview by
 // scripts/build-engine.sh) and what it needs: its fonts, the document as
@@ -679,10 +679,46 @@ export class PageEngine {
    *   which screen readers read it in; none when it isn't known
    * @param date when the PDF was made, in ISO 8601 with its offset (see
    *   pdfDate), which a PDF/A needs: the wasm has no clock
+   * @param pages the pages to write, by their index in ascending order;
+   *   all if left out
    */
-  pdf(title: string, author: string, language?: string, date?: string) {
+  pdf(
+    title: string,
+    author: string,
+    language?: string,
+    date?: string,
+    pages?: number[],
+  ) {
     return this.call(new Uint8Array(), () =>
-      this.raw.pdf(title, author, language ?? null, date ?? null),
+      this.raw.pdf(
+        title,
+        author,
+        language ?? null,
+        date ?? null,
+        pages ? Uint32Array.from(pages) : null,
+      ),
+    );
+  }
+
+  /**
+   * printPdf writes a PDF to print: the sheets, with the pages placed on
+   * them (see printSheets in src/print/sheets.ts), without the structure,
+   * bookmarks and links of the document's PDF
+   */
+  printPdf(sheets: readonly PrintSheet[], title: string) {
+    return this.call(new Uint8Array(), () =>
+      this.raw.printPdf(JSON.stringify(sheets), title),
+    );
+  }
+
+  /**
+   * printDisplay returns what a page prints, its body and its header and
+   * footer, without the hints only the screen shows
+   */
+  printDisplay(page: number): PageDisplay {
+    return this.call(
+      EMPTY_DISPLAY,
+      () => JSON.parse(this.raw.printDisplay(page)) as PageDisplay,
     );
   }
 

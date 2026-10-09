@@ -59,6 +59,10 @@ export interface Option<T> {
   // label then says what it means in its tooltip, which screen readers read
   // as its description
   short?: string;
+  // an icon before the label
+  icon?: string;
+  // what the option's tooltip says, if it says more than its label
+  tip?: string;
 }
 
 /**
@@ -104,6 +108,14 @@ export const HEADING_OPTIONS: Option<number>[] = [1, 2, 3, 4, 5, 6].map(
 );
 
 /**
+ * marginsPresetOf returns the named margins `margins` are, if they are
+ */
+export const marginsPresetOf = (margins: Margins): MarginPreset | undefined =>
+  (Object.keys(MARGIN_PRESETS) as MarginPreset[]).find((key) =>
+    sameMargins(margins, allMargins(MARGIN_PRESETS[key])),
+  );
+
+/**
  * choicesOf returns what the dialog shows for page settings
  * @param settings the settings of the document
  * @param locale the locale whose paper "auto" is
@@ -120,9 +132,7 @@ export const choicesOf = (
     typeof settings.size === "string"
       ? settings.size
       : matchPaper(paper.width, paper.height);
-  const preset = (Object.keys(MARGIN_PRESETS) as MarginPreset[]).find((key) =>
-    sameMargins(margins, allMargins(MARGIN_PRESETS[key])),
-  );
+  const preset = marginsPresetOf(margins);
   const show = (points: number) => String(toUnit(points, unit));
   return {
     paper: name === "auto" || name === own ? "auto" : (name ?? "custom"),

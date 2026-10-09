@@ -37,7 +37,9 @@ sha2 = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 futures-util = { version = "0.3", default-features = false }
-tokio = { version = "1", features = ["fs", "sync"] }
+tokio = { version = "1", features = ["fs", "sync", "time"] }
+# what comes with the print PDF, encoded for a header (src/print/mod.rs)
+percent-encoding = "2"
 # the system's fonts for scripts Blank's fonts lack, see src/fonts.rs
 fontique = "0.11"
 unicode-script = "0.5"
@@ -62,7 +64,26 @@ gtk = "0.18"
 # whether there is a session bus for the single-instance plugin (src/open.rs);
 # the version it uses
 zbus = "5"
+# names Blank's window for the print portal's dialog, on X11 and Wayland
+# (src/print/linux.rs); on zbus's async-io, as above
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "raw_handle", "wayland"] }
+raw-window-handle = "0.6"
+# runs the print portal's calls on a thread of their own (src/print/linux.rs)
+async-io = "2"
 
+# the print panel for the print PDF (src/print/macos.rs); the versions tauri's
+# webview already uses
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSGeometry", "NSObject", "NSString", "NSValue", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3", features = ["NSPrintInfo", "NSPrintOperation", "NSPrinter"] }
+objc2-pdf-kit = { version = "0.3", features = ["PDFDocument", "objc2-app-kit"] }
+
+# WebView2's print dialog for the print PDF (src/print/windows.rs); the
+# versions tauri's webview already uses
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.38"
+windows = "0.61"
 
 [dev-dependencies]
 tempfile = "3"

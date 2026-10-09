@@ -11,6 +11,7 @@
 @use "formatToolbar";
 @use "settings";
 @use "bands";
+@use "print";
 
 html {
   overflow-y: auto;
@@ -346,10 +347,18 @@ body {
     }
   }
 
-  // the options of a row as one segmented control, see OptionGroup.vue
+  // the options of a row as one segmented control, see OptionGroup.vue,
+  // an option's icon before its label
   .options {
     @include segmented;
     flex-wrap: wrap;
+
+    > button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
   }
 }
 

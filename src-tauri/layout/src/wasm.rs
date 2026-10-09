@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use crate::engine::{Changes, Engine, Hit, Op};
 use crate::fonts::{split_files, Fonts};
 use crate::model::{Content, Item, Settings};
-use crate::pdf::{self, ImageData, Info, Warning};
+use crate::pdf::{self, ImageData, Info, PrintSheet, Warning};
 
 #[wasm_bindgen]
 pub struct LayoutEngine {
@@ -314,6 +314,14 @@ impl LayoutEngine {
         display(self.engine.band_ops(page as usize))
     }
 
+    /// what a page prints, its body and its header and footer, as `page`
+    /// gives them: without the hints only the screen shows, for the print
+    /// preview
+    #[wasm_bindgen(js_name = printDisplay)]
+    pub fn print_display(&mut self, page: u32) -> String {
+        display(self.engine.printed_ops(page as usize))
+    }
+
     /// a glyph's outline as an SVG path, in font units with y up
     #[wasm_bindgen(js_name = glyphPath)]
     pub fn glyph_path(&self, font: u32, glyph: u32) -> String {
@@ -582,16 +590,18 @@ impl LayoutEngine {
 
     /// the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
     /// "de-CH", none if left out or empty), made at `date` (ISO 8601 with
-    /// its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
-    /// image that can't be decoded shows its alt text, a font that can't be
-    /// embedded is left out, and a document that can't be PDF/A-2u is a
-    /// normal PDF: see `pdfWarnings`
+    /// its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it), of
+    /// all its pages or of `pages` (their indexes, ascending). An image that
+    /// can't be decoded shows its alt text, a font that can't be embedded is
+    /// left out, and a document that can't be PDF/A-2u is a normal PDF: see
+    /// `pdfWarnings`
     pub fn pdf(
         &mut self,
         title: &str,
         author: &str,
         language: Option<String>,
         date: Option<String>,
+        pages: Option<Vec<u32>>,
     ) -> Result<Vec<u8>, JsError> {
         let info = Info {
             title: title.to_string(),
@@ -600,8 +610,32 @@ impl LayoutEngine {
         };
         let language = language.unwrap_or_default();
         self.warnings.clear();
+        let written = match pages {
+            Some(pages) => {
+                let pages: Vec<usize> = pages.into_iter().map(|page| page as usize).collect();
+                pdf::write_pages(&mut self.engine, &self.images, &info, &language, &pages)
+            }
+            None => pdf::write_with(&mut self.engine, &self.images, &info, &language),
+        }
+        .map_err(error)?;
+        self.warnings = written.warnings;
+        Ok(written.bytes)
+    }
+
+    /// sheets to print as a PDF, titled `title`: `sheets` is JSON, a list of
+    /// `{width, height, placements: [{page, x, y, scale}]}` in points, see
+    /// PrintSheet. Untagged and without bookmarks or links; what went wrong
+    /// is in `pdfWarnings`, as for `pdf`
+    #[wasm_bindgen(js_name = printPdf)]
+    pub fn print_pdf(&mut self, sheets: &str, title: &str) -> Result<Vec<u8>, JsError> {
+        let sheets: Vec<PrintSheet> = serde_json::from_str(sheets).map_err(error)?;
+        let info = Info {
+            title: title.to_string(),
+            ..Info::default()
+        };
+        self.warnings.clear();
         let written =
-            pdf::write_with(&mut self.engine, &self.images, &info, &language).map_err(error)?;
+            pdf::write_print(&mut self.engine, &self.images, &info, &sheets).map_err(error)?;
         self.warnings = written.warnings;
         Ok(written.bytes)
     }

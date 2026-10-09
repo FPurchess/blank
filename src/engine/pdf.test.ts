@@ -28,9 +28,11 @@ import toPDF, {
   describeWarnings,
   pdfDate,
   pdfLanguage,
+  printPDF,
   sizesOf,
   WORKER_TIMEOUT,
 } from "./pdf";
+import type { PrintSheet } from "./types";
 import { language } from "../state";
 import { prepareImages } from "../images/prepare";
 import { documentFields } from "../layout/bands";
@@ -88,6 +90,85 @@ const exportIt = async () => {
   const state = EditorState.create({ schema, doc });
   return toPDF(state, { docPath: null, layout: testLayout() });
 };
+
+// three pages, one word on each
+const threePages = () =>
+  EditorState.create({
+    schema,
+    doc: parseMarkdown(
+      "Alpha\n\n<!-- pagebreak -->\n\nBeta\n\n<!-- pagebreak -->\n\nGamma\n",
+    ),
+  });
+
+// pages side by side on a landscape A4 sheet, at half their size
+const sideBySide = (pages: number[]): PrintSheet => ({
+  width: 841.89,
+  height: 595.28,
+  placements: pages.map((page, index) => ({
+    page,
+    x: 18 + index * 420,
+    y: 18,
+    scale: 0.5,
+  })),
+});
+
+const pdfInfo = (contents: Uint8Array, name: string) => {
+  const file = join(dir, name);
+  writeFileSync(file, contents);
+  return {
+    info: execFileSync("pdfinfo", [file], { encoding: "utf8" }),
+    text: execFileSync("pdftotext", [file, "-"], { encoding: "utf8" }),
+  };
+};
+
+describe("a PDF of some pages", () => {
+  beforeEach(() => testEngine());
+
+  it.runIf(has("pdfinfo"))(
+    "holds only those pages, as a tagged PDF",
+    async () => {
+      const { contents, pages } = await toPDF(threePages(), {
+        docPath: null,
+        layout: testLayout(),
+        pages: [0, 2],
+      });
+
+      expect(pages).toBe(2);
+      const { info, text } = pdfInfo(contents, "some-pages.pdf");
+      expect(info).toMatch(/Pages:\s+2\n/);
+      expect(info).toMatch(/Tagged:\s+yes\n/);
+      expect(text).toContain("Alpha");
+      expect(text).not.toContain("Beta");
+      expect(text).toContain("Gamma");
+    },
+  );
+});
+
+describe("the PDF to print", () => {
+  beforeEach(() => testEngine());
+
+  it.runIf(has("pdfinfo"))(
+    "places the pages on the sheets, untagged",
+    async () => {
+      const { contents, pages } = await printPDF(threePages(), {
+        docPath: null,
+        layout: testLayout(),
+        sheets: [sideBySide([0, 1]), sideBySide([2])],
+      });
+
+      expect(pages).toBe(2);
+      const { info, text } = pdfInfo(contents, "print.pdf");
+      expect(info).toMatch(/Pages:\s+2\n/);
+      expect(info).toMatch(/Page size:\s+841.89 x 595.28 pts/);
+      expect(info).toMatch(/Tagged:\s+no\n/);
+      // the first two pages on the first sheet, the third on the second
+      const [first, second] = text.split("\f");
+      expect(first).toContain("Alpha");
+      expect(first).toContain("Beta");
+      expect(second).toContain("Gamma");
+    },
+  );
+});
 
 describe("the PDF's fonts", () => {
   beforeEach(() => testEngine());
@@ -233,6 +314,25 @@ describe("the PDF export after the engine trapped", () => {
         encoding: "utf8",
       });
       expect(text).toContain("Findings");
+    },
+  );
+
+  it.runIf(has("pdfinfo"))(
+    "prints in a worker too, with the sheets",
+    async () => {
+      vi.spyOn(LayoutEngine.prototype, "printPdf").mockImplementationOnce(trap);
+
+      const { contents, pages } = await printPDF(threePages(), {
+        docPath: null,
+        layout: testLayout(),
+        sheets: [sideBySide([0, 1])],
+      });
+
+      expect(jobs).toHaveLength(1);
+      expect(JSON.parse(jobs[0].sheets!)).toEqual([sideBySide([0, 1])]);
+      expect(pages).toBe(1);
+      const { info } = pdfInfo(contents, "print-worker.pdf");
+      expect(info).toMatch(/Pages:\s+1\n/);
     },
   );
 

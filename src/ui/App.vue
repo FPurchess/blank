@@ -8,6 +8,7 @@ import {
   imageDialog,
   linkDialog,
   pageSetup,
+  printDialog,
   settingsDialog,
   tablePicker,
   tableToolbar,
@@ -26,6 +27,7 @@ import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
+import PrintDialog from "./PrintDialog.vue";
 import SettingsDialog from "./settings/SettingsDialog.vue";
 import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
@@ -76,6 +78,11 @@ watchFocusMode();
     v-if="pageSetup"
     :key="keyOf(pageSetup)"
     :request="pageSetup"
+  />
+  <PrintDialog
+    v-if="printDialog"
+    :key="keyOf(printDialog)"
+    :request="printDialog"
   />
   <UnsavedDialog
     v-if="unsavedDialog"

@@ -91,6 +91,7 @@ describe("tabMenu", () => {
     closeOthers: vi.fn(),
     closeRight: vi.fn(),
     save: vi.fn(),
+    print: vi.fn(),
     copyPath: vi.fn(),
   });
   const ids = (items: MenuItem[]) =>
@@ -100,9 +101,9 @@ describe("tabMenu", () => {
       (candidate) => candidate !== "separator" && candidate.id === id,
     ) as Exclude<MenuItem, "separator">;
 
-  it("closes, saves and copies the path of a file's tab", () => {
+  it("closes, saves, prints and copies the path of a file's tab", () => {
     const run = actions();
-    const items = tabMenu(tab("/docs/notes.md"), 0, 2, true, run);
+    const items = tabMenu(tab("/docs/notes.md"), 0, 2, true, run, true);
 
     expect(ids(items)).toEqual([
       "close",
@@ -111,30 +112,49 @@ describe("tabMenu", () => {
       "-",
       "save",
       "save-as",
+      "print",
       "-",
       "copy-path",
     ]);
     item(items, "close").run!();
     item(items, "save-as").run!();
+    item(items, "print").run!();
     item(items, "copy-path").run!();
     expect(run.close).toHaveBeenCalledWith("a");
     expect(run.save).toHaveBeenCalledWith("a", true);
+    expect(run.print).toHaveBeenCalledWith("a");
+    expect(item(items, "print")).toMatchObject({
+      label: "Print…",
+      shortcut: "Mod-p",
+      disabled: false,
+    });
+    expect(item(items, "print").detail).toBeUndefined();
     expect(run.copyPath).toHaveBeenCalledWith("/docs/notes.md");
     expect(item(items, "close").shortcut).toBe("Mod-w");
   });
 
   it("names the keys only on the shown tab's menu, where they act", () => {
-    const items = tabMenu(tab("/notes.md"), 1, 2, false, actions());
+    const items = tabMenu(tab("/notes.md"), 1, 2, false, actions(), true);
 
     expect(item(items, "close").shortcut).toBeUndefined();
     expect(item(items, "save").shortcut).toBeUndefined();
+    expect(item(items, "print").shortcut).toBeUndefined();
   });
 
   it("has no path to copy for an untitled tab, nor tabs to close beyond it", () => {
-    const items = tabMenu(tab(null), 0, 1, true, actions());
+    const items = tabMenu(tab(null), 0, 1, true, actions(), true);
 
     expect(ids(items)).not.toContain("copy-path");
     expect(item(items, "close-others").disabled).toBe(true);
     expect(item(items, "close-right").disabled).toBe(true);
+  });
+
+  it("can't print without the page layout", () => {
+    const items = tabMenu(tab(null), 0, 1, true, actions(), false);
+
+    expect(item(items, "print")).toMatchObject({
+      disabled: true,
+      detail: "Needs the page layout",
+    });
   });
 });

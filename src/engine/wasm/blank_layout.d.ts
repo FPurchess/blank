@@ -119,12 +119,26 @@ export class LayoutEngine {
     /**
      * the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
      * "de-CH", none if left out or empty), made at `date` (ISO 8601 with
-     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
-     * image that can't be decoded shows its alt text, a font that can't be
-     * embedded is left out, and a document that can't be PDF/A-2u is a
-     * normal PDF: see `pdfWarnings`
+     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it), of
+     * all its pages or of `pages` (their indexes, ascending). An image that
+     * can't be decoded shows its alt text, a font that can't be embedded is
+     * left out, and a document that can't be PDF/A-2u is a normal PDF: see
+     * `pdfWarnings`
      */
-    pdf(title: string, author: string, language?: string | null, date?: string | null): Uint8Array;
+    pdf(title: string, author: string, language?: string | null, date?: string | null, pages?: Uint32Array | null): Uint8Array;
+    /**
+     * what a page prints, its body and its header and footer, as `page`
+     * gives them: without the hints only the screen shows, for the print
+     * preview
+     */
+    printDisplay(page: number): string;
+    /**
+     * sheets to print as a PDF, titled `title`: `sheets` is JSON, a list of
+     * `{width, height, placements: [{page, x, y, scale}]}` in points, see
+     * PrintSheet. Untagged and without bookmarks or links; what went wrong
+     * is in `pdfWarnings`, as for `pdf`
+     */
+    printPdf(sheets: string, title: string): Uint8Array;
     /**
      * the colour of a role on paper, as 0xRRGGBB; for tests
      */
@@ -239,8 +253,10 @@ export interface InitOutput {
     readonly layoutengine_pageBody: (a: number, b: number) => [number, number];
     readonly layoutengine_pageCount: (a: number) => number;
     readonly layoutengine_pageSpan: (a: number, b: number) => [number, number];
-    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
+    readonly layoutengine_pdf: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number, number];
     readonly layoutengine_pdfWarnings: (a: number) => [number, number];
+    readonly layoutengine_printDisplay: (a: number, b: number) => [number, number];
+    readonly layoutengine_printPdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly layoutengine_roleColor: (a: number, b: number) => number;
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];

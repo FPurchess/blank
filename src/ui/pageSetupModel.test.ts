@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  appliesOnEnter,
   MARGIN_FIELDS,
   problemId,
   problemsOf,
@@ -102,17 +101,5 @@ describe("steppedPaper", () => {
     expect(steppedPaper(options, "b", -1)).toBe("a");
     expect(steppedPaper(options, "c", 1)).toBeUndefined();
     expect(steppedPaper(options, "a", -1)).toBeUndefined();
-  });
-});
-
-describe("appliesOnEnter", () => {
-  it("applies on an option, not on a list or what isn't a button", () => {
-    const option = document.createElement("button");
-    const list = document.createElement("button");
-    list.setAttribute("aria-haspopup", "menu");
-    expect(appliesOnEnter(option)).toBe(true);
-    expect(appliesOnEnter(list)).toBe(false);
-    expect(appliesOnEnter(document.createElement("input"))).toBe(false);
-    expect(appliesOnEnter(null)).toBe(false);
   });
 });

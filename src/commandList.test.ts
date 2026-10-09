@@ -13,6 +13,7 @@ import { iconNames } from "./icons";
 const DIALOGS = new Set([
   CommandIdentifier.FILE_OPEN,
   CommandIdentifier.FILE_SAVE_AS,
+  CommandIdentifier.FILE_PRINT,
   CommandIdentifier.EXPORT_PDF,
   CommandIdentifier.EXPORT_DOCX,
   CommandIdentifier.INSERT_IMAGE,

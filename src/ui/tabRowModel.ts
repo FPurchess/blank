@@ -1,5 +1,6 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { commandItem } from "../commandList";
+import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
 import type { MenuItem, Tab } from "../state";
 import { scrollFor } from "./scrollModel";
 import { stepTo } from "./rovingModel";
@@ -85,12 +86,15 @@ export interface TabActions {
   closeOthers(id: string): void;
   closeRight(id: string): void;
   save(id: string, force: boolean): void;
+  // shows the tab and opens its print dialog
+  print(id: string): void;
   copyPath(path: string): void;
 }
 
 /**
  * tabMenu returns the menu of `tab`, the tab at `index` of `count`. Only the
  * shown tab's menu names the keys, which act on the shown tab.
+ * @param printable whether Blank can print, which needs the page layout
  */
 export const tabMenu = (
   tab: Tab,
@@ -98,6 +102,7 @@ export const tabMenu = (
   count: number,
   shown: boolean,
   actions: TabActions,
+  printable: boolean,
 ): MenuItem[] => {
   const C = CommandIdentifier;
   const key = (command: CommandIdentifier) =>
@@ -133,6 +138,13 @@ export const tabMenu = (
     commandItem("save-as", C.FILE_SAVE_AS, {
       ...keys,
       run: () => actions.save(tab.id, true),
+    }),
+    commandItem("print", C.FILE_PRINT, {
+      ...keys,
+      disabled: !printable,
+      // says why it's disabled, not only that it is
+      detail: printable ? undefined : PRINT_UNAVAILABLE_SHORT,
+      run: () => actions.print(tab.id),
     }),
     ...(tab.path === null
       ? []

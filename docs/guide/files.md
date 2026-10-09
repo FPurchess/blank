@@ -51,7 +51,7 @@ Some blocks are written as lines like `<!-- blank:… -->`, which other markdown
 
 ## Share a PDF {#pdf}
 
-Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your document's name with `.pdf`.
+Press `Mod` `Alt` `P` and choose where to put the PDF. Blank suggests your document's name with `.pdf`. To save only some pages, choose **PDF file** in the [print dialog](./print#pdf).
 
 The PDF is typeset with care, in the same font, sizes and spacing as the editor:
 

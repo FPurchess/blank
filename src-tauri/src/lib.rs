@@ -5,6 +5,7 @@ mod logging;
 mod menu;
 pub mod open;
 pub mod primary;
+pub mod print;
 pub mod session;
 pub mod spellcheck;
 
@@ -65,6 +66,15 @@ pub fn run() {
             std::thread::spawn(move || fonts::warm(&fonts));
             // the files Blank was started with, for the webview
             open::queue_own_args(app.handle());
+            // the print PDFs of a Blank that ended before it deleted them
+            #[cfg(not(target_os = "macos"))]
+            print::sweep_stale(app.handle());
+            // the hidden windows of Windows' print dialogs
+            #[cfg(target_os = "windows")]
+            {
+                app.manage(print::PrintWindows::default());
+                print::close_after_dialog(app.handle());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -78,6 +88,8 @@ pub fn run() {
             spellcheck::spellcheck_remove,
             fonts::fallback_fonts,
             primary::read_primary,
+            print::print_prepare,
+            print::print_send,
             open::take_open_paths,
             open::canonical_path,
             session::session_lock,

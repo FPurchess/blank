@@ -362,17 +362,19 @@ export class LayoutEngine {
     /**
      * the document as a PDF/A-2u, in `language` (a BCP 47 tag such as
      * "de-CH", none if left out or empty), made at `date` (ISO 8601 with
-     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it). An
-     * image that can't be decoded shows its alt text, a font that can't be
-     * embedded is left out, and a document that can't be PDF/A-2u is a
-     * normal PDF: see `pdfWarnings`
+     * its offset, such as "2026-10-01T09:30:00+02:00"; PDF/A needs it), of
+     * all its pages or of `pages` (their indexes, ascending). An image that
+     * can't be decoded shows its alt text, a font that can't be embedded is
+     * left out, and a document that can't be PDF/A-2u is a normal PDF: see
+     * `pdfWarnings`
      * @param {string} title
      * @param {string} author
      * @param {string | null} [language]
      * @param {string | null} [date]
+     * @param {Uint32Array | null} [pages]
      * @returns {Uint8Array}
      */
-    pdf(title, author, language, date) {
+    pdf(title, author, language, date, pages) {
         const ptr0 = passStringToWasm0(title, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(author, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -381,13 +383,56 @@ export class LayoutEngine {
         var len2 = WASM_VECTOR_LEN;
         var ptr3 = isLikeNone(date) ? 0 : passStringToWasm0(date, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len3 = WASM_VECTOR_LEN;
-        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        var ptr4 = isLikeNone(pages) ? 0 : passArray32ToWasm0(pages, wasm.__wbindgen_malloc);
+        var len4 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_pdf(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
         if (ret[3]) {
             throw takeFromExternrefTable0(ret[2]);
         }
-        var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v5;
+        return v6;
+    }
+    /**
+     * what a page prints, its body and its header and footer, as `page`
+     * gives them: without the hints only the screen shows, for the print
+     * preview
+     * @param {number} page
+     * @returns {string}
+     */
+    printDisplay(page) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.layoutengine_printDisplay(this.__wbg_ptr, page);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * sheets to print as a PDF, titled `title`: `sheets` is JSON, a list of
+     * `{width, height, placements: [{page, x, y, scale}]}` in points, see
+     * PrintSheet. Untagged and without bookmarks or links; what went wrong
+     * is in `pdfWarnings`, as for `pdf`
+     * @param {string} sheets
+     * @param {string} title
+     * @returns {Uint8Array}
+     */
+    printPdf(sheets, title) {
+        const ptr0 = passStringToWasm0(sheets, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(title, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_printPdf(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+        return v3;
     }
     /**
      * the colour of a role on paper, as 0xRRGGBB; for tests

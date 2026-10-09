@@ -25,6 +25,7 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 | Open file                                   | `Mod` `O`         |
 | Save                                        | `Mod` `S`         |
 | Save as                                     | `Mod` `Shift` `S` |
+| [Print](./print)                            | `Mod` `P`         |
 | Export as PDF                               | `Mod` `Alt` `P`   |
 | Export as Word                              | `Mod` `Alt` `W`   |
 | Page setup                                  | `Mod` `Alt` `U`   |

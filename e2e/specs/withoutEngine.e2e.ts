@@ -21,6 +21,8 @@ import {
 // what the PDF export says without the engine: the constant engine-editor
 // exports for it, copied, since the e2e package doesn't load the app's code
 const NO_PDF = "The PDF export needs the page layout, which couldn't start.";
+// and what printing says, copied from src/editor/commands/print.ts
+const NO_PRINT = "Printing needs the page layout.";
 
 // the start of the last line, which typing keeps in view, clear of the
 // bars at the edges
@@ -138,6 +140,12 @@ describe("without the layout engine", () => {
   it("says the PDF export needs the page layout", async () => {
     await pressMod(Key.Alt, "p");
     await expect($("#ui-announcement")).toHaveText(NO_PDF);
+  });
+
+  it("says printing needs the page layout", async () => {
+    await pressMod("p");
+    await expect($("#ui-announcement")).toHaveText(NO_PRINT);
+    await expect($("#print")).not.toExist();
   });
 });
 

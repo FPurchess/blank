@@ -1,6 +1,7 @@
 import type { Node } from "prosemirror-model";
+import type { EditorState } from "prosemirror-state";
 
-import type { exporterFunc } from "../exporters/types";
+import type { ExportResult, exporterFunc } from "../exporters/types";
 import {
   failureWarning,
   type PreparedImage,
@@ -20,6 +21,7 @@ import { language } from "../state";
 import { flatten, type ImageSizes } from "./flatten";
 import { fittedSize } from "./images";
 import type { PdfJob, PdfResult, PdfWarning } from "./pdfJob";
+import type { PrintSheet } from "./types";
 import type { PdfReply } from "./pdfWorker";
 
 // The PDF, written by the layout engine with krilla from the same layout
@@ -40,12 +42,17 @@ export const sizesOf =
     return fittedSize(image, { width: contentWidth, height: contentHeight });
   };
 
+// what the PDF holds: the document's pages, all or some (their indexes),
+// tagged and with bookmarks; or sheets to print, untagged
+type Output = { pages?: number[] } | { sheets: readonly PrintSheet[] };
+
 interface Prepared {
   doc: Node;
   layout: Layout;
   fields: ReturnType<typeof documentFields>;
   images: Map<string, PreparedImage>;
   sizes: ImageSizes;
+  output: Output;
 }
 
 /**
@@ -58,6 +65,7 @@ const onSharedEngine = async ({
   fields,
   images,
   sizes,
+  output,
 }: Prepared): Promise<PdfResult> => {
   const engine = await newEngine(true);
   try {
@@ -73,9 +81,24 @@ const onSharedEngine = async ({
       await findFonts(missing, language.value);
       engine.addFonts(fallbackFonts.value);
     }
+    const written =
+      "sheets" in output
+        ? {
+            pdf: engine.printPdf(output.sheets, fields.title),
+            pages: output.sheets.length,
+          }
+        : {
+            pdf: engine.pdf(
+              fields.title,
+              fields.author,
+              pdfLanguage(),
+              pdfDate(),
+              output.pages,
+            ),
+            pages: output.pages?.length ?? engine.pages(),
+          };
     return {
-      pdf: engine.pdf(fields.title, fields.author, pdfLanguage(), pdfDate()),
-      pages: engine.pages(),
+      ...written,
       missing: engine.missing(),
       warnings: engine.pdfWarnings(),
     };
@@ -148,7 +171,7 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes }: Prepared,
+  { doc, layout, fields, images, sizes, output }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
@@ -164,6 +187,9 @@ const jobOf = (
   author: fields.author,
   language: pdfLanguage(),
   date: pdfDate(),
+  ...("sheets" in output
+    ? { sheets: JSON.stringify(output.sheets) }
+    : { pages: output.pages }),
 });
 
 /**
@@ -261,7 +287,17 @@ export const describeWarnings = (
   return described;
 };
 
-const toPDF: exporterFunc = async (state, { docPath, layout }) => {
+/**
+ * write writes `output` of the document as a PDF, on an engine that shares
+ * the page view's fonts, or in a worker once the page view's wasm trapped,
+ * with what it left out in plain words
+ */
+const write = async (
+  state: EditorState,
+  docPath: string | null,
+  layout: Layout,
+  output: Output,
+): Promise<ExportResult> => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
     "image/png",
     "image/jpeg",
@@ -272,6 +308,7 @@ const toPDF: exporterFunc = async (state, { docPath, layout }) => {
     fields: documentFields(state.doc, docPath),
     images,
     sizes: sizesOf(images, layout),
+    output,
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {
@@ -288,13 +325,34 @@ const toPDF: exporterFunc = async (state, { docPath, layout }) => {
     warnings: [
       ...failureWarning(failures),
       ...describeWarnings(result.warnings, imageNames(state.doc)),
-      ...unknownWarning(state.doc, {
-        one: "is a box in the PDF",
-        more: "are boxes in the PDF",
-      }),
+      ...unknownWarning(
+        state.doc,
+        "sheets" in output
+          ? { one: "prints as a box", more: "print as boxes" }
+          : { one: "is a box in the PDF", more: "are boxes in the PDF" },
+      ),
     ],
     pages: result.pages,
   };
 };
+
+/**
+ * toPDF exports the document's pages, all or those of `pages`, as a PDF/A
+ */
+const toPDF: exporterFunc = (state, { docPath, layout, pages }) =>
+  write(state, docPath, layout, { pages });
+
+/**
+ * printPDF writes the PDF to print: `sheets` with the document's pages
+ * placed on them
+ */
+export const printPDF = (
+  state: EditorState,
+  {
+    docPath,
+    layout,
+    sheets,
+  }: { docPath: string | null; layout: Layout; sheets: readonly PrintSheet[] },
+) => write(state, docPath, layout, { sheets });
 
 export default toPDF;

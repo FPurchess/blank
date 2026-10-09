@@ -3,6 +3,8 @@ import { type ShallowRef, shallowRef } from "vue";
 import type { Band } from "../layout/bands";
 import type { BandSettings, PageSettings } from "../layout/settings";
 import type { Unit } from "../layout/units";
+import type { Destination, PrintPlan } from "../print/printModel";
+import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
 
 export interface LinkDialogRequest {
@@ -119,6 +121,32 @@ export type SettingsRequest = Record<string, never>;
 // it is closed. It isn't about a document, so closing a tab leaves it open.
 export const settingsDialog = shallowRef<SettingsRequest | null>(null);
 
+export interface PrintRequest {
+  // the document's pages, all laid out
+  pages: number;
+  // the page the cursor is on, by its index
+  current: number;
+  // the size of the pages, in points
+  page: Size;
+  // the paper the document prints on, in words (printPaper)
+  paper: string;
+  // why printing didn't work the last time, when the dialog opens again
+  note?: string;
+  // the destination to start with instead of the remembered one, after
+  // printing didn't work
+  destination?: Destination;
+  print(plan: PrintPlan): void;
+  // saves the pages, by their index, as a PDF
+  savePdf(pages: number[]): void;
+  // opens the page setup instead
+  pageSetup(): void;
+  cancel(): void;
+}
+
+// printDialog holds the request of the open print dialog, or null while it
+// is closed
+export const printDialog = shallowRef<PrintRequest | null>(null);
+
 // the requests of everything here that takes the focus while it is open, so
 // the editor leaves it the focus (see uiTakesFocus in focus.ts): a new
 // dialog goes here too
@@ -130,6 +158,7 @@ export const focusTakingDialogs = [
   tocPopover,
   unsavedDialog,
   settingsDialog,
+  printDialog,
 ] as const;
 
 /**

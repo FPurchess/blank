@@ -15,6 +15,7 @@ import {
   pageLayoutState,
   pageView,
   type PageViewMode,
+  printSettings,
   spellcheck,
   type Tab,
   tabs,
@@ -28,6 +29,7 @@ import {
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
+import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({
@@ -302,6 +304,8 @@ export const bootStorage = async () => {
   await restore("outline", outlinePinned, isTrue, false);
   // the blocks pane closed until the user opens it
   await restore("blocksPane", blocksPaneOpen, isTrue, false);
+  // what the print dialog chose last, the printer at first
+  await restore("print", printSettings, isPrintSettings, PRINT_DEFAULTS);
 
   sessionKept = await ownSession();
   if (sessionKept) {

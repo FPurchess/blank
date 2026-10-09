@@ -1,4 +1,5 @@
 import type { PageDisplay, PageEngine } from "../../engine/engine";
+import { onPaper } from "../../layout/paperColors";
 import type { Painter, PaintOptions, Snapshot, Surface } from "./types";
 
 // Paints what the engine laid out on a page into a canvas with Canvas 2D:
@@ -19,6 +20,21 @@ export const ROLE_OPACITY = [
   0.5, // the underline of a link, softer than the text as in the editor
   0.6, // the alt text of an image that isn't loaded
 ];
+
+// the paper the printer prints on, white whatever the theme
+export const PAPER = "#ffffff";
+
+// the color of each role on paper, as the PDF prints it (paper_rgb in
+// src-tauri/layout/src/pdf.rs, checked by colors.test.ts): the light theme's
+// text color mixed onto white at the role's opacity, except black text,
+// links and alt text, and grey headers and footers
+export const PAPER_COLORS = ROLE_OPACITY.map((opacity, role) =>
+  role === 0 || role === 7 || role === 8
+    ? "#000000"
+    : role === 1
+      ? "#666666"
+      : onPaper(opacity),
+);
 
 // where the glyphs' outlines come from: the engine, which keeps them
 export type GlyphSource = Pick<PageEngine, "glyph" | "unitsPerEm">;
@@ -53,6 +69,18 @@ export const paintDisplay = (
   const py = (y: number) => (y - options.y) * k;
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+  if (options.background) {
+    context.fillStyle = options.background;
+    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+  }
+  // a role's color, as `fillStyle` and `globalAlpha`
+  const colors = options.colors;
+  const paint = (role: number) => {
+    if (colors) {
+      context.fillStyle = colors[role] ?? colors[0];
+      context.globalAlpha = 1;
+    } else context.globalAlpha = ROLE_OPACITY[role] ?? 1;
+  };
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   if (options.within) {
@@ -73,9 +101,9 @@ export const paintDisplay = (
       context.fillRect(0, 0, context.canvas.width, context.canvas.height);
     }
   }
-  context.fillStyle = options.color;
+  if (options.color) context.fillStyle = options.color;
   for (const [x, y, w, h, role] of display.r) {
-    context.globalAlpha = ROLE_OPACITY[role] ?? 1;
+    paint(role);
     // on whole device pixels, so lines are crisp, and at least one thick
     const left = Math.round(px(x));
     const top = Math.round(py(y));
@@ -90,7 +118,7 @@ export const paintDisplay = (
   }
   for (const run of display.g) {
     const [font, size, role] = run;
-    context.globalAlpha = ROLE_OPACITY[role] ?? 1;
+    paint(role);
     const s = (size / glyphs.unitsPerEm(font)) * k;
     for (let index = 3; index + 2 < run.length; index += 3) {
       // the baseline on a whole device pixel, as the webview sets its text,
