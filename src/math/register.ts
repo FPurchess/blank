@@ -124,8 +124,9 @@ export const mathPreview = (latex: string, display: boolean) => {
 
 /**
  * readyMath loads what sets formulas: the math module and the KaTeX fonts.
- * Rendering waits for it, so a document opened with math (awaitSources)
- * and an export (renderAll) find them there.
+ * Rendering waits for it, so an export (renderAll) finds them there; a
+ * document opened with math starts loading them at once, and its formulas
+ * show their source until they've come.
  */
 const readyMath = () =>
   // without the engine, Temml tells what's wrong; the module and the fonts
