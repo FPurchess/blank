@@ -26,7 +26,7 @@ export const previewOf = (latex: string): PreviewShows => {
 };
 
 // the rects of the find panel and the block toolbar, which it stays clear of
-export const OBSTACLES = ["#find-panel", "#block-toolbar"];
+const OBSTACLES = ["#find-panel", "#block-toolbar"];
 
 /**
  * obstacles returns where the parts of the window it stays clear of are

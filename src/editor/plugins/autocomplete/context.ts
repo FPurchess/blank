@@ -6,12 +6,11 @@ import { config, type AutocorrectConfig } from "../../../config";
 import { language } from "../../../state";
 import type { LanguageRules } from "./languages/types";
 import { getRules } from "./languages/lookup";
-import { LEAF, maskedText } from "../../text";
+import { maskedText } from "../../text";
 import { openDollar } from "../../../markdown/math/scan";
 
 // placeholder for leaf inline nodes (hard_break, image), so every char of the
 // text before the cursor matches one doc position
-export { LEAF };
 
 // chars typed into the text that apply autocorrect, following LibreOffice's
 // IsAutoCorrectChar minus the chars that only drive features Blank lacks and

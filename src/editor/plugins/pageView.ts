@@ -677,32 +677,22 @@ export const pageSync = () => {
             },
             { flush: "sync" },
           );
+          // lays out `blocks` again, e.g. once what they show was drawn
+          const layOutAgain = (blocks: readonly number[]) => {
+            if (!blocks.length) return;
+            timed("layout", () => sync(ready, view.state, frozen, { blocks }));
+            if (engine === ready) publishSelection(ready, view.state, false);
+          };
           // what sources made, once they're drawn or failed
           watch(
             [renderStates, drawnVectors],
-            () => {
-              const blocks = sourceBlockIndices(view.state.doc, drawnSource);
-              if (!blocks.length) return;
-              timed("layout", () =>
-                sync(ready, view.state, frozen, { blocks }),
-              );
-              if (engine === ready) publishSelection(ready, view.state, false);
-            },
+            () => layOutAgain(sourceBlockIndices(view.state.doc, drawnSource)),
             { flush: "sync" },
           );
           // formulas, once the math module drew them
-          watch(
-            drawnMath,
-            () => {
-              const blocks = mathBlocks(view.state.doc);
-              if (!blocks.length) return;
-              timed("layout", () =>
-                sync(ready, view.state, frozen, { blocks }),
-              );
-              if (engine === ready) publishSelection(ready, view.state, false);
-            },
-            { flush: "sync" },
-          );
+          watch(drawnMath, () => layOutAgain(mathBlocks(view.state.doc)), {
+            flush: "sync",
+          });
           // the page setup, the fields of headers and footers, loaded
           // images, and the document's folder, which relative images are in
           watch(

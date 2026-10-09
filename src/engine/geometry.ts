@@ -100,13 +100,18 @@ const boxOf = ({ left, top, right, bottom }: Box): Box => ({
   bottom,
 });
 
-// the smallest box around all of `boxes`
-const around = (boxes: Box[]): Box => ({
-  left: Math.min(...boxes.map((box) => box.left)),
-  top: Math.min(...boxes.map((box) => box.top)),
-  right: Math.max(...boxes.map((box) => box.right)),
-  bottom: Math.max(...boxes.map((box) => box.bottom)),
-});
+/**
+ * unionOf returns the box around `boxes`, or null for none
+ */
+export const unionOf = (boxes: readonly Box[]): Box | null =>
+  boxes.length
+    ? {
+        left: Math.min(...boxes.map((box) => box.left)),
+        top: Math.min(...boxes.map((box) => box.top)),
+        right: Math.max(...boxes.map((box) => box.right)),
+        bottom: Math.max(...boxes.map((box) => box.bottom)),
+      }
+    : null;
 
 // the editor's DOM measures positions it doesn't show (e.g. inside a node
 // view) with an error
@@ -142,7 +147,8 @@ const shownBlocks = (view: EditorView, from: number, to: number) => {
     boxes.push(boxOf(dom.getBoundingClientRect()));
     return false;
   });
-  return boxes.length ? [{ ...around(boxes), page: 0 }] : [];
+  const box = unionOf(boxes);
+  return box ? [{ ...box, page: 0 }] : [];
 };
 
 const shownTable = (view: EditorView, pos: number): TableGeometry | null => {
@@ -295,19 +301,6 @@ export const pageBoxInWindow = (rect: PageBox): Box | null => {
  */
 export const caretPage = (pos: number): number | null =>
   pageEngine?.caret(pos)?.page ?? (measured() ? 0 : null);
-
-/**
- * unionOf returns the box around `boxes`, or null for none
- */
-export const unionOf = (boxes: readonly Box[]): Box | null =>
-  boxes.length
-    ? {
-        left: Math.min(...boxes.map((box) => box.left)),
-        top: Math.min(...boxes.map((box) => box.top)),
-        right: Math.max(...boxes.map((box) => box.right)),
-        bottom: Math.max(...boxes.map((box) => box.bottom)),
-      }
-    : null;
 
 /**
  * rangeRects returns the rectangles of the text from `from` to `to`

@@ -11,7 +11,7 @@ import { replaceLineWith } from "./util";
 // the code block's own, which would make any fence a code block.
 
 // the language of a fence, and the source block it makes
-export const SOURCE_FENCES: Record<string, string> = {
+const SOURCE_FENCES: Record<string, string> = {
   mermaid: "diagram",
   math: "math_display",
 };
