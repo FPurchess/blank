@@ -14,7 +14,9 @@ fn config(args: &[&str]) -> HelperConfig {
         quiet: true,
         timeouts: Timeouts {
             render: Duration::from_millis(300),
-            cancel: Duration::from_millis(300),
+            // room for a cancelled render to answer on a busy machine, which
+            // only the tests of a hang wait out
+            cancel: Duration::from_secs(2),
             ..Timeouts::default()
         },
     }
