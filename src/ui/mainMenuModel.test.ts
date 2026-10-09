@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CommandIdentifier as C } from "../config";
+import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
 import { type MenuLine, ZOOM_NEEDS_PAGES } from "../state";
 import {
   FILE_COMMANDS,
@@ -65,6 +66,7 @@ describe("mainMenuItems", () => {
       C.FILE_SAVE,
       C.FILE_SAVE_AS,
       "file.export",
+      C.FILE_PRINT,
     ]);
     expect(
       entry(lines, "file.export")
@@ -120,6 +122,23 @@ describe("mainMenuItems", () => {
     const without = row(mainMenuItems(deps({ pages: false })), "Zoom");
     expect(without.items.every((item) => item.disabled)).toBe(true);
     expect(without.items[0].tip).toBe(ZOOM_NEEDS_PAGES);
+  });
+
+  it("turns Print off without pages, saying why as the tab's menu does", () => {
+    const print = entry(mainMenuItems(deps()), C.FILE_PRINT);
+    expect(print).toMatchObject({ label: "Print…", disabled: false });
+    expect(print.detail).toBeUndefined();
+    const without = deps({ pages: false });
+    expect(entry(mainMenuItems(without), C.FILE_PRINT)).toMatchObject({
+      disabled: true,
+      detail: PRINT_UNAVAILABLE_SHORT,
+    });
+    // and so does the search
+    expect(
+      mainMenuSearch(without)
+        .results("print")
+        .find(({ id }) => id === C.FILE_PRINT),
+    ).toMatchObject({ disabled: true, detail: PRINT_UNAVAILABLE_SHORT });
   });
 
   it("offers every theme as a swatch, the chosen one checked", () => {

@@ -2,6 +2,7 @@ import { commandInfo } from "../commandList";
 import { rankCommands } from "../commandSearch";
 import { CommandIdentifier as C, getKeyBinding } from "../config";
 import { basename, dirname } from "../paths";
+import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
 import {
   type MenuItem,
   type MenuLine,
@@ -21,7 +22,7 @@ import type { MenuEntry } from "./menuModel";
 const RECENT_SHOWN = 3;
 
 // the File section, top to bottom: "recent" is Open recent ▸ and "export"
-// Export ▸. Print joins it after Export once it's there.
+// Export ▸
 export const FILE_COMMANDS = [
   C.FILE_NEW,
   C.FILE_OPEN,
@@ -29,6 +30,7 @@ export const FILE_COMMANDS = [
   C.FILE_SAVE,
   C.FILE_SAVE_AS,
   "export",
+  C.FILE_PRINT,
 ] as const;
 
 const EDIT_ROW = [C.UNDO, C.REDO, C.EDIT_FIND] as const;
@@ -118,7 +120,8 @@ export const recentForMenu = (
 
 /**
  * commandEntry returns the item of a command, with its label, icon and key,
- * disabled where it can't run now
+ * disabled where it can't run now; without the pages, Print says why after
+ * its label, as the tab's menu does
  */
 const commandEntry = (
   deps: MainMenuDeps,
@@ -128,16 +131,18 @@ const commandEntry = (
   const info = commandInfo(id);
   const stays = item.stays ?? false;
   const zoom = ZOOM_COMMANDS.has(id) && !deps.pages;
+  const noPrint = id === C.FILE_PRINT && !deps.pages;
   return {
     id,
     label: info.label,
     icon: info.icon,
     shortcut: getKeyBinding(id) || undefined,
     command: id,
-    disabled: zoom || !deps.can(id),
+    disabled: zoom || noPrint || !deps.can(id),
     ...(zoom && { tip: ZOOM_NEEDS_PAGES }),
     run: () => deps.run(id, stays),
     ...item,
+    ...(noPrint && { detail: PRINT_UNAVAILABLE_SHORT }),
   };
 };
 

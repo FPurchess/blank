@@ -15,7 +15,7 @@ The search finds every command, also the ones that aren't in the menu itself, li
 ## What's in it {#contents}
 
 - **Recent**: the last few commands you ran, once there are some. It leaves out what the menu shows anyway, and typing like _Bold_ done with its shortcut.
-- **File**: new, open and save, **Open recent** with the last ten files you opened or saved, and **Export** as PDF or Word. A recent file that has moved or was deleted is taken off the list when you try to open it, and _Clear list_ empties it.
+- **File**: new, open and save, **Open recent** with the last ten files you opened or saved, **Export** as PDF or Word, and [**Print**](./print). A recent file that has moved or was deleted is taken off the list when you try to open it, and _Clear list_ empties it.
 - **Edit**: undo, redo and [find and replace](./find).
 - **View**: the blocks pane, the [outline](./pages#outline), [pages or page ends](./pages#on-the-screen) and [focus mode](./writing#focus-mode). The menu stays open, so you can see the switch change; the blocks pane opens with the cursor in its search.
 - **Zoom**: smaller, the [zoom](./pages#zoom) (a click fits the pages to the window again) and larger.
