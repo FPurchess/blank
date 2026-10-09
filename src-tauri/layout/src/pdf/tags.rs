@@ -28,60 +28,79 @@ fn leaves(ids: &mut Ids, part: Part) -> Vec<Node> {
     found.into_iter().map(|(_, id)| Node::Leaf(id)).collect()
 }
 
-/// what was drawn of a text box, in the order it was drawn: its text, and
-/// each link in it as a Link holding the link's text and its annotations
-fn text_nodes(ids: &mut Ids, item: usize, text: usize) -> Vec<Node> {
-    let mut drawn: Vec<(usize, Option<usize>, Identifier)> = ids
+/// what a piece of a text box's drawing is part of
+#[derive(Clone, Copy, PartialEq)]
+enum Within {
+    Text,
+    Link(usize),
+    Math(usize),
+}
+
+/// what was drawn of a text box, in the order it was drawn: its text, each
+/// link in it as a Link holding the link's text and its annotations, and
+/// each formula as a Formula, which says its source
+fn text_nodes(ids: &mut Ids, laid: &Laid, item: usize, text: usize) -> Vec<Node> {
+    let mut drawn: Vec<(usize, Within, Identifier)> = ids
         .remove(&Part::Text { item, text })
         .unwrap_or_default()
         .into_iter()
-        .map(|(order, id)| (order, None, id))
+        .map(|(order, id)| (order, Within::Text, id))
         .collect();
-    let links: Vec<usize> = ids
+    let parts: Vec<(Part, Within)> = ids
         .keys()
         .filter_map(|part| match *part {
             Part::Linked {
                 item: of,
                 text: at,
                 link,
-            } if of == item && at == text => Some(link),
+            } if of == item && at == text => Some((*part, Within::Link(link))),
+            Part::InlineMath {
+                item: of,
+                text: at,
+                math,
+            } if of == item && at == text => Some((*part, Within::Math(math))),
             _ => None,
         })
         .collect();
-    for link in &links {
-        let runs = ids
-            .remove(&Part::Linked {
-                item,
-                text,
-                link: *link,
-            })
-            .unwrap_or_default();
-        drawn.extend(runs.into_iter().map(|(order, id)| (order, Some(*link), id)));
+    for (part, within) in parts {
+        let runs = ids.remove(&part).unwrap_or_default();
+        drawn.extend(runs.into_iter().map(|(order, id)| (order, within, id)));
     }
     drawn.sort_by_key(|(order, ..)| *order);
-    let mut nodes: Vec<Node> = vec![];
-    let mut open: Option<(usize, Vec<Node>)> = None;
-    let close = |open: &mut Option<(usize, Vec<Node>)>, nodes: &mut Vec<Node>, ids: &mut Ids| {
-        if let Some((link, mut children)) = open.take() {
-            children.extend(leaves(ids, Part::Link { item, text, link }));
-            nodes.push(group(Tag::Link, children));
-        }
+    let latex = |math: usize| {
+        laid.texts
+            .get(text)
+            .and_then(|boxed| boxed.maths.get(math))
+            .map(|inline| inline.latex.clone())
     };
-    for (_, link, id) in drawn {
-        match link {
-            None => {
-                close(&mut open, &mut nodes, ids);
-                nodes.push(Node::Leaf(id));
+    let mut nodes: Vec<Node> = vec![];
+    let mut open: Option<(Within, Vec<Node>)> = None;
+    let close =
+        |open: &mut Option<(Within, Vec<Node>)>, nodes: &mut Vec<Node>, ids: &mut Ids| match open
+            .take()
+        {
+            Some((Within::Link(link), mut children)) => {
+                children.extend(leaves(ids, Part::Link { item, text, link }));
+                nodes.push(group(Tag::Link, children));
             }
-            Some(link) => {
-                if open.as_ref().is_some_and(|(current, _)| *current != link) {
-                    close(&mut open, &mut nodes, ids);
-                }
-                open.get_or_insert_with(|| (link, vec![]))
-                    .1
-                    .push(Node::Leaf(id));
+            Some((Within::Math(math), children)) => {
+                nodes.push(group(Tag::Formula(latex(math)), children));
             }
+            Some((Within::Text, children)) => nodes.extend(children),
+            None => {}
+        };
+    for (_, within, id) in drawn {
+        if within == Within::Text {
+            close(&mut open, &mut nodes, ids);
+            nodes.push(Node::Leaf(id));
+            continue;
         }
+        if open.as_ref().is_some_and(|(current, _)| *current != within) {
+            close(&mut open, &mut nodes, ids);
+        }
+        open.get_or_insert_with(|| (within, vec![]))
+            .1
+            .push(Node::Leaf(id));
     }
     close(&mut open, &mut nodes, ids);
     nodes
@@ -232,7 +251,7 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
     let item = &engine.items[index];
     match &item.content {
         Content::Text(text) => {
-            let children = text_nodes(ids, index, 0);
+            let children = text_nodes(ids, &engine.laid[index], index, 0);
             let node = match heading_level(text.level) {
                 Some(level) => group(Tag::Hn(level, Some(text.text.clone())), children),
                 None if text.style == TextKind::Code => {
@@ -263,6 +282,19 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             Tag::Figure(Some(label.clone())),
             leaves(ids, Part::Label { item: index }),
         )),
+        Content::Math { latex, .. } => {
+            let formula = group(
+                Tag::Formula(Some(latex.clone())),
+                leaves(ids, Part::Math { item: index }),
+            );
+            // its number beside it, which the formula's source doesn't say
+            let number = leaves(ids, Part::MathNumber { item: index });
+            Some(if number.is_empty() {
+                formula
+            } else {
+                group(Tag::P, std::iter::once(formula).chain(number).collect())
+            })
+        }
         Content::Table { .. } => Some(table_node(engine, index, ids)),
         Content::Toc { entries, .. } => Some(toc_node(index, entries.len(), ids)),
         Content::Break { .. } | Content::Rule { .. } => None,
@@ -355,7 +387,7 @@ fn cell_content(laid: &Laid, index: usize, cell: &TableCell, ids: &mut Ids) -> V
     let mut blocks: Vec<(f32, f32, Option<usize>, Node)> = vec![];
     for text in cell.texts.clone() {
         let boxed = &laid.texts[text];
-        let paragraph = group(Tag::P, text_nodes(ids, index, text));
+        let paragraph = group(Tag::P, text_nodes(ids, laid, index, text));
         blocks.push((boxed.y, boxed.x, marker_of(Marked::Text(text)), paragraph));
     }
     for &image in &cell.images {
@@ -370,6 +402,26 @@ fn cell_content(laid: &Laid, index: usize, cell: &TableCell, ids: &mut Ids) -> V
             placed.x,
             marker_of(Marked::Image(placed.pos)),
             figure,
+        ));
+    }
+    // display math, or its source while it can't be set
+    for formula in &cell.formulas {
+        let mut content = leaves(
+            ids,
+            Part::CellMath {
+                item: index,
+                pos: formula.pos,
+            },
+        );
+        if let Some(extra) = formula.label {
+            content.extend(leaves(ids, Part::Extra { item: index, extra }));
+        }
+        let node = group(Tag::Formula(Some(formula.latex.clone())), content);
+        blocks.push((
+            formula.y,
+            formula.x,
+            marker_of(Marked::Math(formula.pos)),
+            node,
         ));
     }
     // an alt text stands for an image that isn't loaded, with its marker

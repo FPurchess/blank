@@ -551,6 +551,129 @@
       "after": 8,
       "bars": [],
       "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 306,
+      "text": "so ⁠⁠⁠⁠⁠ and $y$",
+      "spans": [
+        {
+          "from": 3,
+          "to": 8,
+          "math": "x^2"
+        },
+        {
+          "from": 13,
+          "to": 14,
+          "code": true,
+          "dim": true
+        },
+        {
+          "from": 14,
+          "to": 15,
+          "code": true
+        },
+        {
+          "from": 15,
+          "to": 16,
+          "code": true,
+          "dim": true
+        }
+      ],
+      "style": "p",
+      "level": 0,
+      "top": true,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "math",
+      "pos": 323,
+      "end": 332,
+      "latex": "a = b",
+      "numbered": true,
+      "align": "right",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "math",
+      "pos": 332,
+      "end": 337,
+      "latex": "c",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "table",
+      "pos": 337,
+      "end": 348,
+      "rows": [
+        {
+          "header": false,
+          "cells": [
+            {
+              "paragraphs": [],
+              "blocks": [
+                {
+                  "kind": "math",
+                  "pos": 340,
+                  "latex": "d",
+                  "indent": 0,
+                  "bars": []
+                }
+              ],
+              "header": false,
+              "col": 0,
+              "colspan": 1,
+              "rowspan": 1
+            }
+          ]
+        }
+      ],
+      "widths": [
+        1
+      ],
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "text",
+      "pos": 2,
+      "text": "e",
+      "spans": [],
+      "style": "code",
+      "level": 0,
+      "top": false,
+      "indent": 0,
+      "before": 0,
+      "after": 0,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
+      "kind": "math",
+      "pos": 4,
+      "end": 5,
+      "latex": "e",
+      "preview": true,
+      "indent": 0,
+      "before": 8,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
     }
   ],
   "settings": {

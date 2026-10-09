@@ -928,6 +928,15 @@ body:not(.without-engine) #editor {
   font-family: system-ui, sans-serif;
 }
 
+// MathML in the hidden editor, which screen readers read, in the editor's
+// font: WebKit's own math font family takes ~250 ms to resolve on the first
+// formula it lays out (measured with WebKitGTK, which looks it up through
+// fontconfig), and nobody sees this text. Without the engine, the editor
+// shows it, in WebKit's math font.
+body:not(.without-engine) #editor math {
+  font-family: inherit;
+}
+
 // if the layout engine can't load, the editor shows the text itself, as
 // before the page view
 body.without-engine {
@@ -948,6 +957,19 @@ body.without-engine {
 
   #page-view {
     display: none;
+  }
+
+  // inline math shows its MathML, and its source while the caret is in it
+  // (src/editor/plugins/mathInline.ts)
+  #editor .math-inline {
+    &:not(.open) > code,
+    &.open > .math-preview {
+      display: none;
+    }
+
+    > code {
+      font-family: monospace;
+    }
   }
 }
 

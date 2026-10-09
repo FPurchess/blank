@@ -145,6 +145,7 @@ export default defineConfigWithTheme<
           { text: "Find and replace", link: "/guide/find" },
           { text: "Tables", link: "/guide/tables" },
           { text: "Blocks", link: "/guide/blocks" },
+          { text: "Math", link: "/guide/math" },
           { text: "Files & formats", link: "/guide/files" },
           { text: "Print", link: "/guide/print" },
           { text: "Pages", link: "/guide/pages" },

@@ -29,7 +29,7 @@ runs:
 
     - name: test the engine and its modules
       shell: bash
-      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout -p blank-drawings
+      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout -p blank-drawings -p blank-math
 
     - name: check the committed wasm
       shell: bash

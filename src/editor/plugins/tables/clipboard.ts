@@ -14,6 +14,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { headerRowCount, schema, tokenizer } from "../../../markdown";
 import { normalizeTableHtml } from "../../../markdown/html";
+import { mathText } from "../../text";
 import {
   cellAt,
   mapTables,
@@ -286,7 +287,10 @@ export const tableClipboard = () => {
       // cells as tab-separated values, content blocks as their markdown
       // (./blockClipboard.ts), anything else as ProseMirror copies it, for ""
       clipboardTextSerializer: (slice, view) =>
-        tsvOf(slice) ?? blocksMarkdown(slice, view.state.doc) ?? "",
+        tsvOf(slice) ??
+        blocksMarkdown(slice, view.state.doc) ??
+        mathText(slice.content) ??
+        "",
     },
   });
 };

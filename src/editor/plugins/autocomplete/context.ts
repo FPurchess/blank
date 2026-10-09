@@ -6,10 +6,12 @@ import { config, type AutocorrectConfig } from "../../../config";
 import { language } from "../../../state";
 import type { LanguageRules } from "./languages/types";
 import { getRules } from "./languages/lookup";
+import { LEAF, maskedText } from "../../text";
+import { openDollar } from "../../../markdown/math/scan";
 
 // placeholder for leaf inline nodes (hard_break, image), so every char of the
 // text before the cursor matches one doc position
-export const LEAF = "￼";
+export { LEAF };
 
 // chars typed into the text that apply autocorrect, following LibreOffice's
 // IsAutoCorrectChar minus the chars that only drive features Blank lacks and
@@ -57,6 +59,9 @@ export interface Context {
   lang: string;
   rules: LanguageRules;
   config: AutocorrectConfig;
+  // in `$` math not closed yet (see openDollar), where only closing it
+  // applies
+  inDollar: boolean;
 }
 
 const reToken = /[^\s￼]*$/;
@@ -81,12 +86,8 @@ export const createContext = (
     return undefined;
   }
 
-  const textBefore = $cursor.parent.textBetween(
-    0,
-    $cursor.parentOffset,
-    undefined,
-    LEAF,
-  );
+  // inline math as one LEAF per position, so offsets stay positions
+  const textBefore = maskedText($cursor.parent, { to: $cursor.parentOffset });
   const token = reToken.exec(textBefore)![0];
 
   return {
@@ -98,6 +99,7 @@ export const createContext = (
     tokenIndex: textBefore.length - token.length,
     trigger,
     whitespace: trigger === " " || trigger === "Enter" || trigger === "Tab",
+    inDollar: config.value.autocorrect.math && openDollar(textBefore) >= 0,
     lang: language.value,
     rules: getRules(language.value),
     config: config.value.autocorrect,

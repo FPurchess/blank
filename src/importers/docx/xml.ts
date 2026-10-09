@@ -71,6 +71,20 @@ export const markerParagraph = (
 };
 
 /**
+ * markerRun returns a run in the style `style`, holding `text`: what the
+ * rewrites before mammoth mark a place within a paragraph with
+ */
+export const markerRun = (doc: Document, style: string, text: string) => {
+  const r = doc.createElementNS(W, "w:r");
+  const rPr = r.appendChild(doc.createElementNS(W, "w:rPr"));
+  rPr
+    .appendChild(doc.createElementNS(W, "w:rStyle"))
+    .setAttributeNS(W, "w:val", style);
+  r.appendChild(doc.createElementNS(W, "w:t")).textContent = text;
+  return r;
+};
+
+/**
  * customParts returns the text of each Custom XML part of the package whose
  * root is `root` in `namespace`, e.g. what Blank's Word export keeps there
  */

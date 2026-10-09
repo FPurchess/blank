@@ -2,9 +2,18 @@ import type JSZip from "jszip";
 
 import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
+import { MATH_PARA_STYLE } from "./math";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import { TOC_STYLE } from "./toc";
-import { child, children, DOCUMENT_PART, parsePart, val, W } from "./xml";
+import {
+  child,
+  children,
+  DOCUMENT_PART,
+  markerRun,
+  parsePart,
+  val,
+  W,
+} from "./xml";
 
 // mammoth reads a paragraph's alignment (w:jc) but writes it nowhere in its
 // HTML, and never reads the alignment its style gives it. So before the
@@ -113,6 +122,7 @@ const MARKER_STYLES = new Set([
   FORM_STYLE,
   PAGE_BREAK_STYLE,
   TOC_STYLE,
+  MATH_PARA_STYLE,
 ]);
 
 /**
@@ -144,19 +154,6 @@ const inCell = (p: Element) => {
 };
 
 /**
- * markerRun returns a run in the style of `align`, holding the marker
- */
-const markerRun = (doc: Document, align: WordAlignment) => {
-  const r = doc.createElementNS(W, "w:r");
-  const rPr = r.appendChild(doc.createElementNS(W, "w:rPr"));
-  rPr
-    .appendChild(doc.createElementNS(W, "w:rStyle"))
-    .setAttributeNS(W, "w:val", alignStyle(align));
-  r.appendChild(doc.createElementNS(W, "w:t")).textContent = ALIGN_MARKER;
-  return r;
-};
-
-/**
  * markAlignment puts a marker run first in every aligned paragraph of the
  * document, after its properties
  * @returns whether it marked any
@@ -170,7 +167,8 @@ export const markAlignment = async (zip: JSZip): Promise<boolean> => {
     const align = alignmentOf(p, styles);
     if (!align || (align === "left" && !inCell(p))) continue;
     const pPr = child(p, "pPr");
-    p.insertBefore(markerRun(doc, align), pPr ? pPr.nextSibling : p.firstChild);
+    const marker = markerRun(doc, alignStyle(align), ALIGN_MARKER);
+    p.insertBefore(marker, pPr ? pPr.nextSibling : p.firstChild);
     marked = true;
   }
   if (marked) {

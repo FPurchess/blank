@@ -3,7 +3,7 @@
 Blank corrects what you type the way Word and LibreOffice do. Most corrections apply once the word is complete: when you type Space, Tab, Enter or one of `. , ; : ? !` after it. `(c)`, `(r)` and `(tm)` turn into their symbol as soon as you type the `)`. All of this works anywhere in the text, not only at the end of a line.
 
 - **Undo** (`Mod` `Z`) reverts the last correction and keeps what you typed. That goes for block shortcuts too: one undo turns a new list or heading back into the `-` or `#` you typed.
-- Nothing is corrected inside code blocks or inline code.
+- Nothing is corrected inside code blocks, inline code or formulas, nor in a formula you are still typing after its `$`.
 - Every group below can be turned off in the [settings](./settings#writing) (`Mod` `,` → **Writing**), and you can add your own replacements there under **Your replacements**: for every language or only the current one. Yours come before Blank's own replacements. They're kept in [blank.json](./configuration#autocorrect).
 
 ## What gets corrected
@@ -22,6 +22,7 @@ Blank corrects what you type the way Word and LibreOffice do. Most corrections a
 | `hello. this`                                 | Hello. This (sentence starts)                       | `capitalize` |
 | `THe`                                         | The                                                 | `capitalize` |
 | `i` (in English)                              | I, but `i.e.` stays as it is                        | `capitalize` |
+| `$x^2$`                                       | a formula, see [Math](./math#write)                 | `math`       |
 
 ## Quotes and apostrophes
 

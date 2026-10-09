@@ -32,7 +32,12 @@ const notices = join(root, "scripts", "notices");
 const vendoredRoot = join(notices, "vendored");
 
 // Blank's own crates, which carry Blank's licence
-const OWN_CRATES = new Set(["blank", "blank-drawings", "blank-layout"]);
+const OWN_CRATES = new Set([
+  "blank",
+  "blank-drawings",
+  "blank-layout",
+  "blank-math",
+]);
 
 // the same order on every machine, unlike localeCompare
 const byCode = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -87,8 +92,8 @@ const crateNotices = () => {
       "generate",
       "--manifest-path",
       "src-tauri/Cargo.toml",
-      // the layout engine too, a member of the workspace, not a dependency
-      // of the app: without it the wasm's crates were left out
+      // every member of the workspace: the app, the layout engine and its
+      // modules
       "--workspace",
       "--config",
       "scripts/notices/about.toml",

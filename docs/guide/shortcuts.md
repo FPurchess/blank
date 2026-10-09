@@ -74,25 +74,26 @@ Add `Shift` to the last three to select as you go. When a block like a table of 
 
 ## Blocks
 
-| Command                                            | Shortcut        |
-| -------------------------------------------------- | --------------- |
-| Paragraph                                          | `Mod` `0`       |
-| Heading 1 – 6                                      | `Mod` `1` … `6` |
-| Bullet list, on or off                             | `Mod` `8`       |
-| Numbered list, on or off                           | `Mod` `9`       |
-| Code block                                         | (none)          |
-| Indent list item                                   | `Tab`           |
-| Outdent list item                                  | `Shift` `Tab`   |
-| Indent code lines                                  | `Tab`           |
-| Outdent code lines                                 | `Shift` `Tab`   |
-| Tab, in text                                       | `Tab`           |
-| Take away a tab at line start                      | `Shift` `Tab`   |
-| Blockquote, on or off                              | `Mod` `G`       |
-| Horizontal line                                    | `Mod` `H`       |
-| Page break                                         | `Mod` `Enter`   |
-| Table                                              | `Mod` `T`       |
-| [Insert a block](./blocks#pane)                    | `Mod` `Alt` `B` |
-| [Settings of the selected block](./blocks#working) | `Shift` `Enter` |
+| Command                                            | Shortcut          |
+| -------------------------------------------------- | ----------------- |
+| Paragraph                                          | `Mod` `0`         |
+| Heading 1 – 6                                      | `Mod` `1` … `6`   |
+| Bullet list, on or off                             | `Mod` `8`         |
+| Numbered list, on or off                           | `Mod` `9`         |
+| Code block                                         | (none)            |
+| Indent list item                                   | `Tab`             |
+| Outdent list item                                  | `Shift` `Tab`     |
+| Indent code lines                                  | `Tab`             |
+| Outdent code lines                                 | `Shift` `Tab`     |
+| Tab, in text                                       | `Tab`             |
+| Take away a tab at line start                      | `Shift` `Tab`     |
+| Blockquote, on or off                              | `Mod` `G`         |
+| Horizontal line                                    | `Mod` `H`         |
+| Page break                                         | `Mod` `Enter`     |
+| Table                                              | `Mod` `T`         |
+| [Insert a block](./blocks#pane)                    | `Mod` `Alt` `B`   |
+| [Equation](./math#write)                           | `Mod` `Shift` `M` |
+| [Settings of the selected block](./blocks#working) | `Shift` `Enter`   |
 
 ## Forms
 

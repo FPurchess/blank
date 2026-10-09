@@ -220,6 +220,15 @@ const ready = (): {
 };
 
 /**
+ * pageScale returns how many pixels of the screen a point of the pages
+ * takes, or null without the pages
+ */
+export const pageScale = (): number | null => {
+  const frame = ready()?.frames.frames[0];
+  return frame ? frame.width / frame.w : null;
+};
+
+/**
  * pointOnPages returns which page a point of the window is on, or nearest
  * to, and where on it, in points
  */
@@ -286,6 +295,19 @@ export const pageBoxInWindow = (rect: PageBox): Box | null => {
  */
 export const caretPage = (pos: number): number | null =>
   pageEngine?.caret(pos)?.page ?? (measured() ? 0 : null);
+
+/**
+ * unionOf returns the box around `boxes`, or null for none
+ */
+export const unionOf = (boxes: readonly Box[]): Box | null =>
+  boxes.length
+    ? {
+        left: Math.min(...boxes.map((box) => box.left)),
+        top: Math.min(...boxes.map((box) => box.top)),
+        right: Math.max(...boxes.map((box) => box.right)),
+        bottom: Math.max(...boxes.map((box) => box.bottom)),
+      }
+    : null;
 
 /**
  * rangeRects returns the rectangles of the text from `from` to `to`
@@ -615,6 +637,34 @@ export const exposeGeometry = (view: EditorView) => {
         );
         return blocks;
       },
+      // the formulas of the document: their kind, source, position and the
+      // box they are painted in
+      maths: () => {
+        const found: {
+          type: string;
+          source: string;
+          pos: number;
+          box: Box | null;
+        }[] = [];
+        doc().descendants((node, pos) => {
+          if (
+            node.type.name !== "math_inline" &&
+            node.type.name !== "math_display"
+          )
+            return true;
+          const rects = rangeRects(pos, pos + node.nodeSize);
+          found.push({
+            type: node.type.name,
+            source: node.textContent,
+            pos,
+            box: unionOf(rects),
+          });
+          return false;
+        });
+        return found;
+      },
+      // the numbers of numbered display math, as pairs of position and number
+      mathNumbers: () => pageEngine?.mathNumbers() ?? [],
       // the page numbers each table of contents shows, in order
       tocNumbers: () => {
         const numbers: (string[] | null)[] = [];

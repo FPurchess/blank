@@ -196,6 +196,7 @@ export const paintDisplay = (
   }
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.globalAlpha = 1;
+  context.fillStyle = options.color;
   if (options.within) context.restore();
 };
 

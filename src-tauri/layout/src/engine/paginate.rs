@@ -110,6 +110,12 @@ impl Engine {
                 }
             }
         }
+        // and the pages of display math whose number changed
+        for item in self.set_math_numbers(old_of) {
+            for frag in self.frags_of(item) {
+                renumbered[self.page_of_frag(frag)] = true;
+            }
+        }
         // the band texts: every page's where the number of pages or the
         // chapters changed, else only the pages paginated again have new
         // ones. A moved page has another number, so a new page count redoes

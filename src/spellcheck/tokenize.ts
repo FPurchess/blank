@@ -1,8 +1,8 @@
 import type { Node } from "prosemirror-model";
-import { schema } from "../markdown";
 
 import type { SpellcheckConfig } from "../config";
-import { isUrlLike, LEAF } from "../editor/plugins/autocomplete/context";
+import { isUrlLike } from "../editor/plugins/autocomplete/context";
+import { maskedText } from "../editor/text";
 
 export interface Word {
   text: string;
@@ -61,20 +61,7 @@ const segments = (text: string, lang: string): [number, string][] => {
  * position: leaf nodes become LEAF, and inline code becomes spaces, since it is
  * never checked
  */
-export const blockText = (block: Node) => {
-  let text = "";
-  block.forEach((child) => {
-    if (child.isText) {
-      const content = child.text ?? "";
-      text += schema.marks.code.isInSet(child.marks)
-        ? " ".repeat(content.length)
-        : content;
-    } else {
-      text += LEAF.repeat(child.nodeSize);
-    }
-  });
-  return text;
-};
+export const blockText = (block: Node) => maskedText(block, { code: true });
 
 /**
  * urlRanges returns the [from, to] ranges of the whitespace separated tokens

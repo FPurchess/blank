@@ -22,8 +22,8 @@ export interface BlockSettings<T, R extends BlockSettingsRequest<T>> {
   popover: ShallowRef<R | null>;
   // what the block has now
   values: (node: Node) => T;
-  // the block's attributes with `values`
-  attrs: (node: Node, values: T) => Attrs;
+  // the block's attributes with `values`, in the document of `state`
+  attrs: (node: Node, values: T, state: EditorState) => Attrs;
   // what else the request holds, e.g. what a diagram is called
   more?: (node: Node) => Omit<R, keyof BlockSettingsRequest<T>>;
 }
@@ -84,7 +84,7 @@ export const editBlockSettings =
       apply: (changed: T) => {
         const there = at(view.state);
         if (!there) return;
-        const next = attrs(there, changed);
+        const next = attrs(there, changed, view.state);
         if (Object.keys(next).every((key) => next[key] === there.attrs[key])) {
           return;
         }

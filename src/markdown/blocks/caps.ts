@@ -19,6 +19,9 @@ declare module "prosemirror-model" {
 
 export interface BlockCaps {
   align?: boolean;
+  // how it stands without an alignment of its own: at the left, as text
+  // does, unless it says otherwise, e.g. display math centered
+  alignDefault?: "center";
   width?: boolean;
 }
 

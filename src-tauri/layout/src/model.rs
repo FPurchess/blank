@@ -20,6 +20,14 @@ pub struct Span {
     pub underline: bool,
     #[serde(default)]
     pub link: Option<String>,
+    /// inline math: the formula's source, set where its node's positions
+    /// are (placeholder characters of no width, see `crate::math`)
+    #[serde(default)]
+    pub math: Option<String>,
+    /// drawn faint, e.g. the `$` around the source of inline math while
+    /// it's edited
+    #[serde(default)]
+    pub dim: bool,
 }
 
 /// A textblock: a paragraph, heading, code block or caption, wherever it is
@@ -187,6 +195,17 @@ pub struct CellText {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum CellBlock {
     Text(CellText),
+    /// display math, fitted to the width of the cell; unnumbered there
+    Math {
+        pos: u32,
+        latex: String,
+        #[serde(default)]
+        indent: f32,
+        #[serde(default)]
+        marker: Option<String>,
+        #[serde(default)]
+        bars: Vec<f32>,
+    },
     Image {
         pos: u32,
         src: String,
@@ -217,7 +236,7 @@ impl CellBlock {
     pub fn bars(&self) -> &[f32] {
         match self {
             CellBlock::Text(text) => &text.bars,
-            CellBlock::Image { bars, .. } => bars,
+            CellBlock::Image { bars, .. } | CellBlock::Math { bars, .. } => bars,
         }
     }
 }
@@ -331,6 +350,23 @@ pub enum Content {
         /// what is written under it, in the caption style
         #[serde(default)]
         caption: Option<String>,
+    },
+    /// display math: a formula of its own, set in display style. `end` is
+    /// the position right after its node.
+    Math {
+        pos: u32,
+        end: u32,
+        latex: String,
+        /// numbered (1), (2)… at the right, in the order of the document
+        #[serde(default)]
+        numbered: bool,
+        /// center (the default), left or right, as `align_offset` reads it
+        #[serde(default)]
+        align: Option<String>,
+        /// the live render under the source being edited: an error shows
+        /// as a sentence, not as the source again
+        #[serde(default)]
+        preview: bool,
     },
     Table {
         pos: u32,
@@ -726,7 +762,7 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Image { pos, .. } => *pos,
-            Content::Table { pos, .. } => *pos,
+            Content::Table { pos, .. } | Content::Math { pos, .. } => *pos,
         }
     }
 
@@ -739,7 +775,7 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Image { pos, .. } => pos.saturating_add(1),
-            Content::Table { end, .. } => *end,
+            Content::Table { end, .. } | Content::Math { end, .. } => *end,
         }
     }
 
@@ -789,6 +825,10 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Image { pos, .. } => moved(pos),
+            Content::Math { pos, end, .. } => {
+                moved(pos);
+                moved(end);
+            }
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
                 moved(end);
@@ -800,7 +840,9 @@ impl Item {
                         for block in &mut cell.blocks {
                             match block {
                                 CellBlock::Text(text) => moved(&mut text.text.pos),
-                                CellBlock::Image { pos, .. } => moved(pos),
+                                CellBlock::Image { pos, .. } | CellBlock::Math { pos, .. } => {
+                                    moved(pos)
+                                }
                             }
                         }
                     }
@@ -838,9 +880,12 @@ impl Item {
         }
         self.flow_top = finite(self.flow_top, 0.0, 0.0, MAX_PAGE);
         match &mut self.content {
-            Content::Text(Text {
-                hint: Some(hint), ..
-            }) => truncate(hint, MAX_LABEL),
+            Content::Text(text) => {
+                if let Some(hint) = &mut text.hint {
+                    truncate(hint, MAX_LABEL);
+                }
+                truncate_math(text);
+            }
             Content::Image {
                 width,
                 height,
@@ -858,6 +903,7 @@ impl Item {
                 }
             }
             Content::Boxed { label, .. } => truncate(label, MAX_LABEL),
+            Content::Math { latex, .. } => truncate(latex, MAX_MATH),
             Content::Toc {
                 title,
                 depth,
@@ -876,6 +922,13 @@ impl Item {
                 for share in widths {
                     *share = finite(*share, 0.0, 0.0, 1e6);
                 }
+                for text in rows
+                    .iter_mut()
+                    .flat_map(|row| &mut row.cells)
+                    .flat_map(|cell| &mut cell.paragraphs)
+                {
+                    truncate_math(text);
+                }
                 for block in rows
                     .iter_mut()
                     .flat_map(|row| &mut row.cells)
@@ -883,6 +936,7 @@ impl Item {
                 {
                     match block {
                         CellBlock::Text(text) => {
+                            truncate_math(&mut text.text);
                             clamp_bars(&mut text.bars);
                             text.indent = finite(text.indent, 0.0, 0.0, MAX_PAGE);
                         }
@@ -898,6 +952,16 @@ impl Item {
                             *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
                             clamp_bars(bars);
                             clamp_share(share);
+                        }
+                        CellBlock::Math {
+                            latex,
+                            indent,
+                            bars,
+                            ..
+                        } => {
+                            truncate(latex, MAX_MATH);
+                            *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
+                            clamp_bars(bars);
                         }
                     }
                 }
@@ -935,11 +999,20 @@ pub const MAX_BARS: usize = 64;
 pub const MAX_LABEL: usize = 500;
 /// the most entries of a table of contents, far more than a book has
 pub const MAX_TOC_ENTRIES: usize = 10_000;
+/// the most characters of a formula's source, far more than one holds
+pub const MAX_MATH: usize = 20_000;
 
 /// cuts `text` to at most `max` characters
 fn truncate(text: &mut String, max: usize) {
     if let Some((end, _)) = text.char_indices().nth(max) {
         text.truncate(end);
+    }
+}
+
+/// cuts the source of each inline formula of a text to MAX_MATH characters
+fn truncate_math(text: &mut Text) {
+    for latex in text.spans.iter_mut().filter_map(|span| span.math.as_mut()) {
+        truncate(latex, MAX_MATH);
     }
 }
 
@@ -984,6 +1057,65 @@ pub fn utf16_of_byte(text: &str, byte: usize) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cuts_the_source_of_every_formula() {
+        let long = "x".repeat(MAX_MATH + 10);
+        let text = || Text {
+            spans: vec![Span {
+                from: 0,
+                to: 1,
+                math: Some(long.clone()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let math_of = |text: &Text| text.spans[0].math.as_ref().unwrap().chars().count();
+        let mut item = Item {
+            content: Content::Text(text()),
+            ..crate::engine::test_support::paragraph(0, "")
+        };
+        item.sanitize();
+        let Content::Text(cut) = &item.content else {
+            unreachable!()
+        };
+        assert_eq!(math_of(cut), MAX_MATH);
+        // in a table's cells too, as paragraphs and as blocks
+        let mut table = Item {
+            content: Content::Table {
+                pos: 0,
+                end: 10,
+                rows: vec![Row {
+                    cells: vec![
+                        Cell {
+                            paragraphs: vec![text()],
+                            ..Default::default()
+                        },
+                        Cell {
+                            blocks: vec![CellBlock::Text(CellText {
+                                text: text(),
+                                ..Default::default()
+                            })],
+                            ..Default::default()
+                        },
+                    ],
+                    header: false,
+                }],
+                widths: vec![],
+                caption: None,
+            },
+            ..crate::engine::test_support::paragraph(0, "")
+        };
+        table.sanitize();
+        let Content::Table { rows, .. } = &table.content else {
+            unreachable!()
+        };
+        assert_eq!(math_of(&rows[0].cells[0].paragraphs[0]), MAX_MATH);
+        let CellBlock::Text(block) = &rows[0].cells[1].blocks[0] else {
+            unreachable!()
+        };
+        assert_eq!(math_of(&block.text), MAX_MATH);
+    }
 
     #[test]
     fn shifts_positions_within_their_range() {

@@ -47,6 +47,26 @@ export class LayoutEngine {
         wasm.layoutengine_addFont(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
+     * adds several font files, laid one after the other, each for its
+     * family (a JSON list), and lays out once: the math fonts, whose
+     * families are `math:<name>` (see `crate::math`)
+     * @param {Uint8Array} bytes
+     * @param {Uint32Array} lengths
+     * @param {string} families
+     */
+    addFonts(bytes, lengths, families) {
+        const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray32ToWasm0(lengths, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(families, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_addFonts(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
      * JPEG
      * @param {string} src
@@ -59,6 +79,23 @@ export class LayoutEngine {
         const ptr1 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.layoutengine_addImage(this.__wbg_ptr, ptr0, len0, ptr1, len1, kind);
+    }
+    /**
+     * what the math module made of a formula (see `crate::math`): its
+     * drawing, or what is wrong with it; false for JSON it can't read. The
+     * webview adds it before it lays out what holds the formula.
+     * @param {string} latex
+     * @param {boolean} display
+     * @param {string} json
+     * @returns {boolean}
+     */
+    addMath(latex, display, json) {
+        const ptr0 = passStringToWasm0(latex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_addMath(this.__wbg_ptr, ptr0, len0, display, ptr1, len1);
+        return ret !== 0;
     }
     /**
      * the size, distance from the edge and line of the headers and footers,
@@ -252,6 +289,39 @@ export class LayoutEngine {
     lineEdge(pos, end) {
         const ret = wasm.layoutengine_lineEdge(this.__wbg_ptr, pos, end);
         return ret;
+    }
+    /**
+     * a formula in the body text's size, for a preview: `{ok: true, width,
+     * height, depth, display}` with the display list's origin at the
+     * box's top left, `{ok: false, error, line, column}`, or `{ok:
+     * "nofonts"}` while the math fonts or the formula's drawing aren't added
+     * @param {string} latex
+     * @param {boolean} block
+     * @returns {string}
+     */
+    mathLayout(latex, block) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(latex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.layoutengine_mathLayout(this.__wbg_ptr, ptr0, len0, block);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * the numbered display math, as pairs of its position and number
+     * @returns {Uint32Array}
+     */
+    mathNumbers() {
+        const ret = wasm.layoutengine_mathNumbers(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
     }
     /**
      * the characters of the document no font has a glyph for
@@ -460,6 +530,16 @@ export class LayoutEngine {
         const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         wasm.layoutengine_removeDrawing(this.__wbg_ptr, ptr0, len0);
+    }
+    /**
+     * forgets a formula, e.g. one no document holds any more
+     * @param {string} latex
+     * @param {boolean} display
+     */
+    removeMath(latex, display) {
+        const ptr0 = passStringToWasm0(latex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.layoutengine_removeMath(this.__wbg_ptr, ptr0, len0, display);
     }
     /**
      * the colour of a role on paper, as 0xRRGGBB; for tests

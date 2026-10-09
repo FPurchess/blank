@@ -1,6 +1,7 @@
 //! Laying out one item of the flow: its textblocks, and the units the
 //! pagination places, which are lines for text and rows for tables.
 
+mod math;
 mod table;
 mod toc;
 
@@ -13,8 +14,9 @@ use crate::model::{Content, Item, Settings, Text, TextKind};
 use crate::style::{MARKER_GAP, RULE};
 use crate::text::{align_offset, alignment_of, TextBox};
 
+pub use math::{error_sentence, math_units, number_label, NumberPlace};
 use table::table_units;
-pub use table::{TableSpec, MAX_COLUMNS};
+pub use table::{cell_style, TableSpec, MAX_COLUMNS};
 pub use toc::{leaders, number_text, TocLaid, TocLine};
 
 /// what the colours of the screen and the PDF stand for
@@ -74,18 +76,36 @@ pub enum Deco {
         w: f32,
         h: f32,
     },
+    /// a formula, with its baseline's left at `x`, `y`, and the position
+    /// of its block when it is in a table's cell, see `CellFormula`
+    Math {
+        math: std::sync::Arc<crate::math::MathBox>,
+        x: f32,
+        y: f32,
+        cell: Option<u32>,
+    },
 }
 
 impl Deco {
     pub fn moved(&self, dx: f32, dy: f32) -> Deco {
         let mut moved = self.clone();
         match &mut moved {
-            Deco::Rect { x, y, .. } | Deco::Image { x, y, .. } => {
+            Deco::Rect { x, y, .. } | Deco::Image { x, y, .. } | Deco::Math { x, y, .. } => {
                 *x += dx;
                 *y += dy;
             }
         }
         moved
+    }
+
+    /// where it starts and ends across, for the caret beside it: an
+    /// image's or a formula's edges
+    pub fn span(&self) -> Option<(f32, f32)> {
+        match self {
+            Deco::Image { x, w, .. } => Some((*x, x + w)),
+            Deco::Math { math, x, .. } => Some((*x, x + math.width)),
+            Deco::Rect { .. } => None,
+        }
     }
 }
 
@@ -156,6 +176,8 @@ pub struct Laid {
     pub missing: Vec<char>,
     /// for a table of contents: where its page numbers go
     pub toc: Option<TocLaid>,
+    /// for numbered display math: where its number goes
+    pub number: Option<NumberPlace>,
 }
 
 /// a cell of a table as laid out: where it is in the grid, and what of the
@@ -177,6 +199,8 @@ pub struct TableCell {
     /// the alt texts of its images that aren't loaded, in `Laid::extras`,
     /// by the image's position
     pub alts: Vec<(u32, usize)>,
+    /// its display math
+    pub formulas: Vec<CellFormula>,
 }
 
 /// what a list marker in a table's cell marks
@@ -186,6 +210,20 @@ pub enum Marked {
     Text(usize),
     /// an image, by its position (also when it shows its alt text)
     Image(u32),
+    /// display math, by its position (also when it shows its source)
+    Math(u32),
+}
+
+/// display math in a table's cell: its position, its source, and where its
+/// box's top left is, in the item's coordinates
+#[derive(Clone, Debug, PartialEq)]
+pub struct CellFormula {
+    pub pos: u32,
+    pub latex: String,
+    /// its source in its place while it can't be set, in `Laid::extras`
+    pub label: Option<usize>,
+    pub x: f32,
+    pub y: f32,
 }
 
 /// an image in a table's cell: its position, the unit it is drawn with,
@@ -338,6 +376,21 @@ impl Laid {
                     laid
                 }
             }
+            Content::Math {
+                latex,
+                numbered,
+                align,
+                preview,
+                ..
+            } => math_units(
+                fonts,
+                latex,
+                *numbered,
+                align.as_deref(),
+                *preview,
+                indent,
+                inner,
+            ),
             Content::Table {
                 rows,
                 widths,
@@ -411,7 +464,7 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
             let shown = Text {
                 pos: 0,
                 text: hint.clone(),
-                style: text.style.clone(),
+                style: text.style,
                 ..Default::default()
             };
             // one line of hint, aligned like the text it stands for

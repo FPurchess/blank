@@ -6,12 +6,16 @@ use parley::Alignment;
 use super::Engine;
 use crate::bands::{BAND_DISTANCE, BAND_LINE};
 use crate::drawing::{resolve_glyphs, DrawOp, Drawing, LineStyle, Paint, PathCmd};
-use crate::fonts::{Fonts, INK_CODE, INK_UNDERLINE};
+use crate::fonts::{Fonts, INK_CODE, INK_DIM, INK_UNDERLINE};
 use crate::items::{leaders, Deco, Role};
+use crate::math::{MathBox, MathOp};
 use crate::model::{Content, Text, TextKind};
 use crate::style::BAR;
-use crate::text::{Glyph, GlyphRun, TextBox};
+use crate::text::{Glyph, GlyphRun, InlineMath, Shown, TextBox};
 use std::sync::Arc;
+
+/// the style key of a formula's number among the boxes of numbers
+pub(super) const MATH_NUMBER: &str = "math";
 
 /// what the page shows, in points from its top left corner
 #[derive(Clone, Debug, PartialEq)]
@@ -80,6 +84,18 @@ pub enum Part {
     Label { item: usize },
     /// the image of an item
     Image { item: usize },
+    /// display math: its formula, or its source in its place
+    Math { item: usize },
+    /// the number of display math, which isn't part of the formula
+    MathNumber { item: usize },
+    /// inline math in a text box, by its order in the box
+    InlineMath {
+        item: usize,
+        text: usize,
+        math: usize,
+    },
+    /// display math in a table's cell, by its position
+    CellMath { item: usize, pos: u32 },
     /// a list marker or alt text in a table's cell, see `Laid::extras`
     Extra { item: usize, extra: usize },
     /// an image in a table's cell, see `Laid::cell_images`
@@ -176,6 +192,15 @@ impl Engine {
             let dy = frag.y - unit.top;
             for deco in &unit.decos {
                 let part = match deco {
+                    // a formula, also in a table's cell
+                    Deco::Math { cell, .. } => match (&item.content, cell) {
+                        (Content::Math { .. }, _) => Part::Math { item: frag.item },
+                        (_, Some(pos)) => Part::CellMath {
+                            item: frag.item,
+                            pos: *pos,
+                        },
+                        _ => Part::Decoration,
+                    },
                     Deco::Image { x, y, .. } => match item.content {
                         Content::Table { .. } => laid
                             .cell_images
@@ -212,7 +237,11 @@ impl Engine {
                             ops.push((op, part));
                         }
                     }
-                    deco => ops.push((deco_op(deco), part)),
+                    deco => {
+                        for op in deco_ops(deco) {
+                            ops.push((op, part));
+                        }
+                    }
                 }
             }
             // quote bars, down to the next item in the quote on this page
@@ -248,15 +277,20 @@ impl Engine {
                 if let Some(label) = &laid.label {
                     // a table's caption and a table of contents' title
                     // are text; an image's alt text a hint
-                    let role =
-                        if matches!(item.content, Content::Table { .. } | Content::Toc { .. }) {
-                            Role::Text
-                        } else {
-                            Role::Hint
-                        };
+                    let role = if matches!(
+                        item.content,
+                        Content::Table { .. } | Content::Toc { .. } | Content::Math { .. }
+                    ) {
+                        Role::Text
+                    } else {
+                        Role::Hint
+                    };
                     // what an empty text says is the screen's only
                     let part = match item.content {
                         Content::Text(_) => Part::Hint { item: frag.item },
+                        // a formula's source or what's wrong with it, in its
+                        // place
+                        Content::Math { .. } => Part::Math { item: frag.item },
                         _ => Part::Label { item: frag.item },
                     };
                     for line in 0..label.line_count() {
@@ -286,6 +320,16 @@ impl Engine {
                     }
                 }
             }
+            // a formula's number, at the right
+            if let (Some(place), Some(number)) = (laid.number, self.math_number(frag.item)) {
+                if let Some(boxed) = self.number_box(&number, MATH_NUMBER) {
+                    let baseline = boxed.lines().first().map_or(0.0, |info| info.baseline);
+                    let x = dx + place.right - boxed.layout.width() - boxed.x;
+                    let y = dy + place.baseline - baseline - boxed.y;
+                    let part = Part::MathNumber { item: frag.item };
+                    push_text_ops(&mut ops, &self.fonts, boxed, 0, x, y, Role::Text, part);
+                }
+            }
             // a table of contents' page number and the link to its heading
             // a table of contents' entry: its page number, the dots up to
             // it and its link to the heading, once the heading is placed
@@ -301,7 +345,9 @@ impl Engine {
                 // the number's left, in the item's coordinates
                 let left = toc.x + toc.width - boxed.layout.width();
                 for dot in leaders(line, left) {
-                    ops.push((deco_op(dot.moved(dx, dy)), Part::Decoration));
+                    for op in deco_ops(dot.moved(dx, dy)) {
+                        ops.push((op, Part::Decoration));
+                    }
                 }
                 let (x, y) = (dx + left - boxed.x, dy + line.baseline - baseline - boxed.y);
                 let part = Part::TocNumber {
@@ -504,8 +550,10 @@ pub fn drawing_ops(fonts: &Fonts, drawing: &Drawing, x: f32, y: f32, w: f32, h: 
     ops
 }
 
-fn deco_op(deco: Deco) -> Op {
-    match deco {
+/// what a decoration draws: a formula its glyphs and paths, anything else
+/// one op
+fn deco_ops(deco: Deco) -> Vec<Op> {
+    vec![match deco {
         Deco::Rect { x, y, w, h, role } => Op::Rect { x, y, w, h, role },
         Deco::Image {
             src,
@@ -522,7 +570,103 @@ fn deco_op(deco: Deco) -> Op {
             w,
             h,
         },
+        Deco::Math { math, x, y, .. } => return math_ops(&math, x, y, Role::Text),
+    }]
+}
+
+/// what a formula draws with its baseline's left at `x`, `y`: its glyphs,
+/// in runs of glyphs on one baseline in one font and size, its rules and
+/// its paths
+pub fn math_ops(math: &MathBox, x: f32, y: f32, role: Role) -> Vec<Op> {
+    let mut ops = vec![];
+    // the run, and what it's painted in
+    let mut run: Option<(GlyphRun, Paint)> = None;
+    let flush = |run: &mut Option<(GlyphRun, Paint)>, ops: &mut Vec<Op>| {
+        if let Some((run, paint)) = run.take() {
+            ops.push(Op::Glyphs {
+                run,
+                role,
+                text: math.text.clone(),
+                // the ink as text has it, or the author's colour
+                paint: (paint != Paint::default()).then_some(paint),
+            });
+        }
+    };
+    for op in &math.ops {
+        match op {
+            MathOp::Glyph {
+                font,
+                id,
+                start,
+                end,
+                x: gx,
+                y: gy,
+                size,
+                advance,
+                paint,
+            } => {
+                let glyph = crate::text::Glyph {
+                    id: *id,
+                    x: x + gx,
+                    y: y + gy,
+                    advance: *advance,
+                    dx: 0.0,
+                    dy: 0.0,
+                    start: *start,
+                    end: *end,
+                };
+                // the PDF sets a run's glyphs one after the other, so a
+                // run goes on only where the glyph stands at the pen
+                if let Some((current, current_paint)) = run.as_mut() {
+                    let last = current.glyphs.last().copied();
+                    let joins = last.is_some_and(|last| {
+                        *current_paint == *paint
+                            && current.font == *font
+                            && current.size == *size
+                            && (last.y - glyph.y).abs() < 0.001
+                            && glyph.x >= last.x
+                    });
+                    if joins {
+                        if let Some(last) = current.glyphs.last_mut() {
+                            last.advance = glyph.x - last.x;
+                        }
+                        current.width = glyph.x + glyph.advance - current.x;
+                        current.glyphs.push(glyph);
+                        continue;
+                    }
+                }
+                flush(&mut run, &mut ops);
+                run = Some((
+                    GlyphRun {
+                        font: *font,
+                        size: *size,
+                        ink: 0,
+                        glyphs: vec![glyph],
+                        underline: None,
+                        baseline: glyph.y,
+                        x: glyph.x,
+                        width: glyph.advance,
+                    },
+                    *paint,
+                ));
+            }
+            MathOp::Path { d, stroke, paint } => {
+                flush(&mut run, &mut ops);
+                ops.push(Op::Path {
+                    x,
+                    y,
+                    scale: 1.0,
+                    d: d.clone(),
+                    stroke: *stroke,
+                    role,
+                    paint: *paint,
+                    style: LineStyle::default(),
+                });
+            }
+        }
     }
+    flush(&mut run, &mut ops);
+    ops
 }
 
 /// the ops of a line of a text box: its glyphs, as `part`, and what is
@@ -556,7 +700,13 @@ fn push_text_ops(
         Part::Band { .. } => part,
         _ => Part::Decoration,
     };
+    // its formulas, as text of the line between the runs around them, in
+    // the order the PDF reads them
+    let mut maths = boxed.line_maths(line).into_iter().peekable();
     for mut run in boxed.glyph_runs(fonts, line) {
+        while let Some((x, baseline, inline)) = maths.next_if(|(x, ..)| *x <= run.x + 0.01) {
+            push_inline_math(ops, fonts, boxed, inline, ox + x, oy + baseline, role, part);
+        }
         for glyph in &mut run.glyphs {
             glyph.x += ox;
             glyph.y += oy;
@@ -603,6 +753,12 @@ fn push_text_ops(
             continue;
         }
         let glyphs = link_parts(run.ink).0;
+        // the `$` around math being edited, faint as a hint
+        let role = if run.ink & INK_DIM != 0 && role == Role::Text {
+            Role::Hint
+        } else {
+            role
+        };
         let op = Op::Glyphs {
             paint: None,
             run,
@@ -610,6 +766,49 @@ fn push_text_ops(
             text: boxed.text.clone(),
         };
         ops.push((op, glyphs));
+    }
+    for (x, baseline, inline) in maths {
+        push_inline_math(ops, fonts, boxed, inline, ox + x, oy + baseline, role, part);
+    }
+}
+
+/// the ops of a formula in a line of `boxed`, with its baseline's left at
+/// `x`, `y`: in a text of an item, a formula of its own in the PDF's
+/// structure
+#[allow(clippy::too_many_arguments)]
+fn push_inline_math(
+    ops: &mut Vec<(Op, Part)>,
+    fonts: &Fonts,
+    boxed: &TextBox,
+    inline: &InlineMath,
+    x: f32,
+    y: f32,
+    role: Role,
+    part: Part,
+) {
+    let part = match part {
+        Part::Text { item, text } => Part::InlineMath {
+            item,
+            text,
+            math: boxed
+                .maths
+                .iter()
+                .position(|other| other.start == inline.start)
+                .unwrap_or(0),
+        },
+        _ => part,
+    };
+    match &inline.shown {
+        Shown::Math(math) => {
+            for op in math_ops(math, x, y, role) {
+                ops.push((op, part));
+            }
+        }
+        Shown::Source(source) => {
+            let first = source.lines().first().map_or(0.0, |info| info.baseline);
+            let (sx, sy) = (x - source.x, y - first - source.y);
+            push_text_ops(ops, fonts, source, 0, sx, sy, role, part);
+        }
     }
 }
 
@@ -644,6 +843,7 @@ mod tests {
                     role: Role::Hint,
                     run,
                     text,
+                    ..
                 } => Some(text[run.glyphs[0].start as usize..].to_string()),
                 _ => None,
             })
@@ -760,6 +960,7 @@ mod tests {
                     role: Role::Hint,
                     run,
                     text,
+                    ..
                 } => Some(text[run.glyphs[0].start as usize..].to_string()),
                 _ => None,
             })

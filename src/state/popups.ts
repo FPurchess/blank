@@ -230,3 +230,11 @@ export const tooltipsSuppressed = shallowRef(false);
 // whether the word count card shows (src/ui/WordCountCard.vue): opened by the
 // pointer resting on the word count, a click on it, or the Word count command
 export const wordCountCard = shallowRef(false);
+
+// the preview under inline math while it's edited: its source and where the
+// formula is, for src/ui/MathPreview.vue; null while none is open
+export interface MathPreviewState {
+  anchor: Anchor;
+  latex: string;
+}
+export const mathPreview = shallowRef<MathPreviewState | null>(null);

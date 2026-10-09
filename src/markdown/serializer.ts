@@ -12,6 +12,11 @@ import { writeDiagram } from "./blocks/diagrams";
 import { writeEmbed } from "./blocks/embeds";
 import { fieldSpec, isEmptyField } from "./blocks/forms";
 import { alignOf } from "./alignment";
+import {
+  escapingDollars,
+  writeDisplayMath,
+  writeInlineMath,
+} from "./math/serialize";
 import { schema } from "./schema";
 import { escapeHtml, gfmBlocker, gfmLines, htmlLines } from "./tables";
 import { decodeTabs, encodeTabs } from "./tabs";
@@ -103,8 +108,11 @@ const writeImage: NodeWriter = (state, node, parent, index) => {
 const cellSerializer = new MarkdownSerializer(
   {
     ...nodes,
+    paragraph: escapingDollars(nodes.paragraph),
     image: writeImage,
     hard_break: (state) => state.write("<br>"),
+    math_inline: writeInlineMath,
+    math_display: writeDisplayMath,
   },
   marks,
   { escapeExtraCharacters: HTML_START },
@@ -147,23 +155,31 @@ class TabSerializer extends MarkdownSerializer {
 export const markdownSerializer = new TabSerializer(
   {
     ...nodes,
-    paragraph: aligned((state, node, parent, index) => {
-      // an empty paragraph at the start, like the one Blank keeps before a
-      // table there, would be a blank line at the top of the file
-      if (index === 0 && node.childCount === 0 && parent.type.name === "doc") {
-        return;
-      }
-      const { options } = state;
-      const escaped = options.escapeExtraCharacters;
-      // a line of pipes and a delimiter line after a hard break would be read
-      // as a table
-      if (hasHardBreak(node) && node.textContent.includes("|")) {
-        options.escapeExtraCharacters = HTML_START_OR_PIPE;
-      }
-      nodes.paragraph(state, node, parent, index);
-      options.escapeExtraCharacters = escaped;
-    }),
-    heading: aligned(nodes.heading),
+    paragraph: aligned(
+      escapingDollars((state, node, parent, index) => {
+        // an empty paragraph at the start, like the one Blank keeps before a
+        // table there, would be a blank line at the top of the file
+        if (
+          index === 0 &&
+          node.childCount === 0 &&
+          parent.type.name === "doc"
+        ) {
+          return;
+        }
+        const { options } = state;
+        const escaped = options.escapeExtraCharacters;
+        // a line of pipes and a delimiter line after a hard break would be read
+        // as a table
+        if (hasHardBreak(node) && node.textContent.includes("|")) {
+          options.escapeExtraCharacters = HTML_START_OR_PIPE;
+        }
+        nodes.paragraph(state, node, parent, index);
+        options.escapeExtraCharacters = escaped;
+      }),
+    ),
+    heading: aligned(escapingDollars(nodes.heading)),
+    math_inline: writeInlineMath,
+    math_display: aligned(writeDisplayMath),
     horizontal_rule(state, node, parent, index) {
       // a file that starts with `---` would open with the text up to the next
       // `---` as its frontmatter, so a rule on top is written as `***`

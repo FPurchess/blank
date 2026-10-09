@@ -57,6 +57,7 @@
     "localforage": "^1.10.0",
     "mammoth": "^1.12.3",
     "markdown-it": "^15.0.2",
+    "mathml2omml": "0.5.0",
     "mermaid": "12.1.0",
     "prosemirror-commands": "^1.7.2",
     "prosemirror-history": "^1.5.0",
@@ -68,6 +69,7 @@
     "prosemirror-tables": "^1.8.5",
     "prosemirror-transform": "^1.12.2",
     "prosemirror-view": "^1.42.6",
+    "temml": "0.13.5",
     "vue": "^3.5.43",
     "yaml": "^2.9.1"
   },

@@ -11,6 +11,7 @@ import type { EditorView } from "prosemirror-view";
 
 import { fieldAt } from "../../markdown";
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
+import { isSourceBlock } from "../../markdown/blocks/sourceBlock";
 import { blockToolbar, type ToolbarItem } from "../../state";
 import {
   editBlock,
@@ -38,7 +39,8 @@ const blockAt = (state: EditorState) => {
   const { selection, doc } = state;
   if (selection instanceof NodeSelection) {
     const { node, from: pos } = selection;
-    return isContentBlock(node)
+    // also a source block that stands deeper, e.g. display math in a list
+    return isContentBlock(node) || isSourceBlock(node)
       ? { node, pos, name: blockName(doc, node) }
       : null;
   }
@@ -60,6 +62,7 @@ const ICONS: Record<string, string> = {
   form_block: "form",
   embed: "embed",
   diagram: "flow",
+  math_display: "sigma",
   unknown_block: "info",
 };
 

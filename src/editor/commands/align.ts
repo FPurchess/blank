@@ -66,7 +66,12 @@ export const alignmentAt = (state: EditorState): Align | null => {
   if (isInTable(state)) return columnAlignment(state);
   const blocks = alignedBlocks(state);
   const aligns = new Set(
-    blocks.map(({ node }) => textAlignment(node.attrs.align) ?? "left"),
+    blocks.map(
+      ({ node }) =>
+        textAlignment(node.attrs.align) ??
+        capsOf(node.type).alignDefault ??
+        "left",
+    ),
   );
   return aligns.size === 1 ? ([...aligns][0] as Align) : null;
 };

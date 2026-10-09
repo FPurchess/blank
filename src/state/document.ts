@@ -1,6 +1,7 @@
 import type { Transaction } from "prosemirror-state";
 import { onScopeDispose, shallowRef, watch } from "vue";
 
+import { proseText } from "../editor/text";
 import { bootScope } from "../scope";
 
 // the file the document is saved to, or null while it's untitled
@@ -34,12 +35,9 @@ export const bootDocumentState = () =>
       timer = setTimeout(() => {
         if (!tx) return;
         const { doc } = tx;
-        // separate blocks and inline leaves like hard breaks and images by a
-        // space
-        textContent.value = doc
-          .textBetween(0, doc.content.size, " ", " ")
-          .replace(/\s+/g, " ")
-          .trim();
+        // blocks and inline leaves like hard breaks and images apart by a
+        // space, without the sources of math and diagrams
+        textContent.value = proseText(doc);
       }, TEXT_CONTENT_DELAY);
     });
     onScopeDispose(() => clearTimeout(timer));

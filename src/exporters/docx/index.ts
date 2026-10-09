@@ -64,6 +64,7 @@ import {
 import { documentFields } from "../../layout/bands";
 import { bandSections } from "./bands";
 import { fixPackage } from "./fixups";
+import { convertMath, MATH_PLACEHOLDER, type MathEntry } from "./math";
 import {
   type Control,
   CONTROL_CLOSE,
@@ -197,6 +198,10 @@ class Serializer {
   // pixels at 96 dpi like Word
   private maxImageWidth: number;
   private maxImageHeight: number;
+  // the formulas written, in order: each a placeholder run in the document
+  readonly math: MathEntry[] = [];
+  // how many numbered equations were written
+  private numbers = 0;
 
   constructor(
     private docx: Docx,
@@ -368,6 +373,9 @@ class Serializer {
       case "embed":
         return this.embed(node);
 
+      case "math_display":
+        return this.displayMath(node, position);
+
       // blocks() turns page breaks into "page break before"; Word gets
       // nothing of a block Blank can't show (see unknownWarning); the others
       // are never blocks of their own, but written by the block they are in
@@ -380,6 +388,8 @@ class Serializer {
       case "table_header":
       case "form_field":
       case "diagram_source":
+      case "math_display_source":
+      case "math_inline":
       case "text":
       case "image":
       case "hard_break":
@@ -875,10 +885,12 @@ class Serializer {
     width: number,
   ): (Paragraph | Table)[] {
     const margins = TABLE_CELL_MARGINS.left + TABLE_CELL_MARGINS.right;
-    const outer = this.maxImageWidth;
-    this.maxImageWidth = twipsToPixels(cellShare(grid, cell) * width - margins);
+    // its images, tables and tab stops are as wide as the cell's text
+    const outer = [this.contentWidth, this.maxImageWidth];
+    this.contentWidth = Math.round(cellShare(grid, cell) * width - margins);
+    this.maxImageWidth = twipsToPixels(this.contentWidth);
     const blocks = this.blocks(cell.node, TOP);
-    this.maxImageWidth = outer;
+    [this.contentWidth, this.maxImageWidth] = outer;
 
     const align = cell.node.attrs.align as Alignment | null;
     return blocks.map((block, index) =>
@@ -932,6 +944,13 @@ class Serializer {
         return new TextRun({ break: 1 });
       case "image":
         return this.image(node);
+      case "math_inline":
+        return this.mathRun({
+          latex: node.textContent,
+          display: false,
+          label: null,
+          numbered: false,
+        });
       default: {
         const code = hasMark(node, "code");
         return new TextRun({
@@ -943,6 +962,68 @@ class Serializer {
         });
       }
     }
+  }
+
+  /**
+   * mathRun returns the placeholder of a formula, which fixPackage replaces
+   * with its equation (see ./math.ts)
+   */
+  private mathRun(entry: MathEntry): ParagraphChild {
+    this.math.push(entry);
+    return new this.docx.TextRun({
+      text: String(this.math.length - 1),
+      style: MATH_PLACEHOLDER,
+    });
+  }
+
+  /**
+   * displayMath writes display math as a paragraph of its own in the
+   * Equation style, centered unless aligned; a numbered one between a
+   * center and a right tab stop, with its number as a SEQ field after it,
+   * which shows the number Blank counted until Word updates it
+   */
+  private displayMath(node: Node, position: Position): Block[] {
+    const { TabStopType, TextRun, Tab, SimpleField } = this.docx;
+    const latex = node.textContent;
+    const label = (node.attrs.label as string | null) ?? null;
+    const numbered = !!label && !latex.includes("\\tag");
+    const align = node.attrs.align as Alignment | null;
+    const math = this.mathRun({ latex, display: true, label, numbered });
+    if (!numbered) {
+      return [
+        {
+          style: STYLE.equation,
+          children: [math],
+          alignment: wordAlignment(align ?? "center"),
+          ...this.indent(position),
+        },
+      ];
+    }
+    // Word measures tab stops from the margin, not from the indent of a
+    // list or a quote: centered between the indent and the right margin
+    const width = this.contentWidth;
+    const left = indentOf(position);
+    return [
+      {
+        style: STYLE.equation,
+        alignment: "left",
+        tabStops: [
+          {
+            type: TabStopType.CENTER,
+            position: Math.round(left + (width - left) / 2),
+          },
+          { type: TabStopType.RIGHT, position: width },
+        ],
+        children: [
+          new TextRun({ children: [new Tab()] }),
+          math,
+          new TextRun({ children: [new Tab(), "("] }),
+          new SimpleField("SEQ Equation \\* ARABIC", String(++this.numbers)),
+          new TextRun(")"),
+        ],
+        ...this.indent(position),
+      },
+    ];
   }
 
   /**
@@ -1031,11 +1112,13 @@ const indentOf = (position: Position) =>
 const hasMark = (node: Node, name: MarkName) =>
   node.marks.some((mark: Mark) => mark.type.name === name);
 
-// the href of a linked text node; links to anchors have nothing to point to
+// the href of a linked text node or formula, which Word keeps in the
+// hyperlink; links to anchors have nothing to point to
 const linkOf = (node: Node) => {
   const link = node.marks.find((mark: Mark) => mark.type.name === "link");
   const href = link?.attrs.href as string | undefined;
-  return href && !href.startsWith("#") && node.isText ? href : null;
+  const linkable = node.isText || node.type.name === "math_inline";
+  return href && !href.startsWith("#") && linkable ? href : null;
 };
 
 /**
@@ -1176,15 +1259,25 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   });
 
   const contents = await docx.Packer.pack(document, "uint8array");
+  const math = await convertMath(serializer.math);
+  const asText = math.filter((entry) => entry.omml === null).length;
   return {
     contents: await fixPackage(contents, {
       definitions: usedDefinitions(state.doc),
       embeds: embedsOf(state.doc),
       diagrams: serializer.diagrams,
+      math,
     }),
     warnings: [
       ...failureWarning(failures),
       ...sourceWarning(state.doc, "Word"),
+      ...(asText
+        ? [
+            asText === 1
+              ? "1 equation went into Word as its LaTeX, which Word can't read as an equation."
+              : `${asText} equations went into Word as their LaTeX, which Word can't read as equations.`,
+          ]
+        : []),
       ...unknownWarning(state.doc, {
         one: "was left out",
         more: "were left out",

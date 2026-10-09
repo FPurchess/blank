@@ -127,6 +127,13 @@ export interface DiagramPopoverRequest extends BlockSettingsRequest<{
 // null while they are closed
 export const diagramPopover = shallowRef<DiagramPopoverRequest | null>(null);
 
+// display math: whether it is numbered (src/editor/commands/contentBlocks.ts)
+export type MathPopoverRequest = BlockSettingsRequest<{ numbered: boolean }>;
+
+// mathPopover holds the request of the open settings of display math, or
+// null while they are closed
+export const mathPopover = shallowRef<MathPopoverRequest | null>(null);
+
 export interface UnsavedDialogRequest {
   // the tab's name, e.g. "notes"
   label: string;
@@ -182,6 +189,7 @@ export const focusTakingDialogs = [
   bandEditor,
   tocPopover,
   diagramPopover,
+  mathPopover,
   unsavedDialog,
   settingsDialog,
   printDialog,

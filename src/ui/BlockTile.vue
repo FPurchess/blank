@@ -75,6 +75,11 @@ const boxes = computed(() =>
         <rect x="12" y="40" width="16" height="7" rx="3.5" />
         <path d="M20 16v8.5 M20 31.5v8.5" />
       </g>
+      <g v-else-if="choice.group === 'math'" class="lines">
+        <path d="M8 15h8l-5 6 5 6H8" />
+        <path d="M21 21h12" />
+        <path d="M24 15h6 M24 27h6" />
+      </g>
       <g v-else class="lines">
         <rect x="7" y="18" width="11" height="11" />
         <circle cx="28" cy="23.5" r="5.5" />

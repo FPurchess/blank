@@ -104,3 +104,4 @@ opt=(-O3 --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ex
   --enable-mutable-globals --enable-reference-types --enable-multivalue --strip-producers)
 build blank-layout . blank_layout
 build blank-drawings drawings blank_drawings
+build blank-math math blank_math

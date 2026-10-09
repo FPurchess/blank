@@ -26,7 +26,8 @@ use crate::drawing::{Cap, Join, LineStyle, Paint, PathCmd};
 use crate::engine::{Engine, Op, Part};
 use crate::fonts::{Fonts, INSTANCE_BASE};
 use crate::items::Role;
-use crate::model::{Text, TextKind};
+use crate::math::MathLaid;
+use crate::model::{CellBlock, Content, Text, TextKind};
 use crate::text::{Glyph, TextBox};
 
 mod tags;
@@ -396,6 +397,64 @@ pub enum Warning {
     /// why the PDF isn't PDF/A-2u, in plain words: it was written as a
     /// normal PDF instead
     Pdfa(String),
+    /// a formula that can't be set, with what's wrong: its source is in
+    /// its place
+    Math { latex: String, message: String },
+}
+
+/// the formulas of the document that can't be set, display math and
+/// inline math alike, each once
+fn math_warnings(engine: &mut Engine) -> Vec<Warning> {
+    // each formula at the size it is set at, which the layout keeps: display
+    // math in the body text, inline math in its text's style
+    let size_of = |style: TextKind| crate::style::text_style(style).size;
+    let display = size_of(TextKind::P);
+    let mut sources: Vec<(String, bool, f32)> = vec![];
+    let inline = |sources: &mut Vec<(String, bool, f32)>, text: &Text, style: TextKind| {
+        for span in &text.spans {
+            if let Some(latex) = &span.math {
+                sources.push((latex.clone(), false, size_of(style)));
+            }
+        }
+    };
+    for item in &engine.items {
+        match &item.content {
+            Content::Math { latex, .. } => sources.push((latex.clone(), true, display)),
+            Content::Text(text) => inline(&mut sources, text, text.style),
+            Content::Table { rows, .. } => {
+                for cell in rows.iter().flat_map(|row| &row.cells) {
+                    for block in cell.blocks().iter() {
+                        match block {
+                            CellBlock::Math { latex, .. } => {
+                                sources.push((latex.clone(), true, display))
+                            }
+                            CellBlock::Text(block) => inline(
+                                &mut sources,
+                                &block.text,
+                                crate::items::cell_style(cell, block.text.style),
+                            ),
+                            CellBlock::Image { .. } => {}
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut warnings = vec![];
+    for (latex, display, size) in sources {
+        if let MathLaid::Err(error) = crate::math::layout(&mut engine.fonts, &latex, display, size)
+        {
+            let warning = Warning::Math {
+                latex,
+                message: crate::items::error_sentence(&error),
+            };
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
+    }
+    warnings
 }
 
 /// a PDF, and what went wrong in it
@@ -644,6 +703,7 @@ fn write_output(
                 }
                 warnings.extend(skipped.fonts.iter().map(|&font| Warning::Font(font)));
                 warnings.extend(not_archival.map(Warning::Pdfa));
+                warnings.extend(math_warnings(engine));
                 return Ok(Written { bytes, warnings });
             }
             Err(Failed::Image(src)) if !skipped.images.contains(&src) => skipped.images.push(src),
@@ -1617,6 +1677,209 @@ mod tests {
     fn says_pdfa(pdf: &[u8]) -> bool {
         let text = String::from_utf8_lossy(pdf);
         text.contains("<pdfaid:part>2</pdfaid:part><pdfaid:conformance>U</pdfaid:conformance>")
+    }
+
+    fn display_math(pos: u32, latex: &str, numbered: bool) -> Item {
+        Item {
+            content: Content::Math {
+                pos,
+                end: pos + 4 + latex.len() as u32,
+                latex: latex.into(),
+                numbered,
+                align: None,
+                preview: false,
+            },
+            ..paragraph(0, "")
+        }
+    }
+
+    /// "So $x^2$ is" with the formula as flatten.ts sends it
+    fn inline_math(pos: u32) -> Item {
+        let mut item = paragraph(pos, "");
+        if let Content::Text(text) = &mut item.content {
+            text.text = format!("So {} is", "\u{2060}".repeat(5));
+            text.spans = vec![crate::model::Span {
+                from: 3,
+                to: 8,
+                math: Some("x^2".into()),
+                ..Default::default()
+            }];
+        }
+        item
+    }
+
+    fn math_engine(items: Vec<Item>) -> Engine {
+        let mut engine = Engine::new(crate::math::tests::math_fonts());
+        engine.set_items(items);
+        engine
+    }
+
+    #[test]
+    fn writes_math_as_glyphs_and_paths() {
+        let mut engine = math_engine(vec![
+            inline_math(1),
+            display_math(
+                20,
+                r"\sqrt{\frac{a}{b}} = \left(\sum_{i=1}^n i\right)",
+                true,
+            ),
+        ]);
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "en").unwrap();
+        // still a PDF/A-2u, with the KaTeX fonts embedded
+        assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+        assert!(says_pdfa(&written.bytes));
+        let text = String::from_utf8_lossy(&written.bytes);
+        assert!(text.contains("KaTeX_Main"), "no KaTeX font");
+        assert!(text.contains("/Formula"), "no Formula tag");
+        // the formula's characters can be found, the word joiners can't,
+        // and the number is there
+        if let Some(text) = text_of(&written.bytes, "math") {
+            assert!(text.contains('x') && text.contains("So"), "{text:?}");
+            assert!(!text.contains('\u{2060}'), "{text:?}");
+            assert!(text.contains("(1)"), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn tags_every_formula_with_its_source() {
+        use crate::model::{Cell, CellBlock, Row};
+        let rows = vec![Row {
+            cells: vec![Cell {
+                blocks: vec![CellBlock::Math {
+                    pos: 41,
+                    latex: r"\beta".into(),
+                    indent: 0.0,
+                    marker: None,
+                    bars: vec![],
+                }],
+                ..Default::default()
+            }],
+            header: false,
+        }];
+        let mut table = crate::engine::test_support::table_item(rows, None);
+        if let Content::Table { pos, end, .. } = &mut table.content {
+            (*pos, *end) = (40, 60);
+        }
+        let mut engine = math_engine(vec![
+            inline_math(1),
+            display_math(20, r"\alpha", true),
+            table,
+        ]);
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "en").unwrap();
+        assert!(written.warnings.is_empty(), "{:?}", written.warnings);
+        // each says its source
+        let raw = String::from_utf8_lossy(&written.bytes);
+        for alt in ["/Alt(x^2)", r"/Alt(\\alpha)", r"/Alt(\\beta)"] {
+            assert!(raw.contains(alt), "no {alt}");
+        }
+        let Some(structure) = structure_of(&written.bytes, "math-tags") else {
+            return;
+        };
+        let shape: Vec<String> = structure
+            .lines()
+            .skip_while(|line| !line.starts_with("Document"))
+            .map(|line| line.replace(" (block)", ""))
+            .collect();
+        assert_eq!(
+            shape.join("\n"),
+            [
+                "Document",
+                // inline math in its paragraph, between the words around it
+                "  P",
+                "    \"So \"",
+                "    Formula",
+                "      \"x\"",
+                "      \"2\"",
+                "    \" is\"",
+                // display math, its number beside the formula, not in it
+                "  P",
+                "    Formula",
+                "      \"α\"",
+                "    \"(1)\"",
+                // and in a table's cell
+                "  Table",
+                "    TR",
+                "      TD",
+                "        Formula",
+                "          \"β\"",
+            ]
+            .join("\n"),
+            "{structure}"
+        );
+    }
+
+    #[test]
+    fn warns_of_math_it_cant_set() {
+        let mut engine = math_engine(vec![display_math(1, r"\nope", false)]);
+        let written = write_with(&mut engine, &HashMap::new(), &info(), "en").unwrap();
+        assert!(
+            matches!(
+                written.warnings.as_slice(),
+                [Warning::Math { latex, message }] if latex == r"\nope" && message.contains("line 1")
+            ),
+            "{:?}",
+            written.warnings
+        );
+        // its source stands in its place
+        if let Some(text) = text_of(&written.bytes, "math-error") {
+            assert!(text.contains("nope"), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn warns_of_math_it_cant_set_in_table_cells_and_headings() {
+        use crate::model::{Cell, CellBlock, Row};
+        let mut in_cell = inline_math(0);
+        let mut heading = inline_math(200);
+        let mut cell_text = None;
+        for (item, latex) in [(&mut in_cell, r"\nope{2}"), (&mut heading, "x^{")] {
+            if let Content::Text(text) = &mut item.content {
+                text.spans[0].math = Some(latex.into());
+                cell_text = cell_text.or(Some(text.clone()));
+            }
+        }
+        if let Content::Text(text) = &mut heading.content {
+            text.style = TextKind::H2;
+        }
+        let mut cell_text = cell_text.unwrap();
+        cell_text.pos = 30;
+        let rows = vec![Row {
+            cells: vec![
+                Cell {
+                    blocks: vec![CellBlock::Math {
+                        pos: 10,
+                        latex: r"\nope{1}".into(),
+                        indent: 0.0,
+                        marker: None,
+                        bars: vec![],
+                    }],
+                    ..Default::default()
+                },
+                Cell {
+                    paragraphs: vec![cell_text],
+                    header: true,
+                    ..Default::default()
+                },
+            ],
+            header: false,
+        }];
+        let mut table = crate::engine::test_support::table_item(rows, None);
+        if let Content::Table { pos, end, .. } = &mut table.content {
+            (*pos, *end) = (5, 100);
+        }
+        let mut engine = math_engine(vec![table, heading]);
+        let cached = engine.fonts.maths.cached();
+        let warnings = math_warnings(&mut engine);
+        let sources: Vec<&str> = warnings
+            .iter()
+            .map(|warning| match warning {
+                Warning::Math { latex, .. } => latex.as_str(),
+                _ => "",
+            })
+            .collect();
+        assert_eq!(sources, [r"\nope{1}", r"\nope{2}", "x^{"]);
+        // each at the size it was laid out at, so none laid out again
+        assert_eq!(engine.fonts.maths.cached(), cached);
     }
 
     #[test]

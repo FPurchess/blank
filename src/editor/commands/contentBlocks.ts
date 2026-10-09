@@ -1,5 +1,10 @@
 import type { Node, Slice } from "prosemirror-model";
-import { type Command, NodeSelection, TextSelection } from "prosemirror-state";
+import {
+  type Command,
+  type EditorState,
+  NodeSelection,
+  TextSelection,
+} from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { chainCommands } from "prosemirror-commands";
 
@@ -17,6 +22,7 @@ import {
   blocksPaneOpen,
   focusBlocksSearch,
   diagramPopover,
+  mathPopover,
   tocPopover,
 } from "../../state";
 import { blockName, isContentBlock } from "../../markdown/blocks/names";
@@ -31,6 +37,7 @@ import {
 import { enterSource } from "../plugins/sourceBlocks";
 import { sourceKind } from "../../sources/registry";
 import { editBlockSettings } from "./blockSettings";
+import { freeEquationId } from "../../math/labels";
 
 // Content blocks: blocks Blank makes besides the text, see
 // src/markdown/blocks. They stand at the top of the document, never in a
@@ -63,6 +70,25 @@ const DIAGRAM: Choice = {
     insertTopBlock(
       view,
       createSourceBlock(schema, "diagram", DIAGRAM_STARTER),
+      undefined,
+      at,
+    );
+    // into its source, to change it
+    enterSource(view.state, view.dispatch);
+  },
+};
+
+// what a new equation says, so it shows something to change at once
+export const EQUATION_STARTER = "e^{i\\pi} + 1 = 0";
+const EQUATION: Choice = {
+  id: "equation",
+  group: "math",
+  label: "Equation",
+  description: "Math set like LaTeX, numbered if you like",
+  insert: (view, at) => {
+    insertTopBlock(
+      view,
+      createSourceBlock(schema, "math_display", EQUATION_STARTER),
       undefined,
       at,
     );
@@ -187,6 +213,7 @@ export const readBlocks = () =>
         TOC,
         ...forms.map(formChoice),
         DIAGRAM,
+        EQUATION,
         ...embedTypes().map(embedChoice),
       ];
       offered = new Map(choices.map((choice) => [choice.id, choice]));
@@ -268,7 +295,7 @@ export const insertBlock =
  * dialog, an embed with its type, if Blank has it
  */
 export const editBlock = (): Command =>
-  chainCommands(editToc(), editDiagram(), editEmbed());
+  chainCommands(editToc(), editDiagram(), editMath(), editEmbed());
 
 /**
  * blockSettings opens the settings of the selected block, or of the source
@@ -335,6 +362,36 @@ export const editToc = (): Command =>
     }),
     attrs: (node, { depth, title }) => ({ ...node.attrs, depth, title }),
   });
+
+/**
+ * editMath opens the settings of the selected display math, or of the one
+ * being typed: whether it is numbered. Numbering gives it an id, eq-1,
+ * eq-2…, the first its document doesn't have yet; switching it off takes
+ * the id away.
+ */
+export const editMath = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.math_display,
+    popover: mathPopover,
+    values: (node) => ({ numbered: !!node.attrs.label }),
+    attrs: mathSettingsAttrs,
+  });
+
+/**
+ * mathSettingsAttrs returns display math's attributes, numbered or not: a
+ * number keeps its id, a new one gets the first id the document doesn't
+ * have, and no number has none
+ */
+export const mathSettingsAttrs = (
+  node: Node,
+  { numbered }: { numbered: boolean },
+  state: EditorState,
+) => ({
+  ...node.attrs,
+  label: numbered
+    ? ((node.attrs.label as string | null) ?? freeEquationId(state.doc))
+    : null,
+});
 
 /**
  * editDiagram opens the settings of the selected diagram, or of the one

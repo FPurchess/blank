@@ -117,10 +117,7 @@ impl Engine {
                 let at_end = pos >= self.items[item].to();
                 // beside an image where it stands, e.g. centered, else at
                 // the edges of the column's text
-                let image = unit.decos.iter().find_map(|deco| match deco {
-                    crate::items::Deco::Image { x, w, .. } => Some((*x, x + w)),
-                    _ => None,
-                });
+                let image = unit.decos.iter().find_map(crate::items::Deco::span);
                 let (start, end) =
                     image.unwrap_or_else(|| self.items[item].text_edges(&self.settings));
                 let height = unit.height.max(12.0);

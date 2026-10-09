@@ -8,6 +8,7 @@ import { markAlignment } from "./align";
 import { markTocs } from "./toc";
 import { markForms, readDefinitions } from "./forms";
 import { markDiagrams, markEmbeds, readDiagrams, readEmbeds } from "./embeds";
+import { markMath } from "./math";
 import type { Definitions } from "../../markdown";
 import { parsePart } from "./xml";
 import { markPictureWidths } from "./widths";
@@ -67,6 +68,8 @@ export interface PreparedDocx {
   layout: WordLayout;
   // the definitions of the forms in it, by their key
   definitions: Definitions;
+  // how many of its equations were read only in part, as their text
+  mathApproximate: number;
 }
 
 /**
@@ -84,6 +87,8 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const embeds = await markEmbeds(zip, await readEmbeds(zip));
   const diagrams = await markDiagrams(zip, await readDiagrams(zip));
   const widths = await markPictureWidths(zip);
+  // before anything splits or marks the paragraphs equations are in
+  const math = await markMath(zip);
   // before the page breaks, which split paragraphs a field may span
   const tocs = await markTocs(zip);
   const forms = await markForms(zip, definitions);
@@ -98,6 +103,7 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
       embeds ||
       diagrams ||
       widths ||
+      math !== null ||
       numbering ||
       pageBreaks ||
       aligned
@@ -106,5 +112,6 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
     properties,
     layout,
     definitions,
+    mathApproximate: math ?? 0,
   };
 };

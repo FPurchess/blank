@@ -106,13 +106,9 @@ impl Engine {
         let laid = &self.laid[frag.item];
         let unit = &laid.units[frag.unit];
         let left = self.settings.margins.left;
-        // an image is as wide as it is shown
-        if let Some(crate::items::Deco::Image { x, w, .. }) = unit
-            .decos
-            .iter()
-            .find(|deco| matches!(deco, crate::items::Deco::Image { .. }))
-        {
-            return (left + x, frag.y, *w, unit.height);
+        // an image or a formula is as wide as it is shown
+        if let Some((x, end)) = unit.decos.iter().find_map(crate::items::Deco::span) {
+            return (left + x, frag.y, end - x, unit.height);
         }
         let (indent, end) = item.text_edges(&self.settings);
         (left + indent, frag.y, end - indent, unit.height)

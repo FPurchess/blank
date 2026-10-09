@@ -28,6 +28,18 @@ export type Rendered<T = VectorData> =
   // the library that renders it can't run here, e.g. on an old WebKit
   | { ok: "unavailable"; reason: string };
 
+// where a source block's item stands, see SourceKind.item
+export interface ItemPlace {
+  // its position: the block's, or its end while it's open
+  pos: number;
+  // the end of the block
+  end: number;
+  // under its open source, as a preview
+  preview: boolean;
+  // at the top of the document, where a block may be aligned
+  top: boolean;
+}
+
 export interface SourceKind<T = VectorData> {
   // the node that holds it: the wrapper of a block, or the inline node
   node: string;
@@ -43,14 +55,15 @@ export interface SourceKind<T = VectorData> {
   // how long to wait after typing before rendering again, while it's
   // open; 250 ms by default, 0 for a kind that renders at once
   debounce?: number;
+  // what the exports write themselves, whatever rendering it gave, e.g.
+  // math, which the engine sets and Word gets as equations: no export says
+  // it is written as its source
+  written?: boolean;
   // the engine content it is on the pages, instead of the drawing (or the
-  // boxed error) of the default; called for every state
-  item?(
-    node: Node,
-    pos: number,
-    rendered: Rendered<T> | undefined,
-    open: boolean,
-  ): Content;
+  // boxed error) of the default; called for every state. While the block
+  // is open, its source shows as code above it, and the item stands at the
+  // block's end (`at`) as a preview, e.g. display math set as it's typed.
+  item?(node: Node, at: ItemPlace, rendered: Rendered<T> | undefined): Content;
   // what the editor shows without the engine, instead of a picture of the
   // drawing
   preview?(source: string, rendered: Rendered<T> | undefined): HTMLElement;

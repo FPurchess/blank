@@ -108,6 +108,20 @@ export interface PageDisplay {
   p?: [number, number, string, number, string, LineStyle?][];
 }
 
+// a formula laid out on its own, for a preview: its display list has its
+// origin at the top left of its box, see LayoutEngine.mathLayout
+export type MathLayout =
+  | {
+      ok: true;
+      width: number;
+      height: number;
+      depth: number;
+      display: PageDisplay;
+    }
+  | { ok: false; error: string; line: number; column: number }
+  // the math fonts or the formula's drawing aren't there yet
+  | { ok: "nofonts" };
+
 /**
  * settingsOf turns a layout and what the fields stand for into the engine's
  * settings, see model.rs
@@ -434,18 +448,51 @@ export class PageEngine {
   }
 
   private addNewFonts(fonts: readonly FallbackFont[]) {
-    let added = false;
-    for (const font of fonts) {
-      if (this.added.has(font)) continue;
-      this.added.add(font);
-      this.raw.addFont(font.bytes, font.family);
-      added = true;
+    const fresh = fonts.filter((font) => !this.added.has(font));
+    for (const font of fresh) this.added.add(font);
+    const added = fresh.length > 0;
+    // several at once, e.g. the math fonts, lay out once
+    if (fresh.length > 1) {
+      const { bytes, lengths } = packFonts(fresh.map((font) => font.bytes));
+      this.raw.addFonts(
+        bytes,
+        lengths,
+        JSON.stringify(fresh.map((font) => font.family)),
+      );
+    } else if (fresh.length === 1) {
+      this.raw.addFont(fresh[0].bytes, fresh[0].family);
     }
     if (added) {
       this.bodies.clear();
       this.bandsShown.clear();
     }
     return added;
+  }
+
+  /**
+   * mathLayout lays out a formula in the body text's size, for a preview or
+   * to tell whether it can be set
+   */
+  mathLayout(latex: string, display: boolean): MathLayout {
+    return this.call<MathLayout>(
+      { ok: "nofonts" },
+      () => JSON.parse(this.raw.mathLayout(latex, display)) as MathLayout,
+    );
+  }
+
+  /**
+   * mathNumbers returns the numbered display math, as pairs of its
+   * position and its number
+   */
+  mathNumbers(): [number, number][] {
+    return this.call<[number, number][]>([], () => {
+      const flat = this.raw.mathNumbers();
+      const pairs: [number, number][] = [];
+      for (let index = 0; index + 1 < flat.length; index += 2) {
+        pairs.push([flat[index], flat[index + 1]]);
+      }
+      return pairs;
+    });
   }
 
   /**
@@ -719,6 +766,19 @@ export class PageEngine {
 
   removeDrawing(src: string) {
     this.call(undefined, () => this.raw.removeDrawing(src));
+  }
+
+  /**
+   * addMath gives the engine what the math module made of a formula (see
+   * src/math/drawings.ts), before it lays out what holds it; false for one
+   * it can't read
+   */
+  addMath(latex: string, display: boolean, json: string) {
+    return this.call(false, () => this.raw.addMath(latex, display, json));
+  }
+
+  removeMath(latex: string, display: boolean) {
+    this.call(undefined, () => this.raw.removeMath(latex, display));
   }
 
   addImage(src: string, bytes: Uint8Array, kind: ImageKind) {

@@ -12,6 +12,7 @@ import {
   toggleMark,
 } from "prosemirror-commands";
 import { splitListItem } from "prosemirror-schema-list";
+import { insertMath } from "../../math/commands";
 import { alignOf, fieldAt, schema } from "../../markdown";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -139,6 +140,7 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   ),
   [CommandIdentifier.INSERT_IMAGE]: editImage(),
   [CommandIdentifier.INSERT_TABLE]: tableKey(),
+  [CommandIdentifier.INSERT_MATH]: outsideForms(insertMath),
   [CommandIdentifier.INSERT_PAGE_BREAK]: outsideForms(
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),

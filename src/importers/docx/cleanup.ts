@@ -11,8 +11,11 @@ import {
   TOC_CLASS,
   DIAGRAM_CLASS,
   EMBED_CLASS,
+  MATH_PARA_CLASS,
+  MATH_RUN_CLASS,
   FORM_CLASS,
 } from "./styleMap";
+import type { MathMarker } from "./math";
 import { ALIGN_CLASS, ALIGN_MARKER, type WordAlignment } from "./align";
 
 // Turns the HTML mammoth makes of a .docx into HTML the markdown schema can
@@ -318,6 +321,52 @@ const embeds = (doc: Document) => {
 };
 
 /**
+ * math turns the markers of equations (see math.ts) into the math the schema
+ * reads: display math as a source block's figure, inline math as a span
+ */
+const math = (doc: Document) => {
+  const read = (node: Element): MathMarker | null => {
+    try {
+      const marker = JSON.parse(node.textContent ?? "") as MathMarker;
+      return typeof marker.latex === "string" ? marker : null;
+    } catch {
+      return null;
+    }
+  };
+  for (const node of [...doc.querySelectorAll(`p.${MATH_PARA_CLASS}`)]) {
+    const marker = read(node);
+    if (!marker) {
+      node.remove();
+      continue;
+    }
+    const figure = doc.createElement("figure");
+    figure.setAttribute(
+      "data-blank-math_display",
+      JSON.stringify({
+        label: marker.label ?? null,
+        delim: "dollar",
+        align: marker.align ?? null,
+      }),
+    );
+    const pre = figure.appendChild(doc.createElement("pre"));
+    pre.setAttribute("data-blank-source", "math_display");
+    pre.appendChild(doc.createElement("code")).textContent = marker.latex;
+    node.replaceWith(figure);
+  }
+  for (const node of [...doc.querySelectorAll(`span.${MATH_RUN_CLASS}`)]) {
+    const marker = read(node);
+    if (!marker) {
+      node.remove();
+      continue;
+    }
+    const span = doc.createElement("span");
+    span.setAttribute("data-math", "dollar");
+    span.textContent = marker.latex;
+    node.replaceWith(span);
+  }
+};
+
+/**
  * tightLists marks lists whose items are single paragraphs as tight, which
  * mammoth doesn't. Otherwise every imported list would be loose, with blank
  * lines between its items in the markdown.
@@ -342,6 +391,7 @@ export const cleanup = (doc: Document): CleanupReport => {
   tocs(doc);
   forms(doc);
   embeds(doc);
+  math(doc);
   codeLineBreaks(doc);
   const commentCount = comments(doc);
   const footnoteCount = footnotes(doc);
