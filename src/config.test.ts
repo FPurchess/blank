@@ -78,11 +78,11 @@ describe("config", () => {
   });
 
   it.each([
-    ["can't be read", () => Promise.reject(new Error("io"))],
-    ["is invalid JSON", () => Promise.resolve("{ nope")],
+    ["can't be read", () => Promise.reject(new Error("io")), expect.any(Error)],
+    ["is invalid JSON", () => Promise.resolve("{ nope"), "it isn't valid JSON"],
   ])(
     "falls back to defaults when the config file %s",
-    async (_, readResult) => {
+    async (_, readResult, reason) => {
       vi.mocked(exists).mockResolvedValue(true);
       vi.mocked(readTextFile).mockImplementation(readResult);
       const consoleError = vi
@@ -91,9 +91,10 @@ describe("config", () => {
 
       await bootConfig();
 
+      // the reason, never what the file says, which JSON's message quotes
       expect(consoleError).toHaveBeenCalledWith(
-        "failed to read config file",
-        expect.any(Error),
+        "failed to read blank.json",
+        reason,
       );
       expect(config.value.keymap[CommandIdentifier.FORMAT_BOLD]).toBe("Mod-b");
     },

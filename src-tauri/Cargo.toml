@@ -43,6 +43,11 @@ fontique = "0.11"
 unicode-script = "0.5"
 # the version fontique uses; reads a fallback font's licence (fsType) and outlines
 read-fonts = "0.41"
+# Blank's log, in the system's log folder (src/logging.rs); log is the
+# facade it and Tauri's crates write through. The minor version must match
+# @tauri-apps/plugin-log; 2.10 needs a newer tauri.
+tauri-plugin-log = "~2.9"
+log = "0.4"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"

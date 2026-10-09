@@ -35,7 +35,7 @@ fn mirror(value: Option<String>) -> Option<String> {
         .iter()
         .any(|prefix| value.starts_with(prefix));
     if !allowed {
-        eprintln!("ignoring BLANK_DICTIONARY_MIRROR={value}, it must be a loopback URL");
+        log::warn!("ignoring BLANK_DICTIONARY_MIRROR={value}, it must be a loopback URL");
     }
     allowed.then(|| value.trim_end_matches('/').to_string())
 }

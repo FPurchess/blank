@@ -22,7 +22,7 @@ If you want it to: press `Mod` `Alt` `S`. See [Spell check](./spelling).
 
 ## Does Blank send my text anywhere?
 
-No. There's no account, and nothing you write leaves your computer. Blank downloads two things from the internet: a [spell check dictionary](./spelling#languages) when you check a language that doesn't come with Blank, and the images from the web that your documents show and that your PDF and Word exports include.
+No. There's no account, and nothing you write leaves your computer. Blank keeps a [log](#log) of what went wrong, on your computer only. Blank downloads two things from the internet: a [spell check dictionary](./spelling#languages) when you check a language that doesn't come with Blank, and the images from the web that your documents show and that your PDF and Word exports include.
 
 ## Can I use the mouse?
 
@@ -40,4 +40,21 @@ Blank is open source itself, and builds on the work of many others: its fonts, t
 
 ## I found a bug or have an idea
 
-Please [open an issue](https://github.com/FPurchess/blank/issues/new/choose) on GitHub.
+Please [open an issue](https://github.com/FPurchess/blank/issues/new/choose) on GitHub. If something went wrong, the end of Blank's [log](#log) helps us find out why.
+
+## Where is Blank's log? {#log}
+
+Blank writes down what goes wrong, like a file it couldn't save or an export that failed, in a log on your computer. It never sends it anywhere: you decide whether to share it, for example by pasting the end of it into an issue. The log names the files Blank worked with, with their folders, but never holds what you wrote.
+
+You find it here:
+
+| System          | Log                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Linux           | `~/.local/share/com.github.fpurchess.blank/logs/blank.log` (or under `$XDG_DATA_HOME`, if set) |
+| Linux, the Snap | `~/snap/blank/current/.local/share/com.github.fpurchess.blank/logs/blank.log`                  |
+| macOS           | `~/Library/Logs/com.github.fpurchess.blank/blank.log`                                          |
+| Windows         | `%LOCALAPPDATA%\com.github.fpurchess.blank\logs\blank.log`                                     |
+
+The `~/.local` and `~/Library` folders are hidden: in the file manager, press `Ctrl` `H` on Linux, or choose **Go → Go to Folder…** in the Finder and paste the path. On Windows, paste the path into the address bar of the Explorer.
+
+Each line says when, in UTC, and how serious it was. Once `blank.log` reaches 1 MB it is kept as an older file next to it, with its date in the name, and only the two newest of those stay, so the log never takes more than about 3 MB. You can delete the files at any time.

@@ -7,6 +7,7 @@ import { exposeAppearance } from "./state/appearance";
 import { bootEditor } from "./editor";
 import {
   bootEngine,
+  engineStatus,
   exposeEngineHooks,
   useFallbackEditor,
 } from "./engine/engine";
@@ -15,6 +16,7 @@ import { bootMark, exposePerf } from "./engine/perf";
 import { bootUI } from "./ui";
 import { bootSpellcheck } from "./spellcheck/service";
 import { errorMessage } from "./errors";
+import { bootLog, logInfo } from "./log";
 
 import "./scss/main.scss";
 
@@ -40,6 +42,9 @@ const showBootError = (error: unknown) => {
 // dev` and the debug builds they run
 const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
 
+// first, so what goes wrong while starting is in the log
+bootLog();
+
 (async () => {
   let editorReady = false;
   try {
@@ -54,7 +59,11 @@ const testHooks = import.meta.env.DEV || __TEST_HOOKS__;
     // editor lays out its document once it's there (see pageSync). Without
     // it, the editor shows the text itself.
     void bootEngine().then(
-      () => bootMark("engine"),
+      () => {
+        bootMark("engine");
+        // "ready", or "off" when switched off on purpose
+        logInfo(`the page layout is ${engineStatus()}`);
+      },
       (error: unknown) => {
         console.error("failed to load the layout engine", error);
         useFallbackEditor("unavailable");

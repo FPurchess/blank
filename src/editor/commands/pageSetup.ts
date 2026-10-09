@@ -16,6 +16,7 @@ import {
 import { activeTabId, announce, pageSetup } from "../../state";
 import { changeTab } from "../tabs";
 import { pageEdit, pageTr, writePage } from "./frontmatter";
+import { logError } from "../../log";
 
 // the settings the page setup dialog sets: all but those of the header and
 // footer strips
@@ -62,11 +63,12 @@ export const openPageSetup = (view: EditorView) => {
             "New documents are laid out like this now, and so are documents without their own page setup.",
           );
         })
-        .catch((error: unknown) =>
+        .catch((error: unknown) => {
+          logError("failed to save the page setup as default", error);
           sendNotification(
             `Failed to save the page setup as default: ${errorMessage(error)}`,
-          ),
-        );
+          );
+        });
     },
     cancel: () => view.focus(),
   };

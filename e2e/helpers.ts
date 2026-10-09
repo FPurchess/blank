@@ -846,6 +846,22 @@ export const appConfigDir = () => {
 };
 
 /**
+ * appLogFile is Blank's log in this spec's profile (see
+ * src-tauri/src/logging.rs): the log folder under XDG_DATA_HOME on Linux
+ */
+export const appLogFile = () => {
+  const profile = process.env.BLANK_E2E_PROFILE;
+  if (!profile) throw new Error("no E2E profile: run the spec through wdio");
+  return path.join(
+    profile,
+    "data",
+    "com.github.fpurchess.blank",
+    "logs",
+    "blank.log",
+  );
+};
+
+/**
  * secondStart starts Blank a second time in this spec's profile, as
  * `blank file` in a terminal does while it runs: it hands `args` to the
  * running Blank, as tabs, and exits

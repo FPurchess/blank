@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod fonts;
+mod logging;
 #[cfg(target_os = "macos")]
 mod menu;
 pub mod open;
@@ -56,6 +57,8 @@ pub fn run() {
         .manage(open::OpenQueue::default())
         .manage(session::SessionLock::default())
         .setup(|app| {
+            // first, so what goes wrong while starting is in it
+            logging::start(app);
             // finds the system's fonts while the app starts, so the first
             // document with e.g. Chinese doesn't wait for it
             let fonts = app.state::<fonts::FontState>().collection.clone();
