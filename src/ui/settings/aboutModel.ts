@@ -5,8 +5,8 @@ import { getVersion } from "@tauri-apps/api/app";
 
 export const WEBSITE = "https://blank-writer.xyz/";
 export const SOURCE_CODE = "https://github.com/fpurchess/blank";
-// the licenses of every crate and npm package Blank ships, served from
-// public/ (make notices)
+// the licenses of every crate, npm package, font and dictionary Blank ships,
+// served from public/ (make notices)
 export const NOTICES = "/THIRD-PARTY-NOTICES.txt";
 
 /**
