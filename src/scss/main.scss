@@ -1049,6 +1049,8 @@ $page-end-height: 64px + 2 * $band-gap;
   // text WebKitWebDriver reads as empty
   span {
     min-width: 0;
+    // hidden for Safari 15 (macOS 12), which has no clip
+    overflow: hidden;
     overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;

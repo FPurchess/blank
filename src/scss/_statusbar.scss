@@ -76,6 +76,8 @@ $status-narrow: 720px;
 #ui-announcement {
   min-width: 0;
   padding-left: var(--s2);
+  // hidden for Safari 15 (macOS 12), which has no clip
+  overflow: hidden;
   overflow: clip;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,6 +130,8 @@ $status-narrow: 720px;
   .name {
     @include group-label;
     padding-bottom: 6px;
+    // hidden for Safari 15 (macOS 12), which has no clip
+    overflow: hidden;
     overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
