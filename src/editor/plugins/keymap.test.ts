@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
+import { NodeSelection } from "prosemirror-state";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -196,6 +197,51 @@ describe("plugin.keymap", () => {
     expect(press("Shift-Enter")).toBe(true);
 
     expect(view.state.doc.firstChild?.lastChild?.type.name).toBe("hard_break");
+  });
+
+  it("Shift-Enter opens a selected block's settings, and keeps one without", () => {
+    const toc = schema.nodes.toc.create({ depth: 2 });
+    const unknown = schema.nodes.unknown_block.create({
+      raw: "<!-- blank:x@1 -->",
+    });
+    const { view, press } = withKeymap(
+      doc(p("a"), toc, p("b"), unknown, p("c")),
+    );
+    view.dispatch(
+      view.state.tr.setSelection(NodeSelection.create(view.state.doc, 3)),
+    );
+    // its settings, which open below it once it's laid out: no line break
+    // replaces it
+    const shown = view.state.doc;
+    expect(press("Shift-Enter")).toBe(true);
+    expect(view.state.doc).toBe(shown);
+    // a block without settings stays as it is too
+    const at = 3 + toc.nodeSize + 3;
+    view.dispatch(
+      view.state.tr.setSelection(NodeSelection.create(view.state.doc, at)),
+    );
+    const before = view.state.doc;
+    expect(press("Shift-Enter")).toBe(true);
+    expect(view.state.doc).toBe(before);
+  });
+
+  it("Shift-Enter breaks the line again once settings have another key", () => {
+    bindKeys({ [CommandIdentifier.BLOCK_SETTINGS]: "Mod-Alt-Enter" });
+    try {
+      const { view, press } = withKeymap(doc(p("text")));
+      expect(press("Shift-Enter")).toBe(true);
+      expect(view.state.doc.firstChild?.lastChild?.type.name).toBe(
+        "hard_break",
+      );
+    } finally {
+      config.value = {
+        ...config.value,
+        keymap: {
+          ...config.value.keymap,
+          [CommandIdentifier.BLOCK_SETTINGS]: "Shift-Enter",
+        },
+      };
+    }
   });
 
   it("Mod-Enter inserts a page break, splitting the paragraph", () => {

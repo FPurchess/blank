@@ -1,6 +1,6 @@
 import type JSZip from "jszip";
 
-import { EMBED_STYLE } from "./embeds";
+import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import { TOC_STYLE } from "./toc";
@@ -108,6 +108,7 @@ export const readStyleAlignment = (styles: Document | null): StyleAlignment => {
 // the paragraphs the other rewrites mark what mammoth would lose with, whose
 // text cleanup.ts reads
 const MARKER_STYLES = new Set([
+  DIAGRAM_STYLE,
   EMBED_STYLE,
   FORM_STYLE,
   PAGE_BREAK_STYLE,

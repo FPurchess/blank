@@ -161,7 +161,22 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     group: "Insert",
     label: "Insert a block",
     icon: "blocks",
-    aliases: ["table of contents", "toc", "form", "recipe", "drawing", "embed"],
+    aliases: [
+      "table of contents",
+      "toc",
+      "form",
+      "recipe",
+      "drawing",
+      "embed",
+      "diagram",
+      "mermaid",
+    ],
+  },
+  [C.BLOCK_SETTINGS]: {
+    group: "Insert",
+    label: "Block settings",
+    icon: "pencil",
+    aliases: ["settings", "width", "caption", "description", "diagram"],
   },
   [C.BLOCKTYPE_PARAGRAPH]: {
     group: "Format",

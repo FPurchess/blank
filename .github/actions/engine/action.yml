@@ -27,16 +27,20 @@ runs:
         sudo apt-get update
         sudo apt-get install -y poppler-utils qpdf
 
-    - name: test the engine
+    - name: test the engine and its modules
       shell: bash
-      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout
+      run: cargo test --manifest-path src-tauri/Cargo.toml -p blank-layout -p blank-drawings
 
     - name: check the committed wasm
       shell: bash
       run: |
         bash scripts/build-engine.sh
-        git diff --exit-code --stat src/engine/wasm ||
-          { echo "::error::src/engine/wasm isn't what the engine's sources build: run make engine"; exit 1; }
+        # the engine's and every module's wasm, new files too
+        if [ -n "$(git status --porcelain src/engine/wasm)" ]; then
+          git status --short src/engine/wasm
+          echo "::error::src/engine/wasm isn't what the engine's sources build: run make engine"
+          exit 1
+        fi
 
     # public/THIRD-PARTY-NOTICES.txt lists the licences of every crate, npm
     # package, font and dictionary Blank ships, and public/fonts/ has the

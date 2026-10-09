@@ -14,6 +14,7 @@ import {
   tablePicker,
   tableToolbar,
   tocPopover,
+  diagramPopover,
   unsavedDialog,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
@@ -34,6 +35,7 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
+import DiagramPopover from "./DiagramPopover.vue";
 import FindPanel from "./FindPanel.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
@@ -102,6 +104,11 @@ watchFocusMode();
     v-if="tocPopover"
     :key="keyOf(tocPopover)"
     :request="tocPopover"
+  />
+  <DiagramPopover
+    v-if="diagramPopover"
+    :key="keyOf(diagramPopover)"
+    :request="diagramPopover"
   />
   <ContextMenu
     v-if="contextMenu"

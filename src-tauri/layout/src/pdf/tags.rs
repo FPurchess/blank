@@ -245,6 +245,17 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
         Content::Image { src, alt, .. } => {
             let mut children = leaves(ids, Part::Image { item: index });
             children.extend(leaves(ids, Part::Label { item: index }));
+            // its caption, the one extra a picture has
+            let caption = leaves(
+                ids,
+                Part::Extra {
+                    item: index,
+                    extra: 0,
+                },
+            );
+            if !caption.is_empty() {
+                children.push(group(Tag::Caption, caption));
+            }
             let alt = if alt.is_empty() { src } else { alt };
             Some(group(Tag::Figure(Some(alt.clone())), children))
         }

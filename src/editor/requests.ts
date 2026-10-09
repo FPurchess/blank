@@ -14,6 +14,7 @@ import {
   tablePicker,
   tableToolbar,
   tocPopover,
+  diagramPopover,
   unsavedDialog,
   wordCountCard,
 } from "../state";
@@ -42,6 +43,7 @@ export const closeRequests = () => {
   close(printDialog, (request) => request.cancel());
   close(unsavedDialog, (request) => request.cancel());
   close(tocPopover, (request) => request.close());
+  close(diagramPopover, (request) => request.close());
   close(contextMenu, (request) => request.close());
   bandEditorDone.value?.();
   tablePicker.value?.cancel();

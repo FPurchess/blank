@@ -22,6 +22,9 @@ accepted = [
   "Zlib",
   "Unicode-3.0",
   "MPL-2.0",
+  # elkjs, which Mermaid loads for its ELK layout (accepted by the
+  # maintainer, 2026-10-09)
+  "EPL-2.0",
   "BSL-1.0",
   "CDLA-Permissive-2.0",
   "CC0-1.0",

@@ -57,6 +57,7 @@
     "localforage": "^1.10.0",
     "mammoth": "^1.12.3",
     "markdown-it": "^15.0.2",
+    "mermaid": "12.1.0",
     "prosemirror-commands": "^1.7.2",
     "prosemirror-history": "^1.5.0",
     "prosemirror-keymap": "^1.2.3",

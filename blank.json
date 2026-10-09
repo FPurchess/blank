@@ -17,6 +17,7 @@
     "insert.table": "Mod-t",
     "insert.page_break": "Mod-Enter",
     "insert.block": "Mod-Alt-b",
+    "block.settings": "Shift-Enter",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",
