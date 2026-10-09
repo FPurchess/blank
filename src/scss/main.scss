@@ -846,7 +846,9 @@ $faint-text-opacity: 0.6;
 
     .label {
       flex: 1;
-      // clip, not hidden, as for .detail below
+      // clip, not hidden, as for .detail below; hidden first for Safari 15
+      // (macOS 12), which has no clip
+      overflow: hidden;
       overflow: clip;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -860,7 +862,9 @@ $faint-text-opacity: 0.6;
     // a hint after the label, e.g. the first heading on a page
     .detail {
       max-width: 22ch;
-      // clip, not hidden: WebKit's WebDriver reads hidden overflow as empty
+      // clip, not hidden: WebKit's WebDriver reads hidden overflow as empty;
+      // hidden first for Safari 15 (macOS 12), which has no clip
+      overflow: hidden;
       overflow: clip;
       text-overflow: ellipsis;
       white-space: nowrap;
