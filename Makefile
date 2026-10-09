@@ -43,7 +43,7 @@ dictionaries: ## Update the spell check dictionaries and their catalog
 engine: ## Build the layout engine for the webview into src/engine/wasm
 	bun run engine:build
 
-engine-size: ## Report what the layout engine's wasm is made of, before and after wasm-opt (needs twiggy 0.8.0; N=<rows>)
+engine-size: ## Report what the layout engine's wasm is made of and what to cut (needs twiggy 0.8.0; FORMAT=json, NO_BUILD=1, N=<rows>)
 	@bun run --silent engine:size
 
 notices: ## Regenerate public/THIRD-PARTY-NOTICES.txt after changing dependencies (needs cargo-about)
