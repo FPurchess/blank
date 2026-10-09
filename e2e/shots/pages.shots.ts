@@ -8,6 +8,7 @@ import {
   finishShots,
   newDocument,
   prepare,
+  recorder,
   setTheme,
   setView,
   shot,
@@ -38,14 +39,55 @@ describe("docs shots: pages and themes", () => {
     await type(Key.Escape);
   });
 
-  it("captures the print dialog", async () => {
-    await pressMod("p");
-    await $("#print").waitForDisplayed();
-    // with pages per sheet, scale and the paper
-    await $("#print button.disclosure").click();
-    await $("#print-more").waitForDisplayed();
-    await shot("print");
-    await type(Key.Escape);
+  it("records printing", async () => {
+    // four chapters, each on a page of its own, set up before the film starts
+    await newDocument({ view: "pages" });
+    const chapters = ["The keeper", "The lamp", "The storm", "The morning"];
+    for (const [i, title] of chapters.entries()) {
+      if (i > 0) await pressMod(Key.Enter);
+      await paste({
+        "text/html":
+          `<h1>${title}</h1>` +
+          "<p>The keeper climbed the stairs every evening, lit the lamp and wrote down the weather, the ships and the wind.</p>".repeat(
+            3,
+          ),
+      });
+    }
+    await browser
+      .action("pointer")
+      .move({ x: 400, y: 300, origin: "viewport" })
+      .perform();
+    const film = recorder();
+    await film.pause(0.8);
+    const option = (row: string, label: string) =>
+      $(`#print [data-row="${row}"]`).$(`button=${label}`);
+
+    // the dialog opens on the first page as it prints
+    await film.shortcut(
+      ["Mod", "P"],
+      async () => {
+        await pressMod("p");
+        await $("#print .sheet canvas").waitForExist();
+      },
+      1.6,
+    );
+    await film.press("Page Down", Key.PageDown, 0.8);
+    await film.press("Page Down", Key.PageDown, 1.2);
+    // two pages on each sheet
+    await film.clickOn($("#print button.disclosure"), 0.8);
+    await film.clickOn(option("perSheet", "2"), 1.6);
+    await film.press("Page Down", Key.PageDown, 1.4);
+    // only some of them
+    await film.clickOn(option("pages", "Custom"), 0.4);
+    film.hidePointer();
+    await film.type("2-4");
+    await film.hold(1.6);
+    // or a PDF of those pages instead
+    await film.clickOn(option("destination", "PDF file"), 2);
+    film.hidePointer();
+    await film.press("Esc", Key.Escape, 0.8);
+    await $("#print").waitForExist({ reverse: true });
+    film.save("print.gif");
   });
 
   // in page ends, where both pages show beside the break's mark
