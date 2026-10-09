@@ -203,6 +203,8 @@ export const printPaper = (layout: Layout, unit: Unit) => {
 // what Print says without the layout engine: the preview and the print PDF
 // are the engine's pages
 export const PRINT_UNAVAILABLE = "Printing needs the page layout.";
+// why a menu's Print item is disabled then, after its label
+export const PRINT_UNAVAILABLE_SHORT = "Needs the page layout";
 export const NOTHING_TO_PRINT =
   "Your document is empty. There is nothing to print.";
 // while the last print is still on its way to the system

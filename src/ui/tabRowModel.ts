@@ -1,5 +1,6 @@
 import { CommandIdentifier, getKeyBinding } from "../config";
 import { commandItem } from "../commandList";
+import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
 import type { MenuItem, Tab } from "../state";
 import { scrollFor } from "./scrollModel";
 import { stepTo } from "./rovingModel";
@@ -141,6 +142,8 @@ export const tabMenu = (
     commandItem("print", C.FILE_PRINT, {
       ...keys,
       disabled: !printable,
+      // says why it's disabled, not only that it is
+      detail: printable ? undefined : PRINT_UNAVAILABLE_SHORT,
       run: () => actions.print(tab.id),
     }),
     ...(tab.path === null

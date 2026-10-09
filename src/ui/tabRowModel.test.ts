@@ -128,6 +128,7 @@ describe("tabMenu", () => {
       shortcut: "Mod-p",
       disabled: false,
     });
+    expect(item(items, "print").detail).toBeUndefined();
     expect(run.copyPath).toHaveBeenCalledWith("/docs/notes.md");
     expect(item(items, "close").shortcut).toBe("Mod-w");
   });
@@ -151,6 +152,9 @@ describe("tabMenu", () => {
   it("can't print without the page layout", () => {
     const items = tabMenu(tab(null), 0, 1, true, actions(), false);
 
-    expect(item(items, "print").disabled).toBe(true);
+    expect(item(items, "print")).toMatchObject({
+      disabled: true,
+      detail: "Needs the page layout",
+    });
   });
 });
