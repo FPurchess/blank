@@ -7,16 +7,12 @@ import { commandLabel } from "../commandList";
 import {
   closeOtherTabs,
   closeTabsToRight,
-  newFile,
   print,
   saveFile,
   selectTab,
 } from "../editor/commands";
-import {
-  hideBlocksPane,
-  toggleBlocksPane,
-} from "../editor/commands/contentBlocks";
 import { useEditor } from "../editor/handle";
+import { commandFor } from "../editor/plugins/keymap";
 import { activateTab, closeTabs, moveTab } from "../editor/tabs";
 import { engineless } from "../engine/engine";
 import { logError } from "../log";
@@ -27,7 +23,7 @@ import {
   tabRowFocused,
   tabs,
 } from "../state";
-import BlankLogo from "./BlankLogo.vue";
+import LogoButton from "./LogoButton.vue";
 import IconButton from "./components/IconButton.vue";
 import { useFocusRegion } from "./composables/useFocusRegion";
 import { useMenuButton } from "./composables/useMenuButton";
@@ -37,6 +33,7 @@ import { wheelPixels } from "./scrollModel";
 import { tabDrag } from "./tabDrag";
 import {
   compactBlocks,
+  logoKey,
   middleCloses,
   scrollLeftFor,
   tabKey,
@@ -74,10 +71,16 @@ const onClose = (target: EventTarget | null) =>
 const run = (command: Parameters<typeof editor.run>[0], focus = true) =>
   editor.run(command, { focus });
 
-// the tab that is in the tab order: the shown one, unless the arrows moved
-// the focus on
+// what is in the tab order: the shown tab, unless the arrows moved the
+// focus on, to another tab or to the logo (LOGO)
+const LOGO = "logo";
 const focused = shallowRef<string | null>(null);
 const stop = () => focused.value ?? activeTabId.value;
+const logo = useTemplateRef<InstanceType<typeof LogoButton>>("logo");
+const focusLogo = () => {
+  focused.value = LOGO;
+  logo.value?.focus();
+};
 
 /**
  * focusTab gives the tab `id` the focus, once it's rendered
@@ -148,6 +151,8 @@ const onKeydown = (event: KeyboardEvent) => {
   event.preventDefault();
   if (typeof action === "object") {
     focusTab(tabs.value[action.move].id);
+  } else if (action === "logo") {
+    focusLogo();
   } else if (action === "activate") {
     run(selectTab(id), false);
   } else if (action === "close") {
@@ -157,6 +162,15 @@ const onKeydown = (event: KeyboardEvent) => {
   } else {
     editor.focus();
   }
+};
+
+// the keys on the logo move to the tabs, or back to the text
+const onLogoKeydown = (event: KeyboardEvent) => {
+  const action = logoKey(event, tabs.value.length);
+  if (action === null) return;
+  event.preventDefault();
+  if (typeof action === "object") focusTab(tabs.value[action.move].id);
+  else editor.focus();
 };
 
 // dragging a tab moves it along the row
@@ -209,7 +223,8 @@ const onContextmenu = (event: MouseEvent) => {
 const onDblclick = (event: MouseEvent) => {
   const target = event.target as Element;
   if (event.timeStamp - closedAt < DOUBLE_CLICK) return;
-  if (target === list.value || target === spare.value) run(newFile());
+  if (target === list.value || target === spare.value)
+    run(commandFor(C.FILE_NEW));
 };
 
 // the wheel scrolls the tabs that don't fit
@@ -247,8 +262,9 @@ watch(
 
 // F6 comes to the tab row after the text; a menu of a tab keeps the tab that
 // opened it in the tab order
+const row = useTemplateRef<HTMLElement>("row");
 const { onFocusin, onFocusout } = useFocusRegion(
-  () => list.value,
+  () => row.value,
   tabRowFocused,
   {
     id: "tabs",
@@ -259,12 +275,6 @@ const { onFocusin, onFocusout } = useFocusRegion(
     if (!to?.closest(".context-menus")) focused.value = null;
   },
 );
-
-// the Blocks button: the pane opens with the focus in its search, and goes
-const toggleBlocks = () => {
-  if (blocksPaneOpen.value) hideBlocksPane(editor.view);
-  else run(toggleBlocksPane(), false);
-};
 
 // the Blocks button drops its name once the tabs need the room, measured
 // once a frame, after the row has its size
@@ -294,8 +304,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div id="tab-row" class="top-row tab-row">
-    <BlankLogo />
+  <div
+    id="tab-row"
+    ref="row"
+    class="top-row tab-row"
+    @focusin="onFocusin"
+    @focusout="onFocusout"
+  >
+    <LogoButton
+      ref="logo"
+      :tabindex="stop() === LOGO ? 0 : -1"
+      @keydown="onLogoKeydown"
+    />
     <div
       ref="list"
       class="tab-list"
@@ -311,8 +331,6 @@ onUnmounted(() => {
       @contextmenu="onContextmenu"
       @wheel="onWheel"
       @dblclick="onDblclick"
-      @focusin="onFocusin"
-      @focusout="onFocusout"
     >
       <DocumentTab
         v-for="tab in tabs"
@@ -328,7 +346,7 @@ onUnmounted(() => {
       :label="newLabel"
       :command="C.FILE_NEW"
       :focusable="false"
-      @click="run(newFile())"
+      @click="run(commandFor(C.FILE_NEW))"
     />
     <div ref="spare" class="tab-row-spare" @dblclick="onDblclick" />
     <IconButton
@@ -340,7 +358,7 @@ onUnmounted(() => {
       :command="C.INSERT_BLOCK"
       :pressed="blocksPaneOpen"
       :focusable="false"
-      @click="toggleBlocks"
+      @click="run(commandFor(C.VIEW_BLOCKS), false)"
     >
       <span v-if="!compact" ref="label">Blocks</span>
     </IconButton>

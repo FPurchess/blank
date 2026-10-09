@@ -38,7 +38,7 @@ editor.run(mergeCells); // runs it and gives the editor the focus back
 - `state` is a `shallowRef` of the `EditorState`, replaced on every transaction. Derive from it with `computed`, which only notifies when the result changes, so a button's `enabled` doesn't re-render anything while typing.
 - `run(command, { focus })` runs a ProseMirror `Command` and returns the focus to the editor (unless `focus: false`). `can(command)` asks without running it.
 - The handle is provided, not global, so a part of the UI can later work with another editor (a header, a footnote).
-- Don't add refs that ask the editor to do something (`…Requests` counters); call it through the handle instead, as `PageButton.vue` opens the page setup with `editor.run(pageSetup())`.
+- Don't add refs that ask the editor to do something (`…Requests` counters); call it through the handle instead, as `PageButton.vue` opens the page setup with `editor.run(commandFor(CommandIdentifier.PAGE_SETUP))`. Run a command that has an id through `commandFor(id)`, which remembers it for the main menu (see `main-menu.md`), and make every command do nothing without `dispatch`: the menu asks every command it shows whether it can run.
 
 Code outside components (plugins, storage, commands) can't inject. It uses `src/state/` directly.
 

@@ -1,6 +1,11 @@
-import { shallowRef } from "vue";
+import { computed, shallowRef } from "vue";
 
-import { frameLayout, viewAnchor, type ViewAnchor } from "../engine/frames";
+import {
+  frameLayout,
+  SHEET_SCALE,
+  viewAnchor,
+  type ViewAnchor,
+} from "../engine/frames";
 
 // The page view, which the layout engine paints (see src/engine and
 // src/ui/PageView.vue): the view the user chose, and what the engine laid
@@ -13,6 +18,51 @@ export const PAGE_VIEW_MODES: PageViewMode[] = ["page-ends", "pages"];
 
 // the view the user chose, kept across restarts (see storage.ts)
 export const pageView = shallowRef<PageViewMode>("page-ends");
+
+// how large the pages show: "fit" as wide as the view allows, or a share of
+// the size they print at (1 is 100 %), the same in both views; for the
+// window, not per tab, kept across restarts (see storage.ts)
+export type PageZoom = "fit" | number;
+export const ZOOM_STEPS: readonly number[] = [
+  0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2,
+];
+export const pageZoom = shallowRef<PageZoom>("fit");
+export const isPageZoom = (value: unknown): value is PageZoom =>
+  value === "fit" || ZOOM_STEPS.includes(value as number);
+
+// what the zoom commands say without the engine, which shows no pages
+export const ZOOM_NEEDS_PAGES = "Zoom needs the page layout";
+
+/**
+ * zoomLabel returns how the status bar and the main menu show the zoom: its
+ * text, e.g. "Fit" or "125%", the tooltip of the button that sets Fit, and
+ * its name for screen readers, also what the zoom commands announce
+ * @param factor the share of the printed size the pages are at, Fit's too
+ */
+export const zoomLabel = (zoom: PageZoom, factor: number) => {
+  const percent = `${Math.round(factor * 100)}%`;
+  return zoom === "fit"
+    ? {
+        text: "Fit",
+        tip: `Fit to window (${percent})`,
+        spoken: `Fit, ${percent}`,
+      }
+    : { text: percent, tip: "Fit to window", spoken: percent };
+};
+
+// a spot on a page that stays where it is in the view while the zoom
+// changes, e.g. the one under the pointer; set right before the zoom, and
+// cleared by the page view once it scrolled to it
+export interface ZoomAnchor {
+  page: number;
+  // on the page, in points
+  x: number;
+  y: number;
+  // in the view, in pixels from its top left corner
+  viewX: number;
+  viewY: number;
+}
+export const zoomAnchor = shallowRef<ZoomAnchor | null>(null);
 
 // the pages as laid out, replaced whenever a page changes
 export interface PageLayoutState {
@@ -102,9 +152,43 @@ export interface PageViewport {
   width: number;
   height: number;
   scrollTop: number;
+  // how far it scrolled across, when the zoom shows the pages wider than it
+  scrollLeft: number;
 }
 
 export const pageViewport = shallowRef<PageViewport | null>(null);
+
+/**
+ * viewFrames places the pages of `state` in a view `width` pixels wide, in
+ * the view and at the zoom chosen: where every place the pages are shown
+ * comes from (see .claude/rules/layout-engine.md, "Zoom")
+ */
+export const viewFrames = (
+  state: PageLayoutState,
+  width: number,
+  zoom: PageZoom = pageZoom.value,
+) => frameLayout(state, pageView.value, width, zoom);
+
+// the page view's width alone, which notifies only when it changes, not on
+// every scroll as pageViewport does
+const viewWidth = computed(() => pageViewport.value?.width ?? null);
+
+// where the page view shows the pages, worked out again when the layout, the
+// view's width, the view or the zoom change, not on every scroll; null while
+// it isn't shown or nothing is laid out
+export const deskLayout = computed(() => {
+  const state = pageLayoutState.value;
+  const width = viewWidth.value;
+  return state && width !== null ? viewFrames(state, width) : null;
+});
+
+// the share of the printed size the pages show at, e.g. 1.25, or 0.87 on
+// Fit as wide as the view allows (1 before anything is laid out)
+export const zoomFactor = computed(() =>
+  pageZoom.value === "fit"
+    ? (deskLayout.value?.scale ?? SHEET_SCALE) / SHEET_SCALE
+    : pageZoom.value,
+);
 
 /**
  * currentViewAnchor returns the spot of the pages at the top of the view, to
@@ -112,11 +196,8 @@ export const pageViewport = shallowRef<PageViewport | null>(null);
  * without pages
  */
 export const currentViewAnchor = (): ViewAnchor | null => {
-  const layout = pageLayoutState.value;
+  const layout = deskLayout.value;
   const viewport = pageViewport.value;
   if (!layout || !viewport) return null;
-  return viewAnchor(
-    frameLayout(layout, pageView.value, viewport.width),
-    viewport.scrollTop,
-  );
+  return viewAnchor(layout, viewport.scrollTop);
 };

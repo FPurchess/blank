@@ -11,8 +11,8 @@ import { nextMisspelling } from "../plugins/spellcheck";
 /**
  * toggleSpellcheck turns spell check on or off
  */
-export const toggleSpellcheck = (): Command => () => {
-  spellcheck.value = !spellcheck.value;
+export const toggleSpellcheck = (): Command => (_state, dispatch) => {
+  if (dispatch) spellcheck.value = !spellcheck.value;
   return true;
 };
 
@@ -52,8 +52,8 @@ export const goToMisspelling =
 /**
  * openMenu opens the context menu at the cursor
  */
-export const openMenu = (): Command => (state, _dispatch, view) => {
+export const openMenu = (): Command => (state, dispatch, view) => {
   if (!view) return false;
-  openContextMenu(view, state.selection.head, { keyboard: true });
+  if (dispatch) openContextMenu(view, state.selection.head, { keyboard: true });
   return true;
 };

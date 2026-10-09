@@ -19,6 +19,7 @@ import {
   closeTab,
   cycleTabs,
   moveFocus,
+  openGuide,
   openSettings,
   toggleFocusMode,
   moveTab,
@@ -55,7 +56,7 @@ import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { toggleBlocksPane } from "../commands/contentBlocks";
+import { toggleBlocks, toggleBlocksPane } from "../commands/contentBlocks";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import {
@@ -75,6 +76,11 @@ import {
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { setTextblock } from "../commands/setTextblock";
+import { clearRecentFiles } from "../commands/recentFiles";
+import { zoomBy, zoomFit } from "../commands/zoom";
+import { openMainMenu } from "../commands/mainMenu";
+import { openFind } from "./find/commands";
+import { recorded } from "../commandRun";
 
 /**
  * outsideCells runs `command` only outside table cells, which can't hold
@@ -191,6 +197,16 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_FOCUS_MODE]: toggleFocusMode(),
   [CommandIdentifier.TOOLS_STATS]: showWordCount(),
   [CommandIdentifier.APP_SETTINGS]: openSettings(),
+  [CommandIdentifier.VIEW_BLOCKS]: toggleBlocks(),
+  [CommandIdentifier.APP_SHORTCUTS]: openSettings("shortcuts"),
+  [CommandIdentifier.APP_GUIDE]: openGuide(),
+  [CommandIdentifier.APP_ABOUT]: openSettings("about"),
+  [CommandIdentifier.FILE_CLEAR_RECENT]: clearRecentFiles(),
+  [CommandIdentifier.VIEW_ZOOM_IN]: zoomBy(1),
+  [CommandIdentifier.VIEW_ZOOM_OUT]: zoomBy(-1),
+  [CommandIdentifier.VIEW_ZOOM_FIT]: zoomFit(),
+  [CommandIdentifier.MENU_MAIN]: openMainMenu(),
+  [CommandIdentifier.EDIT_FIND]: openFind(),
 };
 
 // keys that run a command besides its own, which can't be changed in
@@ -198,13 +214,26 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
 const FIXED_KEYS: Partial<Record<CommandIdentifier, string[]>> = {
   [CommandIdentifier.TAB_NEXT]: ["Ctrl-PageDown"],
   [CommandIdentifier.TAB_PREVIOUS]: ["Ctrl-PageUp"],
+  // + is a key of its own on many keyboards, = with Shift on others
+  [CommandIdentifier.VIEW_ZOOM_IN]: ["Mod-+"],
 };
+
+// the commands as the UI runs them, one per id, so a computed asking whether
+// one can run keeps the same function
+const clicked = new Map<CommandIdentifier, Command>();
 
 /**
  * commandFor returns the command bound to `id`, the one its key runs, e.g.
- * for the toolbar's buttons
+ * for the toolbar's buttons; running it remembers it (see recorded)
  */
-export const commandFor = (id: CommandIdentifier): Command => commandMap[id];
+export const commandFor = (id: CommandIdentifier): Command => {
+  let command = clicked.get(id);
+  if (!command) {
+    command = recorded(id, commandMap[id], false);
+    clicked.set(id, command);
+  }
+  return command;
+};
 
 /**
  * keyCommands are what the keys of some commands run instead of what the
@@ -252,7 +281,7 @@ const bindingsOf = (
       invalid.push(`${id}: ${binding}`);
       continue;
     }
-    const command = keyCommandFor(id);
+    const command = recorded(id, keyCommandFor(id), true);
     bindings[normalized] = command;
     // with Shift, the key is a capital letter, e.g. "N" for Ctrl+Alt+Shift+N
     // on Windows, where the keymap can't fall back to the key code
@@ -268,7 +297,7 @@ const bindingsOf = (
   for (const id of ids) {
     for (const key of FIXED_KEYS[id] ?? []) {
       if (!configured.some((binding) => sameBinding(binding, key)))
-        bindings[key] = keyCommandFor(id);
+        bindings[key] = recorded(id, keyCommandFor(id), true);
     }
   }
   return bindings;
@@ -294,14 +323,17 @@ const bindCommands = () => {
 };
 
 // the commands that work wherever the focus is in the window, not only in
-// the editor: the files and printing, the tabs, moving between the parts
-// (F6, and Alt-F10 to the toolbar), focus mode and the settings
+// the editor: the files, printing and exports, the tabs, moving between the
+// parts (F6, and Alt-F10 to the toolbar), the blocks pane, the zoom, focus
+// mode, the main menu, find and the settings
 export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
   CommandIdentifier.FILE_SAVE,
   CommandIdentifier.FILE_SAVE_AS,
   CommandIdentifier.FILE_PRINT,
+  CommandIdentifier.EXPORT_PDF,
+  CommandIdentifier.EXPORT_DOCX,
   CommandIdentifier.TAB_CLOSE,
   CommandIdentifier.TAB_NEXT,
   CommandIdentifier.TAB_PREVIOUS,
@@ -312,6 +344,12 @@ export const WINDOW_COMMANDS: readonly CommandIdentifier[] = [
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
   CommandIdentifier.VIEW_FOCUS_MODE,
+  CommandIdentifier.VIEW_BLOCKS,
+  CommandIdentifier.VIEW_ZOOM_IN,
+  CommandIdentifier.VIEW_ZOOM_OUT,
+  CommandIdentifier.VIEW_ZOOM_FIT,
+  CommandIdentifier.MENU_MAIN,
+  CommandIdentifier.EDIT_FIND,
   CommandIdentifier.APP_SETTINGS,
 ];
 

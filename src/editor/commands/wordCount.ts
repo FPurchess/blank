@@ -8,8 +8,10 @@ import { wordCountOf, wordCountSummary } from "../../wordCount";
  * bar, which the next key closes again, and reads its numbers out to screen
  * readers, since the card never takes the focus
  */
-export const showWordCount = (): Command => (state) => {
-  wordCountCard.value = true;
-  announce(wordCountSummary(wordCountOf(state)));
+export const showWordCount = (): Command => (state, dispatch) => {
+  if (dispatch) {
+    wordCountCard.value = true;
+    announce(wordCountSummary(wordCountOf(state)));
+  }
   return true;
 };

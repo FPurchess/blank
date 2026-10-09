@@ -29,7 +29,7 @@ describe("command.cycleTheme", () => {
       assert.equal(theme.value, currentTheme);
       assert.equal(bodyTheme(), currentTheme);
 
-      cycleTheme()(new EditorState());
+      cycleTheme()(new EditorState(), () => {});
 
       const nextTheme = themes[(index + 1) % themes.length];
       assert.equal(theme.value, nextTheme);

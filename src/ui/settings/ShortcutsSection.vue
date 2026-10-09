@@ -8,6 +8,7 @@ import {
   watch,
 } from "vue";
 
+import { matchCommands } from "../../commandSearch";
 import { type CommandIdentifier, config, defaults } from "../../config";
 import { announce } from "../../state";
 import IconButton from "../components/IconButton.vue";
@@ -16,7 +17,6 @@ import { save } from "./settingsModel";
 import {
   type Assigned,
   commandName,
-  filterCommands,
   isChanged,
   keyButton,
   type Pending,
@@ -30,7 +30,7 @@ import {
 // Backspace removes the key, and Enter and Tab are keys like any other.
 const root = useTemplateRef<HTMLElement>("root");
 const query = shallowRef("");
-const shown = computed(() => filterCommands(query.value));
+const shown = computed(() => matchCommands(query.value));
 const keymap = computed(() => config.value.keymap);
 const changed = computed(() =>
   (Object.keys(keymap.value) as CommandIdentifier[]).some((id) =>

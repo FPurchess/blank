@@ -85,6 +85,7 @@ export const TEST_VIEWPORT = {
   width: 800,
   height: 600,
   scrollTop: 0,
+  scrollLeft: 0,
 };
 
 /**

@@ -1,5 +1,6 @@
-<!-- Blank's logo, its I-beam on a filled square, at the left of the tab row.
-It's only a sign: no button, no tooltip, no hand. -->
+<!-- Blank's logo, its I-beam on a filled square: in the button at the left
+of the tab row that opens the main menu (LogoButton.vue), and as a sign in
+About. -->
 <template>
   <svg class="blank-logo" viewBox="0 0 24 24" aria-hidden="true">
     <rect class="logo-ground" x="1" y="1" width="22" height="22" rx="5" />

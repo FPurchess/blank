@@ -3,8 +3,6 @@ import { getVersion } from "@tauri-apps/api/app";
 // About in the settings (AboutSection.vue): Blank's version, its links, and
 // the licenses of the software it uses.
 
-export const WEBSITE = "https://blank-writer.xyz/";
-export const SOURCE_CODE = "https://github.com/fpurchess/blank";
 // the licenses of every crate, npm package, font and dictionary Blank ships,
 // served from public/ (make notices)
 export const NOTICES = "/THIRD-PARTY-NOTICES.txt";

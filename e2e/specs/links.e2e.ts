@@ -25,11 +25,11 @@ describe("links", () => {
     await pressMod("n");
   });
 
-  it("links the selected text via Mod+K", async () => {
+  it("links the selected text via Mod+Alt+K", async () => {
     await type("Blank");
     await browser.keys([Key.Shift, Key.Home]);
 
-    await pressMod("k");
+    await pressMod(Key.Alt, "k");
     await expect(dialog()).toBeExisting();
     await expect($("#link-dialog-text")).toHaveValue("Blank");
     // the URL is selected, so typing replaces a URL prefilled from the clipboard
@@ -48,7 +48,7 @@ describe("links", () => {
   });
 
   it("cancels the dialog on Escape", async () => {
-    await pressMod("k");
+    await pressMod(Key.Alt, "k");
     await expect(dialog()).toBeExisting();
 
     await type(Key.Escape);
@@ -62,7 +62,7 @@ describe("links", () => {
     // to the end of the link, before " rocks!"
     await press(Key.ArrowLeft, 7);
 
-    await pressMod("k");
+    await pressMod(Key.Alt, "k");
     await expect($("#link-dialog-url")).toHaveValue(BLANK);
     await expect($("#link-dialog-text")).toHaveValue("Blank");
     // URL → Link text → Convert to text, at the left of the buttons

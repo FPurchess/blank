@@ -5,6 +5,7 @@ import {
   compactBlocks,
   middleCloses,
   scrollLeftFor,
+  logoKey,
   tabKey,
   tabMenu,
 } from "./tabRowModel";
@@ -33,10 +34,22 @@ const key = (
 });
 
 describe("tabKey", () => {
-  it("moves the focus with the arrows, Home and End, wrapping around", () => {
+  it("moves the focus with the arrows, Home and End, to the logo first", () => {
     expect(tabKey(key("ArrowRight"), 2, 3)).toEqual({ move: 0 });
-    expect(tabKey(key("ArrowLeft"), 0, 3)).toEqual({ move: 2 });
+    expect(tabKey(key("ArrowLeft"), 1, 3)).toEqual({ move: 0 });
+    expect(tabKey(key("ArrowLeft"), 0, 3)).toBe("logo");
+    expect(tabKey(key("Home"), 2, 3)).toBe("logo");
     expect(tabKey(key("End"), 0, 3)).toEqual({ move: 2 });
+  });
+
+  it("moves from the logo to the tabs, or back to the text", () => {
+    expect(logoKey(key("ArrowRight"), 3)).toEqual({ move: 0 });
+    expect(logoKey(key("Home"), 3)).toEqual({ move: 0 });
+    expect(logoKey(key("End"), 3)).toEqual({ move: 2 });
+    expect(logoKey(key("ArrowLeft"), 3)).toEqual({ move: 2 });
+    expect(logoKey(key("Escape"), 3)).toBe("leave");
+    expect(logoKey(key("Enter"), 3)).toBeNull();
+    expect(logoKey(key("ArrowRight", { ctrlKey: true }), 3)).toBeNull();
   });
 
   it("leaves keys with Ctrl, Alt or Meta to the window's commands", () => {

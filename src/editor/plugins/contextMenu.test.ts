@@ -82,7 +82,7 @@ const setup = async (spell = checker(), native = false) => {
 };
 
 const ids = () =>
-  contextMenu.value?.items.map((item: MenuItem) =>
+  (contextMenu.value?.items as MenuItem[] | undefined)?.map((item) =>
     item === "separator" ? "-" : item.id,
   );
 

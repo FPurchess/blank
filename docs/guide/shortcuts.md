@@ -19,25 +19,29 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 
 ## Files
 
-| Command                                     | Shortcut          |
-| ------------------------------------------- | ----------------- |
-| New document                                | `Mod` `N`         |
-| Open file                                   | `Mod` `O`         |
-| Save                                        | `Mod` `S`         |
-| Save as                                     | `Mod` `Shift` `S` |
-| [Print](./print)                            | `Mod` `P`         |
-| Export as PDF                               | `Mod` `Alt` `P`   |
-| Export as Word                              | `Mod` `Alt` `W`   |
-| Page setup                                  | `Mod` `Alt` `U`   |
-| Edit header                                 | `Mod` `Alt` `H`   |
-| Edit footer                                 | `Mod` `Alt` `F`   |
-| [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`   |
-| [Outline](./pages#outline)                  | `Mod` `Alt` `O`   |
-| [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`   |
-| Cycle themes                                | `Mod` `Alt` `T`   |
-| Choose language                             | `Mod` `Alt` `L`   |
-| [Focus mode](./writing#focus-mode)          | `Mod` `Shift` `F` |
-| [Settings](./settings)                      | `Mod` `,`         |
+| Command                                     | Shortcut               |
+| ------------------------------------------- | ---------------------- |
+| New document                                | `Mod` `N`              |
+| Open file                                   | `Mod` `O`              |
+| Save                                        | `Mod` `S`              |
+| Save as                                     | `Mod` `Shift` `S`      |
+| [Print](./print)                            | `Mod` `P`              |
+| Export as PDF                               | `Mod` `Alt` `P`        |
+| Export as Word                              | `Mod` `Alt` `W`        |
+| Page setup                                  | `Mod` `Alt` `U`        |
+| Edit header                                 | `Mod` `Alt` `H`        |
+| Edit footer                                 | `Mod` `Alt` `F`        |
+| [Pages or page ends](./pages#on-the-screen) | `Mod` `Alt` `V`        |
+| [Zoom in](./pages#zoom)                     | `Mod` `=` or `Mod` `+` |
+| [Zoom out](./pages#zoom)                    | `Mod` `-`              |
+| [Fit to window](./pages#zoom)               | (none)                 |
+| [Outline](./pages#outline)                  | `Mod` `Alt` `O`        |
+| [Word count](./writing#the-status-bar)      | `Mod` `Alt` `C`        |
+| Cycle themes                                | `Mod` `Alt` `T`        |
+| Choose language                             | `Mod` `Alt` `L`        |
+| [Focus mode](./writing#focus-mode)          | `Mod` `Shift` `F`      |
+| [Settings](./settings)                      | `Mod` `,`              |
+| [Main menu](./menu)                         | `Mod` `K`              |
 
 ## Tabs and moving around
 
@@ -55,14 +59,16 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 
 ## Editing
 
-| Command                     | Shortcut                                                     |
-| --------------------------- | ------------------------------------------------------------ |
-| Undo                        | `Mod` `Z`                                                    |
-| Redo                        | `Mod` `Shift` `Z`                                            |
-| Insert line break           | `Shift` `Enter`                                              |
-| A screen up / down          | `Page Up` / `Page Down`                                      |
-| Start / end of the line     | `Home` / `End`                                               |
-| Start / end of the document | `Ctrl` `Home` / `Ctrl` `End`, on macOS `Cmd` `↑` / `Cmd` `↓` |
+| Command                              | Shortcut                                                     |
+| ------------------------------------ | ------------------------------------------------------------ |
+| Undo                                 | `Mod` `Z`                                                    |
+| Redo                                 | `Mod` `Shift` `Z`                                            |
+| [Find and replace](./find)           | `Mod` `F`                                                    |
+| Next / previous match, while finding | `F3` / `Shift` `F3`                                          |
+| Insert line break                    | `Shift` `Enter`                                              |
+| A screen up / down                   | `Page Up` / `Page Down`                                      |
+| Start / end of the line              | `Home` / `End`                                               |
+| Start / end of the document          | `Ctrl` `Home` / `Ctrl` `End`, on macOS `Cmd` `↑` / `Cmd` `↓` |
 
 Add `Shift` to the last three to select as you go. When a block like a table of contents or an embed is selected, `↑` and `↓` move on to the text above or below it.
 
@@ -121,13 +127,15 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Italic               | `Mod` `I`         |
 | Underline            | `Mod` `U`         |
 | Code                 | `Mod` `E`         |
-| Insert or edit link  | `Mod` `K`         |
+| Insert or edit link  | `Mod` `Alt` `K`   |
 | Open link in browser | `Mod` + Click     |
 | Insert or edit image | `Mod` `Alt` `I`   |
 | Align left           | `Mod` `Shift` `L` |
 | Center               | `Mod` `Shift` `E` |
 | Align right          | `Mod` `Shift` `R` |
 | Justify              | `Mod` `Shift` `J` |
+
+The link dialog moved from `Mod` `K` to `Mod` `Alt` `K`: `Mod` `K` opens the [main menu](./menu).
 
 ## Spell check
 

@@ -131,7 +131,7 @@ export default defineConfigWithTheme<
         text: "Guide",
         link: "/guide/writing",
         activeMatch:
-          "^/guide/(writing|tables|blocks|files|print|pages|settings|autocorrect|spelling|themes|configuration|faq)",
+          "^/guide/(writing|menu|find|tables|blocks|files|print|pages|settings|autocorrect|spelling|themes|configuration|faq)",
       },
       { text: "Shortcuts", link: "/guide/shortcuts" },
     ],
@@ -141,6 +141,8 @@ export default defineConfigWithTheme<
         items: [
           { text: "Install", link: "/guide/install" },
           { text: "Writing in Blank", link: "/guide/writing" },
+          { text: "The main menu", link: "/guide/menu" },
+          { text: "Find and replace", link: "/guide/find" },
           { text: "Tables", link: "/guide/tables" },
           { text: "Blocks", link: "/guide/blocks" },
           { text: "Files & formats", link: "/guide/files" },

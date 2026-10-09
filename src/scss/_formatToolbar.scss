@@ -34,6 +34,8 @@
   width: 116px;
 
   .text {
+    // hidden for Safari 15 (macOS 12), which has no clip
+    overflow: hidden;
     overflow: clip;
     text-overflow: ellipsis;
   }

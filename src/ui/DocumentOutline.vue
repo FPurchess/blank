@@ -82,7 +82,6 @@ const place = computed(() =>
         blocksDock(blocksPaneOpen.value, windowWidth.value),
       ),
       pageLayoutState.value,
-      pageView.value,
       engineMissing.value,
     ),
   ),

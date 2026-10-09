@@ -61,6 +61,25 @@ describe("the themes", () => {
   });
 });
 
+describe("find's matches on the pages", () => {
+  it.each(themes)(
+    "show on the paper, the text readable over them, in %s",
+    (theme) => {
+      const { background, text, color } = colorsOf(theme);
+      const found = color("find-color");
+      const current = color("find-current-color");
+      expect(contrast(found, background)).toBeGreaterThanOrEqual(1.3);
+      // the one find is at stands out from the others
+      expect(contrast(current, background)).toBeGreaterThanOrEqual(1.8);
+      expect(contrast(current, background)).toBeGreaterThan(
+        contrast(found, background) + 0.3,
+      );
+      expect(contrast(text, found)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(text, current)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+});
+
 describe("the faint text beside the pages", () => {
   const opacity = scssNumber("main.scss", "faint-text-opacity");
 

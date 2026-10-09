@@ -12,6 +12,8 @@
 @use "settings";
 @use "bands";
 @use "print";
+@use "mainMenu";
+@use "find";
 
 html {
   overflow-y: auto;
@@ -93,6 +95,15 @@ body {
     text-decoration: underline wavy var(--spelling-color);
     text-decoration-skip-ink: none;
     text-underline-offset: 0.2em;
+  }
+
+  // the matches of find, while the editor shows the text itself
+  .find-match {
+    background: var(--find-color);
+  }
+
+  .find-current {
+    background: var(--find-current-color);
   }
 
   // links take the theme's text color, so they fit every theme, and are
@@ -815,7 +826,9 @@ $faint-text-opacity: 0.6;
 
   [role="menuitem"],
   [role="menuitemcheckbox"],
-  [role="menuitemradio"] {
+  [role="menuitemradio"],
+  // a result of the main menu's search
+  [role="option"] {
     display: flex;
     align-items: baseline;
     gap: 24px;
@@ -833,7 +846,10 @@ $faint-text-opacity: 0.6;
 
     .label {
       flex: 1;
+      // clip, not hidden, as for .detail below; hidden first for Safari 15
+      // (macOS 12), which has no clip
       overflow: hidden;
+      overflow: clip;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -846,7 +862,9 @@ $faint-text-opacity: 0.6;
     // a hint after the label, e.g. the first heading on a page
     .detail {
       max-width: 22ch;
-      // clip, not hidden: WebKit's WebDriver reads hidden overflow as empty
+      // clip, not hidden: WebKit's WebDriver reads hidden overflow as empty;
+      // hidden first for Safari 15 (macOS 12), which has no clip
+      overflow: hidden;
       overflow: clip;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -938,7 +956,8 @@ body.without-engine {
   // first and last lines and the caret
   inset: $top-bar-height 0 $status-height;
   z-index: 1;
-  overflow-x: hidden;
+  // across only when the zoom shows the pages wider than the view
+  overflow-x: auto;
   overflow-y: auto;
   color: var(--color);
   background-color: var(--background-color);
@@ -978,6 +997,20 @@ body.without-engine {
 
 .page-canvas {
   display: block;
+  // over the matches of find, which come before it (PageFrame.vue)
+  position: relative;
+}
+
+// a match of find, under the text, and the one find is at
+.page-find {
+  position: absolute;
+  pointer-events: none;
+  background: var(--find-color);
+  border-radius: 2px;
+
+  &.current {
+    background: var(--find-current-color);
+  }
 }
 
 // the selected text in colours of its own over the selection, on a page
@@ -1016,6 +1049,8 @@ $page-end-height: 64px + 2 * $band-gap;
   // text WebKitWebDriver reads as empty
   span {
     min-width: 0;
+    // hidden for Safari 15 (macOS 12), which has no clip
+    overflow: hidden;
     overflow: clip;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -1412,30 +1447,9 @@ body.without-engine.blocks-docked {
   padding-left: $blocks-dock;
 }
 
-// the search: a field with the magnifier in it
-.blocks-search {
-  @include field;
-  // the field is paper on the pane's desk
-  --muted: var(--muted-on-paper);
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
+// the search, below the pane's head
+#blocks-pane .search-field {
   margin: 0 var(--s3) var(--s2);
-  color: var(--muted);
-
-  input {
-    flex: 1;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    font: inherit;
-    color: var(--color);
-    background: none;
-
-    &::placeholder {
-      color: var(--muted);
-    }
-  }
 }
 
 .blocks-groups {

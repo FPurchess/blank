@@ -2,15 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "prosemirror-model";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { isRef, type Ref } from "vue";
 
 import { CommandIdentifier, config } from "../../config";
+import * as shared from "../../state";
 import {
   bandEditor,
   imageDialog,
   languagePicker,
   linkDialog,
   path,
+  recentCommands,
   tablePicker,
   theme,
   themes,
@@ -32,10 +35,35 @@ import {
 } from "../../test/editor";
 import { flushPromises } from "../../test/async";
 import { schema } from "../../markdown";
-import { commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
+import { commandFor, commandKeys, keymap, WINDOW_COMMANDS } from "./keymap";
 import * as tabs from "../tabs";
 import { bindKeys, withKeymap } from "../../test/keymap";
 import { createState, createTestView, pressKey } from "../../test/editor";
+
+describe("every command", () => {
+  // the main menu and its search ask each command whether it can run, with
+  // no dispatch: it must do nothing then, or opening the menu would, e.g.
+  // open the export's save dialogs
+  it("does nothing when asked without dispatch", async () => {
+    const refs = Object.entries(shared as Record<string, unknown>).filter(
+      (entry): entry is [string, Ref<unknown>] => isRef(entry[1]),
+    );
+    const before = new Map(refs.map(([name, ref]) => [name, ref.value]));
+    const view = createTestView(createState(doc(p("some text"))));
+
+    for (const id of Object.values(CommandIdentifier))
+      commandFor(id)(view.state, undefined, view);
+    await flushPromises();
+
+    expect(save).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+    const changed = refs
+      .filter(([name, ref]) => ref.value !== before.get(name))
+      .map(([name]) => name);
+    expect(changed).toEqual([]);
+  });
+});
 
 describe("plugin.keymap", () => {
   const defaultConfig = config.value;
@@ -50,7 +78,8 @@ describe("plugin.keymap", () => {
       .filter((binding) => binding !== "");
 
     expect(new Set(bindings).size).toBe(bindings.length);
-    // only the code block has none by default
+    // the code block has none by default, and nor have the commands the
+    // main menu runs
     expect(config.value.keymap[CommandIdentifier.BLOCKTYPE_CODE_BLOCK]).toBe(
       "",
     );
@@ -118,7 +147,7 @@ describe("plugin.keymap", () => {
     expect(view.state.doc.toJSON()).toEqual(flat.toJSON());
   });
 
-  describe("Mod-k", () => {
+  describe("Mod-Alt-k", () => {
     beforeEach(() => {
       linkDialog.value = null;
     });
@@ -126,7 +155,7 @@ describe("plugin.keymap", () => {
     it("opens the link dialog for the selection", async () => {
       const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
 
-      expect(press("Mod-k")).toBe(true);
+      expect(press("Mod-Alt-k")).toBe(true);
 
       await vi.waitFor(() => expect(linkDialog.value?.text).toBe("text"));
     });
@@ -134,7 +163,7 @@ describe("plugin.keymap", () => {
     it("is not handled in a code block", async () => {
       const { press } = withKeymap(doc(codeBlock("code")));
 
-      expect(press("Mod-k")).toBe(false);
+      expect(press("Mod-Alt-k")).toBe(false);
       await flushPromises();
 
       expect(linkDialog.value).toBeNull();
@@ -487,5 +516,59 @@ describe("plugin.keymap", () => {
     expect(sendNotification).toHaveBeenCalledWith(
       "Ignored invalid key bindings in blank.json: format.bold: Hyper-b",
     );
+  });
+});
+
+describe("the commands that ran", () => {
+  afterEach(() => {
+    recentCommands.value = [];
+  });
+
+  it("are remembered when a key runs them", () => {
+    const { press } = withKeymap(doc(p("text")), { cursor: [1, 5] });
+    press("Mod-b");
+    expect(recentCommands.value[0]).toEqual({
+      id: CommandIdentifier.FORMAT_BOLD,
+      byKey: true,
+    });
+  });
+
+  it("are remembered when the UI runs them, not when it asks", () => {
+    const view = createTestView(
+      createState(doc(p("text")), { cursor: [1, 5] }),
+    );
+    const bold = commandFor(CommandIdentifier.FORMAT_BOLD);
+    // the same command each time, for computeds that ask
+    expect(commandFor(CommandIdentifier.FORMAT_BOLD)).toBe(bold);
+
+    expect(bold(view.state)).toBe(true);
+    expect(recentCommands.value).toEqual([]);
+
+    bold(view.state, view.dispatch, view);
+    expect(recentCommands.value[0]).toEqual({
+      id: CommandIdentifier.FORMAT_BOLD,
+      byKey: false,
+    });
+  });
+
+  it("leave out what only moves the focus or opens a menu", () => {
+    const view = createTestView(createState(doc(p("text"))));
+    commandFor(CommandIdentifier.VIEW_FOCUS_NEXT)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    commandFor(CommandIdentifier.FILE_CLEAR_RECENT)(
+      view.state,
+      view.dispatch,
+      view,
+    );
+    expect(recentCommands.value).toEqual([]);
+  });
+
+  it("aren't remembered when they did nothing", () => {
+    const view = createTestView(createState(doc(codeBlock("code"))));
+    commandFor(CommandIdentifier.FORMAT_LINK)(view.state, view.dispatch, view);
+    expect(recentCommands.value).toEqual([]);
   });
 });

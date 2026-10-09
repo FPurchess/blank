@@ -140,6 +140,8 @@ body.band-editing.without-engine #editor {
 #band-editor {
   position: fixed;
   z-index: 8;
+  // hidden for Safari 15 (macOS 12), which has no clip
+  overflow: hidden;
   overflow: clip;
   pointer-events: none;
   @include ui-text;

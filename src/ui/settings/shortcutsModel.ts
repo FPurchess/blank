@@ -1,6 +1,6 @@
 import { base, keyName } from "w3c-keyname";
 
-import { type CommandInfo, commandLabel, commands } from "../../commandList";
+import { commandLabel } from "../../commandList";
 import {
   type CommandIdentifier,
   type Config,
@@ -109,6 +109,12 @@ const REFUSED: Refused[] = [
     keys: ["Ctrl-PageDown", "Ctrl-PageUp"],
     does: "switches tabs",
     except: ["tab.next", "tab.previous"] as CommandIdentifier[],
+  },
+  {
+    // the other key of Zoom in, for keyboards that type + without Shift
+    keys: ["Mod-+"],
+    does: "zooms in",
+    except: ["view.zoom_in"] as CommandIdentifier[],
   },
   { keys: ["Alt-F4"], does: "closes the window", only: "others" },
   {
@@ -240,21 +246,6 @@ export const remove = (id: CommandIdentifier) => ({
 export const isChanged = (id: CommandIdentifier, keymap: Keymap) =>
   keymap[id] !== defaults.keymap[id] &&
   !sameBinding(keymap[id], defaults.keymap[id]);
-
-/**
- * filterCommands returns the commands whose label, group or aliases contain
- * `query`, in the order of the command list
- */
-export const filterCommands = (query: string): readonly CommandInfo[] => {
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return commands;
-  return commands.filter((info) => {
-    const text = [info.label, info.group, ...info.aliases]
-      .join(" ")
-      .toLowerCase();
-    return words.every((word) => text.includes(word));
-  });
-};
 
 /**
  * keyButton returns what the button of a command's key shows and how screen

@@ -208,6 +208,18 @@ export const toggleBlocksPane = (): Command => (_state, dispatch, view) => {
 };
 
 /**
+ * toggleBlocks shows the blocks pane with the focus in its search, or hides
+ * it, wherever the focus is, e.g. for its button or the main menu
+ */
+export const toggleBlocks = (): Command => (state, dispatch, view) => {
+  if (dispatch && view && blocksPaneOpen.value) {
+    hideBlocksPane(view);
+    return true;
+  }
+  return toggleBlocksPane()(state, dispatch, view);
+};
+
+/**
  * refreshBlocks reads the blocks the pane offers again
  */
 export const refreshBlocks = (): Command => (_state, dispatch) => {

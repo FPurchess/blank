@@ -2,6 +2,7 @@ import type {
   PageLayoutState,
   PageRect,
   PageViewMode,
+  PageZoom,
 } from "../state/pageView";
 
 // Where the page view puts each page, in both views: a frame is the part of
@@ -41,6 +42,9 @@ export const TEXT_SCALE = 18 / 11;
 export const SHEET_SCALE = 96 / 72;
 // the least room a page's text takes in "page ends", one line
 const MIN_TEXT = 16;
+// the smallest Fit goes down to on a narrow window, of the size the pages
+// print at: below the smallest step, so Fit never needs a scroll across
+const MIN_FIT = 0.15;
 
 export interface Frame {
   page: number;
@@ -77,6 +81,9 @@ export interface FrameLayout {
   // CSS pixels per point
   scale: number;
   frames: Frame[];
+  // the desk's width: the view's, or more when the zoom makes the pages
+  // wider than it, which then scrolls across
+  width: number;
   // the desk's height
   height: number;
   // the room above the first frame for the first page's header, in "page
@@ -88,19 +95,39 @@ export interface FrameLayout {
 }
 
 /**
- * frameLayout places the pages of `layout` for a view `width` pixels wide
+ * sheetScale returns the CSS pixels per point the pages are shown at: for
+ * Fit, as wide as the view allows, at most at the size they print at (in
+ * "page ends", at the editor's text size) and at least at MIN_FIT of it; for a
+ * zoom, that share of the size they print at, in both views
+ * @param shown the width of what is shown of a page, in points
+ */
+export const sheetScale = (
+  mode: PageViewMode,
+  shown: number,
+  width: number,
+  zoom: PageZoom,
+) => {
+  if (zoom !== "fit") return zoom * SHEET_SCALE;
+  const largest = mode === "pages" ? SHEET_SCALE : TEXT_SCALE;
+  return Math.max(
+    MIN_FIT * SHEET_SCALE,
+    Math.min(largest, (width - 2 * DESK_SIDE) / shown),
+  );
+};
+
+/**
+ * frameLayout places the pages of `layout` for a view `width` pixels wide,
+ * at `zoom`
  */
 export const frameLayout = (
   layout: PageLayoutState,
   mode: PageViewMode,
   width: number,
+  zoom: PageZoom = "fit",
 ): FrameLayout => {
   const frames: Frame[] = [];
   if (mode === "pages") {
-    const scale = Math.max(
-      0.2,
-      Math.min(SHEET_SCALE, (width - 2 * DESK_SIDE) / layout.width),
-    );
+    const scale = sheetScale(mode, layout.width, width, zoom);
     const sheetWidth = layout.width * scale;
     const sheetHeight = layout.height * scale;
     const left = Math.max(DESK_SIDE, (width - sheetWidth) / 2);
@@ -126,6 +153,8 @@ export const frameLayout = (
       mode,
       scale,
       frames: frames.map(snapped),
+      // rounded, so Fit's own width, a hair over the view's, scrolls nothing
+      width: Math.max(width, Math.round(sheetWidth + 2 * DESK_SIDE)),
       height,
       headerRoom: 0,
       footerRoom: 0,
@@ -133,10 +162,7 @@ export const frameLayout = (
   }
   const { margins } = layout;
   const shown = layout.width - margins.left - margins.right + 2 * BLEED;
-  const scale = Math.max(
-    0.2,
-    Math.min(TEXT_SCALE, (width - 2 * DESK_SIDE) / shown),
-  );
+  const scale = sheetScale(mode, shown, width, zoom);
   const left = Math.max(DESK_SIDE / 2, (width - shown * scale) / 2);
   const headerRoom = layout.header ? HEADER_ROOM : 0;
   const footerRoom = layout.footer ? FOOTER_ROOM : 0;
@@ -161,6 +187,7 @@ export const frameLayout = (
     mode,
     scale,
     frames: frames.map(snapped),
+    width: Math.max(width, Math.round(shown * scale + DESK_SIDE)),
     // no mark after the last page, only its footer if it has one
     height: top - MARK_HEIGHT + footerRoom + VIEW_BOTTOM,
     headerRoom,

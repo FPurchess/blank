@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { PageLayoutState } from "../state";
+import {
+  type PageLayoutState,
+  pageView,
+  type PageViewMode,
+  pageZoom,
+} from "../state";
 import { BLOCKS_DOCK, blocksDock } from "./blocksPaneModel";
 import {
-  freeRight,
+  freeRight as freeRightNow,
   layoutWidth,
   listShape,
   OUTLINE_DOCK,
@@ -23,6 +28,22 @@ const a4: PageLayoutState = {
 };
 const letter: PageLayoutState = { ...a4, width: 612, height: 792 };
 
+afterEach(() => {
+  pageView.value = "page-ends";
+  pageZoom.value = "fit";
+});
+
+// the room right of the text in `mode`, at the zoom chosen
+const freeRight = (
+  width: number,
+  state: PageLayoutState | null,
+  mode: PageViewMode,
+  engineless: boolean,
+) => {
+  pageView.value = mode;
+  return freeRightNow(width, state, engineless);
+};
+
 describe("freeRight", () => {
   it("is the room right of the sheets in Pages", () => {
     // an A4 sheet is 794 px wide at 96 dpi, centred
@@ -35,6 +56,12 @@ describe("freeRight", () => {
     // A4's text and the room beside it for list markers is 821 px wide
     expect(freeRight(1000, a4, "page-ends", false)).toBeCloseTo(90, 0);
     expect(freeRight(1400, a4, "page-ends", false)).toBeCloseTo(290, 0);
+  });
+
+  it("is the room at Fit, whatever the zoom", () => {
+    const fit = freeRight(1400, a4, "pages", false);
+    pageZoom.value = 2;
+    expect(freeRight(1400, a4, "pages", false)).toBe(fit);
   });
 
   it("is none on a window narrower than the pages", () => {

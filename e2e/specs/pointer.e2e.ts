@@ -81,7 +81,7 @@ describe("the pointer", () => {
 
   it("shows the hand on a dialog's buttons and the text cursor in its fields", async () => {
     await clickInto("#editor p");
-    await pressMod("k");
+    await pressMod(Key.Alt, "k");
     await expect($("#link-dialog")).toBeDisplayed();
     await expectCursors();
     await type(Key.Escape);

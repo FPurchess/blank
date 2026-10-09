@@ -8,17 +8,18 @@ import { stepTo } from "./rovingModel";
 // The tab row (TabRow.vue): what a key, a click and a drag on a tab do, its
 // menu, and how the row fits the window.
 
-// what a key on a focused tab does: move the focus to another tab, or act on
-// this one
+// what a key on a focused tab does: move the focus to another tab or to the
+// logo before the first, or act on this one
 export type TabKey =
-  { move: number } | "activate" | "close" | "menu" | "leave" | null;
+  { move: number } | "logo" | "activate" | "close" | "menu" | "leave" | null;
 
 /**
  * tabKey returns what the key of `event` does on the tab at `index` of
- * `count`: the arrows, Home and End move the focus, Enter and Space show the
- * tab, Delete closes it, Shift+F10 opens its menu and Esc goes back to the
- * text. With Ctrl, Alt or Meta it does none of these, so the window's
- * commands get it.
+ * `count`: the arrows, Home and End move the focus, to the logo from the
+ * first tab with ← and from any with Home, Enter and Space show the tab,
+ * Delete closes it, Shift+F10 opens its menu and Esc goes back to the text.
+ * With Ctrl, Alt or Meta it does none of these, so the window's commands get
+ * it.
  */
 export const tabKey = (
   event: Pick<
@@ -31,12 +32,31 @@ export const tabKey = (
   const { key, shiftKey } = event;
   if (event.ctrlKey || event.altKey || event.metaKey) return null;
   if (shiftKey) return key === "F10" ? "menu" : null;
+  if (key === "Home" || (key === "ArrowLeft" && index === 0)) return "logo";
   const to = stepTo(key, index, count);
   if (to !== undefined) return { move: to };
   if (key === "Enter" || key === " ") return "activate";
   if (key === "Delete") return "close";
   if (key === "ContextMenu") return "menu";
   if (key === "Escape") return "leave";
+  return null;
+};
+
+/**
+ * logoKey returns what the key of `event` does on the logo, the first stop
+ * of the row: → and Home go to the first tab, ← (around) and End to the
+ * last, Esc back to the text
+ */
+export const logoKey = (
+  event: Pick<KeyboardEvent, "key" | "ctrlKey" | "altKey" | "metaKey">,
+  count: number,
+): TabKey => {
+  if (event.ctrlKey || event.altKey || event.metaKey || count === 0)
+    return null;
+  if (event.key === "ArrowRight" || event.key === "Home") return { move: 0 };
+  if (event.key === "End" || event.key === "ArrowLeft")
+    return { move: count - 1 };
+  if (event.key === "Escape") return "leave";
   return null;
 };
 

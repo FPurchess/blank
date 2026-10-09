@@ -2,7 +2,7 @@
 import { computed } from "vue";
 
 import { CommandIdentifier } from "../config";
-import { pageSetup } from "../editor/commands";
+import { commandFor } from "../editor/plugins/keymap";
 import { useEditor } from "../editor/handle";
 import { describePaper } from "../layout/describe";
 import { localeUnit } from "../layout/paper";
@@ -16,7 +16,7 @@ const editor = useEditor();
 const label = computed(() =>
   describePaper(pageLayout.value.layout, localeUnit()),
 );
-const open = () => editor.run(pageSetup());
+const open = () => editor.run(commandFor(CommandIdentifier.PAGE_SETUP));
 </script>
 
 <template>

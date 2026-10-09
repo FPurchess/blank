@@ -51,6 +51,25 @@ export const commandKey = (command: CommandIdentifier, run: Command) =>
   });
 
 /**
+ * onCommandKey returns a keydown listener that runs `run` on the key of
+ * `command` and takes the event, e.g. a key of the editor's that a part of
+ * the UI holding the focus answers itself; whether it did
+ */
+export const onCommandKey = (command: CommandIdentifier, run: () => void) => {
+  const handler = commandKey(command, () => {
+    run();
+    return true;
+  });
+  return (event: KeyboardEvent) => {
+    // the command runs nothing on a view, so the handler needs none
+    if (!handler({} as EditorView, event)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  };
+};
+
+/**
  * formatShortcut returns a key binding like "Mod-Shift-z" as the platform
  * shows it: "⇧⌘Z" on macOS, "Ctrl+Shift+Z" elsewhere
  */

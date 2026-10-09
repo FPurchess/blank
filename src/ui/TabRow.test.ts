@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import * as commands from "../editor/commands";
-import * as contentBlocks from "../editor/commands/contentBlocks";
 import * as tabActions from "../editor/tabs";
 import {
   activeTabId,
@@ -16,6 +15,7 @@ import {
 } from "../state";
 import { createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
+import { isEntry } from "./menuModel";
 
 const tab = (id: string, change: Partial<Tab> = {}): Tab => ({
   id,
@@ -145,7 +145,10 @@ describe("the tab row", () => {
   });
 
   it("opens a new tab with + and a double click on its empty part", () => {
-    const create = spy("newFile");
+    // + runs New document, the command, whose work is opening a tab
+    const create = vi
+      .spyOn(tabActions, "openNewTab")
+      .mockResolvedValue(undefined as never);
 
     document.querySelector<HTMLElement>(".tab-row-new")!.click();
     document
@@ -184,9 +187,7 @@ describe("the tab row", () => {
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
     );
 
-    const items = contextMenu.value!.items.filter(
-      (item) => item !== "separator",
-    );
+    const items = contextMenu.value!.items.filter(isEntry);
     expect(items.every((item) => item.shortcut === undefined)).toBe(true);
     expect(contextMenu.value?.owner).toBeUndefined();
   });
@@ -263,6 +264,30 @@ describe("the tab row's keys", () => {
 
     press("b", "Enter");
     expect(select).toHaveBeenCalledWith("b");
+  });
+
+  it("goes to the logo before the first tab, and back", async () => {
+    const logo = document.querySelector<HTMLElement>(".logo-button")!;
+    expect(logo.tabIndex).toBe(-1);
+    tabElement("a").focus();
+
+    press("a", "ArrowLeft");
+    await nextTick();
+    expect(document.activeElement).toBe(logo);
+    // the logo is the row's tab stop now, and the row keeps the focus
+    expect(logo.tabIndex).toBe(0);
+    expect(tabElement("a").tabIndex).toBe(-1);
+    expect(tabRowFocused.value).toBe(true);
+
+    logo.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await nextTick();
+    expect(document.activeElement).toBe(tabElement("a"));
   });
 
   it("closes with Delete, opens the menu with Shift+F10 and leaves with Esc", async () => {
@@ -364,16 +389,12 @@ describe("the Blocks button", () => {
   });
 
   it("opens the pane, and hides it again", async () => {
-    const hide = vi
-      .spyOn(contentBlocks, "hideBlocksPane")
-      .mockImplementation(() => (blocksPaneOpen.value = false) as never);
-
     button().click();
     expect(blocksPaneOpen.value).toBe(true);
     await nextTick();
     expect(button().getAttribute("aria-pressed")).toBe("true");
 
     button().click();
-    expect(hide).toHaveBeenCalled();
+    expect(blocksPaneOpen.value).toBe(false);
   });
 });

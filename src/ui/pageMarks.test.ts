@@ -9,7 +9,17 @@ import { doc, p } from "../test/editor";
 import { layOutPages, testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import type { PageEngine } from "../engine/engine";
-import { PageMarksMemo, shownMarks } from "./pageMarks";
+import {
+  MARK_LOOKS,
+  type MarkSource,
+  PageMarksMemo,
+  shownMarks,
+} from "./pageMarks";
+
+// the spell check's decorations, as the page view hands them over
+const spellingSource = (
+  decorations: MarkSource["decorations"],
+): MarkSource[] => [{ decorations, kind: "spelling" }];
 
 const LONG =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
@@ -47,7 +57,9 @@ describe("the marks on a page", () => {
     const memo = new PageMarksMemo();
     const decorations = spellcheckKey.getState(state)?.decorations;
     const marksOn = (page: number) =>
-      shownMarks(memo.marksOn(engine, state.doc, decorations, page, 1));
+      shownMarks(
+        memo.marksOn(engine, state.doc, spellingSource(decorations), page, 1),
+      );
     const marks = marksOn(0);
     const spelling = marks.filter((mark) => mark.kind === "spelling");
     expect(spelling).toHaveLength(1);
@@ -56,6 +68,44 @@ describe("the marks on a page", () => {
     expect(marks.filter((mark) => mark.kind === "break")).toHaveLength(1);
     // the second page has neither
     expect(marksOn(1)).toEqual([]);
+  });
+});
+
+describe("the matches of find on a page", () => {
+  it("show under the text, the current one apart, a code node as a whole", () => {
+    const engine = layOutPages(node);
+    const state = EditorState.create({ schema, doc: node });
+    const from = state.doc.textContent.indexOf("speling") + 1;
+    const decorations = DecorationSet.create(state.doc, [
+      Decoration.inline(from, from + 7, {}),
+    ]);
+    const measure = vi.spyOn(engine, "selection");
+    const marks = shownMarks(
+      new PageMarksMemo().marksOn(
+        engine,
+        state.doc,
+        [
+          { decorations, kind: "find" },
+          {
+            decorations,
+            kind: "find-current",
+            range: (start) => [start, start + 2],
+          },
+        ],
+        0,
+        1,
+      ),
+    );
+    // and the page break the page has
+    expect(marks.map((mark) => mark.kind)).toEqual([
+      "find",
+      "find-current",
+      "break",
+    ]);
+    expect(MARK_LOOKS.find.under).toBe(true);
+    expect(MARK_LOOKS.spelling.under).toBe(false);
+    // the range the source gives is what's measured
+    expect(measure).toHaveBeenCalledWith(from, from + 2);
   });
 });
 
@@ -95,7 +145,7 @@ describe("PageMarksMemo", () => {
     const first = memo.marksOn(
       engine,
       twoPages,
-      decorations,
+      spellingSource(decorations),
       1,
       versionOf(engine, 1),
     );
@@ -103,13 +153,25 @@ describe("PageMarksMemo", () => {
     const measured = measure.mock.calls.length;
     // asked again, nothing is measured, and the very same string comes back
     expect(
-      memo.marksOn(engine, twoPages, decorations, 1, versionOf(engine, 1)),
+      memo.marksOn(
+        engine,
+        twoPages,
+        spellingSource(decorations),
+        1,
+        versionOf(engine, 1),
+      ),
     ).toBe(first);
     expect(measure.mock.calls.length).toBe(measured);
     // the first page has the break's label
     expect(
       shownMarks(
-        memo.marksOn(engine, twoPages, decorations, 0, versionOf(engine, 0)),
+        memo.marksOn(
+          engine,
+          twoPages,
+          spellingSource(decorations),
+          0,
+          versionOf(engine, 0),
+        ),
       ).map((mark) => mark.kind),
     ).toEqual(["break"]);
   });
@@ -120,7 +182,7 @@ describe("PageMarksMemo", () => {
     const before = memo.marksOn(
       engine,
       twoPages,
-      decorations,
+      spellingSource(decorations),
       1,
       versionOf(engine, 1),
     );
@@ -132,7 +194,7 @@ describe("PageMarksMemo", () => {
     const after = memo.marksOn(
       engine,
       tr.doc,
-      decorations.map(tr.mapping, tr.doc),
+      spellingSource(decorations.map(tr.mapping, tr.doc)),
       1,
       versionOf(engine, 1),
     );
@@ -144,7 +206,13 @@ describe("PageMarksMemo", () => {
     const { engine, decorations } = setUp();
     const memo = new PageMarksMemo();
     const before = shownMarks(
-      memo.marksOn(engine, twoPages, decorations, 1, versionOf(engine, 1)),
+      memo.marksOn(
+        engine,
+        twoPages,
+        spellingSource(decorations),
+        1,
+        versionOf(engine, 1),
+      ),
     );
     // on the same page, in the line above the word's
     const state = EditorState.create({ schema, doc: twoPages });
@@ -154,7 +222,7 @@ describe("PageMarksMemo", () => {
       memo.marksOn(
         engine,
         tr.doc,
-        decorations.map(tr.mapping, tr.doc),
+        spellingSource(decorations.map(tr.mapping, tr.doc)),
         1,
         versionOf(engine, 1),
       ),

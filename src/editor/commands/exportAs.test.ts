@@ -19,11 +19,22 @@ const title = "PDF-Export";
 const filters = [{ name: "PDF-File", extensions: ["pdf"] }];
 const bytes = new Uint8Array([1, 2, 3]);
 const state = createState(doc(p("Hello")));
+// runs the export, as a key or the menu does
+const dispatch = () => {};
 
 const createExporter = (warnings: string[] = []) =>
   vi.fn<exporterFunc>().mockResolvedValue({ contents: bytes, warnings });
 
 describe("command.exportAs", () => {
+  it("only says whether there's something to export when asked", () => {
+    expect(exportAs(title, createExporter(), filters)(state)).toBe(true);
+    expect(
+      exportAs(title, createExporter(), filters)(createState(doc(p("")))),
+    ).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     path.value = null;
   });
@@ -34,7 +45,11 @@ describe("command.exportAs", () => {
       const exporter = createExporter();
 
       expect(
-        exportAs(title, exporter, filters)(createState(doc(p(content)))),
+        exportAs(
+          title,
+          exporter,
+          filters,
+        )(createState(doc(p(content))), dispatch),
       ).toBe(false);
 
       expect(sendNotification).toHaveBeenCalledWith({
@@ -51,14 +66,16 @@ describe("command.exportAs", () => {
     const onlyImage = createState(doc(schema.node("paragraph", null, [image])));
     vi.mocked(save).mockResolvedValue(null);
 
-    expect(exportAs(title, createExporter(), filters)(onlyImage)).toBe(true);
+    expect(
+      exportAs(title, createExporter(), filters)(onlyImage, dispatch),
+    ).toBe(true);
   });
 
   it("exports the document to the chosen file", async () => {
     vi.mocked(save).mockResolvedValue("/out.pdf");
     const exporter = createExporter();
 
-    expect(exportAs(title, exporter, filters)(state)).toBe(true);
+    expect(exportAs(title, exporter, filters)(state, dispatch)).toBe(true);
     await flushPromises();
 
     expect(save).toHaveBeenCalledWith({ filters, defaultPath: undefined });
@@ -79,7 +96,7 @@ describe("command.exportAs", () => {
     vi.mocked(save).mockResolvedValue("/docs/report.pdf");
     const exporter = createExporter();
 
-    exportAs(title, exporter, filters)(state);
+    exportAs(title, exporter, filters)(state, dispatch);
     await flushPromises();
 
     expect(save).toHaveBeenCalledWith({
@@ -99,7 +116,7 @@ describe("command.exportAs", () => {
       title,
       createExporter(["1 image could not be embedded: a"]),
       filters,
-    )(state);
+    )(state, dispatch);
     await flushPromises();
 
     expect(sendNotification).toHaveBeenCalledWith({
@@ -117,7 +134,7 @@ describe("command.exportAs", () => {
       .fn<exporterFunc>()
       .mockResolvedValue({ contents: bytes, warnings: [], pages });
 
-    exportAs(title, exporter, filters)(state);
+    exportAs(title, exporter, filters)(state, dispatch);
     await flushPromises();
 
     expect(sendNotification).toHaveBeenCalledWith({ title, body });
@@ -133,7 +150,7 @@ describe("command.exportAs", () => {
       ),
     );
 
-    exportAs(title, exporter, filters)(landscape);
+    exportAs(title, exporter, filters)(landscape, dispatch);
     await flushPromises();
 
     const [, { layout }] = exporter.mock.calls[0];
@@ -155,7 +172,7 @@ describe("command.exportAs", () => {
     };
 
     try {
-      exportAs(title, exporter, filters)(state);
+      exportAs(title, exporter, filters)(state, dispatch);
       await flushPromises();
     } finally {
       config.value = before;
@@ -171,7 +188,10 @@ describe("command.exportAs", () => {
       title,
       createExporter(),
       filters,
-    )(createState(docWithFrontmatter("page:\n  size: a2", p("Hello"))));
+    )(
+      createState(docWithFrontmatter("page:\n  size: a2", p("Hello"))),
+      dispatch,
+    );
     await flushPromises();
 
     expect(sendNotification).toHaveBeenCalledWith({
@@ -184,7 +204,7 @@ describe("command.exportAs", () => {
     vi.mocked(save).mockResolvedValue("/docs/report.md");
     const exporter = createExporter();
 
-    exportAs(title, exporter, filters)(state);
+    exportAs(title, exporter, filters)(state, dispatch);
     await flushPromises();
 
     expect(exporter).not.toHaveBeenCalled();
@@ -198,7 +218,7 @@ describe("command.exportAs", () => {
   it("writes a file name without an extension as typed", async () => {
     vi.mocked(save).mockResolvedValue("/docs/report");
 
-    exportAs(title, createExporter(), filters)(state);
+    exportAs(title, createExporter(), filters)(state, dispatch);
     await flushPromises();
 
     expect(writeFile).toHaveBeenCalledWith("/docs/report", bytes);
@@ -208,7 +228,7 @@ describe("command.exportAs", () => {
     vi.mocked(save).mockResolvedValue(null);
     const exporter = createExporter();
 
-    exportAs(title, exporter, filters)(state);
+    exportAs(title, exporter, filters)(state, dispatch);
     await flushPromises();
 
     expect(exporter).not.toHaveBeenCalled();
@@ -222,7 +242,7 @@ describe("command.exportAs", () => {
       .fn<exporterFunc>()
       .mockRejectedValue(new Error("no fonts"));
 
-    exportAs(title, exporter, filters)(state);
+    exportAs(title, exporter, filters)(state, dispatch);
     await flushPromises();
 
     expect(writeFile).not.toHaveBeenCalled();
@@ -236,7 +256,7 @@ describe("command.exportAs", () => {
     vi.mocked(save).mockResolvedValue("/out.pdf");
     vi.mocked(writeFile).mockRejectedValue("forbidden path");
 
-    exportAs(title, createExporter(), filters)(state);
+    exportAs(title, createExporter(), filters)(state, dispatch);
     await flushPromises();
 
     expect(sendNotification).toHaveBeenCalledWith({
@@ -255,7 +275,7 @@ describe("the PDF export without the engine", () => {
       useFallbackEditor(status);
       const exporter = createExporter();
 
-      expect(exportAs(title, exporter, filters)(state)).toBe(true);
+      expect(exportAs(title, exporter, filters)(state, dispatch)).toBe(true);
 
       expect(sendNotification).toHaveBeenCalledWith({
         title,
@@ -270,7 +290,7 @@ describe("the PDF export without the engine", () => {
   it("still exports after the engine failed while Blank ran", () => {
     useFallbackEditor("failed");
     vi.mocked(save).mockResolvedValue(null);
-    exportAs(title, createExporter(), filters)(state);
+    exportAs(title, createExporter(), filters)(state, dispatch);
     expect(save).toHaveBeenCalled();
   });
 
@@ -279,6 +299,7 @@ describe("the PDF export without the engine", () => {
     vi.mocked(save).mockResolvedValue(null);
     exportAs(title, createExporter(), [{ name: "Word", extensions: ["docx"] }])(
       state,
+      dispatch,
     );
     expect(save).toHaveBeenCalled();
   });

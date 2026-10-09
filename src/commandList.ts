@@ -7,8 +7,8 @@ import type { MenuItem } from "./state";
 
 // One list of Blank's commands: what they're called, where they're grouped,
 // their icon and the other words a search finds them by. Whatever names a
-// command takes its words from here (so far the context menu and tooltips,
-// later the menu, its search and the toolbar); the keys
+// command takes its words from here (the context menu, tooltips, the
+// toolbar, the main menu and its search); the keys
 // stay in the keymap (config.ts). Every CommandIdentifier needs an entry,
 // which the type below makes sure of. See .claude/rules/design.md.
 
@@ -52,6 +52,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Open…",
     icon: "folder-open",
     aliases: ["load", "docx", "word", "import"],
+  },
+  [C.FILE_CLEAR_RECENT]: {
+    group: "File",
+    label: "Clear recent files",
+    icon: "trash",
+    aliases: ["recent", "history", "forget"],
   },
   [C.FILE_SAVE]: {
     group: "File",
@@ -351,6 +357,30 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "pages",
     aliases: ["sheets", "desk", "view", "mode"],
   },
+  [C.VIEW_ZOOM_IN]: {
+    group: "View",
+    label: "Zoom in",
+    icon: "zoom-in",
+    aliases: ["larger", "bigger", "magnify"],
+  },
+  [C.VIEW_ZOOM_OUT]: {
+    group: "View",
+    label: "Zoom out",
+    icon: "zoom-out",
+    aliases: ["smaller"],
+  },
+  [C.VIEW_ZOOM_FIT]: {
+    group: "View",
+    label: "Fit to window",
+    icon: "fit",
+    aliases: ["zoom", "width", "reset"],
+  },
+  [C.VIEW_BLOCKS]: {
+    group: "View",
+    label: "Blocks pane",
+    icon: "blocks",
+    aliases: ["pane", "sidebar"],
+  },
   [C.THEME_CYCLE]: {
     group: "View",
     label: "Next theme",
@@ -392,6 +422,36 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     label: "Settings…",
     icon: "settings",
     aliases: ["preferences", "options", "configuration", "blank.json"],
+  },
+  [C.EDIT_FIND]: {
+    group: "Edit",
+    label: "Find and replace",
+    icon: "search",
+    aliases: ["search", "replace", "find", "regex"],
+  },
+  [C.MENU_MAIN]: {
+    group: "Tools",
+    label: "Main menu",
+    icon: "menu",
+    aliases: ["commands", "palette", "search", "menu"],
+  },
+  [C.APP_SHORTCUTS]: {
+    group: "Tools",
+    label: "Keyboard shortcuts…",
+    icon: "keyboard",
+    aliases: ["keys", "keymap", "bindings"],
+  },
+  [C.APP_GUIDE]: {
+    group: "Tools",
+    label: "Guide",
+    icon: "help",
+    aliases: ["help", "docs", "manual", "documentation"],
+  },
+  [C.APP_ABOUT]: {
+    group: "Tools",
+    label: "About Blank…",
+    icon: "logo",
+    aliases: ["version", "licenses", "website"],
   },
 };
 

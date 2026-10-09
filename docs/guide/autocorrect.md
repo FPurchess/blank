@@ -29,7 +29,7 @@ An apostrophe stays an apostrophe, so `don't`, `l'heure` or `C'est` get a typogr
 
 ## Links
 
-`[title](url)` and `![alt](src)` only turn into a link or an image when the link survives saving and reopening the file, just like in the link dialog (`Mod` `K`). Links such as `javascript:` or `file:` stay as you typed them, so nothing disappears when you open the file again. URLs in quotes or brackets, like `„https://blank.app“` or `[https://blank.app]`, are linked without the quote or bracket. A bracket that belongs to the URL, as in `https://en.wikipedia.org/wiki/Blank_(disambiguation)`, stays part of it.
+`[title](url)` and `![alt](src)` only turn into a link or an image when the link survives saving and reopening the file, just like in the link dialog (`Mod` `Alt` `K`). Links such as `javascript:` or `file:` stay as you typed them, so nothing disappears when you open the file again. URLs in quotes or brackets, like `„https://blank.app“` or `[https://blank.app]`, are linked without the quote or bracket. A bracket that belongs to the URL, as in `https://en.wikipedia.org/wiki/Blank_(disambiguation)`, stays part of it.
 
 Dashes follow LibreOffice: the dash is set once the word after it is complete, so `--` followed by Space does not become a dash on its own. Which dash you get depends on the language, e.g. English sets `A – B` and `A—B`, Russian `A — B`.
 

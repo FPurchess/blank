@@ -1,10 +1,9 @@
-import { frameLayout } from "../engine/frames";
 import {
   MIN_HEADINGS,
   OUTLINE_BREAKPOINT,
   type OutlinePeek,
   type PageLayoutState,
-  type PageViewMode,
+  viewFrames,
 } from "../state";
 
 // Where the outline (DocumentOutline.vue) shows; which heading it marks is
@@ -44,13 +43,13 @@ export const listShape = (open: boolean, peek: OutlinePeek): OutlineShape =>
 export const freeRight = (
   width: number,
   state: PageLayoutState | null,
-  mode: PageViewMode,
   engineless: boolean,
 ) => {
   if (engineless) return width - Math.min(width, FALLBACK_TEXT_WIDTH);
   if (!state) return 0;
-  // every frame is as wide and as far left as the first
-  const frame = frameLayout(state, mode, width).frames[0];
+  // every frame is as wide and as far left as the first, in the view chosen;
+  // at Fit, so zooming in, which scrolls the pages across, doesn't dock it
+  const frame = viewFrames(state, width, "fit").frames[0];
   return frame ? width - (frame.left + frame.width) : 0;
 };
 

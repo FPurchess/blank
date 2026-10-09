@@ -27,6 +27,7 @@ const pageEnds: FrameLayout = {
   mode: "page-ends",
   scale: 1.5,
   frames: [{ ...frame, ...place }],
+  width: 800,
   height: 1200,
   headerRoom: 0,
   footerRoom: 0,

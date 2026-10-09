@@ -7,12 +7,14 @@ import PageButton from "./PageButton.vue";
 import PageStatus from "./PageStatus.vue";
 import SpellcheckStatus from "./SpellcheckStatus.vue";
 import ViewButton from "./ViewButton.vue";
+import ZoomControl from "./ZoomControl.vue";
 import WordCount from "./WordCount.vue";
 
 // The status bar at the bottom of the window: the word count and what just
 // happened on the left; the page in view, the paper, the language, spell
-// check, the view and focus mode on the right. Every item is a button (StatusItem.vue)
-// and a component of its own, so typing only updates the word count.
+// check, the zoom, the view and focus mode on the right. Every item is a
+// button (StatusItem.vue) and a component of its own, so typing only updates
+// the word count.
 </script>
 
 <template>
@@ -34,6 +36,7 @@ import WordCount from "./WordCount.vue";
     <LanguageChooser />
     <SpellcheckStatus />
     <MisspellingButtons />
+    <ZoomControl />
     <ViewButton />
     <FocusModeButton />
   </footer>

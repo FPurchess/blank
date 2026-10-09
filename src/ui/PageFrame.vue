@@ -17,7 +17,7 @@ import BandSlots from "./BandSlots.vue";
 import { addsBand, pageBands } from "./bandStripsModel";
 import BandTarget from "./BandTarget.vue";
 import { layerOf } from "./pageLayer";
-import { shownMarks } from "./pageMarks";
+import { MARK_LOOKS, shownMarks } from "./pageMarks";
 import { frameRenders, layerDisplay } from "./pageLayers";
 import {
   endMark,
@@ -196,17 +196,21 @@ watch(
 if (import.meta.env.DEV || __TEST_HOOKS__)
   onUpdated(() => frameRenders.count++);
 
-// the marks over the text, placed on the frame, keyed by where they are on
-// the page, so a mark that stays keeps its element
+// the marks on the text, placed on the frame, keyed by where they are on
+// the page, so a mark that stays keeps its element: the matches of find
+// under the text, the rest over it
 const marked = computed(() =>
   shownMarks(props.marks).map((mark) => ({
     ...mark,
+    ...MARK_LOOKS[mark.kind],
     left: (mark.x - props.x) * props.scale,
     top: (mark.y - props.y) * props.scale,
     width: mark.width * props.scale,
     height: mark.height * props.scale,
   })),
 );
+const under = computed(() => marked.value.filter((mark) => mark.under));
+const over = computed(() => marked.value.filter((mark) => !mark.under));
 
 // what the mark at the page's end shows, which follows the bands of the
 // page and of the next one, not their text; none after the last page, whose
@@ -259,6 +263,14 @@ const targets = computed(() =>
     :data-page="page + 1"
     :style="styleOf({ left, top, width, height })"
   >
+    <!-- the matches of find, under the text the canvas paints over them -->
+    <div
+      v-for="shown in under"
+      :key="shown.key"
+      :class="shown.className"
+      aria-hidden="true"
+      :style="styleOf(shown)"
+    />
     <!-- its size is set when it's painted, in device pixels -->
     <canvas ref="canvas" class="page-canvas" aria-hidden="true" />
     <canvas
@@ -344,11 +356,11 @@ const targets = computed(() =>
       >
     </div>
     <div
-      v-for="over in marked"
-      :key="over.key"
-      :class="over.kind === 'spelling' ? 'page-misspelling' : 'page-break-mark'"
+      v-for="shown in over"
+      :key="shown.key"
+      :class="shown.className"
       aria-hidden="true"
-      :style="styleOf(over)"
+      :style="styleOf(shown)"
     />
   </div>
 </template>

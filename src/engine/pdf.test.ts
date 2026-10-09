@@ -409,6 +409,7 @@ describe("the PDF export after the engine trapped", () => {
 
     exportAs("PDF-Export", toPDF, [{ name: "PDF", extensions: ["pdf"] }])(
       state,
+      () => {},
     );
     await vi.waitFor(() => expect(sendNotification).toHaveBeenCalled());
     await flushPromises();

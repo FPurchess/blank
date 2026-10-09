@@ -190,6 +190,18 @@ $tip-key: 75%;
   color: var(--muted);
 }
 
+// a panel that floats over the window, with the menus: the main menu and
+// the find panel, 340 px wide but on a narrow window
+@mixin floating-panel {
+  @include popover;
+  @include ui-text;
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  width: min(340px, calc(100% - 16px));
+  padding: 6px;
+}
+
 // the UI's text, at 13/20: set on the roots of the chrome (the top area, the
 // side panes, what floats), never on the editor, whose type is the document's
 @mixin ui-text {
@@ -489,4 +501,36 @@ textarea:not(:disabled) {
   border-top: 1px solid var(--line);
   font-size: var(--ui-small);
   color: var(--muted);
+}
+
+// a field to search or find with, its icon in it (SearchField.vue)
+.search-field {
+  @include field;
+  // the field is paper, also on the desk
+  --muted: var(--muted-on-paper);
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--muted);
+
+  // the field shows the focus, ringed on its border, not the input in it
+  &:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: -1px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    font: inherit;
+    color: var(--color);
+    background: none;
+
+    &::placeholder {
+      color: var(--muted);
+    }
+  }
 }

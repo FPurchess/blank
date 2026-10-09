@@ -87,6 +87,16 @@ export enum CommandIdentifier {
   VIEW_FOCUS_MODE = "view.focus",
   TOOLS_STATS = "tools.stats",
   APP_SETTINGS = "app.settings",
+  VIEW_BLOCKS = "view.blocks",
+  APP_SHORTCUTS = "app.shortcuts",
+  APP_GUIDE = "app.guide",
+  APP_ABOUT = "app.about",
+  FILE_CLEAR_RECENT = "file.clear_recent",
+  VIEW_ZOOM_IN = "view.zoom_in",
+  VIEW_ZOOM_OUT = "view.zoom_out",
+  VIEW_ZOOM_FIT = "view.zoom_fit",
+  MENU_MAIN = "menu.main",
+  EDIT_FIND = "edit.find",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -173,7 +183,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.FORMAT_ITALIC]: "Mod-i",
     [CommandIdentifier.FORMAT_UNDERLINE]: "Mod-u",
     [CommandIdentifier.FORMAT_CODE]: "Mod-e",
-    [CommandIdentifier.FORMAT_LINK]: "Mod-k",
+    [CommandIdentifier.FORMAT_LINK]: "Mod-Alt-k",
     [CommandIdentifier.FORMAT_BLOCKQUOTE]: "Mod-g",
     [CommandIdentifier.FORMAT_ALIGN_LEFT]: "Mod-Shift-l",
     [CommandIdentifier.FORMAT_ALIGN_CENTER]: "Mod-Shift-e",
@@ -209,6 +219,17 @@ const defaultConfig: Config = {
     [CommandIdentifier.VIEW_FOCUS_MODE]: "Mod-Shift-f",
     [CommandIdentifier.TOOLS_STATS]: "Mod-Alt-c",
     [CommandIdentifier.APP_SETTINGS]: "Mod-,",
+    // no keys of their own: from the main menu, or ones set in blank.json
+    [CommandIdentifier.VIEW_BLOCKS]: "",
+    [CommandIdentifier.APP_SHORTCUTS]: "",
+    [CommandIdentifier.APP_GUIDE]: "",
+    [CommandIdentifier.APP_ABOUT]: "",
+    [CommandIdentifier.FILE_CLEAR_RECENT]: "",
+    [CommandIdentifier.VIEW_ZOOM_IN]: "Mod-=",
+    [CommandIdentifier.VIEW_ZOOM_OUT]: "Mod--",
+    [CommandIdentifier.VIEW_ZOOM_FIT]: "",
+    [CommandIdentifier.MENU_MAIN]: "Mod-k",
+    [CommandIdentifier.EDIT_FIND]: "Mod-f",
   },
   autocorrect: {
     arrows: true,

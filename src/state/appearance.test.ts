@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   bootAppearance,
+  chooseTheme,
   colorMode,
   exposeAppearance,
   theme,
+  themeLabel,
 } from "./appearance";
+import { announcement } from "./messages";
 
 describe("appearance", () => {
   let dispose = () => {};
@@ -60,5 +63,24 @@ describe("appearance", () => {
     expect(theme.value).toBe("dark");
     blankSetTheme("purple");
     expect(theme.value).toBe("dark");
+  });
+});
+
+describe("choosing a theme", () => {
+  afterEach(() => {
+    theme.value = "light";
+  });
+
+  it("names a theme, and says the one chosen", () => {
+    expect(themeLabel("dark")).toBe("Dark");
+    chooseTheme("dark");
+    expect(theme.value).toBe("dark");
+    expect(announcement.value?.text).toBe("Dark theme");
+  });
+
+  it("says nothing when the theme is chosen already", () => {
+    announcement.value = null;
+    chooseTheme("light");
+    expect(announcement.value).toBeNull();
   });
 });

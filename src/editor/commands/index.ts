@@ -28,3 +28,4 @@ export { showWordCount } from "./wordCount";
 export { moveFocus } from "./focus";
 export { toggleFocusMode } from "./focusMode";
 export { openSettings } from "./settings";
+export { openGuide } from "./guide";

@@ -2,16 +2,14 @@ import type { Node } from "prosemirror-model";
 import { NodeSelection } from "prosemirror-state";
 import { TableMap } from "prosemirror-tables";
 import type { EditorView } from "prosemirror-view";
-import { computed } from "vue";
 
 import {
-  type PageLayoutState,
-  pageLayoutState,
+  deskLayout,
+  pageHeadBox,
   pageScrollRequest,
-  pageView,
-  type PageViewMode,
   type PageViewport,
   pageViewport,
+  type ZoomAnchor,
 } from "../state/pageView";
 import {
   engineless,
@@ -21,10 +19,11 @@ import {
   type PageEngine,
 } from "./engine";
 import { READING_LINE, STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
+import { scrollFor } from "../scroll";
 import { sectionAt } from "../readingLine";
 import { cellAt } from "../markdown/tables";
 import { topBlockAt } from "../markdown/topBlock";
-import { type FrameLayout, frameLayout, onDesk, pointOnPage } from "./frames";
+import { type FrameLayout, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
 // coordinates like getBoundingClientRect: where the caret at a position is,
@@ -67,13 +66,6 @@ export interface TableGeometry {
   pieces: TablePiece[];
 }
 
-let cached: {
-  state: PageLayoutState;
-  mode: PageViewMode;
-  width: number;
-  frames: FrameLayout;
-} | null = null;
-
 /**
  * framesNow returns where the page view shows the pages, or null while it
  * isn't shown or nothing is laid out; it follows the scrolling
@@ -82,46 +74,9 @@ export const framesNow = (): {
   frames: FrameLayout;
   viewport: PageViewport;
 } | null => {
-  const state = pageLayoutState.value;
+  const frames = deskLayout.value;
   const viewport = pageViewport.value;
-  if (!state || !viewport) return null;
-  return { frames: framesAt(state, pageView.value, viewport.width), viewport };
-};
-
-/**
- * framesAt returns where the page view shows the pages of `state` at
- * `width`, the same layout while they stay the same
- */
-const framesAt = (
-  state: PageLayoutState,
-  mode: PageViewMode,
-  width: number,
-) => {
-  if (
-    cached?.state !== state ||
-    cached.mode !== mode ||
-    cached.width !== width
-  ) {
-    cached = { state, mode, width, frames: frameLayout(state, mode, width) };
-  }
-  return cached.frames;
-};
-
-// the page view's width alone, which notifies only when it changes, not on
-// every scroll as pageViewport does
-const viewWidth = computed(() => pageViewport.value?.width ?? null);
-
-/**
- * deskFrames returns where the page view shows the pages, like framesNow,
- * without following the scrolling: a computed that measures with it isn't
- * worked out again on every scroll
- */
-const deskFrames = (): FrameLayout | null => {
-  const state = pageLayoutState.value;
-  const width = viewWidth.value;
-  return state && width !== null
-    ? framesAt(state, pageView.value, width)
-    : null;
+  return frames && viewport ? { frames, viewport } : null;
 };
 
 // the editor, which the geometry measures without the engine
@@ -273,7 +228,11 @@ const pointOnPages = (
   x: number,
   y: number,
 ) =>
-  pointOnPage(frames, x - viewport.left, y - viewport.top + viewport.scrollTop);
+  pointOnPage(
+    frames,
+    x - viewport.left + viewport.scrollLeft,
+    y - viewport.top + viewport.scrollTop,
+  );
 
 /**
  * deskToWindow returns where a box of the page view's desk is in the window
@@ -283,7 +242,7 @@ export const deskToWindow = <R extends { left: number; top: number }>(
   rect: R,
 ): R => ({
   ...rect,
-  left: viewport.left + rect.left,
+  left: viewport.left + rect.left - viewport.scrollLeft,
   top: viewport.top + rect.top - viewport.scrollTop,
 });
 
@@ -514,7 +473,7 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
       // the window scrolls under the top area
       return box ? box.top + window.scrollY - TOP_BAR_HEIGHT : null;
     });
-  const frames = deskFrames();
+  const frames = deskLayout.value;
   const engine = pageEngine;
   if (!frames || !engine) return positions.map(() => null);
   return positions.map((pos) => {
@@ -529,7 +488,9 @@ export const scrollTops = (positions: readonly number[]): (number | null)[] => {
  * doesn't follow the scrolling.
  */
 export const pageTops = (): number[] | null =>
-  measured() ? null : (deskFrames()?.frames.map((frame) => frame.top) ?? null);
+  measured()
+    ? null
+    : (deskLayout.value?.frames.map((frame) => frame.top) ?? null);
 
 /**
  * pageInView returns the page the view shows at its reading line, counted
@@ -564,7 +525,7 @@ export const scrollState = (): {
     };
   }
   const viewport = pageViewport.value;
-  const frames = deskFrames();
+  const frames = deskLayout.value;
   if (!viewport || !frames) return null;
   return {
     top: viewport.scrollTop,
@@ -575,13 +536,27 @@ export const scrollState = (): {
 
 /**
  * scrollToText scrolls so that the text at `pos` starts `at` pixels below the
- * top of the view, as far as the view scrolls, without moving the selection
+ * top of the view, as far as the view scrolls, without moving the selection;
+ * without `at`, only as far as it takes to bring it into view, e.g. for a
+ * match of find
  */
-export const scrollToText = (pos: number, at: number) => {
+export const scrollToText = (pos: number, at?: number) => {
   const view = measured();
   if (view) {
     const box = shownCaret(view, pos, false);
-    if (box) window.scrollBy({ top: box.top - TOP_BAR_HEIGHT - at });
+    if (!box) return;
+    if (at !== undefined)
+      return window.scrollBy({ top: box.top - TOP_BAR_HEIGHT - at });
+    // in the document, which scrolls under the top area, into what shows
+    // between the top area and the status bar
+    const height = window.innerHeight - TOP_BAR_HEIGHT - STATUS_HEIGHT;
+    const top = box.top - TOP_BAR_HEIGHT + window.scrollY;
+    const to = scrollFor(
+      { top, height: box.bottom - box.top },
+      window.scrollY,
+      height,
+    );
+    if (to !== null) window.scrollTo({ top: to });
     return;
   }
   const caret = pageEngine?.caret(pos);
@@ -700,4 +675,42 @@ export const viewBox = (): Box | null => {
     right: viewport.left + viewport.width,
     bottom: viewport.top + viewport.height,
   };
+};
+
+/**
+ * zoomAnchorNow returns the spot of the pages that stays where it is while
+ * the zoom changes by a key or a button: the caret, or the head of the
+ * selection, while it's in view, else the middle of the view; null without
+ * pages
+ */
+export const zoomAnchorNow = (): ZoomAnchor | null => {
+  const shown = framesNow();
+  if (!shown) return null;
+  const { frames, viewport } = shown;
+  const head = pageHeadBox.value;
+  const box = head && toWindow(frames, viewport, head);
+  if (
+    head &&
+    box &&
+    box.top >= viewport.top &&
+    box.bottom <= viewport.top + viewport.height &&
+    box.left >= viewport.left &&
+    box.left <= viewport.left + viewport.width
+  ) {
+    return {
+      page: head.page,
+      x: head.x,
+      y: head.y,
+      viewX: box.left - viewport.left,
+      viewY: box.top - viewport.top,
+    };
+  }
+  const viewX = viewport.width / 2;
+  const viewY = viewport.height / 2;
+  const middle = pointOnPage(
+    frames,
+    viewport.scrollLeft + viewX,
+    viewport.scrollTop + viewY,
+  );
+  return middle && { ...middle, viewX, viewY };
 };

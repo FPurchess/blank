@@ -1,23 +1,6 @@
 // Scrolling what doesn't fit: the page view, the outline, the tabs.
 
-/**
- * scrollFor returns where to scroll so that `rect`, e.g. on the desk, is in
- * the view from `top` that is `height` high, or null if it already is; the
- * same across, with left and width for top and height
- * @param above the space to keep before it, and `below` after it
- */
-export const scrollFor = (
-  rect: { top: number; height: number },
-  top: number,
-  height: number,
-  { above = 20, below = 64 } = {},
-) => {
-  if (rect.top - above < top) return Math.max(0, rect.top - above);
-  if (rect.top + rect.height + below > top + height) {
-    return rect.top + rect.height + below - height;
-  }
-  return null;
-};
+export { scrollFor } from "../scroll";
 
 /**
  * wheelPixels returns how far a wheel turn scrolls, in pixels
@@ -32,3 +15,38 @@ export const wheelPixels = (
     : deltaMode === 2
       ? deltaY * viewHeight
       : deltaY;
+
+// how far a touchpad's pinch, or a smooth wheel, goes for one step of zoom,
+// in pixels, and how long it rests before a new gesture starts
+// a notch of a mouse wheel is 40 px in WebKitGTK, 100 elsewhere
+const ZOOM_PIXELS = 40;
+const ZOOM_REST = 200;
+
+/**
+ * zoomWheel returns what handles the wheel while Ctrl is held: a notch of a
+ * wheel zooms one step, in or out (`step` gets 1 or -1), and the small
+ * turns a pinch or a smooth wheel sends add up to steps
+ */
+export const zoomWheel = <
+  E extends Pick<WheelEvent, "deltaY" | "deltaMode" | "timeStamp">,
+>(
+  step: (direction: 1 | -1, event: E) => void,
+) => {
+  let pending = 0;
+  let last = -Infinity;
+  return (event: E) => {
+    if (event.timeStamp - last > ZOOM_REST) pending = 0;
+    last = event.timeStamp;
+    // up zooms in
+    const pixels = -wheelPixels(event, 1);
+    if (event.deltaMode !== 0 || Math.abs(pixels) >= ZOOM_PIXELS) {
+      pending = 0;
+      if (pixels !== 0) step(pixels > 0 ? 1 : -1, event);
+      return;
+    }
+    pending += pixels;
+    if (Math.abs(pending) < ZOOM_PIXELS) return;
+    step(pending > 0 ? 1 : -1, event);
+    pending = 0;
+  };
+};

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { commandLabel } from "../commandList";
 import { CommandIdentifier } from "../config";
-import { goToMisspelling } from "../editor/commands";
+import { commandFor } from "../editor/plugins/keymap";
 import { useEditor } from "../editor/handle";
 import { spellcheck } from "../state";
 import StatusItem from "./StatusItem.vue";
@@ -12,7 +12,14 @@ import StatusItem from "./StatusItem.vue";
 // which has it.
 const editor = useEditor();
 const go = (direction: 1 | -1) =>
-  editor.run(goToMisspelling(direction), { focus: false });
+  editor.run(
+    commandFor(
+      direction > 0
+        ? CommandIdentifier.SPELLCHECK_NEXT
+        : CommandIdentifier.SPELLCHECK_PREVIOUS,
+    ),
+    { focus: false },
+  );
 </script>
 
 <template>

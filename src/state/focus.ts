@@ -2,16 +2,17 @@ import { computed, shallowRef } from "vue";
 
 import { blocksPaneFocused } from "./blocksPane";
 import { focusTakingDialogs } from "./dialogs";
+import { findFocused } from "./find";
 import { contextMenu, tableToolbar } from "./popups";
 import { tabRowFocused } from "./tabs";
 import { toolbarFocused } from "./toolbar";
 
 // uiTakesFocus is whether a part of the UI holds the focus, which the editor
 // leaves it: the dialogs, the header and footer strips, the context menu and
-// the caption field of the table toolbar, and the blocks pane, the tab row
-// and the formatting toolbar while the focus is in them. The pickers and the
-// table and block toolbars' buttons never take it, since the editor handles
-// their keys.
+// the caption field of the table toolbar, and the blocks pane, the tab row,
+// the formatting toolbar and the find panel while the focus is in them. The
+// pickers and the table and block toolbars' buttons never take it, since the
+// editor handles their keys.
 export const uiTakesFocus = computed(
   () =>
     focusTakingDialogs.some((request) => request.value !== null) ||
@@ -19,12 +20,13 @@ export const uiTakesFocus = computed(
     blocksPaneFocused.value ||
     tabRowFocused.value ||
     toolbarFocused.value ||
+    findFocused.value ||
     !!tableToolbar.value?.caption,
 );
 
 // where each part of the window comes in the order F6 moves through, after
 // the text
-export const FOCUS_ORDER = { tabs: 10, toolbar: 20 } as const;
+export const FOCUS_ORDER = { tabs: 10, toolbar: 20, find: 30 } as const;
 
 // A part of the window F6 moves the focus to, e.g. the tab row, after the
 // editor, in the order of `order` (see cycleFocus)

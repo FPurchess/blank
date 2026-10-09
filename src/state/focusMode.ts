@@ -1,6 +1,7 @@
 import { computed, shallowRef } from "vue";
 
 import { config } from "../config";
+import { findPanel } from "./find";
 import { uiTakesFocus } from "./focus";
 import { languagePicker } from "./language";
 import { announce } from "./messages";
@@ -18,15 +19,16 @@ export const controlsFaded = shallowRef(false);
 
 // controlsStay is whether something is open that the controls stay for, so
 // they don't fade and Esc closes it instead of leaving focus mode: a dialog
-// or the header and footer strip, a menu, a picker, the outline's peek or
-// the word count card, or a part of the window that holds the focus (the tab
-// row, the toolbar, the blocks pane)
+// or the header and footer strip, a menu, a picker, the outline's peek, the
+// find panel or the word count card, or a part of the window that holds the
+// focus (the tab row, the toolbar, the blocks pane)
 export const controlsStay = computed(
   () =>
     uiTakesFocus.value ||
     languagePicker.value.open ||
     tablePicker.value !== null ||
     outlinePeek.value !== null ||
+    findPanel.value !== null ||
     wordCountCard.value,
 );
 

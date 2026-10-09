@@ -3,6 +3,8 @@ import type { Anchor, TableToolbarState } from "./state";
 
 // space between a popup and the edges of the window
 const MARGIN = 4;
+// space between a popup that fills the window's height and its bottom edge
+const FILL_BOTTOM = 8;
 
 export interface PlaceOptions {
   // the item a submenu opens next to
@@ -10,6 +12,9 @@ export interface PlaceOptions {
   // "end" lines the popup's right end up with the anchor's, as a popover
   // below a button at a toolbar's right end
   align?: "start" | "end";
+  // the popup takes the room below the anchor, to the window's bottom edge,
+  // and its content scrolls in it, e.g. the main menu
+  fill?: boolean;
 }
 
 /**
@@ -20,8 +25,16 @@ export interface PlaceOptions {
 export const place = (
   element: HTMLElement,
   anchor: Anchor,
-  { side, align = "start" }: PlaceOptions = {},
+  { side, align = "start", fill = false }: PlaceOptions = {},
 ) => {
+  if (fill) {
+    // below the anchor, as tall as the room there, never above it
+    const top = anchor.bottom + 2;
+    element.style.maxHeight = `${window.innerHeight - top - FILL_BOTTOM}px`;
+    element.style.left = `${inWindow(anchor.left, element.getBoundingClientRect().width)}px`;
+    element.style.top = `${top}px`;
+    return;
+  }
   const { width, height } = element.getBoundingClientRect();
   const bottom = window.innerHeight - MARGIN;
   let left = side

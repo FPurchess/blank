@@ -8,6 +8,8 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   activeTabId,
   blocksPaneOpen,
+  cleanRecentCommands,
+  cleanRecentFiles,
   currentViewAnchor,
   language,
   outlinePinned,
@@ -16,6 +18,10 @@ import {
   pageView,
   type PageViewMode,
   printSettings,
+  pageZoom,
+  isPageZoom,
+  recentCommands,
+  recentFiles,
   spellcheck,
   type Tab,
   tabs,
@@ -28,6 +34,8 @@ import {
   detectLanguage,
   isLanguageTag,
 } from "./editor/plugins/autocomplete/languages/lookup";
+import { CommandIdentifier } from "./config";
+import { logWarning } from "./log";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
 import { sendNotification } from "@tauri-apps/plugin-notification";
@@ -191,6 +199,9 @@ export const exposeStorage = () => {
 const timeout = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// the keys whose last write failed, logged once until one succeeds
+const failing = new Set<string>();
+
 /**
  * persist stores the value of `ref` under `key` whenever it changes
  */
@@ -200,7 +211,15 @@ const persist = <T>(ref: Readonly<Ref<T>>, key: string) =>
     (value) => {
       const stored = localforage
         .setItem(key, value)
-        .then(() => undefined, console.warn)
+        .then(
+          () => void failing.delete(key),
+          (error: unknown) => {
+            // once until it's stored again: a write follows every change
+            if (failing.has(key)) return;
+            failing.add(key);
+            logWarning(`can't store ${key}`, error);
+          },
+        )
         .finally(() => settling.delete(stored));
       settling.add(stored);
     },
@@ -223,6 +242,12 @@ const restore = async <T>(
 };
 
 const isTrue = (value: unknown): value is boolean => value === true;
+const isList = (value: unknown): value is never[] => Array.isArray(value);
+// a list as `clean` keeps it, the same one if it keeps all of it, so
+// nothing is written back
+const cleaned = <T>(list: readonly T[], kept: readonly T[]) =>
+  kept.length === list.length ? list : kept;
+const COMMAND_IDS = new Set<string>(Object.values(CommandIdentifier));
 const isPageViewMode = (value: unknown): value is PageViewMode =>
   PAGE_VIEW_MODES.includes(value as PageViewMode);
 
@@ -306,6 +331,19 @@ export const bootStorage = async () => {
   await restore("blocksPane", blocksPaneOpen, isTrue, false);
   // what the print dialog chose last, the printer at first
   await restore("print", printSettings, isPrintSettings, PRINT_DEFAULTS);
+  // the pages fit to the window until the user zooms
+  await restore("pageZoom", pageZoom, isPageZoom, "fit");
+  // the commands and files used last, without what Blank no longer knows
+  await restore("recentCommands", recentCommands, isList, []);
+  await restore("recentFiles", recentFiles, isList, []);
+  recentCommands.value = cleaned(
+    recentCommands.value,
+    cleanRecentCommands(recentCommands.value, COMMAND_IDS),
+  );
+  recentFiles.value = cleaned(
+    recentFiles.value,
+    cleanRecentFiles(recentFiles.value),
+  );
 
   sessionKept = await ownSession();
   if (sessionKept) {

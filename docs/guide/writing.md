@@ -4,6 +4,8 @@ Blank shows your text as it will look, not as markdown syntax, and on the lines 
 
 <Shot src="writing.gif" alt="Typing # and a title makes a heading; quotes curl and two hyphens become a dash; **slow** turns bold and *quiet* italic; a hyphen starts a list and > a quote, while the toolbar shows the style at the cursor" />
 
+Everything Blank can do is also in the [main menu](./menu) behind the logo at the top left, which `Mod` `K` opens with a search: type a few letters of what you want and press `Enter`. To find and change words in your text, press `Mod` `F` ([Find and replace](./find)).
+
 ## The toolbar {#toolbar}
 
 The second row at the top of the window has everything to format your text, and shows how the text at the cursor is set: Bold lights up in bold text, the list you're in is pressed, and the style menu says _Heading 2_ while you're in one.
@@ -131,16 +133,17 @@ The bar at the bottom shows where you are and what's switched on. Click any item
 
 <Shot src="status-bar.gif" alt="The mouse rests on the word count and a card with the words, characters, pages and reading time opens; then a click on the view button switches from page ends to pages" />
 
-| Item          | What it shows                                                          | Click it to                                                                                                         | Keys                                     |
-| ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| _348 words_   | how many words the document has                                        | see the details: characters, pages, reading time and the words you selected. Resting the mouse on it opens them too | `Mod` `Alt` `C`                          |
-| _Page 2 of 5_ | the page you're looking at                                             | jump to another page, listed with the first heading on each                                                         |                                          |
-| _A4_          | the [paper](./pages#page-setup)                                        | open the page setup                                                                                                 | `Mod` `Alt` `U`                          |
-| _EN_          | the [language](./autocorrect#language)                                 | choose another one                                                                                                  | `Mod` `Alt` `L`                          |
-| _Spelling_    | whether [spell check](./spelling) is on (_Spelling off_ when it isn't) | turn spell check on or off                                                                                          | `Mod` `Alt` `S`                          |
-| ‹ ›           | while spell check is on and the window is wide enough                  | go to the previous or next misspelled word                                                                          | `Mod` `Alt` `Shift` `N`, `Mod` `Alt` `N` |
-| the view      | [pages or page ends](./pages#on-the-screen), whichever you're in       | switch to the other                                                                                                 | `Mod` `Alt` `V`                          |
-| focus mode    | whether [focus mode](#focus-mode) is on                                | turn it on or off                                                                                                   | `Mod` `Shift` `F`                        |
+| Item          | What it shows                                                              | Click it to                                                                                                         | Keys                                     |
+| ------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| _348 words_   | how many words the document has                                            | see the details: characters, pages, reading time and the words you selected. Resting the mouse on it opens them too | `Mod` `Alt` `C`                          |
+| _Page 2 of 5_ | the page you're looking at                                                 | jump to another page, listed with the first heading on each                                                         |                                          |
+| _A4_          | the [paper](./pages#page-setup)                                            | open the page setup                                                                                                 | `Mod` `Alt` `U`                          |
+| _EN_          | the [language](./autocorrect#language)                                     | choose another one                                                                                                  | `Mod` `Alt` `L`                          |
+| _Spelling_    | whether [spell check](./spelling) is on (_Spelling off_ when it isn't)     | turn spell check on or off                                                                                          | `Mod` `Alt` `S`                          |
+| ‹ ›           | while spell check is on and the window is wide enough                      | go to the previous or next misspelled word                                                                          | `Mod` `Alt` `Shift` `N`, `Mod` `Alt` `N` |
+| − _Fit_ +     | the [zoom](./pages#zoom) of the pages; − and + give way on a narrow window | zoom out or in; a click on the zoom fits the pages to the window again                                              | `Mod` `-`, `Mod` `=`                     |
+| the view      | [pages or page ends](./pages#on-the-screen), whichever you're in           | switch to the other                                                                                                 | `Mod` `Alt` `V`                          |
+| focus mode    | whether [focus mode](#focus-mode) is on                                    | turn it on or off                                                                                                   | `Mod` `Shift` `F`                        |
 
 Next to the word count, the bar tells you for a moment what just happened, like _2 rows added_, and screen readers read it out. The details of the word count close as soon as you type on; with `Mod` `Alt` `C`, screen readers read them out as well.
 

@@ -18,12 +18,14 @@ const DIALOGS = new Set([
   CommandIdentifier.EXPORT_DOCX,
   CommandIdentifier.INSERT_IMAGE,
   CommandIdentifier.FORMAT_LINK,
+  CommandIdentifier.APP_SHORTCUTS,
+  CommandIdentifier.APP_ABOUT,
   CommandIdentifier.PAGE_SETUP,
   CommandIdentifier.APP_SETTINGS,
 ]);
 
 // words that keep their capital inside a label
-const NAMES = new Set(["PDF", "Word"]);
+const NAMES = new Set(["PDF", "Word", "Blank"]);
 
 describe("the command list", () => {
   it("lists every command once", () => {
