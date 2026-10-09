@@ -2,7 +2,7 @@
 
 Press `Mod` `P` and then `Enter`, and your whole document goes to your system's print dialog, ready for the printer. That's all most prints need. Blank's print dialog shows the pages as they'll come out of the printer, so you can check them before any paper is used.
 
-<Shot src="print.png" alt="The print dialog: on the left the first page as it prints, in ink on white paper; on the right Destination, Copies, Pages and More settings with pages per sheet, scale and the paper" />
+<Shot src="print.gif" alt="Mod P opens the print dialog with the first page as it prints, in ink on white paper; Page Down leafs through the pages. Under More settings, 2 pages per sheet puts two pages side by side on a sheet turned sideways; Custom pages 2-4 leaves out the first page; PDF file turns the button into Save PDF…" />
 
 ## What prints {#what-prints}
 
