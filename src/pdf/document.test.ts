@@ -2,17 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import { exists } from "@tauri-apps/plugin-fs";
 
 import {
+  checkSignatures,
   openPdfDocument,
   problemOf,
   problemText,
   withFailedPage,
   withRenderFailure,
 } from "./document";
-import { openPdf } from "./ipc";
+import { openPdf, verifyPdf } from "./ipc";
 
 vi.mock("./ipc", async (original) => ({
   ...(await original<typeof import("./ipc")>()),
   openPdf: vi.fn(),
+  verifyPdf: vi.fn(),
 }));
 
 const opened = {
@@ -23,6 +25,24 @@ const opened = {
 };
 
 describe("a PDF tab's document", () => {
+  it("says why its signatures weren't checked", async () => {
+    const doc = {
+      path: "/a.pdf",
+      opened,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    const unchecked = async (error: unknown) => {
+      vi.mocked(verifyPdf).mockRejectedValue(error);
+      return (await checkSignatures("t", doc)).signatures;
+    };
+
+    expect(await unchecked({ kind: "fileChanged" })).toBe("changed");
+    expect(await unchecked({ kind: "fileMissing" })).toBe("missing");
+    expect(await unchecked({ kind: "failed", message: "no" })).toBe("failed");
+  });
+
   it("opens the PDF", async () => {
     vi.mocked(exists).mockResolvedValue(true);
     vi.mocked(openPdf).mockResolvedValue(opened);

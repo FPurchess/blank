@@ -195,14 +195,11 @@ pub async fn pdf_verify(
         let bytes = read_checked(&pdf.path, &pdf.sha256).map_err(|error| {
             let problem = read_problem(&error);
             log::warn!("PDF: read to check its signatures: {problem}");
-            SigningError::Failed(
-                match problem {
-                    "changed" => "This PDF changed after Blank opened it. Open it again to check its signatures",
-                    "missing" => "This PDF was moved or deleted after Blank opened it",
-                    _ => "Blank can't read this PDF again",
-                }
-                .into(),
-            )
+            match problem {
+                "changed" => SigningError::FileChanged,
+                "missing" => SigningError::FileMissing,
+                _ => SigningError::Failed("Blank can't read this PDF again".into()),
+            }
         })?;
         checked_signatures(&app, &bytes)
     })

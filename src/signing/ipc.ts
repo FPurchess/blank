@@ -24,6 +24,9 @@ export type SigningError =
   // the timestamp server gave no timestamp that holds: signing without one
   // works
   | { kind: "timestamp"; message: string }
+  // a PDF tab's file changed, or was moved or deleted, after Blank opened it
+  | { kind: "fileChanged" }
+  | { kind: "fileMissing" }
   | { kind: "failed"; message: string };
 
 /**
@@ -38,6 +41,8 @@ const isSigningError = (error: unknown): error is SigningError =>
     "noCertificate",
     "keyExists",
     "timestamp",
+    "fileChanged",
+    "fileMissing",
     "failed",
   ].includes((error as { kind: string }).kind);
 
@@ -70,6 +75,10 @@ export const signingMessage = (error: unknown, fallback: string) => {
       return "You have no certificate to sign with";
     case "keyExists":
       return "You have a key already";
+    case "fileChanged":
+      return "The PDF changed after Blank opened it";
+    case "fileMissing":
+      return "The PDF was moved or deleted after Blank opened it";
     case "timestamp":
     case "failed":
       return error.message;

@@ -43,9 +43,9 @@ export interface PdfTabDocument {
   readonly problem: PdfProblem | null;
   // the pages the helper couldn't draw (from 0), not asked for again
   readonly failedPages: readonly number[];
-  // its signatures as Blank checked them: null until they are, "failed" if
-  // they couldn't be
-  readonly signatures: readonly CheckedSignature[] | "failed" | null;
+  // its signatures as Blank checked them: null until they are, why if they
+  // couldn't be
+  readonly signatures: readonly CheckedSignature[] | SignaturesUnchecked | null;
 }
 
 /**
@@ -159,6 +159,10 @@ export const openPdfDocument = async (
   }
 };
 
+// why a PDF's signatures weren't checked: its file changed, or was moved or
+// deleted, after Blank opened it, or anything else
+export type SignaturesUnchecked = "changed" | "missing" | "failed";
+
 /**
  * checkSignatures checks the signatures of the PDF of the tab `tab`, which
  * shows `doc`; one that can't be checked is logged by its kind
@@ -170,8 +174,15 @@ export const checkSignatures = async (
   try {
     return { ...doc, signatures: await verifyPdf(tab) };
   } catch (error) {
-    logWarning("failed to check the signatures of a PDF", signingKind(error));
-    return { ...doc, signatures: "failed" };
+    const kind = signingKind(error);
+    logWarning("failed to check the signatures of a PDF", kind);
+    const signatures =
+      kind === "fileChanged"
+        ? "changed"
+        : kind === "fileMissing"
+          ? "missing"
+          : "failed";
+    return { ...doc, signatures };
   }
 };
 

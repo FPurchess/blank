@@ -54,6 +54,10 @@ pub enum SigningError {
     /// the timestamp server didn't give a timestamp that holds, in words
     /// for the user, who can sign without one
     Timestamp(String),
+    /// the PDF's file changed after Blank opened it
+    FileChanged,
+    /// the PDF's file was moved or deleted after Blank opened it
+    FileMissing,
     /// anything else, in words for the user
     Failed(String),
 }

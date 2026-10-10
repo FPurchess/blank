@@ -9,7 +9,8 @@ import StatusItem from "./StatusItem.vue";
 
 // What the signatures of the PDF shown say, in the status bar: "Not signed",
 // "Signed", "Signed, signer unknown", "Changed after signing", "Signature
-// invalid" or, when the check failed, "Signatures not checked"; nothing while
+// invalid" or, when the check failed, "Signatures not checked" (with why, if
+// the file changed or went); nothing while
 // they are checked. A click lists them
 // (SignaturesPopover.vue). A result with a doubt or worse is read out once
 // it's in, since it changes how far to rely on the PDF.

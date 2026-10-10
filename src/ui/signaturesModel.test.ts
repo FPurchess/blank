@@ -62,7 +62,16 @@ describe("what Blank says of a PDF's signatures", () => {
         signature({ status: "invalid" }),
       ])?.text,
     ).toBe("Signature invalid");
-    expect(signaturesLabel("failed")?.look).toBe("bad");
+    expect(signaturesLabel("failed")).toMatchObject({
+      text: "Signatures not checked",
+      look: "bad",
+    });
+    expect(signaturesLabel("changed")?.text).toBe(
+      "Signatures not checked: the file changed",
+    );
+    expect(signaturesLabel("missing")?.text).toBe(
+      "Signatures not checked: the file is gone",
+    );
   });
 
   it("calls a signature of a certificate Blank doesn't trust only intact", () => {

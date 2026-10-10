@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUpdated, useTemplateRef } from "vue";
 
+import { reopenPdf } from "../editor/tabs";
+import { basename } from "../paths";
 import { place } from "../popup";
 import type { CheckedSignature } from "../signing/ipc";
 import {
+  activeTabId,
   closeDialog,
   shownPdf,
   signatureDetails,
@@ -44,6 +47,14 @@ onUpdated(placeIt);
 
 const close = () => closeDialog(signaturesPopover, props.request.refocus);
 useDismiss(() => [root.value, item()], close, { escape: true, resize: true });
+
+const name = computed(() => basename(shownPdf.value?.path ?? ""));
+// the file changed since the tab opened it: Open again checks it as it is
+const again = () => {
+  const tab = activeTabId.value;
+  closeDialog(signaturesPopover, props.request.refocus);
+  if (tab) void reopenPdf(tab);
+};
 
 const details = (signature: CheckedSignature) =>
   closeDialog(signaturesPopover, () => {
@@ -87,6 +98,17 @@ const details = (signature: CheckedSignature) =>
         </button>
       </li>
     </ul>
+    <template v-else-if="checked === 'changed'">
+      <p id="signatures-empty" class="empty">
+        {{ name }} changed after Blank opened it. Open it again to check its
+        signatures.
+      </p>
+      <button type="button" class="again" @click="again">Open again</button>
+    </template>
+    <p v-else-if="checked === 'missing'" id="signatures-empty" class="empty">
+      {{ name }} was moved or deleted after Blank opened it, so Blank can't
+      check its signatures.
+    </p>
     <p v-else-if="checked === 'failed'" id="signatures-empty" class="empty">
       Blank couldn't check this PDF's signatures.
     </p>

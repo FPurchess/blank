@@ -1,3 +1,4 @@
+import type { SignaturesUnchecked } from "../pdf/document";
 import type { CheckedSignature, Trust } from "../signing/ipc";
 
 // What the status bar, the signatures popover and a signature's details say
@@ -31,16 +32,27 @@ export const lookOf = (signature: CheckedSignature): SignatureLook =>
       ? "ok"
       : "unknown";
 
+// why the signatures weren't checked, after "Signatures not checked"
+const uncheckedBecause: Record<SignaturesUnchecked, string> = {
+  changed: ": the file changed",
+  missing: ": the file is gone",
+  failed: "",
+};
+
 /**
  * signaturesLabel returns what the status bar says of a PDF's signatures,
  * null while they are checked
  */
 export const signaturesLabel = (
-  signatures: readonly CheckedSignature[] | "failed" | null,
+  signatures: readonly CheckedSignature[] | SignaturesUnchecked | null,
 ): { text: string; icon: string; look: SignatureLook } | null => {
   if (signatures === null) return null;
-  if (signatures === "failed")
-    return { text: "Signatures not checked", icon: "seal-off", look: "bad" };
+  if (typeof signatures === "string")
+    return {
+      text: `Signatures not checked${uncheckedBecause[signatures]}`,
+      icon: "seal-off",
+      look: "bad",
+    };
   if (signatures.length === 0)
     return { text: "Not signed", icon: "", look: "ok" };
   if (signatures.some((signature) => signature.status === "invalid"))

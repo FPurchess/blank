@@ -49,7 +49,7 @@ The status bar of a PDF tab says what the PDF's digital signatures say:
 | Weak signature           | A signature relies on SHA-1, an old algorithm whose signatures can be forged. Don't rely on it.                                                             |
 | Changed after signing    | Someone changed the PDF after it was signed.                                                                                                                |
 | Signature invalid        | A signature doesn't match the PDF.                                                                                                                          |
-| Signatures not checked   | Blank couldn't read the PDF's signatures. Open the PDF in your PDF app to check them.                                                                       |
+| Signatures not checked   | Blank couldn't read the PDF's signatures. Open the PDF in your PDF app to check them. If the file changed or was moved after Blank opened it, the status says so, and the list offers **Open again** for a changed file, to check it as it is now. |
 
 When the check finds something wrong or doubtful, a screen reader reads it out.
 

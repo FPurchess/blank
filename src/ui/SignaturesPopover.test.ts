@@ -81,6 +81,23 @@ describe("a PDF's signatures", () => {
     ).toBe("Blank couldn't check this PDF's signatures.");
   });
 
+  it("says the file changed, and opens it again", async () => {
+    shownPdf.value = { ...shownPdf.value!, signatures: "changed" };
+    signaturesPopover.value = { refocus: () => {} };
+    await flushPromises();
+
+    expect(
+      document.querySelector("#signatures-popover .empty")?.textContent?.trim(),
+    ).toBe(
+      "contract.pdf changed after Blank opened it. Open it again to check its signatures.",
+    );
+    document
+      .querySelector<HTMLButtonElement>("#signatures-popover .again")!
+      .click();
+    await flushPromises();
+    expect(signaturesPopover.value).toBeNull();
+  });
+
   it("names whose details a row's button shows, and describes an empty list", async () => {
     signaturesPopover.value = { refocus: () => {} };
     await flushPromises();
