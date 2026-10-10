@@ -684,7 +684,7 @@ fn keeps_the_old_pair_when_the_new_certificate_cant_be_put_in_place() {
 fn refuses_a_signature_without_the_timestamp_asked_for() {
     let signed = signed(key(), &pdf(), &options(None));
     assert!(check_signed(&signed, false).is_ok());
-    let Err(SigningError::Failed(message)) = check_signed(&signed, true) else {
+    let Err(SigningError::Timestamp(message)) = check_signed(&signed, true) else {
         panic!("a signature without its timestamp passed");
     };
     assert_eq!(message, Refusal::TimestampUnusable.to_string());

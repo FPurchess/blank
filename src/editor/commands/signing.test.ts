@@ -244,7 +244,7 @@ describe("signing", () => {
     });
     ipc.signPdf.mockRejectedValue({
       kind: "failed",
-      message: "The timestamp server didn't answer",
+      message: "Blank couldn't sign the PDF",
     });
     run(p("Text"), signature());
     await flushPromises();
@@ -253,16 +253,12 @@ describe("signing", () => {
     expect(writeFile).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: "Failed to export file: The timestamp server didn't answer. Nothing was saved.",
+        body: "Failed to export file: Blank couldn't sign the PDF. Nothing was saved.",
       }),
     );
   });
 
   it("says how to sign without a timestamp when the server fails", async () => {
-    config.value = {
-      ...config.value,
-      signing: { ...config.value.signing, timestampServer: "https://tsa.test" },
-    };
     toPDF.mockResolvedValue({
       contents: new Uint8Array([1]),
       warnings: [],
@@ -270,7 +266,7 @@ describe("signing", () => {
       signatureBox: BOX,
     });
     ipc.signPdf.mockRejectedValue({
-      kind: "failed",
+      kind: "timestamp",
       message: "The timestamp server didn't answer",
     });
     run(p("Text"), signature());
@@ -283,10 +279,6 @@ describe("signing", () => {
         "Nothing was saved. If the timestamp server is down, sign without a timestamp: clear it in Settings ▸ Signing.",
       ),
     });
-    config.value = {
-      ...config.value,
-      signing: { ...config.value.signing, timestampServer: "" },
-    };
   });
 
   it("signs nothing once another tab shows", async () => {

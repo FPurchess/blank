@@ -51,6 +51,9 @@ pub enum SigningError {
     NoCertificate,
     /// there's a key already, which only a request to replace it replaces
     KeyExists,
+    /// the timestamp server didn't give a timestamp that holds, in words
+    /// for the user, who can sign without one
+    Timestamp(String),
     /// anything else, in words for the user
     Failed(String),
 }
@@ -402,10 +405,15 @@ pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> 
     };
     let signed = sign_pdf(pdf, &request).map_err(|error| {
         log::warn!("failed to sign a PDF: {}", kind_of(&error));
-        SigningError::Failed(match error.downcast_ref::<Refusal>() {
-            Some(refusal) => refusal.to_string(),
-            None => "Blank couldn't sign the PDF".into(),
-        })
+        match error.downcast_ref::<Refusal>() {
+            Some(
+                refusal @ (Refusal::NoTimestamp
+                | Refusal::TimestampRefused
+                | Refusal::TimestampUnusable),
+            ) => SigningError::Timestamp(refusal.to_string()),
+            Some(refusal) => SigningError::Failed(refusal.to_string()),
+            None => SigningError::Failed("Blank couldn't sign the PDF".into()),
+        }
     })?;
     check_signed(&signed, request.tsa.is_some())?;
     Ok(signed)
@@ -428,7 +436,9 @@ fn check_signed(signed: &[u8], timestamped: bool) -> Answer<()> {
     };
     if timestamped && (last.timestamp.is_none() || last.timestamp_unreadable) {
         log::warn!("a PDF Blank signed has no timestamp that holds");
-        return Err(SigningError::Failed(Refusal::TimestampUnusable.to_string()));
+        return Err(SigningError::Timestamp(
+            Refusal::TimestampUnusable.to_string(),
+        ));
     }
     Ok(())
 }

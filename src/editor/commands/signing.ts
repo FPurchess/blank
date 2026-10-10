@@ -341,15 +341,15 @@ const signExport = async (
       timestampServer: timestampServer || null,
     });
   } catch (error) {
-    throw new Error(signingFailure(error, timestampServer), { cause: error });
+    throw new Error(signingFailure(error), { cause: error });
   }
 };
 
 /**
  * signingFailure says why a PDF wasn't signed, that nothing was saved, and,
- * while a timestamp server is set, how to sign without it
+ * when the timestamp server gave no timestamp, how to sign without it
  */
-const signingFailure = (error: unknown, timestampServer: string) => {
+const signingFailure = (error: unknown) => {
   const message = signingMessage(error, "Blank couldn't sign the PDF").replace(
     /\.?$/,
     ".",
@@ -357,7 +357,7 @@ const signingFailure = (error: unknown, timestampServer: string) => {
   return [
     message,
     "Nothing was saved.",
-    timestampServer && signingKind(error) === "failed"
+    signingKind(error) === "timestamp"
       ? "If the timestamp server is down, sign without a timestamp: clear it in Settings ▸ Signing."
       : "",
   ]

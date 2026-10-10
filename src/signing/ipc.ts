@@ -21,6 +21,9 @@ export type SigningError =
   | { kind: "noCertificate" }
   // the user has a key, which only a call that replaces it replaces
   | { kind: "keyExists" }
+  // the timestamp server gave no timestamp that holds: signing without one
+  // works
+  | { kind: "timestamp"; message: string }
   | { kind: "failed"; message: string };
 
 /**
@@ -30,9 +33,13 @@ const isSigningError = (error: unknown): error is SigningError =>
   !!error &&
   typeof error === "object" &&
   "kind" in error &&
-  ["wrongPassphrase", "noCertificate", "keyExists", "failed"].includes(
-    (error as { kind: string }).kind,
-  );
+  [
+    "wrongPassphrase",
+    "noCertificate",
+    "keyExists",
+    "timestamp",
+    "failed",
+  ].includes((error as { kind: string }).kind);
 
 /**
  * signingKind returns what kind of error the native side sent, for the
@@ -63,6 +70,7 @@ export const signingMessage = (error: unknown, fallback: string) => {
       return "You have no certificate to sign with";
     case "keyExists":
       return "You have a key already";
+    case "timestamp":
     case "failed":
       return error.message;
   }
