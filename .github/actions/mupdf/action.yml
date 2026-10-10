@@ -48,7 +48,8 @@ runs:
       run: git -c core.longpaths=true submodule update --init --recursive --force --depth 1 -- src-tauri/pdf/mupdf-sys/mupdf
 
     # the build script's stamp for each target: a hash of rustc, the target,
-    # MuPDF's commit and the helper's sources; the runner's image too, since
+    # MuPDF's commit, the helper's sources and the crates it's built from
+    # (see scripts/build-pdf-helper.ts); the runner's image too, since
     # the glibc and the system libraries the helper links come from it
     - id: key
       if: inputs.helper == 'true' || inputs.build == 'true'
