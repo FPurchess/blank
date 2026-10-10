@@ -15,7 +15,7 @@ import { CommandIdentifier } from "../config";
 import { closeTabs, reopenPdf } from "../editor/tabs";
 import { commandKeys, WINDOW_COMMANDS } from "../editor/plugins/keymap";
 import { useEditor } from "../editor/handle";
-import { sheetLayout, viewAnchor } from "../engine/frames";
+import { pointOnPage, viewAnchor } from "../engine/frames";
 import { PDF_FILTER } from "../formats";
 import { basename } from "../paths";
 import {
@@ -32,16 +32,20 @@ import {
   activeTab,
   activeTabId,
   isPdfTab,
+  pdfDeskLayout,
   pdfPageInView,
   pdfViewAnchor,
   pdfViewFocused,
+  pdfViewport,
   shownPdf,
   tabs,
+  zoomAnchor,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
 import { useDeskScroll } from "./composables/useDeskScroll";
 import { useFocusRegion } from "./composables/useFocusRegion";
 import { useResizeObserver } from "./composables/useResizeObserver";
+import { useWheelZoom } from "./composables/useWheelZoom";
 import { type Bitmap, pdfBitmaps } from "./pageBitmaps";
 import PdfPage from "./PdfPage.vue";
 import {
@@ -54,25 +58,26 @@ import {
 } from "./pdfViewModel";
 
 // The pages of the PDF tab shown, as its helper draws them (see
-// .claude/rules/pdf.md): sheets one below the other at the scale that fits
-// the widest, white in every theme, as they print. Only the pages near the
+// .claude/rules/pdf.md): sheets one below the other at the zoom of the
+// window (Fit: the scale that fits the widest), white in every theme, as
+// they print. Only the pages near the
 // view are mounted, and only those are drawn, the ones in view first. In
 // place of the pages, why it can't show them. It holds the focus in a PDF
 // tab, whose editor holds no text (src/pdf/placeholder.ts).
 const editor = useEditor();
 const scroller = useTemplateRef<HTMLElement>("scroller");
-const width = shallowRef(800);
 const viewHeight = shallowRef(600);
 const scrollTop = shallowRef(0);
+const scrollLeft = shallowRef(0);
 const ratio = shallowRef(window.devicePixelRatio || 1);
 // counts the bitmaps drawn, which the pages show once they come
 const drawn = shallowRef(0);
 
 const pdf = shownPdf;
 const pages = computed(() => pdf.value?.opened?.pages ?? []);
-const layout = computed(() =>
-  pages.value.length ? sheetLayout(pages.value, width.value) : null,
-);
+// where the pages are, at the zoom: from the view's width, which measure
+// publishes
+const layout = pdfDeskLayout;
 const problem = computed(() =>
   pdf.value?.problem ? problemText(pdf.value.problem, pdf.value.path) : null,
 );
@@ -80,9 +85,24 @@ const problem = computed(() =>
 const measure = () => {
   const element = scroller.value;
   if (!element) return;
-  width.value = element.clientWidth || window.innerWidth;
   viewHeight.value = element.clientHeight || window.innerHeight;
   scrollTop.value = element.scrollTop;
+  scrollLeft.value = element.scrollLeft;
+  const next = {
+    width: element.clientWidth || window.innerWidth,
+    height: viewHeight.value,
+    scrollTop: scrollTop.value,
+    scrollLeft: scrollLeft.value,
+  };
+  const now = pdfViewport.value;
+  if (
+    !now ||
+    now.width !== next.width ||
+    now.height !== next.height ||
+    now.scrollTop !== next.scrollTop ||
+    now.scrollLeft !== next.scrollLeft
+  )
+    pdfViewport.value = next;
   pdfViewAnchor.value = layout.value
     ? viewAnchor(layout.value, scrollTop.value)
     : null;
@@ -98,17 +118,30 @@ listenOnWindow("resize", () => {
 
 // the pages mounted and those in view, and where the view scrolls to: back
 // to the tab's spot once its pages are there, also the one shown when it
-// mounts, keeping the spot when a resize shows them at another scale, and
-// to a page the status bar's menu goes to
+// mounts, keeping the spot when a resize shows them at another scale, the
+// one a zoom keeps where it is, and to a page the status bar's menu goes to
 const { range, inView } = useDeskScroll({
   scroller: () => scroller.value,
   layout,
   scrollTop,
+  scrollLeft,
   viewHeight,
   measure,
   startAt: () => activeTab.value?.viewAnchor ?? null,
   switched: () => queue.stop(),
+  // the spot the zoom asked to keep, for this layout only
+  zoomed: () => {
+    const kept = zoomAnchor.value;
+    zoomAnchor.value = null;
+    return kept;
+  },
 });
+
+// Ctrl and the wheel zoom the pages about the spot under the pointer
+useWheelZoom(
+  () => scroller.value,
+  (x, y) => (layout.value ? pointOnPage(layout.value, x, y) : undefined),
+);
 
 // the bitmap each page showed last, by its slot
 const shownKeys = new Map<string, string>();
@@ -292,6 +325,7 @@ onUnmounted(() => {
   queue.stop();
   pdfPageInView.value = null;
   pdfViewAnchor.value = null;
+  pdfViewport.value = null;
 });
 
 const label = computed(() => (pdf.value ? basename(pdf.value.path) : ""));
@@ -338,7 +372,7 @@ const close = () => void closeTabs([tabId.value]);
       v-else-if="layout"
       class="page-desk"
       aria-hidden="true"
-      :style="{ height: `${layout.height}px` }"
+      :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
     >
       <div
         v-for="frame in frames"

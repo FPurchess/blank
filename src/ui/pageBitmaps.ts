@@ -173,8 +173,10 @@ export const pageBitmaps = new BitmapCache(BITMAP_LIMIT);
 
 // the pages of PDFs (PdfView.vue) have a budget of their own, so a PDF never
 // takes the bitmaps of the markdown pages in view; at 2× an A4 page is about
-// 8 MB, at 3× 18 MB
-export const PDF_BITMAP_LIMIT = 128 * 1024 * 1024;
+// 8 MB at Fit and 57 MB at a zoom of 200%. A third of it holds the largest a
+// page is drawn with (MAX_PAGE_PIXELS), which the cache would skip, and draw
+// again and again, past a third.
+export const PDF_BITMAP_LIMIT = 192 * 1024 * 1024;
 
 export const pdfBitmaps = new BitmapCache(PDF_BITMAP_LIMIT);
 export const paintQueue = new PaintQueue();

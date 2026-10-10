@@ -3,6 +3,7 @@ import type {
   PageRect,
   PageViewMode,
   PageZoom,
+  ZoomAnchor,
 } from "../state/pageView";
 
 // Where the page view puts each page, in both views: a frame is the part of
@@ -309,6 +310,30 @@ export const pointOnPage = (layout: FrameLayout, x: number, y: number) => {
     x: frame.x + (x - frame.left) / layout.scale,
     y: frame.y + (y - frame.top) / layout.scale,
   };
+};
+
+/**
+ * middleAnchor returns the spot of the pages in the middle of a view of
+ * `layout`, which a zoom keeps where it is; null without pages
+ * @param view the view's size and how far it scrolled, in CSS pixels
+ */
+export const middleAnchor = (
+  layout: FrameLayout,
+  view: {
+    width: number;
+    height: number;
+    scrollTop: number;
+    scrollLeft: number;
+  },
+): ZoomAnchor | null => {
+  const viewX = view.width / 2;
+  const viewY = view.height / 2;
+  const middle = pointOnPage(
+    layout,
+    view.scrollLeft + viewX,
+    view.scrollTop + viewY,
+  );
+  return middle && { ...middle, viewX, viewY };
 };
 
 /**

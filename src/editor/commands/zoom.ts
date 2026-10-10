@@ -1,10 +1,14 @@
 import type { Command } from "prosemirror-state";
 
 import { engineless } from "../../engine/engine";
+import { middleAnchor } from "../../engine/frames";
 import { zoomAnchorNow } from "../../engine/geometry";
 import {
   announce,
+  pdfDeskLayout,
+  pdfViewport,
   pageZoom,
+  shownPdf,
   type PageZoom,
   ZOOM_NEEDS_PAGES,
   ZOOM_STEPS,
@@ -14,7 +18,9 @@ import {
   zoomLabel,
 } from "../../state";
 
-// The zoom of the pages, see .claude/rules/layout-engine.md, "Zoom".
+// The zoom of the pages, see .claude/rules/layout-engine.md, "Zoom": of a
+// markdown tab's and a PDF tab's alike (one zoom for the window), the PDF's
+// drawn by its helper, not the engine.
 
 // how far a factor may be off a step and still count as it, e.g. Fit's
 const NEAR = 0.001;
@@ -39,7 +45,7 @@ const setZoom =
   (zoom: PageZoom, anchor: ZoomAnchor | null): Command =>
   (_state, dispatch) => {
     if (!dispatch) return true;
-    if (engineless()) {
+    if (engineless() && !shownPdf.value) {
       announce(ZOOM_NEEDS_PAGES);
       return true;
     }
@@ -69,16 +75,28 @@ export const zoomStep =
     );
 
 /**
+ * anchorNow returns the spot that stays where it is while a key or a button
+ * zooms: in a PDF tab the middle of its view, else the caret's or the
+ * middle (zoomAnchorNow)
+ */
+const anchorNow = () => {
+  if (!shownPdf.value) return zoomAnchorNow();
+  const layout = pdfDeskLayout.value;
+  const view = pdfViewport.value;
+  return layout && view ? middleAnchor(layout, view) : null;
+};
+
+/**
  * zoomBy zooms the pages one step in (1) or out (-1), keeping the caret where
  * it is if it's in view, else the middle of the view
  */
 export const zoomBy =
   (direction: 1 | -1): Command =>
   (state, dispatch) =>
-    zoomStep(direction, dispatch ? zoomAnchorNow() : null)(state, dispatch);
+    zoomStep(direction, dispatch ? anchorNow() : null)(state, dispatch);
 
 /**
  * zoomFit shows the pages as wide as the view allows
  */
 export const zoomFit = (): Command => (state, dispatch) =>
-  setZoom("fit", dispatch ? zoomAnchorNow() : null)(state, dispatch);
+  setZoom("fit", dispatch ? anchorNow() : null)(state, dispatch);

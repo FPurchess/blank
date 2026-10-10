@@ -23,7 +23,7 @@ import { scrollFor } from "../scroll";
 import { sectionAt } from "../readingLine";
 import { cellAt } from "../markdown/tables";
 import { topBlockAt } from "../markdown/topBlock";
-import { type FrameLayout, onDesk, pointOnPage } from "./frames";
+import { type FrameLayout, middleAnchor, onDesk, pointOnPage } from "./frames";
 
 // The geometry of the document as the page view shows it, in the window's
 // coordinates like getBoundingClientRect: where the caret at a position is,
@@ -705,12 +705,5 @@ export const zoomAnchorNow = (): ZoomAnchor | null => {
       viewY: box.top - viewport.top,
     };
   }
-  const viewX = viewport.width / 2;
-  const viewY = viewport.height / 2;
-  const middle = pointOnPage(
-    frames,
-    viewport.scrollLeft + viewX,
-    viewport.scrollTop + viewY,
-  );
-  return middle && { ...middle, viewX, viewY };
+  return middleAnchor(frames, viewport);
 };

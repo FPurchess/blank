@@ -42,6 +42,7 @@ import {
 } from "../state";
 import { useDeskScroll } from "./composables/useDeskScroll";
 import { useResizeObserver } from "./composables/useResizeObserver";
+import { useWheelZoom } from "./composables/useWheelZoom";
 import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
@@ -60,8 +61,6 @@ import {
 import { DecorationSet } from "prosemirror-view";
 import { movesPages, selectedOn } from "./pageViewModel";
 import { styleOf } from "./rect";
-import { zoomWheel } from "./scrollModel";
-import { zoomStep } from "../editor/commands/zoom";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -356,47 +355,11 @@ const onScroll = () => {
   requestAnimationFrame(moveAgain);
 };
 
-// Ctrl and the wheel zoom the pages about the spot under the pointer, not
-// the webview (and a pinch, where the webview sends it as that)
-const wheelZoom = zoomWheel<WheelEvent>((direction, event) => {
-  if (!layout.value) return;
-  const element = scroller.value!;
-  const box = element.getBoundingClientRect();
-  const { x, y } = deskPoint(event.clientX, event.clientY);
-  const spot = pointOnPage(layout.value, x, y);
-  editor.run(
-    zoomStep(
-      direction,
-      spot && {
-        ...spot,
-        viewX: event.clientX - box.left,
-        viewY: event.clientY - box.top,
-      },
-    ),
-    { focus: false },
-  );
-});
-const onWheel = (event: WheelEvent) => {
-  if (!event.ctrlKey || event.deltaY === 0) return;
-  event.preventDefault();
-  wheelZoom(event);
-};
-// The listener can't be passive, as it keeps the webview from zooming, and
-// one that isn't makes every scroll wait for the page; so it listens only
-// while Ctrl is held
-const ctrlHeld = (event: KeyboardEvent | MouseEvent) => {
-  const element = scroller.value;
-  if (!element) return;
-  if (event.ctrlKey) element.addEventListener("wheel", onWheel);
-  else element.removeEventListener("wheel", onWheel);
-};
-listenOnWindow("keydown", ctrlHeld);
-listenOnWindow("keyup", ctrlHeld);
-const stopWheel = () => scroller.value?.removeEventListener("wheel", onWheel);
-listenOnWindow("blur", stopWheel);
-onUnmounted(stopWheel);
-// a pinch on a touchpad comes as a wheel with Ctrl, without its key
-listenOnWindow("wheel", ctrlHeld, { capture: true, passive: true });
+// Ctrl and the wheel zoom the pages about the spot under the pointer
+useWheelZoom(
+  () => scroller.value,
+  (x, y) => (layout.value ? pointOnPage(layout.value, x, y) : undefined),
+);
 
 // how long the view takes to render, for the measurements
 let renderStart = 0;

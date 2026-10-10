@@ -33,6 +33,9 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.VIEW_TOOLBAR_FOCUS,
   CommandIdentifier.VIEW_FOCUS_MODE,
   CommandIdentifier.VIEW_SIGNATURES,
+  CommandIdentifier.VIEW_ZOOM_IN,
+  CommandIdentifier.VIEW_ZOOM_OUT,
+  CommandIdentifier.VIEW_ZOOM_FIT,
   CommandIdentifier.APP_SETTINGS,
 ]);
 

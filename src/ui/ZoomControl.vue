@@ -5,13 +5,20 @@ import { commandLabel } from "../commandList";
 import { CommandIdentifier } from "../config";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
-import { engineMissing, pageZoom, zoomFactor, zoomLabel } from "../state";
+import {
+  engineMissing,
+  pageZoom,
+  shownPdf,
+  zoomFactor,
+  zoomLabel,
+} from "../state";
 import StatusItem from "./StatusItem.vue";
 
 // The zoom of the pages in the bottom bar: − and +, and the zoom between
 // them, e.g. "Fit" or "125%", which a click sets to Fit. − and + give way
 // on a narrow window, after the misspelling buttons. Without the layout
-// engine there are no pages to zoom, so it isn't there.
+// engine there are no pages to zoom, so it isn't there, but in a PDF tab,
+// whose pages its helper draws.
 const C = CommandIdentifier;
 const editor = useEditor();
 const label = computed(() => zoomLabel(pageZoom.value, zoomFactor.value));
@@ -20,7 +27,7 @@ const run = (id: CommandIdentifier) =>
 </script>
 
 <template>
-  <template v-if="!engineMissing">
+  <template v-if="!engineMissing || shownPdf">
     <span class="status-sep" aria-hidden="true" />
     <span class="status-narrow">
       <StatusItem

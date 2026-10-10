@@ -16,7 +16,7 @@ import WordCount from "./WordCount.vue";
 // check, the zoom, the view and focus mode on the right. Every item is a
 // button (StatusItem.vue) and a component of its own, so typing only updates
 // the word count. A PDF tab, which holds no text, shows the page in view,
-// what its signatures say, and the paper.
+// what its signatures say, the paper and the zoom.
 </script>
 
 <template>
@@ -40,7 +40,9 @@ import WordCount from "./WordCount.vue";
       <LanguageChooser />
       <SpellcheckStatus />
       <MisspellingButtons />
-      <ZoomControl />
+    </template>
+    <ZoomControl />
+    <template v-if="!shownPdf">
       <ViewButton />
       <FocusModeButton />
     </template>

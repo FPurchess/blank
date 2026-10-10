@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { zoomBy } from "../editor/commands/zoom";
+import { pointOnPage, SHEET_SCALE } from "../engine/frames";
 import { cancelRender, renderPage } from "../pdf/ipc";
 import type { PdfTabDocument } from "../pdf/document";
 import {
   activeTabId,
   announcement,
+  pageZoom,
+  pdfDeskLayout,
   pdfPageInView,
   shownPdf,
   tabs,
+  zoomAnchor,
 } from "../state";
 import { flushPromises } from "../test/async";
 import { createTestHandle } from "../test/editor";
@@ -86,6 +91,8 @@ describe("the page view of PDFs", () => {
     tabs.value = [];
     activeTabId.value = null;
     pdfBitmaps.clear();
+    pageZoom.value = "fit";
+    zoomAnchor.value = null;
     vi.unstubAllGlobals();
   });
 
@@ -184,5 +191,43 @@ describe("the page view of PDFs", () => {
     );
 
     expect(announcement.value?.text).toBe("Bold isn't for PDFs");
+  });
+
+  it("zooms with the window's zoom, keeping the spot in the middle of the view", async () => {
+    await show();
+    const element = view()!;
+    // jsdom doesn't scroll
+    Object.defineProperty(element, "scrollTop", { value: 500, writable: true });
+    Object.defineProperty(element, "scrollLeft", { value: 0, writable: true });
+    element.dispatchEvent(new Event("scroll"));
+    const middle = () =>
+      pointOnPage(
+        pdfDeskLayout.value!,
+        element.scrollLeft + window.innerWidth / 2,
+        element.scrollTop + window.innerHeight / 2,
+      );
+    const before = middle()!;
+    expect(pdfDeskLayout.value?.scale).toBe(SHEET_SCALE);
+
+    zoomBy(1)({} as never, () => {});
+    await flushPromises();
+
+    expect(pageZoom.value).toBe(1.1);
+    expect(pdfDeskLayout.value?.scale).toBeCloseTo(1.1 * SHEET_SCALE);
+    const sheet = element.querySelector<HTMLElement>(".page-sheet")!;
+    expect(parseFloat(sheet.style.width)).toBeCloseTo(
+      595 * 1.1 * SHEET_SCALE,
+      -1,
+    );
+    const after = middle()!;
+    expect(after.page).toBe(before.page);
+    expect(after.y).toBeCloseTo(before.y, 0);
+    // drawn again at the new scale, the old bitmap showing meanwhile
+    expect(renderPage).toHaveBeenLastCalledWith(
+      "t",
+      expect.any(Number),
+      expect.closeTo(1.5, 1),
+      expect.any(Number),
+    );
   });
 });

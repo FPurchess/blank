@@ -3,10 +3,11 @@ import { computed, shallowRef } from "vue";
 import {
   frameLayout,
   SHEET_SCALE,
+  sheetLayout,
   viewAnchor,
   type ViewAnchor,
 } from "../engine/frames";
-import { pdfViewAnchor, shownPdf } from "./pdf";
+import { pdfViewAnchor, pdfViewport, shownPdf } from "./pdf";
 
 // The page view, which the layout engine paints (see src/engine and
 // src/ui/PageView.vue): the view the user chose, and what the engine laid
@@ -183,13 +184,32 @@ export const deskLayout = computed(() => {
   return state && width !== null ? viewFrames(state, width) : null;
 });
 
+// the page view of PDFs' width alone, as viewWidth is the page view's
+const pdfViewWidth = computed(() => pdfViewport.value?.width ?? null);
+// the shown PDF's pages alone, which stay the same while what the view
+// learns of it (a page it couldn't draw, the signatures) changes
+const pdfPages = computed(() => shownPdf.value?.opened?.pages ?? null);
+
+// where the page view of PDFs (PdfView.vue) shows the pages of the PDF tab
+// shown: its sheets at the zoom chosen, the same one as a markdown tab's,
+// worked out again when the PDF, the view's width or the zoom change; null
+// in a markdown tab, while the PDF isn't open or the view isn't shown
+export const pdfDeskLayout = computed(() => {
+  const pages = pdfPages.value;
+  const width = pdfViewWidth.value;
+  return pages?.length && width !== null
+    ? sheetLayout(pages, width, pageZoom.value)
+    : null;
+});
+
 // the share of the printed size the pages show at, e.g. 1.25, or 0.87 on
-// Fit as wide as the view allows (1 before anything is laid out)
-export const zoomFactor = computed(() =>
-  pageZoom.value === "fit"
-    ? (deskLayout.value?.scale ?? SHEET_SCALE) / SHEET_SCALE
-    : pageZoom.value,
-);
+// Fit as wide as the view allows (1 before anything is laid out); in a PDF
+// tab, the PDF's
+export const zoomFactor = computed(() => {
+  if (pageZoom.value !== "fit") return pageZoom.value;
+  const layout = shownPdf.value ? pdfDeskLayout.value : deskLayout.value;
+  return (layout?.scale ?? SHEET_SCALE) / SHEET_SCALE;
+});
 
 /**
  * currentViewAnchor returns the spot of the pages at the top of the view, to
