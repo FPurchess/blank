@@ -22,6 +22,8 @@ The search finds every command, also the ones that aren't in the menu itself, li
 - **Theme**: a swatch for each [theme](./themes), in its own colors.
 - **Settings** opens the [settings](./settings), **Keyboard shortcuts** and **About Blank** open them on that section, and **Guide** opens this guide in your browser.
 
+What can't be done right now is greyed out, and pointing at it says why: in a [PDF tab](./pdf), for instance, saving, exporting, find and the page setup, while **Print** prints the PDF and the zoom zooms its pages.
+
 ## With the keyboard {#keyboard}
 
 `↓` in the empty search field goes into the menu at its top, `↑` at its bottom, and `↑` `↓` move through it; `↑` on the first line goes back to the search. In a row like View, `←` and `→` move between its buttons. `→` or `Enter` opens Open recent and Export, and `←` closes them again. When you start typing in the menu itself, the letters go to the search. `Mod` `K` while the menu is open brings you back to the search.

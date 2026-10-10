@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { browser, $, expect } from "@wdio/globals";
 
-import { expectActiveTab, pressMod, restartApp } from "../helpers.ts";
+import { expectActiveTab, Key, pressMod, restartApp } from "../helpers.ts";
 
 // a page turned by /Rotate 90 with a black box on it, and an A5 page, see
 // scripts/build-pdf-fixtures.ts
@@ -68,6 +68,52 @@ describe("PDF tabs", () => {
     await expect($("#pdf-view")).toBeFocused();
     await pressMod("b");
     await expect($("#ui-announcement")).toHaveText("Bold isn't for PDFs");
+  });
+
+  it("zooms its pages with the window's zoom", async () => {
+    const width = async () =>
+      (await $("#pdf-view .page-sheet").getSize()).width;
+    const fit = await width();
+    await pressMod("=");
+    await expect($("#ui-zoom")).toHaveText("110%");
+    await browser.waitUntil(async () => (await width()) > fit, {
+      timeoutMsg: "the pages didn't grow",
+    });
+    // a click on the zoom fits them again
+    await $("#ui-zoom").click();
+    await expect($("#ui-zoom")).toHaveText("Fit");
+  });
+
+  it("greys out in the main menu what isn't for PDFs, saying why", async () => {
+    await pressMod("k");
+    await expect($("#main-menu")).toExist();
+    const save = $('#main-menu [data-id="file.save"]');
+    await expect(save).toHaveAttribute("aria-disabled", "true");
+    await expect(save).toHaveAttribute(
+      "data-tip",
+      "Blank doesn't change PDFs, so there's nothing to save",
+    );
+    await expect($('#main-menu [data-id="file.print"]')).not.toHaveAttribute(
+      "aria-disabled",
+    );
+    // the search is empty, so Esc closes the menu
+    await browser.keys(Key.Escape);
+    await expect($("#main-menu")).not.toExist();
+  });
+
+  it("prints the PDF file itself", async () => {
+    await browser.execute(() => {
+      window.blankPrintCapture = { sent: [] };
+    });
+    await $("#pdf-view").click();
+    await pressMod("p");
+    await expect($("#print")).not.toExist();
+    await browser.waitUntil(
+      () => browser.execute(() => window.blankPrintCapture!.sent.length > 0),
+      { timeoutMsg: "nothing was printed" },
+    );
+    const sent = await browser.execute(() => window.blankPrintCapture!.sent);
+    expect(sent).toEqual([{ sheets: 2, pdf: "%PDF-" }]);
   });
 
   it("opens it again from its file after a restart", async () => {

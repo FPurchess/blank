@@ -94,7 +94,11 @@ export interface MainMenuDeps {
   recent: readonly RecentCommand[];
   files: readonly string[];
   openFile(path: string): void;
-  // the zoom as it shows, and whether there are pages to zoom
+  // why a command can't run in the tab shown, e.g. Save in a PDF tab
+  // (pdfRefusal), or null
+  refusal(id: C): string | null;
+  // the zoom as it shows, and whether there are pages to zoom and print:
+  // the engine's, or a PDF tab's
   zoom: { text: string; tip: string };
   pages: boolean;
   theme: ThemeName;
@@ -125,7 +129,8 @@ export const recentForMenu = (
 /**
  * commandEntry returns the item of a command, with its label, icon and key,
  * disabled where it can't run now; without the pages, Print says why after
- * its label, as the tab's menu does
+ * its label, as the tab's menu does, and one the tab refuses says why in its
+ * tooltip, as its key does
  */
 const commandEntry = (
   deps: MainMenuDeps,
@@ -136,14 +141,16 @@ const commandEntry = (
   const stays = item.stays ?? false;
   const zoom = ZOOM_COMMANDS.has(id) && !deps.pages;
   const noPrint = id === C.FILE_PRINT && !deps.pages;
+  const refusal = deps.refusal(id);
   return {
     id,
     label: info.label,
     icon: info.icon,
     shortcut: getKeyBinding(id) || undefined,
     command: id,
-    disabled: zoom || noPrint || !deps.can(id),
+    disabled: zoom || noPrint || refusal !== null || !deps.can(id),
     ...(zoom && { tip: ZOOM_NEEDS_PAGES }),
+    ...(refusal !== null && { tip: refusal }),
     run: () => deps.run(id, stays),
     ...item,
     ...(noPrint && { detail: PRINT_UNAVAILABLE_SHORT }),
@@ -185,13 +192,20 @@ const fileItem = (
       icon: "clock",
       children: recentFilesItems(deps),
     };
-  if (id === "export")
+  if (id === "export") {
+    // a tab that refuses every export says why on Export itself
+    const refusals = new Set(
+      EXPORT_COMMANDS.map((command) => deps.refusal(command)),
+    );
+    const [refusal] = refusals;
     return {
       id: "file.export",
       label: "Export",
       icon: "export",
       children: EXPORT_COMMANDS.map((command) => commandEntry(deps, command)),
+      ...(refusals.size === 1 && refusal && { disabled: true, tip: refusal }),
     };
+  }
   return commandEntry(deps, id);
 };
 

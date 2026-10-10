@@ -19,6 +19,7 @@ import {
 const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
+  CommandIdentifier.FILE_CLEAR_RECENT,
   // the PDF file itself, as it is (printPdfFile in src/print/job.ts)
   CommandIdentifier.FILE_PRINT,
   CommandIdentifier.TAB_CLOSE,
@@ -38,12 +39,17 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.VIEW_ZOOM_IN,
   CommandIdentifier.VIEW_ZOOM_OUT,
   CommandIdentifier.VIEW_ZOOM_FIT,
+  CommandIdentifier.MENU_MAIN,
   CommandIdentifier.APP_SETTINGS,
+  CommandIdentifier.APP_SHORTCUTS,
+  CommandIdentifier.APP_GUIDE,
+  CommandIdentifier.APP_ABOUT,
 ]);
 
 /**
  * pdfRefusal returns what the command `id` says in a PDF tab instead of
- * running, or null for one that runs there
+ * running, or null for one that runs there: what its key announces, and the
+ * tooltip of its disabled item in the main menu (mainMenuModel.ts)
  */
 export const pdfRefusal = (id: CommandIdentifier): string | null => {
   if (RUN_IN_PDF.has(id)) return null;
@@ -57,8 +63,13 @@ export const pdfRefusal = (id: CommandIdentifier): string | null => {
     case CommandIdentifier.INSERT_BLOCK:
     case CommandIdentifier.VIEW_BLOCKS:
       return "Blocks go into your own documents";
+    case CommandIdentifier.EXPORT_PDF:
+    case CommandIdentifier.EXPORT_DOCX:
+    case CommandIdentifier.EXPORT_SIGNED_PDF:
+      return "Blank exports your own documents, not PDFs";
     default:
-      return `${commandLabel(id)} isn't for PDFs`;
+      // "Page setup…" without its dots
+      return `${commandLabel(id).replace(/…$/, "")} isn't for PDFs`;
   }
 };
 

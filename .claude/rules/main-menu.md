@@ -25,10 +25,10 @@ The logo at the left of the tab row (`LogoButton.vue`) opens the main menu, as `
 Top to bottom, sections between separators:
 
 1. **Recent**: up to 3 of the commands used last that can run now (`recentForMenu`), without what the menu shows anyway (`MENU_SHOWN`) and without the Edit, Format and Tabs commands their key ran (typing, not choosing). The section is left out while there are none.
-2. **File** (`FILE_COMMANDS`, one array): New, Open, Open recent ▸, Save, Save as, Export ▸ (`EXPORT_COMMANDS`: PDF, Word), Print. Without the pages, Print is disabled with `PRINT_UNAVAILABLE_SHORT` as its detail, as in the tab's menu, also among the search's results (`commandEntry`). Export signed PDF goes into Export when it's there; whichever lands second adds its row with a test.
+2. **File** (`FILE_COMMANDS`, one array): New, Open, Open recent ▸, Save, Save as, Export ▸ (`EXPORT_COMMANDS`: PDF, Word), Print. Without the pages, Print is disabled with `PRINT_UNAVAILABLE_SHORT` as its detail, as in the tab's menu, also among the search's results (`commandEntry`). "The pages" (`MainMenuDeps.pages`) are the engine's, or a PDF tab's, which its helper draws, so Print and Zoom work there without the engine. What the tab shown refuses (`MainMenuDeps.refusal`: `pdfRefusal` in a PDF tab, see `pdf.md`) is disabled with the refusal its key announces as its `tip`, in the menu and the search's results alike, and Export ▸ too when all its items say the same. Export signed PDF goes into Export when it's there; whichever lands second adds its row with a test.
 3. **Edit** row: Undo, Redo, Find and replace.
 4. **View** row: the blocks pane, the outline, pages / page ends, focus mode, as switches (`menuitemcheckbox`). The blocks pane closes the menu, since it opens with the focus in its search.
-5. **Zoom** row: −, the zoom (a click fits), +; disabled without the engine (`ZOOM_NEEDS_PAGES`).
+5. **Zoom** row: −, the zoom (a click fits), +; disabled without the engine (`ZOOM_NEEDS_PAGES`), but in a PDF tab.
 6. **Theme** row: a swatch per theme (`menuitemradio`, drawn with `data-theme` in that theme's paper and ink).
 7. Settings…, Keyboard shortcuts, Guide (the website's guide, `GUIDE` in `src/links.ts`), About Blank.
 

@@ -5,17 +5,21 @@ import { CommandIdentifier as C } from "../config";
 import { openRecentFile } from "../editor/commands/recentFiles";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
+import { pdfRefusal } from "../pdf/commands";
 import {
+  activeTab,
   blocksPaneOpen,
   chooseTheme,
   engineMissing,
   focusMode,
+  isPdfTab,
   mainMenuWanted,
   outlinePinned,
   pageView,
   pageZoom,
   recentCommands,
   recentFiles,
+  shownPdf,
   theme,
   zoomFactor,
   zoomLabel,
@@ -47,13 +51,16 @@ const menu = useMenuButton((keyboard) => {
 // what the menu reads and does, as the window is now
 const deps = (): MainMenuDeps => ({
   can: (id) => editor.can(commandFor(id)),
+  // what a PDF tab refuses says why, as its key does
+  refusal: (id) => (isPdfTab(activeTab.value) ? pdfRefusal(id) : null),
   // a switch keeps the focus in the menu, which stays open
   run: (id, stays) => editor.run(commandFor(id), { focus: !stays }),
   recent: recentCommands.value,
   files: recentFiles.value,
   openFile: (path) => editor.run(openRecentFile(path)),
   zoom: zoomLabel(pageZoom.value, zoomFactor.value),
-  pages: !engineMissing.value,
+  // a PDF tab's pages are its helper's, not the engine's
+  pages: !engineMissing.value || shownPdf.value !== null,
   theme: theme.value,
   chooseTheme,
   on: {
@@ -96,6 +103,7 @@ watch(
     blocksPaneOpen,
     recentFiles,
     engineMissing,
+    shownPdf,
   ],
   () => {
     if (!menu.isOpen.value) return;

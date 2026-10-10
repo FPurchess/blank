@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CommandIdentifier as C } from "../config";
+import { pdfRefusal } from "../pdf/commands";
 import { PRINT_UNAVAILABLE_SHORT } from "../print/printModel";
 import { type MenuLine, ZOOM_NEEDS_PAGES } from "../state";
 import {
@@ -14,6 +15,7 @@ import { isEntry, isRow, type MenuEntry } from "./menuModel";
 
 const deps = (over: Partial<MainMenuDeps> = {}): MainMenuDeps => ({
   can: () => true,
+  refusal: () => null,
   run: vi.fn(),
   recent: [],
   files: [],
@@ -139,6 +141,34 @@ describe("mainMenuItems", () => {
         .results("print")
         .find(({ id }) => id === C.FILE_PRINT),
     ).toMatchObject({ disabled: true, detail: PRINT_UNAVAILABLE_SHORT });
+  });
+
+  it("says in a PDF tab why what's for documents is off, as its keys do", () => {
+    const pdf = deps({
+      can: (id) => pdfRefusal(id) === null,
+      refusal: pdfRefusal,
+    });
+    const lines = mainMenuItems(pdf);
+    for (const id of [C.FILE_SAVE, C.EDIT_FIND, C.EXPORT_PDF])
+      expect(
+        entry(lines, id) ??
+          entry(entry(lines, "file.export").children as MenuLine[], id),
+      ).toMatchObject({
+        disabled: true,
+        tip: pdfRefusal(id),
+      });
+    expect(entry(lines, "file.export")).toMatchObject({
+      disabled: true,
+      tip: "Blank exports your own documents, not PDFs",
+    });
+    expect(entry(lines, C.FILE_PRINT).disabled).toBe(false);
+    expect(row(lines, "Zoom").items.some((item) => item.disabled)).toBe(false);
+    // and so does the search, e.g. for the page setup
+    expect(
+      mainMenuSearch(pdf)
+        .results("page setup")
+        .find(({ id }) => id === C.PAGE_SETUP),
+    ).toMatchObject({ disabled: true, tip: "Page setup isn't for PDFs" });
   });
 
   it("offers every theme as a swatch, the chosen one checked", () => {

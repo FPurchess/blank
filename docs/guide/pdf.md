@@ -8,9 +8,20 @@ Press `Mod` `O` and pick a PDF, or drop one on Blank's icon, or right-click it i
 
 The pages show as they print: one below the other, white in every theme, as wide as the window allows. Scroll with the mouse, `↑` `↓`, `Page Up` `Page Down`, `Space`, or `Home` and `End` for the first and last page. The status bar says which page you're on; click it to go to another. Next to it is the PDF's paper, e.g. A4.
 
-A PDF tab only shows the PDF: Blank never changes the file. So saving, exporting, formatting and the page setup aren't there, and their shortcuts say so. Close the tab with `Mod` `W` as any other; when you start Blank again, it opens the PDF again from its file.
+To see the pages larger or smaller, [zoom](./pages#zoom) as in your documents: `Mod` `=` and `Mod` `-`, `Ctrl` and the mouse wheel, or − and + in the status bar, where a click on the zoom fits the pages to the window again. The zoom is the same in every tab, and the spot under the pointer, or in the middle of the window, stays where it is.
+
+A PDF tab only shows the PDF: Blank never changes the file. So saving, exporting, formatting and the page setup aren't there: their shortcuts say so, and in the [main menu](./menu) they're greyed out, saying why when you point at them. Close the tab with `Mod` `W` as any other; when you start Blank again, it opens the PDF again from its file.
 
 Blank can't open PDFs with a password yet. A damaged PDF Blank can't read says so instead of its pages. If the file was moved or deleted since you last opened it, the tab says so too, with **Find it…** to pick where it went.
+
+## Print a PDF {#print}
+
+Press `Mod` `P`, or choose **Print…** in the main menu or the tab's menu, and the PDF goes straight to your system's print dialog, as it is: Blank's own print dialog is for the pages Blank lays out. Choose the printer and its options there.
+
+- **Linux:** Blank prints the PDF whole, at its own size. If you choose some pages or another scale in the print dialog, Blank says so and prints nothing; print it again with all pages at 100%, or open the PDF in another app to print part of it.
+- **macOS** and **Windows:** the print dialog prints the pages you choose there.
+
+If the file changed since Blank opened it, Blank doesn't print it, since it wouldn't be what the tab shows: close the tab and open the PDF again.
 
 ### When a PDF can't be shown {#problems}
 
