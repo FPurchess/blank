@@ -36,7 +36,7 @@ You can open it with `Mod` `O`: Blank turns it into a markdown document and leav
 
 ## What is `blank-pdf`?
 
-The program that draws the pages of the [PDFs](./pdf) you open in Blank, with [MuPDF](https://mupdf.com). It comes with Blank, next to it, and runs once for each PDF tab, so a PDF that crashes it takes down only its tab. It never sends anything anywhere.
+The program that draws the pages of the [PDFs](./pdf) you open in Blank, with [MuPDF](https://mupdf.com). It comes with Blank: on Linux it's installed in `/usr/lib/blank`, on macOS and Windows next to Blank's own program. It runs once for each PDF tab, so a PDF that crashes it takes down only its tab. It never sends anything anywhere.
 
 ## Which open source software does Blank use?
 
