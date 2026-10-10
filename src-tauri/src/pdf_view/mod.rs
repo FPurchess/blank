@@ -135,8 +135,12 @@ pub fn source(path: PathBuf, sha256: String, first: Arc<[u8]>) -> Source {
     )
 }
 
-/// where the helper is: next to the app, where Tauri puts `externalBin` in
-/// every package; in debug builds `BLANK_PDF_HELPER` may say otherwise
+/// where the helper is: on Linux in `../lib/blank` beside the app's
+/// directory, where the packages put it (`bundle.resources` of
+/// `tauri.linux.conf.json`: `/usr/lib/blank` of the .deb, the .rpm and the
+/// snap, `usr/lib/blank` in the AppImage), else next to the app, where Tauri
+/// puts `externalBin` on macOS and Windows, and the resource in a build's
+/// `target/` folder; in debug builds `BLANK_PDF_HELPER` may say otherwise
 fn helper_path() -> io::Result<PathBuf> {
     if cfg!(debug_assertions) {
         if let Some(path) = std::env::var_os("BLANK_PDF_HELPER") {
@@ -145,7 +149,25 @@ fn helper_path() -> io::Result<PathBuf> {
     }
     let exe = std::env::current_exe()?;
     let dir = exe.parent().ok_or(io::ErrorKind::NotFound)?;
-    Ok(dir.join(format!("blank-pdf{}", std::env::consts::EXE_SUFFIX)))
+    let places = helper_places(dir);
+    Ok(places
+        .iter()
+        .find(|path| path.is_file())
+        .unwrap_or(&places[0])
+        .clone())
+}
+
+/// where the helper may be, given the app's directory, in the order tried
+fn helper_places(dir: &Path) -> Vec<PathBuf> {
+    let name = format!("blank-pdf{}", std::env::consts::EXE_SUFFIX);
+    let mut places = Vec::new();
+    if cfg!(target_os = "linux") {
+        if let Some(prefix) = dir.parent() {
+            places.push(prefix.join("lib").join("blank").join(&name));
+        }
+    }
+    places.push(dir.join(name));
+    places
 }
 
 /// how the app starts a helper; its stderr goes nowhere in release builds,
@@ -171,6 +193,23 @@ pub fn watch_idle(app: tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn looks_for_the_helper_where_the_packages_put_it() {
+        let places = helper_places(Path::new("/usr/bin"));
+        if cfg!(target_os = "linux") {
+            assert_eq!(
+                places,
+                [
+                    PathBuf::from("/usr/lib/blank/blank-pdf"),
+                    PathBuf::from("/usr/bin/blank-pdf")
+                ]
+            );
+        } else {
+            let name = format!("blank-pdf{}", std::env::consts::EXE_SUFFIX);
+            assert_eq!(places, [Path::new("/usr/bin").join(name)]);
+        }
+    }
 
     #[test]
     fn stops_what_is_idle_and_the_least_recently_used() {

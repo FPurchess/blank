@@ -66,7 +66,8 @@ jobs:
       - name: run rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p blank
 
-      # the PDF helper, next to the app (bundle.externalBin), runs
+      # the PDF helper runs; every build has it next to the app in target/
+      # (the packages: /usr/lib/blank on Linux, next to the app elsewhere)
       - name: run the PDF helper
         shell: bash
         run: |
@@ -118,8 +119,8 @@ jobs:
           cat "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop"
           grep -qx 'Exec=blank %F' "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop" ||
             { echo "::error::the .deb's desktop entry doesn't pass the files to blank"; exit 1; }
-          test -x "$RUNNER_TEMP/deb/usr/bin/blank-pdf" || { echo "::error::the .deb has no usr/bin/blank-pdf"; exit 1; }
+          test -x "$RUNNER_TEMP/deb/usr/lib/blank/blank-pdf" || { echo "::error::the .deb has no usr/lib/blank/blank-pdf"; exit 1; }
           sudo apt-get install -y rpm
           rpm -qlp src-tauri/target/release/bundle/rpm/*.rpm | tee "$RUNNER_TEMP/rpm.txt"
           grep -qx "/$meta" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /$meta"; exit 1; }
-          grep -qx "/usr/bin/blank-pdf" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /usr/bin/blank-pdf"; exit 1; }
+          grep -qx "/usr/lib/blank/blank-pdf" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /usr/lib/blank/blank-pdf"; exit 1; }
