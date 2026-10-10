@@ -98,8 +98,8 @@ const trust = () =>
     </dl>
     <p class="note">
       <template v-if="canTrust(signature)"
-        >Compare this fingerprint with {{ name }}, by phone or in person, before
-        you trust it.
+        >Compare all of this fingerprint, every group, with the one {{ name }}
+        tells you by phone or in person before you trust it.
       </template>
       Blank doesn't check certificate authorities or revocation.
     </p>

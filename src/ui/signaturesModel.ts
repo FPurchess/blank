@@ -7,20 +7,29 @@ import type { CheckedSignature, Trust } from "../signing/ipc";
 // others are only "intact", since Blank checks neither certificate
 // authorities nor revocation.
 
-// how a signature, or all of a PDF's, looks: fine, fine but from someone
-// Blank doesn't know, or not fine
+// how a signature, or all of a PDF's, looks: fine, fine but with a doubt
+// (a signer Blank doesn't know, a weak algorithm, later changes another
+// signature signed), or not fine
 export type SignatureLook = "ok" | "unknown" | "bad";
 
 const known = (trust: Trust) =>
   trust.kind === "own" || trust.kind === "trusted";
 const intact = (signature: CheckedSignature) =>
   signature.status === "valid" || signature.status === "signedAgainLater";
+const later = (signature: CheckedSignature) =>
+  signature.laterSigner ?? "someone else";
 
 /**
  * lookOf returns how a signature looks
  */
 export const lookOf = (signature: CheckedSignature): SignatureLook =>
-  !intact(signature) ? "bad" : known(signature.trust) ? "ok" : "unknown";
+  !intact(signature)
+    ? "bad"
+    : known(signature.trust) &&
+        signature.status === "valid" &&
+        signature.weak === null
+      ? "ok"
+      : "unknown";
 
 /**
  * signaturesLabel returns what the status bar says of a PDF's signatures,
@@ -38,6 +47,10 @@ export const signaturesLabel = (
     return { text: "Signature invalid", icon: "seal-off", look: "bad" };
   if (signatures.some((signature) => !intact(signature)))
     return { text: "Changed after signing", icon: "seal-off", look: "bad" };
+  if (signatures.some((signature) => signature.weak !== null))
+    return { text: "Weak signature", icon: "seal-off", look: "unknown" };
+  if (signatures.some((signature) => signature.status === "signedAgainLater"))
+    return { text: "Changed and signed again", icon: "seal", look: "unknown" };
   if (signatures.every((signature) => known(signature.trust)))
     return {
       text:
@@ -58,6 +71,10 @@ export const signatureStatus = (signature: CheckedSignature) => {
     return "Signature invalid: it doesn't match the PDF";
   if (signature.status === "changedAfterSigning")
     return "Changed after signing";
+  if (signature.weak !== null) return `Weak: ${signature.weak} can be forged`;
+  const intactAs = known(signature.trust) ? "Valid" : "Intact";
+  if (signature.status === "signedAgainLater")
+    return `${intactAs} for the version it signed; changed and signed again later by ${later(signature)}`;
   switch (signature.trust.kind) {
     case "own":
       return "Valid · your certificate";
@@ -71,16 +88,26 @@ export const signatureStatus = (signature: CheckedSignature) => {
 };
 
 /**
- * signatureVerdict returns the details' sentence on a signature
+ * signatureVerdict returns the details' sentences on a signature
  */
 export const signatureVerdict = (signature: CheckedSignature) => {
   if (signature.status === "invalid")
     return "The signature doesn't match the PDF.";
   if (signature.status === "changedAfterSigning")
     return "The PDF was changed after it was signed.";
-  return known(signature.trust)
-    ? "The PDF hasn't changed since it was signed, and the certificate is one Blank trusts."
-    : "The PDF hasn't changed since it was signed, but Blank doesn't know this certificate.";
+  const sentences = [
+    signature.status === "signedAgainLater"
+      ? `${known(signature.trust) ? "Valid" : "Intact"} for the version it signed; changed and signed again later by ${later(signature)}.`
+      : "The PDF hasn't changed since it was signed.",
+    known(signature.trust)
+      ? "The certificate is one Blank trusts."
+      : "Blank doesn't know this certificate.",
+  ];
+  if (signature.weak !== null)
+    sentences.push(
+      `It relies on ${signature.weak}, whose signatures can be forged: don't rely on it.`,
+    );
+  return sentences.join(" ");
 };
 
 /**
@@ -90,11 +117,22 @@ export const signerName = (signature: CheckedSignature) =>
   signature.name ?? "Someone unknown";
 
 /**
+ * clockOf says whose clock gave a signature's time: the computer's, or a
+ * timestamp server's, named, and "not checked" unless the user trusts its
+ * certificate (Blank checks that a timestamp is intact, not who made it)
+ */
+const clockOf = (signature: CheckedSignature) => {
+  if (!signature.timestamped) return "computer clock";
+  const by = `timestamped by ${signature.timestampAuthority ?? "an unknown server"}`;
+  return signature.timestampTrusted ? by : `${by} (not checked)`;
+};
+
+/**
  * signedWhen returns when a signature was made and by whose clock, e.g.
- * "8 Oct 2026, 14:00 · timestamped", in `locale`
+ * "8 Oct 2026, 14:00 · timestamped by DigiCert (not checked)", in `locale`
  */
 export const signedWhen = (signature: CheckedSignature, locale?: string) => {
-  const clock = signature.timestamped ? "timestamped" : "computer clock";
+  const clock = clockOf(signature);
   if (!signature.time) return clock;
   const time = new Date(signature.time);
   if (Number.isNaN(time.getTime())) return clock;
@@ -106,4 +144,6 @@ export const signedWhen = (signature: CheckedSignature, locale?: string) => {
  * one Blank doesn't trust yet, of a signature that is intact
  */
 export const canTrust = (signature: CheckedSignature) =>
-  lookOf(signature) === "unknown" && signature.certificateDer !== null;
+  intact(signature) &&
+  !known(signature.trust) &&
+  signature.certificateDer !== null;

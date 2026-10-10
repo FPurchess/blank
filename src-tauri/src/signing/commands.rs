@@ -30,8 +30,15 @@ const CERTIFICATE: &str = "certificate.cer";
 /// with more room for a longer chain
 const RESERVE: usize = 16 * 1024;
 
-/// held while the key and certificate files are written or removed, so
-/// they stay a pair
+/// what the user is told of an email address a certificate can't hold:
+/// certificates write them in ASCII (rcgen refuses others), and Blank
+/// doesn't convert the domain to punycode (certificateDialogModel.ts says
+/// the same before it gets here)
+const NON_ASCII_EMAIL: &str =
+    "A certificate can only hold an email address of plain letters (a–z), digits and symbols";
+
+/// held while the key and certificate files are written, copied or
+/// removed, so they stay a pair
 static FILES: Mutex<()> = Mutex::new(());
 
 /// what went wrong, as the webview tells the user
@@ -268,8 +275,13 @@ pub async fn signing_create_certificate(
 ) -> Answer<CertificateInfo> {
     let passphrase = Passphrase::new(passphrase);
     refuse_replacing(&app, replace)?;
+    let email = email
+        .map(|email| email.trim().to_string())
+        .filter(|email| !email.is_empty());
+    if email.as_ref().is_some_and(|email| !email.is_ascii()) {
+        return Err(SigningError::Failed(NON_ASCII_EMAIL.into()));
+    }
     tauri::async_runtime::spawn_blocking(move || {
-        let email = email.filter(|email| !email.trim().is_empty());
         let (p12, identity) = keys::create_certificate(name.trim(), email.as_deref(), &passphrase)
             .map_err(failed(
                 "failed to make a certificate",
@@ -315,6 +327,10 @@ pub async fn signing_import(
 #[tauri::command]
 pub async fn signing_export(app: AppHandle, key: bool, path: PathBuf) -> Answer<()> {
     let from = folder(&app)?.join(if key { KEY } else { CERTIFICATE });
+    // not while the pair is replaced or removed
+    let _files = FILES
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if !from.exists() {
         return Err(SigningError::NoCertificate);
     }
@@ -391,23 +407,28 @@ pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> 
             None => "Blank couldn't sign the PDF".into(),
         })
     })?;
-    check_signed(&signed)?;
+    check_signed(&signed, request.tsa.is_some())?;
     Ok(signed)
 }
 
 /// check_signed makes sure what was just signed checks out, and that its
-/// last signature covers the whole file, or it isn't saved
-fn check_signed(signed: &[u8]) -> Answer<()> {
+/// last signature covers the whole file, or it isn't saved; `timestamped`
+/// asks for a timestamp that holds as well, since the user asked for one
+fn check_signed(signed: &[u8], timestamped: bool) -> Answer<()> {
     let reports = verify_pdf(signed).map_err(failed(
         "failed to check a signed PDF",
         "Blank couldn't sign the PDF",
     ))?;
-    if !reports
+    let Some(last) = reports
         .last()
-        .is_some_and(|report| report.valid() && report.covers_the_whole_file())
-    {
+        .filter(|report| report.valid() && report.covers_the_whole_file())
+    else {
         log::warn!("a PDF Blank signed didn't check out");
         return Err(SigningError::Failed("Blank couldn't sign the PDF".into()));
+    };
+    if timestamped && (last.timestamp.is_none() || last.timestamp_unreadable) {
+        log::warn!("a PDF Blank signed has no timestamp that holds");
+        return Err(SigningError::Failed(Refusal::TimestampUnusable.to_string()));
     }
     Ok(())
 }
@@ -478,10 +499,7 @@ pub fn checked_signatures(app: &AppHandle, pdf: &[u8]) -> Answer<Vec<CheckedSign
         "failed to check the signatures of a PDF",
         "Blank couldn't check the signatures of this PDF",
     ))?;
-    Ok(reports
-        .into_iter()
-        .map(|report| trust::checked(report, own.as_deref(), &trusted))
-        .collect())
+    Ok(trust::checked_all(reports, own.as_deref(), &trusted))
 }
 
 /// signing_trusted returns the certificates the user trusts

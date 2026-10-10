@@ -16,9 +16,10 @@ const MIN_PASSPHRASE = 8;
 // the field what's wrong is about
 type Field = "name" | "email" | "passphrase" | "again";
 
-// what a certificate can hold of an email: ASCII alone (an IA5String)
-const ascii = (text: string) =>
-  [...text].every((char) => char.charCodeAt(0) < 0x80);
+// what a certificate can hold of an email address: ASCII only (Blank
+// doesn't write international domains as punycode), the native side
+// refuses others too
+const ASCII = /^[\x20-\x7e]*$/;
 
 /**
  * checkCertificate says what's wrong with what's typed, once the user tries
@@ -28,7 +29,7 @@ export const checkCertificate = (
   creating: boolean,
   fields: {
     name: string;
-    email: string;
+    email?: string;
     passphrase: string;
     again: string;
     submitted: boolean;
@@ -42,10 +43,10 @@ export const checkCertificate = (
   if (creating && !fields.name.trim()) {
     return problem("name", "Enter the name your signatures show.");
   }
-  if (creating && !ascii(fields.email)) {
+  if (creating && !ASCII.test(fields.email?.trim() ?? "")) {
     return problem(
       "email",
-      "A certificate can only hold an email without accents or other special letters.",
+      "A certificate can only hold an email address of plain letters (a–z), digits and symbols.",
     );
   }
   if (!fields.passphrase) return problem("passphrase", "Enter a passphrase.");

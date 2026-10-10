@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 
 import { CommandIdentifier } from "../config";
 import { useEditor } from "../editor/handle";
-import { shownPdf, signaturesPopover } from "../state";
+import { announce, shownPdf, signaturesPopover } from "../state";
 import { signaturesLabel } from "./signaturesModel";
 import StatusItem from "./StatusItem.vue";
 
@@ -11,10 +11,18 @@ import StatusItem from "./StatusItem.vue";
 // "Signed", "Signed, signer unknown", "Changed after signing", "Signature
 // invalid" or, when the check failed, "Signatures not checked"; nothing while
 // they are checked. A click lists them
-// (SignaturesPopover.vue).
+// (SignaturesPopover.vue). A result with a doubt or worse is read out once
+// it's in, since it changes how far to rely on the PDF.
 const editor = useEditor();
 const label = computed(() =>
   signaturesLabel(shownPdf.value?.signatures ?? null),
+);
+watch(
+  () => label.value?.text,
+  () => {
+    if (label.value && label.value.look !== "ok")
+      announce(label.value.text, { quiet: true });
+  },
 );
 const open = () => {
   signaturesPopover.value = signaturesPopover.value

@@ -38,7 +38,8 @@ pub enum Trust {
 pub enum Status {
     /// intact, and nothing but validation data came after it
     Valid,
-    /// intact, and the later changes were signed again
+    /// intact for the version it signed; the PDF changed after it, and a
+    /// later signature signed those changes
     SignedAgainLater,
     /// intact, but the PDF changed after it
     ChangedAfterSigning,
@@ -54,8 +55,18 @@ pub struct CheckedSignature {
     /// who signed: the certificate's name, else what the signature says
     pub name: Option<String>,
     /// when, in ISO 8601: the timestamp's time, else the signer's clock
+    /// (as written, without an offset when it has none)
     pub time: Option<String>,
     pub timestamped: bool,
+    /// who timestamped it: the name in the timestamp's certificate
+    pub timestamp_authority: Option<String>,
+    /// whether that certificate is one the user trusts: else the time is
+    /// only what the timestamp says, not checked
+    pub timestamp_trusted: bool,
+    /// the weak algorithm it relies on ("SHA-1"), if it does
+    pub weak: Option<&'static str>,
+    /// for SignedAgainLater: who signed next, after the changes
+    pub later_signer: Option<String>,
     pub reason: Option<String>,
     pub location: Option<String>,
     pub status: Status,
@@ -94,6 +105,52 @@ pub fn status(report: &SignatureReport) -> Status {
     }
 }
 
+/// signer_of names who made `report`: the certificate's name, else what the
+/// signature says
+fn signer_of(report: &SignatureReport) -> Option<String> {
+    report
+        .signer
+        .as_ref()
+        .map(|signer| signer.name.clone())
+        .or_else(|| report.name.clone())
+}
+
+/// end is where `report`'s signed bytes end, if its byte range says
+fn end(report: &SignatureReport) -> Option<i64> {
+    (report.byte_range.len() == 4)
+        .then(|| report.byte_range[2].saturating_add(report.byte_range[3]))
+}
+
+/// checked_all makes what the webview shows of a PDF's `reports`, naming
+/// for each one signed again later who signed next
+pub fn checked_all(
+    reports: Vec<SignatureReport>,
+    own: Option<&str>,
+    trusted: &HashSet<String>,
+) -> Vec<CheckedSignature> {
+    // (end, name) of every intact signature, by where it ends
+    let mut ends: Vec<(i64, Option<String>)> = reports
+        .iter()
+        .filter(|report| report.valid())
+        .filter_map(|report| end(report).map(|end| (end, signer_of(report))))
+        .collect();
+    ends.sort_by_key(|(end, _)| *end);
+    reports
+        .into_iter()
+        .map(|report| {
+            let later = (status(&report) == Status::SignedAgainLater)
+                .then(|| end(&report))
+                .flatten()
+                .and_then(|mine| ends.iter().find(|(end, _)| *end > mine))
+                .and_then(|(_, name)| name.clone());
+            CheckedSignature {
+                later_signer: later,
+                ..checked(report, own, trusted)
+            }
+        })
+        .collect()
+}
+
 /// checked makes what the webview shows of `report`
 pub fn checked(
     report: SignatureReport,
@@ -106,14 +163,16 @@ pub fn checked(
         .as_ref()
         .map_or(Trust::Unknown, |signer| classify(signer, own, trusted));
     let timestamp = report.timestamp.as_deref().and_then(generalized_time);
+    let authority = timestamp.as_ref().and(report.timestamp_authority.as_ref());
     CheckedSignature {
+        name: signer_of(&report),
         field: report.field,
-        name: report
-            .signer
-            .as_ref()
-            .map(|signer| signer.name.clone())
-            .or(report.name),
         timestamped: timestamp.is_some(),
+        timestamp_authority: authority.map(|tsa| tsa.name.clone()),
+        timestamp_trusted: authority
+            .is_some_and(|tsa| matches!(classify(tsa, own, trusted), Trust::Own | Trust::Trusted)),
+        weak: report.weak,
+        later_signer: None,
         time: timestamp.or_else(|| report.time.as_deref().and_then(pdf_date)),
         reason: report.reason,
         location: report.location,
@@ -165,8 +224,9 @@ pub fn pdf_date(text: &str) -> Option<String> {
             let minutes = digits(zone, 4, 2).unwrap_or(0);
             format!("{sign}{hours:02}:{minutes:02}")
         }
-        // a local time without an offset is shown as UTC, like Z
-        _ => "Z".into(),
+        Some('Z') => "Z".into(),
+        // a local time of a clock Blank doesn't know: shown as written
+        _ => String::new(),
     };
     Some(format!(
         "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{offset}"
@@ -307,7 +367,11 @@ mod tests {
 
     #[test]
     fn reads_the_dates_of_pdfs() {
-        assert_eq!(pdf_date("D:2026").as_deref(), Some("2026-01-01T00:00:00Z"));
+        assert_eq!(pdf_date("D:2026").as_deref(), Some("2026-01-01T00:00:00"));
+        assert_eq!(
+            pdf_date("D:20261008140000").as_deref(),
+            Some("2026-10-08T14:00:00")
+        );
         assert_eq!(
             pdf_date("D:20261008093000-05'30'").as_deref(),
             Some("2026-10-08T09:30:00-05:30")

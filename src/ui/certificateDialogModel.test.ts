@@ -25,22 +25,19 @@ describe("making or importing a certificate", () => {
     ).toBe("The passphrases aren't the same.");
   });
 
-  it("takes an email a certificate can hold", () => {
+  it("says what's wrong with an email a certificate can't hold", () => {
     expect(
-      checkCertificate(true, { ...fields, email: "ada@example.org" }).valid,
-    ).toBe(true);
-    expect(
-      checkCertificate(true, { ...fields, email: "ada@bücher.de" }),
-    ).toEqual({
+      checkCertificate(true, { ...fields, email: "jürgen@müller.de" }),
+    ).toMatchObject({
       valid: false,
-      error:
-        "A certificate can only hold an email without accents or other special letters.",
       field: "email",
+      error: expect.stringContaining("plain letters (a–z)"),
     });
-    // a key file to import has its own
     expect(
-      checkCertificate(false, { ...fields, email: "ada@bücher.de" }).valid,
+      checkCertificate(true, { ...fields, email: " ada@example.org " }).valid,
     ).toBe(true);
+    // a key file to import has no email
+    expect(checkCertificate(false, { ...fields, email: "ü" }).valid).toBe(true);
   });
 
   it("takes any passphrase of a key file to import", () => {

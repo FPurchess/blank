@@ -1,7 +1,7 @@
 use lopdf::{dictionary, Document, Object, ObjectId, Stream};
 
 use super::*;
-use crate::signing::verify::verify_pdf;
+use crate::signing::verify::{verify_pdf, Coverage};
 
 const PASSPHRASE: &str = "correct horse";
 
@@ -258,7 +258,7 @@ fn signs_again_with_more_room_when_the_signature_doesnt_fit() {
     };
     let signed = sign_pdf(&original, &request).unwrap();
     assert!(signed.starts_with(&original));
-    check_signed(&signed).unwrap();
+    check_signed(&signed, false).unwrap();
 }
 
 #[test]
@@ -289,7 +289,7 @@ fn finds_what_was_added_after_signing() {
         reports[0].coverage,
         crate::signing::verify::Coverage::ChangedAfterSigning
     );
-    assert!(check_signed(&signed).is_err());
+    assert!(check_signed(&signed, false).is_err());
 }
 
 /// validated adds `change` to the signed `pdf` as an unsigned update, and
@@ -345,10 +345,7 @@ fn takes_validation_data_added_after_signing_for_what_it_is() {
         let out = validated(&signed, |_| {}, |_| vec![]);
         let reports = verify_pdf(&out).unwrap();
         assert!(reports[0].valid());
-        assert_eq!(
-            reports[0].coverage,
-            "covers the whole file but validation data (DSS) added later"
-        );
+        assert_eq!(reports[0].coverage, Coverage::ValidationData);
     }
 }
 
@@ -384,11 +381,7 @@ fn calls_a_page_written_again_beside_validation_data_a_change() {
     for out in [plain, held] {
         let reports = verify_pdf(&out).unwrap();
         assert!(reports[0].valid());
-        assert!(
-            reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
-            "{}",
-            reports[0].coverage
-        );
+        assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
     }
 }
 
@@ -494,11 +487,7 @@ fn calls_an_emptied_dictionary_or_an_array_of_numbers_a_change() {
     );
     for out in [emptied, numbers] {
         let reports = verify_pdf(&out).unwrap();
-        assert!(
-            reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
-            "{}",
-            reports[0].coverage
-        );
+        assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
     }
 }
 
@@ -540,11 +529,7 @@ fn calls_an_object_freed_after_signing_a_change() {
         .as_bytes(),
     );
     let reports = verify_pdf(&out).unwrap();
-    assert!(
-        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
-        "{}",
-        reports[0].coverage
-    );
+    assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
 }
 
 #[test]
@@ -693,4 +678,27 @@ fn keeps_the_old_pair_when_the_new_certificate_cant_be_put_in_place() {
     )
     .unwrap_err();
     assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
+}
+
+#[test]
+fn refuses_a_signature_without_the_timestamp_asked_for() {
+    let signed = signed(key(), &pdf(), &options(None));
+    assert!(check_signed(&signed, false).is_ok());
+    let Err(SigningError::Failed(message)) = check_signed(&signed, true) else {
+        panic!("a signature without its timestamp passed");
+    };
+    assert_eq!(message, Refusal::TimestampUnusable.to_string());
+}
+
+#[test]
+fn says_which_signature_signed_the_changes_after_an_earlier_one() {
+    let first = signed(key(), &pdf(), &options(None));
+    let twice = signed(RSA_KEY, &first, &options(None));
+    let reports = verify_pdf(&twice).unwrap();
+    let rsa_name = reports[1].signer.as_ref().unwrap().name.clone();
+    let shown = trust::checked_all(reports, None, &Default::default());
+    assert_eq!(shown[0].status, trust::Status::SignedAgainLater);
+    assert_eq!(shown[0].later_signer.as_deref(), Some(rsa_name.as_str()));
+    assert_eq!(shown[1].status, trust::Status::Valid);
+    assert_eq!(shown[1].later_signer, None);
 }

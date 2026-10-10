@@ -61,6 +61,7 @@ const details = (signature: CheckedSignature) =>
     class="signatures-popover"
     role="dialog"
     aria-label="Signatures"
+    :aria-describedby="list.length ? undefined : 'signatures-empty'"
     tabindex="-1"
   >
     <div class="signatures-head">Signatures</div>
@@ -77,13 +78,23 @@ const details = (signature: CheckedSignature) =>
           <div class="meta">{{ signedWhen(signature) }}</div>
           <div class="meta status">{{ signatureStatus(signature) }}</div>
         </div>
-        <button type="button" @click="details(signature)">Details…</button>
+        <button
+          type="button"
+          :aria-label="`Details of ${signerName(signature)}'s signature`"
+          @click="details(signature)"
+        >
+          Details…
+        </button>
       </li>
     </ul>
-    <p v-else-if="checked === 'failed'" class="empty">
+    <p v-else-if="checked === 'failed'" id="signatures-empty" class="empty">
       Blank couldn't check this PDF's signatures.
     </p>
-    <p v-else-if="checked === null" class="empty">Checking the signatures…</p>
-    <p v-else class="empty">This PDF has no digital signatures.</p>
+    <p v-else-if="checked === null" id="signatures-empty" class="empty">
+      Checking the signatures…
+    </p>
+    <p v-else id="signatures-empty" class="empty">
+      This PDF has no digital signatures.
+    </p>
   </div>
 </template>

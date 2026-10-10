@@ -24,6 +24,10 @@ const maria: CheckedSignature = {
   name: "Maria Keller",
   time: "2026-10-07T18:40:00Z",
   timestamped: true,
+  timestampAuthority: "Example TSA",
+  timestampTrusted: false,
+  weak: null,
+  laterSigner: null,
   reason: "I agree",
   location: null,
   status: "valid",
@@ -75,6 +79,39 @@ describe("a PDF's signatures", () => {
     expect(
       document.querySelector("#signatures-popover .empty")?.textContent?.trim(),
     ).toBe("Blank couldn't check this PDF's signatures.");
+  });
+
+  it("names whose details a row's button shows, and describes an empty list", async () => {
+    signaturesPopover.value = { refocus: () => {} };
+    await flushPromises();
+    const details = document.querySelector("#signatures-popover button");
+    expect(details?.getAttribute("aria-label")).toBe(
+      "Details of Maria Keller's signature",
+    );
+
+    shownPdf.value = { ...shownPdf.value!, signatures: [] };
+    await flushPromises();
+    const popover = document.getElementById("signatures-popover")!;
+    const description = document.getElementById(
+      popover.getAttribute("aria-describedby")!,
+    );
+    expect(description?.textContent?.trim()).toBe(
+      "This PDF has no digital signatures.",
+    );
+  });
+
+  it("reads out a check that found something wrong", async () => {
+    shownPdf.value = { ...shownPdf.value!, signatures: null };
+    await flushPromises();
+    shownPdf.value = {
+      ...shownPdf.value!,
+      signatures: [{ ...maria, status: "changedAfterSigning" }],
+    };
+    await flushPromises();
+    expect(announcement.value).toMatchObject({
+      text: "Changed after signing",
+      quiet: true,
+    });
   });
 
   it("lists them from the status bar, and shows one's details", async () => {

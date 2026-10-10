@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { CheckedSignature } from "../signing/ipc";
 import {
   canTrust,
+  lookOf,
   signatureStatus,
+  signatureVerdict,
   signaturesLabel,
   signedWhen,
 } from "./signaturesModel";
@@ -24,6 +26,10 @@ const signature = (
   name: "Maria Keller",
   time: "2026-10-07T18:40:00Z",
   timestamped: false,
+  timestampAuthority: null,
+  timestampTrusted: false,
+  weak: null,
+  laterSigner: null,
   reason: null,
   location: null,
   status: "valid",
@@ -74,12 +80,68 @@ describe("what Blank says of a PDF's signatures", () => {
     );
   });
 
-  it("says when and by whose clock", () => {
+  it("says when and by whose clock, a timestamp not checked unless trusted", () => {
     expect(signedWhen(signature(), "en-GB")).toMatch(
       /^7 Oct 2026, .* · computer clock$/,
     );
-    expect(signedWhen(signature({ time: null, timestamped: true }))).toBe(
-      "timestamped",
+    const stamped = signature({
+      time: null,
+      timestamped: true,
+      timestampAuthority: "DigiCert Timestamp 2025",
+    });
+    expect(signedWhen(stamped)).toBe(
+      "timestamped by DigiCert Timestamp 2025 (not checked)",
+    );
+    expect(signedWhen({ ...stamped, timestampTrusted: true })).toBe(
+      "timestamped by DigiCert Timestamp 2025",
+    );
+    expect(signedWhen({ ...stamped, timestampAuthority: null })).toBe(
+      "timestamped by an unknown server (not checked)",
+    );
+  });
+
+  it("never calls a signature signed again later unchanged", () => {
+    const earlier = signature({
+      status: "signedAgainLater",
+      trust: { kind: "own" },
+      laterSigner: "Jonas Weber",
+    });
+    expect(lookOf(earlier)).toBe("unknown");
+    expect(signaturesLabel([earlier, signature()])).toMatchObject({
+      text: "Changed and signed again",
+      look: "unknown",
+    });
+    expect(signatureStatus(earlier)).toBe(
+      "Valid for the version it signed; changed and signed again later by Jonas Weber",
+    );
+    expect(signatureVerdict(earlier)).toBe(
+      "Valid for the version it signed; changed and signed again later by Jonas Weber. The certificate is one Blank trusts.",
+    );
+    expect(signatureVerdict(earlier)).not.toMatch(/hasn't changed/);
+    expect(
+      signatureStatus({
+        ...earlier,
+        trust: { kind: "unknown" },
+        laterSigner: null,
+      }),
+    ).toBe(
+      "Intact for the version it signed; changed and signed again later by someone else",
+    );
+  });
+
+  it("flags a signature over SHA-1 as weak, not valid", () => {
+    const weak = signature({ trust: { kind: "trusted" }, weak: "SHA-1" });
+    expect(lookOf(weak)).toBe("unknown");
+    expect(signaturesLabel([weak])).toMatchObject({
+      text: "Weak signature",
+      look: "unknown",
+    });
+    expect(signatureStatus(weak)).toBe("Weak: SHA-1 can be forged");
+    expect(signatureVerdict(weak)).toMatch(
+      /relies on SHA-1, whose signatures can be forged/,
+    );
+    expect(signatureVerdict(signature())).toBe(
+      "The PDF hasn't changed since it was signed. Blank doesn't know this certificate.",
     );
   });
 
