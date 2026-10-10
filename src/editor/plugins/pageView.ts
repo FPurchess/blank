@@ -44,7 +44,18 @@ import { tableAround } from "./tables/util";
 import { columnPercents } from "../../markdown/tables";
 import { embedSrc } from "../../markdown/blocks/embeds";
 import { tableGrid } from "../../exporters/table";
-import { type FrozenWidths, headingsSignature } from "../../engine/flatten";
+import {
+  type FrozenWidths,
+  headingsSignature,
+  type SourceView,
+} from "../../engine/flatten";
+import { isSourceBlock } from "../../markdown/blocks/sourceBlock";
+import { isSourceNode } from "../../sources/registry";
+import { renderStates, sourceKeyOf } from "../../sources/store";
+import { drawingOf } from "../../engine/vectors";
+import { drawnVectors } from "../../state/drawings";
+import { createDrawingSync } from "../../engine/drawings";
+import { sourceBlocksKey } from "./sourceBlocks";
 import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
 import { pageGeometry } from "../../layout/resolve";
@@ -93,6 +104,18 @@ export const headAfter = (state: EditorState) =>
 export const pageViewKey = new PluginKey<PageViewState>("pageView");
 
 /**
+ * sourceBlockAround returns the position of the source block a position is
+ * in, or null
+ */
+const sourceBlockAround = (doc: Node, pos: number) => {
+  const $pos = doc.resolve(pos);
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    if (isSourceBlock($pos.node(depth))) return $pos.before(depth);
+  }
+  return null;
+};
+
+/**
  * selectionAt returns a selection at a hit: a caret, a selected node, or,
  * with `anchor`, a range from it
  */
@@ -126,6 +149,10 @@ export const selectionAt = (
     const node = doc.nodeAt(pos);
     if (node && NodeSelection.isSelectable(node))
       return NodeSelection.create(doc, pos);
+    // what a source block makes, shown under its source while it's open,
+    // stands for the block
+    const block = sourceBlockAround(doc, pos);
+    if (block !== null) return NodeSelection.create(doc, block);
   }
   return TextSelection.between(doc.resolve(pos), doc.resolve(pos));
 };
@@ -237,6 +264,75 @@ const tocBlocks = (engine: PageEngine, doc: Node): number[] => {
   return tocs;
 };
 
+// the source view each engine laid out with last, see sourceView
+const sourceViews = new WeakMap<PageEngine, SourceView>();
+
+/**
+ * sourceView returns how the sources are shown (the open one, and what shows
+ * under it), and the top-level blocks to flatten again because that changed
+ * since `engine` laid them out
+ */
+const sourceView = (engine: PageEngine, state: EditorState) => {
+  const shown = sourceBlocksKey.getState(state);
+  const view: SourceView = {
+    open: shown?.open ?? null,
+    preview: shown?.preview ?? null,
+  };
+  const before = sourceViews.get(engine);
+  sourceViews.set(engine, view);
+  // the blocks the old and new open ones are, found anew: an old position
+  // may stand for another block of this document
+  const blocks =
+    before?.open !== view.open || before?.preview !== view.preview
+      ? sourceBlockIndices(state.doc)
+      : [];
+  return { view, blocks };
+};
+
+/**
+ * sourceBlockIndices returns the top-level blocks of `doc` that hold a source
+ * (src/sources/registry.ts), e.g. a diagram
+ */
+const sourceBlockIndices = (doc: Node) => {
+  const blocks: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    let found = isSourceNode(block);
+    if (!found && !block.isTextblock) {
+      block.descendants((node) => {
+        if (found) return false;
+        found = isSourceNode(node);
+        return !found && !node.isTextblock;
+      });
+    }
+    if (found) blocks.push(index);
+  });
+  return blocks;
+};
+
+// the diagram module's drawings, as each engine has them
+const syncDiagrams = createDrawingSync({
+  add: (engine, key, json) => engine.addDrawing(key, json),
+  remove: (engine, key) => engine.removeDrawing(key),
+});
+
+/**
+ * addDrawings gives the engine the drawings of the module (diagrams) its
+ * document shows, the open block's last good preview included, and takes
+ * back those it no longer shows
+ */
+const addDrawings = (engine: PageEngine, state: EditorState) => {
+  const shown = new Map<string, string | undefined>();
+  const preview = sourceBlocksKey.getState(state)?.preview;
+  if (preview) shown.set(preview, drawingOf(preview));
+  state.doc.descendants((node) => {
+    if (!isSourceNode(node)) return !node.isTextblock;
+    const key = sourceKeyOf(node);
+    shown.set(key, drawingOf(key));
+    return false;
+  });
+  syncDiagrams(engine, shown);
+};
+
 /**
  * sync hands the engine what changed in the document, and the page
  * @param blocks top-level blocks to flatten again, e.g. once their image
@@ -256,10 +352,19 @@ const sync = (
     height: contentHeight,
   });
   const tracked = pageSyncKey.getState(state);
+  const sources = sourceView(engine, state);
+  addDrawings(engine, state);
   const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
-    blocks: [...new Set([...blocks, ...tocBlocks(engine, state.doc)])],
+    sources: sources.view,
+    blocks: [
+      ...new Set([
+        ...blocks,
+        ...tocBlocks(engine, state.doc),
+        ...sources.blocks,
+      ]),
+    ],
     changes: tracked?.from
       ? { from: tracked.from, ranges: tracked.ranges }
       : null,
@@ -380,7 +485,12 @@ const VERTICAL: Record<string, boolean> = { ArrowUp: false, ArrowDown: true };
  * the caret leaves it rather than moving into it
  */
 const verticalStart = (selection: Selection, down: boolean) => {
-  if (!(selection instanceof NodeSelection) || selection.node.isLeaf)
+  // a source block that's closed has no text on the pages
+  if (
+    !(selection instanceof NodeSelection) ||
+    selection.node.isLeaf ||
+    isSourceBlock(selection.node)
+  )
     return selection.head;
   const { from, to, $from, $to } = selection;
   const inner = Selection.findFrom(down ? $to : $from, down ? -1 : 1, true);
@@ -487,6 +597,19 @@ export const pageSync = () => {
               if (engine !== ready) return;
               publishLayout(ready);
               publishSelection(ready, view.state, false);
+            },
+            { flush: "sync" },
+          );
+          // what sources made, once they're drawn or failed
+          watch(
+            [renderStates, drawnVectors],
+            () => {
+              const blocks = sourceBlockIndices(view.state.doc);
+              if (!blocks.length) return;
+              timed("layout", () =>
+                sync(ready, view.state, frozen, { blocks }),
+              );
+              if (engine === ready) publishSelection(ready, view.state, false);
             },
             { flush: "sync" },
           );

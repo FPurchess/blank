@@ -292,12 +292,14 @@ impl Engine {
                 }
             }
             if unit.texts.is_empty() {
-                // a table's caption isn't text to move through, and the
-                // table's cells come after it
+                // a caption isn't text to move through: a table's cells come
+                // after it, and a picture is above its own
                 let laid = &self.laid[frag.item];
-                let caption = frag.unit == 0
-                    && laid.label.is_some()
-                    && matches!(self.items[frag.item].content, Content::Table { .. });
+                let caption = match self.items[frag.item].content {
+                    Content::Table { .. } => frag.unit == 0 && laid.label.is_some(),
+                    Content::Image { .. } => frag.unit > 0,
+                    _ => false,
+                };
                 if caption {
                     continue;
                 }
@@ -482,6 +484,8 @@ mod tests {
                     height: 100.0,
                     alt: String::new(),
                     align: align.map(String::from),
+                    share: None,
+                    caption: None,
                 },
                 ..paragraph(0, "")
             };

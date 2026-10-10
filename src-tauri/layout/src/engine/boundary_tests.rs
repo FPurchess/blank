@@ -201,6 +201,7 @@ fn keeps_images_to_a_size_that_can_be_laid_out() {
             indent: 0.0,
             marker: None,
             bars: vec![],
+            share: None,
         };
         let cell = Cell {
             blocks: vec![image],

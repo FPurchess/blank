@@ -206,6 +206,9 @@ pub enum CellBlock {
         marker: Option<String>,
         #[serde(default)]
         bars: Vec<f32>,
+        /// the share of the cell's width it takes, see `Content::Image`
+        #[serde(default)]
+        share: Option<f32>,
     },
 }
 
@@ -321,6 +324,13 @@ pub enum Content {
         /// anything else, justify too, stands it at the start
         #[serde(default)]
         align: Option<String>,
+        /// the share of the room's width it takes (0 to 1), which may
+        /// enlarge it; None for its own size, at most the room's
+        #[serde(default)]
+        share: Option<f32>,
+        /// what is written under it, in the caption style
+        #[serde(default)]
+        caption: Option<String>,
     },
     Table {
         pos: u32,
@@ -604,6 +614,14 @@ fn read_start_number<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, 
 
 /// an image's size as it may be: not finite is not loaded (0 × 0), and at
 /// most MAX_IMAGE a side, keeping its shape
+/// a share of a width as the engine takes it: above 0 and at most 1, None
+/// for one that isn't a number
+fn clamp_share(share: &mut Option<f32>) {
+    *share = share
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| value.min(1.0));
+}
+
 fn image_size(width: &mut f32, height: &mut f32) {
     if !(width.is_finite() && height.is_finite()) || *width <= 0.0 || *height <= 0.0 {
         (*width, *height) = (0.0, 0.0);
@@ -823,7 +841,22 @@ impl Item {
             Content::Text(Text {
                 hint: Some(hint), ..
             }) => truncate(hint, MAX_LABEL),
-            Content::Image { width, height, .. } => image_size(width, height),
+            Content::Image {
+                width,
+                height,
+                share,
+                caption,
+                ..
+            } => {
+                image_size(width, height);
+                clamp_share(share);
+                if caption.as_ref().is_some_and(|text| text.trim().is_empty()) {
+                    *caption = None;
+                }
+                if let Some(caption) = caption {
+                    truncate(caption, MAX_LABEL);
+                }
+            }
             Content::Boxed { label, .. } => truncate(label, MAX_LABEL),
             Content::Toc {
                 title,
@@ -858,11 +891,13 @@ impl Item {
                             height,
                             indent,
                             bars,
+                            share,
                             ..
                         } => {
                             image_size(width, height);
                             *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
                             clamp_bars(bars);
+                            clamp_share(share);
                         }
                     }
                 }

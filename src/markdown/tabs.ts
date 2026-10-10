@@ -15,6 +15,9 @@ const PLACEHOLDER = "";
 const ENTITY = "&#9;";
 
 const isBreak = (node: Node | null) => node?.type === schema.nodes.hard_break;
+// code blocks, and the sources of diagrams, which are written as fences
+const isCodeBlock = (node: Node) =>
+  node.isTextblock && node.type.spec.code === true;
 const isCode = (node: Node) =>
   node.marks.some((mark) => mark.type === schema.marks.code);
 
@@ -30,7 +33,7 @@ const encodeText = (node: Node, start: boolean, end: boolean) => {
 };
 
 const encodeBlock = (block: Node): Node => {
-  if (block.type === schema.nodes.code_block) return block;
+  if (isCodeBlock(block)) return block;
   if (block.isTextblock) {
     const children: Node[] = [];
     block.forEach((child, _, index) => {
@@ -52,7 +55,7 @@ const encodeBlock = (block: Node): Node => {
 const hasTabs = (doc: Node) => {
   let found = false;
   doc.descendants((node) => {
-    if (found || node.type === schema.nodes.code_block) return false;
+    if (found || isCodeBlock(node)) return false;
     if (node.isText && node.text!.includes("\t") && !isCode(node)) found = true;
     return !found;
   });

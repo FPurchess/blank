@@ -6,7 +6,9 @@ use std::ops::Range;
 
 use parley::Alignment;
 
-use super::{CellImage, Deco, Laid, Marked, Role, TableCell, Unit};
+use super::{
+    caption_box, picture_scale, CellImage, Deco, Laid, Marked, Role, TableCell, Unit, CAPTION_GAP,
+};
 use crate::fonts::Fonts;
 use crate::model::{CellBlock, Text, TextKind};
 use crate::style::{BAR, CELL_PADDING_X, CELL_PADDING_Y, HEADER_LINE, MARKER_GAP, TABLE_LINE};
@@ -18,8 +20,6 @@ pub const MAX_COLUMNS: u32 = 1000;
 
 /// the space between the paragraphs of a cell
 const CELL_PARAGRAPH_GAP: f32 = 8.0;
-/// the space between a caption and its table
-const CAPTION_GAP: f32 = 4.0;
 
 pub struct TableSpec<'a> {
     pub rows: &'a [crate::model::Row],
@@ -184,6 +184,7 @@ fn lay_out_cell(
                 indent,
                 marker,
                 bars,
+                share,
             } => {
                 let indent = indent.clamp(0.0, (inner - 10.0).max(0.0));
                 let x = left + indent;
@@ -192,9 +193,12 @@ fn lay_out_cell(
                 if *image_width > 0.0 && *image_height > 0.0 {
                     // never wider than the cell, nor taller than a
                     // page, as a row's slices don't cut it
-                    let scale = (room_x / image_width)
-                        .min((room - 2.0 * CELL_PADDING_Y) / image_height)
-                        .min(1.0);
+                    let scale = picture_scale(
+                        (*image_width, *image_height),
+                        room_x,
+                        room - 2.0 * CELL_PADDING_Y,
+                        *share,
+                    );
                     let (w, h) = (image_width * scale, image_height * scale);
                     // aligned like the cell's text, as in the Word export
                     let x = x + align_offset(cell.align.as_deref(), room_x, w);
@@ -307,14 +311,7 @@ pub(super) fn table_units(
     let mut label = None;
     let mut top = 0.0;
     if let Some(caption) = table.caption.filter(|caption| !caption.trim().is_empty()) {
-        let text = Text {
-            pos: 0,
-            text: caption.to_string(),
-            style: TextKind::Caption,
-            ..Default::default()
-        };
-        let mut boxed = TextBox::new(fonts, &text, width, Alignment::Start);
-        boxed.x = indent;
+        let boxed = caption_box(fonts, caption, width, indent);
         top = boxed.height() + CAPTION_GAP;
         units.push(Unit {
             height: top,
@@ -1021,6 +1018,7 @@ mod tests {
             indent: 0.0,
             marker: None,
             bars: vec![],
+            share: None,
         }
     }
 
@@ -1187,6 +1185,7 @@ mod tests {
             .iter()
             .filter_map(|op| match op {
                 Op::Glyphs {
+                    paint: None,
                     text,
                     role: Role::Hint,
                     ..
@@ -1246,6 +1245,8 @@ mod tests {
                 height: 2000.0,
                 alt: String::new(),
                 align: None,
+                share: None,
+                caption: None,
             },
             ..crate::engine::test_support::paragraph(0, "")
         };
@@ -1374,6 +1375,7 @@ mod tests {
             indent: 18.0,
             marker: Some("•".into()),
             bars: vec![0.0],
+            share: None,
         }
     }
 

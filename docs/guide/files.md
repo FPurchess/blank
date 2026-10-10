@@ -71,7 +71,7 @@ Every PDF is a PDF/A, the standard for archiving: it holds its fonts, colours an
 
 If you made PDFs with Blank 2.1 or earlier, lines may now break in other places: the PDF is typeset by Blank itself now, the same way as your screen.
 
-Images come along at the size they have in Blank, up to the width of the page. Images from the web are downloaded for the PDF, so that needs an internet connection. If an image can't be loaded, the PDF shows its description in its place, and Blank tells you which one it was.
+Images come along at the size they have in Blank, up to the width of the page. [Diagrams](./blocks#diagrams) stay sharp at any zoom, and their words can be searched. Images from the web are downloaded for the PDF, so that needs an internet connection. If an image can't be loaded, the PDF shows its description in its place, and Blank tells you which one it was.
 
 ## Word documents {#word}
 

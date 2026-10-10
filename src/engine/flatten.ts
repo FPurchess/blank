@@ -11,6 +11,10 @@ import { isListed, listedHeadings } from "../markdown/headings";
 import { parseLength } from "../layout/units";
 import { unknownLabel } from "../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../markdown/blocks/embeds";
+import { parseWidth } from "../markdown/blocks/caps";
+import { sourceKind } from "../sources/registry";
+import { renderedOf, sourceKeyOf } from "../sources/store";
+import { drawingRevision, isVector } from "./vectors";
 import { tableGrid } from "../exporters/table";
 import {
   BLOCK_AFTER,
@@ -50,6 +54,18 @@ export const QUOTE_INDENT = 2.25 + 11;
 export type ImageSizes = (
   src: string,
 ) => { width: number; height: number } | undefined;
+
+// how the sources (src/sources/registry.ts) are shown: the one the cursor is
+// in open, as its source above what it makes (the last drawing that worked,
+// `preview`, while it is being typed); in an export, every one closed and
+// none with the editor's notes
+export interface SourceView {
+  // the position of the open source block
+  open?: number | null;
+  // the key of the drawing shown under the open one's source
+  preview?: string | null;
+  export?: boolean;
+}
 
 // the column widths of the table the cursor is in, kept while it's there so
 // the columns don't move while typing (see frozenWidths)
@@ -151,13 +167,65 @@ const sameMarks = (a: EngineSpan, b: EngineSpan) =>
 const styleOf = (node: Node): TextStyle => {
   if (node.type.name === "heading")
     return `h${node.attrs.level as 1 | 2 | 3 | 4 | 5 | 6}`;
-  if (node.type.name === "code_block") return "code";
+  // code blocks, and the sources of diagrams
+  if (node.type.spec.code) return "code";
   return "p";
 };
 
+interface PictureOptions {
+  alt: string;
+  // the alignment of the paragraph it stands in, or its own
+  align?: EngineAlign | null;
+  // how wide it is shown, as the file writes it (see parseWidth)
+  width?: string | null;
+  caption?: string | null;
+}
+
 /**
- * imageContent builds an image, which stands on a line of its own at `pos`
+ * picture builds a picture, which stands on a line of its own at `pos`: an
+ * image, an embed's drawing, a diagram. It's laid out at the width it is
+ * given, a share of the room or a length, else at its own size; 0 by 0
+ * until it's loaded.
  * @param size its size once it is loaded
+ * @returns the item and what its record's key must tell apart
+ */
+const picture = (
+  src: string,
+  pos: number,
+  size: ReturnType<ImageSizes>,
+  { alt, align, width, caption }: PictureOptions,
+) => {
+  const given = parseWidth(width);
+  const wide = size
+    ? (given && "points" in given && given.points) || size.width
+    : 0;
+  const height = size?.width ? (size.height * wide) / size.width : 0;
+  const content = {
+    kind: "image" as const,
+    pos,
+    src,
+    width: height ? wide : 0,
+    height,
+    alt,
+    ...(align ? { align } : {}),
+    ...(given && "share" in given ? { share: given.share } : {}),
+    ...(caption ? { caption } : {}),
+  };
+  const key = [
+    src,
+    // a drawing of the diagram module's, once it's there, in place of the
+    // picture
+    isVector(src) ? `drawn:${drawingRevision(src) ?? ""}` : "",
+    height ? `${wide}x${height}` : "?",
+    align ?? "",
+    width ?? "",
+    caption ?? "",
+  ].join(" ");
+  return { content, key };
+};
+
+/**
+ * imageContent builds an image node's picture, see picture
  * @param align the alignment of the paragraph it stands in
  */
 const imageContent = (
@@ -165,15 +233,12 @@ const imageContent = (
   pos: number,
   size: ReturnType<ImageSizes>,
   align?: EngineAlign | null,
-) => ({
-  kind: "image" as const,
-  pos,
-  src: image.attrs.src as string,
-  width: size?.width ?? 0,
-  height: size?.height ?? 0,
-  alt: (image.attrs.alt as string | null) ?? "",
-  ...(align ? { align } : {}),
-});
+) =>
+  picture(image.attrs.src as string, pos, size, {
+    alt: (image.attrs.alt as string | null) ?? "",
+    align,
+    width: image.attrs.width as string | null,
+  });
 
 /**
  * textOf builds the text of a textblock's children, which start at `pos`
@@ -307,8 +372,16 @@ const cellBlocks = (
         const first = index === 0 && marker ? { marker } : {};
         if (piece.image) {
           const size = sizes(piece.image.attrs.src as string);
+          // a cell's image follows the cell's alignment, and has no caption
+          const { content } = imageContent(piece.image, piece.pos, size);
           blocks.push({
-            ...imageContent(piece.image, piece.pos, size),
+            kind: "image",
+            pos: content.pos,
+            src: content.src,
+            width: content.width,
+            height: content.height,
+            alt: content.alt,
+            ...("share" in content ? { share: content.share } : {}),
             indent,
             bars,
             ...first,
@@ -428,7 +501,9 @@ export const flatten = (
   doc: Node,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
-): FlatRecord[] => flattenBlocks(doc, 0, doc.childCount, sizes, frozen).flat();
+  sources: SourceView = {},
+): FlatRecord[] =>
+  flattenBlocks(doc, 0, doc.childCount, sizes, frozen, sources).flat();
 
 /**
  * flattenBlocks returns the records of the document's top-level blocks from
@@ -442,6 +517,7 @@ export const flattenBlocks = (
   to: number,
   sizes: ImageSizes,
   frozen: FrozenWidths | null = null,
+  sources: SourceView = {},
 ): FlatRecord[][] => {
   const records: FlatRecord[] = [];
   const quoteOf: number[][] = [];
@@ -545,27 +621,17 @@ export const flattenBlocks = (
       return;
     }
     if (name === "embed") {
-      // its drawing, as an image: as wide as it says, as high as that
-      // makes it; 0 by 0 until it is loaded
+      // its drawing, as an image, as wide as it says
       const src = embedSrc(node);
-      const size = sizes(src);
-      const width = size ? (parseLength(node.attrs.width) ?? size.width) : 0;
-      const height = size?.width ? (size.height * width) / size.width : 0;
-      push(
-        node,
-        pos,
-        context,
-        space,
-        () => ({
-          kind: "image",
-          pos,
-          src,
-          width: height ? width : 0,
-          height,
-          alt: embedLabel(node),
-        }),
-        { key: height ? `${width}x${height}` : "?" },
-      );
+      const { content, key } = picture(src, pos, sizes(src), {
+        alt: embedLabel(node),
+        width: node.attrs.width as string,
+      });
+      push(node, pos, context, space, () => content, { key });
+      return;
+    }
+    if (node.type.spec.sourceBlock) {
+      sourceBlock(node, pos, context, space);
       return;
     }
     if (name === "unknown_block") {
@@ -832,18 +898,16 @@ export const flattenBlocks = (
         const size = sizes(image.attrs.src as string);
         // the record's node is the image, which stays the same when the
         // paragraph's alignment changes, so the key tells that apart
-        const align = alignOf(node);
-        push(
+        const { content, key } = imageContent(
           image,
           piece.pos,
-          context,
-          pieceSpace,
-          () => imageContent(image, piece.pos, size, align),
-          {
-            marker: pieceMarker,
-            key: `${size ? `${size.width}x${size.height}` : "?"}${align ?? ""}`,
-          },
+          size,
+          alignOf(node),
         );
+        push(image, piece.pos, context, pieceSpace, () => content, {
+          marker: pieceMarker,
+          key,
+        });
         return;
       }
       // a paragraph split around images is keyed by its piece, so the
@@ -870,6 +934,86 @@ export const flattenBlocks = (
         { marker: pieceMarker, key: runs.length > 1 ? `piece${index}` : "" },
       );
     });
+  };
+
+  // a block that holds its source (src/sources/registry.ts): closed, what
+  // it makes; open, or while it can't be drawn, its source as code with what
+  // it makes under it, or what is wrong. Exports show what it makes, or its
+  // source where it can't be drawn.
+  const sourceBlock = (
+    node: Node,
+    pos: number,
+    context: Context,
+    space: Space,
+  ) => {
+    const kind = sourceKind(node.type.name);
+    const source = node.firstChild!;
+    const key = sourceKeyOf(node);
+    const rendered = renderedOf(node);
+    const open = !sources.export && sources.open === pos;
+    if (kind?.item) {
+      const item = kind.item;
+      push(node, pos, context, space, () => item(node, pos, rendered, open), {
+        key: [open, key, rendered ? JSON.stringify(rendered) : "?"].join(" "),
+      });
+      return;
+    }
+    const failed = rendered !== undefined && rendered.ok !== true;
+    const label = kind?.label(source.textContent) ?? "";
+    const shown = {
+      alt: (node.attrs.alt as string) || label,
+      align: alignOf(node),
+      width: node.attrs.width as string | null,
+      caption: node.attrs.caption as string | null,
+    };
+    if (!open && !failed) {
+      const { content, key: sized } = picture(key, pos, sizes(key), shown);
+      push(node, pos, context, space, () => content, { key: sized });
+      return;
+    }
+    // its source, as code, where the cursor goes
+    const inner = { ...context, top: false, listed: false };
+    const notes = !sources.export;
+    textblock(source, pos + 1, inner, {
+      before: space.before,
+      after: notes ? 0 : space.after,
+    });
+    if (!notes) return;
+    // under it what it makes, or made last while it's being typed, at the
+    // end of the block, so the positions stay in order
+    const end = pos + node.nodeSize - 1;
+    const preview = rendered?.ok === true ? key : open ? sources.preview : null;
+    const previewSize = preview ? sizes(preview) : undefined;
+    if (preview && previewSize) {
+      const { content, key: sized } = picture(preview, end, previewSize, {
+        ...shown,
+        caption: null,
+      });
+      push(
+        node,
+        end,
+        context,
+        { before: BLOCK_AFTER, after: failed ? 0 : space.after },
+        () => content,
+        {
+          key: `preview ${sized}`,
+        },
+      );
+    }
+    if (failed) {
+      const said =
+        rendered.ok === false
+          ? rendered.error
+          : (rendered as { reason: string }).reason;
+      push(
+        node,
+        end,
+        context,
+        { before: BLOCK_AFTER, after: space.after },
+        () => ({ kind: "boxed", pos: end, label: said }),
+        { key: `failed ${said}` },
+      );
+    }
   };
 
   const top: Context = {

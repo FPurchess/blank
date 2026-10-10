@@ -3,11 +3,13 @@ import type { Command, EditorState } from "prosemirror-state";
 import { isInTable, selectedRect } from "prosemirror-tables";
 
 import { type TextAlignment, textAlignment } from "../../markdown";
+import { capsOf } from "../../markdown/blocks/caps";
 import { alignColumns } from "./table/format";
 import { cellsOfColumns } from "./table/rect";
 
 // The alignment of text: of the paragraphs and headings at the top of the
-// document, or in a table of its columns, as markdown aligns whole columns.
+// document, and of blocks that can be aligned (diagrams), or in a table of
+// its columns, as markdown aligns whole columns.
 // Lists, quotes, code and form fields keep no alignment (see
 // src/markdown/alignment.ts).
 
@@ -33,7 +35,10 @@ const alignedBlocks = (state: EditorState): { pos: number; node: Node }[] => {
   return found.filter(
     ({ node }) =>
       node.type === state.schema.nodes.paragraph ||
-      node.type === state.schema.nodes.heading,
+      node.type === state.schema.nodes.heading ||
+      // a block that can be aligned, e.g. a diagram (see
+      // src/markdown/blocks/caps.ts)
+      capsOf(node.type).align === true,
   );
 };
 
@@ -77,7 +82,10 @@ export const alignText =
     if (isInTable(state)) {
       return align !== "justify" && alignColumns(align)(state, dispatch);
     }
-    const blocks = alignedBlocks(state);
+    // a block of no text, e.g. a diagram, can't be justified
+    const blocks = alignedBlocks(state).filter(
+      ({ node }) => align !== "justify" || node.isTextblock,
+    );
     if (blocks.length === 0) return false;
     if (dispatch) {
       const value =

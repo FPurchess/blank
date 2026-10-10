@@ -110,9 +110,10 @@ export const _openImageDialog = (view: EditorView) => {
   imageDialog.value = {
     src: (node?.attrs.src as string | undefined) ?? "",
     alt: (node?.attrs.alt as string | null | undefined) ?? "",
+    width: (node?.attrs.width as string | null | undefined) ?? null,
     isEdit: node !== null,
     chooseFile: chooseImageFile,
-    submit: (rawSrc, alt) => {
+    submit: (rawSrc, alt, width) => {
       // an embedded image is kept as is, a typed path or address is encoded
       // like the markdown parser does, so it survives saving
       const src = rawSrc.startsWith("data:") ? rawSrc : normalizeUrl(rawSrc);
@@ -124,6 +125,7 @@ export const _openImageDialog = (view: EditorView) => {
         src,
         alt: alt.trim() || null,
         title: node?.attrs.title ?? null,
+        width,
       });
       apply((tr) => {
         tr.replaceWith(from, to, image);

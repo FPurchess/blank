@@ -276,11 +276,42 @@ figure.embed {
   }
 }
 
+// a block that holds its source, e.g. a diagram (src/editor/plugins/
+// sourceBlocks.ts): what it makes, and its source as code only while the
+// cursor is in it (`open`), as the pages show it; what is wrong below it
+figure.source-block {
+  margin: 0;
+
+  &:not(.open) > pre {
+    display: none;
+  }
+
+  .source-preview img {
+    display: block;
+    max-width: 100%;
+    margin-top: 0.4em;
+  }
+
+  .source-error {
+    margin-top: 0.4em;
+    font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif;
+    font-size: 0.85em;
+    white-space: pre-wrap;
+    opacity: 0.7;
+  }
+
+  // a source that can't be drawn shows, open or not
+  &:has(.source-error:not([hidden])) > pre {
+    display: block;
+  }
+}
+
 // a content block the cursor selected, as a page break
 :is(
   nav.toc,
   section.form,
   figure.embed,
+  figure.source-block,
   pre.unknown-block
 ).ProseMirror-selectednode {
   outline: 2px solid var(--color);

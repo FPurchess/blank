@@ -37,9 +37,12 @@ const FIELD_TAG = "blank:field:";
 export const GRID_TAG = "blank:grid";
 // the tag of an embed's picture, before its id
 const EMBED_TAG = "blank:embed@1:";
+// the tag of a diagram's picture, before its id
+const DIAGRAM_TAG = "blank:diagram@1:";
 
 export const formTag = (def: string) => `${FORM_TAG}${def}`;
 export const embedTag = (id: string) => `${EMBED_TAG}${id}`;
+export const diagramTag = (id: string) => `${DIAGRAM_TAG}${id}`;
 export const fieldTag = (name: string) => `${FIELD_TAG}${name}`;
 
 /**
@@ -54,9 +57,13 @@ export const readTag = (
   | { field: string }
   | { grid: true }
   | { embed: string }
+  | { diagram: string }
   | null => {
   if (tag?.startsWith(FORM_TAG)) return { form: tag.slice(FORM_TAG.length) };
   if (tag?.startsWith(EMBED_TAG)) return { embed: tag.slice(EMBED_TAG.length) };
+  if (tag?.startsWith(DIAGRAM_TAG)) {
+    return { diagram: tag.slice(DIAGRAM_TAG.length) };
+  }
   if (tag?.startsWith(FIELD_TAG)) return { field: tag.slice(FIELD_TAG.length) };
   if (tag === GRID_TAG) return { grid: true };
   return null;
@@ -67,6 +74,8 @@ export const DEFINITIONS_NAMESPACE =
   "https://blank-writer.xyz/2026/definitions";
 // and the one that holds the embeds
 export const EMBEDS_NAMESPACE = "https://blank-writer.xyz/2026/embeds";
+// and the one that holds the diagrams' sources and settings
+export const DIAGRAMS_NAMESPACE = "https://blank-writer.xyz/2026/diagrams";
 
 const element = (doc: Document, name: string, val?: string) => {
   const made = doc.createElementNS(W, `w:${name}`);
@@ -192,32 +201,44 @@ const escapeXml = (text: string) =>
 
 // a Custom XML part of Blank's: its number in customXml/, the element
 // that holds it, its namespace and the id Word knows it by
-interface CustomPart {
+export interface CustomPart {
   number: number;
   root: string;
   namespace: string;
   id: string;
 }
 
-const DEFINITIONS_PART: CustomPart = {
-  number: 1,
-  root: "definitions",
-  namespace: DEFINITIONS_NAMESPACE,
-  id: "{6B8E2D7A-2B4C-4E4B-9C1A-5F0A3B1D7E21}",
-};
-
-const EMBEDS_PART: CustomPart = {
-  number: 2,
-  root: "embeds",
-  namespace: EMBEDS_NAMESPACE,
-  id: "{2F1C8B4E-7D3A-4C9E-8B6F-1A5E9D0C3B72}",
-};
+// Blank's Custom XML parts, each its own number, which names its files
+export const CUSTOM_PARTS = {
+  definitions: {
+    number: 1,
+    root: "definitions",
+    namespace: DEFINITIONS_NAMESPACE,
+    id: "{6B8E2D7A-2B4C-4E4B-9C1A-5F0A3B1D7E21}",
+  },
+  embeds: {
+    number: 2,
+    root: "embeds",
+    namespace: EMBEDS_NAMESPACE,
+    id: "{2F1C8B4E-7D3A-4C9E-8B6F-1A5E9D0C3B72}",
+  },
+  diagrams: {
+    number: 3,
+    root: "diagrams",
+    namespace: DIAGRAMS_NAMESPACE,
+    id: "{8C3E5A1D-4F2B-4D7C-9E6A-3B1F7C2D5E94}",
+  },
+} satisfies Record<string, CustomPart>;
 
 /**
  * addCustomPart puts `text` in a Custom XML part of the package, which Word
  * keeps, see CustomPart
  */
-const addCustomPart = async (zip: JSZip, part: CustomPart, text: string) => {
+export const addCustomPart = async (
+  zip: JSZip,
+  part: CustomPart,
+  text: string,
+) => {
   const { number, root, namespace, id } = part;
   zip.file(
     `customXml/item${number}.xml`,
@@ -265,7 +286,12 @@ const addCustomPart = async (zip: JSZip, part: CustomPart, text: string) => {
 export const addDefinitions = (
   zip: JSZip,
   definitions: readonly Definition[],
-) => addCustomPart(zip, DEFINITIONS_PART, writeDefinitionList(definitions));
+) =>
+  addCustomPart(
+    zip,
+    CUSTOM_PARTS.definitions,
+    writeDefinitionList(definitions),
+  );
 
 /**
  * addEmbeds puts the embeds, their attributes by their ids as JSON, in a
@@ -273,4 +299,20 @@ export const addDefinitions = (
  * the pictures that show them again
  */
 export const addEmbeds = (zip: JSZip, embeds: Record<string, Attrs>) =>
-  addCustomPart(zip, EMBEDS_PART, JSON.stringify(embeds));
+  addCustomPart(zip, CUSTOM_PARTS.embeds, JSON.stringify(embeds));
+
+// a diagram as the Word export keeps it: its source and its settings
+export interface WordDiagram {
+  source: string;
+  attrs: Attrs;
+}
+
+/**
+ * addDiagrams puts the diagrams, their sources and settings by their ids
+ * as JSON, in a Custom XML part of the package, so that the Word
+ * import makes diagrams of the pictures that show them again
+ */
+export const addDiagrams = (
+  zip: JSZip,
+  diagrams: Record<string, WordDiagram>,
+) => addCustomPart(zip, CUSTOM_PARTS.diagrams, JSON.stringify(diagrams));

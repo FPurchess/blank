@@ -19,7 +19,15 @@ import {
 import { CellSelection, tableEditing, TableMap } from "prosemirror-tables";
 import { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 import type { Node } from "prosemirror-model";
 import { createForm, schema } from "../../markdown";
@@ -68,6 +76,12 @@ import { pageSync, pageView, pageViewKey, selectionAt } from "./pageView";
 import { documentState, showDocument } from "../document";
 import * as flattening from "../../engine/flatten";
 import { tableGrid } from "../../exporters/table";
+import { diagram, registerBoxes } from "../../test/sources";
+import { useTestDiagramModule } from "../../test/diagramModule";
+import { setDiagramModuleLoader } from "../../engine/diagramModule";
+import { drawAll, drawingOf, forgetVectors } from "../../engine/vectors";
+import { forgetRendered, sourceKeyOf } from "../../sources/store";
+import { sourceBlocks } from "./sourceBlocks";
 
 /**
  * shown returns the state of `doc`, published as the shown document, as a
@@ -1183,4 +1197,45 @@ describe("the pages after many real edits", () => {
       view.destroy();
     },
   );
+});
+
+describe("diagrams on the pages", () => {
+  beforeEach(() => showPages());
+  afterEach(() => hidePages());
+
+  it("paints a diagram from the diagram module's drawing once it's drawn", async () => {
+    const unregister = registerBoxes();
+    useTestDiagramModule();
+    const block = diagram("A --> B");
+    const mounted = mount(doc(block, p(LONG)), [sourceBlocks()]);
+    onTestFinished(() => {
+      mounted.pluginView.destroy?.();
+      unregister();
+      setDiagramModuleLoader(null);
+      forgetRendered();
+      forgetVectors();
+    });
+    const key = sourceKeyOf(block);
+    await drawAll([key]);
+    expect(drawingOf(key)).toBeDefined();
+    const engine = pageEngine!;
+    // its rectangle as a path in the ink, no picture
+    const { body } = pageOf(engine, 0);
+    expect(body.p?.length).toBeGreaterThan(0);
+    expect(body.i).toEqual([]);
+    // the engine lets it go with the diagram: an image of the same src is
+    // then a picture again, not the drawing
+    mounted.view.dispatch(
+      mounted.view.state.tr.replaceWith(
+        0,
+        block.nodeSize,
+        schema.node("paragraph", null, [
+          schema.nodes.image.create({ src: key }),
+        ]),
+      ),
+    );
+    const after = pageOf(engine, 0).body;
+    expect(after.p ?? []).toEqual([]);
+    expect(after.i).toHaveLength(1);
+  });
 });

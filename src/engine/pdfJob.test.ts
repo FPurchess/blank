@@ -60,7 +60,7 @@ describe("writePdf", () => {
     const result = writePdf(LayoutEngine, {
       ...job,
       language: "de-CH",
-      images: [{ src: "x.png", bytes: new Uint8Array([1, 2, 3]), jpeg: false }],
+      images: [{ src: "x.png", bytes: new Uint8Array([1, 2, 3]), kind: 0 }],
       items: JSON.stringify([
         ...JSON.parse(job.items),
         {

@@ -84,6 +84,88 @@ describe("Canvas2DPainter", () => {
     ]);
   });
 
+  it("paints a drawing's lines and shapes, in the ink or the author's colour", () => {
+    const { painter, surface, calls } = setUp();
+    painter.paint(
+      surface,
+      {
+        ...DISPLAY,
+        p: [
+          [
+            0,
+            1.5,
+            "M0 0L10 0",
+            0.5,
+            "",
+            {
+              dash: [3, 3],
+              offset: 1,
+              cap: "round",
+              join: "bevel",
+              evenodd: false,
+            },
+          ],
+          [
+            0,
+            0,
+            "M0 0L10 0L10 10Z",
+            1,
+            "#c81e1e",
+            { cap: "butt", join: "miter", evenodd: true },
+          ],
+        ],
+      },
+      { scale: 2, ratio: 1, x: 10, y: 10, color: "black" },
+    );
+    expect(calls).toContainEqual([
+      "stroke",
+      { d: "M0 0L10 0" },
+      "black",
+      1.5,
+      "round",
+      "bevel",
+      [3, 3],
+      1,
+      0.5,
+    ]);
+    expect(calls).toContainEqual([
+      "fill",
+      { d: "M0 0L10 0L10 10Z" },
+      "evenodd",
+    ]);
+    expect(calls).toContainEqual(["style", "#c81e1e", 1]);
+  });
+
+  it("paints a drawing on paper in the colour of its role, as the PDF prints", () => {
+    const { painter, surface, calls } = setUp();
+    painter.paint(
+      surface,
+      {
+        ...DISPLAY,
+        r: [],
+        i: [],
+        g: [[0, 10, 0, 42, 12, 30]],
+        gp: [[0, 0.5]],
+        p: [[0, 1, "M0 0L10 0", 0.4, ""]],
+      },
+      {
+        scale: 1,
+        ratio: 1,
+        x: 0,
+        y: 0,
+        color: "",
+        colors: PAPER_COLORS,
+        background: "#fff",
+      },
+    );
+    // the path's ink is the text's colour on paper, at its strength
+    const stroke = calls.find((call) => call[0] === "stroke")!;
+    expect(stroke[2]).toBe(PAPER_COLORS[0]);
+    expect(stroke[8]).toBe(0.4);
+    // and a drawing's glyphs too
+    expect(calls).toContainEqual(["style", PAPER_COLORS[0], 0.5]);
+  });
+
   it("paints nothing without an engine", () => {
     const canvas = { width: 10, height: 10 };
     const { context, calls } = recordingContext(canvas);

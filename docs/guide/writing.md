@@ -49,6 +49,7 @@ At the start of an empty line, type one of these to turn the line into a block:
 | `+++`                       | Enter | [Page break](./pages#page-breaks) |
 | `[toc]`                     | Enter | [Table of contents](./blocks#toc) |
 | ` ``` ` or ` ```lang `      | Enter | Code block                        |
+| ` ```mermaid `              | Enter | [Diagram](./blocks#diagrams)      |
 | `\| Name \| Qty \|`         | Enter | Table                             |
 
 Changed your mind? `Mod` `Z` right away gives you back the line as you typed it.
@@ -101,7 +102,9 @@ These images stay where they are and the document links to them.
 
 To change or remove an image, put the cursor right before or after it and press `Mod` `Alt` `I` again.
 
-Images are as wide as they are in the file, up to the width of the page, and [PDFs and Word documents](./files#pdf) include them at that size.
+Images are as wide as they are in the file, up to the width of the page, and [PDFs and Word documents](./files#pdf) include them at that size. To give one another width, choose it under **Width** in the dialog: **Fit** keeps its own size, and half, three quarters or all of the text's width make it that wide, larger too. Center or right-align it as you align its paragraph.
+
+A sized image is written as HTML in your markdown file, `<img src="cat.png" alt="A cat" width="50%">`, which GitHub, GitLab, Obsidian and Typora show at that width as well; an image without a width stays `![A cat](cat.png)`. Its width comes along into Word and back.
 
 ## Tabs
 

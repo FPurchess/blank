@@ -10,6 +10,7 @@ import {
   type FlatRecord,
   type FrozenWidths,
   type ImageSizes,
+  type SourceView,
 } from "./flatten";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
@@ -17,7 +18,8 @@ import { engineMissing } from "../state/pageView";
 import init, { initSync, LayoutEngine } from "./wasm/blank_layout.js";
 import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
-import { packFonts, type PdfWarning } from "./pdfJob";
+import { setPictureFonts } from "./vectors";
+import { type ImageKind, packFonts, type PdfWarning } from "./pdfJob";
 import type { EngineItem, PrintSheet } from "./types";
 
 // The layout engine (src-tauri/layout, built for the webview by
@@ -78,6 +80,15 @@ const rectsOf = (values: Float32Array): PageBox[] => {
   return rects;
 };
 
+// how a drawing's line is drawn, in page points (see drawing.rs)
+export interface LineStyle {
+  dash?: number[];
+  offset?: number;
+  cap: CanvasLineCap;
+  join: CanvasLineJoin;
+  evenodd: boolean;
+}
+
 // what a page shows, as the engine writes it (see wasm.rs `page`)
 export interface PageDisplay {
   // rectangles: x, y, width, height, role
@@ -88,6 +99,13 @@ export interface PageDisplay {
   l: [string, number, number, number, number][];
   // glyph runs: font, size, role, then id, x, y for each glyph
   g: number[][];
+  // the paints of drawings' glyph runs: the run's index in `g`, strength,
+  // and the author's colour, if it has one
+  gp?: ([number, number] | [number, number, string])[];
+  // paths of drawings: role, stroke width (0 to fill), path data in page
+  // points, strength, the author's colour ("" for the ink), and how its
+  // line is drawn, unless it's a plain line
+  p?: [number, number, string, number, string, LineStyle?][];
 }
 
 /**
@@ -176,6 +194,9 @@ export interface SyncOptions {
   sizesKey?: string;
   // top-level blocks to flatten again, e.g. those whose image loaded
   blocks?: readonly number[];
+  // which source block is open (see SourceView in ./flatten.ts); kept for
+  // every flattening after, so name the blocks it changes in `blocks`
+  sources?: SourceView;
 }
 
 // flattening more blocks than this again costs about as much as flattening
@@ -304,6 +325,8 @@ export class PageEngine {
   private sizesKey = "";
   private settings = "";
   private frozen = "";
+  // which source block is open, see SyncOptions
+  private sources: SourceView = {};
   // what each page's body and bands show, by their own versions
   private bodies = new Map<number, { version: number; display: PageDisplay }>();
   private bandsShown = new Map<
@@ -475,8 +498,10 @@ export class PageEngine {
       changes = null,
       sizesKey = "",
       blocks = [],
+      sources,
     }: SyncOptions,
   ) {
+    if (sources) this.sources = sources;
     const frozenKey = frozen ? `${frozen.pos}:${frozen.widths.join(" ")}` : "";
     const same = frozenKey === this.frozen && sizesKey === this.sizesKey;
     const unchanged = doc === this.doc;
@@ -504,7 +529,14 @@ export class PageEngine {
     frozen: FrozenWidths | null,
     progressive: boolean,
   ) {
-    const blocks = flattenBlocks(doc, 0, doc.childCount, sizes, frozen);
+    const blocks = flattenBlocks(
+      doc,
+      0,
+      doc.childCount,
+      sizes,
+      frozen,
+      this.sources,
+    );
     const records = blocks.flat();
     if (this.doc === null) {
       const first = progressive ? records.slice(0, FIRST_ITEMS) : records;
@@ -573,7 +605,14 @@ export class PageEngine {
     // how many blocks the groups before added, to find the next one's
     let moved = 0;
     for (const { from, to, oldFrom, oldTo } of groups) {
-      const fresh = flattenBlocks(doc, from, to + 1, sizes, frozen);
+      const fresh = flattenBlocks(
+        doc,
+        from,
+        to + 1,
+        sizes,
+        frozen,
+        this.sources,
+      );
       const records = fresh.flat();
       const start = this.blockStarts[oldFrom + moved];
       const end = this.blockStarts[oldTo + 1 + moved];
@@ -669,8 +708,21 @@ export class PageEngine {
     return this.call(new Float32Array(), () => this.raw.bottoms());
   }
 
-  addImage(src: string, bytes: Uint8Array, jpeg: boolean) {
-    this.call(undefined, () => this.raw.addImage(src, bytes, jpeg));
+  /**
+   * addDrawing gives the engine a drawing of a module's (see
+   * src/engine/vectors.ts), drawn in place of the image `src`; false for one
+   * it can't read
+   */
+  addDrawing(src: string, json: string) {
+    return this.call(false, () => this.raw.addDrawing(src, json));
+  }
+
+  removeDrawing(src: string) {
+    this.call(undefined, () => this.raw.removeDrawing(src));
+  }
+
+  addImage(src: string, bytes: Uint8Array, kind: ImageKind) {
+    this.call(undefined, () => this.raw.addImage(src, bytes, kind));
   }
 
   /**
@@ -959,6 +1011,7 @@ export const createEngine = (fonts: Uint8Array[], strict = false) => {
 export const loadEngineSync = (wasm: Uint8Array, fonts: Uint8Array[]) => {
   initSync({ module: wasm as Uint8Array<ArrayBuffer> });
   fontFiles = fonts;
+  setPictureFonts(fonts[0], fonts[2]);
   return createEngine(fonts);
 };
 
@@ -980,6 +1033,9 @@ const loadFiles = () =>
     ]);
     bootMark("fonts");
     fontFiles = fonts as Uint8Array[];
+    // drawings shown as pictures use IBM Plex Sans as their own data,
+    // regular and medium (see FONT_URLS)
+    setPictureFonts(fontFiles[0], fontFiles[2]);
     return fontFiles;
   })());
 

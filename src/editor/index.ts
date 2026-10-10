@@ -11,6 +11,7 @@ import {
   pastedLinks,
   blockRemovals,
   blockTools,
+  sourceBlocks,
   contextMenu,
   embeds,
   find,
@@ -39,6 +40,7 @@ import { setGeometryView } from "../engine/geometry";
 import { createEditorHandle, syncPlugin } from "./handle";
 import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { timed } from "../engine/perf";
+import { registerDiagrams } from "../diagrams";
 
 /**
  * bootEditor mounts the editor with the tabs of the last session and the
@@ -46,6 +48,8 @@ import { timed } from "../engine/perf";
  * @returns the handle the UI works with the editor through
  */
 export const bootEditor = async () => {
+  // the kinds of source blocks: Mermaid itself loads with the first diagram
+  registerDiagrams();
   const state = await restoreTabs(
     EditorState.create({
       schema,
@@ -62,6 +66,8 @@ export const bootEditor = async () => {
         languagePicker(),
         tablePickerKeys(),
         tableTools(),
+        // Esc in a source, before the block tools' Enter on a selected one
+        sourceBlocks(),
         blockTools(),
         blockRemovals(),
         contextMenu(),

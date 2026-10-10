@@ -15,6 +15,10 @@
 ["duck@0.1.12"]
 license = "BSD-2-Clause"
 
+# no licence in package.json; its license file is MIT's
+["khroma@2.1.0"]
+license = "MIT"
+
 # no licence file
 ["hash.js@1.1.7"]
 text-from = "README.md"

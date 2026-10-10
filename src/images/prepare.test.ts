@@ -5,7 +5,7 @@ import { readFile } from "@tauri-apps/plugin-fs";
 
 import { doc } from "../test/editor";
 import { IMAGES, bytesOf, dataUrl } from "../test/images";
-import { decodeSize, rasterize } from "./codec";
+import { rasterize } from "./codec";
 import { failureWarning, prepareImages } from "./prepare";
 
 vi.mock("./codec", () => ({ decodeSize: vi.fn(), rasterize: vi.fn() }));
@@ -34,15 +34,25 @@ describe("images.prepareImages", () => {
     expect(rasterize).not.toHaveBeenCalled();
   });
 
-  it("decodes the size if the header doesn't tell", async () => {
+  it("gives an SVG file as a picture, with the SVG along", async () => {
     const svg = "data:image/svg+xml,%3Csvg%3E%3C/svg%3E";
-    vi.mocked(decodeSize).mockResolvedValue({ width: 10, height: 20 });
+    vi.mocked(rasterize).mockResolvedValue({
+      bytes: converted,
+      mime: "image/png",
+      size: { width: 10, height: 20 },
+    });
 
     const { images } = await prepareImages(doc(paragraph(image(svg))), null, [
       "image/svg+xml",
     ]);
 
-    expect(images.get(svg)).toMatchObject({ width: 10, height: 20 });
+    // only Blank's own drawings are drawn as vectors, whose fonts it knows
+    expect(images.get(svg)).toMatchObject({
+      mime: "image/png",
+      width: 10,
+      height: 20,
+    });
+    expect(new TextDecoder().decode(images.get(svg)!.svg)).toBe("<svg></svg>");
   });
 
   it("converts other formats to PNG", async () => {

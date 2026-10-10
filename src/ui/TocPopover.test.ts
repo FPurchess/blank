@@ -19,8 +19,7 @@ describe("the settings of a table of contents", () => {
     dispose = bootApp(createTestHandle());
     request = {
       anchor: { left: 100, top: 200, bottom: 260, right: 600 },
-      depth: 3,
-      title: "Contents",
+      values: { depth: 3, title: "Contents" },
       apply: vi.fn(),
       close: vi.fn(),
     };
@@ -47,14 +46,23 @@ describe("the settings of a table of contents", () => {
   it("applies each change at once", () => {
     depth().value = "5";
     depth().dispatchEvent(new Event("change"));
-    expect(request.apply).toHaveBeenLastCalledWith(5, "Contents");
+    expect(request.apply).toHaveBeenLastCalledWith({
+      depth: 5,
+      title: "Contents",
+    });
     title().value = "Overview";
     title().dispatchEvent(new Event("input"));
-    expect(request.apply).toHaveBeenLastCalledWith(5, "Overview");
+    expect(request.apply).toHaveBeenLastCalledWith({
+      depth: 5,
+      title: "Overview",
+    });
     // an empty title is the default one
     title().value = " ";
     title().dispatchEvent(new Event("input"));
-    expect(request.apply).toHaveBeenLastCalledWith(5, "Contents");
+    expect(request.apply).toHaveBeenLastCalledWith({
+      depth: 5,
+      title: "Contents",
+    });
   });
 
   it("closes on Esc, taking the key, and gives the focus back", async () => {
