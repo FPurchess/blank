@@ -1,0 +1,117 @@
+name: "MuPDF"
+description: >-
+  Checks out MuPDF (the submodule src-tauri/pdf/mupdf-sys/mupdf, with its own
+  submodules) from a cache of its git data, and restores the built PDF helper
+  or MuPDF's build output, so they are neither downloaded nor built again
+  while nothing they're made from changed. Use it after actions/checkout
+  without submodules; with helper or build, after Bun and Rust are set up.
+
+inputs:
+  helper:
+    description: >-
+      Restore src-tauri/binaries/ (the PDF helper and its stamp), so
+      scripts/build-pdf-helper.ts skips the build while the stamp matches
+    default: "false"
+  targets:
+    description: >-
+      The target triples the job builds the helper for, separated by spaces;
+      empty for the host's
+    default: ""
+  build:
+    description: >-
+      Restore mupdf-sys's build output in src-tauri/target/release (Linux
+      only), for jobs that link MuPDF into their tests
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    # the commit the repository pins; MuPDF's own submodules follow from it
+    - id: pin
+      shell: bash
+      run: |
+        commit=$(git ls-tree HEAD src-tauri/pdf/mupdf-sys/mupdf | awk '{ print $3 }')
+        [ -n "$commit" ] || { echo "::error::src-tauri/pdf/mupdf-sys/mupdf isn't a submodule of HEAD"; exit 1; }
+        echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+    # the git data of the submodule and of MuPDF's submodules inside it (its
+    # modules/), all shallow. On a hit, the update below finds the commits
+    # there and fetches nothing
+    - uses: actions/cache@v6
+      with:
+        path: .git/modules/src-tauri/pdf/mupdf-sys/mupdf
+        key: mupdf-git-${{ runner.os }}-${{ steps.pin.outputs.commit }}-${{ hashFiles('.gitmodules') }}
+
+    # as actions/checkout does with submodules: recursive
+    - name: check out MuPDF
+      shell: bash
+      run: git -c core.longpaths=true submodule update --init --recursive --force --depth 1 -- src-tauri/pdf/mupdf-sys/mupdf
+
+    # the build script's stamp for each target: a hash of rustc, the target,
+    # MuPDF's commit and the helper's sources; the runner's image too, since
+    # the glibc and the system libraries the helper links come from it
+    - id: key
+      if: inputs.helper == 'true' || inputs.build == 'true'
+      shell: bash
+      env:
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        stamps=""
+        for target in ${TARGETS:-host}; do
+          triple=$target
+          [ "$target" = host ] && triple=""
+          # no stamp (MuPDF changed in the checkout): a key nothing restores
+          stamp=$(TAURI_ENV_TARGET_TRIPLE=$triple bun scripts/build-pdf-helper.ts --fingerprint) || {
+            echo "::warning::the PDF helper has no stamp for $target, so it isn't restored"
+            stamp="unstamped-$GITHUB_RUN_ID"
+          }
+          stamps="$stamps $target=$stamp"
+        done
+        echo "stamps:$stamps"
+        hash=$(printf '%s' "$stamps" | git hash-object --stdin)
+        echo "key=${RUNNER_OS}-${ImageOS:-unknown}-$hash" >> "$GITHUB_OUTPUT"
+
+    # only main saves, so pull requests don't fill the cache with helpers of
+    # their own; they restore main's while they don't change the helper
+    - if: inputs.helper == 'true' && github.ref == 'refs/heads/main'
+      uses: actions/cache@v6
+      with:
+        path: src-tauri/binaries
+        key: blank-pdf-${{ steps.key.outputs.key }}
+    - if: inputs.helper == 'true' && github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@v6
+      with:
+        path: src-tauri/binaries
+        key: blank-pdf-${{ steps.key.outputs.key }}
+
+    # Swatinem/rust-cache drops mupdf-sys's build output (it keeps no crate
+    # inside the workspace's folder), so MuPDF would be compiled every run
+    - id: build-main
+      if: inputs.build == 'true' && runner.os == 'Linux' && github.ref == 'refs/heads/main'
+      uses: actions/cache@v6
+      with:
+        path: |
+          src-tauri/target/release/build/mupdf-sys-*
+          src-tauri/target/release/.fingerprint/mupdf-sys-*
+          src-tauri/target/release/deps/*mupdf_sys-*
+        key: mupdf-build-${{ steps.key.outputs.key }}
+    - id: build-pr
+      if: inputs.build == 'true' && runner.os == 'Linux' && github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          src-tauri/target/release/build/mupdf-sys-*
+          src-tauri/target/release/.fingerprint/mupdf-sys-*
+          src-tauri/target/release/deps/*mupdf_sys-*
+        key: mupdf-build-${{ steps.key.outputs.key }}
+
+    # cargo checks a path dependency's build by mtimes: the checkout made
+    # MuPDF's headers and mupdf-sys's sources newer than the restored output,
+    # which would compile MuPDF again. The key says they are the same
+    - name: take MuPDF's build output as fresh
+      if: steps.build-main.outputs.cache-hit == 'true' || steps.build-pr.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        now=$(date +%s)
+        find src-tauri/target/release \( -path '*/build/mupdf-sys-*' -o -path '*/.fingerprint/mupdf-sys-*' -o -path '*/deps/*mupdf_sys-*' \) \
+          -exec touch -h -d "@$now" {} +

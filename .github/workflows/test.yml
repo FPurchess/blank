@@ -70,9 +70,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          # MuPDF's licence files, which the third-party notices quote
-          submodules: recursive
+      # MuPDF's licence files, which the third-party notices quote
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: ./.github/actions/engine
 
@@ -85,13 +84,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: recursive
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           cache-workspaces: src-tauri -> target
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
+      # MuPDF, and its build output while it didn't change: the tests and
+      # the notices check link and read the same libmupdf.a
+      - uses: ./.github/actions/mupdf
+        with:
+          build: true
 
       - name: install poppler, qpdf and a CJK font
         run: |

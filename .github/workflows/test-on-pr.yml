@@ -20,15 +20,20 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          # MuPDF, which the PDF helper is built from
-          submodules: recursive
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           cache-workspaces: src-tauri -> target
           # only main saves, so pull requests don't evict its cache with their own copies
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # MuPDF, which the PDF helper is built from, and the helper itself,
+      # from the cache while they didn't change; the macOS leg also
+      # cross-builds it for Intel below
+      - uses: ./.github/actions/mupdf
+        with:
+          helper: true
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'host x86_64-apple-darwin' || '' }}
 
       - name: setup node
         uses: actions/setup-node@v7

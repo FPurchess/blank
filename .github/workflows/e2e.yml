@@ -30,9 +30,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          # MuPDF, which the PDF helper is built from
-          submodules: recursive
 
       - uses: ./.github/actions/webkit-deps
 
@@ -47,6 +44,12 @@ jobs:
         with:
           build-warnings: warn
           cache-workspaces: src-tauri -> target
+
+      # MuPDF, which the PDF helper is built from, and the helper itself,
+      # from the cache while they didn't change
+      - uses: ./.github/actions/mupdf
+        with:
+          helper: true
 
       # ~/.cargo/bin is cached by the rust toolchain setup, hence this is a no-op on subsequent runs
       - name: install tauri-driver

@@ -10,9 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          # MuPDF's licence files, which the third-party notices quote
-          submodules: recursive
+      # MuPDF's licence files, which the third-party notices quote
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: ./.github/actions/engine
 
@@ -38,9 +37,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          # MuPDF, which the PDF helper is built from
-          submodules: recursive
+      # MuPDF's sources from the cache of their git data; a release builds
+      # the helper it ships itself, never from the cache
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
