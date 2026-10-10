@@ -54,7 +54,8 @@ describe("formulas drawn by the math module", () => {
     expect(mathDrawing("\\secret", false)).toBeUndefined();
     // the kind of failure, never the formula
     expect(error).toHaveBeenCalledWith(
-      "blank: the math module didn't load: TypeError",
+      "the math module didn't load",
+      "TypeError",
     );
     expect(JSON.stringify(error.mock.calls)).not.toContain("secret");
   });
@@ -71,7 +72,8 @@ describe("formulas drawn by the math module", () => {
     await loadMathModule();
     expect(mathDrawing("\\boom", false)).toContain("can't set");
     expect(error).toHaveBeenCalledWith(
-      "blank: the math module stopped working: RuntimeError",
+      "the math module stopped working",
+      "RuntimeError",
     );
     expect(JSON.stringify(error.mock.calls)).not.toContain("boom");
     // remembered, not drawn again

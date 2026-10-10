@@ -149,6 +149,9 @@ describe("place, filling the window's height", () => {
     expect(element.style.top).toBe("42px");
     expect(element.style.maxHeight).toBe(`${600 - 42 - 8}px`);
     expect(element.style.left).toBe("10px");
+  });
+});
+
 describe("place clear of what it must not cover", () => {
   const line = { left: 300, top: 300, bottom: 320, right: 340 };
   const rect = (left: number, top: number, right: number, bottom: number) =>

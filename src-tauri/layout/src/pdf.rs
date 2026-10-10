@@ -1779,6 +1779,12 @@ mod tests {
             .lines()
             .skip_while(|line| !line.starts_with("Document"))
             .map(|line| line.replace(" (block)", ""))
+            // newer pdfinfo prints a formula's alt text after it, checked
+            // above
+            .map(|line| match line.find("Formula [") {
+                Some(at) => line[..at + "Formula".len()].to_string(),
+                None => line,
+            })
             .collect();
         assert_eq!(
             shape.join("\n"),
