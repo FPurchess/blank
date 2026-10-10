@@ -36,6 +36,20 @@ const diagramBox = () =>
       : null;
   });
 
+// the diagram's source, from the hidden editor (WebDriver's text is only
+// what shows)
+const sourceText = () =>
+  browser.execute(
+    () =>
+      document.querySelector("#editor figure.diagram pre")?.textContent ?? "",
+  );
+
+// waits until the diagram's source holds `text`
+const sourceHas = (text: string) =>
+  browser.waitUntil(async () => (await sourceText()).includes(text), {
+    timeoutMsg: `the diagram's source never held "${text}"`,
+  });
+
 const isOpen = () =>
   browser.execute(() =>
     document
@@ -77,9 +91,7 @@ describe("a diagram", () => {
     await type(Key.Enter);
     expect(await isOpen()).toBe(true);
     await type(" --> print");
-    await expect($("#editor figure.diagram pre")).toHaveText(
-      expect.stringContaining("done --> print"),
-    );
+    await sourceHas("done --> print");
     await type(Key.Escape);
     expect(await isOpen()).toBe(false);
   });
@@ -97,9 +109,7 @@ describe("a diagram", () => {
     await type(Key.Enter);
     await type("  done --> read");
     await expect($("#diagram-popover")).not.toBeExisting();
-    await expect($("#editor figure.diagram pre")).toHaveText(
-      expect.stringContaining("done --> read"),
-    );
+    await sourceHas("done --> read");
     await type(Key.Escape);
     expect(await isOpen()).toBe(false);
   });
@@ -108,7 +118,7 @@ describe("a diagram", () => {
     const before = (await diagramBox())!;
     await pressShift(Key.Enter);
     await expect($("#diagram-popover")).toBeDisplayed();
-    await $('#diagram-popover [data-row="width"] button=50%').click();
+    await $('#diagram-popover [data-row="width"] [data-value="50%"]').click();
     await $("#diagram-popover-caption").setValue("the plan");
     await type(Key.Escape);
     await expect($("#diagram-popover")).not.toBeExisting();
