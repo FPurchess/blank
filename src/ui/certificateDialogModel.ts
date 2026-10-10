@@ -7,7 +7,7 @@
  */
 export const busyNote = (creating: boolean) =>
   creating
-    ? "Making your key. This takes a few seconds."
+    ? "Creating your certificate. This takes a few seconds."
     : "Opening your key file. This takes a few seconds.";
 
 // the shortest passphrase Blank takes for a new key

@@ -99,7 +99,7 @@ describe("the dialog of the user's certificate", () => {
     expect(create.disabled && cancel.disabled).toBe(true);
     expect(
       document.getElementById("certificate-dialog-status")!.textContent,
-    ).toContain("Making your key");
+    ).toContain("Creating your certificate");
     dialog()!
       .querySelector("form")!
       .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
