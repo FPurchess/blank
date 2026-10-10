@@ -115,21 +115,36 @@ describe("a diagram", () => {
   });
 
   it("takes a width and a caption from its settings, and an alignment", async () => {
-    const before = (await diagramBox())!;
+    const width = async () => {
+      const box = (await diagramBox())!;
+      return box.right - box.left;
+    };
+    const choose = (value: string) =>
+      $(`#diagram-popover [data-row="width"] [data-value="${value}"]`).click();
     await pressShift(Key.Enter);
     await expect($("#diagram-popover")).toBeDisplayed();
-    await $('#diagram-popover [data-row="width"] [data-value="50%"]').click();
+    // the whole width first, which "50%" is half of; Fit is the diagram's
+    // own size, which may be narrower or wider than half
+    await choose("100%");
+    let full = 0;
+    await browser.waitUntil(
+      async () => {
+        const now = await width();
+        const settled = now === full;
+        full = now;
+        return settled && now > 0;
+      },
+      { timeoutMsg: "the diagram didn't take the whole width" },
+    );
+    await choose("50%");
+    await browser.waitUntil(
+      async () => Math.abs((await width()) - full / 2) < 2,
+      { timeoutMsg: "the diagram didn't take half the width" },
+    );
     await $("#diagram-popover-caption").setValue("the plan");
     await type(Key.Escape);
     await expect($("#diagram-popover")).not.toBeExisting();
     await pressMod(Key.Shift, "e");
-    await browser.waitUntil(
-      async () => {
-        const box = (await diagramBox())!;
-        return box.right - box.left < before.right - before.left;
-      },
-      { timeoutMsg: "the diagram didn't take half the width" },
-    );
     await pressMod("s");
     await browser.waitUntil(() =>
       fs.readFileSync(file, "utf8").includes("<!-- /blank:diagram -->"),
@@ -140,7 +155,8 @@ describe("a diagram", () => {
       '<!-- blank:diagram@1 width="50%" caption="the plan" -->',
     );
     expect(saved).toContain(
-      "```mermaid\nflowchart LR\n  idea --> draft --> done --> print\n```",
+      "```mermaid\nflowchart LR\n  idea --> draft --> done --> print\n",
     );
+    expect(saved).toMatch(/done --> read\n```/);
   });
 });
