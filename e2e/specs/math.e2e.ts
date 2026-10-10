@@ -52,7 +52,8 @@ describe("math", () => {
     expect(inline.type).toBe("math_inline");
     expect(display.type).toBe("math_display");
     await waitForInk(inline.box!);
-    await waitForInk(display.box!);
+    // display math's box is as wide as the text, the formula in its middle
+    await waitForInk(display.box!, {}, 0.01);
     expect(
       await browser.execute(() => window.blankGeometry.mathNumbers()),
     ).toEqual([[display.pos, 1]]);
@@ -71,15 +72,7 @@ describe("math", () => {
     const [inline] = await maths();
     // a click on the formula opens it
     const box = inline.box!;
-    await browser
-      .action("pointer")
-      .move({
-        x: Math.round((box.left + box.right) / 2),
-        y: Math.round((box.top + box.bottom) / 2),
-      })
-      .down()
-      .up()
-      .perform();
+    await clickAt((box.left + box.right) / 2, (box.top + box.bottom) / 2);
     await expect($("#math-preview")).toBeExisting();
     await expect($("#math-preview canvas")).toBeExisting();
     await type(Key.Escape);
