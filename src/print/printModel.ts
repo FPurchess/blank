@@ -215,18 +215,42 @@ export const MAY_NOT_HAVE_PRINTED =
 
 // a reason, and what to do instead: the print dialog opens again with it,
 // ready to save a PDF
-const instead = (reason: string) =>
+export const instead = (reason: string) =>
   `${reason} Save a PDF and print it from another app.`;
+// a reason a PDF tab's PDF didn't print, and what to do instead, which a
+// notification says
+export const insteadForPdf = (reason: string) =>
+  `${reason} Open the PDF in another app to print it.`;
 
-export const NO_PRINT_SERVICE = instead(
-  "Printing needs your desktop's print service.",
-);
-export const NO_PRINT_DIALOG = instead(
-  "Windows can't show its print dialog for Blank until Microsoft Edge WebView2 is updated.",
-);
+const NO_SERVICE = "Printing needs your desktop's print service.";
+const NO_DIALOG =
+  "Windows can't show its print dialog for Blank until Microsoft Edge WebView2 is updated.";
+export const NO_PRINT_SERVICE = instead(NO_SERVICE);
+export const NO_PRINT_DIALOG = instead(NO_DIALOG);
 
 /**
- * failedNote says that printing failed, with `message` as its reason
+ * failedNote says that printing failed, with `message` as its reason, and
+ * what to do `instead`
  */
-export const failedNote = (message: string) =>
-  instead(`Printing didn't work: ${message.replace(/\.$/, "")}.`);
+export const failedNote = (message: string, then = instead) =>
+  then(`Printing didn't work: ${message.replace(/\.$/, "")}.`);
+
+/**
+ * systemNote says what the system's print service or dialog lacks, and what
+ * to do `instead`
+ */
+export const systemNote = (kind: "noService" | "unsupported", then = instead) =>
+  then(kind === "noService" ? NO_SERVICE : NO_DIALOG);
+
+// a PDF tab prints its file, which changed since Blank opened it: it would
+// print something else than what the tab shows
+export const PDF_CHANGED =
+  "The PDF changed since Blank opened it. Close its tab and open it again to print it.";
+// a PDF tab whose PDF Blank couldn't open has nothing to print
+export const PDF_NOT_OPEN = insteadForPdf(
+  "Blank couldn't open this PDF, so it can't print it.",
+);
+// the system's dialog (Linux) chose pages or a scale, which Blank can't
+// apply to a PDF it didn't write
+export const PDF_PRINTS_WHOLE =
+  "Blank prints a PDF whole, at its own size. Print it again with all pages at 100%, or open it in another app to print some of it.";

@@ -154,14 +154,14 @@ describe("tabMenu", () => {
     expect(item(items, "print").shortcut).toBeUndefined();
   });
 
-  it("offers no saving in a PDF tab, which Blank never changes", () => {
+  it("offers no saving in a PDF tab, which Blank never changes, but prints it without the page layout", () => {
     const items = tabMenu(
       { ...tab("/docs/contract.pdf"), kind: "pdf" },
       0,
       1,
       true,
       actions(),
-      true,
+      false,
     );
 
     expect(ids(items)).toEqual([
@@ -169,8 +169,11 @@ describe("tabMenu", () => {
       "close-others",
       "close-right",
       "-",
+      "print",
+      "-",
       "copy-path",
     ]);
+    expect(item(items, "print").disabled).toBe(false);
   });
 
   it("has no path to copy for an untitled tab, nor tabs to close beyond it", () => {

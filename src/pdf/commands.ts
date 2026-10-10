@@ -19,6 +19,8 @@ import {
 const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.FILE_NEW,
   CommandIdentifier.FILE_OPEN,
+  // the PDF file itself, as it is (printPdfFile in src/print/job.ts)
+  CommandIdentifier.FILE_PRINT,
   CommandIdentifier.TAB_CLOSE,
   CommandIdentifier.TAB_NEXT,
   CommandIdentifier.TAB_PREVIOUS,

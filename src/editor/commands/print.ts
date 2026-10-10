@@ -12,10 +12,12 @@ import { documentFields } from "../../layout/bands";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { pageGeometry, resolveLayout } from "../../layout/resolve";
 import { frontmatterOf } from "../../markdown";
-import { printDocument, printingNow } from "../../print/job";
+import { basename } from "../../paths";
+import { printDocument, printingNow, printPdfFile } from "../../print/job";
 import {
   type Destination,
   NOTHING_TO_PRINT,
+  PDF_NOT_OPEN,
   PRINT_UNAVAILABLE,
   printPaper,
   STILL_PRINTING,
@@ -27,6 +29,7 @@ import {
   importedFrom,
   path,
   printDialog,
+  shownPdf,
   tabLabel,
 } from "../../state";
 import { isEmpty, PDF_EXPORT, runExport } from "./exportAs";
@@ -119,7 +122,37 @@ export const openPrint = (
   return true;
 };
 
+/**
+ * printShownPdf prints the PDF tab shown: its file as it is, straight to the
+ * system's print dialog (see printPdfFile)
+ */
+const printShownPdf = () => {
+  const pdf = shownPdf.value;
+  if (!pdf) return;
+  if (printingNow()) {
+    announce(STILL_PRINTING);
+    return;
+  }
+  if (!pdf.opened) {
+    sendNotification({ title: "Print", body: PDF_NOT_OPEN });
+    announce(PDF_NOT_OPEN);
+    return;
+  }
+  void printPdfFile({
+    path: pdf.path,
+    sha256: pdf.opened.sha256,
+    title: basename(pdf.path),
+    pages: pdf.opened.pages,
+  });
+};
+
+/**
+ * print opens the print dialog of the document shown; in a PDF tab, it
+ * prints the PDF
+ */
 export default (): Command => (_state, dispatch, view) => {
-  if (dispatch && view) openPrint(view);
+  if (!dispatch || !view) return true;
+  if (shownPdf.value) printShownPdf();
+  else openPrint(view);
   return true;
 };

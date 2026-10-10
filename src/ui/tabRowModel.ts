@@ -114,7 +114,8 @@ export interface TabActions {
 /**
  * tabMenu returns the menu of `tab`, the tab at `index` of `count`. Only the
  * shown tab's menu names the keys, which act on the shown tab.
- * @param printable whether Blank can print, which needs the page layout
+ * @param printable whether Blank can print a document of its own, which
+ *   needs the page layout; a PDF tab prints its PDF without it
  */
 export const tabMenu = (
   tab: Tab,
@@ -149,12 +150,12 @@ export const tabMenu = (
       disabled: index === count - 1,
       run: () => actions.closeRight(tab.id),
     },
-    // a PDF tab has nothing to save: Blank never changes the PDF. It has
-    // nothing to print from Blank's print dialog yet either.
+    "separator" as const,
+    // a PDF tab has nothing to save: Blank never changes the PDF. It prints
+    // the PDF itself, which needs no page layout.
     ...(isPdfTab(tab)
       ? []
       : [
-          "separator" as const,
           commandItem("save", C.FILE_SAVE, {
             icon: "save",
             ...keys,
@@ -164,14 +165,14 @@ export const tabMenu = (
             ...keys,
             run: () => actions.save(tab.id, true),
           }),
-          commandItem("print", C.FILE_PRINT, {
-            ...keys,
-            disabled: !printable,
-            // says why it's disabled, not only that it is
-            detail: printable ? undefined : PRINT_UNAVAILABLE_SHORT,
-            run: () => actions.print(tab.id),
-          }),
         ]),
+    commandItem("print", C.FILE_PRINT, {
+      ...keys,
+      disabled: !printable && !isPdfTab(tab),
+      // says why it's disabled, not only that it is
+      detail: printable || isPdfTab(tab) ? undefined : PRINT_UNAVAILABLE_SHORT,
+      run: () => actions.print(tab.id),
+    }),
     ...(tab.path === null
       ? []
       : [

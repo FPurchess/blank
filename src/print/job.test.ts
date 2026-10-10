@@ -1,15 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
+import { readFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import { createHash } from "node:crypto";
 
 import { announcement } from "../state";
 import { doc, p } from "../test/editor";
 import { testLayout } from "../test/layout";
-import { printDocument, printingNow } from "./job";
+import { printDocument, printingNow, printPdfFile } from "./job";
 import {
   MAY_NOT_HAVE_PRINTED,
   NO_PRINT_DIALOG,
   NO_PRINT_SERVICE,
+  PDF_CHANGED,
+  PDF_PRINTS_WHOLE,
   type PrintPlan,
 } from "./printModel";
 
@@ -231,5 +235,74 @@ describe("printDocument", () => {
     expect(window.blankPrintCapture.sent).toEqual([
       { sheets: 2, pdf: "%PDF-" },
     ]);
+  });
+});
+
+describe("printPdfFile", () => {
+  const file = new TextEncoder().encode("%PDF-1.4 a PDF tab's file");
+  const sha256 = createHash("sha256").update(file).digest("hex");
+  const job = {
+    path: "/docs/contract.pdf",
+    sha256,
+    title: "contract.pdf",
+    pages: [LETTER, A4],
+  };
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    announcement.value = null;
+    vi.mocked(readFile).mockResolvedValue(file);
+    ready();
+    sendPrint.mockResolvedValue({ outcome: "sent", printer: "Office" });
+  });
+
+  it("hands the file to the system's dialog as it is, on its first page's paper", async () => {
+    await printPdfFile(job);
+
+    expect(readFile).toHaveBeenCalledWith("/docs/contract.pdf");
+    expect(preparePrint).toHaveBeenCalledWith("contract.pdf", {
+      copies: 1,
+      collate: true,
+      fit: false,
+      paper: LETTER,
+    });
+    expect(sendPrint).toHaveBeenCalledWith(file, {
+      token: 7,
+      title: "contract.pdf",
+      preset: expect.objectContaining({ paper: LETTER }),
+    });
+    expect(printPDF).not.toHaveBeenCalled();
+    expect(announcement.value?.text).toBe("Sent 2 pages to Office");
+  });
+
+  it("prints nothing but what the tab shows", async () => {
+    await printPdfFile({ ...job, sha256: "0".repeat(64) });
+
+    expect(sendPrint).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "Print",
+      body: PDF_CHANGED,
+    });
+  });
+
+  it("says when the pages chosen in the system's dialog can't apply", async () => {
+    ready({ ranges: [[1, 1]] });
+    await printPdfFile(job);
+
+    expect(sendPrint).not.toHaveBeenCalled();
+    expect(announcement.value?.text).toBe(PDF_PRINTS_WHOLE);
+  });
+
+  it("says why a file it can't read doesn't print", async () => {
+    vi.mocked(readFile).mockRejectedValue("No such file or directory");
+    await printPdfFile(job);
+
+    expect(preparePrint).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "Print",
+      body: "Printing didn't work: No such file or directory. Open the PDF in another app to print it.",
+    });
+    expect(printingNow()).toBe(false);
   });
 });
