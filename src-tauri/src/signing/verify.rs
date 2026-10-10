@@ -1303,4 +1303,18 @@ mod tests {
         assert!(fields.len() <= 33, "{} fields", fields.len());
         assert!(fields.iter().all(|field| field.name.len() <= 1_024));
     }
+
+    #[test]
+    fn calls_a_signature_with_sha1_weak_but_intact() {
+        // see fixtures/README.md
+        let reports = verify_pdf(include_bytes!("fixtures/sha1.pdf")).unwrap();
+        assert_eq!(reports.len(), 1);
+        assert!(reports[0].valid(), "{:?}", reports[0].checks);
+        assert!(
+            reports[0].covers_the_whole_file(),
+            "{:?}",
+            reports[0].coverage
+        );
+        assert_eq!(reports[0].weak, Some("SHA-1"));
+    }
 }
