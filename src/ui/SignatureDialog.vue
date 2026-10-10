@@ -71,7 +71,15 @@ const problem = computed(() =>
     : "",
 );
 
-onMounted(() => void loadSignatureFonts());
+onMounted(() => {
+  void loadSignatureFonts();
+  // the focus starts on the tab shown, so Esc and Tab stay in the dialog
+  document
+    .querySelector<HTMLElement>(
+      "#signature-dialog [role=tab][aria-selected=true]",
+    )
+    ?.focus();
+});
 
 // the font choices are a radio group in a column: every arrow chooses the
 // next or the one before

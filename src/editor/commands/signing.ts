@@ -2,7 +2,8 @@ import type { Command } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { config } from "../../config";
+import { CommandIdentifier, config } from "../../config";
+import { commandShortcut } from "../keyBindings";
 import { focusBack } from "../../dom";
 import { errorMessage } from "../../errors";
 import { logError, logWarning } from "../../log";
@@ -44,6 +45,8 @@ import { loadMarks, saveMark } from "../../signing/marks";
 import type { Mark } from "../../signing/profile";
 import { renderMark } from "../../signing/render";
 import { chosenOf, targetsOf } from "../../signing/targets";
+import { formatSigningDate } from "../../signing/date";
+import { languageName } from "../../spellcheck/service";
 import { chooseImageFile } from "./editImage";
 
 // The user's signature and initials: the dialog that makes them, which
@@ -147,10 +150,11 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
   const problem = exportProblem(state, request);
   if (problem) return problem !== "empty";
   if (targetsOf(state.doc).length === 0) {
-    sendNotification({
-      title: TITLE,
-      body: "This document has no signature block. Insert one from the blocks pane, under Signing.",
-    });
+    // in the window as well, where a notification may not show
+    const key = commandShortcut(CommandIdentifier.VIEW_BLOCKS);
+    const body = `This document has no signature block. Insert one from the blocks pane${key ? ` (${key})` : ""}, under Signing.`;
+    sendNotification({ title: TITLE, body });
+    announce(body);
     return true;
   }
   if (!view) return true;
@@ -180,6 +184,14 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
       chosen: chosenOf(targets, name),
       place: signingPlace.value,
       signer: signerName(),
+      today: {
+        date: formatSigningDate(
+          new Date(),
+          signingDates.value.language,
+          signingDates.value.format,
+        ),
+        language: languageName(signingDates.value.language),
+      },
       warnings: file.importedFrom
         ? [
             "Blank's layout of this Word document can differ from Word's. Check every page before you send it, or ask the sender for a PDF.",
@@ -194,8 +206,14 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
           return passphraseProblem(error);
         }
       },
-      createCertificate: (opener) =>
-        void openCertificateDialog("create", focusBack(opener)),
+      createCertificate: (opener) => {
+        const back = focusBack(opener);
+        // once there's a certificate, the Sign dialog takes the focus to
+        // its passphrase itself
+        void openCertificateDialog("create", () => {
+          if (!signingCertificate.value) back();
+        });
+      },
       submit: (pos, place, passphrase) => {
         refocus();
         if (!shown()) return;
@@ -263,6 +281,14 @@ const signNow = (
   // the place the page shows: the block's own, else where the user signs
   const shownPlace = target.place || place;
   const signer = signerName();
+  const timestamped = !!config.value.signing.timestampServer;
+  // what the notification adds to what was exported
+  const how =
+    passphrase === null
+      ? "Your signature shows as a picture"
+      : timestamped
+        ? "Signed digitally, with a timestamp"
+        : "Signed digitally";
   void runExport(state, file, {
     ...request,
     context: {
@@ -279,8 +305,9 @@ const signNow = (
     },
     written: () => {
       if (shownPlace) signingPlace.value = shownPlace;
-      announce("Signed and saved");
+      announce("Signed PDF exported");
     },
+    done: how,
     ...(passphrase === null
       ? {}
       : {

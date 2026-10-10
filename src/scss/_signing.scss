@@ -273,3 +273,25 @@
     font-size: var(--ui-small);
   }
 }
+
+// the Sign dialog's warnings (a Word document's layout, a block for someone
+// else) stand out from its notes: in ink, in a box
+.sign-dialog p.warning {
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  color: var(--color);
+}
+
+// Settings ▸ Signing: the certificate's buttons and its fingerprint take
+// the row's width below its label and description, which a narrow window
+// would squeeze into a word per line
+.dialog [data-row="certificate"],
+.dialog [data-row="fingerprint"] {
+  flex-wrap: wrap;
+  row-gap: var(--s2);
+
+  .setting-text {
+    flex-basis: 100%;
+  }
+}

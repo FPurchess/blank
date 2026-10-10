@@ -59,6 +59,10 @@ describe("the dialog of the user's signature", () => {
     );
   });
 
+  it("takes the focus, on the tab shown", () => {
+    expect(document.activeElement).toBe(tab("Draw"));
+  });
+
   it("cancels on Esc", () => {
     dialog()
       .querySelector("form")!

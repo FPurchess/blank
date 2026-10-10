@@ -20,12 +20,19 @@ describe("the dialog that signs", () => {
     request = {
       title: "lease",
       targets: [
-        { pos: 3, name: "Bea", place: "", label: "Bea · Landlord" },
-        { pos: 9, name: "", place: "", label: "Tenant" },
+        {
+          pos: 3,
+          name: "Bea",
+          place: "",
+          dated: true,
+          label: "Bea · Landlord",
+        },
+        { pos: 9, name: "", place: "", dated: true, label: "Tenant" },
       ],
       chosen: 9,
       place: "Berlin",
       signer: "Ada",
+      today: { date: "10 October 2026", language: "English" },
       warnings: [],
       check: vi.fn(async () => null),
       createCertificate: vi.fn(),
@@ -61,7 +68,7 @@ describe("the dialog that signs", () => {
 
   it("offers no choice with one block, and shows its warnings", async () => {
     await open({
-      targets: [{ pos: 3, name: "", place: "", label: "Tenant" }],
+      targets: [{ pos: 3, name: "", place: "", dated: true, label: "Tenant" }],
       chosen: 3,
       warnings: ["Check every page."],
     });
@@ -85,9 +92,18 @@ describe("the dialog that signs", () => {
     );
   });
 
+  it("says which date goes under the signature, in which language", async () => {
+    await open();
+    expect(document.getElementById("sign-dialog-date")!.textContent).toContain(
+      "Dated 10 October 2026, written in English",
+    );
+  });
+
   it("signs a block that fixes its place there, and says so", async () => {
     await open({
-      targets: [{ pos: 3, name: "", place: "Paris", label: "Tenant" }],
+      targets: [
+        { pos: 3, name: "", place: "Paris", dated: false, label: "Tenant" },
+      ],
       chosen: 3,
     });
     expect(document.querySelector("#sign-dialog-place")).toBeNull();

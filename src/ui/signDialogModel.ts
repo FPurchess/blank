@@ -13,11 +13,23 @@ export const HOW_OPTIONS: Option<How>[] = [
 ];
 
 /**
+ * hostOf returns a server's host name, e.g. "timestamp.digicert.com", or
+ * the URL as it is when it can't be read
+ */
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+};
+
+/**
  * timeNote says where the time of a digital signature comes from
  */
 export const timeNote = (server: string) =>
   server
-    ? `The time of signing comes from ${server}.`
+    ? `The time of signing comes from the timestamp server ${hostOf(server)}.`
     : "The time of signing comes from your computer's clock. A timestamp server in Settings ▸ Signing proves it.";
 
 /**
@@ -37,6 +49,18 @@ export const namedNote = (target: SignTarget | undefined, signer: string) =>
 export const placeNote = (target: SignTarget | undefined) =>
   target?.place
     ? `This block says where it's signed: ${target.place}. Change it in the block's settings.`
+    : "";
+
+/**
+ * dateNote says which date goes under the signature, and in which
+ * language, which is the document's: "" for a block without today's date
+ */
+export const dateNote = (
+  target: SignTarget | undefined,
+  today: { date: string; language: string },
+) =>
+  target?.dated
+    ? `Dated ${today.date}, written in ${today.language}, the document's language. To change it, choose the document's language in the status bar.`
     : "";
 
 /**

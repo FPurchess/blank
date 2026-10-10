@@ -70,6 +70,18 @@ describe("the dialog of the user's certificate", () => {
     expect(request.done).toHaveBeenCalled();
   });
 
+  it("says which email address a certificate can't hold", async () => {
+    await open("create");
+    type("email", "zoë@example.org");
+    type("passphrase", "correct horse");
+    type("again", "correct horse");
+    submit();
+    await nextTick();
+    expect(error()).toContain("plain letters");
+    expect(field("email").getAttribute("aria-invalid")).toBe("true");
+    expect(request.submit).not.toHaveBeenCalled();
+  });
+
   it("says it's busy while the key is made, and can't be cancelled meanwhile", async () => {
     await open("create");
     let finish: (failure: string | null) => void = () => {};

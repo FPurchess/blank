@@ -159,6 +159,9 @@ describe("signing", () => {
       new Uint8Array([1]),
     );
     expect(signingPlace.value).toBe("Hamburg");
+    expect(vi.mocked(sendNotification).mock.lastCall![0]).toMatchObject({
+      body: expect.stringContaining("Your signature shows as a picture"),
+    });
   });
 
   it("remembers the place only once the PDF is written", async () => {

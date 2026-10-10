@@ -21,6 +21,7 @@ import TextField from "./components/TextField.vue";
 import {
   HOW_OPTIONS,
   type How,
+  dateNote,
   namedNote,
   othersNote,
   placeNote,
@@ -51,6 +52,7 @@ const target = computed(() =>
 // a block that says where it's signed is signed there, whatever is typed
 const fixedPlace = computed(() => placeNote(target.value));
 const named = computed(() => namedNote(target.value, props.request.signer));
+const dated = computed(() => dateNote(target.value, props.request.today));
 const others = othersNote(props.request.targets);
 
 const placeField = useTemplateRef<InstanceType<typeof TextField>>("placeField");
@@ -122,6 +124,7 @@ const submit = async () => {
     />
     <p v-else id="sign-dialog-fixed-place" class="note">{{ fixedPlace }}</p>
     <p v-if="named" id="sign-dialog-named" class="warning">{{ named }}</p>
+    <p v-if="dated" id="sign-dialog-date" class="note">{{ dated }}</p>
     <OptionGroup
       v-if="signingCertificate"
       id="sign-dialog-how"

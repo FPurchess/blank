@@ -193,6 +193,8 @@ export interface SignTarget {
   name: string;
   // where it says it's signed, "" for where the signer says
   place: string;
+  // whether today's date goes under it when it's signed
+  dated: boolean;
   // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
   label: string;
 }
@@ -207,6 +209,9 @@ export interface SignDialogRequest {
   place: string;
   // the name the user signs as, "" when Blank doesn't know it
   signer: string;
+  // today's date as the block writes it, and the language it's written in,
+  // e.g. "10 October 2026" and "English"
+  today: { date: string; language: string };
   // the notes the dialog shows, e.g. that an imported Word document's
   // layout can differ from Word's
   warnings: string[];

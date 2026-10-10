@@ -33,7 +33,7 @@ A contract for two people has two blocks, one for each. On the pages and in a pr
 **Export signed PDF…** (`Mod` `Alt` `Shift` `P`) signs your document:
 
 1. If you haven't made your signature yet, Blank asks for it first.
-2. Choose which block is yours, if the document has several (the one with your name is chosen for you), and where you sign. Blank remembers the place for the next time. A block that gives its own place is signed there, and the dialog says so; a block with someone else's name gets a warning.
+2. Choose which block is yours, if the document has several (the one with your name is chosen for you), and where you sign. Blank remembers the place for the next time. A block that gives its own place is signed there, and the dialog says so; a block with someone else's name gets a warning. The dialog also shows the date that goes under your signature: it's written in the document's language, which you choose in the status bar.
 3. Choose where to save the PDF. Blank suggests the document's name with _signed_ after it, so the unsigned file stays as it is.
 
 The block shows your signature, your name and the place and today's date, written as **Settings ▸ Signing ▸ Date** says: the long form in the document's language (e.g. _8 October 2026_ in British English), its short form, or _2026-10-08_. The markdown file itself never holds your signature.

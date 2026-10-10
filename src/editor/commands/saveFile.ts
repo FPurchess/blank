@@ -11,9 +11,20 @@ import suggestPath from "./suggestPath";
 import { errorMessage } from "../../errors";
 import { MARKDOWN_FILTER, NOT_MARKDOWN } from "../../formats";
 import { logError } from "../../log";
+import { CommandIdentifier } from "../../config";
+import { commandShortcut } from "../keyBindings";
 
 const isMarkdownTarget = (target: string) =>
   !NOT_MARKDOWN.includes(extname(target));
+
+/**
+ * exportKey names the key of the Word export, e.g. " with Ctrl+Alt+W", or
+ * nothing when it has none
+ */
+const exportKey = () => {
+  const key = commandShortcut(CommandIdentifier.EXPORT_DOCX);
+  return key ? ` with ${key}` : "";
+};
 
 export interface Options {
   force?: boolean;
@@ -47,7 +58,7 @@ export const _saveFile = async (
       }
       if (!isMarkdownTarget(target)) {
         sendNotification(
-          `Saving writes markdown, which would destroy the .${extname(target)} file. Choose a .md file name, or export with Mod+Alt+W for Word.`,
+          `Saving writes markdown, which would destroy the .${extname(target)} file. Choose a .md file name, or export it for Word${exportKey()}.`,
         );
         return null;
       }

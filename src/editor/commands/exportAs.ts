@@ -62,6 +62,9 @@ export interface ExportRequest {
   context?: Pick<ExportContext, "pages" | "signed">;
   // told once the file is written, e.g. to remember where the user signed
   written?: () => void;
+  // what the notification says after what was exported, e.g. that the PDF
+  // is signed digitally
+  done?: string;
   // what is written instead of the export's contents, e.g. the PDF signed
   finish?: (result: ExportResult) => Promise<Uint8Array>;
 }
@@ -107,7 +110,16 @@ export const exportProblem = (
 export const runExport = async (
   state: EditorState,
   file: DocumentFile,
-  { title, exporter, filters, suffix, context, written, finish }: ExportRequest,
+  {
+    title,
+    exporter,
+    filters,
+    suffix,
+    context,
+    written,
+    finish,
+    done,
+  }: ExportRequest,
 ) => {
   const extension = filters?.[0]?.extensions[0];
   const docPath = file.path;
@@ -142,7 +154,12 @@ export const runExport = async (
       pages === undefined
         ? `Exported on ${paper} pages`
         : `Exported ${pages} ${paper} ${pages === 1 ? "page" : "pages"}`;
-    const messages = [exported, ...layoutWarnings(problems), ...warnings];
+    const messages = [
+      exported,
+      ...(done ? [done] : []),
+      ...layoutWarnings(problems),
+      ...warnings,
+    ];
     sendNotification({ title, body: messages.join(". ") });
   } catch (err: unknown) {
     logError(`failed to export as ${extension ?? "a file"}`, err);
