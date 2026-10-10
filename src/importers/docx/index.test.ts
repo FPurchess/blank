@@ -155,6 +155,32 @@ describe("importers.docx", () => {
         'Sign here:\n\nTenant:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
       );
     });
+
+    it("from table cells come after the table, which stays whole", async () => {
+      const line = (signer: string, role: string) =>
+        PICT.replace("Ada Lovelace", signer).replace("Tenant", role);
+      const bytes = await rewriteDocx(
+        await exportDocx("| left | right |\n| --- | --- |\n| one | two |"),
+        "word/document.xml",
+        (xml = "") =>
+          xml
+            .replace(
+              /(<w:t[^>]*>one<\/w:t><\/w:r>)/,
+              `$1${line("Ada Lovelace", "Tenant")}`,
+            )
+            .replace(
+              /<w:r>(?:(?!<w:r>).)*?<w:t[^>]*>two<\/w:t><\/w:r>/s,
+              line("Charles Babbage", "Landlord"),
+            ),
+      );
+      expect((await toMarkdown(bytes)).markdown).toBe(
+        [
+          "| left | right |\n| ---- | ----- |\n| one  |       |",
+          '<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
+          '<!-- blank:signature@1 role="Landlord" name="Charles Babbage" -->',
+        ].join("\n\n"),
+      );
+    });
   });
 
   // each test writes a .docx and reads it back through docx, JSZip and
