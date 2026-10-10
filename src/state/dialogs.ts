@@ -244,6 +244,9 @@ export interface ConfirmDialogRequest {
   text: string;
   // the button that does it, e.g. "Remove"
   action: string;
+  // a certificate's fingerprint to compare, grouped, shown in monospace
+  // below the text as everywhere else
+  fingerprint?: string;
   // what else the dialog offers on its left, which leaves it open, e.g.
   // backing up what is to be removed
   secondary?: { label: string; run(): void };

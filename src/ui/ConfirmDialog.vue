@@ -28,7 +28,12 @@ const close = (callback: () => void) => closeDialog(confirmDialog, callback);
     @submit="close(props.request.confirm)"
     @cancel="close(props.request.cancel)"
   >
-    <p id="confirm-dialog-text" class="dialog-text">{{ request.text }}</p>
+    <div id="confirm-dialog-text">
+      <p class="dialog-text">{{ request.text }}</p>
+      <p v-if="request.fingerprint" class="dialog-text fingerprint">
+        {{ request.fingerprint }}
+      </p>
+    </div>
     <template v-if="request.secondary" #secondary>
       <button type="button" @click="request.secondary.run">
         {{ request.secondary.label }}

@@ -139,8 +139,9 @@ export type Trust =
   | { kind: "issuedBy"; issuer: string }
   | { kind: "unknown" };
 
-// what a signature says of the PDF: intact, intact with the later changes
-// signed again, intact but changed later, or not matching the PDF
+// what a signature says of the PDF: intact, intact for the version it
+// signed with the later changes signed by someone else, intact but changed
+// later, or not matching the PDF
 export type SignatureStatus =
   "valid" | "signedAgainLater" | "changedAfterSigning" | "invalid";
 
@@ -148,9 +149,18 @@ export type SignatureStatus =
 export interface CheckedSignature {
   field: string;
   name: string | null;
-  // ISO 8601: the timestamp's time, else the signer's clock
+  // ISO 8601: the timestamp's time, else the signer's clock (without an
+  // offset when the PDF gives none)
   time: string | null;
   timestamped: boolean;
+  // who timestamped it, and whether that's a certificate the user trusts:
+  // else the time is the timestamp's word, not checked
+  timestampAuthority: string | null;
+  timestampTrusted: boolean;
+  // the weak algorithm it relies on ("SHA-1"), if it does
+  weak: string | null;
+  // for signedAgainLater: who signed next, after the changes
+  laterSigner: string | null;
   reason: string | null;
   location: string | null;
   status: SignatureStatus;

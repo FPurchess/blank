@@ -156,7 +156,14 @@ describe("a PDF's signatures", () => {
     expect(confirmDialog.value?.title).toBe(
       "Trust Maria Keller's certificate?",
     );
-    expect(confirmDialog.value?.text).toContain("3F2A 91C0");
+    expect(confirmDialog.value?.fingerprint).toBe(
+      "3F2A 91C0 ".repeat(8).trim(),
+    );
+    expect(
+      document
+        .querySelector("#confirm-dialog .fingerprint")
+        ?.textContent?.trim(),
+    ).toBe("3F2A 91C0 ".repeat(8).trim());
 
     confirmDialog.value!.confirm();
     await flushPromises();

@@ -45,7 +45,8 @@ export const confirmTrust = (
   const name = signature.name ?? "the signer";
   confirmDialog.value = {
     title: `Trust ${name}'s certificate?`,
-    text: `Only if ${name} told you this same fingerprint: ${fingerprint}`,
+    text: `Only if ${name} told you this same fingerprint, all of it, every group:`,
+    fingerprint,
     action: "Trust",
     confirm: async () => {
       try {
