@@ -20,11 +20,12 @@ describe("the dialog that signs", () => {
     request = {
       title: "lease",
       targets: [
-        { pos: 3, name: "Bea", label: "Bea · Landlord" },
-        { pos: 9, name: "", label: "Tenant" },
+        { pos: 3, name: "Bea", place: "", label: "Bea · Landlord" },
+        { pos: 9, name: "", place: "", label: "Tenant" },
       ],
       chosen: 9,
       place: "Berlin",
+      signer: "Ada",
       warnings: [],
       check: vi.fn(async () => null),
       createCertificate: vi.fn(),
@@ -60,7 +61,7 @@ describe("the dialog that signs", () => {
 
   it("offers no choice with one block, and shows its warnings", async () => {
     await open({
-      targets: [{ pos: 3, name: "", label: "Tenant" }],
+      targets: [{ pos: 3, name: "", place: "", label: "Tenant" }],
       chosen: 3,
       warnings: ["Check every page."],
     });
@@ -68,6 +69,36 @@ describe("the dialog that signs", () => {
     expect(dialog()!.querySelector(".warning")!.textContent).toContain(
       "Check every page.",
     );
+    expect(dialog()!.textContent).not.toContain("other signature blocks");
+  });
+
+  it("says the other blocks stay empty, and warns of a block for someone else", async () => {
+    await open();
+    expect(dialog()!.textContent).toContain(
+      "The other signature blocks stay empty.",
+    );
+    expect(document.getElementById("sign-dialog-named")).toBeNull();
+    dialog()!.querySelector<HTMLButtonElement>(".options button")!.click();
+    await nextTick();
+    expect(document.getElementById("sign-dialog-named")!.textContent).toContain(
+      "This block is for Bea",
+    );
+  });
+
+  it("signs a block that fixes its place there, and says so", async () => {
+    await open({
+      targets: [{ pos: 3, name: "", place: "Paris", label: "Tenant" }],
+      chosen: 3,
+    });
+    expect(document.querySelector("#sign-dialog-place")).toBeNull();
+    expect(
+      document.getElementById("sign-dialog-fixed-place")!.textContent,
+    ).toContain("Paris");
+    dialog()!
+      .querySelector("form")!
+      .dispatchEvent(new Event("submit", { cancelable: true }));
+    // the dialog passes what was typed; the command signs in the block's
+    expect(request.submit).toHaveBeenCalledWith(3, "Berlin", null);
   });
 
   it("signs in the chosen block, where the user says", async () => {

@@ -70,7 +70,7 @@ describe("the user's certificate", () => {
     expect(request.mode).toBe("create");
     ipc.createCertificate.mockRejectedValue({
       kind: "failed",
-      message: "Blank couldn't make your certificate",
+      message: "Blank couldn't create your certificate",
     });
     expect(
       await request.submit({
@@ -78,7 +78,7 @@ describe("the user's certificate", () => {
         email: "",
         passphrase: "correct horse",
       }),
-    ).toBe("Blank couldn't make your certificate");
+    ).toBe("Blank couldn't create your certificate");
     ipc.createCertificate.mockResolvedValue(INFO);
     expect(
       await request.submit({
@@ -94,7 +94,7 @@ describe("the user's certificate", () => {
       false,
     );
     expect(signingCertificate.value).toEqual(INFO);
-    expect(announcement.value?.text).toBe("Certificate made");
+    expect(announcement.value?.text).toBe("Certificate created");
   });
 
   it("is imported from a key file, once its passphrase opens it", async () => {
@@ -130,7 +130,7 @@ describe("the user's certificate", () => {
     expect(await replaced).toBeNull();
     expect(ipc.importKey).toHaveBeenLastCalledWith("/keys/ada.p12", "x", true);
     expect(signingCertificate.value).toEqual(INFO);
-    expect(announcement.value?.text).toBe("Certificate imported");
+    expect(announcement.value?.text).toBe("Key file imported");
   });
 
   it("asks nothing when no key file is chosen", async () => {
@@ -158,12 +158,17 @@ describe("the user's certificate", () => {
       kind: "failed",
       message: "Blank couldn't remove your certificate",
     });
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     await forgetCertificate();
     expect(sendNotification).toHaveBeenCalledWith({
       title: "Certificate",
       body: "Blank couldn't remove your certificate",
     });
+    // the log gets its kind only, never the native side's text
+    expect(logged).toHaveBeenCalledWith(
+      "failed to remove the certificate",
+      "failed",
+    );
     ipc.removeCertificate.mockResolvedValue(undefined);
     await forgetCertificate();
     expect(signingCertificate.value).toBeNull();

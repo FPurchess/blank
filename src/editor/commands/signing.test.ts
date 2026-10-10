@@ -5,11 +5,13 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { schema } from "../../markdown";
 import {
+  activeTabId,
   importedFrom,
   path,
   savedMarks,
   signatureDialog,
   signDialog,
+  signingCertificate,
   signingPlace,
 } from "../../state";
 import { config } from "../../config";
@@ -90,6 +92,13 @@ describe("signing", () => {
     signatureDialog.value = null;
     savedMarks.value = undefined;
     withName("");
+  });
+
+  it("leaves the key to others on an empty document, as the export does", () => {
+    expect(run(p())).toBe(false);
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining("empty") }),
+    );
   });
 
   it("does nothing when only asked whether it can run", () => {
@@ -202,7 +211,9 @@ describe("signing", () => {
     run(p("Text"), signature({ role: "Tenant" }));
     await flushPromises();
     const request = signDialog.value!;
-    expect(await request.check("wrong")).toBe("The passphrase is wrong");
+    expect(await request.check("wrong")).toMatch(
+      /^The passphrase is wrong\. Forgot it\? Sign with a picture only/,
+    );
     ipc.checkPassphrase.mockResolvedValue(undefined);
     expect(await request.check("right")).toBeNull();
     request.submit(request.targets[0].pos, "Hamburg", "right");
@@ -239,9 +250,124 @@ describe("signing", () => {
     expect(writeFile).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: "Failed to export file: The timestamp server didn't answer",
+        body: "Failed to export file: The timestamp server didn't answer. Nothing was saved.",
       }),
     );
+  });
+
+  it("says how to sign without a timestamp when the server fails", async () => {
+    config.value = {
+      ...config.value,
+      signing: { ...config.value.signing, timestampServer: "https://tsa.test" },
+    };
+    toPDF.mockResolvedValue({
+      contents: new Uint8Array([1]),
+      warnings: [],
+      pages: 1,
+      signatureBox: BOX,
+    });
+    ipc.signPdf.mockRejectedValue({
+      kind: "failed",
+      message: "The timestamp server didn't answer",
+    });
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    await flushPromises();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(vi.mocked(sendNotification).mock.lastCall![0]).toMatchObject({
+      body: expect.stringContaining(
+        "Nothing was saved. If the timestamp server is down, sign without a timestamp: clear it in Settings ▸ Signing.",
+      ),
+    });
+    config.value = {
+      ...config.value,
+      signing: { ...config.value.signing, timestampServer: "" },
+    };
+  });
+
+  it("signs nothing once another tab shows", async () => {
+    activeTabId.value = "one";
+    run(p("Text"), signature());
+    await flushPromises();
+    const request = signDialog.value!;
+    activeTabId.value = "two";
+    request.submit(request.targets[0].pos, "", null);
+    await flushPromises();
+    expect(save).not.toHaveBeenCalled();
+    expect(toPDF).not.toHaveBeenCalled();
+    expect(vi.mocked(sendNotification).mock.lastCall![0]).toMatchObject({
+      body: expect.stringContaining("Another tab shows now"),
+    });
+    activeTabId.value = null;
+  });
+
+  it("goes on to signing after the signature only in the same tab", async () => {
+    activeTabId.value = "one";
+    savedMarks.value = { signature: null, initials: null };
+    run(p("Offer"), signature());
+    await flushPromises();
+    savedMarks.value = { signature: SIGNATURE, initials: null };
+    activeTabId.value = "two";
+    signatureDialog.value!.done();
+    expect(signDialog.value).toBeNull();
+    activeTabId.value = null;
+  });
+
+  it("signs no other block when the one chosen is gone", async () => {
+    run(
+      p("Text"),
+      signature({ role: "Tenant" }),
+      signature({ role: "Landlord" }),
+    );
+    await flushPromises();
+    const { targets } = signDialog.value!;
+    // the first block taken out: the second moves to another position
+    view.dispatch(view.state.tr.delete(targets[0].pos, targets[0].pos + 1));
+    signDialog.value!.submit(targets[1].pos, "", null);
+    await flushPromises();
+    expect(toPDF).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("Nothing was signed"),
+      }),
+    );
+  });
+
+  it("names the signer by their certificate and signs in the place the block shows", async () => {
+    withName("Ada");
+    signingCertificate.value = {
+      name: "Ada Lovelace",
+      issuer: "Ada Lovelace",
+      notBefore: "2026-10-08",
+      notAfter: "2031-10-08",
+      selfSigned: true,
+      fingerprint: "AB".repeat(32),
+    };
+    toPDF.mockResolvedValue({
+      contents: new Uint8Array([1]),
+      warnings: [],
+      pages: 1,
+      signatureBox: BOX,
+    });
+    ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
+    run(p("Text"), signature({ name: "Bea", place: "Paris" }));
+    await flushPromises();
+    const request = signDialog.value!;
+    expect(request.signer).toBe("Ada Lovelace");
+    expect(request.targets[0].place).toBe("Paris");
+    request.submit(request.targets[0].pos, "Hamburg", "right");
+    await flushPromises();
+    expect(toPDF.mock.calls[0][1].signed.signing).toMatchObject({
+      name: "Ada Lovelace",
+      place: "Paris",
+    });
+    // the native side names the certificate's holder, never the block's
+    // name
+    expect(ipc.signPdf.mock.calls[0][2]).toMatchObject({ location: "Paris" });
+    expect(ipc.signPdf.mock.calls[0][2]).not.toHaveProperty("name");
+    expect(signingPlace.value).toBe("Paris");
+    signingCertificate.value = undefined;
   });
 
   it("never signs a PDF without the block's place for the signature", async () => {

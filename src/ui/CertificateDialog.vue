@@ -74,7 +74,7 @@ const submit = async () => {
 <template>
   <BaseDialog
     id="certificate-dialog"
-    :title="creating ? 'Create certificate' : 'Import certificate'"
+    :title="creating ? 'Create certificate' : 'Import key file'"
     form-class="certificate-dialog"
     @submit="submit"
     @cancel="cancel"

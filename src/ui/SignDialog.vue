@@ -18,13 +18,21 @@ import {
 import BaseDialog from "./components/BaseDialog.vue";
 import OptionGroup from "./components/OptionGroup.vue";
 import TextField from "./components/TextField.vue";
-import { HOW_OPTIONS, type How, timeNote } from "./signDialogModel";
+import {
+  HOW_OPTIONS,
+  type How,
+  namedNote,
+  othersNote,
+  placeNote,
+  timeNote,
+} from "./signDialogModel";
 
 // Signs a document (see src/editor/commands/signing.ts): which of its
 // signature blocks is the user's and where they sign, whether their
 // certificate signs it too (with its passphrase), then where the signed PDF
 // goes. The signature, the name and the date come from the user's signature
-// and settings.
+// and settings; a block that names someone or fixes its place keeps them,
+// which the dialog says.
 const props = defineProps<{ request: SignDialogRequest }>();
 
 const chosen = shallowRef(props.request.chosen);
@@ -37,11 +45,18 @@ const digital = computed(
   () => !!signingCertificate.value && how.value === "digital",
 );
 const note = computed(() => timeNote(config.value.signing.timestampServer));
+const target = computed(() =>
+  props.request.targets.find((target) => target.pos === chosen.value),
+);
+// a block that says where it's signed is signed there, whatever is typed
+const fixedPlace = computed(() => placeNote(target.value));
+const named = computed(() => namedNote(target.value, props.request.signer));
+const others = othersNote(props.request.targets);
 
 const placeField = useTemplateRef<InstanceType<typeof TextField>>("placeField");
 const passphraseField =
   useTemplateRef<InstanceType<typeof TextField>>("passphraseField");
-onMounted(() => placeField.value!.select());
+onMounted(() => placeField.value?.select());
 
 // a certificate made from here signs at once: on to its passphrase
 watch(signingCertificate, (now, before) => {
@@ -64,10 +79,11 @@ const submit = async () => {
     }
     // the passphrase is checked before anything is exported
     checking.value = true;
-    failure.value = (await props.request.check(passphrase.value)) ?? "";
-    checking.value = false;
-    // closed meanwhile, e.g. for another tab: nothing is signed
+    const problem = await props.request.check(passphrase.value);
+    // closed meanwhile, e.g. as another tab showed: nothing is signed
     if (signDialog.value !== props.request) return;
+    checking.value = false;
+    failure.value = problem ?? "";
     if (failure.value) return;
   }
   const secret = digital.value ? passphrase.value : null;
@@ -97,12 +113,15 @@ const submit = async () => {
       "
     />
     <TextField
+      v-if="!fixedPlace"
       id="sign-dialog-place"
       ref="placeField"
       v-model="place"
       label="Place"
       placeholder="Where you sign"
     />
+    <p v-else id="sign-dialog-fixed-place" class="note">{{ fixedPlace }}</p>
+    <p v-if="named" id="sign-dialog-named" class="warning">{{ named }}</p>
     <OptionGroup
       v-if="signingCertificate"
       id="sign-dialog-how"
@@ -130,10 +149,11 @@ const submit = async () => {
     <p v-for="warning in request.warnings" :key="warning" class="warning">
       {{ warning }}
     </p>
+    <p v-if="others" class="note">{{ others }}</p>
     <p v-if="digital" class="note">{{ note }}</p>
     <p v-else-if="!signingCertificate" class="note">
-      The PDF shows your signature as a picture. To sign it digitally too, so
-      anyone can check it, create a certificate.
+      The PDF shows your signature as a picture. A certificate also signs it
+      digitally, so PDF apps show whether anything changed after you signed.
     </p>
     <p v-else class="note">The PDF shows your signature as a picture.</p>
     <template v-if="!signingCertificate" #secondary>

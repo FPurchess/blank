@@ -18,6 +18,12 @@ export const titleOf = (mark: Mark) =>
   mark === "signature" ? "Your signature" : "Your initials";
 
 /**
+ * sampleOf returns what the fonts show while nothing is typed
+ */
+export const sampleOf = (mark: Mark) =>
+  mark === "signature" ? "Your name" : "Your initials";
+
+/**
  * initialsOf returns the initials of a name: "Ada Lovelace" gives "AL"
  */
 export const initialsOf = (name: string) =>

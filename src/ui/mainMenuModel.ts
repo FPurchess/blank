@@ -51,7 +51,7 @@ const APP_COMMANDS = [
   C.APP_GUIDE,
   C.APP_ABOUT,
 ] as const;
-// Export ▸, top to bottom; "Export signed PDF…" joins it once it's there
+// Export ▸, top to bottom
 export const EXPORT_COMMANDS = [
   C.EXPORT_PDF,
   C.EXPORT_DOCX,

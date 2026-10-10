@@ -67,6 +67,28 @@ describe("the dialog of the user's signature", () => {
     expect(signatureDialog.value).toBeNull();
   });
 
+  it("can't be cancelled while it saves, which would still save", async () => {
+    let saved: (done: boolean) => void = () => {};
+    request.submit = vi.fn(
+      () => new Promise<boolean>((resolve) => (saved = resolve)),
+    );
+    tab("Type").click();
+    await nextTick();
+    submit();
+    await nextTick();
+    const cancel = [
+      ...dialog().querySelectorAll<HTMLButtonElement>(".dialog-foot > button"),
+    ].find((button) => button.textContent!.trim() === "Cancel")!;
+    expect(cancel.disabled).toBe(true);
+    dialog()
+      .querySelector("form")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(request.cancel).not.toHaveBeenCalled();
+    saved(true);
+    await flushPromises();
+    expect(request.done).toHaveBeenCalled();
+  });
+
   it("switches between drawing, typing and an image with the arrow keys", async () => {
     tab("Draw").focus();
     tab("Draw").dispatchEvent(

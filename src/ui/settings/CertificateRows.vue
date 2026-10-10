@@ -25,7 +25,7 @@ const summary = computed(() =>
   signingCertificate.value ? certificateSummary(signingCertificate.value) : "",
 );
 // the first button of the certificate's row, which takes the focus when
-// the button that had it goes, e.g. Create… once the certificate is made
+// the button that had it goes, e.g. Create certificate… once it's created
 const certificateButton = () =>
   document.querySelector<HTMLElement>("#settings-certificate .edit");
 const create = (mode: "create" | "import", event: Event) =>
@@ -69,7 +69,7 @@ const usePreset = () => {
     >
       <div class="signing-mark">
         <button type="button" class="edit" @click="saveCertificate(false)">
-          Export…
+          Save certificate…
         </button>
         <button type="button" class="edit" @click="saveCertificate(true)">
           Back up key…
@@ -96,14 +96,14 @@ const usePreset = () => {
     id="settings-certificate"
     name="certificate"
     label="Your certificate"
-    description="Signs your PDFs digitally, so anyone can check that you signed them and nothing changed since"
+    description="Signs your PDFs digitally, so PDF apps show whether anything changed after you signed. Those who trust your certificate also see that it was you"
   >
     <div class="signing-mark">
       <button type="button" class="edit" @click="create('create', $event)">
-        Create…
+        Create certificate…
       </button>
       <button type="button" class="edit" @click="create('import', $event)">
-        Import…
+        Import key file…
       </button>
     </div>
   </SettingRow>

@@ -32,6 +32,7 @@ import {
   PAD_TABS,
   type PadTab,
   problemOf,
+  sampleOf,
   startOf,
   titleOf,
 } from "./signatureDialogModel";
@@ -97,6 +98,10 @@ const chooseFile = async () => {
 };
 
 const close = (callback: () => void) => closeDialog(signatureDialog, callback);
+// a mark being saved can't be cancelled: it would still be saved
+const cancel = () => {
+  if (!saving.value) close(props.request.cancel);
+};
 
 const sourceOf = (): MarkSource =>
   tab.value === "draw"
@@ -140,7 +145,7 @@ const what = props.request.mark;
     :title="titleOf(request.mark)"
     form-class="signature-dialog"
     @submit="submit"
-    @cancel="close(request.cancel)"
+    @cancel="cancel"
   >
     <SegmentedTabs v-model="tab" label="How to sign" :items="PAD_TABS" />
     <div v-if="tab === 'draw'" class="signature-panel">
@@ -191,7 +196,7 @@ const what = props.request.mark;
             class="signature-font-sample"
             :style="{ fontFamily: `'${choice}', cursive` }"
           >
-            {{ text.trim() || "Your name" }}
+            {{ text.trim() || sampleOf(request.mark) }}
           </span>
           <span class="signature-font-name"
             >{{ FONT_STYLES[choice] }} · {{ choice }}</span
@@ -224,7 +229,7 @@ const what = props.request.mark;
       {{ problem }}
     </p>
     <template #actions>
-      <button type="button" @click="close(request.cancel)">Cancel</button>
+      <button type="button" :disabled="saving" @click="cancel">Cancel</button>
       <button type="submit" :disabled="saving">Save</button>
     </template>
   </BaseDialog>

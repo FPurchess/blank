@@ -42,6 +42,14 @@ export const signingKind = (error: unknown) =>
   isSigningError(error) ? error.kind : "other";
 
 /**
+ * forTheLog returns what the log gets of an error: an error of the native
+ * side by its kind only, since its text may quote what the crypto crates
+ * got; one of the webview as it is
+ */
+export const forTheLog = (error: unknown) =>
+  isSigningError(error) ? error.kind : error;
+
+/**
  * signingMessage says what went wrong, in words for the user, `fallback`
  * (e.g. "Blank couldn't back up your key") for what the native side didn't
  * say

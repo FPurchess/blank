@@ -19,6 +19,7 @@ export const targetsOf = (doc: Node): SignTarget[] => {
     targets.push({
       pos,
       name,
+      place: node.attrs.place as string,
       label: label || `Signature ${targets.length + 1}`,
     });
   });

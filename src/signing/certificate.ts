@@ -16,6 +16,7 @@ import {
   type CertificateInfo,
   createCertificate,
   exportCertificate,
+  forTheLog,
   importKey,
   removeCertificate,
   signingKind,
@@ -38,7 +39,7 @@ export const reportSigningFailure = (
   fallback: string,
   title = TITLE,
 ) => {
-  logError(context, error);
+  logError(context, forTheLog(error));
   sendNotification({ title, body: signingMessage(error, fallback) });
 };
 
@@ -53,7 +54,7 @@ export const loadCertificate = () =>
       signingCertificate.value = info;
     })
     .catch((error: unknown) => {
-      logError("failed to read the certificate", error);
+      logError("failed to read the certificate", forTheLog(error));
       signingCertificate.value = null;
       // the next call reads it again
       reading = null;
@@ -206,19 +207,19 @@ export const openCertificateDialog = async (
           return (await confirmReplacing()) ? keep(true) : null;
         });
         if (!info) return "Blank kept the key you have";
-        publish(info, path ? "Certificate imported" : "Certificate made");
+        publish(info, path ? "Key file imported" : "Certificate created");
       } catch (error) {
         logError(
           path
-            ? "failed to import a certificate"
-            : "failed to make a certificate",
-          error,
+            ? "failed to import a key file"
+            : "failed to create a certificate",
+          forTheLog(error),
         );
         return signingMessage(
           error,
           path
             ? "Blank couldn't import the key file"
-            : "Blank couldn't make your certificate",
+            : "Blank couldn't create your certificate",
         );
       }
       return null;

@@ -191,6 +191,8 @@ export interface SignTarget {
   pos: number;
   // who it names, "" for whoever signs
   name: string;
+  // where it says it's signed, "" for where the signer says
+  place: string;
   // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
   label: string;
 }
@@ -201,7 +203,10 @@ export interface SignDialogRequest {
   // the signature blocks the document has, the one to fill in chosen
   targets: SignTarget[];
   chosen: number;
+  // where the user signed last
   place: string;
+  // the name the user signs as, "" when Blank doesn't know it
+  signer: string;
   // the notes the dialog shows, e.g. that an imported Word document's
   // layout can differ from Word's
   warnings: string[];
@@ -210,7 +215,8 @@ export interface SignDialogRequest {
   // opens the dialog that makes the user a certificate, which gives the
   // focus back to `opener`
   createCertificate(opener: EventTarget | null): void;
-  // fills in the block at `pos`, asks where to save the signed PDF and, with
+  // fills in the block at `pos` (signed in `place` when it says none),
+  // asks where to save the signed PDF and, with
   // the key's passphrase, signs it digitally too
   submit(pos: number, place: string, passphrase: string | null): void;
   cancel(): void;

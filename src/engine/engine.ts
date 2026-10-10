@@ -14,6 +14,7 @@ import {
   type SignedBlock,
 } from "./flatten";
 import type { DateStyle } from "../markdown/blocks/signature";
+import { type PageBox, rectsOf } from "./boxes";
 import { type FallbackFont, fallbackFonts } from "./fallback";
 import { FONT_URLS } from "./fonts";
 import { engineMissing } from "../state/pageView";
@@ -22,6 +23,8 @@ import wasmUrl from "./wasm/blank_layout_bg.wasm?url";
 import { bootMark } from "./perf";
 import { packFonts, type PdfWarning } from "./pdfJob";
 import type { EngineItem, PrintSheet } from "./types";
+
+export type { PageBox } from "./boxes";
 
 // The layout engine (src-tauri/layout, built for the webview by
 // scripts/build-engine.sh) and what it needs: its fonts, the document as
@@ -43,9 +46,6 @@ export interface Move extends Hit {
 
 const toHit = (values: Float64Array): Hit | null =>
   values.length === 2 ? { node: values[0] === 1, pos: values[1] } : null;
-
-import { type PageBox, rectsOf } from "./boxes";
-export type { PageBox } from "./boxes";
 
 // a table as laid out: where each column starts on the page and where the
 // last ends, and each row placed on a page

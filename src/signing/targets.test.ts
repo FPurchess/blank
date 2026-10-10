@@ -12,7 +12,7 @@ describe("the signature blocks a document can be signed in", () => {
     p("Both sign."),
     block({ role: "Landlord", name: "Bob Builder" }),
     block({ role: "Tenant" }),
-    block({ name: "Ada Lovelace" }),
+    block({ name: "Ada Lovelace", place: "Paris" }),
   );
 
   it("are named by who signs on them and as what", () => {
@@ -23,6 +23,12 @@ describe("the signature blocks a document can be signed in", () => {
     ]);
     expect(targetsOf(doc(block())).map((target) => target.label)).toEqual([
       "Signature 1",
+    ]);
+    // and say where they're signed, if they do
+    expect(targetsOf(contract).map((target) => target.place)).toEqual([
+      "",
+      "",
+      "Paris",
     ]);
   });
 
