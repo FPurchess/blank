@@ -66,6 +66,13 @@ describe("a PDF tab's document", () => {
     );
   });
 
+  it("says a PDF without pages is damaged", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(openPdf).mockResolvedValue({ ...opened, pages: [] });
+    expect((await openPdfDocument("t", "/cut.pdf")).problem).toBe("damaged");
+  });
+
   it("doesn't log a PDF whose tab closed while it opened", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(exists).mockResolvedValue(true);

@@ -3,7 +3,7 @@ import type { Command, EditorState } from "prosemirror-state";
 
 import { CommandIdentifier as C } from "../config";
 import { schema } from "../markdown";
-import type { MenuItem } from "../state";
+import { activeTabId, type MenuItem, tabs } from "../state";
 import {
   aligned,
   blockquote,
@@ -277,6 +277,37 @@ describe("the style menu", () => {
     expect(run).not.toHaveBeenCalled();
     entry(items, "style-paragraph").run!();
     expect(run).toHaveBeenCalledWith(C.BLOCKTYPE_PARAGRAPH);
+  });
+
+  it("offers nothing in a PDF tab, where the text can't change", () => {
+    tabs.value = [
+      {
+        id: "pdf",
+        kind: "pdf",
+        path: "/a.pdf",
+        importedFrom: null,
+        untitledNumber: null,
+        unsaved: false,
+        viewAnchor: null,
+      },
+    ];
+    activeTabId.value = "pdf";
+    try {
+      const state = createState(doc(p("")));
+      const styles = styleMenuItems(state, can(state), vi.fn());
+      expect(
+        styles.every((item) => item === "separator" || item.disabled),
+      ).toBe(true);
+      const insert = insertMenuItems(can(state), vi.fn(), vi.fn(), {
+        left: 1,
+        top: 2,
+        bottom: 3,
+      });
+      expect(entry(insert, C.INSERT_TABLE).disabled).toBe(true);
+    } finally {
+      tabs.value = [];
+      activeTabId.value = null;
+    }
   });
 
   it("takes text out of a quote", () => {

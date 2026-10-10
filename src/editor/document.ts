@@ -15,6 +15,9 @@ import {
   WORD_EXTENSIONS,
 } from "../formats";
 
+import { CommandIdentifier } from "../config";
+import { commandShortcut } from "./keyBindings";
+
 import welcomeMessage from "./welcome.md?raw";
 
 // Where a document comes from: its markdown file (`path`), or the Word
@@ -68,6 +71,14 @@ export const emptyDocument = (): Node => schema.topNodeType.createAndFill()!;
  */
 export const welcomeDocument = (): Node => parseMarkdown(welcomeMessage);
 
+/**
+ * saveHint says how to save, with Save's key as the user has it
+ */
+const saveHint = () => {
+  const key = commandShortcut(CommandIdentifier.FILE_SAVE);
+  return key ? `Save it with ${key}` : "Save it";
+};
+
 // Word documents larger than this are refused
 const MAX_WORD_BYTES = 50 * 1024 * 1024;
 
@@ -101,7 +112,7 @@ const importWordDocument = async (
   if (!silent) {
     sendNotification(
       [
-        `Imported ${name}. Save it with Mod+S as a markdown file`,
+        `Imported ${name}. ${saveHint()} as a markdown file`,
         ...(result.page ? [`Its ${result.page} pages came along`] : []),
         ...result.warnings,
       ].join(". "),

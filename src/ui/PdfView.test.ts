@@ -195,6 +195,21 @@ describe("the page view of PDFs", () => {
     );
   });
 
+  it("leaves Tab to move the focus", async () => {
+    await show();
+    announcement.value = null;
+    const tab = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    view()!.dispatchEvent(tab);
+
+    expect(tab.defaultPrevented).toBe(false);
+    expect(announcement.value).toBeNull();
+  });
+
   it("zooms with the window's zoom, keeping the spot in the middle of the view", async () => {
     await show();
     const element = view()!;

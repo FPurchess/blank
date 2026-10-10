@@ -317,6 +317,8 @@ const onKeydown = (event: KeyboardEvent) => {
     measure();
     return;
   }
+  // Tab moves the focus as anywhere, not Indent's refusal
+  if (event.key === "Tab") return;
   if (refusals(editor.view, event)) event.preventDefault();
 };
 
@@ -336,12 +338,17 @@ onUnmounted(() => {
 
 const label = computed(() => (pdf.value ? basename(pdf.value.path) : ""));
 const tabId = computed(() => activeTabId.value ?? "");
-const again = () => void reopenPdf(tabId.value);
+// the pages take the focus back, from the button that goes or the dialog
+const focusPages = () => void nextTick(() => scroller.value?.focus());
+const again = () => {
+  void reopenPdf(tabId.value).then(focusPages);
+};
 const find = async () => {
   // the tab the dialog is for, which may not show when it closes
   const id = tabId.value;
   const chosen = await open({ filters: [PDF_FILTER] });
   if (typeof chosen === "string") await reopenPdf(id, chosen);
+  if (id === activeTabId.value) focusPages();
 };
 const close = () => void closeTabs([tabId.value]);
 </script>

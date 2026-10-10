@@ -144,7 +144,13 @@ export const openPdfDocument = async (
   const doc = openingPdf(path);
   try {
     if (!(await exists(path))) return withProblem(doc, "missing");
-    return { ...doc, opened: await openPdf(tab, path) };
+    const opened = await openPdf(tab, path);
+    // e.g. a file cut short: nothing to show
+    if (!opened.pages.length) {
+      logWarning("failed to open a PDF", "no pages");
+      return withProblem(doc, "damaged");
+    }
+    return { ...doc, opened };
   } catch (error) {
     const failure = failureOf(error);
     // the tab closed, or opened it again, meanwhile: nothing went wrong

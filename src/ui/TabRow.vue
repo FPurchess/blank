@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { nextTick, onUnmounted, shallowRef, useTemplateRef, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onUnmounted,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from "vue";
 
 import { CommandIdentifier } from "../config";
 import { commandLabel } from "../commandList";
@@ -13,6 +20,7 @@ import {
 } from "../editor/commands";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
+import { pdfRefusal } from "../pdf/commands";
 import { activateTab, closeTabs, moveTab } from "../editor/tabs";
 import { engineless } from "../engine/engine";
 import { logError } from "../log";
@@ -20,6 +28,7 @@ import {
   activeTabId,
   blocksPaneOpen,
   FOCUS_ORDER,
+  shownPdf,
   tabRowFocused,
   tabs,
 } from "../state";
@@ -52,7 +61,12 @@ const spare = useTemplateRef<HTMLElement>("spare");
 const label = useTemplateRef<HTMLElement>("label");
 const C = CommandIdentifier;
 const newLabel = commandLabel(C.FILE_NEW);
-const blocksTip = commandLabel(C.INSERT_BLOCK);
+// in a PDF tab, why there are no blocks (pdfRefusal), its click says it too
+const blocksTip = computed(() =>
+  shownPdf.value
+    ? (pdfRefusal(C.VIEW_BLOCKS) ?? commandLabel(C.INSERT_BLOCK))
+    : commandLabel(C.INSERT_BLOCK),
+);
 
 const tabElements = () => [
   ...(list.value?.querySelectorAll<HTMLElement>("[role=tab]") ?? []),
@@ -356,7 +370,8 @@ onUnmounted(() => {
       label="Blocks"
       :tip="blocksTip"
       :command="C.INSERT_BLOCK"
-      :pressed="blocksPaneOpen"
+      :pressed="blocksPaneOpen && !shownPdf"
+      :disabled="shownPdf !== null"
       :focusable="false"
       @click="run(commandFor(C.VIEW_BLOCKS), false)"
     >
