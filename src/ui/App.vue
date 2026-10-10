@@ -67,8 +67,6 @@ useWindowCommands();
 // focus mode: the classes that fade the controls, and when they fade
 useBodyClass("focus-mode", () => focusMode.value);
 useBodyClass("controls-faded", () => controlsFaded.value);
-// a PDF tab shows its pages in place of the page view (see .claude/rules/pdf.md)
-useBodyClass("pdf-tab", () => shownPdf.value !== null);
 watchFocusMode();
 </script>
 

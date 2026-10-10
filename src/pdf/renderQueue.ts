@@ -27,9 +27,16 @@ export interface Renderer<T> {
   done(job: RenderJob, result: RenderResult<T>): void;
 }
 
+// the page being drawn, and whether it was asked to stop
+interface Running {
+  job: RenderJob;
+  ticket: number;
+  cancelled: boolean;
+}
+
 export class RenderQueue<T> {
   private wanted = new Map<string, RenderJob>();
-  private running: { job: RenderJob; ticket: number } | null = null;
+  private running: Running | null = null;
   private tickets = 0;
 
   constructor(private renderer: Renderer<T>) {}
@@ -41,10 +48,15 @@ export class RenderQueue<T> {
   want(jobs: readonly RenderJob[]) {
     this.wanted = new Map(jobs.map((job) => [job.key, job]));
     const running = this.running;
-    if (running && !this.wanted.has(running.job.key)) {
-      this.renderer.cancel(running.job, running.ticket);
+    if (running && !running.cancelled) {
+      if (this.wanted.has(running.job.key)) this.wanted.delete(running.job.key);
+      else {
+        running.cancelled = true;
+        this.renderer.cancel(running.job, running.ticket);
+      }
     }
-    this.wanted.delete(running?.job.key ?? "");
+    // one stopped already but wanted again stays wanted: it is drawn again
+    // once the stop comes back
     this.next();
   }
 
@@ -61,7 +73,7 @@ export class RenderQueue<T> {
       other.priority < first.priority ? other : first,
     );
     this.wanted.delete(job.key);
-    const running = { job, ticket: ++this.tickets };
+    const running = { job, ticket: ++this.tickets, cancelled: false };
     this.running = running;
     this.renderer.render(job, running.ticket).then(
       (bitmap) => this.finish(running, { bitmap }),
@@ -69,13 +81,12 @@ export class RenderQueue<T> {
     );
   }
 
-  private finish(
-    running: { job: RenderJob; ticket: number },
-    result: RenderResult<T>,
-  ) {
+  private finish(running: Running, result: RenderResult<T>) {
     this.running = null;
     if (!("failure" in result) || result.failure !== "cancelled") {
       this.renderer.done(running.job, result);
+      // drawn after all, though asked to stop: not again
+      this.wanted.delete(running.job.key);
     }
     this.next();
   }

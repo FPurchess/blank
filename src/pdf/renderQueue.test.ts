@@ -15,23 +15,24 @@ const job = (page: number, priority = 0): RenderJob => ({
  * queued returns a queue whose renders wait until `finish` settles them
  */
 const queued = () => {
-  const pending: { page: number; settle: (ok: boolean) => void }[] = [];
+  // settled with the page's bitmap, or rejected with a failure
+  const pending: { page: number; settle: (failure?: string) => void }[] = [];
   const renderer = {
     render: vi.fn(
       (job: RenderJob) =>
         new Promise<string>((resolve, reject) =>
           pending.push({
             page: job.page,
-            settle: (ok) =>
-              ok ? resolve(`bitmap ${job.page}`) : reject("crashed"),
+            settle: (failure) =>
+              failure ? reject(failure) : resolve(`bitmap ${job.page}`),
           }),
         ),
     ),
     cancel: vi.fn(),
     done: vi.fn(),
   };
-  const finish = async (ok = true) => {
-    pending.shift()!.settle(ok);
+  const finish = async (failure?: string) => {
+    pending.shift()!.settle(failure);
     await Promise.resolve();
     await Promise.resolve();
   };
@@ -77,10 +78,40 @@ describe("RenderQueue", () => {
     expect(renderer.cancel).not.toHaveBeenCalled();
   });
 
+  it("draws a page again that was stopped and then wanted again", async () => {
+    const { queue, renderer, pending, finish } = queued();
+    queue.want([job(1)]);
+    queue.want([job(5)]);
+    expect(renderer.cancel).toHaveBeenCalledTimes(1);
+
+    // back before the stop came back
+    queue.want([job(1), job(5)]);
+    expect(renderer.cancel).toHaveBeenCalledTimes(1);
+    await finish("cancelled");
+
+    expect(renderer.done).not.toHaveBeenCalled();
+    expect(pending.map(({ page }) => page)).toEqual([1]);
+    await finish();
+    expect(renderer.done).toHaveBeenCalledWith(job(1), { bitmap: "bitmap 1" });
+    expect(pending.map(({ page }) => page)).toEqual([5]);
+  });
+
+  it("doesn't draw a page again that was drawn though asked to stop", async () => {
+    const { queue, renderer, pending, finish } = queued();
+    queue.want([job(1)]);
+    queue.want([]);
+    queue.want([job(1)]);
+
+    await finish();
+
+    expect(renderer.done).toHaveBeenCalledTimes(1);
+    expect(pending).toHaveLength(0);
+  });
+
   it("tells a failure, but not a page it stopped", async () => {
     const { queue, renderer, finish } = queued();
     queue.want([job(1)]);
-    await finish(false);
+    await finish("crashed");
     expect(renderer.done).toHaveBeenCalledWith(job(1), { failure: "crashed" });
 
     renderer.render.mockRejectedValueOnce("cancelled");

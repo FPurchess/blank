@@ -64,6 +64,22 @@ describe("BitmapCache", () => {
     expect(old.close).toHaveBeenCalled();
     expect(cache.used).toBe(100);
   });
+
+  it("keeps the pinned bitmaps past its limit, letting the others go", () => {
+    // room for three of 10 × 10 pixels, while four are mounted
+    const cache = new BitmapCache(3 * 10 * 10 * 4);
+    cache.set("old", bitmap(10, 10));
+    cache.pin(["a", "b", "c", "d"]);
+    for (const key of ["a", "b", "c", "d"]) cache.set(key, bitmap(10, 10));
+
+    expect(cache.get("old")).toBeUndefined();
+    expect([...cache.keys()]).toEqual(["a", "b", "c", "d"]);
+
+    // scrolled on: what isn't mounted any more goes with the next one
+    cache.pin(["c", "d", "e"]);
+    cache.set("e", bitmap(10, 10));
+    expect([...cache.keys()]).toEqual(["c", "d", "e"]);
+  });
 });
 
 describe("engineId", () => {

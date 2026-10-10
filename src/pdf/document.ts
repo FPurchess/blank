@@ -22,11 +22,17 @@ export type PdfProblem =
   | "missing"
   // the file can't be read, or changed while it was read
   | "unreadable"
+  // the file holds another PDF than the one the tab opened
+  | "changed"
   // not a PDF the helper can read
   | "damaged"
+  // more than the helper may take: too large, or too slow to open
+  | "tooComplex"
   | "needsPassword"
   // the helper couldn't be started
   | "start"
+  // the helper stopped while it opened it
+  | "stopped"
   // the helper failed twice on it
   | "failed";
 
@@ -50,15 +56,47 @@ export const problemOf = (failure: PdfFailure): PdfProblem => {
     case "needsPassword":
     case "start":
     case "unreadable":
+    case "missing":
+    case "changed":
     case "failed":
+    case "tooComplex":
       return failure;
     case "source":
       return "unreadable";
-    case "crashed":
+    case "timedOut":
     case "hung":
-      return "failed";
+      return "tooComplex";
+    case "crashed":
+      return "stopped";
     default:
       return "damaged";
+  }
+};
+
+/**
+ * withRenderFailure returns `doc` after the helper couldn't draw `page`:
+ * the page shows that it couldn't, unless the PDF can't be shown at all
+ * any more (its helper failed twice, its file went or changed and a new
+ * helper couldn't open it again), whose problem then shows instead of the
+ * pages; a tab closed meanwhile keeps it as it is
+ */
+export const withRenderFailure = (
+  doc: PdfTabDocument,
+  page: number,
+  failure: PdfFailure,
+): PdfTabDocument => {
+  switch (failure) {
+    case "closed":
+      return doc;
+    case "failed":
+    case "missing":
+    case "changed":
+    case "unreadable":
+    case "source":
+    case "start":
+      return withProblem(doc, problemOf(failure));
+    default:
+      return withFailedPage(doc, page);
   }
 };
 
@@ -109,7 +147,8 @@ export const openPdfDocument = async (
     return { ...doc, opened: await openPdf(tab, path) };
   } catch (error) {
     const failure = failureOf(error);
-    logWarning("failed to open a PDF", failure);
+    // the tab closed, or opened it again, meanwhile: nothing went wrong
+    if (failure !== "closed") logWarning("failed to open a PDF", failure);
     return withProblem(doc, problemOf(failure));
   }
 };
@@ -160,8 +199,18 @@ export const problemText = (problem: PdfProblem, path: string): ProblemText => {
         `Blank can't read ${name}`,
         "It may have changed while Blank read it, or Blank isn't allowed to read it.",
       );
+    case "changed":
+      return text(
+        `${name} changed`,
+        "It changed after Blank opened it. Open it again to see it as it is now.",
+      );
     case "damaged":
       return text(`Blank can't open ${name}`, "It isn't a PDF Blank can read.");
+    case "tooComplex":
+      return text(
+        `${name} is too large or complex`,
+        "Blank can't show it. Open it in another app.",
+      );
     case "needsPassword":
       return text(
         "This PDF needs a password",
@@ -171,6 +220,11 @@ export const problemText = (problem: PdfProblem, path: string): ProblemText => {
       return text(
         "Blank's PDF viewer couldn't start",
         "Try again. If it keeps failing, install Blank again.",
+      );
+    case "stopped":
+      return text(
+        `Blank's PDF viewer stopped while it opened ${name}`,
+        "The file may be damaged. Try again, or open it in another app.",
       );
     case "failed":
       return text(

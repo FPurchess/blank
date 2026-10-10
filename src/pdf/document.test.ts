@@ -6,6 +6,7 @@ import {
   problemOf,
   problemText,
   withFailedPage,
+  withRenderFailure,
 } from "./document";
 import { openPdf } from "./ipc";
 
@@ -52,9 +53,43 @@ describe("a PDF tab's document", () => {
   it("names the problems of the helper's failures", () => {
     expect(problemOf("damaged")).toBe("damaged");
     expect(problemOf("engine")).toBe("damaged");
-    expect(problemOf("crashed")).toBe("failed");
+    expect(problemOf("crashed")).toBe("stopped");
+    expect(problemOf("tooComplex")).toBe("tooComplex");
+    expect(problemOf("timedOut")).toBe("tooComplex");
     expect(problemOf("source")).toBe("unreadable");
     expect(problemOf("start")).toBe("start");
+    expect(problemText("tooComplex", "/big.pdf").title).toBe(
+      "big.pdf is too large or complex",
+    );
+    expect(problemText("stopped", "/a.pdf").title).toBe(
+      "Blank's PDF viewer stopped while it opened a.pdf",
+    );
+  });
+
+  it("doesn't log a PDF whose tab closed while it opened", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(exists).mockResolvedValue(true);
+    vi.mocked(openPdf).mockRejectedValue("closed");
+    await openPdfDocument("t", "/a.pdf");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("shows why instead of the pages once a file it reads again went or changed", () => {
+    const doc = {
+      path: "/a.pdf",
+      opened,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    expect(withRenderFailure(doc, 1, "engine").failedPages).toEqual([1]);
+    expect(withRenderFailure(doc, 1, "changed")).toMatchObject({
+      opened: null,
+      problem: "changed",
+    });
+    expect(withRenderFailure(doc, 1, "missing").problem).toBe("missing");
+    expect(withRenderFailure(doc, 1, "failed").problem).toBe("failed");
+    expect(withRenderFailure(doc, 1, "closed")).toBe(doc);
   });
 
   it("says why in words, with Find it… for a file that went", () => {

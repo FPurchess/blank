@@ -19,8 +19,20 @@ export class BitmapCache {
   // the key each slot holds, e.g. a page's text at a scale, whose older
   // bitmap no page shows any more once it holds a newer one
   private slots = new Map<string, string>();
+  // the keys that stay, however long ago they were used: what the view has
+  // mounted, which it would otherwise draw again and again when it holds
+  // more than `limit`
+  private pinned = new Set<string>();
 
   constructor(private limit: number) {}
+
+  /**
+   * pin keeps the bitmaps of `keys`, and only those, while they take more
+   * than `limit` together with the rest: the others go first
+   */
+  pin(keys: Iterable<string>) {
+    this.pinned = new Set(keys);
+  }
 
   get(key: string): Bitmap | undefined {
     const bitmap = this.bitmaps.get(key);
@@ -50,9 +62,9 @@ export class BitmapCache {
     this.delete(key);
     this.bitmaps.set(key, bitmap);
     this.bytes += bitmap.width * bitmap.height * 4;
-    for (const oldest of this.bitmaps.keys()) {
-      if (this.bytes <= this.limit || oldest === key) break;
-      this.delete(oldest);
+    for (const oldest of [...this.bitmaps.keys()]) {
+      if (this.bytes <= this.limit) break;
+      if (oldest !== key && !this.pinned.has(oldest)) this.delete(oldest);
     }
   }
 
@@ -173,9 +185,12 @@ export const pageBitmaps = new BitmapCache(BITMAP_LIMIT);
 
 // the pages of PDFs (PdfView.vue) have a budget of their own, so a PDF never
 // takes the bitmaps of the markdown pages in view; at 2× an A4 page is about
-// 8 MB at Fit and 57 MB at a zoom of 200%. A third of it holds the largest a
+// 8 MB at Fit and 32 MB at a zoom of 200%. A third of it holds the largest a
 // page is drawn with (MAX_PAGE_PIXELS), which the cache would skip, and draw
-// again and again, past a third.
+// again and again, past a third. The pages mounted are pinned, so at a large
+// zoom they may take more for a while (about 5 views' height of pages: some
+// 200 MB for A4 at 200% on a 2× screen), rather than drawing each other
+// away; what isn't mounted any more goes with the next bitmap.
 export const PDF_BITMAP_LIMIT = 192 * 1024 * 1024;
 
 export const pdfBitmaps = new BitmapCache(PDF_BITMAP_LIMIT);

@@ -8,14 +8,23 @@ import { errorMessage } from "../errors";
 import { logError, logWarning } from "../log";
 import type { Layout } from "../layout/resolve";
 import { announce } from "../state";
-import { isPrintError, preparePrint, type Preset, sendPrint } from "./ipc";
+import {
+  isPrintError,
+  preparePrint,
+  type Preset,
+  printPdfTab,
+  sendPrint,
+} from "./ipc";
 import {
   failedNote,
   instead,
   insteadForPdf,
   MAY_NOT_HAVE_PRINTED,
   PDF_CHANGED,
+  PDF_MISSING,
+  PDF_NOT_OPEN,
   PDF_PRINTS_WHOLE,
+  PDF_PRINTS_WHOLE_FIRST,
   type PrintPlan,
   sentMessage,
   systemNote,
@@ -162,23 +171,16 @@ const failureNote = (
 };
 
 export interface PdfPrintJob {
-  // the PDF tab's file, and its SHA-256 as the tab opened it
+  // the PDF tab, whose native side holds its file and its SHA-256
+  tab: string;
   path: string;
-  sha256: string;
   title: string;
   // its pages' sizes, in points: the system's dialog starts on the first's
   pages: readonly Size[];
 }
 
-/**
- * sha256Of returns the SHA-256 of `bytes` in lower-case hex, as the PDF
- * tabs' native side gives it (src-tauri/src/pdf_view)
- */
-const sha256Of = async (bytes: Uint8Array<ArrayBuffer>) =>
-  Array.from(
-    new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
-    (byte) => byte.toString(16).padStart(2, "0"),
-  ).join("");
+// the system's dialog on Linux leaves the pages and the scale to Blank
+const asksFirst = () => /Linux/.test(navigator.platform);
 
 /**
  * printPdfFile prints a PDF tab's file as it is, unchanged, while it is the
@@ -186,13 +188,15 @@ const sha256Of = async (bytes: Uint8Array<ArrayBuffer>) =>
  * out, which a PDF Blank didn't write isn't, so the file goes straight to
  * the system's print dialog. Cancelling says nothing; what didn't work a
  * notification says.
+ * @returns "missing" or "changed" when the file was moved or deleted, or
+ * changed, since the tab opened it, which its tab then shows
  */
 export const printPdfFile = async ({
+  tab,
   path,
-  sha256,
   title,
   pages,
-}: PdfPrintJob) => {
+}: PdfPrintJob): Promise<"missing" | "changed" | undefined> => {
   const preset: Preset = {
     copies: 1,
     collate: true,
@@ -201,33 +205,36 @@ export const printPdfFile = async ({
   };
   const capture = __TEST_HOOKS__ ? window.blankPrintCapture : undefined;
   let note: string | undefined;
+  let problem: "missing" | "changed" | undefined;
   printing = true;
   try {
-    const contents = await readFile(path);
-    if ((await sha256Of(contents)) !== sha256) {
-      note = PDF_CHANGED;
-      logWarning("printing a PDF failed: it changed since it was opened");
-    } else if (capture) {
+    if (capture) {
+      const contents = await readFile(path);
       const pdf = new TextDecoder().decode(contents.subarray(0, 5));
       capture.sent = [...capture.sent, { sheets: pages.length, pdf }];
-    } else {
-      const setup = await preparePrint(title, preset);
-      if (setup.outcome === "cancelled") return;
-      // Linux's dialog asks before Blank sends the PDF, and leaves the pages
-      // and the scale chosen to Blank, which can't apply them to this one
-      if (setup.ranges || setup.scale) note = PDF_PRINTS_WHOLE;
-      else {
-        const sent = await sendPrint(contents, {
-          token: setup.token,
-          title,
-          preset,
-        });
-        if (sent.outcome === "sent")
-          announce(sentMessage(pages.length, sent.printer));
-      }
+      return;
     }
+    if (asksFirst()) {
+      sendNotification({ title: "Print", body: PDF_PRINTS_WHOLE_FIRST });
+      announce(PDF_PRINTS_WHOLE_FIRST);
+    }
+    const printed = await printPdfTab(tab, { title, preset });
+    if (printed.outcome === "whole") note = PDF_PRINTS_WHOLE;
+    else if (printed.outcome === "sent")
+      announce(sentMessage(pages.length, printed.printer));
   } catch (error) {
-    note = failureNote(error, insteadForPdf);
+    if (isPrintError(error) && error.kind === "changed") {
+      logWarning("printing a PDF failed: it changed since it was opened");
+      note = PDF_CHANGED;
+      problem = "changed";
+    } else if (isPrintError(error) && error.kind === "missing") {
+      logWarning("printing a PDF failed: it was moved or deleted");
+      note = PDF_MISSING;
+      problem = "missing";
+    } else if (isPrintError(error) && error.kind === "notOpen") {
+      logWarning("printing a PDF failed: it isn't open");
+      note = PDF_NOT_OPEN;
+    } else note = failureNote(error, insteadForPdf);
   } finally {
     printing = false;
   }
@@ -235,4 +242,5 @@ export const printPdfFile = async ({
     sendNotification({ title: "Print", body: note });
     announce(note);
   }
+  return problem;
 };

@@ -18,6 +18,7 @@ import {
   type Destination,
   NOTHING_TO_PRINT,
   PDF_NOT_OPEN,
+  PDF_STILL_OPENING,
   PRINT_UNAVAILABLE,
   printPaper,
   STILL_PRINTING,
@@ -34,6 +35,7 @@ import {
 } from "../../state";
 import { isEmpty, PDF_EXPORT, runExport } from "./exportAs";
 import { openPageSetup } from "./pageSetup";
+import { showPdfProblem } from "../tabs";
 
 /**
  * openPrint opens the print dialog for the document of `view`
@@ -128,21 +130,26 @@ export const openPrint = (
  */
 const printShownPdf = () => {
   const pdf = shownPdf.value;
-  if (!pdf) return;
+  const tab = activeTabId.value;
+  if (!pdf || !tab) return;
   if (printingNow()) {
     announce(STILL_PRINTING);
     return;
   }
   if (!pdf.opened) {
-    sendNotification({ title: "Print", body: PDF_NOT_OPEN });
-    announce(PDF_NOT_OPEN);
+    const note = pdf.problem ? PDF_NOT_OPEN : PDF_STILL_OPENING;
+    sendNotification({ title: "Print", body: note });
+    announce(note);
     return;
   }
   void printPdfFile({
+    tab,
     path: pdf.path,
-    sha256: pdf.opened.sha256,
     title: basename(pdf.path),
     pages: pdf.opened.pages,
+  }).then((problem) => {
+    // the tab says why, with Open again or Find it…
+    if (problem) showPdfProblem(tab, problem);
   });
 };
 

@@ -28,8 +28,6 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.TAB_REOPEN,
   CommandIdentifier.TAB_MOVE_LEFT,
   CommandIdentifier.TAB_MOVE_RIGHT,
-  CommandIdentifier.SIGNING_SIGNATURE,
-  CommandIdentifier.SIGNING_INITIALS,
   CommandIdentifier.THEME_CYCLE,
   CommandIdentifier.VIEW_FOCUS_NEXT,
   CommandIdentifier.VIEW_FOCUS_PREVIOUS,
@@ -46,10 +44,15 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.APP_ABOUT,
 ]);
 
+// what signing says in a PDF tab: received PDFs are signed with PR 3b
+export const SIGN_RECEIVED_REFUSAL =
+  "Blank can't sign PDFs you received yet. Sign your own documents with Export signed PDF.";
+
 /**
  * pdfRefusal returns what the command `id` says in a PDF tab instead of
  * running, or null for one that runs there: what its key announces, and the
- * tooltip of its disabled item in the main menu (mainMenuModel.ts)
+ * tooltip of its disabled item in the main menu (mainMenuModel.ts). The one
+ * table of these reasons.
  */
 export const pdfRefusal = (id: CommandIdentifier): string | null => {
   if (RUN_IN_PDF.has(id)) return null;
@@ -63,13 +66,40 @@ export const pdfRefusal = (id: CommandIdentifier): string | null => {
     case CommandIdentifier.INSERT_BLOCK:
     case CommandIdentifier.VIEW_BLOCKS:
       return "Blocks go into your own documents";
+    case CommandIdentifier.EXPORT_SIGNED_PDF:
+    case CommandIdentifier.INSERT_SIGNATURE:
+    case CommandIdentifier.SIGNING_SIGNATURE:
+    case CommandIdentifier.SIGNING_INITIALS:
+      return SIGN_RECEIVED_REFUSAL;
     case CommandIdentifier.EXPORT_PDF:
     case CommandIdentifier.EXPORT_DOCX:
-    case CommandIdentifier.EXPORT_SIGNED_PDF:
       return "Blank exports your own documents, not PDFs";
+    case CommandIdentifier.EDIT_FIND:
+      return "Blank can't search PDFs yet";
+    case CommandIdentifier.LANGUAGE_CHOOSE:
+    case CommandIdentifier.SPELLCHECK_TOGGLE:
+    case CommandIdentifier.SPELLCHECK_NEXT:
+    case CommandIdentifier.SPELLCHECK_PREVIOUS:
+      return "Blank checks the spelling of your own documents, not of PDFs";
+    case CommandIdentifier.CONTEXT_MENU:
+      return "PDFs have no context menu in Blank yet";
+    case CommandIdentifier.PAGE_SETUP:
+      return "A PDF's pages are set already";
+    case CommandIdentifier.EDIT_HEADER:
+    case CommandIdentifier.EDIT_FOOTER:
+      return "Headers and footers are for your own documents";
+    case CommandIdentifier.VIEW_PAGES:
+      return "PDFs always show as pages";
+    case CommandIdentifier.VIEW_OUTLINE:
+      return "Blank shows no outline for PDFs yet";
+    case CommandIdentifier.TOOLS_STATS:
+      return "Blank doesn't count the words of PDFs";
     default:
+      // what changes the text: the block types, formatting, inserting
+      if (/^(blocktype|format|insert)\./.test(id))
+        return "Blank can't change the text of a PDF";
       // "Page setup…" without its dots
-      return `${commandLabel(id).replace(/…$/, "")} isn't for PDFs`;
+      return `${commandLabel(id).replace(/…$/, "")} is for your own documents`;
   }
 };
 

@@ -67,7 +67,9 @@ describe("PDF tabs", () => {
   it("says why a command of the text doesn't work in it", async () => {
     await expect($("#pdf-view")).toBeFocused();
     await pressMod("b");
-    await expect($("#ui-announcement")).toHaveText("Bold isn't for PDFs");
+    await expect($("#ui-announcement")).toHaveText(
+      "Blank can't change the text of a PDF",
+    );
   });
 
   it("zooms its pages with the window's zoom", async () => {

@@ -12,7 +12,7 @@ import {
 } from "vue";
 
 import { CommandIdentifier } from "../config";
-import { closeTabs, reopenPdf } from "../editor/tabs";
+import { closeTabs, reopenPdf, signatureChecks } from "../editor/tabs";
 import { commandKeys, WINDOW_COMMANDS } from "../editor/plugins/keymap";
 import { useEditor } from "../editor/handle";
 import { pointOnPage, viewAnchor } from "../engine/frames";
@@ -22,7 +22,7 @@ import {
   checkSignatures,
   problemText,
   withFailedPage,
-  withProblem,
+  withRenderFailure,
 } from "../pdf/document";
 import { renderPage, cancelRender, type PageBitmap } from "../pdf/ipc";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
@@ -193,11 +193,7 @@ const queue = new RenderQueue<PageBitmap>({
     )
       return;
     if ("failure" in result) {
-      if (result.failure === "closed") return;
-      pdf.value =
-        result.failure === "failed"
-          ? withProblem(pdf.value, "failed")
-          : withFailedPage(pdf.value, job.page);
+      pdf.value = withRenderFailure(pdf.value, job.page, result.failure);
       return;
     }
     const { width, height, pixels } = result.bitmap;
@@ -220,8 +216,11 @@ const queue = new RenderQueue<PageBitmap>({
   },
 });
 
-// what to draw: the pages mounted without their bitmap, those in view first
+// what to draw: the pages mounted without their bitmap, those in view first;
+// the cache keeps those mounted, which would otherwise draw each other away
+// at a large zoom
 watch(frames, (list) => {
+  pdfBitmaps.pin(list.map((frame) => frame.key));
   const tab = activeTabId.value;
   if (!tab) return queue.stop();
   queue.want(
@@ -267,7 +266,13 @@ watch(
   async (tab) => {
     if (!tab || !pdf.value) return;
     const sha256 = pdf.value.opened?.sha256;
-    const checked = await checkSignatures(tab, pdf.value);
+    let checked;
+    let asked;
+    // Blank trusted other certificates while it checked: again
+    do {
+      asked = signatureChecks();
+      checked = await checkSignatures(tab, pdf.value);
+    } while (asked !== signatureChecks() && pdf.value);
     // the same PDF still, not one opened again from elsewhere meanwhile
     if (
       activeTabId.value === tab &&
@@ -323,6 +328,7 @@ onBeforeUnmount(() => {
 });
 onUnmounted(() => {
   queue.stop();
+  pdfBitmaps.pin([]);
   pdfPageInView.value = null;
   pdfViewAnchor.value = null;
   pdfViewport.value = null;

@@ -243,14 +243,24 @@ export const systemNote = (kind: "noService" | "unsupported", then = instead) =>
   then(kind === "noService" ? NO_SERVICE : NO_DIALOG);
 
 // a PDF tab prints its file, which changed since Blank opened it: it would
-// print something else than what the tab shows
+// print something other than what the tab shows; the tab then says so, with
+// Open again
 export const PDF_CHANGED =
-  "The PDF changed since Blank opened it. Close its tab and open it again to print it.";
+  "The PDF changed after Blank opened it, so Blank didn't print it. Open it again in its tab to print it as it is now.";
+// a PDF tab's file was moved or deleted; the tab then offers Find it…
+export const PDF_MISSING =
+  "The PDF was moved or deleted after Blank opened it. Find it in its tab to print it.";
 // a PDF tab whose PDF Blank couldn't open has nothing to print
 export const PDF_NOT_OPEN = insteadForPdf(
   "Blank couldn't open this PDF, so it can't print it.",
 );
-// the system's dialog (Linux) chose pages or a scale, which Blank can't
-// apply to a PDF it didn't write
+// a PDF tab whose PDF is still opening
+export const PDF_STILL_OPENING =
+  "Blank is still opening this PDF. Print it once its pages show.";
+// before the system's dialog opens on Linux, whose pages and scale Blank
+// can't apply to a PDF it didn't write
+export const PDF_PRINTS_WHOLE_FIRST =
+  "Blank prints a PDF whole, at its own size: leave all pages and 100% in the print dialog.";
+// the system's dialog (Linux) chose pages or a scale all the same
 export const PDF_PRINTS_WHOLE =
   "Blank prints a PDF whole, at its own size. Print it again with all pages at 100%, or open it in another app to print some of it.";

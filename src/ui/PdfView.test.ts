@@ -190,7 +190,9 @@ describe("the page view of PDFs", () => {
       new KeyboardEvent("keydown", { key: "b", ctrlKey: true, bubbles: true }),
     );
 
-    expect(announcement.value?.text).toBe("Bold isn't for PDFs");
+    expect(announcement.value?.text).toBe(
+      "Blank can't change the text of a PDF",
+    );
   });
 
   it("zooms with the window's zoom, keeping the spot in the middle of the view", async () => {

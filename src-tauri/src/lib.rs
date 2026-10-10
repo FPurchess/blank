@@ -104,6 +104,7 @@ pub fn run() {
             pdf_view::commands::pdf_cancel,
             pdf_view::commands::pdf_close,
             pdf_view::commands::pdf_verify,
+            pdf_view::commands::pdf_print,
             signing::commands::signing_certificate,
             signing::commands::signing_create_certificate,
             signing::commands::signing_import,

@@ -193,17 +193,17 @@ const fileItem = (
       children: recentFilesItems(deps),
     };
   if (id === "export") {
-    // a tab that refuses every export says why on Export itself
-    const refusals = new Set(
-      EXPORT_COMMANDS.map((command) => deps.refusal(command)),
-    );
+    // a tab that refuses every export says why on Export itself, with the
+    // first one's reason (each item says its own)
+    const refusals = EXPORT_COMMANDS.map((command) => deps.refusal(command));
     const [refusal] = refusals;
     return {
       id: "file.export",
       label: "Export",
       icon: "export",
       children: EXPORT_COMMANDS.map((command) => commandEntry(deps, command)),
-      ...(refusals.size === 1 && refusal && { disabled: true, tip: refusal }),
+      ...(refusal &&
+        !refusals.includes(null) && { disabled: true, tip: refusal }),
     };
   }
   return commandEntry(deps, id);

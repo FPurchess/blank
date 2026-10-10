@@ -8,7 +8,12 @@ import {
   signaturesPopover,
   tabs,
 } from "../state";
-import { forPdf, pdfRefusal, showSignatures } from "./commands";
+import {
+  forPdf,
+  pdfRefusal,
+  showSignatures,
+  SIGN_RECEIVED_REFUSAL,
+} from "./commands";
 
 const run = () => true;
 
@@ -37,11 +42,31 @@ afterEach(() => {
 describe("commands in a PDF tab", () => {
   it("says why a command of the text doesn't run", () => {
     expect(pdfRefusal(CommandIdentifier.FORMAT_BOLD)).toBe(
-      "Bold isn't for PDFs",
+      "Blank can't change the text of a PDF",
+    );
+    expect(pdfRefusal(CommandIdentifier.EDIT_FIND)).toBe(
+      "Blank can't search PDFs yet",
     );
     expect(pdfRefusal(CommandIdentifier.FILE_SAVE)).toMatch(/nothing to save/);
     expect(pdfRefusal(CommandIdentifier.TAB_CLOSE)).toBeNull();
     expect(pdfRefusal(CommandIdentifier.APP_SETTINGS)).toBeNull();
+  });
+
+  it("says once that received PDFs can't be signed yet", () => {
+    for (const id of [
+      CommandIdentifier.EXPORT_SIGNED_PDF,
+      CommandIdentifier.INSERT_SIGNATURE,
+      CommandIdentifier.SIGNING_SIGNATURE,
+      CommandIdentifier.SIGNING_INITIALS,
+    ])
+      expect(pdfRefusal(id)).toBe(SIGN_RECEIVED_REFUSAL);
+  });
+
+  it("says why in a sentence for every command that doesn't run", () => {
+    for (const id of Object.values(CommandIdentifier)) {
+      const refusal = pdfRefusal(id);
+      if (refusal !== null) expect(refusal).not.toMatch(/isn't for PDFs|…/);
+    }
   });
 
   it("can't run there, and its key says why", () => {
@@ -51,7 +76,9 @@ describe("commands in a PDF tab", () => {
 
     expect(bold(state)).toBe(false);
     expect(bold(state, () => {})).toBe(true);
-    expect(announcement.value?.text).toBe("Bold isn't for PDFs");
+    expect(announcement.value?.text).toBe(
+      "Blank can't change the text of a PDF",
+    );
     expect(forPdf(CommandIdentifier.TAB_NEXT, run)(state)).toBe(true);
   });
 

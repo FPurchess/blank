@@ -26,9 +26,13 @@ export interface OpenedPdf {
 
 // why a call failed, as the native side says it (`PdfError::kind`), or
 // "unreadable" for a file that can't be read, "closed" for a tab whose PDF
-// was closed meanwhile
+// was closed meanwhile, and for a file read again (a helper that stopped
+// opens it again) "missing" when it has gone, "changed" when it holds
+// another PDF than the one opened
 export type PdfFailure =
   | "unreadable"
+  | "missing"
+  | "changed"
   | "closed"
   | "badRequest"
   | "unknownOp"

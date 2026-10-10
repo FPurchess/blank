@@ -168,7 +168,7 @@ describe("mainMenuItems", () => {
       mainMenuSearch(pdf)
         .results("page setup")
         .find(({ id }) => id === C.PAGE_SETUP),
-    ).toMatchObject({ disabled: true, tip: "Page setup isn't for PDFs" });
+    ).toMatchObject({ disabled: true, tip: "A PDF's pages are set already" });
   });
 
   it("offers every theme as a swatch, the chosen one checked", () => {

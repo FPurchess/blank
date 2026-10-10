@@ -15,6 +15,7 @@ import { activeTabId, announcement, printDialog, shownPdf } from "../../state";
 import { doc, docWithFrontmatter, h, p } from "../../test/editor";
 import {
   NOTHING_TO_PRINT,
+  PDF_STILL_OPENING,
   PRINT_UNAVAILABLE,
   STILL_PRINTING,
 } from "../../print/printModel";
@@ -258,8 +259,27 @@ describe("command.print", () => {
     expect(printDialog.value).toBe(first);
   });
 
+  it("says a PDF that still opens can't print yet", () => {
+    activeTabId.value = "a";
+    shownPdf.value = {
+      path: "/docs/contract.pdf",
+      opened: null,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    mount(doc(p("")));
+
+    printCommand()(view.state, view.dispatch, view);
+
+    expect(printPdfFile).not.toHaveBeenCalled();
+    expect(announcement.value?.text).toBe(PDF_STILL_OPENING);
+  });
+
   it("prints a PDF tab's file itself, without Blank's dialog or the engine", () => {
     setPageEngine(null);
+    activeTabId.value = "a";
+    printPdfFile.mockResolvedValue(undefined);
     const pages = [{ width: 595, height: 842, rotation: 0 }];
     shownPdf.value = {
       path: "/docs/contract.pdf",
@@ -274,8 +294,8 @@ describe("command.print", () => {
 
     expect(printDialog.value).toBeNull();
     expect(printPdfFile).toHaveBeenCalledWith({
+      tab: "a",
       path: "/docs/contract.pdf",
-      sha256: "abc",
       title: "contract.pdf",
       pages,
     });

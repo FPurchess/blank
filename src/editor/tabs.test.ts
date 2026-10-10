@@ -39,6 +39,7 @@ import {
   openNewTab,
   openPaths,
   reopenPdf,
+  showPdfProblem,
   reopenTab,
   restoreTabs,
   saveTab,
@@ -744,15 +745,51 @@ describe("PDF tabs", () => {
     expect(activeTab.value?.unsaved).toBe(false);
   });
 
-  it("adds no tab for a PDF it can't open, and says why", async () => {
+  it("says in its tab why it can't open a PDF", async () => {
     files["/broken.pdf"] = "x";
     await boot();
     await openPaths(["/broken.pdf"]);
+    await flushPromises();
 
-    expect(tabs.value).toHaveLength(1);
-    expect(sendNotification).toHaveBeenCalledWith(
-      "Blank can't open broken.pdf. It isn't a PDF Blank can read.",
+    expect(activeTab.value).toMatchObject({ kind: "pdf" });
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: "damaged" });
+  });
+
+  it("opens a PDF from the command line without waiting for its helper", async () => {
+    let opened = () => {};
+    vi.mocked(openPdf).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          opened = () =>
+            resolve({
+              sha256: "c1",
+              pages: [{ width: 595, height: 842, rotation: 0 }],
+              repaired: false,
+              encrypted: false,
+            });
+        }),
     );
+    await boot();
+    await openPaths(["/c.pdf"]);
+    // the tabs' queue goes on meanwhile
+    await openPaths(["/a.md"]);
+    expect(tabs.value).toHaveLength(3);
+
+    await activateTab(tabs.value.find((tab) => tab.kind === "pdf")!.id);
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+    opened();
+    await flushPromises();
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+  });
+
+  it("shows a problem printing found, with what the tab offers then", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    await flushPromises();
+
+    showPdfProblem(activeTabId.value!, "changed");
+
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: "changed" });
   });
 
   it("shows a markdown tab's document again after a PDF tab", async () => {
@@ -812,6 +849,8 @@ describe("PDF tabs", () => {
     await boot();
 
     await reopenPdf("a", "/moved/c.pdf");
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+    await flushPromises();
 
     expect(activeTab.value?.path).toBe("/moved/c.pdf");
     expect(shownPdf.value).toMatchObject({
