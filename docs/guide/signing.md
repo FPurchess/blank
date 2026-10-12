@@ -41,6 +41,7 @@ A contract for two people has two blocks, one for each. On the pages and in a pr
    - **Reason**, if you like, e.g. _I agree to these terms_: PDF apps show it with a digital signature.
 
    Blank remembers the place and the initials for the next time. The dialog also shows the date that goes under your signature: it's written in the document's language, which you choose in the status bar.
+
 3. Choose where to save the PDF. Blank suggests the document's name with _signed_ after it (_Untitled signed.pdf_ for a document you haven't saved yet), so the unsigned file stays as it is.
 
 The block shows your signature, your name and the place and today's date, written as **Settings ▸ Signing ▸ Date** says: the long form in the document's language (e.g. _8 October 2026_ in British English), its short form, or _2026-10-08_. The markdown file itself never holds your signature.
@@ -49,10 +50,14 @@ The block shows your signature, your name and the place and today's date, writte
 
 You sign only your own block. Every other block keeps its empty line and gets an empty signature field over it, named after who signs there (e.g. _Signature of Ben Sample_, or _Signature of Landlord_ for a block with a role only). Send the signed PDF to the others, and they sign it:
 
-- **In any PDF app, or in Blank:** they click their field and sign with a signature of their own. Opened in Blank, the PDF shows their field as the place to sign. If you signed digitally, PDF apps then show that something was added after you signed, and your signature stays intact; an app that rewrites the whole file breaks it.
+- **In any PDF app, or in Blank:** they click their field and sign with a signature of their own. Opened in Blank, the PDF shows their field as the place to sign, and [Sign…](./pdf#sign-received) signs it. If you signed digitally, PDF apps then show that something was added after you signed, and your signature stays intact; an app that rewrites the whole file breaks it.
 - **On paper:** they print it, sign on their line by hand, and scan it or send it back.
 
 A Word document you opened in Blank is signed the same way. Blank lays the pages out a little differently from Word, so check every page before you send it, or ask the sender for a PDF: **Sign…** waits until you switch on **I checked every page**.
+
+## Sign a PDF you received {#received}
+
+A PDF someone sent you, a contract or a form, you fill in and sign in its own tab: Blank marks where it wants your signature, a date or your details, **Next** takes you from one to the next, and **Sign…** saves it signed as a new file. See [Fill in and sign a PDF you received](./pdf#fill-in).
 
 ## Digital signatures {#digital}
 

@@ -1,6 +1,8 @@
 ---
 paths:
   - "src/signing/**"
+  - "src/pdf/sign.ts"
+  - "src/pdf/receivedPlan.ts"
   - "src/editor/commands/signing.ts"
   - "src/ui/Sign*.vue"
   - "src/ui/sign*Model.ts"
@@ -18,7 +20,7 @@ paths:
 
 # Signing
 
-Blank signs what the user writes by exporting a signed PDF; a markdown file never holds a signature. It also checks the signatures of the PDFs it opens in PDF tabs, and keeps the certificates the user trusts (`trust.rs`, see `pdf.md`). The plan and its later parts (certificates, PAdES, signing received PDFs) are in the e-signing plan; this is what is built.
+Blank signs what the user writes by exporting a signed PDF; a markdown file never holds a signature. It also fills in and signs the PDFs the user received, in PDF tabs, checks the signatures of the PDFs it opens, and keeps the certificates the user trusts (`trust.rs`, see `pdf.md`). The plan is the e-signing plan; this is what is built.
 
 ## The user's signature and initials
 
@@ -65,4 +67,5 @@ One dialog for both flows, `SignDialogRequest.mode` `"export"` or `"pdf"` (a PDF
 - `sign.rs` (`update_pdf`): the stamps, then empty `/Sig` fields for the others who sign ("Signature of ‹name›", unique, no periods), then the signature: an existing empty field keeps its name and gets `/V` and the stamp as its `/AP /N`; a new `SignatureN` shows its stamp in the page content on a PDF nobody signed yet and as its appearance on signed or certified ones; or invisible. Without a signer, a signature's stamp goes into the page content.
 - `rules.rs` (`Rules::read`, once per update): DocMDP P, signed, FieldMDP locks. `signing_pdf_rules(path)` (`pdf_rules`) gives the PDF tab's signing tools the same as `PdfRules { signed, docmdp, encrypted, damaged, locked }` (`load_for_update`'s `Restricted` is `encrypted`, its other failures `damaged`; `locked` the full names an earlier signature locked), read on a blocking thread; see `pdf.md`, "Stamps". Refused natively (`Refusal`): anything on P=1 (`Certified`), stamps in the pages' content of signed or certified PDFs (`SignedPages`), a field that isn't there, is signed or locked, encrypted PDFs (`Restricted`, `load_for_update`).
 - After the update, `verify_pdf` must find exactly one new signature, valid and covering the whole file (none for a stamps-only update), and every earlier one, known by its byte range, as valid as it was; else the generic sentence and nothing is returned.
+- **The webview's side** (`signReceived`, `src/pdf/sign.ts`: Sign…, Mod-S in a PDF tab, the close question's Sign…): `loadMarks`, `loadCertificate`, then the Sign dialog in mode `"pdf"` (`stamped`: a signature stamp is placed; `emptyFields`: the places not filled; `initials` from a repeated initials stamp, its `reason` `toolRefusal("initials")`; `setInitials` (`initialsSetter`) repeats the initials placed, else adds them in the corner chosen of the first page, moves them to another corner, and off takes the repeat off, or the stamp it added). On submit: the save dialog (`suggestPath` with " signed", or `window.blankTestSavePath` where `__TEST_HOOKS__`), then each stamp's `stampPdf` at its rect's size (`scaledSpec`) after `loadMarks`, then `signPdf` with `source: { kind: "tab", tab, path, sha256, fills }` and `receivedPlan` (`src/pdf/receivedPlan.ts`, pure: the stamps in reading order as the parts; signed digitally, the signature stamp on a `/Sig` field (else the first) is `signature: existing` with its field, or `new` at its spot, the others page content; without a passphrase every stamp is page content and the signature invisible; `others` empty). Then `writeFile`, `signingPlace` remembered, `clearSheet` (nothing unsaved; `syncFills` empties the helper's form), "Signed and saved as ‹file›", and with "Open the signed PDF" `openPaths([dest])` (imported when it runs: the tabs import this module). A failure is a notification with `signingFailure`'s sentence ("… Nothing was saved."), and nothing is written; the passphrase is checked in the dialog first.
 - Tests: `commands/received.rs` on the PDF tab's fixtures with stamp PDFs made by lopdf; `pdftotext -bbox -cropbox`, `pdfsig -nssdir <temp>` and `qpdf --check` where installed (CI never skips them).
