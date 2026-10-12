@@ -4,6 +4,7 @@
  * so every entry point here catches. Nothing here prints or logs what a PDF
  * holds.
  */
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +24,9 @@
 /* the most fields and kids a walk of the form looks at */
 #define MAX_VISITS 100000
 #define MAX_OPTIONS 1000
+/* what a drawn line is to be a rule: wide, thin (protocol.rs, RULE_*) */
+#define RULE_MIN_WIDTH 40
+#define RULE_MAX_HEIGHT 2
 
 typedef struct
 {
@@ -47,6 +51,10 @@ struct blank_engine
 struct blank_doc
 {
 	blank_engine *engine;
+	/* the bytes it was opened from, and its password, to open it afresh */
+	const unsigned char *data;
+	size_t len;
+	char *password;
 	pdf_document *pdf;
 	int pages;
 	int repaired;
@@ -270,6 +278,16 @@ int blank_open(blank_engine *engine, const unsigned char *data, size_t len, cons
 		return status;
 	}
 	doc->engine = engine;
+	doc->data = data;
+	doc->len = len;
+	if (password && (doc->password = malloc(strlen(password) + 1)) != NULL)
+		memcpy(doc->password, password, strlen(password) + 1);
+	else if (password)
+	{
+		pdf_drop_document(ctx, pdf);
+		free(doc);
+		return BLANK_TOO_COMPLEX;
+	}
 	doc->pdf = pdf;
 	doc->pages = pages;
 	doc->page_index = -1;
@@ -288,6 +306,7 @@ void blank_doc_drop(blank_doc *doc)
 		return;
 	fz_drop_page(doc->engine->ctx, doc->page);
 	pdf_drop_document(doc->engine->ctx, doc->pdf);
+	free(doc->password);
 	free(doc);
 }
 
@@ -775,4 +794,495 @@ int blank_form_json(blank_doc *doc, int signatures, char **json, size_t *len)
 void blank_free(char *json)
 {
 	free(json);
+}
+
+/* a page's text and rules, as JSON */
+
+/* a character that separates words */
+static int is_space(int c)
+{
+	return c <= 32 || c == 0xa0 || (c >= 0x2000 && c <= 0x200b) || c == 0x202f || c == 0x205f || c == 0x3000 || c == 0xfeff;
+}
+
+static int finite_rect(fz_rect rect)
+{
+	return isfinite(rect.x0) && isfinite(rect.y0) && isfinite(rect.x1) && isfinite(rect.y1);
+}
+
+/* writes the word gathered in `word` with its box, if there is one, and empties it */
+static void flush_word(fz_context *ctx, fz_buffer *out, fz_buffer *word, fz_rect *box, int *count)
+{
+	unsigned char *data;
+	size_t size = fz_buffer_storage(ctx, word, &data);
+	if (size && finite_rect(*box) && !fz_is_empty_rect(*box))
+	{
+		fz_append_string(ctx, out, (*count)++ ? ",{\"text\":" : "{\"text\":");
+		fz_terminate_buffer(ctx, word);
+		json_string(ctx, out, (const char *)data);
+		fz_append_string(ctx, out, ",\"rect\":");
+		json_rect(ctx, out, *box);
+		fz_append_byte(ctx, out, '}');
+	}
+	fz_clear_buffer(ctx, word);
+	*box = fz_empty_rect;
+}
+
+/* a character's box: MuPDF's quad spans the font's ascender and descender,
+ * which many fonts give with their line gap; this one spans at most 0.8 em
+ * above the baseline and 0.25 below it, close to the type itself (and to
+ * what poppler reads from base 14 metrics) */
+static fz_rect char_box(fz_context *ctx, fz_stext_char *ch)
+{
+	float ascender = fz_font_ascender(ctx, ch->font);
+	float descender = fz_font_descender(ctx, ch->font);
+	float span = ascender - descender;
+	fz_point up, along, low;
+	fz_quad quad;
+	if (!(span > 0.01f))
+		return fz_rect_from_quad(ch->quad);
+	/* a vector of 1 em from the baseline up, and the advance along it */
+	up = fz_make_point((ch->quad.ul.x - ch->quad.ll.x) / span, (ch->quad.ul.y - ch->quad.ll.y) / span);
+	along = fz_make_point(ch->quad.lr.x - ch->quad.ll.x, ch->quad.lr.y - ch->quad.ll.y);
+	ascender = fz_min(ascender, 0.8f);
+	descender = fz_max(descender, -0.25f);
+	low = fz_make_point(ch->origin.x + up.x * descender, ch->origin.y + up.y * descender);
+	quad.ll = low;
+	quad.lr = fz_make_point(low.x + along.x, low.y + along.y);
+	quad.ul = fz_make_point(low.x + up.x * (ascender - descender), low.y + up.y * (ascender - descender));
+	quad.ur = fz_make_point(quad.ul.x + along.x, quad.ul.y + along.y);
+	return fz_rect_from_quad(quad);
+}
+
+/* whether a vector is nearly white: not a line anyone sees */
+static int is_white(uint32_t argb)
+{
+	return ((argb >> 16) & 0xff) > 0xf0 && ((argb >> 8) & 0xff) > 0xf0 && (argb & 0xff) > 0xf0;
+}
+
+int blank_page_text_json(blank_doc *doc, int index, char **json, size_t *len)
+{
+	blank_engine *engine = doc->engine;
+	fz_context *ctx = engine->ctx;
+	fz_stext_page *text = NULL;
+	fz_device *device = NULL;
+	fz_buffer *out = NULL, *rules = NULL, *word = NULL;
+	int status = BLANK_OK;
+	*json = NULL;
+	*len = 0;
+	engine->refused = 0;
+	fz_var(text);
+	fz_var(device);
+	fz_var(out);
+	fz_var(rules);
+	fz_var(word);
+	fz_var(status);
+	fz_try(ctx)
+	{
+		fz_page *page = load_page(doc, index);
+		fz_stext_options options;
+		fz_stext_block *block;
+		unsigned char *data;
+		size_t size;
+		int words = 0, lines = 0;
+		memset(&options, 0, sizeof options);
+		options.flags = FZ_STEXT_COLLECT_VECTORS;
+		text = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
+		device = fz_new_stext_device(ctx, text, &options);
+		/* the page and its annotations, without the form's widgets: their
+		 * values aren't the page's text */
+		fz_run_page_contents(ctx, page, device, fz_identity, NULL);
+		fz_run_page_annots(ctx, page, device, fz_identity, NULL);
+		fz_close_device(ctx, device);
+
+		out = fz_new_buffer(ctx, 4096);
+		rules = fz_new_buffer(ctx, 256);
+		word = fz_new_buffer(ctx, 64);
+		fz_append_string(ctx, out, "{\"words\":[");
+		for (block = text->first_block; block; block = block->next)
+		{
+			if (block->type == FZ_STEXT_BLOCK_TEXT)
+			{
+				fz_stext_line *line;
+				for (line = block->u.t.first_line; line; line = line->next)
+				{
+					fz_stext_char *ch;
+					fz_rect box = fz_empty_rect;
+					for (ch = line->first_char; ch; ch = ch->next)
+					{
+						char utf8[FZ_UTFMAX];
+						if (is_space(ch->c))
+						{
+							flush_word(ctx, out, word, &box, &words);
+							continue;
+						}
+						fz_append_data(ctx, word, utf8, fz_runetochar(utf8, ch->c));
+						box = fz_union_rect(box, char_box(ctx, ch));
+					}
+					flush_word(ctx, out, word, &box, &words);
+				}
+			}
+			else if (block->type == FZ_STEXT_BLOCK_VECTOR)
+			{
+				fz_rect box = block->bbox;
+				if (finite_rect(box) && box.x1 - box.x0 >= RULE_MIN_WIDTH && box.y1 - box.y0 <= RULE_MAX_HEIGHT && !is_white(block->u.v.argb))
+				{
+					if (lines++)
+						fz_append_byte(ctx, rules, ',');
+					json_rect(ctx, rules, box);
+				}
+			}
+		}
+		fz_append_string(ctx, out, "],\"rules\":[");
+		size = fz_buffer_storage(ctx, rules, &data);
+		fz_append_data(ctx, out, data, size);
+		fz_append_string(ctx, out, "]}");
+		size = fz_buffer_storage(ctx, out, &data);
+		*json = malloc(size);
+		if (!*json)
+			fz_throw(ctx, FZ_ERROR_SYSTEM, "out of memory");
+		memcpy(*json, data, size);
+		*len = size;
+	}
+	fz_always(ctx)
+	{
+		fz_drop_device(ctx, device);
+		fz_drop_stext_page(ctx, text);
+		fz_drop_buffer(ctx, out);
+		fz_drop_buffer(ctx, rules);
+		fz_drop_buffer(ctx, word);
+	}
+	fz_catch(ctx)
+		status = caught(engine, BLANK_ENGINE);
+	return status;
+}
+
+/* filling the form in */
+
+/* the base 14 font MuPDF draws a field's text in: the one its /DA names,
+ * if it is one of the five it knows, else Helvetica (pdf-appearance.c) */
+static const char *appearance_font(fz_context *ctx, pdf_document *pdf, pdf_obj *field)
+{
+	const char *da = pdf_to_str_buf(ctx, pdf_dict_get_inheritable(ctx, field, PDF_NAME(DA)));
+	const char *font;
+	float size, color[4];
+	int n;
+	if (!da || !*da)
+		da = pdf_to_str_buf(ctx, pdf_dict_getp(ctx, pdf_trailer(ctx, pdf), "Root/AcroForm/DA"));
+	pdf_parse_default_appearance(ctx, da ? da : "", &font, &size, &n, color);
+	if (!strcmp(font, "Cour")) return "Courier";
+	if (!strcmp(font, "TiRo")) return "Times-Roman";
+	if (!strcmp(font, "Symb")) return "Symbol";
+	if (!strcmp(font, "ZaDb")) return "ZapfDingbats";
+	return "Helvetica";
+}
+
+/* whether MuPDF can show `text` in the field: it writes a field's value in
+ * its base 14 font with the Windows-1252 encoding, and puts anything else
+ * in fonts of its own (Greek, Cyrillic, CJK fonts it doesn't embed) or
+ * replaces it, so only what that encoding and font have is shown as typed */
+static int shows(fz_context *ctx, pdf_document *pdf, pdf_obj *field, const char *text)
+{
+	fz_font *font = fz_new_base14_font(ctx, appearance_font(ctx, pdf, field));
+	int ok = 1;
+	fz_try(ctx)
+	{
+		while (*text && ok)
+		{
+			int c;
+			text += fz_chartorune(&c, text);
+			if (c == '\n' || c == '\r')
+				continue;
+			if (c == FZ_REPLACEMENT_CHARACTER || fz_windows_1252_from_unicode(c) <= 0 || fz_encode_character(ctx, font, c) <= 0)
+				ok = 0;
+		}
+	}
+	fz_always(ctx)
+		fz_drop_font(ctx, font);
+	fz_catch(ctx)
+		fz_rethrow(ctx);
+	return ok;
+}
+
+/* the widget `i` of a terminal field: its kids without /T, or itself; NULL past the last */
+static pdf_obj *widget_of(fz_context *ctx, pdf_obj *field, int i)
+{
+	pdf_obj *kids = pdf_dict_get(ctx, field, PDF_NAME(Kids));
+	pdf_obj *widget;
+	if (!pdf_is_array(ctx, kids))
+		return i == 0 ? field : NULL;
+	while (i < pdf_array_len(ctx, kids))
+	{
+		widget = pdf_array_get(ctx, kids, i);
+		if (!pdf_dict_get(ctx, widget, PDF_NAME(T)))
+			return widget;
+		i++;
+	}
+	return NULL;
+}
+
+/* the number of runes in `text` */
+static int runes(const char *text)
+{
+	int count = 0, c;
+	while (*text)
+	{
+		text += fz_chartorune(&c, text);
+		count++;
+	}
+	return count;
+}
+
+/* sets a check box or radio button group to the state `value` (a name):
+ * the field's /V, and each widget's /AS where it has that state, else /Off */
+static void set_button(fz_context *ctx, pdf_document *pdf, pdf_obj *field, pdf_obj *value)
+{
+	pdf_obj *widget;
+	int i;
+	pdf_dict_put(ctx, field, PDF_NAME(V), value);
+	pdf_dirty_obj(ctx, field);
+	for (i = 0; (widget = widget_of(ctx, field, i)) != NULL; i++)
+	{
+		pdf_obj *states = pdf_dict_getp(ctx, widget, "AP/N");
+		pdf_dict_put(ctx, widget, PDF_NAME(AS), pdf_dict_get(ctx, states, value) ? value : PDF_NAME(Off));
+		pdf_dirty_obj(ctx, widget);
+	}
+	pdf->resynth_required = 1;
+}
+
+/* whether a radio button group has a widget with the state `name` */
+static int has_state(fz_context *ctx, pdf_obj *field, const char *name)
+{
+	pdf_obj *widget;
+	int i;
+	for (i = 0; (widget = widget_of(ctx, field, i)) != NULL; i++)
+		if (pdf_dict_gets(ctx, pdf_dict_getp(ctx, widget, "AP/N"), name))
+			return 1;
+	return 0;
+}
+
+/* fills one field in; inside fz_try */
+static int fill_field(fz_context *ctx, pdf_document *pdf, pdf_obj *fields, const blank_fill *fill)
+{
+	pdf_obj *field = pdf_lookup_field(ctx, fields, fill->field);
+	char *name;
+	int same, type, flags, max_len, i, options;
+	const char *value = fill->text;
+	if (!field || has_field_kids(ctx, pdf_dict_get(ctx, field, PDF_NAME(Kids))))
+		return BLANK_BAD_REQUEST;
+	/* the field of that full name, not one whose name only starts so */
+	name = pdf_load_field_name(ctx, field);
+	same = !strcmp(name, fill->field);
+	fz_free(ctx, name);
+	if (!same)
+		return BLANK_BAD_REQUEST;
+	type = pdf_field_type(ctx, field);
+	flags = pdf_field_flags(ctx, field);
+	if (flags & PDF_FIELD_IS_READ_ONLY)
+		return BLANK_BAD_REQUEST;
+	switch (type)
+	{
+	case PDF_WIDGET_TYPE_TEXT:
+		if (!value)
+			return BLANK_BAD_REQUEST;
+		max_len = pdf_dict_get_inheritable_int(ctx, field, PDF_NAME(MaxLen));
+		if (max_len > 0 && runes(value) > max_len)
+			return BLANK_BAD_REQUEST;
+		if (!(flags & PDF_TX_FIELD_IS_MULTILINE) && strpbrk(value, "\r\n"))
+			return BLANK_BAD_REQUEST;
+		if (!shows(ctx, pdf, field, value))
+			return BLANK_MISSING_GLYPHS;
+		pdf_set_field_value(ctx, pdf, field, value, 1);
+		return BLANK_OK;
+	case PDF_WIDGET_TYPE_COMBOBOX:
+	case PDF_WIDGET_TYPE_LISTBOX:
+		if (!value)
+			return BLANK_BAD_REQUEST;
+		/* one of its options, by what it shows; its export value is set */
+		options = pdf_choice_field_option_count(ctx, field);
+		for (i = 0; i < options; i++)
+			if (!strcmp(pdf_choice_field_option(ctx, field, 0, i), value))
+			{
+				value = pdf_choice_field_option(ctx, field, 1, i);
+				break;
+			}
+		if (i == options && *value && !(type == PDF_WIDGET_TYPE_COMBOBOX && (flags & PDF_CH_FIELD_IS_EDIT)))
+			return BLANK_BAD_REQUEST;
+		if (!shows(ctx, pdf, field, fill->text))
+			return BLANK_MISSING_GLYPHS;
+		pdf_set_field_value(ctx, pdf, field, value, 1);
+		return BLANK_OK;
+	case PDF_WIDGET_TYPE_CHECKBOX:
+		if (value)
+			return BLANK_BAD_REQUEST;
+		if (fill->checked)
+		{
+			pdf_obj *widget, *on = NULL;
+			for (i = 0; !on && (widget = widget_of(ctx, field, i)) != NULL; i++)
+			{
+				const char *state = on_state(ctx, widget);
+				if (state)
+					on = pdf_new_name(ctx, state);
+			}
+			if (!on)
+				on = PDF_NAME(Yes);
+			fz_try(ctx)
+				set_button(ctx, pdf, field, on);
+			fz_always(ctx)
+				pdf_drop_obj(ctx, on);
+			fz_catch(ctx)
+				fz_rethrow(ctx);
+		}
+		else
+			set_button(ctx, pdf, field, PDF_NAME(Off));
+		return BLANK_OK;
+	case PDF_WIDGET_TYPE_RADIOBUTTON:
+		if (!value)
+			return BLANK_BAD_REQUEST;
+		if (!strcmp(value, "Off"))
+		{
+			set_button(ctx, pdf, field, PDF_NAME(Off));
+			return BLANK_OK;
+		}
+		if (!has_state(ctx, field, value))
+			return BLANK_BAD_REQUEST;
+		{
+			pdf_obj *on = pdf_new_name(ctx, value);
+			fz_try(ctx)
+				set_button(ctx, pdf, field, on);
+			fz_always(ctx)
+				pdf_drop_obj(ctx, on);
+			fz_catch(ctx)
+				fz_rethrow(ctx);
+		}
+		return BLANK_OK;
+	default:
+		return BLANK_BAD_REQUEST;
+	}
+}
+
+/* draws the appearances of the filled fields' widgets again: their pages
+ * are loaded together, since MuPDF updates the pages that are open */
+static void update_pages(blank_doc *doc, const blank_fill *fills, int count)
+{
+	fz_context *ctx = doc->engine->ctx;
+	pdf_obj *fields = pdf_dict_getp(ctx, pdf_trailer(ctx, doc->pdf), "Root/AcroForm/Fields");
+	form_walk walk;
+	fz_page **pages = NULL;
+	int i, j, page;
+	memset(&walk, 0, sizeof walk);
+	walk.doc = doc;
+	fz_var(pages);
+	fz_try(ctx)
+	{
+		find_widgets(&walk);
+		pages = fz_calloc(ctx, doc->pages ? doc->pages : 1, sizeof *pages);
+		for (i = 0; i < count; i++)
+		{
+			pdf_obj *field = pdf_lookup_field(ctx, fields, fills[i].field), *widget;
+			for (j = 0; field && (widget = widget_of(ctx, field, j)) != NULL; j++)
+			{
+				page = page_of(&walk, widget);
+				if (page >= 0 && !pages[page])
+					pages[page] = fz_load_page(ctx, &doc->pdf->super, page);
+			}
+		}
+		for (page = 0; page < doc->pages; page++)
+			if (pages[page])
+				pdf_update_page(ctx, (pdf_page *)pages[page]);
+	}
+	fz_always(ctx)
+	{
+		if (pages)
+			for (page = 0; page < doc->pages; page++)
+				fz_drop_page(ctx, pages[page]);
+		fz_free(ctx, pages);
+		fz_free(ctx, walk.widgets);
+		fz_free(ctx, walk.ctms);
+	}
+	fz_catch(ctx)
+		fz_rethrow(ctx);
+}
+
+int blank_set_fills(blank_doc *doc, const blank_fill *fills, int count, blank_doc **out, int *failed)
+{
+	blank_engine *engine = doc->engine;
+	fz_context *ctx = engine->ctx;
+	blank_doc *filled = NULL;
+	int status, i;
+	*out = NULL;
+	*failed = -1;
+	status = blank_open(engine, doc->data, doc->len, doc->password, &filled);
+	if (status != BLANK_OK)
+		return status;
+	engine->refused = 0;
+	fz_var(status);
+	fz_var(i);
+	fz_try(ctx)
+	{
+		pdf_obj *fields = pdf_dict_getp(ctx, pdf_trailer(ctx, filled->pdf), "Root/AcroForm/Fields");
+		for (i = 0; i < count && status == BLANK_OK; i++)
+		{
+			status = fill_field(ctx, filled->pdf, fields, &fills[i]);
+			if (status != BLANK_OK)
+				*failed = i;
+		}
+		if (status == BLANK_OK)
+			update_pages(filled, fills, count);
+	}
+	fz_catch(ctx)
+		status = caught(engine, BLANK_ENGINE);
+	if (status != BLANK_OK)
+	{
+		blank_doc_drop(filled);
+		return status;
+	}
+	*out = filled;
+	return BLANK_OK;
+}
+
+int blank_save(blank_doc *doc, unsigned char **data, size_t *len)
+{
+	blank_engine *engine = doc->engine;
+	fz_context *ctx = engine->ctx;
+	fz_buffer *buffer = NULL;
+	fz_output *out = NULL;
+	int status = BLANK_OK;
+	*data = NULL;
+	*len = 0;
+	/* MuPDF can't append to a repaired PDF; one with bytes before its
+	 * header would get offsets that are off by them (pdf_write_document
+	 * doesn't take its bias into account) */
+	if (doc->repaired || doc->pdf->bias)
+		return BLANK_REPAIRED;
+	if (doc->encrypted)
+		return BLANK_ENCRYPTED;
+	engine->refused = 0;
+	fz_var(buffer);
+	fz_var(out);
+	fz_var(status);
+	fz_try(ctx)
+	{
+		pdf_write_options options = pdf_default_write_options;
+		unsigned char *saved;
+		size_t size;
+		options.do_incremental = 1;
+		buffer = fz_new_buffer(ctx, doc->len + 4096);
+		out = fz_new_output_with_buffer(ctx, buffer);
+		pdf_write_document(ctx, doc->pdf, out, &options);
+		fz_close_output(ctx, out);
+		size = fz_buffer_storage(ctx, buffer, &saved);
+		*data = malloc(size ? size : 1);
+		if (!*data)
+			fz_throw(ctx, FZ_ERROR_SYSTEM, "out of memory");
+		memcpy(*data, saved, size);
+		*len = size;
+	}
+	fz_always(ctx)
+	{
+		fz_drop_output(ctx, out);
+		fz_drop_buffer(ctx, buffer);
+	}
+	fz_catch(ctx)
+		status = caught(engine, BLANK_ENGINE);
+	return status;
 }

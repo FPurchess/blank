@@ -58,3 +58,35 @@ fn serves_a_pdf_to_the_client() {
         rounds[1]
     );
 }
+
+#[test]
+fn fills_a_form_in_and_saves_it_through_the_client() {
+    use blank_pdf_ipc::protocol::{Field, Fill, FillValue, PageText};
+    let path = format!("{}/../fixtures/form.pdf", env!("CARGO_MANIFEST_DIR"));
+    let pdf: Arc<[u8]> = std::fs::read(path).unwrap().into();
+    let config = HelperConfig {
+        program: env!("CARGO_BIN_EXE_blank-pdf").into(),
+        args: vec!["--memory-limit-mb".into(), "256".into()],
+        quiet: true,
+        timeouts: Timeouts::default(),
+    };
+    let original = pdf.clone();
+    let supervisor = Supervisor::new(config, Box::new(move || Ok(pdf.clone())));
+    let text: PageText = supervisor.ask(Op::Text { page: 0 }).unwrap();
+    assert_eq!(text.words[0].text, "Contract");
+    let fills = vec![
+        Fill {
+            field: "name".into(),
+            value: FillValue::Text("Ada".into()),
+        },
+        Fill {
+            field: "agree".into(),
+            value: FillValue::Checked(true),
+        },
+    ];
+    assert_eq!(supervisor.set_fills(fills).unwrap(), [0]);
+    let fields: Vec<Field> = supervisor.ask(Op::Fields).unwrap();
+    assert_eq!(fields[0].value, "Ada");
+    let saved = supervisor.save().unwrap();
+    assert!(saved.starts_with(&original) && saved.len() > original.len());
+}

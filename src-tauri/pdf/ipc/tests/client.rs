@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use blank_pdf_ipc::client::{HelperConfig, PdfError, Supervisor, Timeouts};
-use blank_pdf_ipc::protocol::{ErrorKind, Op, PageInfo};
+use blank_pdf_ipc::protocol::{ErrorKind, Field, Fill, FillValue, Op, PageInfo, PageText};
 
 fn config(args: &[&str]) -> HelperConfig {
     HelperConfig {
@@ -318,4 +318,52 @@ fn refuses_a_pdf_bigger_than_a_frame() {
         PdfError::Engine(ErrorKind::TooComplex)
     );
     assert!(!pdf.failed());
+}
+
+fn fill(field: &str, value: FillValue) -> Fill {
+    Fill {
+        field: field.into(),
+        value,
+    }
+}
+
+#[test]
+fn keeps_the_fills_for_a_new_helper() {
+    let pdf = supervisor(&["ok", "crash"]);
+    let fills = vec![
+        fill("name", FillValue::Text("Ada".into())),
+        fill("agree", FillValue::Checked(true)),
+    ];
+    assert_eq!(pdf.set_fills(fills.clone()).unwrap(), [0, 1]);
+    assert_eq!(
+        pdf.set_fills(vec![fill("name", FillValue::Text("中".into()))])
+            .unwrap_err(),
+        PdfError::Engine(ErrorKind::MissingGlyphs)
+    );
+    assert_eq!(pdf.fills(), fills, "a refused set keeps the last");
+
+    assert_eq!(render(&pdf, 1).unwrap_err(), PdfError::Crashed);
+    // the new helper has them again
+    let fields: Vec<Field> = pdf.ask(Op::Fields).unwrap();
+    let values: Vec<&str> = fields.iter().map(|field| field.value.as_str()).collect();
+    assert_eq!(values, ["Ada", "Yes"]);
+    let saved = pdf.save().unwrap();
+    let opened = serde_json::to_vec(&serde_json::json!({ "pages": ["ok", "crash"] })).unwrap();
+    assert!(saved.starts_with(&opened) && saved.len() > opened.len());
+
+    assert_eq!(pdf.set_fills(vec![]).unwrap(), [0, 1], "both changed back");
+    assert_eq!(pdf.save().unwrap(), opened);
+}
+
+#[test]
+fn reads_a_pages_text() {
+    let pdf = supervisor(&["ok", "ok"]);
+    let text: PageText = pdf.ask(Op::Text { page: 1 }).unwrap();
+    let words: Vec<&str> = text.words.iter().map(|word| word.text.as_str()).collect();
+    assert_eq!(words, ["page", "1"]);
+    assert_eq!(text.rules, [[1.0, 4.0, 8.0, 0.5]]);
+    assert_eq!(
+        pdf.ask::<PageText>(Op::Text { page: 2 }).unwrap_err(),
+        PdfError::Engine(ErrorKind::BadRequest)
+    );
 }

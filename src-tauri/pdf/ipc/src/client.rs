@@ -5,12 +5,14 @@
 //! new helper and opens the PDF again, and the request that failed isn't
 //! asked again; after the second, the supervisor gives up (`Failed`), and only
 //! a new one (the tab's "Open again") tries again. A helper stopped for being
-//! idle isn't a failure.
+//! idle isn't a failure. The supervisor keeps the form's fills (`set_fills`),
+//! so a new helper gets them again once it has opened the PDF.
 
 use std::collections::VecDeque;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
@@ -22,7 +24,7 @@ use serde_json::Value;
 use crate::frame::{read_frame, write_frame, MAX_BODY};
 use crate::limits::Backstop;
 use crate::protocol::{ErrorKind, Hello, Op, OpenInfo, Outcome, Request, Response, PROTOCOL};
-use crate::protocol::{PageInfo, RenderInfo, MAX_PIXELS, PAGES_PER_REQUEST};
+use crate::protocol::{Fill, Filled, PageInfo, RenderInfo, MAX_PIXELS, PAGES_PER_REQUEST};
 
 /// why a request got no answer
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +67,10 @@ pub struct Timeouts {
     pub open: Duration,
     pub render: Duration,
     pub read: Duration,
+    /// `setFills`
+    pub fill: Duration,
+    /// `save`
+    pub save: Duration,
     /// how long a cancelled request has to answer before the helper is killed
     pub cancel: Duration,
 }
@@ -76,6 +82,8 @@ impl Default for Timeouts {
             open: Duration::from_secs(20),
             render: Duration::from_secs(15),
             read: Duration::from_secs(15),
+            fill: Duration::from_secs(10),
+            save: Duration::from_secs(30),
             cancel: Duration::from_secs(1),
         }
     }
@@ -108,6 +116,11 @@ struct Helper {
     answers: Receiver<Incoming>,
     next_id: u64,
     backstop: Backstop,
+    /// the ops it knows, from its hello
+    ops: Vec<String>,
+    /// the most the reader takes of an answer's body: a page's pixels, or
+    /// for `save` the PDF and a little more
+    max_answer: Arc<AtomicU64>,
 }
 
 /// how many answers the reader holds before it waits for the client: a
@@ -146,8 +159,10 @@ impl Helper {
             return Err(PdfError::Start);
         };
         let (send, answers) = mpsc::sync_channel(QUEUED_ANSWERS);
+        let max_answer = Arc::new(AtomicU64::new(MAX_ANSWER));
+        let limit = max_answer.clone();
         thread::spawn(move || {
-            while let Ok(frame) = read_frame(&mut stdout, MAX_ANSWER) {
+            while let Ok(frame) = read_frame(&mut stdout, limit.load(Ordering::SeqCst)) {
                 let Ok(header) = serde_json::from_slice(&frame.header) else {
                     break;
                 };
@@ -163,6 +178,8 @@ impl Helper {
             answers,
             next_id: 1,
             backstop,
+            ops: vec![],
+            max_answer,
         };
         helper.greet(config.timeouts.start)?;
         Ok(helper)
@@ -172,7 +189,10 @@ impl Helper {
     fn greet(&mut self, timeout: Duration) -> Result<(), PdfError> {
         match self.answers.recv_timeout(timeout) {
             Ok(Incoming::Frame(header, _)) => match serde_json::from_value::<Hello>(header) {
-                Ok(hello) if hello.protocol == PROTOCOL => Ok(()),
+                Ok(hello) if hello.protocol == PROTOCOL => {
+                    self.ops = hello.ops;
+                    Ok(())
+                }
                 _ => {
                     log::warn!("PDF helper: start: another protocol");
                     self.kill();
@@ -236,6 +256,10 @@ impl Helper {
         cancel_timeout: Duration,
         sent: impl FnOnce(u64, Arc<Mutex<ChildStdin>>),
     ) -> Result<(Value, Vec<u8>), PdfError> {
+        // an op the helper doesn't know (one newer than it): not asked
+        if !self.ops.iter().any(|known| known == op.name()) {
+            return Err(PdfError::Engine(ErrorKind::UnknownOp));
+        }
         let id = self.next_id;
         self.next_id += 1;
         let header =
@@ -306,6 +330,8 @@ struct State {
     info: Option<OpenInfo>,
     /// the PDF while a helper has it open; dropped with the helper
     bytes: Option<Arc<[u8]>>,
+    /// the form's fills the helper has, which a new helper gets again
+    fills: Vec<Fill>,
     failures: u32,
     last_used: Instant,
 }
@@ -356,6 +382,7 @@ impl Supervisor {
                 helper: None,
                 info: None,
                 bytes: None,
+                fills: vec![],
                 failures: 0,
                 last_used: Instant::now(),
             }),
@@ -426,7 +453,8 @@ impl Supervisor {
     }
 
     /// asks `op`, starting the helper and opening the PDF in it first if
-    /// none runs; `ticket` lets `cancel` stop it
+    /// none runs (and giving it the fills again); `ticket` lets `cancel`
+    /// stop it. A `setFills` that succeeds replaces the fills kept
     pub fn request(&self, op: Op, ticket: Option<u64>) -> Result<(Value, Vec<u8>), PdfError> {
         let mut state = locked(&self.state);
         if state.failures >= MAX_FAILURES {
@@ -441,9 +469,17 @@ impl Supervisor {
         let timeout = match op {
             Op::Open { .. } => timeouts.open,
             Op::Render { .. } => timeouts.render,
+            Op::SetFills { .. } => timeouts.fill,
+            Op::Save => timeouts.save,
             _ => timeouts.read,
         };
+        // a saved PDF is the one opened and the fills' update
+        let max_answer = match (&op, &state.bytes) {
+            (Op::Save, Some(bytes)) => (bytes.len() as u64 + MAX_ANSWER).min(MAX_BODY),
+            _ => MAX_ANSWER,
+        };
         let helper = state.helper.as_mut().ok_or(PdfError::Start)?;
+        helper.max_answer.store(max_answer, Ordering::SeqCst);
         let result = helper.call(&op, &[], timeout, timeouts.cancel, |id, stdin| {
             if let Some(ticket) = ticket {
                 let mut in_flight = locked(&self.in_flight);
@@ -461,6 +497,10 @@ impl Supervisor {
             (Op::Render { .. }, Ok((value, pixels))) if !drawn(&value, &pixels) => {
                 log::warn!("PDF helper: render: pixels don't match their size");
                 Err(PdfError::Engine(ErrorKind::Engine))
+            }
+            (Op::SetFills { fills }, Ok(answer)) => {
+                state.fills = fills.clone();
+                Ok(answer)
             }
             (_, result) => result,
         };
@@ -481,6 +521,25 @@ impl Supervisor {
             pages.extend(batch);
         }
         Ok(pages)
+    }
+
+    /// fills the form in with `fills`, the whole set (see `Op::SetFills`),
+    /// and keeps them for a new helper; gives the pages to draw again
+    pub fn set_fills(&self, fills: Vec<Fill>) -> Result<Vec<usize>, PdfError> {
+        let (value, _) = self.request(Op::SetFills { fills }, None)?;
+        let filled: Filled =
+            serde_json::from_value(value).map_err(|_| PdfError::Engine(ErrorKind::Engine))?;
+        Ok(filled.pages)
+    }
+
+    /// the fills the helper has
+    pub fn fills(&self) -> Vec<Fill> {
+        locked(&self.state).fills.clone()
+    }
+
+    /// the PDF with the fills as an incremental update (see `Op::Save`)
+    pub fn save(&self) -> Result<Vec<u8>, PdfError> {
+        self.request(Op::Save, None).map(|(_, bytes)| bytes)
     }
 
     /// asks `op` and reads its answer as `T`
@@ -524,6 +583,18 @@ impl Supervisor {
         let (value, _) = self.settle(state, opened)?;
         let info: OpenInfo =
             serde_json::from_value(value).map_err(|_| PdfError::Engine(ErrorKind::Engine))?;
+        if !state.fills.is_empty() {
+            let refill = helper.call(
+                &Op::SetFills {
+                    fills: state.fills.clone(),
+                },
+                &[],
+                self.config.timeouts.fill,
+                self.config.timeouts.cancel,
+                |_, _| {},
+            );
+            self.settle(state, refill)?;
+        }
         state.helper = Some(helper);
         state.bytes = Some(bytes);
         state.info = Some(info.clone());

@@ -201,8 +201,29 @@ fn answer<E: PdfEngine>(
             })?;
             Ok((value, bitmap.rgba))
         }
+        Op::Text { page } => {
+            if page >= doc.info().pages {
+                return Err(ErrorKind::BadRequest);
+            }
+            json(doc.text(page).map_err(failed)?)
+        }
         Op::Fields => json(doc.fields().map_err(failed)?),
         Op::Signatures => json(doc.signatures().map_err(failed)?),
+        Op::SetFills { fills } => {
+            let pages = doc.set_fills(&fills).map_err(failed)?;
+            json(crate::protocol::Filled { pages })
+        }
+        Op::Save => {
+            let info = doc.info();
+            if info.repaired {
+                return Err(ErrorKind::Repaired);
+            }
+            if info.encrypted {
+                return Err(ErrorKind::Encrypted);
+            }
+            let bytes = doc.save_incremental().map_err(failed)?;
+            Ok((serde_json::json!({}), bytes))
+        }
         Op::Open { .. } | Op::Ping | Op::Cancel { .. } => Err(ErrorKind::BadRequest),
     }
 }

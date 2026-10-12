@@ -1,13 +1,13 @@
 %PDF-1.7
 %‚„œ”
 1 0 obj
-<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 13 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 13 0 R 15 0 R 18 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>
 endobj
 2 0 obj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 14 0 R] >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 14 0 R 16 0 R 17 0 R 18 0 R] >>
 endobj
 4 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
@@ -54,25 +54,41 @@ endobj
 14 0 obj
 << /T (street) /Parent 13 0 R /Type /Annot /Subtype /Widget /Rect [100 550 300 570] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>
 endobj
+15 0 obj
+<< /FT /Btn /Ff 49152 /T (size) /V /Off /Kids [16 0 R 17 0 R] >>
+endobj
+16 0 obj
+<< /Parent 15 0 R /Type /Annot /Subtype /Widget /Rect [100 420 115 435] /P 3 0 R /F 4 /AS /Off /AP << /N << /S 8 0 R /Off 9 0 R >> >> >>
+endobj
+17 0 obj
+<< /Parent 15 0 R /Type /Annot /Subtype /Widget /Rect [130 420 145 435] /P 3 0 R /F 4 /AS /Off /AP << /N << /L 8 0 R /Off 9 0 R >> >> >>
+endobj
+18 0 obj
+<< /FT /Ch /T (fruit) /Opt [(Apple) (Pear)] /Type /Annot /Subtype /Widget /Rect [350 600 500 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>
+endobj
 xref
-0 15
+0 19
 0000000000 65535 f 
 0000000015 00000 n 
-0000000186 00000 n 
-0000000243 00000 n 
-0000000419 00000 n 
-0000000489 00000 n 
-0000000713 00000 n 
-0000000869 00000 n 
-0000001036 00000 n 
-0000001150 00000 n 
-0000001247 00000 n 
-0000001428 00000 n 
-0000001542 00000 n 
-0000001686 00000 n 
-0000001744 00000 n 
+0000000200 00000 n 
+0000000257 00000 n 
+0000000454 00000 n 
+0000000524 00000 n 
+0000000748 00000 n 
+0000000904 00000 n 
+0000001071 00000 n 
+0000001185 00000 n 
+0000001282 00000 n 
+0000001463 00000 n 
+0000001577 00000 n 
+0000001721 00000 n 
+0000001779 00000 n 
+0000001918 00000 n 
+0000001999 00000 n 
+0000002152 00000 n 
+0000002305 00000 n 
 trailer
-<< /Size 15 /Root 1 0 R >>
+<< /Size 19 /Root 1 0 R >>
 startxref
-1883
+2458
 %%EOF

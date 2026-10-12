@@ -6,7 +6,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use blank_pdf_ipc::engine::{Bitmap, CancelFlag, EngineError, PdfDoc, PdfEngine};
-use blank_pdf_ipc::protocol::{ErrorKind, Field, OpenInfo, PageInfo, SigInfo, MAX_PIXELS};
+use blank_pdf_ipc::protocol::{
+    ErrorKind, Field, Fill, FillValue, OpenInfo, PageInfo, PageText, SigInfo, MAX_PIXELS,
+};
 use serde::de::DeserializeOwned;
 
 // the static MuPDF libraries the shim needs are linked through mupdf-sys
@@ -23,6 +25,14 @@ struct RawDoc {
 #[repr(C)]
 struct RawCookie {
     _private: [u8; 0],
+}
+
+/// `blank_fill` of shim/blank_mupdf.h
+#[repr(C)]
+struct RawFill {
+    field: *const c_char,
+    text: *const c_char,
+    checked: c_int,
 }
 
 /// see `blank_font_finder` in shim/blank_mupdf.h
@@ -89,6 +99,20 @@ extern "C" {
         len: *mut usize,
     ) -> c_int;
     fn blank_free(json: *mut c_char);
+    fn blank_page_text_json(
+        doc: *mut RawDoc,
+        page: c_int,
+        json: *mut *mut c_char,
+        len: *mut usize,
+    ) -> c_int;
+    fn blank_set_fills(
+        doc: *mut RawDoc,
+        fills: *const RawFill,
+        count: c_int,
+        out: *mut *mut RawDoc,
+        failed: *mut c_int,
+    ) -> c_int;
+    fn blank_save(doc: *mut RawDoc, data: *mut *mut u8, len: *mut usize) -> c_int;
 }
 
 /// a shim status as a result
@@ -99,6 +123,10 @@ fn checked(status: c_int) -> Result<(), EngineError> {
         3 => ErrorKind::Cancelled,
         4 => ErrorKind::NeedsPassword,
         5 => ErrorKind::Damaged,
+        6 => ErrorKind::BadRequest,
+        7 => ErrorKind::MissingGlyphs,
+        8 => ErrorKind::Repaired,
+        9 => ErrorKind::Encrypted,
         _ => ErrorKind::Engine,
     };
     Err(kind.into())
@@ -172,6 +200,7 @@ impl PdfEngine for Mupdf {
         Ok(MupdfDoc {
             raw,
             info,
+            fills: vec![],
             _bytes: bytes,
             _engine: self.engine.clone(),
         })
@@ -183,6 +212,8 @@ impl PdfEngine for Mupdf {
 pub struct MupdfDoc {
     raw: *mut RawDoc,
     info: OpenInfo,
+    /// the fills `raw` has: it is the PDF opened afresh with them
+    fills: Vec<Fill>,
     _bytes: Arc<[u8]>,
     _engine: Rc<EngineHandle>,
 }
@@ -213,14 +244,67 @@ impl MupdfDoc {
     }
 
     fn form<T: DeserializeOwned>(&mut self, signatures: bool) -> Result<T, EngineError> {
-        let mut json = std::ptr::null_mut();
-        let mut len = 0;
-        checked(unsafe { blank_form_json(self.raw, signatures as c_int, &mut json, &mut len) })?;
-        let bytes = unsafe { std::slice::from_raw_parts(json as *const u8, len) };
-        let parsed = serde_json::from_str(&String::from_utf8_lossy(bytes));
-        unsafe { blank_free(json) };
-        parsed.map_err(|_| ErrorKind::Engine.into())
+        let raw = self.raw;
+        read_json(|json, len| unsafe { blank_form_json(raw, signatures as c_int, json, len) })
     }
+
+    /// the PDF opened afresh with `fills`, their appearances drawn again
+    fn filled(&self, fills: &[Fill]) -> Result<*mut RawDoc, EngineError> {
+        let text = |text: &str| CString::new(text).map_err(|_| ErrorKind::BadRequest);
+        let mut strings = Vec::with_capacity(fills.len());
+        for fill in fills {
+            let value = match &fill.value {
+                FillValue::Text(value) => Some(text(value)?),
+                FillValue::Checked(_) => None,
+            };
+            strings.push((text(&fill.field)?, value));
+        }
+        let raw: Vec<RawFill> = fills
+            .iter()
+            .zip(&strings)
+            .map(|(fill, (field, value))| RawFill {
+                field: field.as_ptr(),
+                text: value
+                    .as_ref()
+                    .map_or(std::ptr::null(), |value| value.as_ptr()),
+                checked: matches!(fill.value, FillValue::Checked(true)) as c_int,
+            })
+            .collect();
+        let count = c_int::try_from(raw.len()).map_err(|_| ErrorKind::BadRequest)?;
+        let (mut out, mut failed) = (std::ptr::null_mut(), -1);
+        checked(unsafe { blank_set_fills(self.raw, raw.as_ptr(), count, &mut out, &mut failed) })?;
+        Ok(out)
+    }
+}
+
+/// reads the JSON a shim function writes, which it allocated
+fn read_json<T: DeserializeOwned>(
+    write: impl FnOnce(*mut *mut c_char, *mut usize) -> c_int,
+) -> Result<T, EngineError> {
+    let mut json = std::ptr::null_mut();
+    let mut len = 0;
+    checked(write(&mut json, &mut len))?;
+    let bytes = unsafe { std::slice::from_raw_parts(json as *const u8, len) };
+    let parsed = serde_json::from_str(&String::from_utf8_lossy(bytes));
+    unsafe { blank_free(json) };
+    parsed.map_err(|_| ErrorKind::Engine.into())
+}
+
+/// the pages of the fields whose value differs between `before` and `after`
+fn changed_pages(before: &[Field], after: &[Field]) -> Vec<usize> {
+    let mut pages: Vec<usize> = after
+        .iter()
+        .filter(|field| {
+            before
+                .iter()
+                .find(|old| old.name == field.name)
+                .is_none_or(|old| old.value != field.value)
+        })
+        .flat_map(|field| field.widgets.iter().map(|widget| widget.page))
+        .collect();
+    pages.sort_unstable();
+    pages.dedup();
+    pages
 }
 
 impl PdfDoc for MupdfDoc {
@@ -297,8 +381,38 @@ impl PdfDoc for MupdfDoc {
         })
     }
 
+    fn text(&mut self, index: usize) -> Result<PageText, EngineError> {
+        let (raw, page) = (self.raw, self.index(index)?);
+        read_json(|json, len| unsafe { blank_page_text_json(raw, page, json, len) })
+    }
+
     fn fields(&mut self) -> Result<Vec<Field>, EngineError> {
         self.form(false)
+    }
+
+    fn set_fills(&mut self, fills: &[Fill]) -> Result<Vec<usize>, EngineError> {
+        let before = self.fields()?;
+        let filled = self.filled(fills)?;
+        unsafe { blank_doc_drop(self.raw) };
+        self.raw = filled;
+        self.fills = fills.to_vec();
+        Ok(changed_pages(&before, &self.fields()?))
+    }
+
+    fn save_incremental(&mut self) -> Result<Vec<u8>, EngineError> {
+        // from a document of its own: MuPDF takes what it saved as saved
+        let fresh = MupdfDoc {
+            raw: self.filled(&self.fills)?,
+            info: self.info.clone(),
+            fills: self.fills.clone(),
+            _bytes: self._bytes.clone(),
+            _engine: self._engine.clone(),
+        };
+        let (mut data, mut len) = (std::ptr::null_mut(), 0);
+        checked(unsafe { blank_save(fresh.raw, &mut data, &mut len) })?;
+        let saved = unsafe { std::slice::from_raw_parts(data, len) }.to_vec();
+        unsafe { blank_free(data as *mut c_char) };
+        Ok(saved)
     }
 
     fn signatures(&mut self) -> Result<Vec<SigInfo>, EngineError> {

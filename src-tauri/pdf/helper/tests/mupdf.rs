@@ -105,7 +105,9 @@ fn reads_the_form() {
             "color",
             "signature",
             "id",
-            "address.street"
+            "address.street",
+            "size",
+            "fruit"
         ]
     );
     let field = |name: &str| fields.iter().find(|field| field.name == name).unwrap();
@@ -132,6 +134,21 @@ fn reads_the_form() {
     assert_eq!(color.kind, FieldKind::Combo);
     assert_eq!(color.options, ["Red", "Green", "Blue"]);
     assert_eq!(color.value, "Green");
+
+    let size = field("size");
+    assert_eq!(size.kind, FieldKind::Radio);
+    assert_eq!(size.value, "Off");
+    let states: Vec<_> = size
+        .widgets
+        .iter()
+        .map(|widget| widget.on_value.as_deref())
+        .collect();
+    assert_eq!(states, [Some("S"), Some("L")]);
+
+    let fruit = field("fruit");
+    assert_eq!(fruit.kind, FieldKind::List);
+    assert_eq!(fruit.options, ["Apple", "Pear"]);
+    assert_eq!(fruit.value, "");
 
     let signature = field("signature");
     assert_eq!(signature.kind, FieldKind::Signature);

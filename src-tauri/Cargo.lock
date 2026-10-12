@@ -568,6 +568,7 @@ dependencies = [
  "mupdf-sys",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

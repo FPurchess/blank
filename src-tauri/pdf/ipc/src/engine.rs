@@ -4,7 +4,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use crate::protocol::{ErrorKind, Field, OpenInfo, PageInfo, SigInfo};
+use crate::protocol::{ErrorKind, Field, Fill, OpenInfo, PageInfo, PageText, SigInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EngineError {
@@ -41,9 +41,25 @@ pub trait PdfDoc {
         scale: f32,
         cancel: &CancelFlag,
     ) -> Result<Bitmap, EngineError>;
+    /// a page's words and thin horizontal lines, in display points
+    fn text(&mut self, _index: usize) -> Result<PageText, EngineError> {
+        Err(ErrorKind::UnknownOp.into())
+    }
     /// every field of the form, with full names and what they inherit
     fn fields(&mut self) -> Result<Vec<Field>, EngineError>;
     fn signatures(&mut self) -> Result<Vec<SigInfo>, EngineError>;
+    /// fills the form in with `fills`, the whole set, on the PDF as it was
+    /// opened; what's drawn and saved from then on is the filled PDF. Gives
+    /// the pages whose fields changed since the last set. On a failure the
+    /// last set stays
+    fn set_fills(&mut self, _fills: &[Fill]) -> Result<Vec<usize>, EngineError> {
+        Err(ErrorKind::UnknownOp.into())
+    }
+    /// the PDF opened, byte for byte, with the fills appended as an
+    /// incremental update (none without fills)
+    fn save_incremental(&mut self) -> Result<Vec<u8>, EngineError> {
+        Err(ErrorKind::UnknownOp.into())
+    }
 }
 
 type Hook = Box<dyn FnMut() + Send>;

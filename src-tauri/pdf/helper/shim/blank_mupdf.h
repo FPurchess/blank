@@ -20,6 +20,14 @@ enum
 	BLANK_CANCELLED = 3,
 	BLANK_NEEDS_PASSWORD = 4,
 	BLANK_DAMAGED = 5,
+	/* a fill names no field it can fill in, or a value it can't take */
+	BLANK_BAD_REQUEST = 6,
+	/* a fill's value has characters the field's font can't show */
+	BLANK_MISSING_GLYPHS = 7,
+	/* blank_save: the PDF was repaired to be read */
+	BLANK_REPAIRED = 8,
+	/* blank_save: the PDF is encrypted */
+	BLANK_ENCRYPTED = 9,
 };
 
 /*
@@ -59,5 +67,29 @@ void blank_cookie_drop(blank_cookie *cookie);
  */
 int blank_form_json(blank_doc *doc, int signatures, char **json, size_t *len);
 void blank_free(char *json);
+
+/* the words of a page and its thin horizontal lines, as JSON in the shape
+ * of protocol.rs's PageText, in *json (blank_free frees it) */
+int blank_page_text_json(blank_doc *doc, int page, char **json, size_t *len);
+
+/* a field (its full name) and its value: `text`, or for a check box (text
+ * NULL) whether it is `checked` */
+typedef struct blank_fill
+{
+	const char *field;
+	const char *text;
+	int checked;
+} blank_fill;
+
+/*
+ * The PDF of `doc` opened afresh, from its bytes, with `fills` filled in and
+ * their appearances drawn again, in *out. On a failure *failed is the
+ * index of the fill that failed, or -1.
+ */
+int blank_set_fills(blank_doc *doc, const blank_fill *fills, int count, blank_doc **out, int *failed);
+
+/* the PDF as opened with its changes as an incremental update, in *data
+ * (blank_free frees it) */
+int blank_save(blank_doc *doc, unsigned char **data, size_t *len);
 
 #endif
