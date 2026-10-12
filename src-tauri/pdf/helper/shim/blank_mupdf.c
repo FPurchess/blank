@@ -397,6 +397,38 @@ int blank_render_size(blank_doc *doc, int index, float scale, int *width, int *h
 	return status;
 }
 
+/* draws the page as fz_run_page does, but for the orange arrow saying "SIGN"
+ * that MuPDF draws over every unsigned signature field in place of its
+ * appearance: Blank shows its own target there (PdfTarget.vue), which the
+ * user's signature then covers */
+static void run_page(fz_context *ctx, fz_page *page, fz_device *device, fz_matrix ctm, fz_cookie *cookie)
+{
+	pdf_page *pdf = pdf_page_from_fz_page(ctx, page);
+	pdf_annot *widget;
+	fz_run_page_contents(ctx, page, device, ctm, cookie);
+	fz_run_page_annots(ctx, page, device, ctm, cookie);
+	if (!pdf)
+	{
+		fz_run_page_widgets(ctx, page, device, ctm, cookie);
+		return;
+	}
+	for (widget = pdf_first_widget(ctx, pdf); widget; widget = pdf_next_widget(ctx, widget))
+	{
+		if (cookie->abort)
+			break;
+		if (pdf_widget_type(ctx, widget) == PDF_WIDGET_TYPE_SIGNATURE && !pdf_widget_is_signed(ctx, widget))
+			continue;
+		/* as fz_run_page_widgets: a cancel ends the drawing, not the render */
+		fz_try(ctx)
+			pdf_run_annot(ctx, widget, device, ctm, cookie);
+		fz_catch(ctx)
+		{
+			fz_rethrow_unless(ctx, FZ_ERROR_ABORT);
+			fz_ignore_error(ctx);
+		}
+	}
+}
+
 int blank_render(blank_doc *doc, int index, float scale, blank_cookie *cookie, unsigned char *rgba, int width, int height)
 {
 	blank_engine *engine = doc->engine;
@@ -419,7 +451,7 @@ int blank_render(blank_doc *doc, int index, float scale, blank_cookie *cookie, u
 		/* white and opaque, so straight and premultiplied alpha are the same */
 		fz_clear_pixmap_with_value(ctx, pixmap, 255);
 		device = fz_new_draw_device(ctx, fz_identity, pixmap);
-		fz_run_page(ctx, page, device, fz_scale(scale, scale), &cookie->cookie);
+		run_page(ctx, page, device, fz_scale(scale, scale), &cookie->cookie);
 		fz_close_device(ctx, device);
 	}
 	fz_always(ctx)

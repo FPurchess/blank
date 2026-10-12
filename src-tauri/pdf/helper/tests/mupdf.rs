@@ -257,3 +257,27 @@ fn draws_chinese_in_a_system_font() {
     assert!(ink(35, 70) > 50, "the characters show");
     assert_eq!(ink(0, 15), 0);
 }
+
+#[test]
+fn draws_no_sign_arrow_over_an_unsigned_signature_field() {
+    // MuPDF draws an orange arrow saying "SIGN" over every unsigned
+    // signature field; Blank shows its own target there, which the user's
+    // signature covers
+    let engine = engine();
+    let mut doc = open(&engine, "form.pdf");
+    let fields = doc.fields().unwrap();
+    let field = fields
+        .iter()
+        .find(|field| field.name == "signature")
+        .unwrap();
+    let rect = field.widgets[0].rect;
+    let bitmap = doc.render(0, 1.0, &CancelFlag::default()).unwrap();
+    let orange = (rect[1] as u32..(rect[1] + rect[3]) as u32).any(|y| {
+        (rect[0] as u32..(rect[0] + rect[2]) as u32).any(|x| {
+            let at = ((y * bitmap.width + x) * 4) as usize;
+            let [r, g, b] = [bitmap.rgba[at], bitmap.rgba[at + 1], bitmap.rgba[at + 2]];
+            r > 200 && g < 150 && b < 100
+        })
+    });
+    assert!(!orange, "the SIGN arrow shows");
+}
