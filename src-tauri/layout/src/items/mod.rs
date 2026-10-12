@@ -371,7 +371,7 @@ fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
             let shown = Text {
                 pos: 0,
                 text: hint.clone(),
-                style: text.style.clone(),
+                style: text.style,
                 ..Default::default()
             };
             // one line of hint, aligned like the text it stands for
