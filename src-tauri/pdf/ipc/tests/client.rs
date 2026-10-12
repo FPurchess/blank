@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use blank_pdf_ipc::client::{HelperConfig, PdfError, Supervisor, Timeouts};
+use blank_pdf_ipc::client::{HelperConfig, PdfError, Refused, Supervisor, Timeouts};
 use blank_pdf_ipc::protocol::{ErrorKind, Field, Fill, FillValue, Op, PageInfo, PageText};
 
 fn config(args: &[&str]) -> HelperConfig {
@@ -335,12 +335,38 @@ fn keeps_the_fills_for_a_new_helper() {
         fill("agree", FillValue::Checked(true)),
     ];
     assert_eq!(pdf.set_fills(fills.clone()).unwrap(), [0, 1]);
+    assert!(
+        pdf.set_fills(fills.clone()).unwrap().is_empty(),
+        "nothing changed"
+    );
+    // a refusal names the field whose fill failed
     assert_eq!(
-        pdf.set_fills(vec![fill("name", FillValue::Text("中".into()))])
+        pdf.set_fills(vec![
+            fill("agree", FillValue::Checked(false)),
+            fill("name", FillValue::Text("中".into()))
+        ])
+        .unwrap_err(),
+        Refused {
+            error: PdfError::Engine(ErrorKind::MissingGlyphs),
+            field: Some("name".into())
+        }
+    );
+    assert_eq!(
+        pdf.set_fills(vec![fill("agree", FillValue::Text("Yes".into()))])
             .unwrap_err(),
-        PdfError::Engine(ErrorKind::MissingGlyphs)
+        Refused {
+            error: PdfError::Engine(ErrorKind::BadRequest),
+            field: Some("agree".into())
+        }
     );
     assert_eq!(pdf.fills(), fills, "a refused set keeps the last");
+    assert_eq!(
+        pdf.set_fills(vec![fill("name", FillValue::Text("Ada".into()))])
+            .unwrap(),
+        [1],
+        "only the checkbox changed"
+    );
+    assert_eq!(pdf.set_fills(fills.clone()).unwrap(), [1]);
 
     assert_eq!(render(&pdf, 1).unwrap_err(), PdfError::Crashed);
     // the new helper has them again
@@ -366,4 +392,25 @@ fn reads_a_pages_text() {
         pdf.ask::<PageText>(Op::Text { page: 2 }).unwrap_err(),
         PdfError::Engine(ErrorKind::BadRequest)
     );
+}
+
+#[test]
+fn takes_a_saved_pdf_bigger_than_a_pages_pixels() {
+    // past MAX_PIXELS × 4, the most of any other answer: save's own limit
+    // must hold for its answer, not the next one
+    let pad = "x".repeat(70 << 20);
+    let pdf: Arc<[u8]> = serde_json::to_vec(&serde_json::json!({ "pages": ["ok"], "pad": pad }))
+        .unwrap()
+        .into();
+    let opened = pdf.clone();
+    let supervisor = Supervisor::new(config(&[]), Box::new(move || Ok(pdf.clone())));
+    supervisor
+        .set_fills(vec![fill("name", FillValue::Text("Ada".into()))])
+        .unwrap();
+    let saved = supervisor.save().unwrap();
+    assert!(saved.starts_with(&opened) && saved.len() > opened.len());
+    assert_eq!(supervisor.save().unwrap(), saved, "and again");
+    assert!(!supervisor.failed());
+    // a render after it is held to a page's pixels again
+    assert!(render(&supervisor, 0).is_ok());
 }

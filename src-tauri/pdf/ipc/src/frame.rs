@@ -55,6 +55,16 @@ pub fn write_frame(output: &mut impl Write, header: &[u8], body: &[u8]) -> io::R
 
 /// reads one frame whose body holds at most `max_body` bytes
 pub fn read_frame(input: &mut impl Read, max_body: u64) -> Result<Frame, FrameError> {
+    read_frame_by(input, |_| max_body)
+}
+
+/// reads one frame whose body holds at most what `max_body` says for its
+/// header, which is read first: the most an answer may hold depends on
+/// the request it answers
+pub fn read_frame_by(
+    input: &mut impl Read,
+    max_body: impl FnOnce(&[u8]) -> u64,
+) -> Result<Frame, FrameError> {
     let mut prefix = [0u8; 16];
     loop {
         match input.read(&mut prefix[..1]) {
@@ -73,11 +83,14 @@ pub fn read_frame(input: &mut impl Read, max_body: u64) -> Result<Frame, FrameEr
     if header_len > MAX_HEADER {
         return Err(FrameError::Bad("header too long"));
     }
-    if body_len > max_body.min(MAX_BODY) {
+    if body_len > MAX_BODY {
         return Err(FrameError::Bad("body too long"));
     }
     let mut header = vec![0; header_len];
     input.read_exact(&mut header)?;
+    if body_len > max_body(&header).min(MAX_BODY) {
+        return Err(FrameError::Bad("body too long"));
+    }
     let mut body = vec![0; body_len as usize];
     input.read_exact(&mut body)?;
     Ok(Frame { header, body })

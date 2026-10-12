@@ -17,7 +17,7 @@ use blank_pdf_ipc::protocol::{ErrorKind, Field, Fill, Op, PageInfo, PageText};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
-use super::{helper_config, read_checked, sha256, source, PdfTab, PdfTabs};
+use super::{helper_config, read_checked, read_for_signing, sha256, source, PdfTab, PdfTabs};
 use crate::signing::commands::{checked_signatures, SigningError};
 use crate::signing::trust::CheckedSignature;
 
@@ -64,7 +64,7 @@ fn helper_failed(context: &'static str, path: PathBuf) -> impl Fn(PdfError) -> S
 }
 
 /// what reading a PDF tab's file again found, by `read_checked`'s error
-pub(super) fn read_problem(error: &io::Error) -> &'static str {
+fn read_problem(error: &io::Error) -> &'static str {
     match error.kind() {
         io::ErrorKind::InvalidData => "changed",
         io::ErrorKind::NotFound => "missing",
@@ -211,24 +211,38 @@ pub async fn pdf_fields(tabs: State<'_, PdfTabs>, tab: String) -> Result<Vec<Fie
     .await
 }
 
+/// why `pdf_set_fills` failed: the kind, as the other commands fail with,
+/// and for a fill the helper refused, the full name of its field
+#[derive(Debug, PartialEq, Serialize)]
+pub struct FillFailure {
+    pub kind: String,
+    pub field: Option<String>,
+}
+
 /// fills the form of tab `tab`'s PDF in with `fills`, always the whole set,
 /// which its helper keeps (a new helper gets them again); gives the pages
 /// to draw again. A value refused ("missingGlyphs", "badRequest") leaves
-/// the last set as it was
+/// the last set as it was, and names the field it was for
 #[tauri::command]
 pub async fn pdf_set_fills(
     tabs: State<'_, PdfTabs>,
     tab: String,
     fills: Vec<Fill>,
-) -> Result<Vec<usize>, String> {
-    let pdf = tabs.get(&tab).ok_or("closed")?;
+) -> Result<Vec<usize>, FillFailure> {
+    let failure = |kind: String| FillFailure { kind, field: None };
+    let pdf = tabs.get(&tab).ok_or_else(|| failure("closed".into()))?;
     tabs.stop_idle(Some(&tab), Instant::now());
-    blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
+        // the field's name never reaches the log
         pdf.supervisor
             .set_fills(fills)
-            .map_err(helper_failed("fill in", pdf.path.clone()))
+            .map_err(|refused| FillFailure {
+                kind: helper_failed("fill in", pdf.path.clone())(refused.error),
+                field: refused.field,
+            })
     })
     .await
+    .unwrap_or_else(|_| Err(failure("failed".into())))
 }
 
 /// stops the render of `ticket` in tab `tab`, if it runs
@@ -257,15 +271,7 @@ pub async fn pdf_verify(
         .get(&tab)
         .ok_or_else(|| SigningError::Failed("This PDF isn't open any more".into()))?;
     tauri::async_runtime::spawn_blocking(move || {
-        let bytes = read_checked(&pdf.path, &pdf.sha256).map_err(|error| {
-            let problem = read_problem(&error);
-            log::warn!("PDF: read to check its signatures: {problem}");
-            match problem {
-                "changed" => SigningError::FileChanged,
-                "missing" => SigningError::FileMissing,
-                _ => SigningError::Failed("Blank can't read this PDF again".into()),
-            }
-        })?;
+        let bytes = read_for_signing(&pdf.path, &pdf.sha256, "to check its signatures")?;
         checked_signatures(&app, &bytes)
     })
     .await

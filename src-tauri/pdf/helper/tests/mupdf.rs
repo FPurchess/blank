@@ -162,7 +162,6 @@ fn reads_the_form() {
         FieldKind::Text,
         "inherits /FT"
     );
-    assert!(open(&engine, "form.pdf").signatures().unwrap().is_empty());
 }
 
 #[test]
@@ -178,19 +177,16 @@ fn places_widgets_on_turned_pages() {
 }
 
 #[test]
-fn reads_the_signatures() {
+fn reads_a_signed_signature_field() {
     let engine = engine();
-    let signatures = open(&engine, "signature.pdf").signatures().unwrap();
-    assert_eq!(signatures.len(), 1);
-    let signature = &signatures[0];
-    assert_eq!(signature.field, "Signature1");
-    assert_eq!(signature.page, Some(0));
-    assert!(near(signature.rect.unwrap(), [72.0, 720.0, 200.0, 50.0]));
-    assert_eq!(signature.sub_filter.as_deref(), Some("ETSI.CAdES.detached"));
-    assert_eq!(signature.name.as_deref(), Some("Ada Lovelace"));
-    assert_eq!(signature.reason.as_deref(), Some("I agree"));
-    assert_eq!(signature.location.as_deref(), Some("London"));
-    assert_eq!(signature.time.as_deref(), Some("D:20261008120000Z"));
+    let fields = open(&engine, "signature.pdf").fields().unwrap();
+    assert_eq!(fields.len(), 1);
+    let signature = &fields[0];
+    assert_eq!(signature.name, "Signature1");
+    assert_eq!(signature.kind, FieldKind::Signature);
+    assert!(signature.signed);
+    assert_eq!(signature.widgets[0].page, 0);
+    assert!(near(signature.widgets[0].rect, [72.0, 720.0, 200.0, 50.0]));
 }
 
 #[test]

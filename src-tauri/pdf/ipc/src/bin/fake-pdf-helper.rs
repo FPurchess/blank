@@ -4,8 +4,11 @@
 //! ignores the cancel, "crash" dies, "reserve" asks for more memory than
 //! the helper's limits allow, "short" draws fewer pixels than its size says,
 //! "huge" a page past `MAX_PIXELS`. Its form is a text field "name" on page
-//! 0 and a checkbox "agree" on page 1; a fill with "中" lacks glyphs, and
-//! `save` appends the fills to the "PDF" as a line of JSON. Each page's text
+//! 0 and a checkbox "agree" on page 1; a fill with "中" lacks glyphs, a
+//! checkbox's text or a text field's `true` is a bad request (each refusal
+//! names the fill that failed), `setFills` answers the pages whose values
+//! changed since the last set, and `save` appends the fills to the "PDF" as
+//! a line of JSON. Each page's text
 //! is the word "page" and its number, over a rule. `--protocol N` says hello with another
 //! version; `--garbage` answers every request with bytes that aren't a frame
 //! and then keeps running.
@@ -16,8 +19,8 @@ use std::time::{Duration, Instant};
 
 use blank_pdf_ipc::engine::{Bitmap, CancelFlag, EngineError, PdfDoc, PdfEngine};
 use blank_pdf_ipc::protocol::{
-    ErrorKind, Field, FieldFlags, FieldKind, Fill, FillValue, OpenInfo, PageInfo, PageText,
-    SigInfo, Widget, Word,
+    ErrorKind, Field, FieldFlags, FieldKind, Fill, FillValue, OpenInfo, PageInfo, PageText, Widget,
+    Word,
 };
 use blank_pdf_ipc::{frame, limits, serve};
 
@@ -183,23 +186,29 @@ impl PdfDoc for FakeDoc {
     }
 
     fn set_fills(&mut self, fills: &[Fill]) -> Result<Vec<usize>, EngineError> {
-        let mut pages = vec![];
-        for fill in fills {
-            let page = match fill.field.as_str() {
-                "name" => 0,
-                "agree" => 1,
-                _ => return Err(ErrorKind::BadRequest.into()),
-            };
-            if matches!(&fill.value, FillValue::Text(text) if text.contains('中')) {
-                return Err(ErrorKind::MissingGlyphs.into());
-            }
-            pages.push(page);
-        }
-        for fill in &self.fills {
-            if !fills.contains(fill) {
-                pages.push(if fill.field == "name" { 0 } else { 1 });
+        let page = |field: &str| if field == "name" { 0 } else { 1 };
+        for (index, fill) in fills.iter().enumerate() {
+            let refused = |kind| Err(EngineError::of_fill(kind, index));
+            match (fill.field.as_str(), &fill.value) {
+                ("name", FillValue::Text(text)) if text.contains('中') => {
+                    return refused(ErrorKind::MissingGlyphs)
+                }
+                ("name", FillValue::Text(_)) | ("agree", FillValue::Checked(_)) => {}
+                _ => return refused(ErrorKind::BadRequest),
             }
         }
+        // as the real one: the pages of the fields whose values changed,
+        // filled in, changed or no longer filled in
+        let value = |set: &[Fill], field: &str| {
+            set.iter()
+                .find(|fill| fill.field == field)
+                .map(|fill| fill.value.clone())
+        };
+        let mut pages: Vec<usize> = ["name", "agree"]
+            .into_iter()
+            .filter(|field| value(fills, field) != value(&self.fills, field))
+            .map(page)
+            .collect();
         pages.sort_unstable();
         pages.dedup();
         self.fills = fills.to_vec();
@@ -213,10 +222,6 @@ impl PdfDoc for FakeDoc {
             saved.extend(serde_json::to_vec(&self.fills).map_err(|_| ErrorKind::Engine)?);
         }
         Ok(saved)
-    }
-
-    fn signatures(&mut self) -> Result<Vec<SigInfo>, EngineError> {
-        Ok(vec![])
     }
 }
 

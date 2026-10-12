@@ -349,3 +349,73 @@ fn refuses_to_save_a_repaired_or_encrypted_pdf() {
         ErrorKind::Encrypted
     );
 }
+
+#[test]
+fn shows_and_fills_choices_by_their_display_texts() {
+    let engine = engine();
+    let mut doc = open(&engine, "choices.pdf");
+    let shown = |doc: &mut MupdfDoc| {
+        doc.fields()
+            .unwrap()
+            .into_iter()
+            .map(|field| (field.name, field.value, field.options))
+            .collect::<Vec<_>>()
+    };
+    let fields = shown(&mut doc);
+    assert_eq!(
+        fields[0],
+        (
+            "country".into(),
+            "Germany".into(),
+            vec!["Germany".into(), "Łódź".into(), "Omega".into()]
+        ),
+        "the display text of the option /V exports"
+    );
+    assert_eq!(
+        (fields[1].1.as_str(), &fields[1].2[..]),
+        ("Dog", &["Cat".to_string(), "Dog".to_string()][..])
+    );
+
+    // by its display text; MuPDF draws a combo box's export value, which
+    // Helvetica shows for Łódź ("pl") and not for Omega (Ω)
+    doc.set_fills(&[fill("country", "Łódź"), fill("pets", "Cat")])
+        .unwrap();
+    let fields = shown(&mut doc);
+    assert_eq!(
+        (fields[0].1.as_str(), fields[1].1.as_str()),
+        ("Łódź", "Cat")
+    );
+    let refused = |doc: &mut MupdfDoc, fills: &[Fill]| doc.set_fills(fills).unwrap_err();
+    let omega = refused(&mut doc, &[fill("pets", "Dog"), fill("country", "Omega")]);
+    assert_eq!(omega.kind, ErrorKind::MissingGlyphs);
+    assert_eq!(omega.fill, Some(1), "the fill that failed");
+    // a list box shows all its options, β among them, whichever is chosen
+    let letters = refused(&mut doc, &[fill("letters", "Alpha")]);
+    assert_eq!(
+        (letters.kind, letters.fill),
+        (ErrorKind::MissingGlyphs, Some(0))
+    );
+
+    // saved, the exported values
+    doc.set_fills(&[fill("country", "Łódź"), fill("pets", "Cat")])
+        .unwrap();
+    let saved = doc.save_incremental().unwrap();
+    let text = String::from_utf8_lossy(&saved);
+    let update = &text[fixture("choices.pdf").len()..];
+    assert!(
+        update.contains("/V(pl)") || update.contains("/V (pl)"),
+        "{update}"
+    );
+    assert!(
+        update.contains("/V(c)") || update.contains("/V (c)"),
+        "{update}"
+    );
+}
+
+#[test]
+fn fills_a_tab_in_as_a_space() {
+    let engine = engine();
+    let mut doc = open(&engine, "form.pdf");
+    doc.set_fills(&[fill("name", "Ada\tMüller")]).unwrap();
+    assert_eq!(values(&doc.fields().unwrap())[0], ("name", "Ada Müller"));
+}

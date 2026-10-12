@@ -52,14 +52,11 @@ pub enum Op {
     },
     /// the form's fields (`Field`), with the values the fills gave them
     Fields,
-    /// what the signatures say of themselves. Not asked by the app yet: the
-    /// signature check reads the PDF itself (signing/verify.rs); this is for
-    /// placing signature fields in the next step, see .claude/rules/pdf.md
-    Signatures,
     /// fills in the form: always the whole set, on the PDF as it was opened
     /// (what an earlier `setFills` did is undone first); the answer is
     /// `Filled`, the pages to draw again. A value the field can't take, or
-    /// a field that isn't there, fails the whole set and keeps the last one
+    /// a field that isn't there, fails the whole set and keeps the last one;
+    /// the failure names that fill's field (`Failure::field`)
     SetFills {
         fills: Vec<Fill>,
     },
@@ -76,17 +73,8 @@ pub enum Op {
 
 impl Op {
     /// every op's name, as the helper says in its hello
-    pub const NAMES: [&'static str; 10] = [
-        "open",
-        "pages",
-        "render",
-        "text",
-        "fields",
-        "signatures",
-        "setFills",
-        "save",
-        "cancel",
-        "ping",
+    pub const NAMES: [&'static str; 9] = [
+        "open", "pages", "render", "text", "fields", "setFills", "save", "cancel", "ping",
     ];
 
     /// its name, as in the request and in the log
@@ -97,7 +85,6 @@ impl Op {
             Op::Render { .. } => "render",
             Op::Text { .. } => "text",
             Op::Fields => "fields",
-            Op::Signatures => "signatures",
             Op::SetFills { .. } => "setFills",
             Op::Save => "save",
             Op::Cancel { .. } => "cancel",
@@ -157,6 +144,15 @@ impl ErrorKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Failure {
     pub kind: ErrorKind,
+    /// `setFills`: the field of the fill that failed, when one did
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+}
+
+impl From<ErrorKind> for Failure {
+    fn from(kind: ErrorKind) -> Self {
+        Failure { kind, field: None }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -274,18 +270,14 @@ pub struct Word {
 }
 
 /// what a page says and the lines drawn on it: its words in reading order,
-/// and its thin horizontal lines (at least `RULE_MIN_WIDTH` wide, at most
-/// `RULE_MAX_HEIGHT` high, stroked or filled), where people sign or write
+/// and its thin horizontal lines (at least 40 pt wide, at most 2 pt high,
+/// stroked or filled, not white: `RULE_*` in the helper's shim), where
+/// people sign or write
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct PageText {
     pub words: Vec<Word>,
     pub rules: Vec<Rect>,
 }
-
-/// the narrowest a drawn line is to be one of `PageText::rules`, in points
-pub const RULE_MIN_WIDTH: f32 = 40.0;
-/// the highest a drawn line is to be one of `PageText::rules`, in points
-pub const RULE_MAX_HEIGHT: f32 = 2.0;
 
 /// what a field is filled in with: a checkbox's `true` or `false`; else
 /// text: a text field's, a choice's (one of its options, or any text for a
@@ -309,23 +301,6 @@ pub struct Fill {
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct Filled {
     pub pages: Vec<usize>,
-}
-
-/// a signature in the PDF: where it is and what it says of itself; whether
-/// it is valid is for the app's verify.rs to say
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct SigInfo {
-    pub field: String,
-    /// its first widget's page and box, if it shows on a page
-    pub page: Option<usize>,
-    pub rect: Option<Rect>,
-    pub sub_filter: Option<String>,
-    pub reason: Option<String>,
-    pub location: Option<String>,
-    pub name: Option<String>,
-    /// its `/M`, as written
-    pub time: Option<String>,
 }
 
 #[cfg(test)]
@@ -385,11 +360,18 @@ mod tests {
         );
         let error = json!({"id": 5, "error": {"kind": "tooComplex"}});
         let read: Response = serde_json::from_value(error).unwrap();
+        assert_eq!(read.outcome, Outcome::Error(ErrorKind::TooComplex.into()));
+        // a refused fill names its field
+        let refused = Response {
+            id: 7,
+            outcome: Outcome::Error(Failure {
+                kind: ErrorKind::MissingGlyphs,
+                field: Some("name".into()),
+            }),
+        };
         assert_eq!(
-            read.outcome,
-            Outcome::Error(Failure {
-                kind: ErrorKind::TooComplex
-            })
+            serde_json::to_value(&refused).unwrap(),
+            json!({"id": 7, "error": {"kind": "missingGlyphs", "field": "name"}})
         );
     }
 

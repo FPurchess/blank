@@ -12,7 +12,6 @@ use std::collections::VecDeque;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
@@ -21,7 +20,7 @@ use std::time::{Duration, Instant};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::frame::{read_frame, write_frame, MAX_BODY};
+use crate::frame::{read_frame_by, write_frame, MAX_BODY};
 use crate::limits::Backstop;
 use crate::protocol::{ErrorKind, Hello, Op, OpenInfo, Outcome, Request, Response, PROTOCOL};
 use crate::protocol::{Fill, Filled, PageInfo, RenderInfo, MAX_PIXELS, PAGES_PER_REQUEST};
@@ -118,9 +117,25 @@ struct Helper {
     backstop: Backstop,
     /// the ops it knows, from its hello
     ops: Vec<String>,
-    /// the most the reader takes of an answer's body: a page's pixels, or
-    /// for `save` the PDF and a little more
-    max_answer: Arc<AtomicU64>,
+    /// the request asked last and the most the reader takes of its answer's
+    /// body: a page's pixels, or for `save` the PDF and a little more; any
+    /// other answer gets `MAX_ANSWER`
+    limit: Arc<Mutex<AnswerLimit>>,
+    /// the field the last answer refused, if it named one (`setFills`)
+    refused_field: Option<String>,
+}
+
+/// the request whose answer may be bigger than `MAX_ANSWER`, and how big
+#[derive(Clone, Copy)]
+struct AnswerLimit {
+    id: u64,
+    max: u64,
+}
+
+/// what the reader needs of an answer's header to pick its limit
+#[derive(serde::Deserialize)]
+struct AnswerId {
+    id: u64,
 }
 
 /// how many answers the reader holds before it waits for the client: a
@@ -159,10 +174,22 @@ impl Helper {
             return Err(PdfError::Start);
         };
         let (send, answers) = mpsc::sync_channel(QUEUED_ANSWERS);
-        let max_answer = Arc::new(AtomicU64::new(MAX_ANSWER));
-        let limit = max_answer.clone();
+        let limit = Arc::new(Mutex::new(AnswerLimit {
+            id: 0,
+            max: MAX_ANSWER,
+        }));
+        let reader_limit = limit.clone();
+        // the limit is the answer's own, picked once its header is read: by
+        // then the request it answers was written, with its limit set
+        let max_body = move |header: &[u8]| {
+            let wanted = *locked(&reader_limit);
+            match serde_json::from_slice::<AnswerId>(header) {
+                Ok(answer) if answer.id == wanted.id && wanted.id != 0 => wanted.max,
+                _ => MAX_ANSWER,
+            }
+        };
         thread::spawn(move || {
-            while let Ok(frame) = read_frame(&mut stdout, limit.load(Ordering::SeqCst)) {
+            while let Ok(frame) = read_frame_by(&mut stdout, &max_body) {
                 let Ok(header) = serde_json::from_slice(&frame.header) else {
                     break;
                 };
@@ -179,7 +206,8 @@ impl Helper {
             next_id: 1,
             backstop,
             ops: vec![],
-            max_answer,
+            limit,
+            refused_field: None,
         };
         helper.greet(config.timeouts.start)?;
         Ok(helper)
@@ -246,16 +274,19 @@ impl Helper {
         }
     }
 
-    /// asks `op` and waits for its answer at most `timeout`; `sent` learns
-    /// the request's id once it's written, so another thread can cancel it
+    /// asks `op` and waits for its answer at most `timeout`, an answer
+    /// whose body holds at most `max_answer` bytes; `sent` learns the
+    /// request's id once it's written, so another thread can cancel it
     fn call(
         &mut self,
         op: &Op,
         body: &[u8],
-        timeout: Duration,
-        cancel_timeout: Duration,
+        max_answer: u64,
+        timeouts: (Duration, Duration),
         sent: impl FnOnce(u64, Arc<Mutex<ChildStdin>>),
     ) -> Result<(Value, Vec<u8>), PdfError> {
+        let (timeout, cancel_timeout) = timeouts;
+        self.refused_field = None;
         // an op the helper doesn't know (one newer than it): not asked
         if !self.ops.iter().any(|known| known == op.name()) {
             return Err(PdfError::Engine(ErrorKind::UnknownOp));
@@ -264,6 +295,10 @@ impl Helper {
         self.next_id += 1;
         let header =
             serde_json::to_vec(&Request { id, op: op.clone() }).map_err(|_| PdfError::Start)?;
+        *locked(&self.limit) = AnswerLimit {
+            id,
+            max: max_answer,
+        };
         if write_frame(&mut *locked(&self.stdin), &header, body).is_err() {
             return Err(self.crashed(op));
         }
@@ -287,7 +322,10 @@ impl Helper {
                     return match response.outcome {
                         Outcome::Ok(value) => Ok((value, body)),
                         Outcome::Error(_) if cancelled_at.is_some() => Err(PdfError::TimedOut),
-                        Outcome::Error(failure) => Err(PdfError::Engine(failure.kind)),
+                        Outcome::Error(failure) => {
+                            self.refused_field = failure.field;
+                            Err(PdfError::Engine(failure.kind))
+                        }
                     };
                 }
                 Ok(Incoming::Closed) | Err(RecvTimeoutError::Disconnected) => {
@@ -334,6 +372,20 @@ struct State {
     fills: Vec<Fill>,
     failures: u32,
     last_used: Instant,
+}
+
+/// a request that got no answer, and the field it refused, if it named one
+/// (`setFills`: the fill that failed)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refused {
+    pub error: PdfError,
+    pub field: Option<String>,
+}
+
+impl From<PdfError> for Refused {
+    fn from(error: PdfError) -> Self {
+        Refused { error, field: None }
+    }
 }
 
 /// the request that runs: its ticket, its id and where to write a cancel;
@@ -395,7 +447,6 @@ impl Supervisor {
         locked(&self.state).failures >= MAX_FAILURES
     }
 
-    /// whether a helper runs, and since when it was last asked something
     /// whether a helper runs, and since when it was last asked something;
     /// `None` while a request runs, which it doesn't wait for: it's in use
     pub fn idle_since(&self) -> Option<Instant> {
@@ -456,14 +507,20 @@ impl Supervisor {
     /// none runs (and giving it the fills again); `ticket` lets `cancel`
     /// stop it. A `setFills` that succeeds replaces the fills kept
     pub fn request(&self, op: Op, ticket: Option<u64>) -> Result<(Value, Vec<u8>), PdfError> {
+        self.request_naming(op, ticket)
+            .map_err(|refused| refused.error)
+    }
+
+    /// `request`, with the field a refusal named
+    fn request_naming(&self, op: Op, ticket: Option<u64>) -> Result<(Value, Vec<u8>), Refused> {
         let mut state = locked(&self.state);
         if state.failures >= MAX_FAILURES {
-            return Err(PdfError::Failed);
+            return Err(PdfError::Failed.into());
         }
         state.last_used = Instant::now();
         self.ensure_open(&mut state)?;
         if self.cancelled_ahead(ticket) {
-            return Err(PdfError::Engine(ErrorKind::Cancelled));
+            return Err(PdfError::Engine(ErrorKind::Cancelled).into());
         }
         let timeouts = &self.config.timeouts;
         let timeout = match op {
@@ -479,19 +536,25 @@ impl Supervisor {
             _ => MAX_ANSWER,
         };
         let helper = state.helper.as_mut().ok_or(PdfError::Start)?;
-        helper.max_answer.store(max_answer, Ordering::SeqCst);
-        let result = helper.call(&op, &[], timeout, timeouts.cancel, |id, stdin| {
-            if let Some(ticket) = ticket {
-                let mut in_flight = locked(&self.in_flight);
-                // cancelled between the check above and the write
-                if let Some(at) = in_flight.cancelled.iter().position(|&each| each == ticket) {
-                    in_flight.cancelled.remove(at);
-                    send_cancel(&stdin, id);
+        let result = helper.call(
+            &op,
+            &[],
+            max_answer,
+            (timeout, timeouts.cancel),
+            |id, stdin| {
+                if let Some(ticket) = ticket {
+                    let mut in_flight = locked(&self.in_flight);
+                    // cancelled between the check above and the write
+                    if let Some(at) = in_flight.cancelled.iter().position(|&each| each == ticket) {
+                        in_flight.cancelled.remove(at);
+                        send_cancel(&stdin, id);
+                    }
+                    in_flight.last = in_flight.last.max(ticket);
+                    in_flight.running = Some((ticket, id, stdin));
                 }
-                in_flight.last = in_flight.last.max(ticket);
-                in_flight.running = Some((ticket, id, stdin));
-            }
-        });
+            },
+        );
+        let field = helper.refused_field.take();
         locked(&self.in_flight).running = None;
         let result = match (&op, result) {
             (Op::Render { .. }, Ok((value, pixels))) if !drawn(&value, &pixels) => {
@@ -505,6 +568,7 @@ impl Supervisor {
             (_, result) => result,
         };
         self.settle(&mut state, result)
+            .map_err(|error| Refused { error, field })
     }
 
     /// every page's size, asked `PAGES_PER_REQUEST` at a time so that no
@@ -524,9 +588,10 @@ impl Supervisor {
     }
 
     /// fills the form in with `fills`, the whole set (see `Op::SetFills`),
-    /// and keeps them for a new helper; gives the pages to draw again
-    pub fn set_fills(&self, fills: Vec<Fill>) -> Result<Vec<usize>, PdfError> {
-        let (value, _) = self.request(Op::SetFills { fills }, None)?;
+    /// and keeps them for a new helper; gives the pages to draw again. A
+    /// refusal names the field whose fill it refused, when the helper says
+    pub fn set_fills(&self, fills: Vec<Fill>) -> Result<Vec<usize>, Refused> {
+        let (value, _) = self.request_naming(Op::SetFills { fills }, None)?;
         let filled: Filled =
             serde_json::from_value(value).map_err(|_| PdfError::Engine(ErrorKind::Engine))?;
         Ok(filled.pages)
@@ -573,11 +638,12 @@ impl Supervisor {
             return Err(PdfError::Engine(ErrorKind::TooComplex));
         }
         let mut helper = Helper::start(&self.config)?;
+        let timeouts = &self.config.timeouts;
         let opened = helper.call(
             &Op::Open { password: None },
             &bytes,
-            self.config.timeouts.open,
-            self.config.timeouts.cancel,
+            MAX_ANSWER,
+            (timeouts.open, timeouts.cancel),
             |_, _| {},
         );
         let (value, _) = self.settle(state, opened)?;
@@ -589,8 +655,8 @@ impl Supervisor {
                     fills: state.fills.clone(),
                 },
                 &[],
-                self.config.timeouts.fill,
-                self.config.timeouts.cancel,
+                MAX_ANSWER,
+                (timeouts.fill, timeouts.cancel),
                 |_, _| {},
             );
             self.settle(state, refill)?;

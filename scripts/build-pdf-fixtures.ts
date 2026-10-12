@@ -9,6 +9,8 @@
 // - signature.pdf: a signature field that holds a signature's dictionary
 //   (not a valid signature: the helper only reads where it is and what it says);
 // - cjk.pdf: Chinese in a font the PDF names but doesn't embed;
+// - choices.pdf: choices whose options are [export display] pairs, some
+//   with characters the field's font lacks;
 // - repaired.pdf: form.pdf with its cross-reference offsets wrong;
 // - password.pdf: form.pdf encrypted with the password "secret" (needs qpdf).
 //
@@ -114,6 +116,22 @@ writeFileSync(
     "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> /FontDescriptor 6 0 R /DW 1000 >>",
     "<< /Type /FontDescriptor /FontName /STSong-Light /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 880 /StemV 80 >>",
     stream("BT /F1 40 Tf 20 30 Td <4E2D6587> Tj ET"),
+  ]),
+);
+
+// choices.pdf: 1 catalog, 2 pages, 3 page, 4 font, 5 country (a combo box
+// of [export display] pairs: Łódź exports "pl", Omega exports Ω), 6 pets
+// (a list box of pairs), 7 letters (a list box with β among its options)
+writeFileSync(
+  join(out, "choices.pdf"),
+  pdf([
+    "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R 6 0 R 7 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Annots [5 0 R 6 0 R 7 0 R] >>",
+    helvetica,
+    "<< /FT /Ch /Ff 131072 /T (country) /Opt [[(de) (Germany)] [(pl) <FEFF014100F30064017A>] [<FEFF03A9> (Omega)]] /V (de) /Type /Annot /Subtype /Widget /Rect [100 700 250 720] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
+    "<< /FT /Ch /T (pets) /Opt [[(c) (Cat)] [(d) (Dog)]] /V (d) /Type /Annot /Subtype /Widget /Rect [100 600 250 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
+    "<< /FT /Ch /T (letters) /Opt [(Alpha) <FEFF03B2>] /Type /Annot /Subtype /Widget /Rect [300 600 450 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
   ]),
 );
 

@@ -78,25 +78,23 @@ pub fn serve<E: PdfEngine>(
             running.current = Some((id, flag.clone()));
         }
         let answer = if flag.is_cancelled() {
-            Err(ErrorKind::Cancelled)
+            Err(ErrorKind::Cancelled.into())
         } else {
             match parse(header) {
                 Ok(op) => answer(engine, &mut doc, op, body, &flag),
-                Err(kind) => Err(kind),
+                Err(kind) => Err(kind.into()),
             }
         };
         lock(&running).current = None;
         let (outcome, body) = match answer {
             Ok((value, body)) => (Outcome::Ok(value), body),
-            Err(kind) => (Outcome::Error(Failure { kind }), vec![]),
+            Err(failure) => (Outcome::Error(failure), vec![]),
         };
         let mut header = serde_json::to_vec(&Response { id, outcome })?;
         let mut body = body;
         // an answer too big for a frame: the request asked too much
         if header.len() > MAX_HEADER || body.len() as u64 > MAX_BODY {
-            let outcome = Outcome::Error(Failure {
-                kind: ErrorKind::TooComplex,
-            });
+            let outcome = Outcome::Error(ErrorKind::TooComplex.into());
             header = serde_json::to_vec(&Response { id, outcome })?;
             body = vec![];
         }
@@ -145,12 +143,12 @@ fn parse(header: Value) -> Result<Op, ErrorKind> {
         .map_err(|_| ErrorKind::BadRequest)
 }
 
-type Answer = Result<(Value, Vec<u8>), ErrorKind>;
+type Answer = Result<(Value, Vec<u8>), Failure>;
 
 fn json(value: impl serde::Serialize) -> Answer {
     serde_json::to_value(value)
         .map(|value| (value, vec![]))
-        .map_err(|_| ErrorKind::Engine)
+        .map_err(|_| ErrorKind::Engine.into())
 }
 
 fn answer<E: PdfEngine>(
@@ -160,7 +158,7 @@ fn answer<E: PdfEngine>(
     body: Vec<u8>,
     cancel: &CancelFlag,
 ) -> Answer {
-    let failed = |error: EngineError| error.kind;
+    let failed = |error: EngineError| Failure::from(error.kind);
     if let Op::Open { password } = &op {
         *doc = None;
         let opened = engine
@@ -173,7 +171,7 @@ fn answer<E: PdfEngine>(
     if op == Op::Ping {
         return json(serde_json::json!({}));
     }
-    let doc = doc.as_mut().ok_or(ErrorKind::BadRequest)?;
+    let doc = doc.as_mut().ok_or(Failure::from(ErrorKind::BadRequest))?;
     match op {
         Op::Pages { from, to } => {
             let to = to.min(doc.info().pages);
@@ -185,15 +183,15 @@ fn answer<E: PdfEngine>(
         }
         Op::Render { page, scale } => {
             if !(scale.is_finite() && scale > 0.0) || page >= doc.info().pages {
-                return Err(ErrorKind::BadRequest);
+                return Err(ErrorKind::BadRequest.into());
             }
             let bitmap = doc.render(page, scale, cancel).map_err(failed)?;
             let count = bitmap.width as u64 * bitmap.height as u64;
             if count > MAX_PIXELS {
-                return Err(ErrorKind::TooComplex);
+                return Err(ErrorKind::TooComplex.into());
             }
             if bitmap.rgba.len() as u64 != count * 4 {
-                return Err(ErrorKind::Engine);
+                return Err(ErrorKind::Engine.into());
             }
             let (value, _) = json(crate::protocol::RenderInfo {
                 width: bitmap.width,
@@ -203,27 +201,33 @@ fn answer<E: PdfEngine>(
         }
         Op::Text { page } => {
             if page >= doc.info().pages {
-                return Err(ErrorKind::BadRequest);
+                return Err(ErrorKind::BadRequest.into());
             }
             json(doc.text(page).map_err(failed)?)
         }
         Op::Fields => json(doc.fields().map_err(failed)?),
-        Op::Signatures => json(doc.signatures().map_err(failed)?),
         Op::SetFills { fills } => {
-            let pages = doc.set_fills(&fills).map_err(failed)?;
+            // a refused fill is named by its field
+            let pages = doc.set_fills(&fills).map_err(|error| Failure {
+                kind: error.kind,
+                field: error
+                    .fill
+                    .and_then(|index| fills.get(index))
+                    .map(|fill| fill.field.clone()),
+            })?;
             json(crate::protocol::Filled { pages })
         }
         Op::Save => {
             let info = doc.info();
             if info.repaired {
-                return Err(ErrorKind::Repaired);
+                return Err(ErrorKind::Repaired.into());
             }
             if info.encrypted {
-                return Err(ErrorKind::Encrypted);
+                return Err(ErrorKind::Encrypted.into());
             }
             let bytes = doc.save_incremental().map_err(failed)?;
             Ok((serde_json::json!({}), bytes))
         }
-        Op::Open { .. } | Op::Ping | Op::Cancel { .. } => Err(ErrorKind::BadRequest),
+        Op::Open { .. } | Op::Ping | Op::Cancel { .. } => Err(ErrorKind::BadRequest.into()),
     }
 }

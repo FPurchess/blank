@@ -126,6 +126,25 @@ pub fn read_checked(path: &Path, expected: &str) -> io::Result<Arc<[u8]>> {
     Ok(bytes.into())
 }
 
+/// reads `path` for signing while it still holds the PDF of `sha256`:
+/// `FileChanged` when it holds another, `FileMissing` when it has gone;
+/// `context` says what for in the log
+pub fn read_for_signing(
+    path: &Path,
+    sha256: &str,
+    context: &str,
+) -> Result<Arc<[u8]>, SigningError> {
+    read_checked(path, sha256).map_err(|error| {
+        let problem = match error.kind() {
+            io::ErrorKind::InvalidData => SigningError::FileChanged,
+            io::ErrorKind::NotFound => SigningError::FileMissing,
+            _ => SigningError::Failed("Blank can't read this PDF again".into()),
+        };
+        log::warn!("PDF: read {context}: {}", error.kind());
+        problem
+    })
+}
+
 /// the PDF's bytes for its helper: `first` for the first helper, which
 /// were just read, then the file again, while it is the same
 pub fn source(path: PathBuf, sha256: String, first: Arc<[u8]>) -> Source {
@@ -150,15 +169,7 @@ pub fn filled_bytes(
     sha256: &str,
     fills: &[Fill],
 ) -> Result<Vec<u8>, SigningError> {
-    let bytes = read_checked(path, sha256).map_err(|error| {
-        let problem = commands::read_problem(&error);
-        log::warn!("PDF: read to fill in: {problem}");
-        match problem {
-            "changed" => SigningError::FileChanged,
-            "missing" => SigningError::FileMissing,
-            _ => SigningError::Failed("Blank can't read this PDF again".into()),
-        }
-    })?;
+    let bytes = read_for_signing(path, sha256, "to fill in")?;
     if fills.is_empty() {
         return Ok(bytes.to_vec());
     }
@@ -171,7 +182,9 @@ pub fn filled_bytes(
     }
     let saved = (|| {
         if pdf.supervisor.fills() != fills {
-            pdf.supervisor.set_fills(fills.to_vec())?;
+            pdf.supervisor
+                .set_fills(fills.to_vec())
+                .map_err(|refused| refused.error)?;
         }
         pdf.supervisor.save()
     })()

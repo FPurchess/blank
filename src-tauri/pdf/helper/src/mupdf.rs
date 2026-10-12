@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use blank_pdf_ipc::engine::{Bitmap, CancelFlag, EngineError, PdfDoc, PdfEngine};
 use blank_pdf_ipc::protocol::{
-    ErrorKind, Field, Fill, FillValue, OpenInfo, PageInfo, PageText, SigInfo, MAX_PIXELS,
+    ErrorKind, Field, Fill, FillValue, OpenInfo, PageInfo, PageText, MAX_PIXELS,
 };
 use serde::de::DeserializeOwned;
 
@@ -92,12 +92,7 @@ extern "C" {
     fn blank_cookie_new() -> *mut RawCookie;
     fn blank_cookie_abort(cookie: *mut RawCookie);
     fn blank_cookie_drop(cookie: *mut RawCookie);
-    fn blank_form_json(
-        doc: *mut RawDoc,
-        signatures: c_int,
-        json: *mut *mut c_char,
-        len: *mut usize,
-    ) -> c_int;
+    fn blank_form_json(doc: *mut RawDoc, json: *mut *mut c_char, len: *mut usize) -> c_int;
     fn blank_free(json: *mut c_char);
     fn blank_page_text_json(
         doc: *mut RawDoc,
@@ -243,21 +238,19 @@ impl MupdfDoc {
         }
     }
 
-    fn form<T: DeserializeOwned>(&mut self, signatures: bool) -> Result<T, EngineError> {
-        let raw = self.raw;
-        read_json(|json, len| unsafe { blank_form_json(raw, signatures as c_int, json, len) })
-    }
-
-    /// the PDF opened afresh with `fills`, their appearances drawn again
+    /// the PDF opened afresh with `fills`, their appearances drawn again;
+    /// a tab in a value is a space, which the fonts MuPDF draws fields in
+    /// have, where a tab has no glyph. A refusal says which fill failed
     fn filled(&self, fills: &[Fill]) -> Result<*mut RawDoc, EngineError> {
-        let text = |text: &str| CString::new(text).map_err(|_| ErrorKind::BadRequest);
+        let text = |text: &str| CString::new(text);
         let mut strings = Vec::with_capacity(fills.len());
-        for fill in fills {
+        for (index, fill) in fills.iter().enumerate() {
+            let refused = |_| EngineError::of_fill(ErrorKind::BadRequest, index);
             let value = match &fill.value {
-                FillValue::Text(value) => Some(text(value)?),
+                FillValue::Text(value) => Some(text(&value.replace('\t', " ")).map_err(refused)?),
                 FillValue::Checked(_) => None,
             };
-            strings.push((text(&fill.field)?, value));
+            strings.push((text(&fill.field).map_err(refused)?, value));
         }
         let raw: Vec<RawFill> = fills
             .iter()
@@ -272,7 +265,12 @@ impl MupdfDoc {
             .collect();
         let count = c_int::try_from(raw.len()).map_err(|_| ErrorKind::BadRequest)?;
         let (mut out, mut failed) = (std::ptr::null_mut(), -1);
-        checked(unsafe { blank_set_fills(self.raw, raw.as_ptr(), count, &mut out, &mut failed) })?;
+        let status =
+            unsafe { blank_set_fills(self.raw, raw.as_ptr(), count, &mut out, &mut failed) };
+        checked(status).map_err(|error| match usize::try_from(failed) {
+            Ok(index) if index < fills.len() => EngineError::of_fill(error.kind, index),
+            _ => error,
+        })?;
         Ok(out)
     }
 }
@@ -387,7 +385,8 @@ impl PdfDoc for MupdfDoc {
     }
 
     fn fields(&mut self) -> Result<Vec<Field>, EngineError> {
-        self.form(false)
+        let raw = self.raw;
+        read_json(|json, len| unsafe { blank_form_json(raw, json, len) })
     }
 
     fn set_fills(&mut self, fills: &[Fill]) -> Result<Vec<usize>, EngineError> {
@@ -413,9 +412,5 @@ impl PdfDoc for MupdfDoc {
         let saved = unsafe { std::slice::from_raw_parts(data, len) }.to_vec();
         unsafe { blank_free(data as *mut c_char) };
         Ok(saved)
-    }
-
-    fn signatures(&mut self) -> Result<Vec<SigInfo>, EngineError> {
-        self.form(true)
     }
 }

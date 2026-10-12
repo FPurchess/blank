@@ -62,10 +62,10 @@ void blank_cookie_abort(blank_cookie *cookie);
 void blank_cookie_drop(blank_cookie *cookie);
 
 /*
- * The form's fields, or (signatures != 0) its signatures, as JSON in the
- * shapes of protocol.rs, in *json (blank_free frees it).
+ * The form's fields as JSON in the shape of protocol.rs, in *json
+ * (blank_free frees it).
  */
-int blank_form_json(blank_doc *doc, int signatures, char **json, size_t *len);
+int blank_form_json(blank_doc *doc, char **json, size_t *len);
 void blank_free(char *json);
 
 /* the words of a page and its thin horizontal lines, as JSON in the shape

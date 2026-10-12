@@ -507,7 +507,6 @@ typedef struct
 {
 	blank_doc *doc;
 	fz_buffer *out;
-	int signatures;
 	int count;
 	/* the fields and kids looked at: shared kids make a tree of few objects
 	 * that is very wide when walked */
@@ -619,6 +618,22 @@ static void json_widgets(form_walk *walk, pdf_obj *field, int with_state)
 	fz_append_byte(ctx, walk->out, ']');
 }
 
+/* a field's value as people see it: for a choice whose options are
+ * [export display] pairs, the display text of the option /V exports (its
+ * options are listed by their display texts, and filled in by them too) */
+static const char *shown_value(fz_context *ctx, pdf_obj *field, int type)
+{
+	const char *value = pdf_field_value(ctx, field);
+	int i, n;
+	if (type != PDF_WIDGET_TYPE_COMBOBOX && type != PDF_WIDGET_TYPE_LISTBOX)
+		return value;
+	n = pdf_choice_field_option_count(ctx, field);
+	for (i = 0; i < n; i++)
+		if (!strcmp(pdf_choice_field_option(ctx, field, 1, i), value))
+			return pdf_choice_field_option(ctx, field, 0, i);
+	return value;
+}
+
 static void json_field(form_walk *walk, pdf_obj *field, int type)
 {
 	fz_context *ctx = walk->doc->engine->ctx;
@@ -636,7 +651,7 @@ static void json_field(form_walk *walk, pdf_obj *field, int type)
 		fz_append_printf(ctx, out, ",\"kind\":\"%s\",\"label\":", kind_name(type));
 		json_string(ctx, out, or_null(pdf_to_text_string(ctx, pdf_dict_get_inheritable(ctx, field, PDF_NAME(TU)))));
 		fz_append_string(ctx, out, ",\"value\":");
-		json_string(ctx, out, pdf_field_value(ctx, field));
+		json_string(ctx, out, shown_value(ctx, field, type));
 		fz_append_string(ctx, out, ",\"options\":[");
 		if (type == PDF_WIDGET_TYPE_COMBOBOX || type == PDF_WIDGET_TYPE_LISTBOX)
 			options = fz_mini(pdf_choice_field_option_count(ctx, field), MAX_OPTIONS);
@@ -659,46 +674,6 @@ static void json_field(form_walk *walk, pdf_obj *field, int type)
 		fz_append_printf(ctx, out, "},\"signed\":%s,\"widgets\":",
 			type == PDF_WIDGET_TYPE_SIGNATURE && pdf_signature_is_signed(ctx, walk->doc->pdf, field) ? "true" : "false");
 		json_widgets(walk, field, type == PDF_WIDGET_TYPE_CHECKBOX || type == PDF_WIDGET_TYPE_RADIOBUTTON);
-		fz_append_byte(ctx, out, '}');
-	}
-	fz_always(ctx)
-		fz_free(ctx, name);
-	fz_catch(ctx)
-		fz_rethrow(ctx);
-}
-
-static void json_signature(form_walk *walk, pdf_obj *field)
-{
-	fz_context *ctx = walk->doc->engine->ctx;
-	fz_buffer *out = walk->out;
-	pdf_obj *value = pdf_dict_get_inheritable(ctx, field, PDF_NAME(V));
-	pdf_obj *kids = pdf_dict_get(ctx, field, PDF_NAME(Kids));
-	pdf_obj *widget = pdf_is_array(ctx, kids) ? pdf_array_get(ctx, kids, 0) : field;
-	int page = page_of(walk, widget);
-	char *name = NULL;
-	fz_var(name);
-	fz_try(ctx)
-	{
-		name = pdf_load_field_name(ctx, field);
-		fz_append_string(ctx, out, walk->count ? ",{\"field\":" : "{\"field\":");
-		json_string(ctx, out, name);
-		if (page >= 0)
-		{
-			fz_append_printf(ctx, out, ",\"page\":%d,\"rect\":", page);
-			json_rect(ctx, out, fz_transform_rect(pdf_dict_get_rect(ctx, widget, PDF_NAME(Rect)), walk->ctms[page]));
-		}
-		else
-			fz_append_string(ctx, out, ",\"page\":null,\"rect\":null");
-		fz_append_string(ctx, out, ",\"subFilter\":");
-		json_string(ctx, out, or_null(pdf_to_name(ctx, pdf_dict_get(ctx, value, PDF_NAME(SubFilter)))));
-		fz_append_string(ctx, out, ",\"reason\":");
-		json_string(ctx, out, or_null(pdf_dict_get_text_string(ctx, value, PDF_NAME(Reason))));
-		fz_append_string(ctx, out, ",\"location\":");
-		json_string(ctx, out, or_null(pdf_dict_get_text_string(ctx, value, PDF_NAME(Location))));
-		fz_append_string(ctx, out, ",\"name\":");
-		json_string(ctx, out, or_null(pdf_dict_get_text_string(ctx, value, PDF_NAME(Name))));
-		fz_append_string(ctx, out, ",\"time\":");
-		json_string(ctx, out, or_null(pdf_dict_get_text_string(ctx, value, PDF_NAME(M))));
 		fz_append_byte(ctx, out, '}');
 	}
 	fz_always(ctx)
@@ -741,17 +716,12 @@ static void walk_fields(form_walk *walk, pdf_obj *fields, pdf_cycle_list *up, in
 		type = pdf_field_type(ctx, field);
 		if (!kind_name(type))
 			continue;
-		if (!walk->signatures)
-			json_field(walk, field, type);
-		else if (type == PDF_WIDGET_TYPE_SIGNATURE && pdf_signature_is_signed(ctx, walk->doc->pdf, field))
-			json_signature(walk, field);
-		else
-			continue;
+		json_field(walk, field, type);
 		walk->count++;
 	}
 }
 
-int blank_form_json(blank_doc *doc, int signatures, char **json, size_t *len)
+int blank_form_json(blank_doc *doc, char **json, size_t *len)
 {
 	blank_engine *engine = doc->engine;
 	fz_context *ctx = engine->ctx;
@@ -759,7 +729,6 @@ int blank_form_json(blank_doc *doc, int signatures, char **json, size_t *len)
 	int status = BLANK_OK;
 	memset(&walk, 0, sizeof walk);
 	walk.doc = doc;
-	walk.signatures = signatures;
 	*json = NULL;
 	*len = 0;
 	engine->refused = 0;
@@ -813,11 +782,13 @@ static int finite_rect(fz_rect rect)
 static void flush_word(fz_context *ctx, fz_buffer *out, fz_buffer *word, fz_rect *box, int *count)
 {
 	unsigned char *data;
-	size_t size = fz_buffer_storage(ctx, word, &data);
+	size_t size;
+	/* terminated first: it may move the buffer's storage */
+	fz_terminate_buffer(ctx, word);
+	size = fz_buffer_storage(ctx, word, &data);
 	if (size && finite_rect(*box) && !fz_is_empty_rect(*box))
 	{
 		fz_append_string(ctx, out, (*count)++ ? ",{\"text\":" : "{\"text\":");
-		fz_terminate_buffer(ctx, word);
 		json_string(ctx, out, (const char *)data);
 		fz_append_string(ctx, out, ",\"rect\":");
 		json_rect(ctx, out, *box);
@@ -1003,6 +974,17 @@ static int shows(fz_context *ctx, pdf_document *pdf, pdf_obj *field, const char 
 	return ok;
 }
 
+/* whether MuPDF can show every option of a list box: it draws them all, by
+ * their display texts, whichever is chosen (pdf_write_ch_widget_appearance) */
+static int shows_options(fz_context *ctx, pdf_document *pdf, pdf_obj *field)
+{
+	int i, n = pdf_choice_field_option_count(ctx, field);
+	for (i = 0; i < n; i++)
+		if (!shows(ctx, pdf, field, pdf_choice_field_option(ctx, field, 0, i)))
+			return 0;
+	return 1;
+}
+
 /* the widget `i` of a terminal field: its kids without /T, or itself; NULL past the last */
 static pdf_obj *widget_of(fz_context *ctx, pdf_obj *field, int i)
 {
@@ -1107,7 +1089,9 @@ static int fill_field(fz_context *ctx, pdf_document *pdf, pdf_obj *fields, const
 			}
 		if (i == options && *value && !(type == PDF_WIDGET_TYPE_COMBOBOX && (flags & PDF_CH_FIELD_IS_EDIT)))
 			return BLANK_BAD_REQUEST;
-		if (!shows(ctx, pdf, field, fill->text))
+		/* what MuPDF draws: a combo box's value, the one exported (its /V),
+		 * a list box's options */
+		if (type == PDF_WIDGET_TYPE_COMBOBOX ? !shows(ctx, pdf, field, value) : !shows_options(ctx, pdf, field))
 			return BLANK_MISSING_GLYPHS;
 		pdf_set_field_value(ctx, pdf, field, value, 1);
 		return BLANK_OK;
