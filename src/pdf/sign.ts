@@ -312,6 +312,22 @@ const writeSigned = async (
 };
 
 /**
+ * savedMessage says that the PDF was saved as `file`: signed, when it was
+ * signed digitally; else saved, with the user's signature as a picture
+ * when one was placed, since the PDF's signatures don't count it
+ */
+export const savedMessage = (
+  file: string,
+  digital: boolean,
+  pictured: boolean,
+) =>
+  digital
+    ? `Signed and saved as ${file}`
+    : pictured
+      ? `Saved as ${file}, your signature shows as a picture`
+      : `Saved as ${file}`;
+
+/**
  * signNow saves the PDF of the tab `tab` signed as chosen (writeSigned);
  * meanwhile its stamps, fills and places wait. Once it's written, the
  * tab's stamps and fills are done with, if they're still those it signed,
@@ -340,12 +356,17 @@ const signNow = async (tab: string, choices: SignChoices) => {
   if (dest === null) return;
   if (choices.place) signingPlace.value = choices.place;
   signingInitials.value = choices.initials;
+  const pictured = (book?.stamps ?? []).some(
+    (stamp) => stamp.kind === "signature",
+  );
   if (stampBooks.value.get(tab)?.book === book) clearSheet(tab);
-  announce(`Signed and saved as ${basename(dest)}`);
-  sendNotification({
-    title: TITLE,
-    body: `Signed and saved as ${basename(dest)}`,
-  });
+  const saved = savedMessage(
+    basename(dest),
+    choices.passphrase !== null,
+    pictured,
+  );
+  announce(saved);
+  sendNotification({ title: TITLE, body: saved });
   if (choices.open) {
     // the tabs ask this module to sign when a tab closes, so they're loaded
     // only here

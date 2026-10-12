@@ -26,7 +26,7 @@ import {
   showPdf,
   testStamp,
 } from "../test/pdf";
-import { readShownRules, signShownPdf } from "./sign";
+import { readShownRules, savedMessage, signShownPdf } from "./sign";
 import { changeStamps, stampsOf } from "./stampBooks";
 import { stampPdf } from "./stampEngine";
 import { CHECKING, RESTRICTED, SIGNING, VISIBLE_ON_SIGNED } from "./toolRules";
@@ -151,6 +151,14 @@ describe("signing a PDF received", () => {
     expect(announcement.value?.text).toBe(
       "Signed and saved as contract signed.pdf",
     );
+  });
+
+  it("says the signature is only a picture without a digital signature", async () => {
+    await sign({ passphrase: null });
+    expect(announcement.value?.text).toBe(
+      "Saved as contract signed.pdf, your signature shows as a picture",
+    );
+    expect(savedMessage("a.pdf", false, false)).toBe("Saved as a.pdf");
   });
 
   it("keeps what was placed when the signed PDF can't be written", async () => {
