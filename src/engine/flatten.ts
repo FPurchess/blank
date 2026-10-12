@@ -469,7 +469,8 @@ const cellBlocks = (
         const children: Node[] = [];
         source.forEach((child) => children.push(child));
         blocks.push({
-          ...textOf(source, children, at + 1, false, false, sources),
+          // from its first character, inside the source node at at + 1
+          ...textOf(source, children, at + 2, false, false, sources),
           indent,
           bars,
           ...(marker ? { marker } : {}),

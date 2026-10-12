@@ -138,7 +138,8 @@ describe("math on the pages", () => {
     };
     expect(blocksOf()).toMatchObject([{ kind: "math", latex: "x^2" }]);
     expect(blocksOf(cell)).toMatchObject([
-      { kind: "text", style: "code", text: "x^2" },
+      // its text from the first character, as the caret counts it
+      { kind: "text", style: "code", text: "x^2", pos: cell + 2 },
       { kind: "math", pos: cell + 6 },
     ]);
     // the table is laid out again as the source opens
