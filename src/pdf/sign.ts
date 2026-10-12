@@ -205,6 +205,9 @@ export const signReceived = () => {
     // brings back
     const before = stampBooks.value.get(tab);
     let changed = false;
+    // the Initials row's changes, one after the other: new initials wait
+    // for their stamp, which signing and a cancel wait for in turn
+    let initialsDone: Promise<void> = Promise.resolve();
     signDialog.value = {
       ...signDialogBase(refocus),
       mode: "pdf",
@@ -222,7 +225,9 @@ export const signReceived = () => {
       },
       setInitials: (choice) => {
         changed = true;
-        void setInitials(choice);
+        initialsDone = initialsDone
+          .then(() => setInitials(choice))
+          .catch(() => {});
       },
       stamped: stamps.some((stamp) => stamp.kind === "signature"),
       ...(visibleReason ? { visibleRefusal: visibleReason } : {}),
@@ -235,10 +240,12 @@ export const signReceived = () => {
       },
       submit: (choices) => {
         refocus();
-        if (shown()) void signNow(tab, choices);
+        void initialsDone.then(() => {
+          if (shown()) void signNow(tab, choices);
+        });
       },
       cancel: () => {
-        if (changed) returnTo(tab, before);
+        if (changed) void initialsDone.then(() => returnTo(tab, before));
         refocus();
       },
     };

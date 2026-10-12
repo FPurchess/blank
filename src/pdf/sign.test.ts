@@ -217,6 +217,16 @@ describe("signing a PDF received", () => {
     expect(stampsOf("t").some((stamp) => stamp.kind === "initials")).toBe(true);
     signDialog.value = null;
     request.cancel();
+    await flushPromises();
+    expect(stampsOf("t")).toEqual([testStamp()]);
+  });
+
+  it("takes back initials whose stamp came after the dialog was cancelled", async () => {
+    const request = await ask();
+    request.setInitials!({ on: true, side: "left" });
+    signDialog.value = null;
+    request.cancel();
+    await flushPromises();
     expect(stampsOf("t")).toEqual([testStamp()]);
   });
 
