@@ -19,7 +19,7 @@ import { filledOf } from "./placeModel";
 import { nextButton, placesOf } from "./places";
 import { dismissedOf, fillsOf, stampsOf } from "./stampBooks";
 import { onPages } from "./stampModel";
-import type { ToolContext } from "./toolRules";
+import { blocked, type ToolContext } from "./toolRules";
 
 // The places of the PDF tabs: their forms' fields, read once a PDF shows,
 // and the places found by their labels, page by page in the background
@@ -143,10 +143,15 @@ export const shownFilled = computed(() => {
     : new Set<string>();
 });
 
+// why nothing can be filled in or signed on the PDF shown (not open,
+// encrypted, damaged, certified without changes), or null: its places then
+// show no targets, and Next none of them
+export const shownBlocked = computed(() => blocked(shownContext()));
+
 // where Next goes in the PDF shown, and what it says
 export const shownNext = computed(() =>
   nextButton(
-    shownPlaces.value,
+    shownBlocked.value ? [] : shownPlaces.value,
     shownFilled.value,
     lastPlace.value ?? undefined,
   ),

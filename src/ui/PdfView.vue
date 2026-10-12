@@ -32,6 +32,7 @@ import { isTargetPlace } from "../pdf/placeModel";
 import { type FieldPlace, type Place, readingOrder } from "../pdf/places";
 import {
   readPlaces,
+  shownBlocked,
   shownContext,
   shownPlaces,
   shownStamps,
@@ -298,7 +299,7 @@ const overlays = computed(() => {
     ...shownPlaces.value.flatMap((place): Overlay[] =>
       place.source === "field" && !isTargetPlace(place)
         ? [{ id: place.id, page: place.page, rect: place.rect, field: place }]
-        : filled.has(place.id)
+        : filled.has(place.id) || shownBlocked.value
           ? []
           : [
               {

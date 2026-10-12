@@ -55,7 +55,7 @@ import {
   resetPdfState,
   showPdf,
 } from "../test/pdf";
-import { FIELD_LOCKED, SIGNING } from "../pdf/toolRules";
+import { FIELD_LOCKED, NO_CHANGES, SIGNING } from "../pdf/toolRules";
 import { bootApp } from "./mount";
 import { pdfBitmaps } from "./pageBitmaps";
 
@@ -387,6 +387,24 @@ describe("the places of a PDF", () => {
     expect(announcement.value?.text).toBe(FIELD_LOCKED);
     expect(next().textContent?.trim()).toBe("Next · 1 of 5");
     expect(signDialog.value).toBeNull();
+  });
+
+  it("show no targets and no Next on a PDF that allows no changes", async () => {
+    expect(next().hidden).toBe(false);
+    shownPdfRules.value = {
+      sha256: "abc",
+      rules: pdfRulesOf({ docmdp: 1, signed: true }),
+    };
+    await flushPromises();
+    expect(placeEl(SIGNATURE_LINE)).toBeNull();
+    expect(placeEl("field:signature")).toBeNull();
+    expect(next().hidden).toBe(true);
+    // its fields still show what they hold, disabled
+    expect(placeEl("field:name")?.getAttribute("aria-disabled")).toBe("true");
+    expect(nextShownPlace()(createState(doc(p())))).toBe(false);
+    nextShownPlace()(createState(doc(p())), () => {});
+    await flushPromises();
+    expect(announcement.value?.text).toBe(NO_CHANGES);
   });
 
   it("are all disabled while Blank signs the PDF", async () => {

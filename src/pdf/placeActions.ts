@@ -33,7 +33,12 @@ import {
   type Place,
   type Prefill,
 } from "./places";
-import { shownContext, shownNext, shownPlaces } from "./placesRead";
+import {
+  shownBlocked,
+  shownContext,
+  shownNext,
+  shownPlaces,
+} from "./placesRead";
 import {
   focusStamp,
   knownPlace,
@@ -224,6 +229,10 @@ export const dismissShownPlace = (place: Place) => {
  * @returns whether there was one
  */
 export const goNext = async () => {
+  if (shownBlocked.value) {
+    announce(shownBlocked.value);
+    return false;
+  }
   const place = shownNext.value.place;
   if (!place) {
     announce(

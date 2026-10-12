@@ -8,7 +8,12 @@ import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
 import { goNext } from "../pdf/placeActions";
-import { shownContext, shownNext, shownPlaces } from "../pdf/placesRead";
+import {
+  shownBlocked,
+  shownContext,
+  shownNext,
+  shownPlaces,
+} from "../pdf/placesRead";
 import { readShownRules } from "../pdf/sign";
 import { cancelPlacing, placeStamp } from "../pdf/stampActions";
 import type { StampKind } from "../pdf/stampModel";
@@ -97,9 +102,12 @@ const sign = () =>
     focus: !toolbarFocused.value,
   });
 
-// Next, with the places the PDF has to fill in; hidden without any
+// Next, with the places the PDF has to fill in; hidden without any, and on
+// a PDF nothing can be filled in on
 const next = shownNext;
-const hasPlaces = computed(() => shownPlaces.value.length > 0);
+const hasPlaces = computed(
+  () => !shownBlocked.value && shownPlaces.value.length > 0,
+);
 const nextLabel = commandLabel(CommandIdentifier.PDF_NEXT);
 const goToNext = () => {
   if (next.value.disabled) {
