@@ -149,6 +149,19 @@ const onMainKey = onCommandKey(CommandIdentifier.MENU_MAIN, () => {
 const searchShortcut = computed(() =>
   commandShortcut(CommandIdentifier.MENU_MAIN),
 );
+// on the menus' container, from a submenu too. Added by hand: Vue drops an
+// event for a listener it added in the millisecond the event's first Vue
+// listener saw it, so a capturing one here would drop the keys of a level
+// that rendered in that millisecond, e.g. a submenu that just opened.
+const onContainerKey = (event: KeyboardEvent) => {
+  if (search.value) onMainKey(event);
+};
+onMounted(() =>
+  container.value!.addEventListener("keydown", onContainerKey, true),
+);
+onUnmounted(() =>
+  container.value?.removeEventListener("keydown", onContainerKey, true),
+);
 
 // the main menu at most as tall as the window allows below its anchor, its list
 // fading out at the bottom while there's more of it below
@@ -198,12 +211,8 @@ watch([spellcheck, language], close);
 
 <template>
   <!-- the main menu's key takes the focus back to its search, also from a
-  submenu -->
-  <div
-    ref="container"
-    class="context-menus"
-    @keydown.capture="search && onMainKey($event)"
-  >
+  submenu (onContainerKey) -->
+  <div ref="container" class="context-menus">
     <div
       v-if="search"
       id="main-menu"

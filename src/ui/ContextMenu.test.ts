@@ -253,6 +253,20 @@ describe("contextMenu", () => {
     expect(runs).toEqual(["all:wrong"]);
   });
 
+  it("takes keys pressed in the millisecond a submenu opened", async () => {
+    // Vue drops an event for a listener it added in the millisecond the
+    // event's first Vue listener saw it
+    vi.spyOn(Date, "now").mockReturnValue(1000);
+    await open();
+    await press("ArrowDown");
+
+    await press("ArrowRight");
+    await press("ArrowDown");
+    expect(focusedId()).toBe("all:wring");
+    await press("Escape");
+    expect(submenu()).toBeNull();
+  });
+
   it("closes a submenu opened by the mouse when the keys move on", async () => {
     await open(false);
     row("all").dispatchEvent(new MouseEvent("mouseenter"));
