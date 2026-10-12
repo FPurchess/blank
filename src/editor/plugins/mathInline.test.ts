@@ -1,4 +1,5 @@
 import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorView } from "prosemirror-view";
 import { describe, expect, it } from "vitest";
 
 import { schema } from "../../markdown";
@@ -121,5 +122,36 @@ describe("inline math in the editor", () => {
       if (node.type.name === "math_inline") formulas++;
     });
     expect(formulas).toBe(0);
+  });
+
+  it("opens in a real editor without reading what it says to screen readers as an edit", async () => {
+    const node = doc(
+      schema.node("paragraph", null, [
+        schema.text("a "),
+        inlineMath("x^2"),
+        schema.text(" b"),
+      ]),
+    );
+    const place = document.body.appendChild(document.createElement("div"));
+    let updates = 0;
+    const view = new EditorView(place, {
+      state: EditorState.create({ schema, doc: node, plugins: [mathInline()] }),
+      dispatchTransaction: (tr) => view.updateState(view.state.apply(tr)),
+    });
+    const update = view.updateState.bind(view);
+    view.updateState = (state) => {
+      // without end, it would hang the tests rather than fail them
+      if (++updates > 50) throw new Error("drawn again without end");
+      update(state);
+    };
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 5)),
+    );
+    // the mutations it caused are read in a microtask: once, not again
+    for (let round = 0; round < 20; round++) await Promise.resolve();
+    expect(updates).toBeLessThan(5);
+    expect(place.querySelector(".math-inline.open")).not.toBeNull();
+    view.destroy();
+    place.remove();
   });
 });

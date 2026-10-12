@@ -134,6 +134,14 @@ export const handleKey = (view: EditorView, event: KeyboardEvent) => {
 };
 
 /**
+ * hide sets whether screen readers skip an element, if that changes
+ */
+const hide = (element: HTMLElement, hidden: boolean) => {
+  if (element.getAttribute("aria-hidden") !== String(hidden))
+    element.setAttribute("aria-hidden", String(hidden));
+};
+
+/**
  * MathInlineView shows inline math in the hidden editor: its source to type
  * in, and its MathML, which screen readers read as math while the caret is
  * elsewhere (and the editor shows without the engine). The MathML is filled
@@ -170,9 +178,10 @@ class MathInlineView implements NodeView {
       this.preview = preview;
       this.shown = source;
     }
-    // what screen readers read: the source while it's typed, else the math
-    this.contentDOM.setAttribute("aria-hidden", String(!this.open));
-    this.preview.setAttribute("aria-hidden", String(this.open));
+    // what screen readers read: the source while it's typed, else the math.
+    // Only a change is written: every write is a mutation the editor reads
+    hide(this.contentDOM, !this.open);
+    hide(this.preview, this.open);
   }
 
   update(node: Node) {
@@ -182,12 +191,13 @@ class MathInlineView implements NodeView {
     return true;
   }
 
-  // MathML filled in later, once Temml loaded, isn't an edit
+  // MathML filled in later, once Temml loaded, isn't an edit, and neither
+  // is what render() says to screen readers: read as one, it would draw the
+  // formula again, which says it again, without end
   ignoreMutation(mutation: MutationRecord | { type: "selection" }) {
-    return (
-      mutation.type !== "selection" &&
-      !this.contentDOM.contains(mutation.target as globalThis.Node)
-    );
+    if (mutation.type === "selection") return false;
+    if (mutation.type === "attributes") return true;
+    return !this.contentDOM.contains(mutation.target as globalThis.Node);
   }
 }
 

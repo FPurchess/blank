@@ -5,6 +5,7 @@ import path from "node:path";
 import { browser, $, expect } from "@wdio/globals";
 
 import {
+  clickAt,
   focusEditor,
   Key,
   pressMod,
