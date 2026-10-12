@@ -95,7 +95,7 @@ describe("PDF tabs", () => {
     await expect(save).toHaveAttribute("aria-disabled", "true");
     await expect(save).toHaveAttribute(
       "data-tip",
-      "Blank doesn't change PDFs, so there's nothing to save",
+      "Sign the PDF to keep what you placed on it",
     );
     await expect($('#main-menu [data-id="file.print"]')).not.toHaveAttribute(
       "aria-disabled",
@@ -103,6 +103,48 @@ describe("PDF tabs", () => {
     // the search is empty, so Esc closes the menu
     await browser.keys(Key.Escape);
     await expect($("#main-menu")).not.toExist();
+  });
+
+  it("places a stamp from the signing toolbar, moves it by keys and undoes it", async () => {
+    await $("#pdf-view").click();
+    // Alt-F10 goes to the toolbar's first tool; the date needs no signature
+    await browser.keys([Key.Alt, Key.F10]);
+    await expect($('#signing-toolbar [data-tool="signature"]')).toBeFocused();
+    await browser.keys(Key.ArrowRight);
+    await browser.keys(Key.ArrowRight);
+    await expect($('#signing-toolbar [data-tool="date"]')).toBeFocused();
+    await browser.keys(Key.Enter);
+    const stamp = $('#pdf-view .pdf-stamp[role="group"]');
+    await expect(stamp).toBeFocused();
+    await expect(stamp).toHaveAttribute(
+      "aria-label",
+      "Date on page 1, selected",
+    );
+    await expect($("#ui-announcement")).toHaveText(
+      "Date placed on page 1, use the arrow keys to move it",
+    );
+    const left = () =>
+      browser.execute(() =>
+        parseFloat(
+          document.querySelector<HTMLElement>(
+            '#pdf-view .pdf-stamp[role="group"]',
+          )?.style.left ?? "NaN",
+        ),
+      );
+    const placed = await left();
+    // 10 pt to the right, then back with undo
+    await browser.keys([Key.Shift, Key.ArrowRight]);
+    await browser.waitUntil(async () => (await left()) > placed, {
+      timeoutMsg: "the stamp didn't move",
+    });
+    await pressMod("z");
+    await browser.waitUntil(async () => (await left()) === placed, {
+      timeoutMsg: "undo didn't move the stamp back",
+    });
+    // and once more takes it off the page, so the tab has nothing unsaved
+    await pressMod("z");
+    await expect(stamp).not.toExist();
+    await expect($("#pdf-view")).toBeFocused();
   });
 
   it("prints the PDF file itself", async () => {

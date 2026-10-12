@@ -10,11 +10,41 @@ The pages show as they print: one below the other, white in every theme, as wide
 
 To see the pages larger or smaller, [zoom](./pages#zoom) as in your documents: `Mod` `=` and `Mod` `-`, `Ctrl` and the mouse wheel, or − and + in the status bar, where a click on the zoom fits the pages to the window again. The zoom is the same in every tab, and the spot under the pointer, or in the middle of the window, stays where it is.
 
-A PDF tab only shows the PDF: Blank never changes the file. So saving, exporting, formatting, searching and the page setup aren't there: their shortcuts say so, and in the [main menu](./menu) they're greyed out, saying why when you point at them. Close the tab with `Mod` `W` as any other; when you start Blank again, it opens the PDF again from its file. A large PDF opens in the background: its tab says _Opening …_ meanwhile, and you can go on in your other tabs.
+Blank never changes the file itself. What you [place on its pages](#stamps) stays in Blank until you sign; so exporting, formatting, searching and the page setup aren't there: their shortcuts say so, and in the [main menu](./menu) they're greyed out, saying why when you point at them. Close the tab with `Mod` `W` as any other; when you start Blank again, it opens the PDF again from its file. A large PDF opens in the background: its tab says _Opening …_ meanwhile, and you can go on in your other tabs.
 
-## Sign a PDF you received {#sign-received}
+## Place your signature, initials, date and place {#stamps}
 
-Blank can't sign PDFs you received yet: signing them, and filling in their forms, comes with a later version. Until then, sign them in your PDF app, or print, sign and scan them. Your own documents you sign in Blank with [Export signed PDF](./signing#export).
+In a PDF tab, the toolbar above the pages has the signing tools: **Signature**, **Initials**, **Date** and **Place**, then **Sign…**.
+
+- **With the mouse:** click a tool, then click the page where it goes: it's placed there, centred on the click. While a tool waits for the click, the pointer is a crosshair; `Esc` or a second click on the tool puts it down again.
+- **With the keyboard:** press `Alt` `F10` (or `F6` until you're in the toolbar), go to a tool with `←` `→` and press `Enter` or `Space`. It's placed on the page you're reading: a signature in the lower third, centred; initials at the bottom right; a date or place below your last signature.
+
+The first time you use **Signature** or **Initials**, Blank asks you to [make them](./signing#your-signature), then places them. The date is today's, written as **Settings ▸ Signing ▸ Date** says, in the document's language; the place is where you signed last.
+
+What you placed is selected, with a ring and four corners, and a small toolbar above it:
+
+| To                                          | Mouse                                   | Keys                                                                  |
+| ------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| Move it                                     | drag it                                 | `←` `→` `↑` `↓` by 1 pt, with `Shift` 10 pt                           |
+| Make it larger or smaller (its shape stays) | drag a corner                           | `Alt` `→` or `↑` larger, `Alt` `←` or `↓` smaller, with `Shift` 10 pt |
+| Remove it                                   | **Remove** on its toolbar               | `Delete` or `Backspace`                                               |
+| Put initials on every page                  | **Repeat on every page** on its toolbar | `Tab` to the toolbar, then `Enter`                                    |
+| Undo, redo                                  |                                         | `Mod` `Z`, `Mod` `Shift` `Z`                                          |
+| Leave it                                    | click elsewhere on the pages            | `Esc`                                                                 |
+
+It stays on its page, with at least a little of it showing, and grows to at most three times its size and shrinks to half. Repeated initials show faded on the other pages, at the same spot, moved into smaller pages. `Tab` goes from one stamp to the next in reading order, and a screen reader names each, e.g. _Signature on page 2_.
+
+A PDF tab with something placed on it has a dot, as a document with unsaved changes has. Blank keeps what you placed when you close Blank, and when you start it again, it's back on the pages, as long as the file is the same. If the file changed, what was on pages it no longer has is gone, and Blank says so. Closing the tab asks whether to **Sign…** it first; **Discard** drops what you placed.
+
+Some PDFs don't allow everything, and the tools say why when you point at them:
+
+- **Signed already:** only your signature can be added, in a signature field of its own. Initials, a date or a place would change pages the earlier signers signed.
+- **Allows no changes** (certified so by its author), **restricted** by its author, or **damaged:** nothing can be added, and the toolbar says why.
+- When Blank's page layout didn't start, the tools are off, and the toolbar says so.
+
+### Sign it {#sign-received}
+
+**Sign…**, or `Mod` `S` in a PDF tab, will sign the PDF with what you placed on it. Signing PDFs you received, and filling in their forms, is still being finished: for now, **Sign…** says so. Until then, sign them in your PDF app, or print, sign and scan them. Your own documents you sign in Blank with [Export signed PDF](./signing#export).
 
 ## Print a PDF {#print}
 
@@ -40,15 +70,15 @@ Blank draws a PDF's pages with a separate program, `blank-pdf`, one for each PDF
 
 The status bar of a PDF tab says what the PDF's digital signatures say:
 
-| Status bar               | What it means                                                                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not signed               | The PDF has no digital signatures.                                                                                                                          |
-| Signed, Signed by 2      | Nothing changed since it was signed, and each certificate is yours or one you trust.                                                                        |
-| Signed, signer unknown   | Nothing changed since it was signed, but Blank doesn't know a certificate: see below how to trust it.                                                       |
-| Changed and signed again | A signature is valid for the version it signed, but the PDF was changed after it and signed again later; its list says by whom. Check who made the changes. |
-| Weak signature           | A signature relies on SHA-1, an old algorithm whose signatures can be forged. Don't rely on it.                                                             |
-| Changed after signing    | Someone changed the PDF after it was signed.                                                                                                                |
-| Signature invalid        | A signature doesn't match the PDF.                                                                                                                          |
+| Status bar               | What it means                                                                                                                                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not signed               | The PDF has no digital signatures.                                                                                                                                                                                                                 |
+| Signed, Signed by 2      | Nothing changed since it was signed, and each certificate is yours or one you trust.                                                                                                                                                               |
+| Signed, signer unknown   | Nothing changed since it was signed, but Blank doesn't know a certificate: see below how to trust it.                                                                                                                                              |
+| Changed and signed again | A signature is valid for the version it signed, but the PDF was changed after it and signed again later; its list says by whom. Check who made the changes.                                                                                        |
+| Weak signature           | A signature relies on SHA-1, an old algorithm whose signatures can be forged. Don't rely on it.                                                                                                                                                    |
+| Changed after signing    | Someone changed the PDF after it was signed.                                                                                                                                                                                                       |
+| Signature invalid        | A signature doesn't match the PDF.                                                                                                                                                                                                                 |
 | Signatures not checked   | Blank couldn't read the PDF's signatures. Open the PDF in your PDF app to check them. If the file changed or was moved after Blank opened it, the status says so, and the list offers **Open again** for a changed file, to check it as it is now. |
 
 When the check finds something wrong or doubtful, a screen reader reads it out.
