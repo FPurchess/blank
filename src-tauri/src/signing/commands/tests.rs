@@ -419,11 +419,7 @@ fn calls_a_page_its_own_dss_lists_written_again_a_change() {
     );
     let reports = verify_pdf(&out).unwrap();
     assert!(reports[0].valid());
-    assert!(
-        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
-        "{}",
-        reports[0].coverage
-    );
+    assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
 }
 
 #[test]
@@ -449,11 +445,7 @@ fn calls_the_info_its_own_dss_lists_written_again_a_change() {
         |_| vec![],
     );
     let reports = verify_pdf(&out).unwrap();
-    assert!(
-        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
-        "{}",
-        reports[0].coverage
-    );
+    assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
 }
 
 #[test]
