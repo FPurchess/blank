@@ -1,5 +1,7 @@
 use lopdf::{dictionary, Document, Object, ObjectId, Stream};
 
+use blank_pdf_ipc::protocol::FillValue;
+
 use super::*;
 use crate::signing::verify::{verify_pdf, Coverage};
 
@@ -82,7 +84,7 @@ pub(super) fn sign_as(
     stamps: &[&[u8]],
 ) -> Answer<Vec<u8>> {
     let parts: Vec<&[u8]> = std::iter::once(pdf).chain(stamps.iter().copied()).collect();
-    sign(Some(Key { p12, passphrase }), pdf, &parts, plan)
+    sign(Some(Key { p12, passphrase }), pdf, &parts, plan, &[])
 }
 
 // a key made once, with few rounds of PBKDF2, which opens fast
@@ -284,8 +286,10 @@ fn signs_again_with_more_room_when_the_signature_doesnt_fit() {
         stamps: vec![],
         signature: Spot::Invisible,
         others: vec![],
+        filled: vec![],
     };
-    let signed = update_pdf(&original, &plan, Some(&signer)).unwrap();
+    let doc = load_for_update(&original).unwrap();
+    let signed = update_pdf(&original, doc, &plan, Some(&signer)).unwrap();
     assert!(signed.starts_with(&original));
     check_signed(&signed, false, &[]).unwrap();
 }

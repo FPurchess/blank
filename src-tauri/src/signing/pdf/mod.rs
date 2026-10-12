@@ -12,8 +12,12 @@ pub mod sign;
 pub mod stamp;
 pub mod xobject;
 
+use std::collections::BTreeMap;
+
 use anyhow::{bail, Context, Result};
-use lopdf::{Dictionary, Document, IncrementalDocument, Object, ObjectId, StringFormat};
+use lopdf::{
+    Dictionary, Document, IncrementalDocument, LoadOptions, Object, ObjectId, StringFormat,
+};
 
 use crate::signing::Refusal;
 
@@ -49,6 +53,21 @@ fn looks_like_xref_at(bytes: &[u8], at: usize) -> bool {
         if n.parse::<u32>().is_ok() && g.parse::<u16>().is_ok() && o.starts_with("obj"))
 }
 
+/// the most one of a PDF's object or cross-reference streams may
+/// decompress to while it's read: lopdf decodes them all up front, so a
+/// small file could otherwise fill the memory (a decompression bomb)
+const MAX_DECOMPRESSED: usize = 128 << 20;
+
+/// load_bounded reads a PDF Blank didn't write, its streams decompressed
+/// within `MAX_DECOMPRESSED` each
+pub fn load_bounded(bytes: &[u8]) -> Result<Document> {
+    let options = LoadOptions {
+        max_decompressed_size: Some(MAX_DECOMPRESSED),
+        ..Default::default()
+    };
+    Document::load_mem_with_options(bytes, options).context("can't read the PDF")
+}
+
 /// load_for_update reads a PDF that is about to get an incremental update,
 /// refusing what can't safely be updated
 pub fn load_for_update(bytes: &[u8]) -> Result<Document> {
@@ -61,7 +80,7 @@ pub fn load_for_update(bytes: &[u8]) -> Result<Document> {
     if !looks_like_xref_at(bytes, startxref) {
         bail!("the cross-reference offset at the end of the file is wrong; the file would need repairing");
     }
-    let doc = Document::load_mem(bytes).context("can't read the PDF")?;
+    let doc = load_bounded(bytes)?;
     if doc.xref_start == 0 || doc.xref_start != startxref {
         bail!("the cross-reference table had to be reconstructed; the file would need repairing");
     }
@@ -224,8 +243,8 @@ pub fn inherited<'a>(doc: &'a Document, page: ObjectId, key: &[u8]) -> Option<&'
     None
 }
 
-/// numbers reads an array of numbers
-fn numbers(o: &Object, doc: &Document) -> Option<Vec<f64>> {
+/// numbers reads an array of numbers, e.g. a box
+pub fn numbers(o: &Object, doc: &Document) -> Option<Vec<f64>> {
     let arr = resolve(doc, o)?.as_array().ok()?;
     arr.iter()
         .map(|v| match resolve(doc, v)? {
@@ -443,7 +462,13 @@ pub fn clean_trailer(incr: &mut IncrementalDocument) {
 
 /// page_id returns the object of page `page`, from 1
 pub fn page_id(doc: &Document, page: u32) -> Result<ObjectId> {
-    doc.get_pages()
+    page_in(&doc.get_pages(), page)
+}
+
+/// page_in is page `page` (from 1) of `pages`, as `Document::get_pages`
+/// gives them
+pub fn page_in(pages: &BTreeMap<u32, ObjectId>, page: u32) -> Result<ObjectId> {
+    pages
         .get(&page)
         .copied()
         .with_context(|| format!("no page {page}"))

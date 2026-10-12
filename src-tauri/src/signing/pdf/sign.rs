@@ -7,17 +7,19 @@
 use std::collections::HashMap;
 
 use super::rules::Rules;
-use super::stamp::{appearance, clamp, draw_on_page, Draw};
+use super::stamp::{appearance, draw_on_page, repeat_into, Draw};
 use super::xobject::{import_stamp, Imported};
 use super::{
-    clean_trailer, current, form_fields, is_rect, load_for_update, pdfa_part, reals, resolve,
-    text_string, PageGeometry,
+    clean_trailer, current, form_fields, is_rect, load_for_update, numbers, page_in, pdfa_part,
+    reals, resolve, text_string, PageGeometry,
 };
 use crate::signing::cms::sign_detached;
 use crate::signing::keys::Identity;
 use crate::signing::Refusal;
 use anyhow::{bail, Context, Result};
-use lopdf::{dictionary, Dictionary, IncrementalDocument, Object, ObjectId, StringFormat};
+use lopdf::{
+    dictionary, Dictionary, Document, IncrementalDocument, Object, ObjectId, StringFormat,
+};
 use sha2::{Digest, Sha256};
 
 /// who signs, and what the signature says
@@ -38,7 +40,8 @@ pub struct PlacedStamp<'a> {
     pub page: u32,
     /// x, y, w, h in points from the top left of the page as shown
     pub rect: [f64; 4],
-    /// on every page, at the same place, moved into smaller pages
+    /// on every page, as far from the nearer edges as on `page`
+    /// (`repeat_into`)
     pub repeat: bool,
 }
 
@@ -73,6 +76,9 @@ pub struct Plan<'a> {
     pub stamps: Vec<PlacedStamp<'a>>,
     pub signature: Spot<'a>,
     pub others: Vec<Other>,
+    /// the fields the user filled in (full names), in a revision of their
+    /// own before this one: none may be one an earlier signature locked
+    pub filled: Vec<&'a str>,
 }
 
 /// the most room for a signature: a long chain and a timestamp token fit
@@ -90,10 +96,16 @@ enum Attempt {
 
 const BR_PLACEHOLDER: [i64; 4] = [0, 1_111_111_111, 2_222_222_222, 3_333_333_333];
 
-/// update_pdf appends `plan` to `original` as an incremental update, signed
-/// by `signer`, or with no signature without one. A signature larger than
-/// `signer.reserve` is made again with room for it.
-pub fn update_pdf(original: &[u8], plan: &Plan, signer: Option<&Signer>) -> Result<Vec<u8>> {
+/// update_pdf appends `plan` to `original`, which `load_for_update` read
+/// as `doc`, as an incremental update, signed by `signer`, or with no
+/// signature without one. A signature larger than `signer.reserve` is made
+/// again with room for it.
+pub fn update_pdf(
+    original: &[u8],
+    doc: Document,
+    plan: &Plan,
+    signer: Option<&Signer>,
+) -> Result<Vec<u8>> {
     let rects = plan
         .stamps
         .iter()
@@ -112,14 +124,16 @@ pub fn update_pdf(original: &[u8], plan: &Plan, signer: Option<&Signer>) -> Resu
         bail!("too many stamps");
     }
     let Some(signer) = signer else {
-        let (incr, _) = build(original, plan, None)?;
+        let (incr, _) = build(original, doc, plan, None)?;
         return save(incr, original);
     };
-    match sign_once(original, plan, signer, signer.reserve)? {
+    match sign_once(original, doc, plan, signer, signer.reserve)? {
         Attempt::Signed(signed) => Ok(signed),
-        // a new signature, and a new timestamp, may be a little longer
+        // a new signature, and a new timestamp, may be a little longer;
+        // the PDF read again, which the first try took
         Attempt::TooLarge(length) if length + 2048 <= MAX_RESERVE => {
-            match sign_once(original, plan, signer, length + 2048)? {
+            let doc = load_for_update(original)?;
+            match sign_once(original, doc, plan, signer, length + 2048)? {
                 Attempt::Signed(signed) => Ok(signed),
                 Attempt::TooLarge(_) => bail!("the signature doesn't fit"),
             }
@@ -334,17 +348,12 @@ fn find_target(incr: &IncrementalDocument, rules: &Rules, name: &str) -> Result<
             })
             .context("a signature field isn't on a page")?,
     };
-    let numbers: Vec<f64> = widget_dict
+    let Some([x0, y0, x1, y1]) = widget_dict
         .get(b"Rect")
         .ok()
-        .and_then(|r| resolve(doc, r))
-        .and_then(|r| r.as_array().ok())
-        .into_iter()
-        .flatten()
-        .filter_map(|v| resolve(doc, v))
-        .filter_map(|v| v.as_float().ok().map(f64::from))
-        .collect();
-    let [x0, y0, x1, y1] = numbers[..] else {
+        .and_then(|r| numbers(r, doc))
+        .and_then(|n| <[f64; 4]>::try_from(n).ok())
+    else {
         bail!("a signature field's widget has no rectangle");
     };
     Ok(Target {
@@ -373,17 +382,20 @@ impl Forms {
     }
 }
 
-/// build makes the update `plan` asks for, signed with the signature
-/// dictionary `signature` if there is one
+/// build makes the update `plan` asks for of `original` (read as `doc`),
+/// signed with the signature dictionary `signature` if there is one
 fn build(
     original: &[u8],
+    doc: Document,
     plan: &Plan,
     signature: Option<Dictionary>,
 ) -> Result<(IncrementalDocument, Option<ObjectId>)> {
-    let doc = load_for_update(original)?;
     let rules = Rules::read(&doc);
     if !rules.allows_changes() {
         return Err(Refusal::Certified.into());
+    }
+    if plan.filled.iter().any(|name| rules.locks(name)) {
+        return Err(Refusal::FilledLocked.into());
     }
     let mut taken: Vec<String> = form_fields(&doc).into_iter().map(|f| f.name).collect();
     let mut forms = Forms {
@@ -393,7 +405,7 @@ fn build(
     let mut incr = IncrementalDocument::create_from(original.to_vec(), doc);
     clean_trailer(&mut incr);
     let pages = incr.get_prev_documents().get_pages();
-    let page_of = |number: u32| page_id_in(&pages, number);
+    let page_of = |number: u32| page_in(&pages, number);
     let signing = signature.is_some();
 
     let target = match &plan.signature {
@@ -418,15 +430,13 @@ fn build(
     for stamp in &plan.stamps {
         let form = forms.get(&mut incr, stamp.pdf)?;
         if stamp.repeat {
+            let size = |page: ObjectId| {
+                PageGeometry::of(incr.get_prev_documents(), page).map(|geo| geo.visible_size())
+            };
+            let placed = size(page_of(stamp.page)?)?;
             for page in pages.values() {
-                let size = PageGeometry::of(incr.get_prev_documents(), *page)?.visible_size();
-                draws.push((
-                    *page,
-                    Draw {
-                        form,
-                        rect: clamp(stamp.rect, size),
-                    },
-                ));
+                let rect = repeat_into(stamp.rect, placed, size(*page)?);
+                draws.push((*page, Draw { form, rect }));
             }
         } else {
             draws.push((
@@ -498,12 +508,7 @@ fn build(
         match (&plan.signature, target) {
             (Spot::Existing { .. }, Some(target)) => {
                 let geo = PageGeometry::of(incr.get_prev_documents(), target.page)?;
-                let [x0, y0, x1, y1] = target.rect;
-                let (w, h) = if geo.rotate % 180 == 0 {
-                    (x1 - x0, y1 - y0)
-                } else {
-                    (y1 - y0, x1 - x0)
-                };
+                let [_, _, w, h] = geo.user_to_display(target.rect);
                 let ap = appearance(&mut incr, &geo, w, h, shown);
                 incr.opt_clone_object_to_new_document(target.field)?;
                 incr.new_document
@@ -544,17 +549,15 @@ fn build(
     Ok((incr, sig_id))
 }
 
-/// page_id_in is page `number` (from 1) of `pages`
-fn page_id_in(pages: &std::collections::BTreeMap<u32, ObjectId>, number: u32) -> Result<ObjectId> {
-    pages
-        .get(&number)
-        .copied()
-        .with_context(|| format!("no page {number}"))
-}
-
 /// sign_once signs `original` with `reserve` bytes of room for the DER
 /// signature
-fn sign_once(original: &[u8], plan: &Plan, signer: &Signer, reserve: usize) -> Result<Attempt> {
+fn sign_once(
+    original: &[u8],
+    doc: Document,
+    plan: &Plan,
+    signer: &Signer,
+    reserve: usize,
+) -> Result<Attempt> {
     let mut sig = dictionary! {
         "Type" => "Sig",
         "Filter" => "Adobe.PPKLite",
@@ -572,7 +575,7 @@ fn sign_once(original: &[u8], plan: &Plan, signer: &Signer, reserve: usize) -> R
     if let Some(l) = &signer.location {
         sig.set("Location", text_string(l));
     }
-    let (incr, _) = build(original, plan, Some(sig))?;
+    let (incr, _) = build(original, doc, plan, Some(sig))?;
     let mut out = save(incr, original)?;
 
     // patch /ByteRange and find /Contents in what we appended

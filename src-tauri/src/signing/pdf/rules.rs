@@ -6,13 +6,11 @@
 use std::collections::HashSet;
 
 use lopdf::{Dictionary, Document, Object};
-use serde::Serialize;
 
 use super::{docmdp_permission, form_fields, resolve};
 
 /// the fields one signature locks once it is signed
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "action", content = "fields", rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lock {
     /// every field
     All,
@@ -59,8 +57,7 @@ impl Lock {
 }
 
 /// what may be added to a PDF
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Rules {
     /// the DocMDP permission of a certified PDF: 1 no changes, 2 filling in
     /// and signing, 3 annotations too

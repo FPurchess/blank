@@ -8,6 +8,7 @@
 use std::path::Path;
 use std::process::Command;
 
+use blank_pdf_ipc::protocol::FillValue;
 use lopdf::{dictionary, Document, Object, ObjectId, Stream};
 
 use super::tests::{key, options, pdf, sign_as, signed, widgets, PASSPHRASE, RSA_KEY};
@@ -77,7 +78,7 @@ fn stamp_at(part: usize, page: u32, rect: [f64; 4], repeat: bool) -> StampPlan {
 /// `stamps` from part 1 on
 fn stamped(pdf: &[u8], plan: &Plan, stamps: &[&[u8]]) -> Answer<Vec<u8>> {
     let parts: Vec<&[u8]> = std::iter::once(pdf).chain(stamps.iter().copied()).collect();
-    sign(None, pdf, &parts, plan)
+    sign(None, pdf, &parts, plan, &[])
 }
 
 /// has tells whether `tool` of poppler-utils or qpdf runs; CI never skips
@@ -840,4 +841,86 @@ fn signs_a_field_listed_before_an_earlier_signature() {
         let path = written(dir.path(), "twice.pdf", &out);
         assert_eq!(pdfsig_valid(dir.path(), &path), (2, 2));
     }
+}
+
+#[test]
+fn refuses_fills_of_fields_an_earlier_signature_locked() {
+    // the form signed, its signature locking the field "name"
+    let mut doc = Document::load_mem(&signed(key(), FORM, &options(None))).unwrap();
+    let sig = crate::signing::pdf::form_fields(&doc)
+        .into_iter()
+        .find(|field| field.signature && field.dict.get(b"V").is_ok())
+        .and_then(|field| field.id)
+        .expect("a signed field");
+    doc.get_dictionary_mut(sig).unwrap().set(
+        "Lock",
+        dictionary! { "Action" => "Include", "Fields" => vec![Object::string_literal("name")] },
+    );
+    let locked = doc_bytes(&doc);
+    let fill = |field: &str| Fill {
+        field: field.into(),
+        value: FillValue::Text("Ada".into()),
+    };
+    let nothing = plan(vec![], SignaturePlan::Invisible);
+    let Err(SigningError::Failed(message)) =
+        sign(None, &locked, &[&locked], &nothing, &[fill("name")])
+    else {
+        panic!("filled a locked field");
+    };
+    assert_eq!(message, Refusal::FilledLocked.to_string());
+    // a field it didn't lock may be filled in, and signed
+    let new = SignaturePlan::New {
+        page: 1,
+        rect: [72., 72., 120., 30.],
+        stamp: None,
+    };
+    let p12 = key();
+    sign(
+        Some(Key {
+            p12,
+            passphrase: PASSPHRASE,
+        }),
+        &locked,
+        &[&locked],
+        &plan(vec![], new),
+        &[fill("address.street")],
+    )
+    .unwrap();
+}
+
+#[test]
+fn keeps_a_stamps_content_where_its_page_box_has_it() {
+    // a stamp page whose box doesn't start at the origin
+    let mut doc = Document::load_mem(&stamp_pdf(56., 28., "x")).unwrap();
+    let page = pages(&doc)[0];
+    doc.get_dictionary_mut(page)
+        .unwrap()
+        .set("MediaBox", vec![10.into(), 20.into(), 66.into(), 48.into()]);
+    let stamp = doc_bytes(&doc);
+    let target = pdf();
+    let mut incr = lopdf::IncrementalDocument::create_from(
+        target.clone(),
+        Document::load_mem(&target).unwrap(),
+    );
+    let form = crate::signing::pdf::xobject::import_stamp(&mut incr, &stamp, false).unwrap();
+    assert_eq!((form.width, form.height), (56., 28.));
+    let dict = &incr
+        .new_document
+        .get_object(form.id)
+        .unwrap()
+        .as_stream()
+        .unwrap()
+        .dict;
+    let floats = |key: &[u8]| -> Vec<f32> {
+        dict.get(key)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n.as_float().unwrap())
+            .collect()
+    };
+    // the BBox clips in the form's own space, where its content is
+    assert_eq!(floats(b"BBox"), [10., 20., 66., 48.]);
+    assert_eq!(floats(b"Matrix"), [1., 0., 0., 1., -10., -20.]);
 }

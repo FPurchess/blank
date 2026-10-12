@@ -40,6 +40,8 @@ pub enum Refusal {
     FieldSigned,
     /// an earlier signer locked the signature field asked for
     FieldLocked,
+    /// an earlier signer locked a field the user filled in
+    FilledLocked,
     /// the timestamp server can't be reached or didn't answer
     NoTimestamp,
     /// the timestamp server answered, and refused
@@ -61,6 +63,9 @@ impl std::fmt::Display for Refusal {
             Refusal::NoSuchField => "This PDF has no signature field of that name",
             Refusal::FieldSigned => "This signature field is signed already",
             Refusal::FieldLocked => "An earlier signer locked this signature field",
+            Refusal::FilledLocked => {
+                "An earlier signer locked a field you filled in, so it can't change any more. Clear what you filled in there and sign again."
+            }
             Refusal::NoTimestamp => "The timestamp server didn't answer",
             Refusal::TimestampRefused => "The timestamp server refused to timestamp the signature",
             Refusal::TimestampUnusable => "The timestamp server's answer can't be used",

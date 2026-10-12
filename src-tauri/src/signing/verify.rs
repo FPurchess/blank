@@ -4,7 +4,7 @@
 
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::der as d;
-use crate::signing::pdf::form_fields;
+use crate::signing::pdf::{form_fields, load_bounded};
 use anyhow::{Context, Result};
 use cms::content_info::ContentInfo;
 use cms::signed_data::{SignedData, SignerIdentifier};
@@ -564,11 +564,15 @@ fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
 /// verify_pdf checks every signature of the PDF `bytes`, in the order of
 /// its form's fields
 pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
-    let doc = Document::load_mem(bytes).context("can't read the PDF")?;
+    verify_doc(&load_bounded(bytes)?, bytes)
+}
+
+/// verify_doc is verify_pdf of `bytes` that were read already as `doc`
+pub fn verify_doc(doc: &Document, bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     let header = bytes.windows(5).position(|w| w == b"%PDF-").unwrap_or(0);
     let effective_len = bytes.len() - bytes.iter().rev().take_while(|b| is_ws(**b)).count();
     let mut reports = vec![];
-    for sd in collect_sig_fields(&doc) {
+    for sd in collect_sig_fields(doc) {
         let mut r = SignatureReport {
             field: sd.field.clone(),
             ..Default::default()
@@ -784,7 +788,7 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
         .collect();
     let last_covered = ends.iter().copied().max().unwrap_or(0);
     let tail_dss_only =
-        last_covered < effective_len && tail_is_validation_data(&doc, bytes, header, last_covered);
+        last_covered < effective_len && tail_is_validation_data(doc, bytes, header, last_covered);
     for r in &mut reports {
         if r.byte_range.len() != 4 || !r.checks.first().is_some_and(|c| c.1) {
             r.coverage = Coverage::Unknown;
@@ -841,7 +845,7 @@ fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: us
     let Ok(root) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
         return false;
     };
-    let Ok(before) = Document::load_mem(&bytes[..from]) else {
+    let Ok(before) = load_bounded(&bytes[..from]) else {
         return false;
     };
     // the catalog may only have gained (or changed) its /DSS
@@ -984,6 +988,10 @@ enum TailEntry {
 /// the sections it points to start (/Prev, /XRefStm)
 type Section = (Vec<(u32, TailEntry)>, Vec<usize>);
 
+/// how long a cross-reference stream may be, decompressed: 7 bytes an entry
+/// for over two million objects
+const MAX_XREF_STREAM: usize = 16 << 20;
+
 /// how many sections an update's chain of cross-references may have
 const MAX_SECTIONS: usize = 256;
 
@@ -1091,7 +1099,7 @@ fn xref_stream(section: &[u8]) -> Option<Section> {
         )
         .as_bytes(),
     );
-    let doc = Document::load_mem(&pdf).ok()?;
+    let doc = load_bounded(&pdf).ok()?;
     let stream = doc.get_object((1, 0)).ok()?.as_stream().ok()?;
     let dict = &stream.dict;
     if dict.get(b"Type").and_then(Object::as_name).ok() != Some(b"XRef") {
@@ -1113,7 +1121,9 @@ fn xref_stream(section: &[u8]) -> Option<Section> {
     }
     let index = integers(b"Index").unwrap_or_else(|| vec![0, size]);
     let content = if dict.has(b"Filter") {
-        stream.decompressed_content().ok()?
+        stream
+            .decompressed_content_with_limit(MAX_XREF_STREAM)
+            .ok()?
     } else {
         stream.content.clone()
     };

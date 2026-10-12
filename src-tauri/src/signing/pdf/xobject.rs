@@ -11,7 +11,7 @@ use lopdf::content::{Content, Operation};
 use lopdf::Stream;
 use lopdf::{dictionary, Dictionary, Document, IncrementalDocument, LoadOptions, Object, ObjectId};
 
-use super::{inherited, page_id, reals, resolve};
+use super::{inherited, numbers, page_id, reals, resolve};
 
 /// the largest stamp PDF taken, what any stream of it may decompress to,
 /// how many objects it may bring along and how deep they may nest: it's
@@ -33,7 +33,8 @@ pub struct Imported {
 }
 
 /// import_stamp copies page 1 of the PDF `pdf` into `incr` as a Form
-/// XObject with the BBox `[0 0 w h]`; `pdfa1` drops what PDF/A-1 forbids
+/// XObject that shows as `[0 0 w h]` (its BBox is the page's box, moved
+/// there by its /Matrix); `pdfa1` drops what PDF/A-1 forbids
 /// (transparency groups, soft masks), since the PDF it goes into claims it
 pub fn import_stamp(incr: &mut IncrementalDocument, pdf: &[u8], pdfa1: bool) -> Result<Imported> {
     if pdf.len() > MAX_PDF {
@@ -50,14 +51,9 @@ pub fn import_stamp(incr: &mut IncrementalDocument, pdf: &[u8], pdfa1: bool) -> 
     let page = page_id(&doc, 1)?;
     let media = inherited(&doc, page, b"CropBox")
         .or_else(|| inherited(&doc, page, b"MediaBox"))
-        .and_then(|o| o.as_array().ok())
         .context("a stamp's page has no size")?;
-    let numbers: Vec<f64> = media
-        .iter()
-        .filter_map(|v| resolve(&doc, v))
-        .filter_map(|v| v.as_float().ok().map(f64::from))
-        .collect();
-    let [x0, y0, x1, y1] = numbers[..] else {
+    let Some([x0, y0, x1, y1]) = numbers(media, &doc).and_then(|n| <[f64; 4]>::try_from(n).ok())
+    else {
         bail!("a stamp's page box isn't four numbers");
     };
     let (x0, y0, x1, y1) = (x0.min(x1), y0.min(y1), x0.max(x1), y0.max(y1));
@@ -82,9 +78,11 @@ pub fn import_stamp(incr: &mut IncrementalDocument, pdf: &[u8], pdfa1: bool) -> 
         queue: vec![],
     };
     let resources = copier.copy_dict(incr, &resources, 0)?;
+    // the content is drawn where the page has it: the BBox is the page's
+    // box, and the matrix moves it to the origin
     let mut form = dictionary! {
         "Type" => "XObject", "Subtype" => "Form",
-        "BBox" => reals(&[0., 0., width, height]),
+        "BBox" => reals(&[x0, y0, x1, y1]),
         "Resources" => resources,
     };
     if x0 != 0. || y0 != 0. {

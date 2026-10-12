@@ -12,14 +12,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager};
 use zeroize::Zeroizing;
 
-pub use blank_pdf_ipc::protocol::{Fill, FillValue};
+use blank_pdf_ipc::protocol::Fill;
 
-use crate::pdf_view::{filled_bytes, PdfTabs};
+use crate::pdf_view::{filled_bytes, read_for_signing, PdfTabs};
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::keys::{self, Identity, OpenError};
+use crate::signing::pdf::load_for_update;
 use crate::signing::pdf::sign::{update_pdf, Other, PlacedStamp, Plan as UpdatePlan, Signer, Spot};
 use crate::signing::trust::{self, CheckedSignature};
-use crate::signing::verify::{verify_pdf, SignatureReport};
+use crate::signing::verify::{verify_doc, verify_pdf, SignatureReport};
 use crate::signing::Refusal;
 
 /// the folder of the user's signature, initials, key and certificate
@@ -385,7 +386,8 @@ pub struct StampPlan {
     /// from 1
     pub page: u32,
     pub rect: Rect,
-    /// on every page, at the same place, moved into smaller pages
+    /// on every page, as far from the nearer edges as on `page` (see
+    /// `stamp::repeat_into`)
     #[serde(default)]
     pub repeat: bool,
 }
@@ -467,15 +469,46 @@ fn signer_name(cert: &[u8]) -> Option<String> {
 const SIGN_FAILED: &str = "Blank couldn't sign the PDF";
 const STAMP_FAILED: &str = "Blank couldn't add to the PDF";
 
-/// sign adds `plan` to `pdf` and signs it with the user's key, or, without
-/// a key, adds the stamps and fields alone; the stamps' PDFs are `parts`
-/// of the body, by `part`
-pub fn sign(key: Option<Key>, pdf: &[u8], parts: &[&[u8]], plan: &Plan) -> Answer<Vec<u8>> {
-    let message = if key.is_some() {
+/// failed_sentence is what failed, said to the user: a signature, or (no
+/// passphrase) the stamps and fields alone
+fn failed_sentence(signing: bool) -> &'static str {
+    if signing {
         SIGN_FAILED
     } else {
         STAMP_FAILED
-    };
+    }
+}
+
+/// refusal_of tells the user why an update failed: a refusal's sentence,
+/// else `message`
+fn refusal_of(message: &str) -> impl Fn(anyhow::Error) -> SigningError + '_ {
+    move |error| {
+        log::warn!("failed to update a PDF: {}", kind_of(&error));
+        match error.downcast_ref::<Refusal>() {
+            Some(
+                refusal @ (Refusal::NoTimestamp
+                | Refusal::TimestampRefused
+                | Refusal::TimestampUnusable),
+            ) => SigningError::Timestamp(refusal.to_string()),
+            Some(refusal) => SigningError::Failed(refusal.to_string()),
+            None => SigningError::Failed(message.into()),
+        }
+    }
+}
+
+/// sign adds `plan` to `pdf` and signs it with the user's key, or, without
+/// a key, adds the stamps and fields alone; the stamps' PDFs are `parts`
+/// of the body, by `part`. `fills` are the fills the tab's helper wrote
+/// into `pdf` as a revision of their own: refused if an earlier signature
+/// locked one of their fields
+pub fn sign(
+    key: Option<Key>,
+    pdf: &[u8],
+    parts: &[&[u8]],
+    plan: &Plan,
+    fills: &[Fill],
+) -> Answer<Vec<u8>> {
+    let message = failed_sentence(key.is_some());
     let identity = key
         .map(|key| open_key(key.p12, key.passphrase, "Blank can't open your key"))
         .transpose()?;
@@ -522,6 +555,7 @@ pub fn sign(key: Option<Key>, pdf: &[u8], parts: &[&[u8]], plan: &Plan) -> Answe
         stamps,
         signature,
         others,
+        filled: fills.iter().map(|fill| fill.field.as_str()).collect(),
     };
     let blank = |value: &Option<String>| value.clone().filter(|text| !text.trim().is_empty());
     let signer = identity.as_ref().map(|identity| Signer {
@@ -532,20 +566,11 @@ pub fn sign(key: Option<Key>, pdf: &[u8], parts: &[&[u8]], plan: &Plan) -> Answe
         tsa: blank(&plan.timestamp_server),
         reserve: RESERVE,
     });
-    // what the signatures it has were, to compare after
-    let before = verify_pdf(pdf).unwrap_or_default();
-    let updated = update_pdf(pdf, &update, signer.as_ref()).map_err(|error| {
-        log::warn!("failed to update a PDF: {}", kind_of(&error));
-        match error.downcast_ref::<Refusal>() {
-            Some(
-                refusal @ (Refusal::NoTimestamp
-                | Refusal::TimestampRefused
-                | Refusal::TimestampUnusable),
-            ) => SigningError::Timestamp(refusal.to_string()),
-            Some(refusal) => SigningError::Failed(refusal.to_string()),
-            None => SigningError::Failed(message.into()),
-        }
-    })?;
+    // read once, for what its signatures were (to compare after) and the
+    // update; a PDF whose signatures can't be checked isn't added to
+    let doc = load_for_update(pdf).map_err(refusal_of(message))?;
+    let before = verify_doc(&doc, pdf).map_err(failed("failed to check a PDF to sign", message))?;
+    let updated = update_pdf(pdf, doc, &update, signer.as_ref()).map_err(refusal_of(message))?;
     match &signer {
         Some(signer) => check_signed(&updated, signer.tsa.is_some(), &before)?,
         None => check_unsigned(&updated, &before)?,
@@ -669,16 +694,19 @@ pub async fn signing_sign_pdf(
     app: AppHandle,
     request: tauri::ipc::Request<'_>,
 ) -> Answer<tauri::ipc::Response> {
-    let refused = || SigningError::Failed(SIGN_FAILED.into());
+    let unreadable = || SigningError::Failed(SIGN_FAILED.into());
     let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
-        return Err(refused());
+        return Err(unreadable());
     };
     let header = request
         .headers()
         .get("blank-signing")
         .and_then(|value| value.to_str().ok())
         .and_then(header)
-        .ok_or_else(refused)?;
+        .ok_or_else(unreadable)?;
+    // from here on, what failed is said as what was asked
+    let message = failed_sentence(header.passphrase.is_some());
+    let refused = move || SigningError::Failed(message.into());
     if parts(body).is_none() {
         log::warn!("a request to sign had a body that isn't parts");
         return Err(refused());
@@ -715,7 +743,11 @@ pub async fn signing_sign_pdf(
             (Some(p12), Some(passphrase)) => Some(Key { p12, passphrase }),
             _ => None,
         };
-        sign(key, pdf, &parts, &header.plan)
+        let fills = match &header.source {
+            Source::Tab { fills, .. } => fills.as_slice(),
+            Source::Body => &[],
+        };
+        sign(key, pdf, &parts, &header.plan, fills)
     })
     .await
     .map_err(|_| refused())??;
@@ -750,33 +782,27 @@ pub fn pdf_rules(bytes: &[u8]) -> PdfRules {
         }
     };
     let rules = crate::signing::pdf::rules::Rules::read(&doc);
-    let mut locked: Vec<String> = crate::signing::pdf::form_fields(&doc)
+    let locked: std::collections::BTreeSet<String> = crate::signing::pdf::form_fields(&doc)
         .into_iter()
         .map(|field| field.name)
         .filter(|name| !name.is_empty() && rules.locks(name))
         .collect();
-    locked.dedup();
     PdfRules {
         signed: rules.signed,
         docmdp: rules.docmdp,
         encrypted: false,
         damaged: false,
-        locked,
+        locked: locked.into_iter().collect(),
     }
 }
 
 /// signing_pdf_rules reads what may be placed on the PDF at `path`, which a
-/// PDF tab shows
+/// PDF tab shows, while it is still the file the tab opened (`sha256`):
+/// `fileChanged` or `fileMissing` when it isn't
 #[tauri::command]
-pub async fn signing_pdf_rules(path: PathBuf) -> Answer<PdfRules> {
+pub async fn signing_pdf_rules(path: PathBuf, sha256: String) -> Answer<PdfRules> {
     tauri::async_runtime::spawn_blocking(move || {
-        let bytes = std::fs::read(&path).map_err(|error| {
-            log::warn!("failed to read a PDF for its rules: {}", error.kind());
-            match error.kind() {
-                std::io::ErrorKind::NotFound => SigningError::FileMissing,
-                _ => SigningError::Failed("Blank can't read this PDF again".into()),
-            }
-        })?;
+        let bytes = read_for_signing(&path, &sha256, "for its rules")?;
         Ok(pdf_rules(&bytes))
     })
     .await
