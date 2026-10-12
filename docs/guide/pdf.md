@@ -35,7 +35,7 @@ When a PDF opens, Blank looks for the places to fill in and marks each with a da
 | Leave out a line Blank found           |                | `Delete` (undo brings it back)                          |
 | Undo, redo                             |                | `Mod` `Z`, `Mod` `Shift` `Z`                            |
 
-Your signature goes into a signature field or line as large as it fits, standing on a line; a date or place line gets today's date or your place. A text field that asks for your name, the date or the place starts with it, ready to keep or type over. Remove a signature from a place with `Delete`, and the place is back, selected.
+Your signature goes into a signature field or line as large as it fits, standing on a line; a date or place line gets today's date or your place. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete`, and the place is back, selected.
 
 The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Latin letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say _This field's font can't show some of these characters_ under the field, and the field keeps what it had. Write such text as a stamp instead, or ask the sender for a form with another font.
 

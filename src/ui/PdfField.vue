@@ -62,23 +62,30 @@ const problemId = computed(() => `${id.value}-problem`);
 const pages = () => document.getElementById(PDF_VIEW_ID);
 const input = useTemplateRef<HTMLInputElement | HTMLTextAreaElement>("input");
 
-// what's typed while the input has the focus
+// what's typed while the input has the focus, and what it started with
 const draft = shallowRef("");
 const editing = shallowRef(false);
+// what Blank suggested, which only Enter or typing fills in: Tab through a
+// field leaves it as it was
+let suggested: string | null = null;
 
 const onFocus = () => {
   lastPlace.value = props.place.id;
   if (editing.value) return;
   editing.value = true;
   const now = typeof value.value === "string" ? value.value : "";
-  draft.value = now || prefillText(prefillOf(field.value));
+  suggested = now ? null : prefillText(prefillOf(field.value)) || null;
+  draft.value = now || (suggested ?? "");
   // selected, to type over it
   void nextTick(() => input.value?.select());
 };
-const commit = () => void commitFill(field.value, draft.value);
+const commit = () => {
+  suggested = null;
+  void commitFill(field.value, draft.value);
+};
 const onBlur = () => {
   editing.value = false;
-  commit();
+  if (draft.value !== suggested) commit();
 };
 const onKeydown = (event: KeyboardEvent) => {
   if (event.key === "Escape") {
@@ -86,6 +93,7 @@ const onKeydown = (event: KeyboardEvent) => {
     event.stopPropagation();
     // what was typed goes; the pages take the focus
     draft.value = typeof value.value === "string" ? value.value : "";
+    suggested = draft.value;
     editing.value = false;
     pages()?.focus();
     return;

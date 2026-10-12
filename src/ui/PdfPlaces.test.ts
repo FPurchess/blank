@@ -485,6 +485,19 @@ describe("the places of a PDF", () => {
     expect(setFills).toHaveBeenLastCalledWith("t", []);
   });
 
+  it("fill in what they suggest on Enter only, not when Tab passes", async () => {
+    const input = placeEl("field:name") as HTMLInputElement;
+    input.focus();
+    await flushPromises();
+    input.blur();
+    await flushPromises();
+    expect(setFills).not.toHaveBeenCalled();
+    input.focus();
+    await flushPromises();
+    await press(input, "Enter");
+    expect(fillsOf("t")).toEqual([{ field: "name", value: "Ada Lovelace" }]);
+  });
+
   it("refuse what the field's font can't show, and keep what it had", async () => {
     vi.mocked(setFills).mockRejectedValue("missingGlyphs");
     const input = placeEl("field:name") as HTMLInputElement;
