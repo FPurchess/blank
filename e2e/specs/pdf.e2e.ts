@@ -75,9 +75,11 @@ describe("PDF tabs", () => {
   it("zooms its pages with the window's zoom", async () => {
     const width = async () =>
       (await $("#pdf-view .page-sheet").getSize()).width;
+    await expect($("#ui-zoom")).toHaveText("Fit");
     const fit = await width();
+    // the step after Fit, which depends on the page and the window
     await pressMod("=");
-    await expect($("#ui-zoom")).toHaveText("110%");
+    await expect($("#ui-zoom")).toHaveText(/^\d+%$/);
     await browser.waitUntil(async () => (await width()) > fit, {
       timeoutMsg: "the pages didn't grow",
     });
