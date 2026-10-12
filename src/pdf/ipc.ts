@@ -24,7 +24,9 @@ export interface OpenedPdf {
   encrypted: boolean;
 }
 
-// why a call failed, as the native side says it (`PdfError::kind`), or
+// why a call failed, as the native side says it (`PdfError::kind`: e.g.
+// "missingGlyphs" for a fill with characters the field's font can't show,
+// "badRequest" for one the field can't take), or
 // "unreadable" for a file that can't be read, "closed" for a tab whose PDF
 // was closed meanwhile, and for a file read again (a helper that stopped
 // opens it again) "missing" when it has gone, "changed" when it holds
@@ -41,6 +43,9 @@ export type PdfFailure =
   | "tooComplex"
   | "cancelled"
   | "engine"
+  | "repaired"
+  | "encrypted"
+  | "missingGlyphs"
   | "timedOut"
   | "crashed"
   | "hung"
@@ -114,3 +119,72 @@ export const closePdf = (tab: string) => invoke<void>("pdf_close", { tab });
  */
 export const verifyPdf = (tab: string) =>
   invoke<CheckedSignature[]>("pdf_verify", { tab });
+
+// a box on a page, [x, y, width, height] in display points
+export type PdfRect = [number, number, number, number];
+
+// a page's text: its words in reading order, and the thin horizontal lines
+// drawn on it (at least 40 pt wide, at most 2 pt high), where people sign or
+// write. Never logged: it is what the PDF says
+export interface PageText {
+  words: { text: string; rect: PdfRect }[];
+  rules: PdfRect[];
+}
+
+/**
+ * pageText reads the words and lines of the page `page` (from 0) of the tab
+ * `tab`
+ */
+export const pageText = (tab: string, page: number) =>
+  invoke<PageText>("pdf_text", { tab, page });
+
+export type PdfFieldKind =
+  "text" | "checkbox" | "radio" | "combo" | "list" | "button" | "signature";
+
+// a field of a PDF's form, as protocol.rs's Field
+export interface PdfField {
+  // its full name, which a Fill names
+  name: string;
+  kind: PdfFieldKind;
+  // its /TU, what it is called for people
+  label: string | null;
+  // its value: a checkbox's or radio button group's state ("Off" for none)
+  value: string;
+  // a choice's options
+  options: string[];
+  flags: {
+    readOnly: boolean;
+    required: boolean;
+    multiline: boolean;
+    comb: boolean;
+    maxLen: number | null;
+  };
+  // a signature field that holds a signature
+  signed: boolean;
+  // where it shows; `onValue` is a checkbox's or radio button's state when on
+  widgets: { page: number; rect: PdfRect; onValue: string | null }[];
+}
+
+/**
+ * pdfFields reads the form's fields of the tab's PDF, with the values its
+ * fills gave them
+ */
+export const pdfFields = (tab: string) =>
+  invoke<PdfField[]>("pdf_fields", { tab });
+
+// what a field (by its full name) is filled in with: a checkbox's true or
+// false; text for a text field, a choice (one of its options, any text in a
+// combo box that may be edited) and a radio button group (the `onValue` of
+// the button chosen, "Off" for none)
+export interface Fill {
+  field: string;
+  value: string | boolean;
+}
+
+/**
+ * setFills fills the form of the tab's PDF in with `fills`, always the whole
+ * set: the pages to draw again. Refused with "missingGlyphs" or
+ * "badRequest", the last set stays. Values are never logged
+ */
+export const setFills = (tab: string, fills: Fill[]) =>
+  invoke<number[]>("pdf_set_fills", { tab, fills });
