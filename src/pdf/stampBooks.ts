@@ -8,6 +8,7 @@ import {
   changed,
   changedSheet,
   EMPTY_BOOK,
+  fitOnPage,
   onPages,
   redone,
   type Sheet,
@@ -227,8 +228,9 @@ const restored = new Set<string>();
 /**
  * fitted returns what `kept` becomes on the PDF `doc` opened, and what it
  * lost: on the file they were placed on (or one not known yet), as they
- * are; on a file that changed, without the stamps on pages it no longer has
- * and without the fills, the dismissed places and the history, whose fields
+ * are; on a file that changed, without the stamps on pages it no longer has,
+ * the others moved (and made smaller) onto their pages where those are
+ * smaller now (fitOnPage), and without the fills, the dismissed places and the history, whose fields
  * and lines may be others now; on a file that went or can't be opened, as
  * they are
  */
@@ -241,7 +243,9 @@ const fitted = (
   if (kept.sha256 === null)
     return { kept: { ...kept, sha256: opened.sha256 }, lost: [] };
   const { stamps, fills } = kept.book;
-  const left = onPages(stamps, opened.pages.length);
+  const left = onPages(stamps, opened.pages.length).map((stamp) =>
+    fitOnPage(stamp, opened.pages[stamp.page]),
+  );
   const dropped = stamps.length - left.length;
   return {
     kept: { book: bookOf(left), sha256: opened.sha256 },

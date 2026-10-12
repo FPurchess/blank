@@ -492,6 +492,36 @@ export const onPages = (stamps: readonly Stamp[], count: number) =>
   stamps.filter((stamp) => stamp.page < count);
 
 /**
+ * fitOnPage returns `stamp` wholly on its page of `page`, e.g. once the file
+ * changed to a smaller paper: moved in, and made smaller with its shape kept
+ * where it doesn't fit (its natural size and letters too, so it resizes from
+ * there); as it is when it's on the page already
+ */
+export const fitOnPage = (stamp: Stamp, page: PageSize): Stamp => {
+  const [x, y, w, h] = stamp.rect;
+  if (x >= 0 && y >= 0 && x + w <= page.width && y + h <= page.height)
+    return stamp;
+  const scale = Math.min(page.width / w, page.height / h, 1);
+  const [width, height] = [w * scale, h * scale];
+  const within = (at: number, size: number, room: number) =>
+    Math.max(0, Math.min(at, room - size));
+  const rect: Rect = [
+    within(x, width, page.width),
+    within(y, height, page.height),
+    width,
+    height,
+  ];
+  if (scale === 1) return { ...stamp, rect };
+  const [naturalW, naturalH] = stamp.natural;
+  return {
+    ...stamp,
+    rect,
+    natural: [naturalW * scale, naturalH * scale],
+    spec: { ...stamp.spec, size: stamp.spec.size * scale },
+  };
+};
+
+/**
  * stampLabel names `stamp` for a screen reader, e.g. "Signature on page 2,
  * selected"
  */

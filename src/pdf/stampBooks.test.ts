@@ -107,6 +107,25 @@ describe("restoring a tab's stamps", () => {
     );
   });
 
+  it("moves those beside a smaller page of a changed file onto it", () => {
+    const a5 = { width: 420, height: 595, rotation: 0 };
+    const smaller = doc("new", 1);
+    smaller.opened!.pages = [a5];
+    restoreStamps("t", smaller, {
+      ...stored("abc"),
+      stamps: [
+        stamp({ rect: [400, 700, 180, 60] }),
+        stamp({ id: "wide", rect: [0, 0, 600, 200], natural: [600, 200] }),
+      ],
+    });
+    const [moved, wide] = stampsOf("t");
+    expect(moved.rect).toEqual([240, 535, 180, 60]);
+    // made smaller, its shape and letters kept
+    expect(wide.rect).toEqual([0, 0, 420, 140]);
+    expect(wide.natural).toEqual([420, 140]);
+    expect(wide.spec.size).toBeCloseTo(stampSpec("signature").size * 0.7);
+  });
+
   it("brings back the fills and dismissed places on the same file only", () => {
     const kept = {
       ...stored("abc"),
