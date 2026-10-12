@@ -1,0 +1,34 @@
+{
+  "about": "English captions in brackets below runs of underscores",
+  "text": {
+    "words": [
+      {
+        "text": "________________________________",
+        "rect": [72, 642.82, 177.92, 9.25]
+      },
+      {
+        "text": "______________________",
+        "rect": [330, 642.82, 122.32, 9.25]
+      },
+      {
+        "text": "(signature)",
+        "rect": [120, 656.26, 42.77, 7.4]
+      },
+      {
+        "text": "(date)",
+        "rect": [380, 656.26, 21.97, 7.4]
+      }
+    ],
+    "rules": []
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [72, 615.07, 177.92, 36]
+    },
+    {
+      "kind": "date",
+      "rect": [330, 633.07, 122.32, 18]
+    }
+  ]
+}

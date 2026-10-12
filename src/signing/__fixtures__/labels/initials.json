@@ -1,0 +1,46 @@
+{
+  "about": "Initials at the foot of a page, in English, German and French-style German",
+  "text": {
+    "words": [
+      {
+        "text": "Initials:",
+        "rect": [420, 792.82, 44.38, 9.25]
+      },
+      {
+        "text": "__________",
+        "rect": [467.16, 792.82, 55.6, 9.25]
+      },
+      {
+        "text": "Kürzel",
+        "rect": [72, 792.82, 31.2, 9.25]
+      },
+      {
+        "text": "________",
+        "rect": [105.98, 792.82, 44.48, 9.25]
+      },
+      {
+        "text": "Paraphe:",
+        "rect": [230, 792.82, 39.18, 9.25]
+      },
+      {
+        "text": "_________",
+        "rect": [271.96, 792.82, 50.04, 9.25]
+      }
+    ],
+    "rules": []
+  },
+  "expected": [
+    {
+      "kind": "initials",
+      "rect": [467.16, 787.27, 55.6, 14.8]
+    },
+    {
+      "kind": "initials",
+      "rect": [105.98, 787.27, 44.48, 14.8]
+    },
+    {
+      "kind": "initials",
+      "rect": [271.96, 787.27, 50.04, 14.8]
+    }
+  ]
+}

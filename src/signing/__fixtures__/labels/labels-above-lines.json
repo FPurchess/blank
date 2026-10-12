@@ -1,0 +1,45 @@
+{
+  "about": "Labels above drawn rules, and Sign here left of underscores",
+  "text": {
+    "words": [
+      {
+        "text": "Signature",
+        "rect": [72, 492.82, 46.8, 9.25]
+      },
+      {
+        "text": "Datum",
+        "rect": [320, 492.82, 26, 9.25]
+      },
+      {
+        "text": "Sign",
+        "rect": [72, 592.82, 20.8, 9.25]
+      },
+      {
+        "text": "here:",
+        "rect": [95.58, 592.82, 23.58, 9.25]
+      },
+      {
+        "text": "____________________",
+        "rect": [121.94, 592.82, 111.2, 9.25]
+      }
+    ],
+    "rules": [
+      [72, 539.75, 200, 0.5],
+      [320, 524.75, 150, 0.5]
+    ]
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [72, 502.07, 200, 37.68]
+    },
+    {
+      "kind": "date",
+      "rect": [320, 502.07, 150, 22.68]
+    },
+    {
+      "kind": "signature",
+      "rect": [121.94, 587.27, 111.2, 14.8]
+    }
+  ]
+}

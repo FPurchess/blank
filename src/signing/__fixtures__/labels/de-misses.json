@@ -1,0 +1,70 @@
+{
+  "about": "German captions the labels don't cover (expected, found or not), and Ort und Datum",
+  "text": {
+    "words": [
+      {
+        "text": "Unterschrift",
+        "rect": [72, 653.94, 56.16, 8.33]
+      },
+      {
+        "text": "Mieter",
+        "rect": [130.66, 653.94, 28.08, 8.33]
+      },
+      {
+        "text": "Signatur/Stempel",
+        "rect": [260, 653.94, 74.88, 8.33]
+      },
+      {
+        "text": "Datum",
+        "rect": [440, 653.94, 23.4, 8.33]
+      },
+      {
+        "text": "der",
+        "rect": [465.9, 653.94, 14.04, 8.33]
+      },
+      {
+        "text": "Unterschrift",
+        "rect": [482.44, 653.94, 56.16, 8.33]
+      },
+      {
+        "text": "Ort",
+        "rect": [72, 692.82, 15.6, 9.25]
+      },
+      {
+        "text": "und",
+        "rect": [90.38, 692.82, 15.6, 9.25]
+      },
+      {
+        "text": "Datum:",
+        "rect": [108.76, 692.82, 28.78, 9.25]
+      },
+      {
+        "text": "____________________",
+        "rect": [140.32, 692.82, 111.2, 9.25]
+      }
+    ],
+    "rules": [
+      [72, 649.75, 160, 0.5],
+      [260, 649.75, 160, 0.5],
+      [440, 649.75, 120, 0.5]
+    ]
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [72, 613.75, 160, 36]
+    },
+    {
+      "kind": "signature",
+      "rect": [260, 613.75, 160, 36]
+    },
+    {
+      "kind": "date",
+      "rect": [440, 631.75, 120, 18]
+    },
+    {
+      "kind": "placeAndDate",
+      "rect": [140.32, 687.27, 111.2, 14.8]
+    }
+  ]
+}
