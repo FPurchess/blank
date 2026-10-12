@@ -210,6 +210,21 @@ export const signPdf = async (request: SignRequest, parts: Uint8Array[]) =>
     }),
   );
 
+// what may be placed on a PDF a tab shows (`signing_pdf_rules`, the plan's
+// §6.3): whether it is signed already, its DocMDP permission (1: no changes,
+// 2: filling in and signing, 3: annotations too), whether it's encrypted or
+// would need repairing, and the fields earlier signatures locked
+export interface PdfRules {
+  signed: boolean;
+  docmdp: number | null;
+  encrypted: boolean;
+  damaged: boolean;
+  locked: string[];
+}
+
+export const pdfRules = (path: string) =>
+  invoke<PdfRules>("signing_pdf_rules", { path });
+
 // how far Blank trusts who signed (src-tauri/src/signing/trust.rs): the
 // user's own certificate, one they trusted, one a certificate authority
 // issued (which Blank doesn't check), or an unknown self-signed one

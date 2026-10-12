@@ -115,6 +115,7 @@ pub fn run() {
             signing::commands::signing_remove,
             signing::commands::signing_check_passphrase,
             signing::commands::signing_sign_pdf,
+            signing::commands::signing_pdf_rules,
             signing::commands::signing_trusted,
             signing::commands::signing_trust,
             signing::commands::signing_untrust,

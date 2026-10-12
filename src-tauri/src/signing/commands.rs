@@ -722,6 +722,67 @@ pub async fn signing_sign_pdf(
     Ok(tauri::ipc::Response::new(signed))
 }
 
+/// what may be placed on a PDF a tab shows (the plan's §6.3), for its
+/// signing tools: whether it is signed already, its DocMDP permission, the
+/// fields earlier signatures locked, and whether it is encrypted or would
+/// need repairing, which Blank can't add to
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfRules {
+    pub signed: bool,
+    pub docmdp: Option<i64>,
+    pub encrypted: bool,
+    pub damaged: bool,
+    pub locked: Vec<String>,
+}
+
+/// pdf_rules reads what may be placed on the PDF `bytes`
+pub fn pdf_rules(bytes: &[u8]) -> PdfRules {
+    let doc = match crate::signing::pdf::load_for_update(bytes) {
+        Ok(doc) => doc,
+        Err(error) => {
+            let encrypted = matches!(error.downcast_ref::<Refusal>(), Some(Refusal::Restricted));
+            return PdfRules {
+                encrypted,
+                damaged: !encrypted,
+                ..PdfRules::default()
+            };
+        }
+    };
+    let rules = crate::signing::pdf::rules::Rules::read(&doc);
+    let mut locked: Vec<String> = crate::signing::pdf::form_fields(&doc)
+        .into_iter()
+        .map(|field| field.name)
+        .filter(|name| !name.is_empty() && rules.locks(name))
+        .collect();
+    locked.dedup();
+    PdfRules {
+        signed: rules.signed,
+        docmdp: rules.docmdp,
+        encrypted: false,
+        damaged: false,
+        locked,
+    }
+}
+
+/// signing_pdf_rules reads what may be placed on the PDF at `path`, which a
+/// PDF tab shows
+#[tauri::command]
+pub async fn signing_pdf_rules(path: PathBuf) -> Answer<PdfRules> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = std::fs::read(&path).map_err(|error| {
+            log::warn!("failed to read a PDF for its rules: {}", error.kind());
+            match error.kind() {
+                std::io::ErrorKind::NotFound => SigningError::FileMissing,
+                _ => SigningError::Failed("Blank can't read this PDF again".into()),
+            }
+        })?;
+        Ok(pdf_rules(&bytes))
+    })
+    .await
+    .map_err(|_| SigningError::Failed("Blank can't read this PDF again".into()))?
+}
+
 /// checked_signatures checks every signature of the PDF `pdf`, and whom it
 /// is from as far as Blank can tell (see trust.rs)
 pub fn checked_signatures(app: &AppHandle, pdf: &[u8]) -> Answer<Vec<CheckedSignature>> {

@@ -665,6 +665,38 @@ fn reads_the_rules_of_a_pdf() {
     assert!(locked.locks("Name") && !locked.locks("Other"));
 }
 
+#[test]
+fn tells_the_tools_what_a_pdf_allows() {
+    assert_eq!(pdf_rules(&pdf()), PdfRules::default());
+    let p1 = pdf_rules(&certified(&pdf(), 1));
+    assert_eq!((p1.docmdp, p1.signed), (Some(1), true));
+    let earlier = pdf_rules(&signed(key(), &pdf(), &options(None)));
+    assert!(earlier.signed && earlier.docmdp.is_none() && earlier.locked.is_empty());
+    let encrypted = pdf_rules(PASSWORD);
+    assert!(encrypted.encrypted && !encrypted.damaged);
+    let damaged = pdf_rules(b"%PDF-1.7\nnot a PDF");
+    assert!(damaged.damaged && !damaged.encrypted);
+    // the fields an earlier signature locked, by name
+    let mut doc = Document::load_mem(FORM).unwrap();
+    let names: Vec<String> = crate::signing::pdf::form_fields(&doc)
+        .into_iter()
+        .map(|field| field.name)
+        .collect();
+    let first = names.first().cloned().expect("the form has fields");
+    let signed_form = signed(key(), &doc_bytes(&doc), &options(None));
+    doc = Document::load_mem(&signed_form).unwrap();
+    let sig = crate::signing::pdf::form_fields(&doc)
+        .into_iter()
+        .find(|field| field.signature && field.dict.get(b"V").is_ok())
+        .and_then(|field| field.id)
+        .expect("a signed field");
+    doc.get_dictionary_mut(sig).unwrap().set(
+        "Lock",
+        dictionary! { "Action" => "Include", "Fields" => vec![Object::string_literal(first.clone())] },
+    );
+    assert_eq!(pdf_rules(&doc_bytes(&doc)).locked, [first]);
+}
+
 fn doc_bytes(doc: &Document) -> Vec<u8> {
     let mut out = vec![];
     doc.clone().save_to(&mut out).unwrap();
