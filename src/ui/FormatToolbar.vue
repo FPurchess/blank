@@ -9,11 +9,12 @@ import {
   watch,
 } from "vue";
 
-import type { CommandIdentifier } from "../config";
+import { CommandIdentifier } from "../config";
 import { blockStyleAt } from "../editor/formatState";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
-import { FOCUS_ORDER, toolbarFocused } from "../state";
+import { FOCUS_ORDER, shownPdf, toolbarFocused } from "../state";
+import { pdfRefusal } from "../pdf/commands";
 import type { Anchor } from "../state";
 import { useFocusRegion } from "./composables/useFocusRegion";
 import { useResizeObserver } from "./composables/useResizeObserver";
@@ -147,6 +148,13 @@ const onKey = (event: KeyboardEvent) => {
   }
 };
 
+// in a PDF tab the style and Insert menus are greyed out, saying why: both
+// would change the text
+const textRefusal = computed(() =>
+  shownPdf.value
+    ? (pdfRefusal(CommandIdentifier.BLOCKTYPE_PARAGRAPH) ?? undefined)
+    : undefined,
+);
 const styleItems = () =>
   styleMenuItems(editor.state.value, editor.can, runById);
 const insertItems = (anchor: Anchor) =>
@@ -186,6 +194,8 @@ const moreItems = (anchor: Anchor) =>
         label="Text style"
         :text="style"
         :items="styleItems"
+        :tip="textRefusal"
+        :disabled="!!textRefusal"
         :tabindex="tabindexOf(entry.key)"
         :data-part="entry.part"
       />
@@ -195,6 +205,8 @@ const moreItems = (anchor: Anchor) =>
         icon="plus"
         text="Insert"
         :items="insertItems"
+        :tip="textRefusal"
+        :disabled="!!textRefusal"
         :tabindex="tabindexOf(entry.key)"
         :data-part="entry.part"
       />

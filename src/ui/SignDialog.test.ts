@@ -107,6 +107,10 @@ describe("the dialog that signs", () => {
       chosen: 3,
     });
     expect(document.querySelector("#sign-dialog-place")).toBeNull();
+    // without the place, the focus is in the dialog all the same, never
+    // behind it on the block, which a key would replace
+    await flushPromises();
+    expect(dialog()!.contains(document.activeElement)).toBe(true);
     expect(
       document.getElementById("sign-dialog-fixed-place")!.textContent,
     ).toContain("Paris");
@@ -192,6 +196,9 @@ describe("the dialog that signs", () => {
       expect(
         document.getElementById("sign-dialog-error")!.textContent,
       ).toContain("The passphrase is wrong");
+      // selected, to type it again
+      expect(document.activeElement).toBe(passphrase());
+      expect(passphrase().selectionEnd).toBe(5);
       expect(request.submit).not.toHaveBeenCalled();
       request.check = vi.fn(async () => null);
       submit();
@@ -220,6 +227,17 @@ describe("the dialog that signs", () => {
       expect(first.submit).not.toHaveBeenCalled();
       expect(signDialog.value).toBe(request);
       expect(dialog()!.textContent).toContain("Sign “offer”");
+    });
+
+    it("starts on the passphrase when the block fixes its place", async () => {
+      await open({
+        targets: [
+          { pos: 3, name: "", place: "Paris", dated: false, label: "Tenant" },
+        ],
+        chosen: 3,
+      });
+      await flushPromises();
+      expect(document.activeElement).toBe(passphrase());
     });
 
     it("signs with a picture only when chosen", async () => {

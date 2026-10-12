@@ -126,7 +126,12 @@ export const runExport = async (
   try {
     const dest = await save({
       filters,
-      defaultPath: extension ? suggestPath(extension, file, suffix) : undefined,
+      // an untitled document's file is named "Untitled", in the folder the
+      // dialog picks
+      defaultPath: extension
+        ? (suggestPath(extension, file, suffix) ??
+          `Untitled${suffix ?? ""}.${extension}`)
+        : undefined,
     });
     if (dest === null) return;
 

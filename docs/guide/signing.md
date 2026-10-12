@@ -7,7 +7,7 @@ Sign what you write in Blank and send it as a PDF: your signature, your name, wh
 Make your signature once, and Blank uses it for everything you sign. Make it in **Settings ▸ Signing** (`Mod` `,`) with **Add…**, or change it there with **Edit…**. If you sign before you made it, Blank asks for it first.
 
 - **Draw** it with the mouse, a trackpad or a pen. A pen that knows how hard you press draws a heavier line where you press harder. **Clear** starts again.
-- **Type** your name and pick one of four styles: formal (Pinyon Script), quick (Ms Madi), legible (Dancing Script) or handwritten (Caveat).
+- **Type** your name and pick one of four styles: formal (Pinyon Script), quick (Ms Madi), legible (Dancing Script) or handwritten (Caveat). Blank keeps the name you type as yours, for the name under your signature, unless you set another in **Settings ▸ Signing ▸ Your name**.
 - **Image:** choose a photo or scan of your signature on white paper. Blank keeps only the ink and trims the edges; turn **Remove background** off for a picture that is already transparent.
 
 Your **initials** are made the same way, in the row below. **Remove** takes either away at once; make it again whenever you like.
@@ -34,7 +34,7 @@ A contract for two people has two blocks, one for each. On the pages and in a pr
 
 1. If you haven't made your signature yet, Blank asks for it first.
 2. Choose which block is yours, if the document has several (the one with your name is chosen for you), and where you sign. Blank remembers the place for the next time. A block that gives its own place is signed there, and the dialog says so; a block with someone else's name gets a warning. The dialog also shows the date that goes under your signature: it's written in the document's language, which you choose in the status bar.
-3. Choose where to save the PDF. Blank suggests the document's name with _signed_ after it, so the unsigned file stays as it is.
+3. Choose where to save the PDF. Blank suggests the document's name with _signed_ after it (_Untitled signed.pdf_ for a document you haven't saved yet), so the unsigned file stays as it is.
 
 The block shows your signature, your name and the place and today's date, written as **Settings ▸ Signing ▸ Date** says: the long form in the document's language (e.g. _8 October 2026_ in British English), its short form, or _2026-10-08_. The markdown file itself never holds your signature.
 

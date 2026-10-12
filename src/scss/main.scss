@@ -1796,6 +1796,11 @@ body.without-engine.blocks-docked {
   cursor: default;
   user-select: none;
 
+  // the focus ring inside the view: outside, the bars would cover it
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
   .page-sheet {
     background-color: white;
   }

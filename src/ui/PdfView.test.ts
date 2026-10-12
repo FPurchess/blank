@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { zoomBy } from "../editor/commands/zoom";
+import { closeTabs } from "../editor/tabs";
 import { pointOnPage, SHEET_SCALE } from "../engine/frames";
 import { cancelRender, renderPage } from "../pdf/ipc";
 import type { PdfTabDocument } from "../pdf/document";
@@ -18,6 +19,11 @@ import { flushPromises } from "../test/async";
 import { createTestHandle } from "../test/editor";
 import { bootApp } from "./mount";
 import { pdfBitmaps } from "./pageBitmaps";
+
+vi.mock("../editor/tabs", async (original) => ({
+  ...(await original<typeof import("../editor/tabs")>()),
+  closeTabs: vi.fn(),
+}));
 
 vi.mock("../pdf/ipc", async (original) => ({
   ...(await original<typeof import("../pdf/ipc")>()),
@@ -173,6 +179,23 @@ describe("the page view of PDFs", () => {
     expect(
       [...problem.querySelectorAll("button")].map((b) => b.textContent?.trim()),
     ).toEqual(["Open again", "Close tab"]);
+  });
+
+  it("gives the next PDF's pages the focus once Close tab closed it", async () => {
+    await show(pdf({ opened: null, problem: "missing" }));
+    // the next tab is a PDF too: the same view shows it
+    vi.mocked(closeTabs).mockImplementation(async () => {
+      shownPdf.value = pdf({ path: "/docs/other.pdf" });
+    });
+    const close = [...view()!.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Close tab",
+    )!;
+    close.focus();
+    close.click();
+    await flushPromises();
+
+    expect(closeTabs).toHaveBeenCalledWith(["t"]);
+    expect(document.activeElement).toBe(view());
   });
 
   it("offers to find a PDF that was moved", async () => {

@@ -49,7 +49,7 @@ const commitServer = () => {
       [{ path: ["signing", "timestampServer"], value: parsed.url }],
       parsed.url
         ? "Timestamps from " + parsed.url
-        : "Timestamps from this computer",
+        : "No timestamp server: the time comes from your computer's clock",
     );
 };
 const usePreset = () => {

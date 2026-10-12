@@ -350,7 +350,9 @@ const find = async () => {
   if (typeof chosen === "string") await reopenPdf(id, chosen);
   if (id === activeTabId.value) focusPages();
 };
-const close = () => void closeTabs([tabId.value]);
+// the tab shown next takes the focus: another PDF's pages here, else the
+// text (onBeforeUnmount)
+const close = () => void closeTabs([tabId.value]).then(focusPages);
 </script>
 
 <template>

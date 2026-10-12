@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { useTemplateRef } from "vue";
+import { nextTick, onMounted, useTemplateRef } from "vue";
 
-import { shownIn } from "../../dom";
+import { shownIn, trapTab } from "../../dom";
 
 // A modal dialog: a backdrop with a form, titled `title` in its head. Esc and
 // a press on the backdrop cancel it, Tab keeps the focus inside, and Enter
-// submits the form. The default slot holds its body, `actions` the buttons at
+// submits the form. It takes the focus once open, on its first field, unless
+// the dialog put it somewhere in it itself. The default slot holds its body, `actions` the buttons at
 // the right of its foot (Cancel, then the submit button), and `secondary`
 // those at the left, e.g. "Don't save".
 defineProps<{
@@ -21,26 +22,19 @@ const emit = defineEmits<{ submit: []; cancel: [] }>();
 
 const form = useTemplateRef<HTMLFormElement>("form");
 
-/**
- * trapFocus moves the focus from the last field back to the first on Tab,
- * and the other way round on Shift+Tab. What Tab can reach: not the unchecked
- * options of a radio group, nor what is hidden.
- */
-const trapFocus = (event: KeyboardEvent) => {
-  const focusable = shownIn(
-    form.value!,
-    'input, textarea, button:not(:disabled):not([tabindex="-1"])',
-  );
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-};
+// the dialog's own onMounted runs after this one's, so look a tick later;
+// with the focus left behind, the keys would go to what the dialog covers
+onMounted(() =>
+  nextTick(() => {
+    const element = form.value;
+    if (!element || element.contains(document.activeElement)) return;
+    const [first] = shownIn(
+      element,
+      'input:not([type="radio"]:not(:checked)), textarea, button:not(:disabled):not([tabindex="-1"])',
+    );
+    (first ?? element).focus();
+  }),
+);
 
 const cancelOnBackdrop = (event: MouseEvent) => {
   if (event.target === event.currentTarget) {
@@ -56,12 +50,13 @@ const cancelOnBackdrop = (event: MouseEvent) => {
       ref="form"
       :class="['dialog', formClass]"
       role="dialog"
+      tabindex="-1"
       aria-modal="true"
       :aria-labelledby="`${id}-title`"
       :aria-describedby="describedBy"
       @submit.prevent="emit('submit')"
       @keydown.esc.prevent="emit('cancel')"
-      @keydown.tab="trapFocus"
+      @keydown.tab="trapTab(form!, $event)"
     >
       <header class="dialog-head">
         <h2 :id="`${id}-title`">{{ title }}</h2>

@@ -20,6 +20,11 @@ import { createState, createTestView, doc, p } from "../../test/editor";
 import type { SavedMark } from "../../signing/profile";
 import { editMark, exportSigned, openSignatureDialog } from "./signing";
 
+const saveSettings = vi.hoisted(() => vi.fn());
+vi.mock("../../config", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  saveSettings,
+}));
 const toPDF = vi.hoisted(() => vi.fn());
 vi.mock("../../exporters", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -410,6 +415,39 @@ describe("signing", () => {
       mark: "initials",
       saved: SIGNATURE,
     });
+  });
+
+  it("keeps a typed signature's name as the user's, when they have none", async () => {
+    const name = (value: string) =>
+      (config.value = {
+        ...config.value,
+        signing: { ...config.value.signing, name: value },
+      });
+    const before = config.value;
+    renderMark.mockResolvedValue(SIGNATURE);
+    const typed = {
+      kind: "type" as const,
+      text: " Ada Lovelace ",
+      font: "Caveat" as const,
+    };
+    try {
+      name("");
+      await openSignatureDialog("signature", () => {});
+      await signatureDialog.value!.submit(typed);
+      expect(saveSettings).toHaveBeenCalledWith([
+        { path: ["signing", "name"], value: "Ada Lovelace" },
+      ]);
+      // not initials, and never over a name set in the settings
+      saveSettings.mockClear();
+      await openSignatureDialog("initials", () => {});
+      await signatureDialog.value!.submit({ ...typed, text: "AL" });
+      name("Ada");
+      await openSignatureDialog("signature", () => {});
+      await signatureDialog.value!.submit(typed);
+      expect(saveSettings).not.toHaveBeenCalled();
+    } finally {
+      config.value = before;
+    }
   });
 
   it("saves nothing when there's no ink", async () => {

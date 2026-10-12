@@ -119,7 +119,8 @@ describe("command.exportAs", () => {
     expect(exportAs(title, exporter, filters)(state, dispatch)).toBe(true);
     await flushPromises();
 
-    expect(save).toHaveBeenCalledWith({ filters, defaultPath: undefined });
+    // an untitled document's name
+    expect(save).toHaveBeenCalledWith({ filters, defaultPath: "Untitled.pdf" });
     // jsdom's locale is en-US, so the page is Letter
     expect(exporter).toHaveBeenCalledWith(state, {
       docPath: null,

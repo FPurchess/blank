@@ -58,7 +58,13 @@ const others = othersNote(props.request.targets);
 const placeField = useTemplateRef<InstanceType<typeof TextField>>("placeField");
 const passphraseField =
   useTemplateRef<InstanceType<typeof TextField>>("passphraseField");
-onMounted(() => placeField.value?.select());
+// the place, or with the block's own place the passphrase; else BaseDialog
+// gives its first control the focus
+onMounted(() =>
+  (
+    placeField.value ?? (digital.value ? passphraseField.value : null)
+  )?.select(),
+);
 
 // a certificate made from here signs at once: on to its passphrase
 watch(signingCertificate, (now, before) => {
@@ -77,6 +83,7 @@ const submit = async () => {
   if (digital.value) {
     if (!passphrase.value) {
       failure.value = "Enter the passphrase of your key.";
+      passphraseField.value?.select();
       return;
     }
     // the passphrase is checked before anything is exported
@@ -86,7 +93,8 @@ const submit = async () => {
     if (signDialog.value !== props.request) return;
     checking.value = false;
     failure.value = problem ?? "";
-    if (failure.value) return;
+    // a wrong one is selected, to type it again
+    if (failure.value) return passphraseField.value?.select();
   }
   const secret = digital.value ? passphrase.value : null;
   close(() => props.request.submit(chosen.value, place.value.trim(), secret));

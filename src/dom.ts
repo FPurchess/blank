@@ -14,6 +14,28 @@ export const shownIn = <E extends Element = HTMLElement>(
   );
 
 /**
+ * trapTab keeps Tab inside `root`: from its last control back to its first,
+ * and the other way round on Shift+Tab. What Tab can reach: not the unchecked
+ * options of a radio group, nor what is hidden.
+ */
+export const trapTab = (root: HTMLElement, event: KeyboardEvent) => {
+  const focusable = shownIn(
+    root,
+    'input, select, textarea, button:not(:disabled):not([tabindex="-1"])',
+  ).filter((element) => element.tabIndex >= 0);
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!first) return;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+};
+
+/**
  * keepFocus keeps the focus where it is (in the editor, or in a menu) on a
  * press, except in a text field
  */

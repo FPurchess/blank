@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick } from "vue";
 
+import { announcement } from "../../state";
 import { flushPromises } from "../../test/async";
 import CopyFingerprint from "./CopyFingerprint.vue";
 
@@ -37,6 +38,8 @@ describe("CopyFingerprint", () => {
 
     expect(writeText).toHaveBeenCalledWith("ABCD EF01");
     expect(element.querySelector("button")?.textContent?.trim()).toBe("Copied");
+    // screen readers hear it too
+    expect(announcement.value?.text).toBe("Fingerprint copied");
   });
 
   it("selects it to copy by hand when the clipboard refuses", async () => {

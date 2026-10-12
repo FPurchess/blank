@@ -2,10 +2,12 @@
 import { computed, onUnmounted, shallowRef, useTemplateRef } from "vue";
 
 import { logWarning } from "../../log";
+import { announce } from "../../state";
 import { groupFingerprint } from "../certificateModel";
 
 // A certificate's fingerprint in groups of four, and Copy, which copies it as
-// shown and says "Copied" for a moment, or until it's left. When the
+// shown and says "Copied" for a moment (and screen readers "Fingerprint
+// copied"), or until it's left. When the
 // clipboard refuses, the fingerprint is selected, to copy by hand. Settings ▸
 // Signing (CertificateRows.vue) and a signature's details
 // (SignatureDetailsDialog.vue) show one.
@@ -35,6 +37,7 @@ const copy = async () => {
     return;
   }
   copied.value = true;
+  announce("Fingerprint copied");
   clearTimeout(timer);
   timer = setTimeout(uncopied, 2000);
 };

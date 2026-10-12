@@ -261,9 +261,9 @@
     }
   }
 
+  // text buttons always have a box
   .copy {
     @include text-button;
-    @include text-button-quiet;
     margin-left: var(--s1);
   }
 

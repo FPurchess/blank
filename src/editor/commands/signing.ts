@@ -2,7 +2,7 @@ import type { Command } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { CommandIdentifier, config } from "../../config";
+import { CommandIdentifier, config, saveSettings } from "../../config";
 import { commandShortcut } from "../keyBindings";
 import { focusBack } from "../../dom";
 import { errorMessage } from "../../errors";
@@ -83,6 +83,11 @@ export const openSignatureDialog = async (
         );
         if (!made) return false;
         await saveMark(mark, made);
+        // a typed signature is the user's name: what goes under it from now
+        // on, unless they set one in Settings ▸ Signing
+        const typed = source.kind === "type" ? source.text.trim() : "";
+        if (mark === "signature" && typed && !config.value.signing.name.trim())
+          await saveSettings([{ path: ["signing", "name"], value: typed }]);
       } catch (error) {
         logError(`failed to save the ${mark}`, error);
         sendNotification(`Failed to save your ${mark}: ${errorMessage(error)}`);

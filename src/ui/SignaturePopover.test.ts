@@ -48,6 +48,26 @@ describe("the settings of a signature block", () => {
     expect(checked("width")).toBe("50%");
   });
 
+  it("keeps Tab inside, so typing never reaches the block behind", () => {
+    const tab = (shiftKey = false) => {
+      const event = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.activeElement!.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    // Shift+Tab from the first control goes round to the last
+    expect(tab(true)).toBe(true);
+    const last = document.activeElement!;
+    expect(last.closest("[data-row=width]")).not.toBeNull();
+    // and Tab from it back to the first
+    expect(tab()).toBe(true);
+    expect(document.activeElement).toBe(field("role"));
+  });
+
   it("applies each change at once", async () => {
     const name = field<HTMLInputElement>("name");
     name.value = "Ada Lovelace ";

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUpdated, useTemplateRef } from "vue";
 
+import { trapTab } from "../../dom";
 import { place } from "../../popup";
 import type { BoxAnchor } from "../../state";
 import { useDismiss } from "../composables/useDismiss";
@@ -10,7 +11,7 @@ import { anchorOf, SETTINGS_BUTTON } from "../tocPopoverModel";
 // block, while the button doesn't show): a table of contents', a
 // diagram's. They change the block at once; Esc, Enter in a text field, a
 // press elsewhere or resizing the window close them, and the focus goes back
-// to the block. A press on the settings button is theirs: it closes them
+// to the block. Tab stays in them, so typing never reaches the block behind. A press on the settings button is theirs: it closes them
 // through the button. Not on the window's blur: WebKitGTK shows the list of
 // a select as a menu of its own, which takes the window's focus.
 const props = defineProps<{
@@ -37,8 +38,9 @@ onUpdated(placeIt);
 
 const close = () => emit("close");
 
-// Enter in a text field closes them
+// Enter in a text field closes them; Tab goes round in them
 const onKeyDown = (event: KeyboardEvent) => {
+  if (event.key === "Tab") return trapTab(root.value!, event);
   if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
     event.preventDefault();
     close();

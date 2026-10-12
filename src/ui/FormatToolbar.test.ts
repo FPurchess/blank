@@ -5,9 +5,11 @@ import type { EditorHandle } from "../editor/handle";
 import { schema } from "../markdown";
 import {
   type MenuItem,
+  announcement,
   contextMenu,
   cycleFocus,
   focusStop,
+  shownPdf,
   tablePicker,
   toolbarFocused,
   uiTakesFocus,
@@ -61,6 +63,32 @@ describe("the formatting toolbar", () => {
     contextMenu.value = null;
     tablePicker.value = null;
     toolbarFocused.value = false;
+    shownPdf.value = null;
+  });
+
+  it("greys out the style and Insert menus in a PDF tab, and a press says why", async () => {
+    shownPdf.value = {
+      path: "/docs/contract.pdf",
+      opened: null,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    await mount();
+    const why = "Blank can't change the text of a PDF";
+    const menus = [
+      ...toolbar().querySelectorAll<HTMLButtonElement>(
+        "[aria-haspopup]:not([data-more])",
+      ),
+    ];
+    expect(menus).toHaveLength(2);
+    for (const menu of menus) {
+      expect(menu.getAttribute("aria-disabled")).toBe("true");
+      expect(menu.dataset.tip).toBe(why);
+      press(menu);
+      expect(contextMenu.value).toBeNull();
+      expect(announcement.value?.text).toBe(why);
+    }
   });
 
   it("is a toolbar of the formatting buttons, with tooltips naming their keys", async () => {
