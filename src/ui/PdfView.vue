@@ -251,7 +251,11 @@ watch(tabs, (list) => {
 const stamps = computed(() => {
   void stampBooks.value;
   const tab = activeTabId.value;
-  return tab && pdf.value?.opened ? readingOrder(stampsOf(tab)) : [];
+  // a file opened again from elsewhere may have fewer pages
+  const count = pages.value.length;
+  return tab && pdf.value?.opened
+    ? readingOrder(stampsOf(tab).filter((stamp) => stamp.page < count))
+    : [];
 });
 const ghosts = computed(() => ghostsOf(stamps.value, pages.value));
 const frameOf = (page: number) => layout.value?.frames[page];
