@@ -1,5 +1,5 @@
 import type { Fill, PdfField, PdfRect as Rect } from "./ipc";
-import { fillOf, type Place } from "./places";
+import { fillOf, type Place, type PlaceFill } from "./places";
 import type { Stamp } from "./stampModel";
 
 // What the places of a PDF tab (src/pdf/places.ts) are on its pages: which
@@ -98,17 +98,20 @@ export const filledOf = (
       .map((place) => place.id),
   );
 
+// how to fill in a place, by what filling it does
+const HOW: Record<PlaceFill["action"], string> = {
+  stamp: "Press Enter to fill it in.",
+  text: "Type to fill it in.",
+  toggle: "Press Space to check it.",
+  choose: "Press Space to choose.",
+};
+
 /**
  * nextMessage says where Next went and how to fill it in, e.g.
  * "Signature on page 3. Press Enter to fill it in."
  */
-export const nextMessage = (place: Place) => {
-  const how =
-    fillOf(place).action === "text"
-      ? "Type to fill it in."
-      : "Press Enter to fill it in.";
-  return `${placeName(place)} on page ${place.page + 1}. ${how}`;
-};
+export const nextMessage = (place: Place) =>
+  `${placeName(place)} on page ${place.page + 1}. ${HOW[fillOf(place).action]}`;
 
 // the least height of a signature or initials standing on a found line, in
 // points, so it isn't as small as the line's label: a line's place is about

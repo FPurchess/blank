@@ -44,10 +44,11 @@ import {
 export const PLACING_CANCELED = "Placing canceled";
 
 /**
- * placedMessage says that `stamp` was placed, and how to move it
+ * placedMessage says that `stamp` was placed, and how to move it: "Place
+ * added", since "Place placed" reads as a stutter
  */
 export const placedMessage = (stamp: Stamp) =>
-  `${STAMP_NAMES[stamp.kind]} placed on page ${stamp.page + 1}, use the arrow keys to move it`;
+  `${STAMP_NAMES[stamp.kind]} ${stamp.kind === "place" ? "added" : "placed"} on page ${stamp.page + 1}, use the arrow keys to move it`;
 
 /**
  * removedMessage says that `stamp` was removed

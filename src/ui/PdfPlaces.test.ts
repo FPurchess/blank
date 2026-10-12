@@ -294,6 +294,9 @@ describe("the places of a PDF", () => {
     await flushPromises();
     expect(stampsOf("t")[0]).toMatchObject({ kind: "place" });
     expect(stampsOf("t")[0].spec.lines).toEqual(["Köln"]);
+    expect(announcement.value?.text).toBe(
+      "Place added on page 1, use the arrow keys to move it",
+    );
   });
 
   it("are dismissed with Delete, which undo brings back", async () => {

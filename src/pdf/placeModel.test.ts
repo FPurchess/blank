@@ -136,6 +136,9 @@ describe("the places of a PDF on its pages", () => {
     expect(nextMessage(byId("field:name"))).toBe(
       "Your name on page 1. Type to fill it in.",
     );
+    expect(nextMessage(byId("field:agree"))).toBe(
+      "Agree on page 1. Press Space to check it.",
+    );
     expect(
       nextButton(places, new Set(places.map((place) => place.id))),
     ).toMatchObject({ text: "All places filled", disabled: true });

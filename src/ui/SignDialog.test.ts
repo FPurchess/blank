@@ -233,7 +233,7 @@ describe("the dialog that signs", () => {
       const toggle = byId("sign-dialog-initials")!;
       expect(toggle.disabled).toBe(true);
       expect(byId("sign-dialog-initials-note")!.textContent).toContain(
-        "Add your initials in Settings ▸ Signing first.",
+        "You have no initials yet.",
       );
       const make = byId("sign-dialog-make-initials")!;
       make.click();

@@ -79,7 +79,8 @@ export const SIDE_OPTIONS: Option<InitialsSide>[] = [
   { value: "left", label: "Bottom left" },
 ];
 
-export const NO_INITIALS = "Add your initials in Settings ▸ Signing first.";
+// beside the button that adds them
+export const NO_INITIALS = "You have no initials yet.";
 
 /**
  * initialsProblem says why the initials can't go on every page: the
