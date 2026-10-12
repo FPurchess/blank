@@ -1,0 +1,225 @@
+import { config } from "../config";
+import { openSignatureDialog } from "../editor/commands/signing";
+import { logWarning } from "../log";
+import { formatSigningDate } from "../signing/date";
+import { loadMarks } from "../signing/marks";
+import {
+  activeTabId,
+  announce,
+  language,
+  pdfDeskLayout,
+  pdfPageInView,
+  pdfViewport,
+  placingStamp,
+  savedMarks,
+  selectedStamp,
+  shownPdf,
+  signingPlace,
+} from "../state";
+import { changeStamps, stampsOf } from "./stampBooks";
+import { naturalSize, STAMPS_NEED_LAYOUT } from "./stampEngine";
+import {
+  defaultSpot,
+  markSize,
+  type Shown,
+  type Stamp,
+  STAMP_NAMES,
+  type StampKind,
+  stampSpec,
+  spotAt,
+  toggleRepeat,
+  withoutStamp,
+  withStamp,
+} from "./stampModel";
+
+// What the signing tools and the keys do with the stamps of the PDF shown:
+// make a stamp of a kind (the user's signature first, if they have none),
+// place it at its default spot or where the page was clicked, select it,
+// remove it, and say so. The shown tab's stamps go through stampBooks.ts.
+
+export const PLACING_CANCELED = "Placing canceled";
+
+/**
+ * placedMessage says that `stamp` was placed, and how to move it
+ */
+export const placedMessage = (stamp: Stamp) =>
+  `${STAMP_NAMES[stamp.kind]} placed on page ${stamp.page + 1}, use the arrow keys to move it`;
+
+/**
+ * removedMessage says that `stamp` was removed
+ */
+export const removedMessage = (stamp: Stamp) =>
+  `${STAMP_NAMES[stamp.kind]} removed`;
+
+/**
+ * lineOf returns the line a date or place stamp shows: today's date as the
+ * settings write it, in the language, or where the user signs
+ */
+const lineOf = (kind: "date" | "place") =>
+  kind === "date"
+    ? formatSigningDate(
+        new Date(),
+        language.value,
+        config.value.signing.dateFormat,
+      )
+    : signingPlace.value.trim();
+
+/**
+ * newStamp makes a stamp of `kind`, not yet placed: its look and its
+ * natural size; null for a signature or initials the user has none of yet
+ * @throws when the layout can't size its lines
+ */
+export const newStamp = async (
+  kind: StampKind,
+): Promise<Omit<Stamp, "page" | "rect"> | null> => {
+  const id = crypto.randomUUID();
+  if (kind === "signature" || kind === "initials") {
+    await loadMarks();
+    const mark = savedMarks.value?.[kind];
+    if (!mark) return null;
+    return {
+      id,
+      kind,
+      spec: stampSpec(kind),
+      natural: markSize(kind, mark.width, mark.height),
+    };
+  }
+  const spec = stampSpec(kind, lineOf(kind));
+  const { width, height } = await naturalSize(spec);
+  return { id, kind, spec, natural: [width, height] };
+};
+
+/**
+ * shownPart returns the part of the page `page` of the PDF shown that shows
+ * in the view, in points from its top
+ */
+const shownPart = (page: number): Shown => {
+  const layout = pdfDeskLayout.value;
+  const frame = layout?.frames[page];
+  const viewport = pdfViewport.value;
+  const height = shownPdf.value?.opened?.pages[page]?.height ?? 0;
+  if (!layout || !frame || !viewport) return { top: 0, height };
+  const top = Math.max(0, (viewport.scrollTop - frame.top) / layout.scale);
+  const bottom = Math.min(
+    height,
+    (viewport.scrollTop + viewport.height - frame.top) / layout.scale,
+  );
+  return bottom > top ? { top, height: bottom - top } : { top: 0, height };
+};
+
+// where a stamp goes: its default spot on the page in view, or centred on a
+// point of a page (display points)
+export type Where = { page: number; x: number; y: number } | null;
+
+/**
+ * placeStamp places a new stamp of `kind` on the PDF shown, at `where`,
+ * selects it and says so. The user's signature or initials are made first
+ * if there are none yet (`refocus` gives the focus back once the dialog
+ * closes).
+ * @returns the stamp placed, or null
+ */
+export const placeStamp = async (
+  kind: StampKind,
+  where: Where,
+  refocus: () => void,
+): Promise<Stamp | null> => {
+  const tab = activeTabId.value;
+  const opened = shownPdf.value?.opened;
+  if (!tab || !opened) return null;
+  let made;
+  try {
+    made = await newStamp(kind);
+  } catch (error) {
+    logWarning("failed to make a stamp", error);
+    announce(STAMPS_NEED_LAYOUT);
+    return null;
+  }
+  if (!made) {
+    const mark = kind as "signature" | "initials";
+    // made first, then placed
+    void openSignatureDialog(mark, refocus, () => {
+      if (activeTabId.value === tab) void placeStamp(kind, where, refocus);
+    });
+    return null;
+  }
+  // the tab changed while it was made
+  if (activeTabId.value !== tab || shownPdf.value?.opened !== opened)
+    return null;
+  const sizes = opened.pages;
+  const at = where
+    ? {
+        page: where.page,
+        rect: spotAt(made.natural, where.x, where.y, sizes[where.page]),
+      }
+    : defaultSpot(
+        kind,
+        made.natural,
+        Math.min(pdfPageInView.value ?? 0, sizes.length - 1),
+        sizes,
+        shownPart(pdfPageInView.value ?? 0),
+        stampsOf(tab),
+      );
+  const stamp: Stamp = { ...made, ...at };
+  changeStamps(tab, withStamp(stampsOf(tab), stamp), {
+    sha256: opened.sha256,
+  });
+  selectedStamp.value = stamp.id;
+  announce(placedMessage(stamp));
+  return stamp;
+};
+
+/**
+ * removeStamp removes the stamp `id` of the PDF shown and says so
+ */
+export const removeStamp = (id: string) => {
+  const tab = activeTabId.value;
+  if (!tab) return;
+  const stamp = stampsOf(tab).find((one) => one.id === id);
+  if (!stamp) return;
+  changeStamps(tab, withoutStamp(stampsOf(tab), id));
+  if (selectedStamp.value === id) selectedStamp.value = null;
+  announce(removedMessage(stamp));
+};
+
+/**
+ * repeatStamp puts the initials `id` of the PDF shown on every page, or
+ * back on their own page only, and says so
+ */
+export const repeatStamp = (id: string) => {
+  const tab = activeTabId.value;
+  if (!tab) return;
+  const stamps = toggleRepeat(stampsOf(tab), id);
+  const stamp = stamps.find((one) => one.id === id);
+  if (stamp?.kind !== "initials") return;
+  changeStamps(tab, stamps);
+  announce(
+    stamp.repeat
+      ? "Initials on every page"
+      : `Initials only on page ${stamp.page + 1}`,
+  );
+};
+
+/**
+ * updateStamp puts `stamp` in place of the one of its id on the PDF shown
+ * @param nudge when a nudge moved it, which joins the nudges of the last
+ *   moment in one step
+ */
+export const updateStamp = (stamp: Stamp, nudge?: number) => {
+  const tab = activeTabId.value;
+  if (!tab) return;
+  changeStamps(
+    tab,
+    withStamp(stampsOf(tab), stamp),
+    nudge === undefined ? {} : { nudge: { id: stamp.id, at: nudge } },
+  );
+};
+
+/**
+ * cancelPlacing stops placing a stamp with the mouse, and says so
+ */
+export const cancelPlacing = () => {
+  if (placingStamp.value === null) return false;
+  placingStamp.value = null;
+  announce(PLACING_CANCELED);
+  return true;
+};

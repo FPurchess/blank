@@ -103,6 +103,7 @@ export enum CommandIdentifier {
   VIEW_ZOOM_FIT = "view.zoom_fit",
   MENU_MAIN = "menu.main",
   EDIT_FIND = "edit.find",
+  PDF_SIGN = "pdf.sign",
 }
 
 // Replacements typed text → replacement, keyed by ISO 639-1 language code.
@@ -252,6 +253,8 @@ const defaultConfig: Config = {
     [CommandIdentifier.VIEW_ZOOM_FIT]: "",
     [CommandIdentifier.MENU_MAIN]: "Mod-k",
     [CommandIdentifier.EDIT_FIND]: "Mod-f",
+    // in a PDF tab, Save's key signs it too
+    [CommandIdentifier.PDF_SIGN]: "",
   },
   autocorrect: {
     arrows: true,

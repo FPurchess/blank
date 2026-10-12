@@ -25,6 +25,7 @@ const DIALOGS = new Set([
   CommandIdentifier.APP_ABOUT,
   CommandIdentifier.PAGE_SETUP,
   CommandIdentifier.APP_SETTINGS,
+  CommandIdentifier.PDF_SIGN,
 ]);
 
 // words that keep their capital inside a label

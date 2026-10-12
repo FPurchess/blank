@@ -487,6 +487,61 @@ describe("storage", () => {
       });
     });
 
+    it("stores a PDF tab's stamps, and removes them once it has none or closes", async () => {
+      const { tabs, stampBooks, loadStamps } = await open("a");
+      tabs.value = [{ ...tab("a"), kind: "pdf", path: "/a.pdf" }];
+      const stamp = {
+        id: "s1",
+        kind: "signature" as const,
+        page: 0,
+        rect: [10, 20, 180, 60] as [number, number, number, number],
+        natural: [180, 60] as const,
+        spec: {
+          image: "signature" as const,
+          lines: [],
+          size: 11,
+          align: "center" as const,
+        },
+      };
+      const book = { stamps: [stamp], past: [], future: [], nudged: null };
+      stampBooks.value = new Map([["a", { book, sha256: "abc" }]]);
+      await tick();
+      expect(await localforage.getItem("stamps:a")).toEqual({
+        sha256: "abc",
+        stamps: [stamp],
+        viewAnchor: null,
+      });
+      expect(await loadStamps("a")).toEqual({ sha256: "abc", stamps: [stamp] });
+
+      // all undone: nothing to keep
+      stampBooks.value = new Map([
+        [
+          "a",
+          { book: { ...book, stamps: [], future: [[stamp]] }, sha256: "abc" },
+        ],
+      ]);
+      await tick();
+      expect(await localforage.getItem("stamps:a")).toBeNull();
+      expect(await loadStamps("a")).toBeNull();
+
+      stampBooks.value = new Map([["a", { book, sha256: "abc" }]]);
+      await tick();
+      tabs.value = [tab("b")];
+      await tick();
+      expect(await localforage.getItem("stamps:a")).toBeNull();
+    });
+
+    it("restores only the stamps it can read", async () => {
+      const { loadStamps } = await open("a");
+      await localforage.setItem("stamps:a", {
+        sha256: 7,
+        stamps: [{ id: "x", kind: "seal" }],
+      });
+      expect(await loadStamps("a")).toEqual({ sha256: null, stamps: [] });
+      await localforage.setItem("stamps:a", "garbage");
+      expect(await loadStamps("a")).toBeNull();
+    });
+
     it("removes the document of a closed tab", async () => {
       const { transaction, tabs, activeTabId } = await open("a", "b");
       transaction.value = replace(doc(p("a")));

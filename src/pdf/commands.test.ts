@@ -47,7 +47,7 @@ describe("commands in a PDF tab", () => {
     expect(pdfRefusal(CommandIdentifier.EDIT_FIND)).toBe(
       "Blank can't search PDFs yet",
     );
-    expect(pdfRefusal(CommandIdentifier.FILE_SAVE)).toMatch(/nothing to save/);
+    expect(pdfRefusal(CommandIdentifier.FILE_SAVE)).toMatch(/Sign the PDF/);
     expect(pdfRefusal(CommandIdentifier.TAB_CLOSE)).toBeNull();
     expect(pdfRefusal(CommandIdentifier.APP_SETTINGS)).toBeNull();
   });

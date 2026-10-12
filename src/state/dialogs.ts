@@ -275,6 +275,12 @@ export const signDialog = shallowRef<SignDialogRequest | null>(null);
 export interface UnsavedDialogRequest {
   // the tab's name, e.g. "notes"
   label: string;
+  // what it asks and says, and its buttons' words, where they aren't
+  // saving's (a PDF tab asks whether to sign it)
+  title?: string;
+  text?: string;
+  saveLabel?: string;
+  discardLabel?: string;
   save(): void;
   discard(): void;
   cancel(): void;

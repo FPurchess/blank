@@ -27,6 +27,9 @@ import {
 import { renderPage, cancelRender, type PageBitmap } from "../pdf/ipc";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
 import { RenderQueue } from "../pdf/renderQueue";
+import { cancelPlacing, placeStamp } from "../pdf/stampActions";
+import { stampsOf } from "../pdf/stampBooks";
+import { ghostsOf, readingOrder } from "../pdf/stampModel";
 import { listenOnWindow } from "../scope";
 import {
   activeTab,
@@ -37,7 +40,10 @@ import {
   pdfViewAnchor,
   pdfViewFocused,
   pdfViewport,
+  placingStamp,
+  selectedStamp,
   shownPdf,
+  stampBooks,
   tabs,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
@@ -47,6 +53,9 @@ import { useResizeObserver } from "./composables/useResizeObserver";
 import { useWheelZoom } from "./composables/useWheelZoom";
 import { type Bitmap, pdfBitmaps } from "./pageBitmaps";
 import PdfPage from "./PdfPage.vue";
+import StampOverlay from "./StampOverlay.vue";
+import StampToolbar from "./StampToolbar.vue";
+import { stampBox } from "./stampOverlayModel";
 import {
   pageInView,
   pageKey,
@@ -236,6 +245,56 @@ watch(tabs, (list) => {
   for (const slot of closedKeys(shownKeys.keys(), open)) shownKeys.delete(slot);
 });
 
+// the stamps placed on the pages, in reading order, which the DOM keeps, so
+// Tab goes through them as they're read; repeated initials show faded on
+// the other pages
+const stamps = computed(() => {
+  void stampBooks.value;
+  const tab = activeTabId.value;
+  return tab && pdf.value?.opened ? readingOrder(stampsOf(tab)) : [];
+});
+const ghosts = computed(() => ghostsOf(stamps.value, pages.value));
+const frameOf = (page: number) => layout.value?.frames[page];
+
+// a press on a page places the stamp whose tool was clicked there, centred
+// on the press, and any other press on the desk leaves the stamp selected
+const onDeskPress = (event: PointerEvent) => {
+  const kind = placingStamp.value;
+  if (!kind) {
+    selectedStamp.value = null;
+    return;
+  }
+  const desk = event.currentTarget as HTMLElement;
+  const bounds = desk.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+  const frame = layout.value?.frames.find(
+    (one) =>
+      x >= one.left &&
+      x <= one.left + one.width &&
+      y >= one.top &&
+      y <= one.top + one.height,
+  );
+  if (!frame || !layout.value) return;
+  event.preventDefault();
+  placingStamp.value = null;
+  const scale = layout.value.scale;
+  void placeStamp(
+    kind,
+    {
+      page: frame.page,
+      x: (x - frame.left) / scale,
+      y: (y - frame.top) / scale,
+    },
+    () => scroller.value?.focus(),
+  ).then((stamp) => {
+    if (stamp)
+      void nextTick(() =>
+        document.getElementById(`stamp-${stamp.id}`)?.focus(),
+      );
+  });
+};
+
 // "Page N of M" in the status bar
 watch(
   [layout, scrollTop, viewHeight],
@@ -312,6 +371,15 @@ const onKeydown = (event: KeyboardEvent) => {
   }
   // Tab moves the focus as anywhere, not Indent's refusal
   if (event.key === "Tab") return;
+  // Esc puts the tool down that was to place a stamp, or leaves the stamp
+  // selected
+  if (event.key === "Escape" && !event.ctrlKey && !event.metaKey) {
+    if (cancelPlacing() || selectedStamp.value !== null) {
+      selectedStamp.value = null;
+      event.preventDefault();
+      return;
+    }
+  }
   if (refusals(editor.view, event)) event.preventDefault();
 };
 
@@ -356,6 +424,7 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
     tabindex="0"
     role="document"
     :aria-label="label"
+    :class="{ 'pdf-placing': placingStamp !== null }"
     @scroll="measure"
     @keydown="onKeydown"
     @focusin="focusRegion.onFocusin"
@@ -379,13 +448,14 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
     <div
       v-else-if="layout"
       class="page-desk"
-      aria-hidden="true"
       :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
+      @pointerdown="onDeskPress"
     >
       <div
         v-for="frame in frames"
         :key="frame.page"
         class="page-sheet"
+        aria-hidden="true"
         :style="{
           top: `${frame.top}px`,
           left: `${frame.left}px`,
@@ -404,6 +474,28 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
         :bitmap="frame.bitmap"
         :failed="frame.failed"
       />
+      <StampOverlay
+        v-for="ghost in ghosts"
+        :key="`${ghost.stamp.id}:${ghost.page}`"
+        :stamp="ghost.stamp"
+        :frame="frameOf(ghost.page)!"
+        :page="pages[ghost.page]"
+        :scale="layout.scale"
+        :ghost="ghost.rect"
+      />
+      <template v-for="stamp in stamps" :key="stamp.id">
+        <StampOverlay
+          :stamp="stamp"
+          :frame="frameOf(stamp.page)!"
+          :page="pages[stamp.page]"
+          :scale="layout.scale"
+        />
+        <StampToolbar
+          v-if="stamp.id === selectedStamp"
+          :stamp="stamp"
+          :box="stampBox(stamp.rect, frameOf(stamp.page)!, layout.scale)"
+        />
+      </template>
     </div>
   </div>
 </template>

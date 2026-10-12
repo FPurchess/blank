@@ -41,6 +41,7 @@ onUpdated(draw);
 <template>
   <div
     class="pdf-page"
+    aria-hidden="true"
     :style="{
       top: `${top}px`,
       left: `${left}px`,

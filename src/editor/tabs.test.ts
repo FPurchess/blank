@@ -10,6 +10,8 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { schema } from "../markdown";
 import { closePdf, openPdf } from "../pdf/ipc";
+import { changeStamps, resetStampBooks, stampsOf } from "../pdf/stampBooks";
+import { type Stamp, stampSpec } from "../pdf/stampModel";
 import {
   activeTab,
   activeTabId,
@@ -139,6 +141,7 @@ beforeEach(async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.mocked(closePdf).mockResolvedValue();
+  resetStampBooks();
 });
 
 afterEach(() => {
@@ -893,5 +896,90 @@ describe("PDF tabs", () => {
 
     expect(closePdf).toHaveBeenCalledWith(id);
     expect(shownPdf.value).toBeNull();
+  });
+
+  const stamp = (over: Partial<Stamp> = {}): Stamp => ({
+    id: "s1",
+    kind: "signature",
+    page: 0,
+    rect: [100, 100, 180, 60],
+    natural: [180, 60],
+    spec: stampSpec("signature"),
+    ...over,
+  });
+
+  it("has unsaved changes while stamps are placed on it", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    const id = activeTabId.value!;
+
+    changeStamps(id, [stamp()]);
+    await nextTick();
+    expect(activeTab.value?.unsaved).toBe(true);
+
+    changeStamps(id, []);
+    await nextTick();
+    expect(activeTab.value?.unsaved).toBe(false);
+  });
+
+  it("asks to sign a PDF with stamps before it closes", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    const id = activeTabId.value!;
+    changeStamps(id, [stamp()]);
+    await nextTick();
+
+    void closeTabs([id]);
+    await flushPromises();
+    expect(unsavedDialog.value).toMatchObject({
+      title: "Sign “c” before you close it?",
+      text: "What you placed on its pages is lost when you close it without signing.",
+      saveLabel: "Sign…",
+      discardLabel: "Discard",
+    });
+    // Sign… keeps it open, to sign it
+    unsavedDialog.value!.save();
+    await flushPromises();
+    expect(tabs.value.some((tab) => tab.id === id)).toBe(true);
+    expect(announcement.value).not.toBeNull();
+
+    void closeTabs([id]);
+    await flushPromises();
+    unsavedDialog.value!.discard();
+    await flushPromises();
+    expect(tabs.value.some((tab) => tab.id === id)).toBe(false);
+    expect(stampsOf(id)).toEqual([]);
+  });
+
+  it("brings back the stamps of a restored PDF tab once it opens", async () => {
+    await stored([{ id: "a", kind: "pdf", path: "/c.pdf", unsaved: true }]);
+    await localforage.setItem("stamps:a", {
+      sha256: "c1",
+      stamps: [stamp()],
+      viewAnchor: null,
+    });
+
+    await boot();
+    await flushPromises();
+
+    expect(stampsOf("a")).toEqual([stamp()]);
+    expect(activeTab.value?.unsaved).toBe(true);
+  });
+
+  it("drops the stamps on pages a changed PDF no longer has", async () => {
+    await stored([{ id: "a", kind: "pdf", path: "/c.pdf", unsaved: true }]);
+    await localforage.setItem("stamps:a", {
+      sha256: "older",
+      stamps: [stamp(), stamp({ id: "far", page: 3 })],
+      viewAnchor: null,
+    });
+
+    await boot();
+    await flushPromises();
+
+    expect(stampsOf("a").map((one) => one.id)).toEqual(["s1"]);
+    expect(announcement.value?.text).toBe(
+      "c.pdf changed since you last had it open; 1 stamp was on pages it no longer has",
+    );
   });
 });
