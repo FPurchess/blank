@@ -80,7 +80,7 @@ test-e2e: install-e2e ## Build the debug app and run the e2e tests (Linux only)
 	bun run test:e2e
 
 test-e2e-headless: install-e2e ## Same as test-e2e, in a virtual display (xvfb) with a session bus
-	env -u WAYLAND_DISPLAY GDK_BACKEND=x11 NO_AT_BRIDGE=1 dbus-run-session -- xvfb-run -a bun run test:e2e
+	env -u WAYLAND_DISPLAY -u DISPLAY GDK_BACKEND=x11 NO_AT_BRIDGE=1 xvfb-run -a dbus-run-session -- bun run test:e2e
 
 check: lint format-check test ## Run the checks of the pre-commit hook
 
