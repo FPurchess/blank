@@ -16,8 +16,9 @@ import IconGlyph from "./IconGlyph.vue";
 // Insert and More, or a select, e.g. what the first page has. A menu a click
 // opened gives the focus to `refocus` when it closes (the text, unless
 // given). One opened from the keyboard (↓, Enter or Space on the focused
-// button) starts on its first item and gives the button the focus back when
-// it closes, also after an item ran, so the row it is in keeps it.
+// button) starts on its first item (a select on its value) and gives the
+// button the focus back when it closes, also after an item ran, so the row
+// it is in keeps it.
 const props = withDefaults(
   defineProps<{
     // its name, for its tooltip and screen readers

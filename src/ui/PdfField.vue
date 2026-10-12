@@ -10,6 +10,7 @@ import {
   fieldValue,
   placeElementId,
   placeLabel,
+  placeName,
 } from "../pdf/placeModel";
 import { type FieldPlace, prefillOf } from "../pdf/places";
 import { fillsOf } from "../pdf/stampBooks";
@@ -33,9 +34,10 @@ import { tipAttrs } from "./tooltipModel";
 // MuPDF's drawing of what it holds. Enter, Tab or leaving it fills it in
 // (`commitFill`), and a value its font can't show is refused under it. A
 // checkbox ticks, a radio button chooses, and a combo or list box opens a
-// select of its options. A field that can't be filled in now (an earlier
-// signer locked it, Blank signs the PDF, the PDF allows no changes) says
-// why in its tooltip, and when pressed or typed into.
+// select of its options. Its tooltip names it. A field that can't be filled
+// in now (an earlier signer locked it, Blank signs the PDF, the PDF allows
+// no changes) says why in its tooltip instead, and when pressed or typed
+// into.
 const props = defineProps<{
   place: FieldPlace;
   // the page it shows on
@@ -45,8 +47,9 @@ const props = defineProps<{
   // why it can't be filled in now, null when it can
   refusal: string | null;
 }>();
+// its name, since the page may not show it, else why it can't be filled in
 const tip = computed(() =>
-  props.refusal ? tipAttrs({ name: props.refusal }) : {},
+  tipAttrs({ name: props.refusal ?? placeName(props.place) }),
 );
 
 const field = computed(() => props.place.field);
@@ -259,7 +262,7 @@ const onChoiceKey = (event: KeyboardEvent) => {
       :text="choiceText(value)"
       :items="choices"
       :disabled="!!refusal"
-      :tip="refusal ?? undefined"
+      :tip="refusal ?? placeName(place)"
       :refocus="refocusChoice"
     />
   </span>

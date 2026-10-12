@@ -383,6 +383,9 @@ describe("the places of a PDF", () => {
     expect(name.getAttribute("aria-disabled")).toBe("true");
     expect(name.readOnly).toBe(true);
     expect(name.dataset.tip).toBe(FIELD_LOCKED);
+    // the others are named in their tooltips, since a page may not say
+    expect(placeEl("field:agree").dataset.tip).toBe("Agree");
+    expect(placeEl(SIGNATURE_LINE).dataset.tip).toBe("Signature");
     await press(name, "a");
     expect(announcement.value?.text).toBe(FIELD_LOCKED);
     expect(next().textContent?.trim()).toBe("Next · 1 of 5");
