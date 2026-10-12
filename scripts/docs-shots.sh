@@ -47,6 +47,11 @@ mkdir -p "$logs"
 jobs=${JOBS:-$(( $(nproc) / 3 > 0 ? $(nproc) / 3 : 1 ))}
 port=${E2E_PORT:-4600}
 export E2E_SKIP_BUILD=1 grep GDK_SCALE=${SHOTS_SCALE:-2}
+# keep the app off the desktop: GTK would pick a Wayland session over xvfb, the session
+# bus starts inside xvfb so the services it starts (the print portal) open there too, and
+# the accessibility bridge crashes the app at start without an accessibility bus
+unset WAYLAND_DISPLAY DISPLAY
+export GDK_BACKEND=x11 NO_AT_BRIDGE=1
 
 # runs one spec file: its own display (the -n of xvfb-run, so parallel starts don't race
 # for the same one), its own bus and its own port
@@ -55,8 +60,8 @@ capture() {
   local args=(bunx wdio run ./wdio.shots.conf.ts --spec "shots/$spec.shots.ts")
   [ -z "$grep" ] || args+=(--mochaOpts.grep "$grep")
   if (cd e2e && E2E_PORT=$((port + 2 * index)) \
-    dbus-run-session -- xvfb-run -n $((300 + index)) -s "-screen 0 2400x1800x24" \
-    "${args[@]}") >"$logs/$spec.log" 2>&1; then
+    xvfb-run -n $((300 + index)) -s "-screen 0 2400x1800x24" \
+    dbus-run-session -- "${args[@]}") >"$logs/$spec.log" 2>&1; then
     echo "✓ $spec"
   else
     echo "✖ $spec (see $logs/$spec.log)"
