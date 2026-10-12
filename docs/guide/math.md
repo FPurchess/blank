@@ -27,7 +27,7 @@ When you open a document with math, its formulas show as LaTeX for a moment whil
 
 ## Numbers {#numbers}
 
-A formula on lines of its own can be numbered: select it and press `Shift` `Enter` for its settings, and switch on **Numbered**. Numbers go (1), (2) and so on, at the right, counted through the document; in the file the formula gets an id, `$$ … $$ {#eq-1}`. `\tag{A}` gives one a label of your own instead.
+A formula on lines of its own can be numbered: select it and press `Shift` `Enter` for its settings, and switch on **Numbered**. Numbers go (1), (2) and so on, at the right, counted through the document; in the file the formula gets an id, `$$ … $$ {#eq-1}`. `\tag{A}` gives one a label of your own instead, and `\notag` (or `\nonumber`) leaves it without one. Formulas in a table aren't numbered, on the pages or in Word.
 
 ## What you can write {#latex}
 

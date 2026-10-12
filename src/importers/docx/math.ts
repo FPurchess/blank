@@ -7,6 +7,7 @@ import {
   structural,
 } from "../../exporters/docx/math";
 import { fnv1a } from "../../sources/hash";
+import { freeEquationIdIn } from "../../math/labels";
 import { ommlToLatex } from "./omml";
 import {
   child,
@@ -164,7 +165,7 @@ export const markMath = async (zip: JSZip): Promise<number | null> => {
       const label = numbered
         ? kept?.label && !used.has(kept.label)
           ? kept.label
-          : freeLabel(taken)
+          : freeEquationIdIn(taken)
         : null;
       if (label) {
         taken.add(label);
@@ -188,13 +189,4 @@ export const markMath = async (zip: JSZip): Promise<number | null> => {
   }
   zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
   return approximate;
-};
-
-/**
- * freeLabel returns an equation id not in `taken`: eq-1, eq-2…
- */
-const freeLabel = (taken: Set<string>) => {
-  let number = 1;
-  while (taken.has(`eq-${number}`)) number++;
-  return `eq-${number}`;
 };

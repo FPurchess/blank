@@ -227,8 +227,7 @@ describe("math in the Word export", () => {
       .map((tab) => Number(tab.getAttributeNS(W, "pos")));
   };
 
-  it("numbers an equation in a table's cell within the cell", async () => {
-    const page = tabStops((await exported("$$\na\n$$ {#eq-a}")).doc);
+  it("numbers equations as the pages do: not in a table's cell, nor with \\tag or \\notag", async () => {
     const cell = (content: Node) =>
       schema.nodes.table_cell.create(null, content);
     const table = schema.nodes.table.create(null, [
@@ -238,9 +237,16 @@ describe("math in the Word export", () => {
         cell(p("c")),
       ]),
     ]);
-    const [center, right] = tabStops((await exported(docOf(table))).doc);
-    expect(right).toBeLessThan(page[1] / 2);
-    expect(center).toBe(Math.round(right / 2));
+    const { doc, xml } = await exported(
+      docOf(
+        table,
+        displayMath("b \\notag", { label: "eq-b" }),
+        displayMath("c % \\tag later", { label: "eq-c" }),
+      ),
+    );
+    // only the last, whose \tag is in a comment, and it is the first
+    expect(xml.match(/SEQ Equation/g)).toHaveLength(1);
+    expect(doc.documentElement.textContent).toContain("(1)");
   });
 
   it("centers a numbered equation in a list between its indent and the margin", async () => {

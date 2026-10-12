@@ -29,6 +29,7 @@ import {
 import { unknownWarning } from "../../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../../markdown/blocks/embeds";
 import { parseWidth } from "../../markdown/blocks/caps";
+import { unnumbered } from "../../math/labels";
 import type { Size } from "../../images/mime";
 import { fnv1a } from "../../sources/hash";
 import { sourceKind } from "../../sources/registry";
@@ -202,6 +203,8 @@ class Serializer {
   readonly math: MathEntry[] = [];
   // how many numbered equations were written
   private numbers = 0;
+  // how deep in tables' cells the blocks being written are
+  private cells = 0;
 
   constructor(
     private docx: Docx,
@@ -889,7 +892,9 @@ class Serializer {
     const outer = [this.contentWidth, this.maxImageWidth];
     this.contentWidth = Math.round(cellShare(grid, cell) * width - margins);
     this.maxImageWidth = twipsToPixels(this.contentWidth);
+    this.cells++;
     const blocks = this.blocks(cell.node, TOP);
+    this.cells--;
     [this.contentWidth, this.maxImageWidth] = outer;
 
     const align = cell.node.attrs.align as Alignment | null;
@@ -986,7 +991,8 @@ class Serializer {
     const { TabStopType, TextRun, Tab, SimpleField } = this.docx;
     const latex = node.textContent;
     const label = (node.attrs.label as string | null) ?? null;
-    const numbered = !!label && !latex.includes("\\tag");
+    // as the layout engine numbers them: not in a table's cell
+    const numbered = !!label && !this.cells && !unnumbered(latex);
     const align = node.attrs.align as Alignment | null;
     const math = this.mathRun({ latex, display: true, label, numbered });
     if (!numbered) {

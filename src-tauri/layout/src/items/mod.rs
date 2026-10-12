@@ -385,7 +385,8 @@ impl Laid {
             } => math_units(
                 fonts,
                 latex,
-                *numbered,
+                // room for a number only where it gets one
+                *numbered && !crate::engine::numbers::unnumbered(latex),
                 align.as_deref(),
                 *preview,
                 indent,

@@ -11,7 +11,7 @@ mod grid_tests;
 #[cfg(test)]
 mod incremental_tests;
 mod navigate;
-mod numbers;
+pub(crate) mod numbers;
 mod paginate;
 #[cfg(test)]
 mod picture_tests;

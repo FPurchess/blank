@@ -12,9 +12,12 @@ use crate::items::number_label;
 use crate::model::Content;
 use crate::text::TextBox;
 
-/// whether a formula numbers itself with `\tag` (or `\tag*`), and so gets
-/// no number: the control word itself, not `\tagged`, nor one in a comment
-fn tagged(latex: &str) -> bool {
+/// whether a formula gets no number of Blank's: it labels itself with
+/// `\tag` (or `\tag*`), or says it has none with `\notag` or `\nonumber`,
+/// as amsmath and pandoc read them. The control word itself counts, not
+/// `\tagged`, nor one in a comment. The Word export asks the same
+/// (`unnumbered` in src/exporters/docx/math.ts)
+pub(crate) fn unnumbered(latex: &str) -> bool {
     let mut chars = latex.chars().peekable();
     while let Some(next) = chars.next() {
         match next {
@@ -31,7 +34,7 @@ fn tagged(latex: &str) -> bool {
                 while let Some(letter) = chars.next_if(char::is_ascii_alphabetic) {
                     word.push(letter);
                 }
-                if word == "tag" {
+                if matches!(word.as_str(), "tag" | "notag" | "nonumber") {
                     return true;
                 }
                 // a control symbol, e.g. \% or \\, stands for no more
@@ -81,7 +84,7 @@ impl Engine {
                 ..
             } = &item.content
             {
-                if !tagged(latex) {
+                if !unnumbered(latex) {
                     numbers.push((index, numbers.len() as u32 + 1));
                 }
             }
@@ -137,6 +140,10 @@ mod tests {
         }
     }
 
+    fn math_at_0(latex: &str, numbered: bool) -> Item {
+        math(0, latex, numbered)
+    }
+
     fn engine_of(items: Vec<Item>) -> Engine {
         let mut engine = Engine::new(math_fonts());
         engine.set_items(items);
@@ -144,8 +151,8 @@ mod tests {
     }
 
     #[test]
-    fn knows_a_formula_that_tags_itself() {
-        use super::tagged;
+    fn knows_a_formula_that_tags_itself_or_has_no_number() {
+        use super::unnumbered as tagged;
         assert!(tagged(r"a \tag{1}"));
         assert!(tagged(r"a \tag*{x}"));
         assert!(tagged("a \\tag{1} % \\notag"));
@@ -154,6 +161,9 @@ mod tests {
         assert!(!tagged(r"a \% \\tag"));
         assert!(!tagged(r"a \\tag"));
         assert!(tagged("a % comment\n\\tag{2}"));
+        assert!(tagged(r"a = b \notag"));
+        assert!(tagged(r"a = b \nonumber"));
+        assert!(!tagged(r"a = b \nonumbered"));
     }
 
     #[test]
@@ -233,6 +243,32 @@ mod tests {
             })
             .collect();
         assert_eq!(number, "(1)");
+    }
+
+    #[test]
+    fn sets_a_formula_without_a_number_as_if_it_had_no_label() {
+        // aligned right up to the edge, and no line kept below a wide one
+        let wide = r"\sum_{i=1}^{n} x_i + y_i + z_i".repeat(6);
+        let right = |latex: &str, numbered: bool| {
+            let mut item = math(0, latex, numbered);
+            if let Content::Math { align, .. } = &mut item.content {
+                *align = Some("right".into());
+            }
+            item
+        };
+        for (latex, item) in [
+            (r"a = b \tag{*}".to_string(), right as fn(&str, bool) -> Item),
+            (r"a = b \notag".to_string(), right),
+            (format!(r"{wide} \tag{{*}}"), math_at_0),
+        ] {
+            let mut labelled = engine_of(vec![item(&latex, true)]);
+            let mut plain = engine_of(vec![item(&latex, false)]);
+            assert_eq!(
+                format!("{:?}", labelled.page_ops(0, false)),
+                format!("{:?}", plain.page_ops(0, false)),
+                "{latex}"
+            );
+        }
     }
 
     #[test]
