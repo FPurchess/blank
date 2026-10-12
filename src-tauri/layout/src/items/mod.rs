@@ -399,6 +399,13 @@ impl Laid {
     }
 }
 
+/// contain is the size of a picture of `width` × `height` made as large as
+/// a room of `room_width` × `room_height` holds, its shape kept
+fn contain(width: f32, height: f32, room_width: f32, room_height: f32) -> (f32, f32) {
+    let scale = (room_width / width).min(room_height / height);
+    (width * scale, height * scale)
+}
+
 fn text_units(fonts: &mut Fonts, text: &Text, indent: f32, width: f32) -> Laid {
     let alignment = alignment_of(text.align.as_deref());
     let mut boxed = TextBox::new_at(fonts, text, width, alignment, indent);

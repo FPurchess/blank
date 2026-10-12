@@ -1130,7 +1130,12 @@ fn the_pdf_tags_a_stamp_as_an_artifact() {
     std::fs::write(&path, &pdf).unwrap();
     let Some(content) = run(
         "qpdf",
-        &["--qdf", "--object-streams=disable", path.to_str().unwrap(), "-"],
+        &[
+            "--qdf",
+            "--object-streams=disable",
+            path.to_str().unwrap(),
+            "-",
+        ],
     ) else {
         return;
     };

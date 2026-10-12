@@ -1,12 +1,12 @@
 //! A stamp placed on a PDF's page: an image (the user's signature or
 //! initials) contained in the stamp's box, and the lines under it, e.g. a
 //! date or a place. A stamp engine's page is the stamp's box, so the item
-//! fills it: the image as large as the room the lines leave, centred, and
-//! the lines at the left or centred.
+//! fills it: the image as large as the room the lines leave, centred
+//! however the lines are aligned (at the left or centred).
 
 use parley::Alignment;
 
-use super::{Deco, Laid, Role, Unit};
+use super::{contain, Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
 use crate::model::{Text, TextKind};
 use crate::style::BODY;
@@ -56,14 +56,9 @@ pub fn stamp_units(fonts: &mut Fonts, spec: StampSpec, width: f32, height: f32) 
     let (mut left, mut right) = (f32::INFINITY, f32::NEG_INFINITY);
     let room = (height - lines_height).max(0.0);
     if !spec.src.is_empty() && spec.width > 0.0 && spec.height > 0.0 && room > 0.0 {
-        // as large as the room allows, its shape kept
-        let scale = (width / spec.width).min(room / spec.height);
-        let (w, h) = (spec.width * scale, spec.height * scale);
-        let x = if spec.center || spec.lines.is_empty() {
-            (width - w) / 2.0
-        } else {
-            0.0
-        };
+        // as large as the room allows, its shape kept, in the middle
+        let (w, h) = contain(spec.width, spec.height, width, room);
+        let x = (width - w) / 2.0;
         // in the middle of the room the lines leave
         let y = (room - h) / 2.0;
         decos.push(Deco::Image {
@@ -200,6 +195,15 @@ mod tests {
         assert!(y + h <= text.y + 0.01);
         assert!((text.y + text.height() - 100.0).abs() < 0.01);
         assert!((laid.units[0].height - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn centres_the_image_over_lines_at_the_left() {
+        let lines = ["Ada Lovelace".to_string()];
+        let laid = laid("signature.png", &lines, false, 300.0, 100.0);
+        let (x, _, w, _) = image(&laid);
+        assert!((x - (300.0 - w) / 2.0).abs() < 0.01);
+        assert_eq!(laid.extras[0].0.x, 0.0, "the lines at the left");
     }
 
     #[test]

@@ -6,7 +6,7 @@
 
 use parley::Alignment;
 
-use super::{Deco, Laid, Role, Unit};
+use super::{contain, Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
 use crate::model::{Text, TextKind};
 use crate::style::RULE;
@@ -49,9 +49,7 @@ pub fn signature_units(fonts: &mut Fonts, spec: SignatureSpec, indent: f32, inne
     let mut label = None;
     if !spec.src.is_empty() && spec.width > 0.0 && spec.height > 0.0 {
         // as large as the room allows, standing on the line
-        let room = SIGNATURE_ROOM - IMAGE_GAP;
-        let scale = (width / spec.width).min(room / spec.height);
-        let (w, h) = (spec.width * scale, spec.height * scale);
+        let (w, h) = contain(spec.width, spec.height, width, SIGNATURE_ROOM - IMAGE_GAP);
         decos.push(Deco::Image {
             src: spec.src.to_string(),
             alt: spec.alt.to_string(),
