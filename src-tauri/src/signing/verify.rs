@@ -1165,28 +1165,42 @@ fn dss_objects(doc: &Document) -> std::collections::HashSet<ObjectId> {
     let Ok(dss) = catalog.get(b"DSS") else {
         return Default::default();
     };
-    let mut held = reached(doc, vec![dss]);
+    let Some(mut held) = reached(doc, vec![dss]) else {
+        return Default::default();
+    };
+    // the catalog's other entries, and the trailer's (its /Info)
     let others = catalog
         .iter()
         .filter(|(key, _)| key.as_slice() != b"DSS")
+        .chain(
+            doc.trailer
+                .iter()
+                .filter(|(key, _)| ![&b"Root"[..], b"Prev", b"XRefStm"].contains(&key.as_slice())),
+        )
         .map(|(_, value)| value)
         .collect();
-    let elsewhere = reached(doc, others);
+    // nothing counts as held unless all else is known
+    let Some(elsewhere) = reached(doc, others) else {
+        return Default::default();
+    };
     held.retain(|id| !elsewhere.contains(id));
     held
 }
 
 /// reached returns the objects `from` refers to, and those they refer to,
 /// through dictionaries, arrays and streams' dictionaries; the catalog
-/// only as a reference, not what it holds
-fn reached<'a>(doc: &'a Document, from: Vec<&'a Object>) -> std::collections::HashSet<ObjectId> {
+/// only as a reference, not what it holds. None past a million, more than
+/// a PDF Blank signs has
+fn reached<'a>(
+    doc: &'a Document,
+    from: Vec<&'a Object>,
+) -> Option<std::collections::HashSet<ObjectId>> {
     let root = doc.trailer.get(b"Root").and_then(Object::as_reference).ok();
     let mut found = std::collections::HashSet::new();
     let mut stack = from;
     while let Some(object) = stack.pop() {
-        // far more than a PDF Blank signs has; past it, what's found counts
         if found.len() > 1_000_000 {
-            break;
+            return None;
         }
         match object {
             Object::Reference(id) => {
@@ -1202,5 +1216,5 @@ fn reached<'a>(doc: &'a Document, from: Vec<&'a Object>) -> std::collections::Ha
             _ => {}
         }
     }
-    found
+    Some(found)
 }

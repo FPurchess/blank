@@ -431,6 +431,36 @@ fn calls_a_page_its_own_dss_lists_written_again_a_change() {
 }
 
 #[test]
+fn calls_the_info_its_own_dss_lists_written_again_a_change() {
+    // a PDF prepared before signing, whose DSS lists its /Info
+    let mut doc = Document::load_mem(&pdf()).unwrap();
+    let info = doc.add_object(dictionary! { "Title" => Object::string_literal("Offer") });
+    doc.trailer.set("Info", info);
+    let dss = doc.add_object(dictionary! { "Certs" => vec![info.into()] });
+    let root = doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    doc.get_dictionary_mut(root).unwrap().set("DSS", dss);
+    let mut prepared = vec![];
+    doc.save_to(&mut prepared).unwrap();
+    let signed = sign(key(), PASSPHRASE, &prepared, &options(None)).unwrap();
+    let out = validated(
+        &signed,
+        |update| {
+            update.new_document.set_object(
+                info,
+                dictionary! { "Title" => Object::string_literal("Another offer") },
+            );
+        },
+        |_| vec![],
+    );
+    let reports = verify_pdf(&out).unwrap();
+    assert!(
+        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
+        "{}",
+        reports[0].coverage
+    );
+}
+
+#[test]
 fn calls_an_emptied_dictionary_or_an_array_of_numbers_a_change() {
     let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
     let emptied = validated(
