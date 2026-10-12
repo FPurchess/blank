@@ -1928,6 +1928,7 @@ body.without-engine.blocks-docked {
   padding: 0 2px;
   font-size: var(--ui);
   resize: none;
+  user-select: text;
 
   &.editing {
     border-style: solid;
