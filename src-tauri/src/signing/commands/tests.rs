@@ -623,7 +623,7 @@ fn reads_the_header_the_webview_encodes() {
         panic!("not a tab");
     };
     assert_eq!(sha256, "ab");
-    assert!(matches!(&fills[1].value, FillValue::Ticked(true)));
+    assert!(matches!(&fills[1].value, FillValue::Checked(true)));
     assert!(read.plan.stamps[0].repeat);
     assert!(matches!(
         read.plan.signature,

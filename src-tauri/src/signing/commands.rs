@@ -12,7 +12,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager};
 use zeroize::Zeroizing;
 
-use crate::pdf_view::{read_checked, PdfTabs};
+pub use blank_pdf_ipc::protocol::{Fill, FillValue};
+
+use crate::pdf_view::{filled_bytes, PdfTabs};
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::keys::{self, Identity, OpenError};
 use crate::signing::pdf::sign::{update_pdf, Other, PlacedStamp, Plan as UpdatePlan, Signer, Spot};
@@ -430,22 +432,6 @@ pub struct Plan {
     pub timestamp_server: Option<String>,
 }
 
-/// a form field's new value, which the PDF tab's helper writes (see
-/// pdf_view): text, or whether a box is ticked
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum FillValue {
-    Text(String),
-    Ticked(bool),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Fill {
-    /// the field's full name
-    pub field: String,
-    pub value: FillValue,
-}
-
 /// where the PDF to sign comes from
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -672,37 +658,6 @@ fn parts(body: &[u8]) -> Option<Vec<&[u8]>> {
     rest.is_empty().then_some(out)
 }
 
-/// tab_bytes is the PDF of a PDF tab to sign: its file, read again, while
-/// it is the one the tab opened, with the tab's fills written into it by
-/// the tab's helper as a revision of their own.
-///
-/// INTEGRATION POINT: the fills are `pdf_view::filled_bytes(tabs, tab,
-/// path, sha256, fills)` of the helper's stream; until it lands here, a PDF
-/// with fills isn't signed.
-fn tab_bytes(
-    _tabs: &PdfTabs,
-    _tab: &str,
-    path: &Path,
-    sha256: &str,
-    fills: &[Fill],
-) -> Answer<Vec<u8>> {
-    let bytes = read_checked(path, sha256).map_err(|error| {
-        log::warn!("failed to read a PDF tab's file to sign: {}", error.kind());
-        match error.kind() {
-            std::io::ErrorKind::InvalidData => SigningError::FileChanged,
-            std::io::ErrorKind::NotFound => SigningError::FileMissing,
-            _ => SigningError::Failed("Blank can't read this PDF again".into()),
-        }
-    })?;
-    if !fills.is_empty() {
-        log::warn!("a PDF tab's fills can't be written yet");
-        return Err(SigningError::Failed(
-            "Blank can't fill in this PDF's fields yet".into(),
-        ));
-    }
-    Ok(bytes.to_vec())
-}
-
 /// signing_sign_pdf adds stamps, empty signature fields for others and a
 /// signature to a PDF, and returns it. Its header `blank-signing` holds,
 /// as JSON, the passphrase (null: no signature, the stamps and fields
@@ -712,7 +667,6 @@ fn tab_bytes(
 #[tauri::command]
 pub async fn signing_sign_pdf(
     app: AppHandle,
-    tabs: tauri::State<'_, PdfTabs>,
     request: tauri::ipc::Request<'_>,
 ) -> Answer<tauri::ipc::Response> {
     let refused = || SigningError::Failed(SIGN_FAILED.into());
@@ -729,21 +683,29 @@ pub async fn signing_sign_pdf(
         log::warn!("a request to sign had a body that isn't parts");
         return Err(refused());
     }
-    let pdf = match &header.source {
-        Source::Body => None,
-        Source::Tab {
-            tab,
-            path,
-            sha256,
-            fills,
-        } => Some(tab_bytes(&tabs, tab, path, sha256, fills)?),
-    };
     let p12 = match header.passphrase {
         Some(_) => Some(read_key(&app)?),
         None => None,
     };
     let body = body.clone();
     let signed = tauri::async_runtime::spawn_blocking(move || {
+        // a PDF tab's file as it still is, with its fills as MuPDF's
+        // revision; this waits for the tab's helper
+        let pdf = match &header.source {
+            Source::Body => None,
+            Source::Tab {
+                tab,
+                path,
+                sha256,
+                fills,
+            } => Some(filled_bytes(
+                &app.state::<PdfTabs>(),
+                tab,
+                path,
+                sha256,
+                fills,
+            )?),
+        };
         let parts = parts(&body).ok_or_else(refused)?;
         let pdf = match &pdf {
             Some(pdf) => pdf.as_slice(),

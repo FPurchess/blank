@@ -768,21 +768,21 @@ fn reads_a_tabs_file_while_it_is_the_one_opened() {
     let path = written(dir.path(), "a.pdf", FORM);
     let sha = crate::pdf_view::sha256(FORM);
     let tabs = PdfTabs::default();
-    assert_eq!(tab_bytes(&tabs, "t", &path, &sha, &[]).unwrap(), FORM);
+    assert_eq!(filled_bytes(&tabs, "t", &path, &sha, &[]).unwrap(), FORM);
     assert!(matches!(
-        tab_bytes(&tabs, "t", &path, "00", &[]),
+        filled_bytes(&tabs, "t", &path, "00", &[]),
         Err(SigningError::FileChanged)
     ));
     assert!(matches!(
-        tab_bytes(&tabs, "t", &dir.path().join("gone.pdf"), &sha, &[]),
+        filled_bytes(&tabs, "t", &dir.path().join("gone.pdf"), &sha, &[]),
         Err(SigningError::FileMissing)
     ));
-    // fills wait for the helper's revision (pdf_view::filled_bytes)
+    // fills need the tab's helper, which a tab that isn't open has not
     let fill = Fill {
         field: "Name".into(),
         value: FillValue::Text("Ada".into()),
     };
-    assert!(tab_bytes(&tabs, "t", &path, &sha, &[fill]).is_err());
+    assert!(filled_bytes(&tabs, "t", &path, &sha, &[fill]).is_err());
 }
 
 #[test]
