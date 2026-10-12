@@ -38,6 +38,8 @@ export interface FieldPlace extends PlaceBase {
 export interface LabelPlace extends PlaceBase {
   source: "found";
   kind: PlaceKind;
+  // the size of its label's letters, in points
+  size?: number;
 }
 
 export type Place = FieldPlace | LabelPlace;

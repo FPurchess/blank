@@ -110,25 +110,35 @@ export const nextMessage = (place: Place) => {
   return `${placeName(place)} on page ${place.page + 1}. ${how}`;
 };
 
+// the least height of a signature or initials standing on a found line, in
+// points, so it isn't as small as the line's label: a line's place is about
+// as tall as its label's letters
+export const MARK_ON_LINE = { signature: 36, initials: 24 } as const;
+// the smallest letters a date or place is written on a line with, in points
+export const LEAST_LETTERS = 9;
+
 /**
  * fitMark returns where a signature or initials `size` points large goes in
  * the place `target`: as large as fits with its shape kept, centred across,
- * and standing on the line of a found place (`bottom`) or centred in a
- * field
+ * and standing on the line of a found place (`onLine`), at least `least`
+ * points tall there while it fits the line's width (rising above the
+ * place), or centred in a field
  */
 export const fitMark = (
   size: readonly [number, number],
   target: Rect,
-  bottom: boolean,
+  onLine: boolean,
+  least = 0,
 ): Rect => {
   const [w, h] = size;
   const [x, y, tw, th] = target;
-  const scale = w > 0 && h > 0 ? Math.min(tw / w, th / h) : 1;
+  const room = onLine ? Math.max(th, least) : th;
+  const scale = w > 0 && h > 0 ? Math.min(tw / w, room / h) : 1;
   const width = w * scale;
   const height = h * scale;
   return [
     x + (tw - width) / 2,
-    bottom ? y + th - height : y + (th - height) / 2,
+    onLine ? y + th - height : y + (th - height) / 2,
     width,
     height,
   ];
@@ -136,15 +146,17 @@ export const fitMark = (
 
 /**
  * staysOn tells whether a stamp at `rect` still fills the place at `target`
- * (both on one page): its middle is within it
+ * (both on one page): its middle is within it, or, for a stamp taller than
+ * it that stands on its line, within the room it rises to above it
  */
 export const staysOn = (rect: Rect, target: Rect) => {
   const x = rect[0] + rect[2] / 2;
   const y = rect[1] + rect[3] / 2;
+  const top = Math.min(target[1], target[1] + target[3] - rect[3]);
   return (
     x >= target[0] &&
     x <= target[0] + target[2] &&
-    y >= target[1] &&
+    y >= top &&
     y <= target[1] + target[3]
   );
 };
@@ -153,9 +165,20 @@ export const staysOn = (rect: Rect, target: Rect) => {
 const INSET = 2;
 
 /**
+ * lettersOn returns the size of the letters a date or place is written
+ * with on the found place `place`: its label's, at least LEAST_LETTERS;
+ * undefined for a place that doesn't say (the stamp's own size)
+ */
+export const lettersOn = (place: Place) =>
+  place.source === "found" && place.size
+    ? Math.max(LEAST_LETTERS, place.size)
+    : undefined;
+
+/**
  * fitLines returns where a date or place `size` points large goes on the
- * found place `target`: at its left, standing on its line, made smaller
- * with its shape kept when it doesn't fit
+ * found place `target`: at its left, standing on its line (rising above
+ * the place if its letters are taller), made smaller with its shape kept
+ * when it's wider than the line
  */
 export const fitLines = (
   size: readonly [number, number],
@@ -163,7 +186,7 @@ export const fitLines = (
 ): Rect => {
   const [w, h] = size;
   const [x, y, tw, th] = target;
-  const scale = w > 0 && h > 0 ? Math.min(1, (tw - INSET) / w, th / h) : 1;
+  const scale = w > 0 && h > 0 ? Math.min(1, (tw - INSET) / w) : 1;
   return [x + INSET, y + th - h * scale, w * scale, h * scale];
 };
 

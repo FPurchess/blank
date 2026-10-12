@@ -16,7 +16,14 @@ export interface FoundPlace {
   kind: PlaceKind;
   rect: Rect;
   label: string;
+  // the size of the label's letters, in points, which a date or place
+  // written there takes
+  size: number;
 }
+
+// a word's box spans 0.8 em above its baseline and 0.25 below (`PageText`
+// in src-tauri/pdf/ipc), so its letters are its height / WORD_EM large
+const WORD_EM = 1.05;
 
 // the labels, normalized (see `normalize`)
 const LABELS: Record<string, PlaceKind> = {
@@ -315,6 +322,7 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
       kind,
       rect,
       label: role ? `Signature · ${role}` : written,
+      size: Math.max(...label.map((word) => word.rect[3])) / WORD_EM,
     });
     return true;
   };

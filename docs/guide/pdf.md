@@ -35,7 +35,7 @@ Once Blank found places in a PDF, **Next** in the signing toolbar goes to the ne
 | Leave out a line Blank found           |                | `Delete` (undo brings it back)                          |
 | Undo, redo                             |                | `Mod` `Z`, `Mod` `Shift` `Z`                            |
 
-Your signature goes into a signature field or line as large as it fits, standing on a line; a date or place line gets today's date or your place. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete` or **Remove**, and the place is back, selected. Move a signature off its place, and the place shows again too: the signature is then one of its own, where you put it.
+Your signature goes into a signature field as large as it fits. On a line, it stands on the line, large enough to read, as wide as the line allows. A date or place line gets today's date or your place, in letters as large as the line's label. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete` or **Remove**, and the place is back, selected. Move a signature off its place, and the place shows again too: the signature is then one of its own, where you put it.
 
 The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Western European letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say _This field's font can't show some of these characters_ under the field, and the field keeps what it had. Write such text as a stamp instead, or ask the sender for a form with another font.
 
@@ -61,7 +61,7 @@ What you placed is selected, with a ring and four corners, and a small toolbar a
 
 It stays on its page, with at least a little of it showing, and grows to at most three times its size and shrinks to half. Repeated initials show faded on the other pages, at the same spot, moved into smaller pages. A screen reader names each stamp, e.g. _Signature on page 2_.
 
-A PDF tab you filled in or placed something on has a dot, as a document with unsaved changes has. Blank keeps it when you close Blank, and when you start it again, it's back on the pages, as long as the file is the same. If the file changed, when Blank starts or when you open it again with **Open again** or **Find it…**, what was on pages it no longer has is gone, and so are its form's entries and the lines you left out, and Blank says so. Closing the tab asks whether to **Sign…** it first; **Discard** drops what you did.
+A PDF tab you filled in or placed something on has a dot, as a document with unsaved changes has. Blank keeps it when you close Blank, and when you start it again, it's back on the pages, as long as the file is the same. If the file changed, when Blank starts or when you open it again with **Open again** or **Find it…**, what was on pages it no longer has is gone, what no longer fits on a smaller page moves onto it, and so are its form's entries and the lines you left out, and Blank says so. Closing the tab asks whether to **Sign…** it first; **Discard** drops what you did.
 
 ### Sign it {#sign-received}
 

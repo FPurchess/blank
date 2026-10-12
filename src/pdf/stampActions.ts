@@ -95,11 +95,13 @@ export const knownPlace = async (refocus: () => void) =>
  * newStamp makes a stamp of `kind`, not yet placed: its look and its
  * natural size; null for a signature or initials the user has none of yet
  * @param line what a date or place stamp shows, if not the date or place
+ * @param letters the size of a date or place stamp's letters, if not its own
  * @throws when the layout can't size its lines
  */
 export const newStamp = async (
   kind: StampKind,
   line?: string,
+  letters?: number,
 ): Promise<Omit<Stamp, "page" | "rect"> | null> => {
   const id = crypto.randomUUID();
   if (kind === "signature" || kind === "initials") {
@@ -113,7 +115,8 @@ export const newStamp = async (
       natural: markSize(kind, mark.width, mark.height),
     };
   }
-  const spec = stampSpec(kind, line ?? lineOf(kind));
+  const own = stampSpec(kind, line ?? lineOf(kind));
+  const spec = letters ? { ...own, size: letters } : own;
   const { width, height } = await naturalSize(spec);
   return { id, kind, spec, natural: [width, height] };
 };

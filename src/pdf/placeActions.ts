@@ -19,6 +19,8 @@ import { PDF_VIEW_ID } from "./placeholder";
 import {
   fitLines,
   fitMark,
+  lettersOn,
+  MARK_ON_LINE,
   nextMessage,
   PLACE_DISMISSED,
   placeElementId,
@@ -99,11 +101,17 @@ const stampFor = async (
     stamp === "placeAndDate"
       ? `${signingPlace.value.trim()}, ${todayText()}`
       : undefined;
-  const made = await newStamp(kind, line);
-  if (!made) return null;
   const mark = kind === "signature" || kind === "initials";
+  // a date or place in the letters of the line's label
+  const made = await newStamp(kind, line, mark ? undefined : lettersOn(place));
+  if (!made) return null;
   const rect = mark
-    ? fitMark(made.natural, place.rect, place.source === "found")
+    ? fitMark(
+        made.natural,
+        place.rect,
+        place.source === "found",
+        MARK_ON_LINE[kind],
+      )
     : fitLines(made.natural, place.rect);
   return {
     ...made,

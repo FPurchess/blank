@@ -43,6 +43,7 @@ const found = (kind: FoundPlace["kind"], rect: Rect, page = 0): FoundPlace => ({
   kind,
   rect,
   label: kind,
+  size: 10,
 });
 
 const ids = (places: Place[]) => places.map((place) => place.id);

@@ -7,13 +7,17 @@ import {
   filledOf,
   fitLines,
   fitMark,
+  LEAST_LETTERS,
+  lettersOn,
+  MARK_ON_LINE,
   isFilled,
   nextMessage,
   placeElementId,
   placeLabel,
   placeName,
+  staysOn,
 } from "./placeModel";
-import { nextButton, placesOf } from "./places";
+import { type LabelPlace, nextButton, placesOf } from "./places";
 import { type Stamp, stampSpec } from "./stampModel";
 
 const field = (
@@ -54,12 +58,14 @@ const places = placesOf({
       kind: "signature",
       rect: [100, 300, 200, 36],
       label: "Signature · Tenant",
+      size: 10,
     },
     {
       page: 1,
       kind: "placeAndDate",
       rect: [100, 400, 80, 15],
       label: "Ort, Datum",
+      size: 10,
     },
   ],
 });
@@ -144,10 +150,41 @@ describe("the places of a PDF on its pages", () => {
     expect(fitMark([180, 60], [100, 200, 200, 50], false)).toEqual([
       125, 200, 150, 50,
     ]);
-    // a date on a line, smaller only when it doesn't fit
+    // a date on a line, smaller only when it's wider than the line
     expect(fitLines([60, 14], [100, 400, 80, 20])).toEqual([102, 406, 60, 14]);
     const [, , w, h] = fitLines([156, 14], [100, 400, 80, 20]);
     expect(w).toBeCloseTo(78);
     expect(h).toBeCloseTo(7);
+    // taller than the line's place, it rises above it
+    expect(fitLines([60, 20], [100, 400, 80, 12])).toEqual([102, 392, 60, 20]);
+  });
+
+  it("stand a signature on a found line at least 36 pt tall, while it fits the line", () => {
+    // a line's place as tall as its label: the signature rises above it
+    expect(
+      fitMark([180, 60], [100, 300, 300, 16], true, MARK_ON_LINE.signature),
+    ).toEqual([196, 280, 108, 36]);
+    // a short line: as wide as it
+    expect(
+      fitMark([180, 60], [100, 300, 90, 16], true, MARK_ON_LINE.signature),
+    ).toEqual([100, 286, 90, 30]);
+    // it still fills its place, moved a little
+    expect(staysOn([197, 281, 108, 36], [100, 300, 300, 16])).toBe(true);
+    expect(staysOn([197, 200, 108, 36], [100, 300, 300, 16])).toBe(false);
+  });
+
+  it("write a date or place in the letters of the line's label, at least 9 pt", () => {
+    const place = (size?: number): LabelPlace => ({
+      id: "found:0:100:300",
+      source: "found",
+      kind: "date",
+      page: 0,
+      rect: [100, 300, 200, 16],
+      label: "Date",
+      size,
+    });
+    expect(lettersOn(place(12))).toBe(12);
+    expect(lettersOn(place(6))).toBe(LEAST_LETTERS);
+    expect(lettersOn(place())).toBeUndefined();
   });
 });
