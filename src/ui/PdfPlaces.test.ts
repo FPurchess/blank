@@ -306,6 +306,12 @@ describe("the places of a PDF", () => {
     expect(next().textContent?.trim()).toBe("Next · 1 of 5");
     await press(view(), "Mod-z");
     expect(placeEl(PLACE_DATE)).not.toBeNull();
+    // the place that shows again takes the focus, and undo says so
+    expect(document.activeElement).toBe(placeEl(PLACE_DATE));
+    expect(announcement.value?.text).toBe("Place back");
+    await press(placeEl(PLACE_DATE), "Mod-Shift-z");
+    expect(announcement.value?.text).toBe("Place dismissed");
+    expect(placeEl(PLACE_DATE)).toBeNull();
     // fields are never dismissed
     placeEl("field:signature").focus();
     await press(placeEl("field:signature"), "Delete");
@@ -458,6 +464,7 @@ describe("the places of a PDF", () => {
     await press(view(), "Mod-z");
     expect(fillsOf("t")).toEqual([]);
     expect(setFills).toHaveBeenLastCalledWith("t", []);
+    expect(announcement.value?.text).toBe("Form entry undone");
   });
 
   it("fill in what they suggest on Enter only, not when Tab passes", async () => {

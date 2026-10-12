@@ -14,6 +14,7 @@ import {
   shownPdf,
   signingCertificate,
   signingPlace,
+  stampBooks,
 } from "../state";
 import { PDF_VIEW_ID } from "./placeholder";
 import {
@@ -39,9 +40,21 @@ import {
   newStamp,
   placedMessage,
 } from "./stampActions";
-import { changeSheet, changeStamps, dismissedOf, stampsOf } from "./stampBooks";
+import {
+  changeSheet,
+  changeStamps,
+  dismissedOf,
+  redoStamps,
+  stampsOf,
+  undoStamps,
+} from "./stampBooks";
 import { STAMPS_NEED_LAYOUT } from "./stamps";
-import { type Stamp, type StampKind, withStamp } from "./stampModel";
+import {
+  type Stamp,
+  type StampKind,
+  stepChange,
+  withStamp,
+} from "./stampModel";
 import { placeRefusal } from "./toolRules";
 
 // What the places of the PDF shown do when the user fills them: a stamp
@@ -223,6 +236,25 @@ export const goNext = async () => {
   lastPlace.value = place.id;
   await focusPlace(place.id);
   announce(nextMessage(place));
+  return true;
+};
+
+/**
+ * stepStamps undoes (`undo`) or redoes the last step of the history of
+ * `tab`, says what that changed, and gives a found place that shows again,
+ * or a stamp that's back, the focus
+ * @returns whether there was a step
+ */
+export const stepStamps = (tab: string, undo: boolean) => {
+  const before = stampBooks.value.get(tab)?.book;
+  const stepped = (undo ? undoStamps : redoStamps)(tab);
+  const after = stampBooks.value.get(tab)?.book;
+  // none, or Blank signs the PDF meanwhile, which says so
+  if (!stepped || !before || !after || after === before) return stepped;
+  const change = stepChange(before, after, undo);
+  announce(change.message);
+  if (change.place) void focusPlace(change.place);
+  else if (change.stamp) void focusStamp(change.stamp);
   return true;
 };
 

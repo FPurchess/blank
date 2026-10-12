@@ -11,12 +11,8 @@ import {
   signaturesPopover,
 } from "../state";
 import { signShownPdf } from "./sign";
-import {
-  canRedoStamps,
-  canUndoStamps,
-  redoStamps,
-  undoStamps,
-} from "./stampBooks";
+import { stepStamps } from "./placeActions";
+import { canRedoStamps, canUndoStamps } from "./stampBooks";
 
 // What the commands do in a PDF tab, whose editor holds no text (see
 // placeholder.ts): those of the window, the tabs and the app run as
@@ -127,14 +123,14 @@ export const pdfRefusal = (id: CommandIdentifier): string | null => {
 // what Save, Undo and Redo do in a PDF tab: sign it, and step through the
 // history of its stamps
 const stampHistory =
-  (step: (tab: string) => boolean): Command =>
+  (undo: boolean): Command =>
   (_state, dispatch) => {
-    if (dispatch && activeTabId.value) step(activeTabId.value);
+    if (dispatch && activeTabId.value) stepStamps(activeTabId.value, undo);
     return true;
   };
 const IN_PDF: Partial<Record<CommandIdentifier, Command>> = {
-  [CommandIdentifier.UNDO]: stampHistory(undoStamps),
-  [CommandIdentifier.REDO]: stampHistory(redoStamps),
+  [CommandIdentifier.UNDO]: stampHistory(true),
+  [CommandIdentifier.REDO]: stampHistory(false),
 };
 
 const sign = signShownPdf();

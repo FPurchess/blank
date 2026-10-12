@@ -382,6 +382,60 @@ const sheetOf = ({ stamps, fills, dismissed }: Sheet): Sheet => ({
   dismissed,
 });
 
+// what a step of the history changed, for the screen reader, and what
+// takes the focus: a found place that shows again, or a stamp that's back
+export interface StepChange {
+  message: string;
+  place?: string;
+  stamp?: string;
+}
+
+/**
+ * stepChange says what undoing (`undo`) or redoing a step changed from
+ * `before` to `after`, e.g. "Signature removed", "Place back"; the stamps
+ * first, then the found places, then the form
+ */
+export const stepChange = (
+  before: Sheet,
+  after: Sheet,
+  undo: boolean,
+): StepChange => {
+  const name = (stamp: Stamp) => STAMP_NAMES[stamp.kind];
+  const was = new Map(before.stamps.map((stamp) => [stamp.id, stamp]));
+  const now = new Map(after.stamps.map((stamp) => [stamp.id, stamp]));
+  const back = after.stamps.find((stamp) => !was.has(stamp.id));
+  if (back)
+    return {
+      message: `${name(back)} back on page ${back.page + 1}`,
+      stamp: back.id,
+    };
+  const gone = before.stamps.find((stamp) => !now.has(stamp.id));
+  if (gone) return { message: `${name(gone)} removed` };
+  for (const stamp of after.stamps) {
+    const old = was.get(stamp.id)!;
+    if (!!old.repeat !== !!stamp.repeat)
+      return {
+        message: stamp.repeat
+          ? `${name(stamp)} on every page`
+          : `${name(stamp)} only on page ${stamp.page + 1}`,
+        stamp: stamp.id,
+      };
+    const [x, y, w, h] = stamp.rect;
+    const [ox, oy, ow, oh] = old.rect;
+    if (w !== ow || h !== oh)
+      return { message: `${name(stamp)} resized`, stamp: stamp.id };
+    if (x !== ox || y !== oy || stamp.page !== old.page)
+      return { message: `${name(stamp)} moved`, stamp: stamp.id };
+  }
+  const shows = before.dismissed.find((id) => !after.dismissed.includes(id));
+  if (shows) return { message: "Place back", place: shows };
+  if (after.dismissed.some((id) => !before.dismissed.includes(id)))
+    return { message: "Place dismissed" };
+  if (JSON.stringify(before.fills) !== JSON.stringify(after.fills))
+    return { message: undo ? "Form entry undone" : "Form entry redone" };
+  return { message: undo ? "Undone" : "Redone" };
+};
+
 /**
  * bookOf returns a book of `stamps`, `fills` and `dismissed`, with no
  * history, e.g. restored ones

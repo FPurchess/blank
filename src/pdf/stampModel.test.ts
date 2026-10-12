@@ -20,6 +20,7 @@ import {
   scaledSpec,
   spotAt,
   type Stamp,
+  stepChange,
   stampLabel,
   stampSpec,
   toggleRepeat,
@@ -252,6 +253,61 @@ describe("the history", () => {
 
   it("starts restored stamps with no history", () => {
     expect(bookOf(one)).toEqual({ ...EMPTY_BOOK, stamps: one });
+  });
+});
+
+describe("what a step of the history changed", () => {
+  const sheet = (stamps: Stamp[], dismissed: string[] = [], fills = []) => ({
+    stamps,
+    dismissed,
+    fills,
+  });
+
+  it("names the stamp that came back, went, moved or changed size", () => {
+    expect(stepChange(sheet([]), sheet([stamp()]), false)).toEqual({
+      message: "Signature back on page 1",
+      stamp: "s1",
+    });
+    expect(stepChange(sheet([stamp()]), sheet([]), true)).toEqual({
+      message: "Signature removed",
+    });
+    const moved = stamp({ rect: [120, 100, 180, 60] });
+    expect(stepChange(sheet([moved]), sheet([stamp()]), true).message).toBe(
+      "Signature moved",
+    );
+    const bigger = stamp({ rect: [100, 100, 200, 66] });
+    expect(stepChange(sheet([bigger]), sheet([stamp()]), true).message).toBe(
+      "Signature resized",
+    );
+    const initials = stamp({ id: "i", kind: "initials" });
+    expect(
+      stepChange(
+        sheet([initials]),
+        sheet([{ ...initials, repeat: true }]),
+        false,
+      ).message,
+    ).toBe("Initials on every page");
+  });
+
+  it("gives a found place that shows again the focus", () => {
+    expect(stepChange(sheet([], ["found:0:1:2"]), sheet([]), true)).toEqual({
+      message: "Place back",
+      place: "found:0:1:2",
+    });
+    expect(
+      stepChange(sheet([]), sheet([], ["found:0:1:2"]), false).message,
+    ).toBe("Place dismissed");
+  });
+
+  it("says a form entry was undone or redone, and what else", () => {
+    const filled = { ...sheet([]), fills: [{ field: "name", value: "Ada" }] };
+    expect(stepChange(filled, sheet([]), true).message).toBe(
+      "Form entry undone",
+    );
+    expect(stepChange(sheet([]), filled, false).message).toBe(
+      "Form entry redone",
+    );
+    expect(stepChange(sheet([]), sheet([]), true).message).toBe("Undone");
   });
 });
 
