@@ -171,7 +171,14 @@ impl TextBox {
         alignment: Alignment,
         tabs: &[(std::ops::Range<usize>, f32)],
     ) -> TextBox {
-        let style = text_style(text.style);
+        let mut style = text_style(text.style);
+        // its own size, with lines and letter spacing as much larger
+        if let Some(size) = text.size.filter(|size| *size > 0.0) {
+            let scale = size / style.size;
+            style.size = size;
+            style.line *= scale;
+            style.tracking *= scale;
+        }
         let len = utf16_len(&text.text);
         let laid_text = if text.text.is_empty() {
             " ".to_string()

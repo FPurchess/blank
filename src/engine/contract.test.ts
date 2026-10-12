@@ -27,6 +27,7 @@ import {
   tr,
   ul,
 } from "../test/editor";
+import { stampItem, stampSettings } from "../pdf/stamps";
 import { settingsOf } from "./engine";
 import { flatten } from "./flatten";
 
@@ -194,7 +195,22 @@ describe("the engine's contract", () => {
       now: new Date("2026-01-01T00:00:00Z"),
       locale: "en-GB",
     });
-    const sent = { items, settings: settingsOf(layout, fields) };
+    // and a stamp engine's page: initials over two lines
+    const stamp = {
+      items: [
+        stampItem(
+          {
+            image: "initials",
+            lines: ["12 October 2026", "Berlin"],
+            size: 9,
+            align: "center",
+          },
+          { source: { kind: "image" }, png: "", width: 60, height: 30 },
+        ),
+      ],
+      settings: stampSettings(120, 60),
+    };
+    const sent = { items, settings: settingsOf(layout, fields), stamp };
     expect(items.some((item) => item.barsContinue)).toBe(true);
     await expect(JSON.stringify(sent, null, 2) + "\n").toMatchFileSnapshot(
       "./__fixtures__/contract.json",

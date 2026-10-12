@@ -2,6 +2,7 @@
 //! pagination places, which are lines for text and rows for tables.
 
 mod signature;
+mod stamp;
 mod table;
 mod toc;
 
@@ -15,6 +16,7 @@ use crate::style::{MARKER_GAP, RULE};
 use crate::text::{align_offset, alignment_of, TextBox};
 
 pub use signature::{SignatureSpec, SIGNATURE_ROOM, SIGNATURE_SHARE};
+pub use stamp::StampSpec;
 use table::table_units;
 pub use table::{TableSpec, MAX_COLUMNS};
 pub use toc::{leaders, number_text, TocLaid, TocLine};
@@ -158,6 +160,9 @@ pub struct Laid {
     pub missing: Vec<char>,
     /// for a table of contents: where its page numbers go
     pub toc: Option<TocLaid>,
+    /// for a stamp: where what it shows starts, from its left, and how
+    /// wide it is, which its box is (see `Engine::boxes`)
+    pub extent: Option<(f32, f32)>,
 }
 
 /// a cell of a table as laid out: where it is in the grid, and what of the
@@ -252,6 +257,44 @@ impl Laid {
                 indent,
                 inner,
             ),
+            Content::Stamp {
+                src,
+                width: image_width,
+                height,
+                alt,
+                lines,
+                size,
+                align,
+                ..
+            } => {
+                // the whole page, which is the stamp's box
+                let mut laid = stamp::stamp_units(
+                    fonts,
+                    StampSpec {
+                        src,
+                        width: *image_width,
+                        height: *height,
+                        alt,
+                        lines,
+                        size: *size,
+                        center: align.as_deref() == Some("center"),
+                    },
+                    // as small as a stamp's page may be, not the room for a
+                    // line of text
+                    (right - indent).max(0.0),
+                    room,
+                );
+                if let Some((left, _)) = &mut laid.extent {
+                    *left += indent;
+                }
+                for deco in &mut laid.units[0].decos {
+                    *deco = deco.moved(indent, 0.0);
+                }
+                for (boxed, _) in &mut laid.extras {
+                    boxed.x = indent;
+                }
+                laid
+            }
             Content::Image {
                 src,
                 width: image_width,

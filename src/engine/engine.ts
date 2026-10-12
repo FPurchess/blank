@@ -459,6 +459,22 @@ export class PageEngine {
   }
 
   /**
+   * setContent lays out `items` on the page of `settings`, as model.rs reads
+   * them, e.g. a stamp's (src/pdf/stampEngine.ts), which aren't flattened
+   * from a document: the next sync starts over
+   */
+  setContent(settings: object, items: readonly object[]) {
+    this.call(undefined, () => {
+      this.doc = null;
+      this.records = [];
+      this.blockStarts = [];
+      this.settings = "";
+      this.raw.setSettings(JSON.stringify(settings));
+      this.raw.setItems(JSON.stringify(items));
+    });
+  }
+
+  /**
    * sync hands the engine what changed in the document since the last sync:
    * with `changes`, only the top-level blocks they touch are flattened
    * again, and the engine moves the items after them; without, or when

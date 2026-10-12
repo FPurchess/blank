@@ -155,6 +155,7 @@ impl Engine {
             let unit = &laid.units[frag.unit];
             let dx = left;
             let dy = frag.y - unit.top;
+            let first = ops.len();
             for deco in &unit.decos {
                 let part = match deco {
                     Deco::Image { x, y, .. } => match item.content {
@@ -314,6 +315,13 @@ impl Engine {
                     if unit.shows(boxed.y + info.top, boxed.y + info.bottom) {
                         push_text_ops(&mut ops, &self.fonts, boxed, line, dx, dy, *role, part);
                     }
+                }
+            }
+            // a stamp isn't text of the document, so all of it is drawn as
+            // an artifact
+            if matches!(item.content, Content::Stamp { .. }) {
+                for (_, part) in &mut ops[first..] {
+                    *part = Part::Decoration;
                 }
             }
         }

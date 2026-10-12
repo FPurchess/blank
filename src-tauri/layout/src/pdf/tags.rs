@@ -275,7 +275,8 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             Some(group(Tag::Div, children))
         }
         Content::Toc { entries, .. } => Some(toc_node(index, entries.len(), ids)),
-        Content::Break { .. } | Content::Rule { .. } => None,
+        // a stamp isn't text of the document: it is drawn as an artifact
+        Content::Break { .. } | Content::Rule { .. } | Content::Stamp { .. } => None,
     }
 }
 

@@ -106,6 +106,10 @@ impl Engine {
         let laid = &self.laid[frag.item];
         let unit = &laid.units[frag.unit];
         let left = self.settings.margins.left;
+        // a stamp is as wide as what it shows
+        if let Some((x, w)) = laid.extent {
+            return (left + x, frag.y, w, unit.height);
+        }
         // an image is as wide as it is shown
         if let Some(crate::items::Deco::Image { x, w, .. }) = unit
             .decos

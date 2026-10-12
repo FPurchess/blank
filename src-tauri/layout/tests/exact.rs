@@ -21,6 +21,7 @@ fn text_item(pos: u32, text: &str, style: &str, level: u8, spans: Vec<Span>) -> 
             hint: None,
             picture: false,
             align: None,
+            size: None,
         }),
         indent: 0.0,
         before: if level > 0 { 16.0 } else { 0.0 },
@@ -210,8 +211,11 @@ fn settings() -> Settings {
     settings
 }
 
-/// the words pdftotext finds in a PDF: page, xMin, yMin, xMax, yMax, text
-fn read_words(pdf: &std::path::Path) -> Option<Vec<(usize, f32, f32, f32, f32, String)>> {
+/// a word pdftotext finds in a PDF: page, xMin, yMin, xMax, yMax, text
+type PdfWord = (usize, f32, f32, f32, f32, String);
+
+/// the words pdftotext finds in a PDF
+fn read_words(pdf: &std::path::Path) -> Option<Vec<PdfWord>> {
     let out = pdf.with_extension("html");
     let status = match Command::new("pdftotext")
         .arg("-bbox")
@@ -1047,4 +1051,91 @@ fn pdf_tags_links_around_their_text() {
     // one Link per link: as many as the sample's paragraphs have links
     let links = structure.matches("Link (inline)").count();
     assert_eq!(links, 6 * 8, "{links} Links");
+}
+
+/// a stamp engine's item: lines of text, centred, at 14 pt
+fn stamp(lines: &[&str]) -> Item {
+    Item {
+        content: Content::Stamp {
+            pos: 0,
+            src: String::new(),
+            width: 0.0,
+            height: 0.0,
+            alt: String::new(),
+            lines: lines.iter().map(|line| line.to_string()).collect(),
+            size: 14.0,
+            align: Some("center".into()),
+        },
+        indent: 0.0,
+        before: 0.0,
+        after: 0.0,
+        marker: None,
+        bars: vec![],
+        bars_continue: false,
+        page_start: false,
+        column: None,
+        frame: None,
+        flow_top: 0.0,
+    }
+}
+
+#[test]
+fn the_pdf_of_a_stamp_is_its_box() {
+    let mut engine = Engine::new(repository_fonts());
+    // laid out as the webview finds its natural size, then on its box
+    let mut settings = Settings {
+        width: 600.0,
+        height: 200.0,
+        stamp: true,
+        ..Default::default()
+    };
+    engine.set_settings(settings.clone());
+    engine.set_items(vec![stamp(&["12 October 2026", "Berlin"])]);
+    let (page, x, y, width, height) = engine.boxes(0, 1)[0];
+    assert_eq!(page, 0);
+    assert!(y.abs() < 0.01 && width > 50.0 && width < 200.0);
+    assert!((x - (600.0 - width) / 2.0).abs() < 0.01);
+    let line = 14.0 * blank_layout::style::NATURAL * 1.12;
+    assert!((height - 2.0 * line).abs() < 0.01);
+    settings.width = width.ceil();
+    settings.height = height.ceil();
+    engine.set_settings(settings);
+    assert_eq!(engine.pages.len(), 1);
+    // the lines stay unbroken in a box as wide as the wider one
+    assert_eq!(engine.words().len(), 4);
+    let pdf = pdf_of(&mut engine);
+    let path = std::env::temp_dir().join("blank-layout-stamp.pdf");
+    std::fs::write(&path, &pdf).unwrap();
+    let Some(info) = run("pdfinfo", &[path.to_str().unwrap()]) else {
+        return;
+    };
+    assert!(info.contains("Pages:           1"), "{info}");
+    let size = format!("Page size:       {} x {} pts", width.ceil(), height.ceil());
+    assert!(info.contains(&size), "{info}");
+    compare(&mut engine, "stamp");
+}
+
+#[test]
+fn the_pdf_tags_a_stamp_as_an_artifact() {
+    let mut engine = Engine::new(repository_fonts());
+    engine.set_settings(Settings {
+        width: 120.0,
+        height: 30.0,
+        stamp: true,
+        ..Default::default()
+    });
+    engine.set_items(vec![stamp(&["Berlin"])]);
+    let pdf = pdf_of(&mut engine);
+    let path = std::env::temp_dir().join("blank-layout-stamp-tags.pdf");
+    std::fs::write(&path, &pdf).unwrap();
+    let Some(content) = run(
+        "qpdf",
+        &["--qdf", "--object-streams=disable", path.to_str().unwrap(), "-"],
+    ) else {
+        return;
+    };
+    // its text is drawn, but marked as an artifact, not as content with a
+    // place in the structure
+    assert!(content.contains("/Artifact"), "no artifact");
+    assert!(!content.contains("/MCID"), "tagged as content");
 }

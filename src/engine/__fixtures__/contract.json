@@ -609,5 +609,34 @@
       "date": "1 January 2026",
       "file": "contract"
     }
+  },
+  "stamp": {
+    "items": [
+      {
+        "kind": "stamp",
+        "pos": 0,
+        "src": "blank-signing:initials",
+        "width": 60,
+        "height": 30,
+        "alt": "Initials",
+        "lines": [
+          "12 October 2026",
+          "Berlin"
+        ],
+        "size": 9,
+        "align": "center"
+      }
+    ],
+    "settings": {
+      "width": 120,
+      "height": 60,
+      "margins": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "stamp": true
+    }
   }
 }
