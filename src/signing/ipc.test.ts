@@ -28,7 +28,6 @@ describe("signPdf", () => {
         stamps: [{ part: 1, page: 1, rect: [1, 2, 3, 4], repeat: true }],
         signature: { kind: "invisible" },
         others: [{ page: 1, rect: [5, 6, 7, 8], name: "Bea Müller" }],
-        name: null,
         location: null,
         reason: null,
         timestampServer: null,

@@ -7,7 +7,6 @@ import { config } from "../config";
 import {
   SIGNED_PDF_TITLE,
   signDialogBase,
-  signerName,
   signingFailure,
 } from "../editor/commands/signing";
 import { showSettings } from "../editor/commands/settings";
@@ -291,7 +290,6 @@ const writeSigned = async (
   const { plan, parts } = receivedPlan({
     stamps: onPages(stampsOf(tab), opened.pages.length),
     digital: choices.passphrase !== null,
-    name: signerName(),
     place: choices.place,
     reason: choices.reason,
     timestampServer: config.value.signing.timestampServer,

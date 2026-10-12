@@ -18,7 +18,6 @@ const stamp = (over: Partial<Stamp> = {}): Stamp => ({
 
 const signing = {
   digital: true,
-  name: "Ada Lovelace",
   place: "Berlin",
   reason: "",
   timestampServer: "https://tsa.example",
@@ -41,7 +40,7 @@ describe("signing a PDF received", () => {
     expect(plan.stamps).toEqual([
       { part: 1, page: 1, rect: [100, 380, 80, 14], repeat: false },
     ]);
-    expect(plan.name).toBe("Ada Lovelace");
+    expect(plan).not.toHaveProperty("name");
     expect(plan.location).toBe("Berlin");
     expect(plan.reason).toBeNull();
     expect(plan.timestampServer).toBe("https://tsa.example");

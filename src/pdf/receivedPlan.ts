@@ -12,7 +12,7 @@ export interface ReceivedSigning {
   stamps: readonly Stamp[];
   // whether the user's key signs too, else no digital signature
   digital: boolean;
-  name: string;
+  // the native side names the certificate's holder as who signed it
   place: string;
   reason: string;
   timestampServer: string;
@@ -28,7 +28,6 @@ export interface ReceivedSigning {
 export const receivedPlan = ({
   stamps,
   digital,
-  name,
   place,
   reason,
   timestampServer,
@@ -63,7 +62,6 @@ export const receivedPlan = ({
           ? { kind: "existing", field, stamp: at }
           : { kind: "new", page: shown.page + 1, rect: shown.rect, stamp: at },
       others: [],
-      name: name || null,
       location: place || null,
       reason: reason || null,
       timestampServer: (digital && timestampServer) || null,
