@@ -11,6 +11,7 @@ import {
   isRow,
   lastEnabled,
   rowStep,
+  startIndex,
   step,
   typeahead,
 } from "../menuModel";
@@ -68,7 +69,7 @@ export const useMenuLevels = (
     {
       items: levelZero(),
       index:
-        initial.keyboard && !searchFirst() ? firstEnabled(initial.items) : -1,
+        initial.keyboard && !searchFirst() ? startIndex(initial.items) : -1,
       column: 0,
       side: null,
     },

@@ -6,6 +6,7 @@ import {
   enabledAt,
   firstColumn,
   firstEnabled,
+  startIndex,
   foundText,
   groupsOf,
   hasChecks,
@@ -59,6 +60,7 @@ describe("menuModel", () => {
 
     expect(firstEnabled(none)).toBe(-1);
     expect(lastEnabled(none)).toBe(-1);
+    expect(startIndex(none)).toBe(-1);
     expect(firstEnabled([])).toBe(-1);
   });
 
