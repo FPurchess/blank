@@ -114,7 +114,9 @@ pub fn import_stamp(incr: &mut IncrementalDocument, pdf: &[u8], pdfa1: bool) -> 
 /// the stamp's structure elements aren't copied, so nothing may point
 /// into them
 fn unmark(doc: &Document, content: &[u8], resources: &Dictionary) -> Result<Vec<u8>> {
-    if !content.windows(4).any(|w| w == b"MCID") {
+    // no marked content with properties: an /MCID may also hide in a named
+    // property list, which the content names but doesn't spell out
+    if !content.windows(3).any(|w| w == b"BDC") {
         return Ok(content.to_vec());
     }
     let properties = resources
