@@ -109,4 +109,23 @@ describe("tabs", () => {
     await expectActiveTab("one");
     expect(await tabLabels()).toEqual(before);
   });
+
+  // opening a file used to replace the stored, unsaved text with the file's
+  // (https://github.com/FPurchess/blank/issues/111)
+  it("keeps what wasn't saved when Blank is started with that file again", async () => {
+    const one = path.join(dir, "one.md");
+    await focusEditor();
+    await type(Key.End);
+    await type(" edited");
+    await expect(activeTab()).toHaveElementClass("unsaved");
+    const before = await tabLabels();
+
+    await restartApp([one]);
+
+    expect(await tabLabels()).toEqual(before);
+    await expectActiveTab("one");
+    await expectEditorText("#editor h1", "One edited");
+    await expect(activeTab()).toHaveElementClass("unsaved");
+    expect(fs.readFileSync(one, "utf8")).toBe("# One\n");
+  });
 });
