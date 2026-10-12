@@ -28,7 +28,6 @@ vi.mock("../pdf/ipc", async (original) => ({
 }));
 
 vi.mock("../pdf/stampEngine", () => ({
-  STAMPS_NEED_LAYOUT: "Stamps need the page layout",
   naturalSize: vi.fn(async () => ({ width: 90, height: 14 })),
   paintStamp: vi.fn(async () => true),
   releaseStamp: vi.fn(async () => {}),
@@ -250,8 +249,12 @@ describe("stamps on a PDF's pages", () => {
     await flushPromises();
     expect(stampsOf("t")[0].repeat).toBe(true);
     expect(announcement.value?.text).toBe("Initials on every page");
+    // on every page mounted but its own
     const ghosts = document.querySelectorAll(".pdf-stamp.ghost");
-    expect(ghosts).toHaveLength(2);
+    expect(ghosts.length).toBeGreaterThan(0);
+    expect(ghosts).toHaveLength(
+      document.querySelectorAll(".page-sheet").length - 1,
+    );
     expect(ghosts[0].getAttribute("aria-hidden")).toBe("true");
   });
 

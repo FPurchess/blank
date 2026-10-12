@@ -100,7 +100,6 @@ vi.mock("../editor/tabs", async (original) => ({
 }));
 
 vi.mock("../pdf/stampEngine", () => ({
-  STAMPS_NEED_LAYOUT: "Stamps need the page layout",
   naturalSize: vi.fn(async () => ({ width: 90, height: 14 })),
   paintStamp: vi.fn(async () => true),
   releaseStamp: vi.fn(async () => {}),

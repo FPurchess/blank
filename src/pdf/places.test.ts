@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { FoundPlace } from "../signing/labels";
-import type { PdfField, Rect } from "./fields";
+import type { PdfField, PdfRect as Rect } from "./ipc";
 import {
   dismissPlace,
   fieldLabel,
   fillOf,
-  isTarget,
+  isOpen,
   nextButton,
   nextPlace,
   type Place,
@@ -61,9 +61,19 @@ describe("the places of a PDF", () => {
       field("signature", [0, 0, 10, 10], { kind: "signature" }),
       field("hidden", [0, 0, 10, 10], { widgets: [] }),
     ];
-    expect(
-      fields.filter((each) => isTarget(each, locked)).map((each) => each.name),
-    ).toEqual(["name", "signature"]);
+    const places = placesOf({ fields, found: [], locked });
+    expect(ids(places).sort()).toEqual([
+      "field:locked",
+      "field:name",
+      "field:signature",
+    ]);
+    // a field an earlier signer locked shows, but isn't one to fill in
+    const lockedOne = places.find((place) => place.id === "field:locked")!;
+    expect(lockedOne).toMatchObject({ source: "field", locked: true });
+    expect(isOpen(lockedOne, new Set())).toBe(false);
+    expect(nextPlace(places, new Set(["field:name"]))?.id).toBe(
+      "field:signature",
+    );
   });
 
   it("calls a field by its /TU, else by its name in words", () => {

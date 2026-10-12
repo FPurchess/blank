@@ -1,5 +1,6 @@
 import type { SignPlan, StampPlan } from "../signing/ipc";
-import { readingOrder, type Stamp } from "./stampModel";
+import { fieldOfPlace, readingOrder } from "./places";
+import type { Stamp } from "./stampModel";
 
 // What signing a PDF the user received adds to it (`signing_sign_pdf` with
 // the tab as its source): every stamp as a one-page PDF of its own, one part
@@ -9,16 +10,13 @@ import { readingOrder, type Stamp } from "./stampModel";
 
 export interface ReceivedSigning {
   stamps: readonly Stamp[];
-  // the key's passphrase, null for no digital signature
+  // whether the user's key signs too, else no digital signature
   digital: boolean;
   name: string;
   place: string;
   reason: string;
   timestampServer: string;
 }
-
-// the prefix of the id of a place that is a field of the form
-const FIELD = "field:";
 
 /**
  * receivedPlan returns the plan, and the stamps whose PDFs are the body's
@@ -38,9 +36,10 @@ export const receivedPlan = ({
   const parts = [...readingOrder(stamps)];
   const signatures = parts.filter((stamp) => stamp.kind === "signature");
   const shown = digital
-    ? (signatures.find((stamp) => stamp.place?.startsWith(FIELD)) ??
+    ? (signatures.find((stamp) => fieldOfPlace(stamp.place) !== null) ??
       signatures[0])
     : undefined;
+  const field = fieldOfPlace(shown?.place);
   const pageStamps: StampPlan[] = parts.flatMap((stamp, part) =>
     stamp === shown
       ? []
@@ -60,12 +59,8 @@ export const receivedPlan = ({
       stamps: pageStamps,
       signature: !shown
         ? { kind: "invisible" }
-        : shown.place?.startsWith(FIELD)
-          ? {
-              kind: "existing",
-              field: shown.place.slice(FIELD.length),
-              stamp: at,
-            }
+        : field !== null
+          ? { kind: "existing", field, stamp: at }
           : { kind: "new", page: shown.page + 1, rect: shown.rect, stamp: at },
       others: [],
       name: name || null,

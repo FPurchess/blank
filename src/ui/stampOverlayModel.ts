@@ -1,5 +1,5 @@
 import type { Frame } from "../engine/frames";
-import type { Rect as PageRect } from "../pdf/fields";
+import type { PdfRect as PageRect } from "../pdf/ipc";
 import { BIG_STEP, STEP } from "../pdf/stampModel";
 import type { Rect } from "./rect";
 

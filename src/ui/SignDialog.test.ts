@@ -454,7 +454,7 @@ describe("the dialog that signs", () => {
         "the signature will be invisible",
       );
       expect(byId("sign-dialog-empty")!.textContent).toContain(
-        "This PDF still has 2 empty fields.",
+        "This PDF still has 2 places to fill in.",
       );
       // no blocks in a PDF tab
       expect(document.getElementById("sign-dialog-target")).toBeNull();

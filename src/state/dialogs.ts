@@ -254,7 +254,11 @@ export interface SignDialogRequest {
   // or a signature stamp placed on a PDF tab. Without it a digital
   // signature is invisible and a visible one can't be made.
   stamped: boolean;
-  // a PDF tab: the empty fields still to fill in
+  // why the PDF can't be signed without a digital signature, if it can't
+  // (a PDF tab others signed: a signature drawn into its pages would
+  // change what they signed)
+  visibleRefusal?: string;
+  // a PDF tab: the places still to fill in
   emptyFields: number;
   // whether `passphrase` opens the user's key: what's wrong, or null
   check(passphrase: string): Promise<string | null>;

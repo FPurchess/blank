@@ -754,7 +754,7 @@ pub async fn signing_sign_pdf(
     Ok(tauri::ipc::Response::new(signed))
 }
 
-/// what may be placed on a PDF a tab shows (the plan's §6.3), for its
+/// what may be placed on a PDF a tab shows (see .claude/rules/pdf.md), for its
 /// signing tools: whether it is signed already, its DocMDP permission, the
 /// fields earlier signatures locked, and whether it is encrypted or would
 /// need repairing, which Blank can't add to

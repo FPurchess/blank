@@ -30,12 +30,15 @@ export const signAsText = (how: How, certificate: string | null) =>
 export const signAsItems = ({
   certificate,
   how,
+  visibleRefusal,
   choose,
   create,
   manage,
 }: {
   certificate: string | null;
   how: How;
+  // why there's no signing without a digital signature, if there isn't
+  visibleRefusal?: string;
   choose(how: How): void;
   create(): void;
   manage(): void;
@@ -57,6 +60,7 @@ export const signAsItems = ({
     radio: true,
     checked: how === "visible" || certificate === null,
     run: () => choose("visible"),
+    ...(visibleRefusal ? { disabled: true, tip: visibleRefusal } : {}),
   },
   "separator",
   ...(certificate === null
@@ -100,28 +104,31 @@ export const stampNote = (stamped: boolean, digital: boolean) =>
   stamped ? "" : digital ? INVISIBLE_NOTE : PLACE_FIRST;
 
 /**
- * emptyFieldsNote says how many of a PDF's fields are still empty
+ * emptyFieldsNote says how many of a PDF's places are still to fill in
  */
 export const emptyFieldsNote = (count: number) =>
   count <= 0
     ? ""
-    : `This PDF still has ${count} empty ${count === 1 ? "field" : "fields"}.`;
+    : `This PDF still has ${count} ${count === 1 ? "place" : "places"} to fill in.`;
 
 /**
- * canSign tells whether Sign… signs: with the user's signature on a page
- * or digitally, and once they said they checked every page if asked to
+ * canSign tells whether Sign… signs: digitally, or with the user's
+ * signature on a page where the PDF allows that, and once they said they
+ * checked every page if asked to
  */
 export const canSign = ({
   stamped,
   digital,
+  visibleRefused = false,
   confirmPages,
   checked,
 }: {
   stamped: boolean;
   digital: boolean;
+  visibleRefused?: boolean;
   confirmPages: boolean;
   checked: boolean;
-}) => (stamped || digital) && (!confirmPages || checked);
+}) => (digital || (stamped && !visibleRefused)) && (!confirmPages || checked);
 
 /**
  * hostOf returns a server's host name, e.g. "timestamp.digicert.com", or

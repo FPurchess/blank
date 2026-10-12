@@ -16,6 +16,7 @@ import {
   savedMarks,
   signatureDialog,
   signDialog,
+  type SignDialogRequest,
   signingCertificate,
   type SignChoices,
   signingDates,
@@ -23,7 +24,8 @@ import {
   signingPlace,
 } from "../../state";
 import { type Layout, pageGeometry } from "../../layout/resolve";
-import { stampPdf } from "../../pdf/stampEngine";
+import { isHeld } from "../../pdf/stampBooks";
+import { releaseStamp, stampPdf } from "../../pdf/stampEngine";
 import { INITIALS_BOX, INITIALS_STAMP } from "../../signing/initials";
 import { type ExportSigning, exportRequest } from "../../signing/exportPlan";
 import { openSettings } from "./settings";
@@ -123,8 +125,10 @@ export const editMark =
     return true;
   };
 
-// what the notifications of a signed export are titled
-const TITLE = "Signed PDF";
+// what the notifications of signing are titled, of an export and of a PDF
+// tab alike
+export const SIGNED_PDF_TITLE = "Signed PDF";
+const TITLE = SIGNED_PDF_TITLE;
 
 /**
  * signerName returns the name the user signs as: their certificate's, which
@@ -132,6 +136,62 @@ const TITLE = "Signed PDF";
  */
 export const signerName = () =>
   signingCertificate.value?.name || config.value.signing.name;
+
+/**
+ * todayText returns today's date as the dates next to signatures are
+ * written: Settings ▸ Signing ▸ Date, in the language
+ */
+export const todayText = () =>
+  formatSigningDate(
+    new Date(),
+    signingDates.value.language,
+    signingDates.value.format,
+  );
+
+/**
+ * signDialogBase returns what the Sign dialog's request is in both flows:
+ * the place, the signer, today's date, the passphrase's check, the dialogs
+ * it opens, and `refocus` on cancel
+ */
+export const signDialogBase = (
+  refocus: () => void,
+): Pick<
+  SignDialogRequest,
+  | "place"
+  | "signer"
+  | "today"
+  | "check"
+  | "createCertificate"
+  | "createInitials"
+  | "cancel"
+> => ({
+  place: signingPlace.value,
+  signer: signerName(),
+  today: {
+    date: todayText(),
+    language: languageName(signingDates.value.language),
+  },
+  check: async (passphrase) => {
+    try {
+      await checkPassphrase(passphrase);
+      return null;
+    } catch (error) {
+      logWarning("the passphrase didn't open the key", signingKind(error));
+      return passphraseProblem(error);
+    }
+  },
+  createCertificate: (opener) => {
+    const back = focusBack(opener);
+    // once there's a certificate, the Sign dialog takes the focus to its
+    // passphrase itself
+    void openCertificateDialog("create", () => {
+      if (!signingCertificate.value) back();
+    });
+  },
+  createInitials: (opener) =>
+    void openSignatureDialog("initials", focusBack(opener)),
+  cancel: refocus,
+});
 
 /**
  * passphraseProblem says why a passphrase didn't open the user's key, with
@@ -191,20 +251,11 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
     const name = config.value.signing.name;
     const named = file.path ?? file.importedFrom;
     signDialog.value = {
+      ...signDialogBase(refocus),
       mode: "export",
       title: named ? basename(named).replace(/\.[^.]+$/, "") : "Untitled",
       targets,
       chosen: chosenOf(targets, name),
-      place: signingPlace.value,
-      signer: signerName(),
-      today: {
-        date: formatSigningDate(
-          new Date(),
-          signingDates.value.language,
-          signingDates.value.format,
-        ),
-        language: languageName(signingDates.value.language),
-      },
       warnings: file.importedFrom
         ? [
             "Blank's layout of this Word document can differ from Word's. Check every page before you send it, or ask the sender for a PDF.",
@@ -215,25 +266,6 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
       // the block shows the signature
       stamped: true,
       emptyFields: 0,
-      check: async (passphrase) => {
-        try {
-          await checkPassphrase(passphrase);
-          return null;
-        } catch (error) {
-          logWarning("the passphrase didn't open the key", signingKind(error));
-          return passphraseProblem(error);
-        }
-      },
-      createCertificate: (opener) => {
-        const back = focusBack(opener);
-        // once there's a certificate, the Sign dialog takes the focus to
-        // its passphrase itself
-        void openCertificateDialog("create", () => {
-          if (!signingCertificate.value) back();
-        });
-      },
-      createInitials: (opener) =>
-        void openSignatureDialog("initials", focusBack(opener)),
       manage: () => {
         refocus();
         openSettings("signing")(view.state, view.dispatch);
@@ -249,7 +281,6 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
           png: signature.png,
         });
       },
-      cancel: refocus,
     };
   };
   void Promise.all([loadMarks(), loadCertificate()])
@@ -361,11 +392,17 @@ const finishExport = async (result: ExportResult, signing: ExportSigning) => {
   const asked = exportRequest(signing);
   if (!asked) return result.contents;
   const parts = [result.contents];
-  if (asked.initials) {
-    await loadMarks();
-    parts.push(
-      await stampPdf(INITIALS_STAMP, INITIALS_BOX.width, INITIALS_BOX.height),
-    );
+  try {
+    if (asked.initials) {
+      await loadMarks();
+      parts.push(
+        await stampPdf(INITIALS_STAMP, INITIALS_BOX.width, INITIALS_BOX.height),
+      );
+    }
+  } finally {
+    // its engine stays while a PDF tab's initials look the same
+    if (asked.initials && !isHeld(INITIALS_STAMP))
+      void releaseStamp(INITIALS_STAMP).catch(() => {});
   }
   try {
     return await signPdf(asked.request, parts);

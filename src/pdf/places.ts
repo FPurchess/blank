@@ -4,7 +4,7 @@ import {
   overlap,
   type PlaceKind,
 } from "../signing/labels";
-import type { PdfField, Rect } from "./fields";
+import type { PdfField, PdfRect as Rect } from "./ipc";
 
 // The places of a PDF tab: where the user signs, dates or fills it in. They
 // are its form's fields that can take a value, and the places found by their
@@ -30,6 +30,8 @@ export interface FieldPlace extends PlaceBase {
   source: "field";
   kind: FieldPlaceKind;
   field: PdfField;
+  // an earlier signature locked it (FieldMDP): it shows, but can't change
+  locked?: true;
 }
 
 // a place found by its label
@@ -45,16 +47,30 @@ const BAND = 4;
 // how much a found place may share with a field and still count
 const SHARED = 0.3;
 
+// the prefix of the id of a place that is a field of the form
+const FIELD = "field:";
+
 /**
- * isTarget tells whether `field` can be filled or signed: not a push button,
- * a read-only field, one an earlier signature locked (FieldMDP, its full name
- * in `locked`) or a signature field that holds a signature, and it shows on a
- * page
+ * fieldPlaceId returns the id of the place of the field `name` (its full
+ * name)
  */
-export const isTarget = (field: PdfField, locked: ReadonlySet<string>) =>
+export const fieldPlaceId = (name: string) => `${FIELD}${name}`;
+
+/**
+ * fieldOfPlace returns the full name of the field the place `id` is, or
+ * null for a found place
+ */
+export const fieldOfPlace = (id: string | undefined) =>
+  id?.startsWith(FIELD) ? id.slice(FIELD.length) : null;
+
+/**
+ * isFillable tells whether `field` is one a user fills in or signs: not a
+ * push button, a read-only field or a signature field that holds a
+ * signature, and it shows on a page
+ */
+const isFillable = (field: PdfField) =>
   field.kind !== "button" &&
   !field.flags.readOnly &&
-  !locked.has(field.name) &&
   !(field.kind === "signature" && field.signed) &&
   field.widgets.length > 0;
 
@@ -123,7 +139,8 @@ export const readingOrder = <T extends { page: number; rect: Rect }>(
 
 /**
  * placesOf returns the places of a PDF in reading order: the fields of
- * `fields` that are targets (see isTarget), and the places of `found` that
+ * `fields` that can be filled in (see isFillable; those an earlier signature
+ * locked, `locked`, marked so), and the places of `found` that
  * no field covers (more than SHARED of both, as intersection over union) and
  * that the user didn't dismiss; found places within 4 pt of each other are
  * one
@@ -139,24 +156,23 @@ export const placesOf = ({
   locked?: ReadonlySet<string>;
   dismissed?: ReadonlySet<string>;
 }): Place[] => {
-  const fieldPlaces = fields
-    .filter((field) => isTarget(field, locked))
-    .map((field): FieldPlace => {
-      const page = field.widgets[0].page;
-      return {
-        id: `field:${field.name}`,
-        source: "field",
-        page,
-        rect: union(
-          field.widgets
-            .filter((widget) => widget.page === page)
-            .map((widget) => widget.rect),
-        ),
-        label: fieldLabel(field),
-        kind: field.kind as FieldPlaceKind,
-        field,
-      };
-    });
+  const fieldPlaces = fields.filter(isFillable).map((field): FieldPlace => {
+    const page = field.widgets[0].page;
+    return {
+      ...(locked.has(field.name) ? { locked: true as const } : {}),
+      id: fieldPlaceId(field.name),
+      source: "field",
+      page,
+      rect: union(
+        field.widgets
+          .filter((widget) => widget.page === page)
+          .map((widget) => widget.rect),
+      ),
+      label: fieldLabel(field),
+      kind: field.kind as FieldPlaceKind,
+      field,
+    };
+  });
   // every widget counts against found places, also those of fields that
   // can't be filled: a signed signature isn't a line to sign on
   const widgets = fields.flatMap((field) => field.widgets);
@@ -189,9 +205,16 @@ export const dismissPlace = (
   place.source === "found" ? new Set([...dismissed, place.id]) : dismissed;
 
 /**
+ * isOpen tells whether `place` is still to be filled in: not filled, and
+ * not a field an earlier signature locked
+ */
+export const isOpen = (place: Place, filled: ReadonlySet<string>) =>
+  !filled.has(place.id) && !(place.source === "field" && place.locked);
+
+/**
  * nextPlace returns the first place after the one of id `from` (else from
- * the start) that isn't filled, coming round to the start; none when every
- * place is filled
+ * the start) that is open (see isOpen), coming round to the start; none
+ * when every place is filled
  */
 export const nextPlace = (
   places: readonly Place[],
@@ -201,10 +224,12 @@ export const nextPlace = (
   const start = places.findIndex((place) => place.id === from) + 1;
   for (let step = 0; step < places.length; step++) {
     const place = places[(start + step) % places.length];
-    if (!filled.has(place.id)) return place;
+    if (isOpen(place, filled)) return place;
   }
   return undefined;
 };
+
+export const ALL_FILLED = "All places filled";
 
 // what the Next button says and where it goes
 export interface NextButton {
@@ -224,9 +249,8 @@ export const nextButton = (
   from?: string,
 ): NextButton => {
   const place = nextPlace(places, filled, from);
-  if (!place)
-    return { text: "All places filled", place: undefined, disabled: true };
-  const open = places.filter((each) => !filled.has(each.id));
+  if (!place) return { text: ALL_FILLED, place: undefined, disabled: true };
+  const open = places.filter((each) => isOpen(each, filled));
   return {
     text: `Next · ${open.indexOf(place) + 1} of ${open.length}`,
     place,

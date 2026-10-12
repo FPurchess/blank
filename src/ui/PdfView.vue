@@ -30,10 +30,15 @@ import { RenderQueue } from "../pdf/renderQueue";
 import { pageRevision, syncFills } from "../pdf/fills";
 import { isTargetPlace } from "../pdf/placeModel";
 import { type FieldPlace, type Place, readingOrder } from "../pdf/places";
-import { readPlaces, shownPlaces } from "../pdf/placesRead";
+import {
+  readPlaces,
+  shownContext,
+  shownPlaces,
+  shownStamps,
+} from "../pdf/placesRead";
 import { cancelPlacing, placeStamp } from "../pdf/stampActions";
-import { stampsOf } from "../pdf/stampBooks";
 import { ghostsOf, type Stamp } from "../pdf/stampModel";
+import { placeRefusal } from "../pdf/toolRules";
 import { listenOnWindow } from "../scope";
 import {
   activeTab,
@@ -259,14 +264,24 @@ watch(tabs, (list) => {
 // faded on the other pages
 const stamps = computed(() => {
   void stampBooks.value;
-  const tab = activeTabId.value;
-  // a file opened again from elsewhere may have fewer pages
-  const count = pages.value.length;
-  return tab && pdf.value?.opened
-    ? stampsOf(tab).filter((stamp) => stamp.page < count)
-    : [];
+  return shownStamps();
 });
-const ghosts = computed(() => ghostsOf(stamps.value, pages.value));
+// on the pages mounted only, as those are
+const ghosts = computed(() => {
+  if (!range.value) return [];
+  const [first, last] = range.value.split("-").map(Number);
+  return ghostsOf(stamps.value, pages.value).filter(
+    (ghost) => ghost.page >= first && ghost.page <= last,
+  );
+});
+// what the places and fields may do now: why they can't be filled in, by
+// their ids
+const placeRefusals = computed(() => {
+  const context = shownContext();
+  return new Map(
+    shownPlaces.value.map((place) => [place.id, placeRefusal(place, context)]),
+  );
+});
 type Overlay =
   | { id: string; page: number; rect: Stamp["rect"]; stamp: Stamp }
   | { id: string; page: number; rect: Stamp["rect"]; target: Place }
@@ -562,12 +577,14 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
           :place="item.target"
           :frame="frameOf(item.page)!"
           :scale="layout.scale"
+          :refusal="placeRefusals.get(item.id) ?? null"
         />
         <PdfField
           v-else
           :place="item.field"
           :frame="frameOf(item.page)!"
           :scale="layout.scale"
+          :refusal="placeRefusals.get(item.id) ?? null"
         />
       </template>
     </div>

@@ -15,6 +15,7 @@ import { type FieldPlace, prefillOf } from "../pdf/places";
 import { fillsOf } from "../pdf/stampBooks";
 import {
   activeTabId,
+  announce,
   fieldProblem,
   lastPlace,
   type MenuItem,
@@ -24,6 +25,7 @@ import MenuButton from "./components/MenuButton.vue";
 import { fieldKeyStays, radioBoxes } from "./pdfFieldModel";
 import { styleOf } from "./rect";
 import { stampBox } from "./stampOverlayModel";
+import { tipAttrs } from "./tooltipModel";
 
 // A field of a PDF's form on its page (PdfView.vue). A text field's input
 // shows only while it has the focus, prefilled with the user's name, today's
@@ -31,14 +33,21 @@ import { stampBox } from "./stampOverlayModel";
 // MuPDF's drawing of what it holds. Enter, Tab or leaving it fills it in
 // (`commitFill`), and a value its font can't show is refused under it. A
 // checkbox ticks, a radio button chooses, and a combo or list box opens a
-// select of its options.
+// select of its options. A field that can't be filled in now (an earlier
+// signer locked it, Blank signs the PDF, the PDF allows no changes) says
+// why in its tooltip, and when pressed or typed into.
 const props = defineProps<{
   place: FieldPlace;
   // the page it shows on
   frame: Frame;
   // CSS pixels per point
   scale: number;
+  // why it can't be filled in now, null when it can
+  refusal: string | null;
 }>();
+const tip = computed(() =>
+  props.refusal ? tipAttrs({ name: props.refusal }) : {},
+);
 
 const field = computed(() => props.place.field);
 const box = computed(() =>
@@ -71,7 +80,7 @@ let suggested: string | null = null;
 
 const onFocus = () => {
   lastPlace.value = props.place.id;
-  if (editing.value) return;
+  if (editing.value || props.refusal) return;
   editing.value = true;
   const now = typeof value.value === "string" ? value.value : "";
   suggested = now ? null : prefillText(prefillOf(field.value)) || null;
@@ -84,10 +93,20 @@ const commit = () => {
   void commitFill(field.value, draft.value);
 };
 const onBlur = () => {
+  if (!editing.value) return;
   editing.value = false;
   if (draft.value !== suggested) commit();
 };
+// the keys that would change what a field holds
+const TYPING = new Set(["Backspace", "Delete"]);
 const onKeydown = (event: KeyboardEvent) => {
+  if (
+    props.refusal &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    (event.key.length === 1 || TYPING.has(event.key))
+  )
+    announce(props.refusal);
   if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
@@ -150,6 +169,9 @@ const onChoiceKey = (event: KeyboardEvent) => {
       class="pdf-field"
       :class="{ editing }"
       :aria-label="label"
+      :readonly="!!refusal"
+      :aria-disabled="refusal ? true : undefined"
+      v-bind="tip"
       :maxlength="field.flags.maxLen ?? undefined"
       :aria-invalid="problem ? true : undefined"
       :aria-describedby="problem ? problemId : undefined"
@@ -168,6 +190,9 @@ const onChoiceKey = (event: KeyboardEvent) => {
       class="pdf-field"
       :class="{ editing }"
       :aria-label="label"
+      :readonly="!!refusal"
+      :aria-disabled="refusal ? true : undefined"
+      v-bind="tip"
       :maxlength="field.flags.maxLen ?? undefined"
       :aria-invalid="problem ? true : undefined"
       :aria-describedby="problem ? problemId : undefined"
@@ -186,6 +211,8 @@ const onChoiceKey = (event: KeyboardEvent) => {
     class="pdf-field pdf-check"
     :aria-label="label"
     :aria-checked="value === true"
+    :aria-disabled="refusal ? true : undefined"
+    v-bind="tip"
     :style="styleOf(box)"
     @click="toggle"
     @keydown="onButtonKey($event, toggle)"
@@ -198,6 +225,8 @@ const onChoiceKey = (event: KeyboardEvent) => {
     role="radiogroup"
     class="pdf-radios"
     :aria-label="label"
+    :aria-disabled="refusal ? true : undefined"
+    v-bind="tip"
     :style="styleOf(box)"
     @focusin="lastPlace = place.id"
     @pointerdown.stop
@@ -229,6 +258,8 @@ const onChoiceKey = (event: KeyboardEvent) => {
       :label="label"
       :text="choiceText(value)"
       :items="choices"
+      :disabled="!!refusal"
+      :tip="refusal ?? undefined"
       :refocus="refocusChoice"
     />
   </span>

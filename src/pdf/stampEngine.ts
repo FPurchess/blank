@@ -13,6 +13,7 @@ import {
   stampKey,
   stampSettings,
   type StampSpec,
+  STAMPS_NEED_LAYOUT,
 } from "./stamps";
 
 // The stamps' engines: one for each stamp that looks different, sharing the
@@ -20,10 +21,6 @@ import {
 // added as images. Each lays its stamp out on a page that is the stamp's
 // box, which is painted on screen from its display list and written as the
 // stamp's one-page PDF.
-
-// what the user reads when a stamp can't be laid out
-export const STAMPS_NEED_LAYOUT =
-  "Stamps need the page layout, which isn't running. Restart Blank to place them.";
 
 // the page a stamp is laid out on to find its own size, in points
 export const NATURAL_PAGE = { width: 600, height: 200 };
@@ -212,19 +209,4 @@ export const releaseStamp = async (spec: StampSpec) => {
   if (!stamp) return;
   await stamp.queue;
   stamp.engine.free();
-};
-
-/**
- * releaseStamps frees the engines of all stamps
- */
-export const releaseStamps = async () => {
-  const made = [...engines.values()];
-  engines.clear();
-  for (const stamp of await Promise.all(
-    made.map((one) => one.catch(() => null)),
-  )) {
-    if (!stamp) continue;
-    await stamp.queue;
-    stamp.engine.free();
-  }
 };

@@ -3,22 +3,20 @@ import { computed, nextTick, useTemplateRef, watch } from "vue";
 
 import { commandLabel } from "../commandList";
 import { CommandIdentifier } from "../config";
+import { focusBack } from "../dom";
 import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
-import { engineless } from "../engine/engine";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
 import { goNext } from "../pdf/placeActions";
-import { shownNext, shownPlaces } from "../pdf/placesRead";
+import { shownContext, shownNext, shownPlaces } from "../pdf/placesRead";
 import { readShownRules } from "../pdf/sign";
 import { cancelPlacing, placeStamp } from "../pdf/stampActions";
 import type { StampKind } from "../pdf/stampModel";
 import {
   announce,
-  engineMissing,
   FOCUS_ORDER,
   placingStamp,
   shownPdf,
-  shownPdfRules,
   toolbarFocused,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
@@ -50,18 +48,9 @@ watch(
   { immediate: true },
 );
 
-const state = computed(() => {
-  const opened = shownPdf.value?.opened ?? null;
-  const read = shownPdfRules.value;
-  return signingToolbar(
-    {
-      opened,
-      rules: opened && read?.sha256 === opened.sha256 ? read.rules : null,
-      engine: !engineMissing.value && !engineless(),
-    },
-    placingStamp.value,
-  );
-});
+const state = computed(() =>
+  signingToolbar(shownContext(), placingStamp.value),
+);
 
 const { current, onKeydown, follow, focusCurrent } = useRovingFocus(
   () => root.value,
@@ -89,7 +78,8 @@ const use = (tool: SigningTool, event: MouseEvent) => {
   const kind: StampKind = tool.kind;
   if (activatedByKeys(event)) {
     placingStamp.value = null;
-    const back = () => root.value?.focus();
+    // the tool, after a dialog that made the signature first
+    const back = focusBack(event.currentTarget);
     void placeStamp(kind, null, back).then((stamp) => {
       if (stamp) focusStamp(stamp.id);
     });

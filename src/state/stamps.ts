@@ -58,3 +58,7 @@ export const fieldProblem = shallowRef<{
 // the place that had the focus last in the PDF shown, by its id, which Next
 // goes on from; null before any
 export const lastPlace = shallowRef<string | null>(null);
+
+// the PDF tabs Blank is signing right now, by id: their stamps, fields and
+// places wait until it's done (src/pdf/sign.ts)
+export const signingTabs = shallowRef<ReadonlySet<string>>(new Set());

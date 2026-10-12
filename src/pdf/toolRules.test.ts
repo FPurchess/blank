@@ -1,10 +1,11 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { PdfRules } from "../signing/ipc";
 import {
   CHECKING,
   DAMAGED,
-  NEEDS_LAYOUT,
   NO_CHANGES,
   NOT_OPEN,
   RESTRICTED,
@@ -13,6 +14,7 @@ import {
   toolbarNote,
   toolRefusal,
 } from "./toolRules";
+import { STAMPS_NEED_LAYOUT } from "./stamps";
 
 const rules = (over: Partial<PdfRules> = {}): PdfRules => ({
   signed: false,
@@ -32,6 +34,8 @@ const context = (over: Partial<ToolContext> = {}): ToolContext => ({
   },
   rules: rules(),
   engine: true,
+  signing: false,
+  signatures: 0,
   ...over,
 });
 
@@ -89,11 +93,37 @@ describe("what the signing tools may place", () => {
 
   it("need the layout", () => {
     const without = context({ engine: false });
-    expect(toolRefusal("signature", without)).toBe(NEEDS_LAYOUT);
-    expect(toolbarNote(without)).toBe(NEEDS_LAYOUT);
+    expect(toolRefusal("signature", without)).toBe(STAMPS_NEED_LAYOUT);
+    expect(toolbarNote(without)).toBe(STAMPS_NEED_LAYOUT);
     // signing itself needs no stamps
     expect(signRefusal(without)).toBeNull();
     // a place Blank doesn't know yet is asked for when it's placed
     expect(toolRefusal("place", context())).toBeNull();
+  });
+});
+
+describe("what the signer refuses", () => {
+  // the sentences of `Refusal` (src-tauri/src/signing/mod.rs), which the
+  // tools say before the signer would
+  const source = readFileSync(
+    resolve(import.meta.dirname, "../../src-tauri/src/signing/mod.rs"),
+    "utf8",
+  );
+  const refusal = (name: string) => {
+    const match = new RegExp(`Refusal::${name} =>\\s*\\{?\\s*"([^"]*)"`).exec(
+      source,
+    );
+    expect(match, name).not.toBeNull();
+    return match![1];
+  };
+
+  it("is said in the same words", () => {
+    expect(refusal("Restricted")).toBe(RESTRICTED);
+    expect(refusal("Certified")).toBe(NO_CHANGES);
+  });
+
+  it("never says it can't yet", () => {
+    expect(RESTRICTED).not.toMatch(/\byet\b/);
+    expect(refusal("Restricted")).not.toMatch(/\byet\b/);
   });
 });

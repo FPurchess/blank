@@ -49,7 +49,8 @@ vi.mock("../../signing/ipc", async (importOriginal) => ({
   ...ipc,
 }));
 const stampPdf = vi.hoisted(() => vi.fn());
-vi.mock("../../pdf/stampEngine", () => ({ stampPdf }));
+const releaseStamp = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../../pdf/stampEngine", () => ({ stampPdf, releaseStamp }));
 vi.mock("../../signing/certificate", () => ({
   loadCertificate: vi.fn(async () => {}),
   openCertificateDialog: vi.fn(),

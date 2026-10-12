@@ -2,15 +2,13 @@ import type { Command } from "prosemirror-state";
 import { nextTick } from "vue";
 
 import { config } from "../config";
-import { openSignatureDialog } from "../editor/commands/signing";
+import { openSignatureDialog, todayText } from "../editor/commands/signing";
 import { logWarning } from "../log";
-import { formatSigningDate } from "../signing/date";
 import {
   activeTab,
   activeTabId,
   announce,
   isPdfTab,
-  language,
   lastPlace,
   selectedStamp,
   shownPdf,
@@ -19,32 +17,29 @@ import {
 } from "../state";
 import { PDF_VIEW_ID } from "./placeholder";
 import {
-  ALL_FILLED,
   fitLines,
   fitMark,
   nextMessage,
   PLACE_DISMISSED,
   placeElementId,
 } from "./placeModel";
-import { dismissPlace, fillOf, type Place, type Prefill } from "./places";
-import { shownContext } from "./sign";
-import { shownNext, shownPlaces } from "./placesRead";
+import {
+  ALL_FILLED,
+  dismissPlace,
+  fillOf,
+  type Place,
+  type Prefill,
+} from "./places";
+import { shownContext, shownNext, shownPlaces } from "./placesRead";
 import { knownPlace, newStamp, placedMessage } from "./stampActions";
 import { changeSheet, changeStamps, dismissedOf, stampsOf } from "./stampBooks";
-import { STAMPS_NEED_LAYOUT } from "./stampEngine";
+import { STAMPS_NEED_LAYOUT } from "./stamps";
 import { type Stamp, type StampKind, withStamp } from "./stampModel";
-import { toolRefusal } from "./toolRules";
+import { placeRefusal } from "./toolRules";
 
 // What the places of the PDF shown do when the user fills them: a stamp
 // sized into a signature place or a found line, a text field prefilled,
 // dismissing a found place, and Next.
-
-const today = () =>
-  formatSigningDate(
-    new Date(),
-    language.value,
-    config.value.signing.dateFormat,
-  );
 
 /**
  * prefillText returns what a text field asking for `prefill` starts with:
@@ -55,11 +50,13 @@ export const prefillText = (prefill: Prefill | undefined) => {
     case "name":
       return config.value.signing.name || signingCertificate.value?.name || "";
     case "date":
-      return today();
+      return todayText();
     case "place":
       return signingPlace.value.trim();
     case "placeAndDate":
-      return [signingPlace.value.trim(), today()].filter(Boolean).join(", ");
+      return [signingPlace.value.trim(), todayText()]
+        .filter(Boolean)
+        .join(", ");
     default:
       return "";
   }
@@ -95,7 +92,7 @@ const stampFor = async (
   if (kind === "place" && !(await knownPlace(refocus))) return null;
   const line =
     stamp === "placeAndDate"
-      ? `${signingPlace.value.trim()}, ${today()}`
+      ? `${signingPlace.value.trim()}, ${todayText()}`
       : undefined;
   const made = await newStamp(kind, line);
   if (!made) return null;
@@ -134,7 +131,7 @@ export const fillPlace = async (
   const opened = shownPdf.value?.opened;
   if (!tab || !opened) return null;
   const kind = fill.stamp === "placeAndDate" ? "place" : fill.stamp;
-  const refusal = toolRefusal(kind, shownContext());
+  const refusal = placeRefusal(place, shownContext());
   if (refusal) {
     announce(refusal);
     return null;
@@ -181,8 +178,15 @@ export const fillPlace = async (
 export const dismissShownPlace = (place: Place) => {
   const tab = activeTabId.value;
   if (!tab || place.source !== "found") return false;
-  const dismissed = dismissPlace(new Set(dismissedOf(tab)), place);
-  changeSheet(tab, { dismissed: [...dismissed] });
+  const before = dismissedOf(tab);
+  const dismissed = dismissPlace(new Set(before), place);
+  changeSheet(
+    tab,
+    { dismissed: [...dismissed] },
+    { sha256: shownPdf.value?.opened?.sha256 },
+  );
+  // Blank signs the PDF meanwhile
+  if (dismissedOf(tab) === before) return false;
   if (lastPlace.value === place.id) lastPlace.value = null;
   announce(PLACE_DISMISSED);
   void nextTick(focusPages);

@@ -20,6 +20,7 @@ import {
   tabs,
   toolbarFocused,
 } from "../state";
+import { STAMPS_NEED_LAYOUT } from "../pdf/stamps";
 import { flushPromises } from "../test/async";
 import { createTestHandle, keyEvent } from "../test/editor";
 import { bootApp } from "./mount";
@@ -49,7 +50,6 @@ vi.mock("../signing/certificate", async (original) => ({
 }));
 
 vi.mock("../pdf/stampEngine", () => ({
-  STAMPS_NEED_LAYOUT: "Stamps need the page layout",
   naturalSize: vi.fn(async () => ({ width: 90, height: 14 })),
   paintStamp: vi.fn(async () => true),
   releaseStamp: vi.fn(async () => {}),
@@ -206,7 +206,7 @@ describe("the signing toolbar", () => {
   it("turns the tools off without the page layout", async () => {
     engine.off = true;
     await mount();
-    const why = "Stamps need the page layout, which didn't start";
+    const why = STAMPS_NEED_LAYOUT;
     expect(tool("signature").dataset.tip).toBe(why);
     expect(toolbar().querySelector(".signing-note")?.textContent?.trim()).toBe(
       why,

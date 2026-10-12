@@ -1,6 +1,5 @@
-import type { Rect } from "./fields";
-import type { Fill, PdfField } from "./ipc";
-import { fillOf, nextButton, type NextButton, type Place } from "./places";
+import type { Fill, PdfField, PdfRect as Rect } from "./ipc";
+import { fillOf, type Place } from "./places";
 import type { Stamp } from "./stampModel";
 
 // What the places of a PDF tab (src/pdf/places.ts) are on its pages: which
@@ -12,7 +11,6 @@ export const PLACE_DISMISSED = "Place dismissed";
 export const MISSING_GLYPHS =
   "This field's font can't show some of these characters";
 export const NOT_TAKEN = "This field doesn't take this value";
-export const ALL_FILLED = "All places filled";
 
 // what a place is called by its kind, where its label doesn't say it
 const KIND_NAMES: Record<string, string> = {
@@ -101,16 +99,6 @@ export const filledOf = (
   );
 
 /**
- * nextOf returns the Next button of the places, going on from the place
- * `from` had the focus last
- */
-export const nextOf = (
-  places: readonly Place[],
-  filled: ReadonlySet<string>,
-  from: string | null,
-): NextButton => nextButton(places, filled, from ?? undefined);
-
-/**
  * nextMessage says where Next went and how to fill it in, e.g.
  * "Signature on page 3. Press Enter to fill it in."
  */
@@ -144,6 +132,21 @@ export const fitMark = (
     width,
     height,
   ];
+};
+
+/**
+ * staysOn tells whether a stamp at `rect` still fills the place at `target`
+ * (both on one page): its middle is within it
+ */
+export const staysOn = (rect: Rect, target: Rect) => {
+  const x = rect[0] + rect[2] / 2;
+  const y = rect[1] + rect[3] / 2;
+  return (
+    x >= target[0] &&
+    x <= target[0] + target[2] &&
+    y >= target[1] &&
+    y <= target[1] + target[3]
+  );
 };
 
 // the room left of a date or place written on a line, in points

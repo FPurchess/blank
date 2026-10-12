@@ -1,5 +1,4 @@
-import type { Rect as PageRect } from "../pdf/fields";
-import type { PdfField } from "../pdf/ipc";
+import type { PdfField, PdfRect as PageRect } from "../pdf/ipc";
 import type { Rect } from "./rect";
 
 // What the fields of a PDF's form on its pages (PdfField.vue) work out:

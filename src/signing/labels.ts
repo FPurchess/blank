@@ -1,4 +1,4 @@
-import type { PageText, Rect } from "../pdf/fields";
+import type { PageText, PdfRect as Rect } from "../pdf/ipc";
 
 // Found places: where a PDF without a form asks for a signature, a date or a
 // place, read from the words and lines of its pages. A label ("Unterschrift",

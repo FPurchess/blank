@@ -1,5 +1,5 @@
 import type { PageSize } from "../engine/frames";
-import type { Rect } from "../pdf/fields";
+import type { PdfRect as Rect } from "../pdf/ipc";
 import { type Corner, moveTo, resizeTo, type Stamp } from "../pdf/stampModel";
 
 // Dragging a stamp on a PDF's page with the mouse (StampOverlay.vue): a

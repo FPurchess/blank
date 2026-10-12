@@ -92,8 +92,8 @@ describe("the dialog that signs", () => {
     expect(stampNote(false, true)).toContain("invisible");
     expect(stampNote(false, false)).toContain("Place your signature");
     expect(emptyFieldsNote(0)).toBe("");
-    expect(emptyFieldsNote(1)).toBe("This PDF still has 1 empty field.");
-    expect(emptyFieldsNote(2)).toBe("This PDF still has 2 empty fields.");
+    expect(emptyFieldsNote(1)).toBe("This PDF still has 1 place to fill in.");
+    expect(emptyFieldsNote(2)).toBe("This PDF still has 2 places to fill in.");
   });
 
   it("signs with a signature on the page or digitally, once the pages are checked", () => {

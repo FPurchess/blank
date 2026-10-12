@@ -10,15 +10,8 @@ import { savedMarks } from "../state";
 import { IMAGES } from "../test/images";
 import { paintCalls } from "../test/canvas";
 import { testEngine } from "../test/engine";
-import {
-  naturalSize,
-  paintStamp,
-  releaseStamp,
-  releaseStamps,
-  stampPdf,
-  STAMPS_NEED_LAYOUT,
-} from "./stampEngine";
-import type { StampSpec } from "./stamps";
+import { naturalSize, paintStamp, releaseStamp, stampPdf } from "./stampEngine";
+import { type StampSpec, STAMPS_NEED_LAYOUT } from "./stamps";
 
 // The stamps as Blank's engine lays them out: their own size, what is
 // painted of them, and their one-page PDFs.
@@ -75,7 +68,13 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await releaseStamps();
+  // every look the tests lay out
+  for (const spec of [
+    date,
+    initials,
+    { ...date, lines: ["12 October 2026", "in Berlin"] },
+  ])
+    await releaseStamp(spec);
   savedMarks.value = undefined;
   forgetEngineFailure();
 });

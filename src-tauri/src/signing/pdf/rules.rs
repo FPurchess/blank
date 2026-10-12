@@ -1,4 +1,4 @@
-//! what may be added to a PDF (the plan's §6.3), read once from it: a
+//! what may be added to a PDF (see .claude/rules/signing.md), read once: a
 //! certification's DocMDP permission, whether it is signed already, and
 //! the fields earlier signatures locked (FieldMDP). Encrypted PDFs never
 //! get this far: `load_for_update` refuses them.

@@ -14,7 +14,6 @@ import {
   moveTo,
   nudge,
   onPages,
-  readingOrder,
   redone,
   resizeBy,
   resizeTo,
@@ -28,6 +27,7 @@ import {
   withoutStamp,
   withStamp,
 } from "./stampModel";
+import { readingOrder } from "./places";
 
 const A4 = { width: 595, height: 842 };
 const A5 = { width: 420, height: 595 };

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   computed,
-  nextTick,
   onBeforeUnmount,
   shallowRef,
   useTemplateRef,
@@ -10,10 +9,9 @@ import {
 
 import { imagesLoaded } from "../engine/images";
 import type { Frame, PageSize } from "../engine/frames";
-import type { Rect as PageRect } from "../pdf/fields";
+import type { PdfRect as PageRect } from "../pdf/ipc";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
-import { placeElementId } from "../pdf/placeModel";
-import { removeStamp, takeFreedPlace, updateStamp } from "../pdf/stampActions";
+import { focusFreed, removeStamp, updateStamp } from "../pdf/stampActions";
 import { paintStamp } from "../pdf/stampEngine";
 import {
   type Corner,
@@ -162,14 +160,8 @@ const onPointerup = () => {
 // a stamp undone or removed while it holds the focus gives it to the place
 // it filled, which shows again, else to the pages
 onBeforeUnmount(() => {
-  if (!root.value?.contains(document.activeElement)) return;
-  const place = takeFreedPlace();
-  void nextTick(() =>
-    (
-      (place && document.getElementById(placeElementId(place))) ||
-      pages()
-    )?.focus(),
-  );
+  if (root.value?.contains(document.activeElement))
+    focusFreed(props.stamp.place);
 });
 </script>
 

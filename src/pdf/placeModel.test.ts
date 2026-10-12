@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PdfField, Rect } from "./fields";
+import type { PdfField, PdfRect as Rect } from "./ipc";
 import {
   choiceText,
   fieldValue,
@@ -9,12 +9,11 @@ import {
   fitMark,
   isFilled,
   nextMessage,
-  nextOf,
   placeElementId,
   placeLabel,
   placeName,
 } from "./placeModel";
-import { placesOf } from "./places";
+import { nextButton, placesOf } from "./places";
 import { type Stamp, stampSpec } from "./stampModel";
 
 const field = (
@@ -122,7 +121,7 @@ describe("the places of a PDF on its pages", () => {
   });
 
   it("say where Next goes and how to fill it", () => {
-    const next = nextOf(places, new Set(["field:name"]), null);
+    const next = nextButton(places, new Set(["field:name"]));
     expect(next.text).toBe("Next · 1 of 5");
     expect(next.place?.id).toBe("field:agree");
     expect(nextMessage(byId("field:signature_1"))).toBe(
@@ -132,7 +131,7 @@ describe("the places of a PDF on its pages", () => {
       "Your name on page 1. Type to fill it in.",
     );
     expect(
-      nextOf(places, new Set(places.map((place) => place.id)), null),
+      nextButton(places, new Set(places.map((place) => place.id))),
     ).toMatchObject({ text: "All places filled", disabled: true });
   });
 

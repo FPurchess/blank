@@ -27,3 +27,20 @@ export const rectsOf = (values: Float32Array): PageBox[] => {
   }
   return rects;
 };
+
+/**
+ * signingBoxes returns where a signed export's signature blocks are, for
+ * its result: the one filled in (at `signed`) and the others (at `others`,
+ * null for one not on the pages), each the first box `boxesOf` gives the
+ * block at a position, on the shared engine and in the PDF worker alike
+ */
+export const signingBoxes = (
+  boxesOf: (pos: number) => PageBox[],
+  signed: number | undefined,
+  others: readonly number[] | undefined,
+): { signatureBox?: PageBox; otherBoxes?: (PageBox | null)[] } => ({
+  ...(signed === undefined ? {} : { signatureBox: boxesOf(signed)[0] }),
+  ...(others
+    ? { otherBoxes: others.map((pos) => boxesOf(pos)[0] ?? null) }
+    : {}),
+});

@@ -4,7 +4,7 @@ import { EditorKey, type EditorHandle } from "../editor/handle";
 import { bootScope } from "../scope";
 import { forgetFills } from "../pdf/fills";
 import { forgetPlaces } from "../pdf/placesRead";
-import { isPdfTab, tabs } from "../state";
+import { activeTabId, isPdfTab, lastPlace, tabs } from "../state";
 import { uiRoot } from "../uiRoot";
 import App from "./App.vue";
 import { pdfBitmaps } from "./pageBitmaps";
@@ -35,6 +35,10 @@ export const bootApp = (editor: EditorHandle) =>
       },
       { immediate: true },
     );
+    // Next goes on from a place of the tab shown only
+    watch(activeTabId, () => {
+      lastPlace.value = null;
+    });
     onScopeDispose(() => {
       app.unmount();
       element.remove();

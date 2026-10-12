@@ -1,5 +1,5 @@
 import { basename } from "../paths";
-import { announce, stampBooks, type TabStamps } from "../state";
+import { announce, signingTabs, stampBooks, type TabStamps } from "../state";
 import type { PdfTabDocument } from "./document";
 import { releaseStamp } from "./stampEngine";
 import type { Fill } from "./ipc";
@@ -15,7 +15,8 @@ import {
   type StampBook,
   undone,
 } from "./stampModel";
-import { stampKey } from "./stamps";
+import { stampKey, type StampSpec } from "./stamps";
+import { SIGNING } from "./toolRules";
 
 // The stamps of each PDF tab, the fills of its form and the found places
 // dismissed, with their one history (`stampBooks`), changed only here:
@@ -75,6 +76,23 @@ const keysOf = (books: ReadonlyMap<string, TabStamps>) =>
   );
 
 /**
+ * isHeld tells whether a stamp of a tab, or one its history may bring back,
+ * looks like `spec`, and so keeps its engine
+ */
+export const isHeld = (spec: StampSpec) =>
+  keysOf(stampBooks.value).has(stampKey(spec));
+
+/**
+ * busy tells whether Blank is signing the PDF of `tab`, which its stamps,
+ * fills and places wait for, and says so
+ */
+const busy = (tab: string) => {
+  if (!signingTabs.value.has(tab)) return false;
+  announce(SIGNING);
+  return true;
+};
+
+/**
  * write makes `next` the stamps of `tab` (none for null), and frees the
  * engines of the looks no stamp has any more
  */
@@ -108,6 +126,7 @@ export const changeStamps = (
     sha256,
   }: { nudge?: { id: string; at: number }; sha256?: string | null } = {},
 ) => {
+  if (busy(tab)) return;
   const now = stampBooks.value.get(tab);
   const book = changed(now?.book ?? EMPTY_BOOK, stamps, nudge);
   if (book === now?.book) return;
@@ -123,6 +142,7 @@ export const changeSheet = (
   part: Partial<Sheet>,
   { sha256 }: { sha256?: string | null } = {},
 ) => {
+  if (busy(tab)) return;
   const now = stampBooks.value.get(tab);
   const book = changedSheet(now?.book ?? EMPTY_BOOK, part);
   if (book === now?.book) return;
@@ -138,6 +158,14 @@ export const clearSheet = (tab: string) => {
 };
 
 /**
+ * returnTo makes `kept` what `tab` holds again, as it was, with its history,
+ * e.g. when the Sign dialog that changed it was cancelled
+ */
+export const returnTo = (tab: string, kept: TabStamps | undefined) => {
+  if (stampBooks.value.get(tab) !== kept) write(tab, kept ?? null);
+};
+
+/**
  * canUndoStamps tells whether `tab` has a step to undo
  */
 export const canUndoStamps = (tab: string | null) =>
@@ -150,23 +178,27 @@ export const canRedoStamps = (tab: string | null) =>
   tab !== null && (stampBooks.value.get(tab)?.book.future.length ?? 0) > 0;
 
 /**
- * undoStamps takes the last step of `tab` back
+ * undoStamps takes the last step of `tab` back; while Blank signs its PDF,
+ * it says so
  * @returns whether there was one
  */
 export const undoStamps = (tab: string) => {
   const now = stampBooks.value.get(tab);
   if (!now || !now.book.past.length) return false;
+  if (busy(tab)) return true;
   write(tab, { ...now, book: undone(now.book) });
   return true;
 };
 
 /**
- * redoStamps does the step of `tab` undone last again
+ * redoStamps does the step of `tab` undone last again; while Blank signs
+ * its PDF, it says so
  * @returns whether there was one
  */
 export const redoStamps = (tab: string) => {
   const now = stampBooks.value.get(tab);
   if (!now || !now.book.future.length) return false;
+  if (busy(tab)) return true;
   write(tab, { ...now, book: redone(now.book) });
   return true;
 };
@@ -193,47 +225,66 @@ export interface StoredStamps {
 const restored = new Set<string>();
 
 /**
- * restoreStamps brings back the stamps, fills and dismissed places `stored`
- * of `tab` once its PDF `doc` opened, the first time only: as they were on
- * the same file; on a file that changed, without the stamps on pages it no
- * longer has and without the fills and dismissed places, whose fields and
- * lines may be others now, which it says; on a file that went or can't be
- * opened, as they were
+ * fitted returns what `kept` becomes on the PDF `doc` opened, and what it
+ * lost: on the file they were placed on (or one not known yet), as they
+ * are; on a file that changed, without the stamps on pages it no longer has
+ * and without the fills, the dismissed places and the history, whose fields
+ * and lines may be others now; on a file that went or can't be opened, as
+ * they are
+ */
+const fitted = (
+  doc: PdfTabDocument,
+  kept: TabStamps,
+): { kept: TabStamps; lost: string[] } => {
+  const opened = doc.opened;
+  if (!opened || kept.sha256 === opened.sha256) return { kept, lost: [] };
+  if (kept.sha256 === null)
+    return { kept: { ...kept, sha256: opened.sha256 }, lost: [] };
+  const { stamps, fills } = kept.book;
+  const left = onPages(stamps, opened.pages.length);
+  const dropped = stamps.length - left.length;
+  return {
+    kept: { book: bookOf(left), sha256: opened.sha256 },
+    lost: [
+      dropped > 0
+        ? `${dropped === 1 ? "1 stamp was" : `${dropped} stamps were`} on pages it no longer has`
+        : "",
+      fills.length > 0 ? "its form is empty again" : "",
+    ].filter(Boolean),
+  };
+};
+
+/**
+ * restoreStamps runs on every open of the PDF `doc` of `tab`: the first
+ * time, it brings back the stamps, fills and dismissed places `stored` of
+ * it, unless some were placed meanwhile, which count more; then it makes
+ * what the tab holds fit the file opened (see fitted), also on Open again
+ * or Find it…, which may open another file, and says what that lost
  */
 export const restoreStamps = (
   tab: string,
   doc: PdfTabDocument,
   stored: StoredStamps | null,
 ) => {
-  if (restored.has(tab)) return;
+  const first = !restored.has(tab);
   restored.add(tab);
-  // placed meanwhile, which counts more
-  if (
-    !stored ||
-    !(stored.stamps.length || stored.fills.length || stored.dismissed.length) ||
-    stampBooks.value.has(tab)
-  )
-    return;
-  const opened = doc.opened;
-  if (!opened || opened.sha256 === stored.sha256) {
-    write(tab, {
-      book: bookOf(stored.stamps, stored.fills, stored.dismissed),
-      sha256: stored.sha256,
-    });
-    return;
-  }
-  const kept = onPages(stored.stamps, opened.pages.length);
-  write(tab, { book: bookOf(kept), sha256: opened.sha256 });
-  const dropped = stored.stamps.length - kept.length;
-  const lost = [
-    dropped > 0
-      ? `${dropped === 1 ? "1 stamp was" : `${dropped} stamps were`} on pages it no longer has`
-      : "",
-    stored.fills.length > 0 ? "its form is empty again" : "",
-  ].filter(Boolean);
-  if (lost.length)
+  const now = stampBooks.value.get(tab);
+  const kept =
+    now ??
+    (first &&
+    stored &&
+    (stored.stamps.length || stored.fills.length || stored.dismissed.length)
+      ? {
+          book: bookOf(stored.stamps, stored.fills, stored.dismissed),
+          sha256: stored.sha256,
+        }
+      : null);
+  if (!kept) return;
+  const fit = fitted(doc, kept);
+  if (fit.kept !== now) write(tab, fit.kept);
+  if (fit.lost.length)
     announce(
-      `${basename(doc.path)} changed since you last had it open; ${lost.join(", and ")}`,
+      `${basename(doc.path)} changed since you last had it open; ${fit.lost.join(", and ")}`,
     );
 };
 

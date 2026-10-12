@@ -1,12 +1,11 @@
-import { config } from "../config";
-import { openSignatureDialog } from "../editor/commands/signing";
+import { nextTick } from "vue";
+
+import { openSignatureDialog, todayText } from "../editor/commands/signing";
 import { logWarning } from "../log";
-import { formatSigningDate } from "../signing/date";
 import { loadMarks } from "../signing/marks";
 import {
   activeTabId,
   announce,
-  language,
   pdfDeskLayout,
   pdfPageInView,
   pdfViewport,
@@ -17,8 +16,12 @@ import {
   shownPdf,
   signingPlace,
 } from "../state";
+import { PDF_VIEW_ID } from "./placeholder";
+import { placeElementId, staysOn } from "./placeModel";
+import { shownPlaces } from "./placesRead";
 import { changeStamps, stampsOf } from "./stampBooks";
-import { naturalSize, STAMPS_NEED_LAYOUT } from "./stampEngine";
+import { naturalSize } from "./stampEngine";
+import { STAMPS_NEED_LAYOUT } from "./stamps";
 import {
   defaultSpot,
   markSize,
@@ -57,13 +60,7 @@ export const removedMessage = (stamp: Stamp) =>
  * settings write it, in the language, or where the user signs
  */
 const lineOf = (kind: "date" | "place") =>
-  kind === "date"
-    ? formatSigningDate(
-        new Date(),
-        language.value,
-        config.value.signing.dateFormat,
-      )
-    : signingPlace.value.trim();
+  kind === "date" ? todayText() : signingPlace.value.trim();
 
 /**
  * askPlace asks where the user signs, and remembers it (`signingPlace`);
@@ -202,33 +199,35 @@ export const placeStamp = async (
   return stamp;
 };
 
-// the place a stamp removed filled, which takes the focus once it shows
-// again
-let freedPlace: string | null = null;
-
 /**
- * takeFreedPlace returns the place the stamp removed last filled, once:
- * what takes the focus after it
+ * focusFreed gives the focus, once the DOM shows a stamp gone, to the place
+ * `place` it filled, which shows again, else to the pages
  */
-export const takeFreedPlace = () => {
-  const place = freedPlace;
-  freedPlace = null;
-  return place;
-};
+export const focusFreed = (place: string | undefined) =>
+  void nextTick(() =>
+    (
+      (place && document.getElementById(placeElementId(place))) ||
+      document.getElementById(PDF_VIEW_ID)
+    )?.focus(),
+  );
 
 /**
  * removeStamp removes the stamp `id` of the PDF shown and says so; the
- * place it filled, if it filled one, shows again and takes the focus
+ * place it filled, if it filled one, shows again
+ * @returns the stamp removed, or null when there was none to remove
  */
-export const removeStamp = (id: string) => {
+export const removeStamp = (id: string): Stamp | null => {
   const tab = activeTabId.value;
-  if (!tab) return;
-  const stamp = stampsOf(tab).find((one) => one.id === id);
-  if (!stamp) return;
-  freedPlace = stamp.place ?? null;
-  changeStamps(tab, withoutStamp(stampsOf(tab), id));
+  if (!tab) return null;
+  const stamps = stampsOf(tab);
+  const stamp = stamps.find((one) => one.id === id);
+  if (!stamp) return null;
+  changeStamps(tab, withoutStamp(stamps, id));
+  // Blank signs the PDF meanwhile
+  if (stampsOf(tab) === stamps) return null;
   if (selectedStamp.value === id) selectedStamp.value = null;
   announce(removedMessage(stamp));
+  return stamp;
 };
 
 /**
@@ -250,7 +249,21 @@ export const repeatStamp = (id: string) => {
 };
 
 /**
- * updateStamp puts `stamp` in place of the one of its id on the PDF shown
+ * offItsPlace returns `stamp` without the place it filled once it was moved
+ * or resized off it, so that place shows again; else as it is
+ */
+const offItsPlace = (stamp: Stamp): Stamp => {
+  if (!stamp.place) return stamp;
+  const place = shownPlaces.value.find((one) => one.id === stamp.place);
+  if (!place || (place.page === stamp.page && staysOn(stamp.rect, place.rect)))
+    return stamp;
+  const { id, kind, page, rect, natural, repeat, spec } = stamp;
+  return { id, kind, page, rect, natural, spec, ...(repeat ? { repeat } : {}) };
+};
+
+/**
+ * updateStamp puts `stamp` in place of the one of its id on the PDF shown;
+ * one moved off the place it filled leaves it
  * @param nudge when a nudge moved it, which joins the nudges of the last
  *   moment in one step
  */
@@ -259,7 +272,7 @@ export const updateStamp = (stamp: Stamp, nudge?: number) => {
   if (!tab) return;
   changeStamps(
     tab,
-    withStamp(stampsOf(tab), stamp),
+    withStamp(stampsOf(tab), offItsPlace(stamp)),
     nudge === undefined ? {} : { nudge: { id: stamp.id, at: nudge } },
   );
 };

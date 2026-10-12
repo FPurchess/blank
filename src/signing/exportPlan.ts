@@ -1,6 +1,7 @@
 import type { PageBox } from "../engine/boxes";
 import { type InitialsSide, initialsRect } from "./initials";
-import type { PageRect, SignRequest } from "./ipc";
+import type { PdfRect } from "../pdf/ipc";
+import type { SignRequest } from "./ipc";
 
 // What a signed export adds to the PDF the layout engine wrote, in one
 // incremental update (`signing_sign_pdf` with the PDF as the body's part 0):
@@ -25,12 +26,7 @@ export interface ExportSigning {
   page: { width: number; height: number };
 }
 
-const rectOf = (box: PageBox): PageRect => [
-  box.x,
-  box.y,
-  box.width,
-  box.height,
-];
+const rectOf = (box: PageBox): PdfRect => [box.x, box.y, box.width, box.height];
 
 /**
  * exportRequest returns what to ask the signer for, with the body's parts

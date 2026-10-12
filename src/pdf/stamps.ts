@@ -17,6 +17,14 @@ export interface StampSpec {
   align: "left" | "center";
 }
 
+// the size of the lines of a date or place, in points
+export const LINE_SIZE = 11;
+
+// what the user reads when a stamp can't be laid out: the signing tools'
+// tooltips and note, and a stamp that failed to be made
+export const STAMPS_NEED_LAYOUT =
+  "Stamps need the page layout, which isn't running. Restart Blank to place them.";
+
 // the src the engine knows a mark's PNG by
 export const MARK_SRC: Record<Mark, string> = {
   signature: "blank-signing:signature",

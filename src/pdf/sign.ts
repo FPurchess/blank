@@ -5,34 +5,24 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../config";
 import {
-  openSignatureDialog,
-  passphraseProblem,
+  SIGNED_PDF_TITLE,
+  signDialogBase,
   signerName,
   signingFailure,
 } from "../editor/commands/signing";
 import { showSettings } from "../editor/commands/settings";
 import suggestPath from "../editor/commands/suggestPath";
-import { engineless } from "../engine/engine";
-import { focusBack } from "../dom";
 import { PDF_FILTER } from "../formats";
 import { logError, logWarning } from "../log";
 import { basename } from "../paths";
-import { formatSigningDate } from "../signing/date";
-import { type InitialsChoice, type InitialsSide } from "../signing/initials";
 import {
-  checkPassphrase,
-  forTheLog,
-  pdfRules,
-  signingKind,
-  signPdf,
-} from "../signing/ipc";
-import {
-  loadCertificate,
-  openCertificateDialog,
-  reportSigningFailure,
-} from "../signing/certificate";
+  type InitialsChoice,
+  type InitialsSide,
+  initialsRect,
+} from "../signing/initials";
+import { forTheLog, pdfRules, signingKind, signPdf } from "../signing/ipc";
+import { loadCertificate, reportSigningFailure } from "../signing/certificate";
 import { loadMarks } from "../signing/marks";
-import { languageName } from "../spellcheck/service";
 import {
   activeTab,
   activeTabId,
@@ -42,33 +32,48 @@ import {
   shownPdfRules,
   signDialog,
   type SignChoices,
-  signingCertificate,
-  signingDates,
   signingInitials,
   signingPlace,
+  signingTabs,
+  stampBooks,
 } from "../state";
+import type { PdfTabDocument } from "./document";
+import type { OpenedPdf } from "./ipc";
 import { PDF_VIEW_ID } from "./placeholder";
-import { shownFilled, shownPlaces } from "./placesRead";
+import { isOpen } from "./places";
+import {
+  shownContext,
+  shownFilled,
+  shownPlaces,
+  shownStamps,
+} from "./placesRead";
 import { receivedPlan } from "./receivedPlan";
 import { newStamp } from "./stampActions";
-import { changeStamps, clearSheet, fillsOf, stampsOf } from "./stampBooks";
+import {
+  changeStamps,
+  clearSheet,
+  fillsOf,
+  returnTo,
+  stampsOf,
+} from "./stampBooks";
 import { stampPdf } from "./stampEngine";
 import {
-  EDGE,
+  onPages,
   scaledSpec,
   type Stamp,
   toggleRepeat,
   withoutStamp,
   withStamp,
 } from "./stampModel";
-import { signRefusal, type ToolContext, toolRefusal } from "./toolRules";
+import { signRefusal, toolRefusal, visibleRefusal } from "./toolRules";
 
 // Signing a PDF the user received, `pdf.sign` (Sign… on the signing
 // toolbar, Save's key in a PDF tab, and Sign… when a tab with stamps
 // closes): the Sign dialog, then the save dialog, then the stamps' PDFs and
 // the signer, which writes the fills, the stamps and the signature as
 // updates of the file the tab opened (see .claude/rules/signing.md). What
-// the PDF allows is read once it shows (`readShownRules`).
+// the PDF allows is read once it shows (`readShownRules`). While it signs,
+// the tab's stamps, fills and places wait (`signingTabs`).
 
 // what a PDF allows when it can't be read
 const OPEN_RULES = {
@@ -81,7 +86,7 @@ const OPEN_RULES = {
 
 export const SIGN_IN_PDF =
   "Sign… signs PDFs you received. Open one to sign it.";
-const TITLE = "Signed PDF";
+const TITLE = SIGNED_PDF_TITLE;
 
 declare global {
   interface Window {
@@ -90,19 +95,6 @@ declare global {
     blankTestSavePath?: string;
   }
 }
-
-/**
- * shownContext returns what the signing tools of the PDF shown may do
- */
-export const shownContext = (): ToolContext => {
-  const opened = shownPdf.value?.opened ?? null;
-  const read = shownPdfRules.value;
-  return {
-    opened,
-    rules: opened && read?.sha256 === opened.sha256 ? read.rules : null,
-    engine: !engineless(),
-  };
-};
 
 /**
  * chooseDestination asks where the signed PDF goes, suggesting
@@ -120,24 +112,6 @@ const sideOf = (stamp: Stamp, width: number): InitialsSide =>
   stamp.rect[0] + stamp.rect[2] / 2 < width / 2 ? "left" : "right";
 
 /**
- * cornerOf returns where initials of `stamp`'s size go in the corner `side`
- * of a page `page` large
- */
-const cornerOf = (
-  stamp: Pick<Stamp, "rect">,
-  side: InitialsSide,
-  page: { width: number; height: number },
-): Stamp["rect"] => {
-  const [, , w, h] = stamp.rect;
-  return [
-    side === "right" ? page.width - EDGE - w : EDGE,
-    page.height - EDGE - h,
-    w,
-    h,
-  ];
-};
-
-/**
  * initialsSetter returns what the Sign dialog's Initials row does in the
  * tab `tab`: on, the initials repeat on every page (those placed, else new
  * ones in the corner chosen of the first page); off, they don't (and those
@@ -148,7 +122,7 @@ const initialsSetter = (tab: string) => {
   return async ({ on, side }: InitialsChoice) => {
     const opened = shownPdf.value?.opened;
     if (activeTabId.value !== tab || !opened) return;
-    const stamps = stampsOf(tab);
+    const stamps = onPages(stampsOf(tab), opened.pages.length);
     const repeated = stamps.find(
       (stamp) => stamp.kind === "initials" && stamp.repeat,
     );
@@ -157,8 +131,8 @@ const initialsSetter = (tab: string) => {
       changeStamps(
         tab,
         repeated.id === added
-          ? withoutStamp(stamps, repeated.id)
-          : toggleRepeat(stamps, repeated.id),
+          ? withoutStamp(stampsOf(tab), repeated.id)
+          : toggleRepeat(stampsOf(tab), repeated.id),
       );
       if (repeated.id === added) added = null;
       return;
@@ -168,16 +142,19 @@ const initialsSetter = (tab: string) => {
       if (sideOf(repeated, page.width) !== side)
         changeStamps(
           tab,
-          withStamp(stamps, {
+          withStamp(stampsOf(tab), {
             ...repeated,
-            rect: cornerOf(repeated, side, page),
+            rect: initialsRect(page, side, [
+              repeated.rect[2],
+              repeated.rect[3],
+            ]),
           }),
         );
       return;
     }
     const placed = stamps.find((stamp) => stamp.kind === "initials");
     if (placed) {
-      changeStamps(tab, toggleRepeat(stamps, placed.id));
+      changeStamps(tab, toggleRepeat(stampsOf(tab), placed.id));
       return;
     }
     const made = await newStamp("initials");
@@ -185,11 +162,7 @@ const initialsSetter = (tab: string) => {
     const stamp: Stamp = {
       ...made,
       page: 0,
-      rect: cornerOf(
-        { rect: [0, 0, made.natural[0], made.natural[1]] },
-        side,
-        opened.pages[0],
-      ),
+      rect: initialsRect(opened.pages[0], side, made.natural),
       repeat: true,
     };
     added = stamp.id;
@@ -201,8 +174,9 @@ const initialsSetter = (tab: string) => {
 
 /**
  * signReceived signs the PDF shown with what was placed on it: the Sign
- * dialog, then where to save it, then the signer. It makes the user's
- * signature first if they have none and placed nothing yet.
+ * dialog, then where to save it, then the signer. Without a signature
+ * placed, the dialog offers an invisible digital signature, or asks for
+ * one on the page first.
  */
 export const signReceived = () => {
   const refusal = signRefusal(shownContext());
@@ -219,30 +193,24 @@ export const signReceived = () => {
   const shown = () => activeTabId.value === tab && shownPdf.value === doc;
   const ask = () => {
     if (!shown()) return;
-    const stamps = stampsOf(tab);
+    const stamps = shownStamps();
     const repeated = stamps.find(
       (stamp) => stamp.kind === "initials" && stamp.repeat,
     );
-    const initialsReason = toolRefusal("initials", shownContext());
+    const context = shownContext();
+    const initialsReason = toolRefusal("initials", context);
+    const visibleReason = visibleRefusal(context);
     const setInitials = initialsSetter(tab);
-    const open = shownPlaces.value.filter(
-      (place) => !shownFilled.value.has(place.id),
-    );
+    // what the tab held before the Initials row changed it, which a cancel
+    // brings back
+    const before = stampBooks.value.get(tab);
+    let changed = false;
     signDialog.value = {
+      ...signDialogBase(refocus),
       mode: "pdf",
       title: basename(doc.path).replace(/\.pdf$/i, ""),
       targets: [],
       chosen: 0,
-      place: signingPlace.value,
-      signer: signerName(),
-      today: {
-        date: formatSigningDate(
-          new Date(),
-          signingDates.value.language,
-          signingDates.value.format,
-        ),
-        language: languageName(signingDates.value.language),
-      },
       warnings: [],
       confirmPages: false,
       initials: {
@@ -252,26 +220,15 @@ export const signReceived = () => {
           : signingInitials.value.side,
         ...(initialsReason ? { reason: initialsReason } : {}),
       },
-      setInitials: (choice) => void setInitials(choice),
+      setInitials: (choice) => {
+        changed = true;
+        void setInitials(choice);
+      },
       stamped: stamps.some((stamp) => stamp.kind === "signature"),
-      emptyFields: open.length,
-      check: async (passphrase) => {
-        try {
-          await checkPassphrase(passphrase);
-          return null;
-        } catch (error) {
-          logWarning("the passphrase didn't open the key", signingKind(error));
-          return passphraseProblem(error);
-        }
-      },
-      createCertificate: (opener) => {
-        const back = focusBack(opener);
-        void openCertificateDialog("create", () => {
-          if (!signingCertificate.value) back();
-        });
-      },
-      createInitials: (opener) =>
-        void openSignatureDialog("initials", focusBack(opener)),
+      ...(visibleReason ? { visibleRefusal: visibleReason } : {}),
+      emptyFields: shownPlaces.value.filter((place) =>
+        isOpen(place, shownFilled.value),
+      ).length,
       manage: () => {
         refocus();
         showSettings("signing");
@@ -280,7 +237,10 @@ export const signReceived = () => {
         refocus();
         if (shown()) void signNow(tab, choices);
       },
-      cancel: refocus,
+      cancel: () => {
+        if (changed) returnTo(tab, before);
+        refocus();
+      },
     };
   };
   void Promise.all([loadMarks(), loadCertificate()])
@@ -296,60 +256,91 @@ export const signReceived = () => {
 };
 
 /**
- * signNow saves the PDF of the tab `tab` signed as chosen: where the user
- * says, then the stamps' PDFs, then the signer. Once it's written, the
- * tab's stamps and fills are done with, and the signed PDF opens in a tab
- * of its own if asked. Nothing is written when anything fails.
+ * setSigning marks the tab `tab` as being signed, or not any more
  */
-const signNow = async (tab: string, choices: SignChoices) => {
-  const doc = shownPdf.value;
-  const opened = doc?.opened;
-  if (!doc || !opened) return;
+const setSigning = (tab: string, on: boolean) => {
+  const next = new Set(signingTabs.value);
+  if (on) next.add(tab);
+  else next.delete(tab);
+  signingTabs.value = next;
+};
+
+/**
+ * writeSigned writes the PDF of the tab `tab` signed as chosen: where the
+ * user says, then the stamps' PDFs (those on the pages it has), then the
+ * signer
+ * @returns where it went, null when the user didn't choose a place
+ */
+const writeSigned = async (
+  tab: string,
+  doc: PdfTabDocument,
+  opened: OpenedPdf,
+  choices: SignChoices,
+) => {
   const dest = await chooseDestination(
     suggestPath("pdf", { path: doc.path, importedFrom: null }, " signed"),
   );
-  if (dest === null) return;
-  const digital = choices.passphrase !== null;
+  if (dest === null) return null;
   const { plan, parts } = receivedPlan({
-    stamps: stampsOf(tab),
-    digital,
+    stamps: onPages(stampsOf(tab), opened.pages.length),
+    digital: choices.passphrase !== null,
     name: signerName(),
     place: choices.place,
     reason: choices.reason,
     timestampServer: config.value.signing.timestampServer,
   });
-  let bytes: Uint8Array;
-  try {
-    await loadMarks();
-    const pdfs: Uint8Array[] = [];
-    for (const stamp of parts)
-      pdfs.push(
-        await stampPdf(scaledSpec(stamp), stamp.rect[2], stamp.rect[3]),
-      );
-    bytes = await signPdf(
-      {
-        passphrase: choices.passphrase,
-        source: {
-          kind: "tab",
-          tab,
-          path: doc.path,
-          sha256: opened.sha256,
-          fills: [...fillsOf(tab)],
-        },
-        plan,
+  await loadMarks();
+  const pdfs: Uint8Array[] = [];
+  for (const stamp of parts)
+    pdfs.push(await stampPdf(scaledSpec(stamp), stamp.rect[2], stamp.rect[3]));
+  const bytes = await signPdf(
+    {
+      passphrase: choices.passphrase,
+      source: {
+        kind: "tab",
+        tab,
+        path: doc.path,
+        sha256: opened.sha256,
+        fills: [...fillsOf(tab)],
       },
-      pdfs,
-    );
-    await writeFile(dest, bytes);
+      plan,
+    },
+    pdfs,
+  );
+  await writeFile(dest, bytes);
+  return dest;
+};
+
+/**
+ * signNow saves the PDF of the tab `tab` signed as chosen (writeSigned);
+ * meanwhile its stamps, fills and places wait. Once it's written, the
+ * tab's stamps and fills are done with, if they're still those it signed,
+ * and the signed PDF opens in a tab of its own if asked. Nothing is written
+ * when anything fails.
+ */
+const signNow = async (tab: string, choices: SignChoices) => {
+  const doc = shownPdf.value;
+  const opened = doc?.opened;
+  if (!doc || !opened || signingTabs.value.has(tab)) return;
+  // what is signed
+  const book = stampBooks.value.get(tab)?.book;
+  setSigning(tab, true);
+  let dest: string | null;
+  try {
+    dest = await writeSigned(tab, doc, opened, choices);
   } catch (error) {
     logError("failed to sign a PDF", forTheLog(error));
     const body = signingFailure(error);
     sendNotification({ title: TITLE, body });
     announce(body);
     return;
+  } finally {
+    setSigning(tab, false);
   }
+  if (dest === null) return;
   if (choices.place) signingPlace.value = choices.place;
-  clearSheet(tab);
+  signingInitials.value = choices.initials;
+  if (stampBooks.value.get(tab)?.book === book) clearSheet(tab);
   announce(`Signed and saved as ${basename(dest)}`);
   sendNotification({
     title: TITLE,
@@ -377,7 +368,8 @@ export const signShownPdf = (): Command => (_state, dispatch) => {
 
 /**
  * readShownRules reads what the PDF shown allows, once per file it opened;
- * one that can't be read leaves the tools waiting, which it logs by kind
+ * one that can't be read allows anything, and the signer refuses what it
+ * doesn't; that's logged by kind
  */
 export const readShownRules = async () => {
   const doc = shownPdf.value;

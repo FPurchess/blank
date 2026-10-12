@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { PDF_VIEW_ID } from "../pdf/placeholder";
-import { removeStamp, repeatStamp } from "../pdf/stampActions";
+import { focusFreed, removeStamp, repeatStamp } from "../pdf/stampActions";
 import type { Stamp } from "../pdf/stampModel";
 import IconButton from "./components/IconButton.vue";
 import type { Rect } from "./rect";
@@ -21,9 +20,11 @@ const props = defineProps<{
 const spot = computed(() => toolbarSpot(props.box));
 const stampElement = () => document.getElementById(`stamp-${props.stamp.id}`);
 
+// as Delete on the stamp: the place it filled takes the focus, else the
+// pages
 const remove = () => {
-  removeStamp(props.stamp.id);
-  document.getElementById(PDF_VIEW_ID)?.focus();
+  const removed = removeStamp(props.stamp.id);
+  if (removed) focusFreed(removed.place);
 };
 const repeat = () => repeatStamp(props.stamp.id);
 const onKeydown = (event: KeyboardEvent) => {

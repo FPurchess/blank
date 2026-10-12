@@ -86,7 +86,7 @@ export interface Session {
 const SESSION = "session";
 const tabKey = (id: string) => `tab:${id}`;
 // a PDF tab's stamps, fills and dismissed places: `{ sha256, stamps,
-// fills, dismissed, viewAnchor }`
+// fills, dismissed }`
 const stampsKey = (id: string) => `stamps:${id}`;
 
 // the documents waiting to be written, and the ones last written, by tab
@@ -174,8 +174,6 @@ const writeNow = async () => {
               stamps: kept.book.stamps,
               fills: kept.book.fills,
               dismissed: kept.book.dismissed,
-              viewAnchor:
-                tabs.value.find((tab) => tab.id === id)?.viewAnchor ?? null,
             })
           : localforage.removeItem(stampsKey(id)),
       ),

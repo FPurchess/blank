@@ -20,6 +20,7 @@ import {
   newEngine,
   settingsOf,
 } from "./engine";
+import { signingBoxes } from "./boxes";
 import { fallbackFonts, findFonts } from "./fallback";
 import { language, signingDates } from "../state";
 import {
@@ -119,16 +120,7 @@ const onSharedEngine = async ({
       ...written,
       missing: engine.missing(),
       warnings: engine.pdfWarnings(),
-      ...(signed
-        ? { signatureBox: engine.boxes(signed.pos, signed.pos + 1)[0] }
-        : {}),
-      ...(others
-        ? {
-            otherBoxes: others.map(
-              (pos) => engine.boxes(pos, pos + 1)[0] ?? null,
-            ),
-          }
-        : {}),
+      ...signingBoxes((pos) => engine.boxes(pos, pos + 1), signed?.pos, others),
     };
   } finally {
     engine.free();

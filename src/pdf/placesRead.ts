@@ -1,25 +1,58 @@
 import { computed } from "vue";
 
+import { engineless } from "../engine/engine";
 import { logWarning } from "../log";
 import { findLabels, type FoundPlace } from "../signing/labels";
 import {
   activeTabId,
+  engineMissing,
   lastPlace,
   pdfPlaces,
   shownPdf,
   shownPdfRules,
+  signingTabs,
   stampBooks,
   type TabPlaces,
 } from "../state";
 import { failureOf, type OpenedPdf, pageText, pdfFields } from "./ipc";
-import { filledOf, nextOf } from "./placeModel";
-import { placesOf } from "./places";
+import { filledOf } from "./placeModel";
+import { nextButton, placesOf } from "./places";
 import { dismissedOf, fillsOf, stampsOf } from "./stampBooks";
+import { onPages } from "./stampModel";
+import type { ToolContext } from "./toolRules";
 
 // The places of the PDF tabs: their forms' fields, read once a PDF shows,
 // and the places found by their labels, page by page in the background
 // (`pdfPlaces`); and those of the PDF shown in reading order, which are
-// filled, and where Next goes.
+// filled, and where Next goes; and what the signing tools, places and
+// fields of the PDF shown may do (`shownContext`).
+
+/**
+ * shownStamps returns the stamps of the PDF shown on the pages it has: a
+ * file opened again from elsewhere may have fewer
+ */
+export const shownStamps = () => {
+  const tab = activeTabId.value;
+  const opened = shownPdf.value?.opened;
+  return tab && opened ? onPages(stampsOf(tab), opened.pages.length) : [];
+};
+
+/**
+ * shownContext returns what the signing tools of the PDF shown may do
+ */
+export const shownContext = (): ToolContext => {
+  const tab = activeTabId.value;
+  const opened = shownPdf.value?.opened ?? null;
+  const read = shownPdfRules.value;
+  return {
+    opened,
+    rules: opened && read?.sha256 === opened.sha256 ? read.rules : null,
+    engine: !engineMissing.value && !engineless(),
+    signing: tab !== null && signingTabs.value.has(tab),
+    signatures: shownStamps().filter((stamp) => stamp.kind === "signature")
+      .length,
+  };
+};
 
 // the readings under way, by tab, so a tab is read once per PDF it opened
 const reading = new Map<string, OpenedPdf>();
@@ -82,8 +115,8 @@ export const resetPlaces = () => {
 };
 
 // the places of the PDF shown, in reading order: its fields that can be
-// filled (not those an earlier signature locked) and the places found that
-// the user didn't dismiss, on the pages it has
+// filled (those an earlier signature locked marked so) and the places found
+// that the user didn't dismiss, on the pages it has
 export const shownPlaces = computed(() => {
   void stampBooks.value;
   const tab = activeTabId.value;
@@ -112,5 +145,9 @@ export const shownFilled = computed(() => {
 
 // where Next goes in the PDF shown, and what it says
 export const shownNext = computed(() =>
-  nextOf(shownPlaces.value, shownFilled.value, lastPlace.value),
+  nextButton(
+    shownPlaces.value,
+    shownFilled.value,
+    lastPlace.value ?? undefined,
+  ),
 );

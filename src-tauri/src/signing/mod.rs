@@ -54,7 +54,7 @@ impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Refusal::Restricted => {
-                "This PDF has restrictions set by its author. Blank can't sign it yet."
+                "This PDF has restrictions set by its author. Blank can't sign it."
             }
             Refusal::Certified => "This PDF doesn't allow any changes, not even signatures",
             Refusal::SignedPages => {

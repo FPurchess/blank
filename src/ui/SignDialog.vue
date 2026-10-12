@@ -84,10 +84,15 @@ const stamp = computed(() =>
 const initialsBlocked = computed(() =>
   initialsProblem(props.request.initials.reason, !!savedMarks.value?.initials),
 );
+// why it can't be signed without a digital signature, while it would be
+const visibleBlocked = computed(() =>
+  digital.value ? "" : (props.request.visibleRefusal ?? ""),
+);
 const signs = computed(() =>
   canSign({
     stamped: props.request.stamped,
     digital: digital.value,
+    visibleRefused: !!props.request.visibleRefusal,
     confirmPages: props.request.confirmPages,
     checked: checked.value,
   }),
@@ -132,6 +137,9 @@ const signAsMenu = () =>
   signAsItems({
     certificate: certificateName.value,
     how: how.value,
+    ...(props.request.visibleRefusal
+      ? { visibleRefusal: props.request.visibleRefusal }
+      : {}),
     choose: (chosen) => {
       how.value = chosen;
       failure.value = "";
@@ -293,13 +301,16 @@ const submit = async () => {
     >
       I checked every page
     </SwitchControl>
-    <p v-if="stamp" id="sign-dialog-stamp" class="note">{{ stamp }}</p>
+    <p v-if="visibleBlocked" id="sign-dialog-visible" class="note">
+      {{ visibleBlocked }}
+    </p>
+    <p v-else-if="stamp" id="sign-dialog-stamp" class="note">{{ stamp }}</p>
     <p v-if="emptyFields" id="sign-dialog-empty" class="note">
       {{ emptyFields }}
     </p>
     <p v-if="others" id="sign-dialog-others" class="note">{{ others }}</p>
     <p v-if="digital" class="note">{{ note }}</p>
-    <template v-else-if="!request.stamped" />
+    <template v-else-if="!request.stamped || visibleBlocked" />
     <p v-else-if="!signingCertificate" class="note">
       The PDF shows your signature as a picture. A certificate also signs it
       digitally, so PDF apps show whether anything changed after you signed.

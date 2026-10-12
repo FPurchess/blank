@@ -518,7 +518,6 @@ describe("storage", () => {
         stamps: [stamp],
         fills: book.fills,
         dismissed: book.dismissed,
-        viewAnchor: null,
       });
       expect(await loadStamps("a")).toEqual({
         sha256: "abc",

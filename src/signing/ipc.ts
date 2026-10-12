@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import type { Fill, PdfRect } from "../pdf/ipc";
+
 // The calls to the native side's signing (src-tauri/src/signing/commands.rs),
 // in one place. The key never comes here: the passphrase goes there once
 // per signing, and the signed PDF comes back.
@@ -85,17 +87,13 @@ export const signingMessage = (error: unknown, fallback: string) => {
   }
 };
 
-// a place on a page: x, y, width and height in points from the top left
-// of the page as shown (its crop box after /Rotate, UserUnit applied)
-export type PageRect = [number, number, number, number];
-
 // a stamp to put in the pages' content: the one-page PDF of the body's
 // part `part`, on page `page` (from 1); `repeat` puts it on every page at
 // the same place, moved into smaller pages
 export interface StampPlan {
   part: number;
   page: number;
-  rect: PageRect;
+  rect: PdfRect;
   repeat: boolean;
 }
 
@@ -105,13 +103,13 @@ export interface StampPlan {
 export type SignaturePlan =
   | { kind: "invisible" }
   | { kind: "existing"; field: string; stamp?: number | null }
-  | { kind: "new"; page: number; rect: PageRect; stamp?: number | null };
+  | { kind: "new"; page: number; rect: PdfRect; stamp?: number | null };
 
 // an empty signature field for someone else to sign later, called
 // "Signature of ‹name›"
 export interface OtherSigner {
   page: number;
-  rect: PageRect;
+  rect: PdfRect;
   name: string;
 }
 
@@ -124,13 +122,6 @@ export interface SignPlan {
   reason: string | null;
   // an RFC 3161 server, for a timestamp
   timestampServer: string | null;
-}
-
-// a form field's new value: text (text, combo, list, the export value of a
-// radio button) or whether a box is ticked
-export interface Fill {
-  field: string;
-  value: string | boolean;
 }
 
 // where the PDF comes from: the body's part 0 (an export), or a PDF tab's
@@ -210,8 +201,8 @@ export const signPdf = async (request: SignRequest, parts: Uint8Array[]) =>
     }),
   );
 
-// what may be placed on a PDF a tab shows (`signing_pdf_rules`, the plan's
-// §6.3): whether it is signed already, its DocMDP permission (1: no changes,
+// what may be placed on a PDF a tab shows (`signing_pdf_rules`, see
+// .claude/rules/pdf.md, "Stamps"): whether it is signed already, its DocMDP permission (1: no changes,
 // 2: filling in and signing, 3: annotations too), whether it's encrypted or
 // would need repairing, and the fields earlier signatures locked
 export interface PdfRules {

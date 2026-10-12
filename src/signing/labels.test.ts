@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { PageText, Rect } from "../pdf/fields";
+import type { PageText, PdfRect as Rect } from "../pdf/ipc";
 import { findLabels, type PlaceKind } from "./labels";
 
 // The fixtures are pages as the helper reads them, each with the places it

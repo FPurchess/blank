@@ -1,5 +1,5 @@
 import type { LayoutEngine } from "./wasm/blank_layout.js";
-import { type PageBox, rectsOf } from "./boxes";
+import { type PageBox, rectsOf, signingBoxes } from "./boxes";
 
 // A PDF written by an engine of its own, from what the main thread prepared:
 // the fonts, the images, the settings and the flattened items. The PDF
@@ -104,21 +104,15 @@ export const writePdf = (
             ),
             pages: job.pages?.length ?? engine.pageCount(),
           };
-    const signed = job.signedPos;
     return {
       ...written,
       missing: engine.missing(),
       warnings: JSON.parse(engine.pdfWarnings()) as PdfWarning[],
-      ...(signed === undefined
-        ? {}
-        : { signatureBox: rectsOf(engine.boxes(signed, signed + 1))[0] }),
-      ...(job.otherPos
-        ? {
-            otherBoxes: job.otherPos.map(
-              (pos) => rectsOf(engine.boxes(pos, pos + 1))[0] ?? null,
-            ),
-          }
-        : {}),
+      ...signingBoxes(
+        (pos) => rectsOf(engine.boxes(pos, pos + 1)),
+        job.signedPos,
+        job.otherPos,
+      ),
     };
   } finally {
     try {

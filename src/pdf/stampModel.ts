@@ -1,8 +1,13 @@
 import type { PageSize } from "../engine/frames";
+import {
+  INITIALS_BOX,
+  INITIALS_STAMP,
+  initialsRect,
+} from "../signing/initials";
 import type { Mark } from "../signing/profile";
-import type { Rect } from "./fields";
-import type { Fill } from "./ipc";
-import type { StampSpec } from "./stamps";
+import type { Fill, PdfRect as Rect } from "./ipc";
+import { readingOrder } from "./places";
+import { LINE_SIZE, type StampSpec } from "./stamps";
 
 // The stamps placed on a PDF's pages, and what the keys and the mouse do to
 // them (see .claude/rules/pdf.md, "Stamps"): place, move, nudge, resize with
@@ -45,16 +50,12 @@ export const MAX_SCALE = 3;
 // how far the keys move or resize, in points, and with Shift
 export const STEP = 1;
 export const BIG_STEP = 10;
-// the room between a signature and the date or place below it, and from
-// the page's edges for initials, in points
+// the room between a signature and the date or place below it, in points
 export const GAP = 6;
-export const EDGE = 36;
-// the size of the lines of a date or place, in points
-export const LINE_SIZE = 11;
 // the box a signature or initials is contained in when placed freely
 export const MARK_BOX: Record<Mark, readonly [number, number]> = {
   signature: [180, 60],
-  initials: [56, 28],
+  initials: [INITIALS_BOX.width, INITIALS_BOX.height],
 };
 
 // what a stamp is called, for the screen reader and the announcements
@@ -70,9 +71,11 @@ export const STAMP_NAMES: Record<StampKind, string> = {
  * initials, or one line of text (the date, the place)
  */
 export const stampSpec = (kind: StampKind, line = ""): StampSpec =>
-  kind === "signature" || kind === "initials"
-    ? { image: kind, lines: [], size: LINE_SIZE, align: "center" }
-    : { lines: [line], size: LINE_SIZE, align: "left" };
+  kind === "initials"
+    ? { ...INITIALS_STAMP }
+    : kind === "signature"
+      ? { image: kind, lines: [], size: LINE_SIZE, align: "center" }
+      : { lines: [line], size: LINE_SIZE, align: "left" };
 
 /**
  * markSize returns the size of a signature or initials placed freely: its
@@ -237,15 +240,6 @@ export const toggleRepeat = (
       : stamp,
   );
 
-/**
- * readingOrder returns `stamps` as they're read: by page, then from the top,
- * then from the left, which the DOM and so Tab follow
- */
-export const readingOrder = (stamps: readonly Stamp[]): readonly Stamp[] =>
-  [...stamps].sort(
-    (a, b) => a.page - b.page || a.rect[1] - b.rect[1] || a.rect[0] - b.rect[0],
-  );
-
 // a repeated stamp as it shows on a page other than its own
 export interface Ghost {
   stamp: Stamp;
@@ -286,9 +280,9 @@ export interface Shown {
 
 /**
  * defaultSpot returns where a stamp of `kind`, `size` points large, goes on
- * the page `page` of `sizes` when it's placed from the keyboard (§4.4):
- * a signature centred in the lower third of what shows of the page;
- * initials at its bottom right; a date or place below the last signature
+ * the page `page` of `sizes` when it's placed from the keyboard: a
+ * signature centred in the lower third of what shows of the page; initials
+ * in its bottom right corner, as on every page of a signed export; a date or place below the last signature
  * stamp (and what was placed below it already), else as a signature
  */
 export const defaultSpot = (
@@ -306,12 +300,7 @@ export const defaultSpot = (
   });
   const pageSize = sizes[page];
   if (kind === "initials")
-    return on(page, [
-      pageSize.width - w - EDGE,
-      pageSize.height - h - EDGE,
-      w,
-      h,
-    ]);
+    return on(page, initialsRect(pageSize, "right", [w, h]));
   const signature = [...stamps]
     .reverse()
     .find((stamp) => stamp.kind === "signature");

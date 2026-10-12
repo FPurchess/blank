@@ -9,17 +9,21 @@ import type { Place } from "../pdf/places";
 import { lastPlace } from "../state";
 import { styleOf } from "./rect";
 import { stampBox } from "./stampOverlayModel";
+import { tipAttrs } from "./tooltipModel";
 
 // A place to sign or date on a PDF's page (PdfView.vue): a signature field
 // of its form, or a place found by its label, as a dashed box in the
 // accent. Enter, Space or a click fills it with its stamp; Delete dismisses
-// a found place (undoable), never a field.
+// a found place (undoable), never a field. One that can't be filled in now
+// says why in its tooltip, and when pressed.
 const props = defineProps<{
   place: Place;
   // the page it shows on
   frame: Frame;
   // CSS pixels per point
   scale: number;
+  // why it can't be filled in now, null when it can
+  refusal: string | null;
 }>();
 
 const box = computed(() =>
@@ -53,6 +57,8 @@ const onKeydown = (event: KeyboardEvent) => {
     class="pdf-target"
     :data-kind="place.kind"
     :aria-label="placeLabel(place)"
+    :aria-disabled="refusal ? true : undefined"
+    v-bind="refusal ? tipAttrs({ name: refusal }) : {}"
     :style="styleOf(box)"
     @click="fill"
     @keydown="onKeydown"
