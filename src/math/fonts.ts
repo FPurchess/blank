@@ -74,10 +74,15 @@ export const wantMathFonts = () => {
 export const loadMathFonts = () =>
   (loading ??= (async () => {
     const fonts: FallbackFont[] = await Promise.all(
-      MATH_FONTS.map(async ([name, url]) => ({
-        family: `${MATH_FAMILY}${name}`,
-        bytes: new Uint8Array(await (await fetch(url)).arrayBuffer()),
-      })),
+      MATH_FONTS.map(async ([name, url]) => {
+        const response = await fetch(url);
+        // a failed request is no font: tried again, not added broken
+        if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+        return {
+          family: `${MATH_FAMILY}${name}`,
+          bytes: new Uint8Array(await response.arrayBuffer()),
+        };
+      }),
     );
     fallbackFonts.value = [...fallbackFonts.value, ...fonts];
   })().catch((error: unknown) => {

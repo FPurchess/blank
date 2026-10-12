@@ -24,8 +24,15 @@ export const inlineMarkdown = (node: Node): string => {
   const source = node.textContent;
   const delim = node.attrs.delim as string;
   if (delim === "backtick" && !source.includes("`$")) return `$\`${source}\`$`;
-  if (delim === "display" && !source.includes("$$") && source.trim()) {
-    return `$$${source}$$`;
+  // $$…$$ reads up to the first $$ after the opening one, which a source
+  // ending in $ (x\$) would bring forward
+  const display = `$$${source}$$`;
+  if (
+    delim === "display" &&
+    source.trim() &&
+    display.indexOf("$$", 2) === source.length + 2
+  ) {
+    return display;
   }
   const dollars = `$${source}$`;
   const read = scanDollarMath(dollars, 0);
@@ -92,7 +99,7 @@ const opensMath = (text: string, at: number) => {
  * would read as the start of math, as it reads: not in code spans, link
  * destinations and autolinks, which it reads as such first, nor in the math
  * Blank wrote (between MARKs). Escaping one can make the next one open
- * math, so it goes on until none does.
+ * math, so it reads on after each it escaped, until none does.
  */
 export const escapeDollars = (markdown: string): string => {
   if (!markdown.includes("$")) return markdown.replaceAll(MARK, "");
@@ -108,22 +115,29 @@ export const escapeDollars = (markdown: string): string => {
     chars.push(char);
     kept.push(inMath);
   }
-  for (let round = 0; round < 50; round++) {
-    const text = chars.join("");
-    const at = firstOpening(text, kept);
+  let text = chars.join("");
+  let from = 0;
+  for (;;) {
+    const at = firstOpening(text, kept, from);
     if (at < 0) break;
     chars.splice(at, 0, "\\");
     kept.splice(at, 0, false);
+    text = chars.join("");
+    // on from the escaped one, or from the $s right before it, which
+    // "$$" read with it before and may now open math alone
+    from = at;
+    while (from > 0 && text[from - 1] === "$" && !kept[from - 1]) from--;
+    if (from === at) from = at + 2;
   }
-  return chars.join("");
+  return text;
 };
 
 /**
- * firstOpening returns where the first `$` of text that would open math is,
- * or -1
+ * firstOpening returns where the first `$` of text from `from` on that would
+ * open math is, or -1
  */
-const firstOpening = (text: string, kept: boolean[]): number => {
-  let at = 0;
+const firstOpening = (text: string, kept: boolean[], from: number): number => {
+  let at = from;
   while (at < text.length) {
     if (kept[at]) {
       at++;
@@ -153,9 +167,9 @@ const firstOpening = (text: string, kept: boolean[]): number => {
       continue;
     }
     // an autolink
-    const autolink = /^<[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]*>/.exec(
-      text.slice(at, at + 2000),
-    );
+    const autolink =
+      char === "<" &&
+      /^<[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]*>/.exec(text.slice(at, at + 2000));
     if (autolink) {
       at += autolink[0].length;
       continue;

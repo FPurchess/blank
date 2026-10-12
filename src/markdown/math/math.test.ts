@@ -101,6 +101,16 @@ describe("math in markdown", () => {
     expect(parseMarkdown(markdown).textContent).toBe("a $x$ b");
   });
 
+  it("escapes every $ of a long text that would read as math", () => {
+    const text = "a $x$ b ".repeat(80) + "$$y$ z";
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text(text)]),
+    ]);
+    const again = parseMarkdown(serializeMarkdown(doc));
+    expect(maths(again)).toEqual([]);
+    expect(again.textContent).toBe(text);
+  });
+
   it("escapes a $ of text before math", () => {
     const doc = schema.node("doc", null, [
       schema.node("paragraph", null, [
@@ -150,6 +160,18 @@ describe("math in markdown", () => {
       { type: "math_inline", source: "x", attrs: { delim: "display" } },
     ]);
     expect(roundTrip(markdown)).toBe(markdown);
+  });
+
+  it("keeps a source ending in $ that was written as $$…$$", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [
+        schema.text("a "),
+        schema.node("math_inline", { delim: "display" }, [schema.text("x\\$")]),
+        schema.text(" b"),
+      ]),
+    ]);
+    const again = parseMarkdown(serializeMarkdown(doc));
+    expect(maths(again).map((math) => math.source)).toEqual(["x\\$"]);
   });
 
   it("keeps any source of display math through a save", () => {
