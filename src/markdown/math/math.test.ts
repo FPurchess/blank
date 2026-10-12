@@ -162,6 +162,17 @@ describe("math in markdown", () => {
     expect(roundTrip(markdown)).toBe(markdown);
   });
 
+  it("writes a formula of only spaces as those spaces, not as \\( \\)", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [
+        schema.text("a"),
+        schema.node("math_inline", null, [schema.text(" ")]),
+        schema.text("b"),
+      ]),
+    ]);
+    expect(serializeMarkdown(doc).trim()).toBe("a b");
+  });
+
   it("keeps a source ending in $ that was written as $$…$$", () => {
     const doc = schema.node("doc", null, [
       schema.node("paragraph", null, [

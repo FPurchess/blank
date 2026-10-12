@@ -16,7 +16,7 @@ use crate::text::TextBox;
 /// `\tag` (or `\tag*`), or says it has none with `\notag` or `\nonumber`,
 /// as amsmath and pandoc read them. The control word itself counts, not
 /// `\tagged`, nor one in a comment. The Word export asks the same
-/// (`unnumbered` in src/exporters/docx/math.ts)
+/// (`unnumbered` in src/math/labels.ts)
 pub(crate) fn unnumbered(latex: &str) -> bool {
     let mut chars = latex.chars().peekable();
     while let Some(next) = chars.next() {

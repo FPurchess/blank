@@ -18,10 +18,13 @@ const MARK = "";
 /**
  * inlineMarkdown returns how inline math is written: `$…$` where that reads
  * back as the same source, GitHub's ``$`…`$`` or `$$…$$` as the file had
- * it, `\(…\)` otherwise (a source with a space at either end, or with a `$`)
+ * it, `\(…\)` otherwise (a source with a space at either end, or with a `$`),
+ * and a source of only spaces as those spaces
  */
 export const inlineMarkdown = (node: Node): string => {
   const source = node.textContent;
+  // only spaces, which no way of writing math reads back: the spaces
+  if (!source.trim()) return source;
   const delim = node.attrs.delim as string;
   if (delim === "backtick" && !source.includes("`$")) return `$\`${source}\`$`;
   // $$…$$ reads up to the first $$ after the opening one, which a source

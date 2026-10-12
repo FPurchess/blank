@@ -110,6 +110,14 @@ describe("inline math in the editor", () => {
     expect(view.state.doc.textContent).toBe("a  b");
   });
 
+  it("removes a formula of only spaces once left", () => {
+    const { view } = setUp(4, " ");
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)),
+    );
+    expect(view.state.doc.firstChild!.childCount).toBe(1);
+  });
+
   it("removes a formula left empty by an edit that moved it", () => {
     const { view } = setUp(4, "");
     // text typed at the start of the paragraph moves it, and the caret

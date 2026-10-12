@@ -219,8 +219,14 @@ const previewOf = (source: string) => {
 };
 
 /**
- * emptyLeft returns the transaction that removes inline math left empty
- * once the selection left it, or null
+ * blank tells whether inline math holds nothing but spaces, which no way of
+ * writing math reads back as math
+ */
+const blank = (node: Node) => !node.textContent.trim();
+
+/**
+ * emptyLeft returns the transaction that removes inline math left empty, or
+ * with only spaces, once the selection left it, or null
  */
 const emptyLeft = (
   transactions: readonly Transaction[],
@@ -228,13 +234,13 @@ const emptyLeft = (
   state: EditorState,
 ) => {
   const was = mathAround(old);
-  if (!was || was.node.content.size > 0) return null;
+  if (!was || !blank(was.node)) return null;
   const now = mathAround(state);
   // where it is now, after what the transactions changed
   const pos = transactions.reduce((at, tr) => tr.mapping.map(at, 1), was.pos);
   const node = state.doc.nodeAt(pos);
   if (now?.pos === pos || node?.type.name !== "math_inline") return null;
-  if (node.content.size > 0) return null;
+  if (!blank(node)) return null;
   return state.tr.delete(pos, pos + node.nodeSize);
 };
 
