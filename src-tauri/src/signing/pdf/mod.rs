@@ -56,7 +56,7 @@ fn looks_like_xref_at(bytes: &[u8], at: usize) -> bool {
 /// the most one of a PDF's object or cross-reference streams may
 /// decompress to while it's read: lopdf decodes them all up front, so a
 /// small file could otherwise fill the memory (a decompression bomb)
-const MAX_DECOMPRESSED: usize = 128 << 20;
+pub(super) const MAX_DECOMPRESSED: usize = 128 << 20;
 
 /// load_bounded reads a PDF Blank didn't write, its streams decompressed
 /// within `MAX_DECOMPRESSED` each

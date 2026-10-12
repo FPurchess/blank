@@ -7,7 +7,7 @@ use anyhow::{bail, Context, Result};
 use lopdf::{dictionary, Dictionary, IncrementalDocument, Object, ObjectId, Stream};
 
 use super::xobject::Imported;
-use super::{current, inherited, reals, resolve, PageGeometry};
+use super::{current, inherited, reals, resolve, PageGeometry, MAX_DECOMPRESSED};
 
 /// a stamp to draw on a page
 #[derive(Debug, Clone, Copy)]
@@ -97,18 +97,9 @@ pub fn draw_on_page(incr: &mut IncrementalDocument, page: ObjectId, draws: &[Dra
         .and_then(|x| x.as_dict().ok())
         .cloned()
         .unwrap_or_default();
-    let mut ops = String::from("\nQ\n");
-    for draw in draws {
-        let name = free_name(&xobjects);
-        xobjects.set(name.as_bytes(), draw.form.id);
-        ops.push_str(&format!(
-            "q {} /{name} Do Q\n",
-            cm(&matrix(&geo, &draw.form, draw.rect))
-        ));
-    }
-    resources.set("XObject", xobjects);
-
-    // the content: [q, the old streams…, Q and the stamps]
+    // the content: [q…, the old streams…, Q… and the stamps], with a q for
+    // each Q the page has too many and a Q for each q it leaves open, so the
+    // stamps are drawn in the page's own space whatever its content does
     let mut contents: Vec<Object> = match page_dict.get(b"Contents") {
         Ok(Object::Array(a)) => a.clone(),
         Ok(Object::Reference(r)) => match current(incr, *r)? {
@@ -119,9 +110,24 @@ pub fn draw_on_page(incr: &mut IncrementalDocument, page: ObjectId, draws: &[Dra
         Ok(_) => bail!("a page's /Contents isn't a stream or an array"),
         Err(_) => vec![],
     };
-    let open = incr
-        .new_document
-        .add_object(Stream::new(Dictionary::new(), b"q\n".to_vec()));
+    let (closes, depth) = nesting(incr, &contents);
+    // what is open after the page: Blank's q, and the page's own
+    let open = (1 + closes as i64 + depth).max(1) as usize;
+    let mut ops = format!("\n{}", "Q\n".repeat(open));
+    for draw in draws {
+        let name = free_name(&xobjects);
+        xobjects.set(name.as_bytes(), draw.form.id);
+        ops.push_str(&format!(
+            "q {} /{name} Do Q\n",
+            cm(&matrix(&geo, &draw.form, draw.rect))
+        ));
+    }
+    resources.set("XObject", xobjects);
+
+    let open = incr.new_document.add_object(Stream::new(
+        Dictionary::new(),
+        "q\n".repeat(1 + closes).into_bytes(),
+    ));
     let close = incr
         .new_document
         .add_object(Stream::new(Dictionary::new(), ops.into_bytes()));
@@ -133,6 +139,43 @@ pub fn draw_on_page(incr: &mut IncrementalDocument, page: ObjectId, draws: &[Dra
     p.set("Contents", Object::Array(contents));
     p.set("Resources", resources);
     Ok(())
+}
+
+/// nesting reads the page content `contents` and returns how many more Q
+/// than q it has at its lowest, and how many more q than Q at its end
+/// (fewer than none if its Qs win); (0, 0) for content that can't be read,
+/// as most is balanced
+fn nesting(incr: &IncrementalDocument, contents: &[Object]) -> (usize, i64) {
+    let mut bytes = vec![];
+    for part in contents {
+        let Object::Reference(id) = part else {
+            continue;
+        };
+        let Ok(Object::Stream(stream)) = current(incr, *id) else {
+            return (0, 0);
+        };
+        let Ok(content) = stream.decompressed_content_with_limit(MAX_DECOMPRESSED) else {
+            return (0, 0);
+        };
+        bytes.extend_from_slice(&content);
+        // streams are one content, split between tokens
+        bytes.push(b'\n');
+    }
+    let Ok(content) = lopdf::content::Content::decode(&bytes) else {
+        return (0, 0);
+    };
+    let (mut depth, mut lowest) = (0i64, 0i64);
+    for operation in &content.operations {
+        match operation.operator.as_str() {
+            "q" => depth += 1,
+            "Q" => {
+                depth -= 1;
+                lowest = lowest.min(depth);
+            }
+            _ => {}
+        }
+    }
+    ((-lowest) as usize, depth)
 }
 
 /// appearance is a widget's appearance: a form of `w` × `h` points
@@ -166,6 +209,85 @@ pub fn appearance(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// stamped draws a stamp on the one page of a PDF whose content is
+    /// `content`, and returns the page's content after
+    fn stamped(content: &[u8]) -> Vec<lopdf::content::Operation> {
+        let mut doc = lopdf::Document::with_version("1.7");
+        let pages = doc.new_object_id();
+        let stream = doc.add_object(Stream::new(Dictionary::new(), content.to_vec()));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page", "Parent" => pages, "Contents" => stream,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        doc.objects.insert(
+            pages,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1,
+            }),
+        );
+        let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages });
+        doc.trailer.set("Root", catalog);
+        let mut bytes = vec![];
+        doc.save_to(&mut bytes).unwrap();
+        let prev = lopdf::Document::load_mem(&bytes).unwrap();
+        let mut incr = IncrementalDocument::create_from(bytes, prev);
+        let form = incr.new_document.add_object(Stream::new(
+            dictionary! { "Type" => "XObject", "Subtype" => "Form", "BBox" => reals(&[0., 0., 10., 10.]) },
+            vec![],
+        ));
+        let draw = Draw {
+            form: Imported {
+                id: form,
+                width: 10.,
+                height: 10.,
+            },
+            rect: [100., 100., 10., 10.],
+        };
+        draw_on_page(&mut incr, page, &[draw]).unwrap();
+        let Object::Array(parts) = incr
+            .new_document
+            .get_dictionary(page)
+            .unwrap()
+            .get(b"Contents")
+            .unwrap()
+        else {
+            panic!("no contents");
+        };
+        let mut all = vec![];
+        for part in parts {
+            let id = part.as_reference().unwrap();
+            let stream = current(&incr, id).unwrap().as_stream().unwrap();
+            all.extend_from_slice(&stream.content);
+            all.push(b'\n');
+        }
+        lopdf::content::Content::decode(&all).unwrap().operations
+    }
+
+    #[test]
+    fn draws_stamps_in_the_pages_own_space_however_its_content_nests() {
+        // balanced, a q left open with a scale, a Q too many
+        for content in [
+            &b"q 2 0 0 2 0 0 cm Q"[..],
+            b"q 2 0 0 2 0 0 cm",
+            b"Q 2 0 0 2 0 0 cm",
+        ] {
+            let mut depth = 0;
+            let mut at_stamp = None;
+            for operation in stamped(content) {
+                match operation.operator.as_str() {
+                    "q" => depth += 1,
+                    "Q" => depth -= 1,
+                    "Do" => at_stamp = Some(depth),
+                    _ => {}
+                }
+                assert!(depth >= 0, "a Q pops what isn't there");
+            }
+            // inside its own q alone, and nothing left open
+            assert_eq!(at_stamp, Some(1));
+            assert_eq!(depth, 0);
+        }
+    }
 
     #[test]
     fn repeats_a_stamp_as_far_from_the_nearer_edges() {
