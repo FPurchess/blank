@@ -2,6 +2,7 @@
 import {
   computed,
   onBeforeUnmount,
+  onMounted,
   shallowRef,
   useTemplateRef,
   watch,
@@ -66,8 +67,9 @@ const selected = computed(
 );
 const label = computed(() => stampLabel(props.stamp, selected.value));
 
-// painted again when it looks different or shows at another size, and once
-// the user's signature, which it shows, has loaded
+// painted once it's mounted (an immediate watcher would run in setup, before
+// the canvas is there), and again when it looks different or shows at another
+// size, and once the user's signature, which it shows, has loaded
 // (each stamp engine paints one after the other, so the last one asked
 // shows)
 const paint = async () => {
@@ -91,8 +93,9 @@ watch(
     savedMarks.value,
   ],
   paint,
-  { flush: "post", immediate: true },
+  { flush: "post" },
 );
+onMounted(paint);
 
 const pages = () => document.getElementById(PDF_VIEW_ID);
 

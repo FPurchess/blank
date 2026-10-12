@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cancelRender, renderPage } from "../pdf/ipc";
 import { changeStamps, stampsOf } from "../pdf/stampBooks";
+import { paintStamp } from "../pdf/stampEngine";
 import { stampSpec } from "../pdf/stampModel";
 import { announcement, placingStamp, selectedStamp } from "../state";
 import { flushPromises } from "../test/async";
@@ -95,6 +96,31 @@ describe("stamps on a PDF's pages", () => {
     ]);
     expect(groups().every((group) => group.tabIndex === 0)).toBe(true);
     expect(stampEl().getAttribute("aria-label")).toBe("Signature on page 1");
+  });
+
+  it("paint their canvas once mounted, without waiting for a change", () => {
+    const painted = vi.mocked(paintStamp).mock.calls.map((call) => call[1]);
+    for (const group of groups())
+      expect(painted).toContain(group.querySelector("canvas"));
+  });
+
+  it("paint a repeated stamp's faded copies once they mount", async () => {
+    changeStamps("t", [
+      stamp({
+        id: "i",
+        kind: "initials",
+        repeat: true,
+        spec: stampSpec("initials"),
+      }),
+    ]);
+    await flushPromises();
+    const painted = vi.mocked(paintStamp).mock.calls.map((call) => call[1]);
+    const ghosts = [
+      ...document.querySelectorAll<HTMLElement>(".pdf-stamp.ghost"),
+    ];
+    expect(ghosts.length).toBeGreaterThan(0);
+    for (const ghost of ghosts)
+      expect(painted).toContain(ghost.querySelector("canvas"));
   });
 
   it("are selected when they take the focus, with their ring, corners and toolbar", async () => {
