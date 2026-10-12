@@ -311,13 +311,15 @@ struct State {
 }
 
 /// the request that runs: its ticket, its id and where to write a cancel;
-/// and the tickets cancelled before their request was written (while it
-/// waited for the helper to start, or for the request before it), the last
-/// `CANCELLED_KEPT` of them
+/// the tickets cancelled before their request was written (while it waited
+/// for the helper to start, or for the request before it), the last
+/// `CANCELLED_KEPT` of them; and the last ticket written, since a cancel of
+/// one up to it comes after its request finished
 #[derive(Default)]
 struct InFlight {
     running: Option<(u64, u64, Arc<Mutex<ChildStdin>>)>,
     cancelled: VecDeque<u64>,
+    last: u64,
 }
 
 /// how many tickets cancelled ahead of their request are remembered: more
@@ -391,6 +393,8 @@ impl Supervisor {
         let mut in_flight = locked(&self.in_flight);
         match &in_flight.running {
             Some((running, id, stdin)) if *running == ticket => send_cancel(stdin, *id),
+            // its request finished already: nothing to stop
+            _ if ticket <= in_flight.last => {}
             _ => {
                 if in_flight.cancelled.len() == CANCELLED_KEPT {
                     in_flight.cancelled.pop_front();
@@ -448,6 +452,7 @@ impl Supervisor {
                     in_flight.cancelled.remove(at);
                     send_cancel(&stdin, id);
                 }
+                in_flight.last = in_flight.last.max(ticket);
                 in_flight.running = Some((ticket, id, stdin));
             }
         });

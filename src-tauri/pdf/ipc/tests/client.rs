@@ -121,6 +121,16 @@ fn drops_a_render_cancelled_before_it_was_sent() {
 }
 
 #[test]
+fn ignores_a_cancel_that_comes_after_its_render() {
+    let pdf = supervisor(&["ok", "ok"]);
+    assert!(render(&pdf, 1).is_ok());
+    // its answer was on its way back already
+    pdf.cancel(1);
+    assert!(render(&pdf, 0).is_ok());
+    assert!(render(&pdf, 1).is_ok());
+}
+
+#[test]
 fn kills_a_hang_and_starts_again_once() {
     let pdf = supervisor(&["stuck", "ok"]);
     assert_eq!(render(&pdf, 0).unwrap_err(), PdfError::Hung);

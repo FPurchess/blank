@@ -59,7 +59,9 @@ describe("RenderQueue", () => {
 
     queue.want([job(5)]);
 
-    expect(renderer.cancel).toHaveBeenCalledWith(job(1), 1);
+    // the ticket it was drawn with
+    const ticket = (vi.mocked(renderer.render).mock.calls[0] as unknown[])[1];
+    expect(renderer.cancel).toHaveBeenCalledWith(job(1), ticket);
     await finish();
     expect(pending.map(({ page }) => page)).toEqual([5]);
     expect(renderer.render).not.toHaveBeenCalledWith(

@@ -150,7 +150,12 @@ describe("the page view of PDFs", () => {
     expect(view()?.getAttribute("aria-label")).toBe("contract.pdf");
     expect(document.getElementById("page-view")).toBeNull();
     expect(view()!.querySelectorAll(".pdf-page").length).toBeGreaterThan(0);
-    expect(renderPage).toHaveBeenCalledWith("t", 0, expect.any(Number), 1);
+    expect(renderPage).toHaveBeenCalledWith(
+      "t",
+      0,
+      expect.any(Number),
+      expect.any(Number),
+    );
     expect(pdfBitmaps.size).toBeGreaterThan(0);
     expect(pdfPageInView.value).toBe(0);
   });

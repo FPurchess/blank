@@ -34,10 +34,14 @@ interface Running {
   cancelled: boolean;
 }
 
+// the last ticket given out: tickets never repeat while Blank runs, also
+// across the queues of a PDF view mounted again, so a late cancel of one
+// can't stop another render that got its number
+let tickets = 0;
+
 export class RenderQueue<T> {
   private wanted = new Map<string, RenderJob>();
   private running: Running | null = null;
-  private tickets = 0;
 
   constructor(private renderer: Renderer<T>) {}
 
@@ -73,7 +77,7 @@ export class RenderQueue<T> {
       other.priority < first.priority ? other : first,
     );
     this.wanted.delete(job.key);
-    const running = { job, ticket: ++this.tickets, cancelled: false };
+    const running = { job, ticket: ++tickets, cancelled: false };
     this.running = running;
     this.renderer.render(job, running.ticket).then(
       (bitmap) => this.finish(running, { bitmap }),
