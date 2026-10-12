@@ -516,13 +516,10 @@ fn calls_an_emptied_dictionary_or_an_array_of_numbers_a_change() {
     }
 }
 
-#[test]
-fn calls_an_object_freed_after_signing_a_change() {
-    let signed = sign_as(key(), PASSPHRASE, &pdf(), &options(None), &[]).unwrap();
-    let mut out = validated(&signed, |_| {}, |_| vec![]);
-    // another update, whose cross-reference table marks the page's content
-    // stream free
-    let doc = Document::load_mem(&out).unwrap();
+/// with_contents_freed adds an update to `pdf` whose cross-reference table
+/// marks the first page's content stream free
+fn with_contents_freed(mut pdf: Vec<u8>) -> Vec<u8> {
+    let doc = Document::load_mem(&pdf).unwrap();
     let page = *doc.get_pages().get(&1).unwrap();
     let (number, generation) = doc
         .get_dictionary(page)
@@ -531,7 +528,7 @@ fn calls_an_object_freed_after_signing_a_change() {
         .unwrap()
         .as_reference()
         .unwrap();
-    let text = String::from_utf8_lossy(&out).into_owned();
+    let text = String::from_utf8_lossy(&pdf).into_owned();
     let prev: usize = text
         .rsplit("startxref")
         .next()
@@ -543,8 +540,8 @@ fn calls_an_object_freed_after_signing_a_change() {
         .unwrap();
     let root = doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
     let size = doc.trailer.get(b"Size").unwrap().as_i64().unwrap();
-    let at = out.len() + 1;
-    out.extend_from_slice(
+    let at = pdf.len() + 1;
+    pdf.extend_from_slice(
         format!(
             "\nxref\n{number} 1\n0000000000 {:05} f\r\ntrailer\n<< /Size {size} /Root {} {} R /Prev {prev} >>\nstartxref\n{at}\n%%EOF\n",
             generation + 1,
@@ -553,6 +550,13 @@ fn calls_an_object_freed_after_signing_a_change() {
         )
         .as_bytes(),
     );
+    pdf
+}
+
+#[test]
+fn calls_an_object_freed_after_signing_a_change() {
+    let signed = sign_as(key(), PASSPHRASE, &pdf(), &options(None), &[]).unwrap();
+    let out = with_contents_freed(validated(&signed, |_| {}, |_| vec![]));
     let reports = verify_pdf(&out).unwrap();
     assert_eq!(reports[0].coverage, Coverage::ChangedAfterSigning);
 }
@@ -781,6 +785,46 @@ fn keeps_a_signature_valid_that_later_revisions_only_signed_again() {
     // who signed next is still said
     assert_eq!(shown[0].later_signer.as_deref(), Some(rsa_name.as_str()));
     assert_eq!(shown[2].later_signer, None);
+}
+
+#[test]
+fn calls_a_page_content_rewritten_before_a_later_signature_a_change() {
+    let first = signed(key(), &pdf(), &options(None));
+    // the page's content stream rewritten in place, under its own number
+    let doc = Document::load_mem(&first).unwrap();
+    let page = *doc.get_pages().values().next().unwrap();
+    let contents = doc
+        .get_dictionary(page)
+        .unwrap()
+        .get(b"Contents")
+        .unwrap()
+        .as_reference()
+        .unwrap();
+    let mut update = lopdf::IncrementalDocument::create_from(first.clone(), doc);
+    update.new_document.objects.insert(
+        contents,
+        Object::Stream(Stream::new(
+            dictionary! {},
+            b"BT /F1 12 Tf 72 700 Td (Changed) Tj ET".to_vec(),
+        )),
+    );
+    let mut changed = vec![];
+    update.save_to(&mut changed).unwrap();
+    let twice = signed(RSA_KEY, &changed, &options(None));
+    assert_eq!(
+        verify_pdf(&twice).unwrap()[0].coverage,
+        Coverage::SignedAgainLater
+    );
+}
+
+#[test]
+fn calls_a_page_content_freed_before_a_later_signature_a_change() {
+    let first = signed(key(), &pdf(), &options(None));
+    let twice = signed(RSA_KEY, &with_contents_freed(first), &options(None));
+    assert_eq!(
+        verify_pdf(&twice).unwrap()[0].coverage,
+        Coverage::SignedAgainLater
+    );
 }
 
 #[test]
