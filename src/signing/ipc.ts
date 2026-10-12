@@ -247,7 +247,8 @@ export interface CheckedSignature {
   timestampTrusted: boolean;
   // the weak algorithm it relies on ("SHA-1"), if it does
   weak: string | null;
-  // for signedAgainLater: who signed next, after the changes
+  // for signedAgainLater, and for a valid one that later revisions only
+  // signed again: who signed next
   laterSigner: string | null;
   reason: string | null;
   location: string | null;

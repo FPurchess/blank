@@ -436,7 +436,7 @@ fn calls_a_page_its_own_dss_lists_written_again_a_change() {
     doc.get_dictionary_mut(root).unwrap().set("DSS", dss);
     let mut prepared = vec![];
     doc.save_to(&mut prepared).unwrap();
-    let signed = sign(key(), PASSPHRASE, &prepared, &options(None)).unwrap();
+    let signed = sign_as(key(), PASSPHRASE, &prepared, &options(None), &[]).unwrap();
     let out = validated(
         &signed,
         |update| {
@@ -738,7 +738,19 @@ fn refuses_a_signature_without_the_timestamp_asked_for() {
 #[test]
 fn says_which_signature_signed_the_changes_after_an_earlier_one() {
     let first = signed(key(), &pdf(), &options(None));
-    let twice = signed(RSA_KEY, &first, &options(None));
+    // a change that isn't a signature: the page gains a key
+    let doc = Document::load_mem(&first).unwrap();
+    let page = *doc.get_pages().values().next().unwrap();
+    let mut update = lopdf::IncrementalDocument::create_from(first.clone(), doc);
+    update.opt_clone_object_to_new_document(page).unwrap();
+    update
+        .new_document
+        .get_dictionary_mut(page)
+        .unwrap()
+        .set("Rotate", 90);
+    let mut changed = vec![];
+    update.save_to(&mut changed).unwrap();
+    let twice = signed(RSA_KEY, &changed, &options(None));
     let reports = verify_pdf(&twice).unwrap();
     let rsa_name = reports[1].signer.as_ref().unwrap().name.clone();
     let shown = trust::checked_all(reports, None, &Default::default());
@@ -746,4 +758,54 @@ fn says_which_signature_signed_the_changes_after_an_earlier_one() {
     assert_eq!(shown[0].later_signer.as_deref(), Some(rsa_name.as_str()));
     assert_eq!(shown[1].status, trust::Status::Valid);
     assert_eq!(shown[1].later_signer, None);
+}
+
+#[test]
+fn keeps_a_signature_valid_that_later_revisions_only_signed_again() {
+    let first = signed(key(), &pdf(), &options(Some([72., 72., 200., 50.])));
+    // a second signer in a field of its own, then a third invisibly
+    let twice = signed(RSA_KEY, &first, &options(Some([300., 72., 200., 50.])));
+    let thrice = signed(key(), &twice, &options(None));
+    let reports = verify_pdf(&thrice).unwrap();
+    assert_eq!(
+        reports.iter().map(|r| r.coverage).collect::<Vec<_>>(),
+        [
+            crate::signing::verify::Coverage::SignedOnlyAgain,
+            crate::signing::verify::Coverage::SignedOnlyAgain,
+            crate::signing::verify::Coverage::WholeFile,
+        ]
+    );
+    let rsa_name = reports[1].signer.as_ref().unwrap().name.clone();
+    let shown = trust::checked_all(reports, None, &Default::default());
+    assert!(shown.iter().all(|s| s.status == trust::Status::Valid));
+    // who signed next is still said
+    assert_eq!(shown[0].later_signer.as_deref(), Some(rsa_name.as_str()));
+    assert_eq!(shown[2].later_signer, None);
+}
+
+#[test]
+fn calls_a_note_added_before_a_later_signature_a_change() {
+    let first = signed(key(), &pdf(), &options(None));
+    // a new annotation that isn't a signature's, on the page
+    let doc = Document::load_mem(&first).unwrap();
+    let page = *doc.get_pages().values().next().unwrap();
+    let mut update = lopdf::IncrementalDocument::create_from(first.clone(), doc);
+    let note = update.new_document.add_object(dictionary! {
+        "Type" => "Annot", "Subtype" => "Text",
+        "Rect" => vec![0.into(), 0.into(), 10.into(), 10.into()],
+    });
+    update.opt_clone_object_to_new_document(page).unwrap();
+    update
+        .new_document
+        .get_dictionary_mut(page)
+        .unwrap()
+        .set("Annots", vec![Object::Reference(note)]);
+    let mut noted = vec![];
+    update.save_to(&mut noted).unwrap();
+    let twice = signed(RSA_KEY, &noted, &options(None));
+    let reports = verify_pdf(&twice).unwrap();
+    assert_eq!(
+        reports[0].coverage,
+        crate::signing::verify::Coverage::SignedAgainLater
+    );
 }

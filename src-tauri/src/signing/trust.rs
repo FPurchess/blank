@@ -65,7 +65,8 @@ pub struct CheckedSignature {
     pub timestamp_trusted: bool,
     /// the weak algorithm it relies on ("SHA-1"), if it does
     pub weak: Option<&'static str>,
-    /// for SignedAgainLater: who signed next, after the changes
+    /// for SignedAgainLater, and for a Valid one that later revisions only
+    /// signed again (Coverage::SignedOnlyAgain): who signed next
     pub later_signer: Option<String>,
     pub reason: Option<String>,
     pub location: Option<String>,
@@ -98,7 +99,7 @@ pub fn status(report: &SignatureReport) -> Status {
         return Status::Invalid;
     }
     match report.coverage {
-        Coverage::WholeFile | Coverage::ValidationData => Status::Valid,
+        Coverage::WholeFile | Coverage::ValidationData | Coverage::SignedOnlyAgain => Status::Valid,
         Coverage::SignedAgainLater => Status::SignedAgainLater,
         Coverage::ChangedAfterSigning => Status::ChangedAfterSigning,
         Coverage::Unknown => Status::Invalid,
@@ -138,7 +139,8 @@ pub fn checked_all(
     reports
         .into_iter()
         .map(|report| {
-            let later = (status(&report) == Status::SignedAgainLater)
+            let later = (status(&report) == Status::SignedAgainLater
+                || report.coverage == Coverage::SignedOnlyAgain)
                 .then(|| end(&report))
                 .flatten()
                 .and_then(|mine| ends.iter().find(|(end, _)| *end > mine))

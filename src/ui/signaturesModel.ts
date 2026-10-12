@@ -110,7 +110,9 @@ export const signatureVerdict = (signature: CheckedSignature) => {
   const sentences = [
     signature.status === "signedAgainLater"
       ? `${known(signature.trust) ? "Valid" : "Intact"} for the version it signed; changed and signed again later by ${later(signature)}.`
-      : "The PDF hasn't changed since it was signed.",
+      : signature.laterSigner
+        ? `The PDF hasn't changed since it was signed, only signed again by ${signature.laterSigner}.`
+        : "The PDF hasn't changed since it was signed.",
     known(signature.trust)
       ? "The certificate is one Blank trusts."
       : "Blank doesn't know this certificate.",

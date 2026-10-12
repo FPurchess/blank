@@ -548,6 +548,11 @@ fn draws_the_signature_on_an_unsigned_pdf_and_in_the_widget_on_a_signed_one() {
     let reports = verify_pdf(&twice).unwrap();
     assert_eq!(reports.len(), 2);
     assert!(reports.iter().all(|r| r.valid()));
+    // the second only signed: the first is as valid as it was
+    assert_eq!(
+        reports[0].coverage,
+        crate::signing::verify::Coverage::SignedOnlyAgain
+    );
     let doc_twice = Document::load_mem(&twice).unwrap();
     let page = pages(&doc_twice)[0];
     assert_eq!(
@@ -836,6 +841,11 @@ fn signs_a_field_listed_before_an_earlier_signature() {
     let fields: Vec<&str> = reports.iter().map(|r| r.field.as_str()).collect();
     assert_eq!(fields, ["signature", "Signature1"]);
     assert!(reports.iter().all(|r| r.valid()));
+    // filling in the PDF's own empty field only signed it again
+    assert_eq!(
+        reports[1].coverage,
+        crate::signing::verify::Coverage::SignedOnlyAgain
+    );
     if has("pdfsig") {
         let dir = tempfile::tempdir().unwrap();
         let path = written(dir.path(), "twice.pdf", &out);
