@@ -210,7 +210,6 @@ describe("signing", () => {
     expect(ipc.signPdf).toHaveBeenCalledWith(new Uint8Array([1]), "right", {
       page: 1,
       rect: [70, 600, 230, 70],
-      name: null,
       location: "Hamburg",
       reason: null,
       timestampServer: null,

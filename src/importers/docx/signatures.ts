@@ -89,8 +89,9 @@ export const markSignatures = async (zip: JSZip) => {
   for (const sdt of [...doc.getElementsByTagNameNS(W, "sdt")]) {
     if (val(child(child(sdt, "sdtPr"), "tag")) !== SIGNATURE_TAG) continue;
     const line = hiddenText(sdt);
-    // a control whose line was edited away stays what it shows
-    if (!readAtom(line)) continue;
+    // a control whose line was edited away, or holds another block's,
+    // stays what it shows
+    if (readAtom(line)?.node !== "signature") continue;
     sdt.replaceWith(markerParagraph(doc, ATOM_STYLE, line));
     changed = true;
   }

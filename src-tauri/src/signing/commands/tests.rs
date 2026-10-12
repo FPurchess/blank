@@ -57,7 +57,6 @@ fn options(rect: Option<[f64; 4]>) -> SignOptions {
     SignOptions {
         page: 1,
         rect,
-        name: Some("Ada Lovelace".into()),
         location: Some("Zürich".into()),
         reason: None,
         timestamp_server: None,
@@ -120,6 +119,14 @@ fn numbers(array: &Object) -> Vec<f64> {
         .collect()
 }
 
+/// the name the signature of `widget` gives as who signed it
+fn signer_named(pdf: &[u8], widget: &lopdf::Dictionary) -> Vec<u8> {
+    let doc = Document::load_mem(pdf).unwrap();
+    let signature = widget.get(b"V").unwrap().as_reference().unwrap();
+    let signature = doc.get_dictionary(signature).unwrap();
+    signature.get(b"Name").unwrap().as_str().unwrap().to_vec()
+}
+
 #[test]
 fn makes_a_certificate_for_signing_documents() {
     let identity = keys::load_p12(key(), PASSPHRASE).unwrap();
@@ -170,6 +177,8 @@ fn puts_the_field_over_the_block() {
         numbers(widget.get(b"Rect").unwrap()),
         [300., 82., 500., 142.]
     );
+    // signed in the name of the certificate's holder
+    assert_eq!(signer_named(&signed, widget), b"Ada Lovelace");
 }
 
 #[test]
@@ -216,6 +225,10 @@ fn signs_with_an_rsa_key() {
         .signer
         .as_ref()
         .is_some_and(|signer| signer.name == "Lovelace, Ada"));
+    assert_eq!(
+        signer_named(&signed, &widgets(&signed)[0].1),
+        b"Lovelace, Ada"
+    );
 }
 
 #[test]
@@ -532,9 +545,15 @@ fn reads_the_header_the_webview_encodes() {
 fn keeps_the_key_file_for_the_user_alone_and_removes_both() {
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().join("signing");
-    keep_files(&folder, b"key", b"certificate").unwrap();
-    // again, over the files there
-    keep_files(&folder, b"new key", b"new certificate").unwrap();
+    assert!(keep_files(&folder, b"key", b"certificate", false).unwrap());
+    // a key there is kept unless it's to be replaced
+    assert!(!keep_files(&folder, b"new key", b"new certificate", false).unwrap());
+    assert_eq!(std::fs::read(folder.join(KEY)).unwrap(), b"key");
+    assert_eq!(
+        std::fs::read(folder.join(CERTIFICATE)).unwrap(),
+        b"certificate"
+    );
+    assert!(keep_files(&folder, b"new key", b"new certificate", true).unwrap());
     assert_eq!(std::fs::read(folder.join(KEY)).unwrap(), b"new key");
     assert_eq!(
         std::fs::read(folder.join(CERTIFICATE)).unwrap(),
@@ -550,9 +569,54 @@ fn keeps_the_key_file_for_the_user_alone_and_removes_both() {
         assert_eq!(mode & 0o777, 0o600);
     }
     let names: Vec<_> = std::fs::read_dir(&folder).unwrap().collect();
-    assert_eq!(names.len(), 2, "no partial files left");
+    assert_eq!(names.len(), 2, "no partial or old files left");
     remove_files(&folder).unwrap();
     assert!(!folder.join(KEY).exists() && !folder.join(CERTIFICATE).exists());
     // nothing there to remove is fine
     remove_files(&folder).unwrap();
+}
+
+#[test]
+fn keeps_the_old_pair_when_the_new_certificate_cant_be_put_in_place() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("signing");
+    assert!(keep_files(&folder, b"key", b"certificate", false).unwrap());
+    let fails_on_the_certificate = |from: &Path, to: &Path| {
+        if to.ends_with(CERTIFICATE) {
+            Err(std::io::ErrorKind::PermissionDenied.into())
+        } else {
+            std::fs::rename(from, to)
+        }
+    };
+    let error = keep_files_with(
+        &folder,
+        b"new key",
+        b"new certificate",
+        true,
+        fails_on_the_certificate,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(std::fs::read(folder.join(KEY)).unwrap(), b"key");
+    assert_eq!(
+        std::fs::read(folder.join(CERTIFICATE)).unwrap(),
+        b"certificate"
+    );
+    let mut names: Vec<_> = std::fs::read_dir(&folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    names.sort();
+    assert_eq!(names, [CERTIFICATE, KEY], "no partial or old files left");
+    // with no key before, the new one goes again
+    remove_files(&folder).unwrap();
+    keep_files_with(
+        &folder,
+        b"new key",
+        b"new certificate",
+        false,
+        fails_on_the_certificate,
+    )
+    .unwrap_err();
+    assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
 }

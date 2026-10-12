@@ -152,6 +152,29 @@ describe("the dialog that signs", () => {
       expect(request.submit).toHaveBeenCalledWith(9, "Berlin", "wrong");
     });
 
+    it("signs nothing when it's closed while the passphrase is checked", async () => {
+      let answer: (failure: string | null) => void = () => {};
+      await open({
+        check: vi.fn(
+          () => new Promise<string | null>((resolve) => (answer = resolve)),
+        ),
+      });
+      const first = request;
+      passphrase().value = "secret";
+      passphrase().dispatchEvent(new Event("input"));
+      submit();
+      await nextTick();
+      // another tab comes up meanwhile, with a dialog of its own
+      signDialog.value = null;
+      await nextTick();
+      await open({ title: "offer" });
+      answer(null);
+      await flushPromises();
+      expect(first.submit).not.toHaveBeenCalled();
+      expect(signDialog.value).toBe(request);
+      expect(dialog()!.textContent).toContain("Sign “offer”");
+    });
+
     it("signs with a picture only when chosen", async () => {
       await open();
       const options = [

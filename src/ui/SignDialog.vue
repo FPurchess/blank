@@ -66,6 +66,8 @@ const submit = async () => {
     checking.value = true;
     failure.value = (await props.request.check(passphrase.value)) ?? "";
     checking.value = false;
+    // closed meanwhile, e.g. for another tab: nothing is signed
+    if (signDialog.value !== props.request) return;
     if (failure.value) return;
   }
   const secret = digital.value ? passphrase.value : null;

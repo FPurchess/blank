@@ -41,7 +41,8 @@ export const isEmpty = (state: EditorState) => {
     if (
       node.type.name === "image" ||
       node.type.name === "form_block" ||
-      (node.isBlock && node.isAtom)
+      // a page break alone only makes empty pages
+      (node.isBlock && node.isAtom && node.type.name !== "page_break")
     )
       empty = false;
     return empty;

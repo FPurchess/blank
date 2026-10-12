@@ -73,9 +73,20 @@ pub async fn timestamp(url: &str, data: &[u8]) -> Result<Vec<u8>> {
         .context(Refusal::NoTimestamp)?
         .error_for_status()
         .context(Refusal::NoTimestamp)?;
-    let body = response.bytes().await.context(Refusal::NoTimestamp)?;
-    if body.len() > MAX_RESPONSE {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_RESPONSE as u64)
+    {
         return Err(Refusal::TimestampUnusable.into());
+    }
+    // read no more than the longest answer, whatever the server sends
+    let mut body = Vec::new();
+    let mut chunks = response.bytes_stream();
+    while let Some(chunk) = futures_util::StreamExt::next(&mut chunks).await {
+        body.extend_from_slice(&chunk.context(Refusal::NoTimestamp)?);
+        if body.len() > MAX_RESPONSE {
+            return Err(Refusal::TimestampUnusable.into());
+        }
     }
     token(&body, &nonce_der)
 }
@@ -138,6 +149,44 @@ mod tests {
             refusal(token(b"<html>busy</html>", &nonce_der)),
             Some(Refusal::TimestampUnusable)
         );
+    }
+
+    /// serve answers every request with `body`, its length told or, with
+    /// `chunked`, not, and returns the server's URL
+    fn serve(body: Vec<u8>, chunked: bool) -> String {
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", server.server_addr().to_ip().unwrap());
+        std::thread::spawn(move || {
+            for request in server.incoming_requests() {
+                let length = (!chunked).then_some(body.len());
+                let reader = std::io::Cursor::new(body.clone());
+                let response = tiny_http::Response::new(200.into(), vec![], reader, length, None);
+                let _ = request.respond(response);
+            }
+        });
+        url
+    }
+
+    #[test]
+    fn refuses_an_answer_too_long_whether_its_length_is_told_or_not() {
+        let long = vec![0x30; MAX_RESPONSE + 1];
+        for chunked in [false, true] {
+            let url = serve(long.clone(), chunked);
+            let result = tauri::async_runtime::block_on(timestamp(&url, b"x"));
+            assert_eq!(refusal(result), Some(Refusal::TimestampUnusable));
+        }
+    }
+
+    #[test]
+    fn reads_an_answer_in_chunks() {
+        // a granted answer, but for another nonce than the request's
+        let url = serve(answer(0, &NONCE), true);
+        let result = tauri::async_runtime::block_on(timestamp(&url, b"x"));
+        assert_eq!(refusal(result), Some(Refusal::TimestampUnusable));
+        // a refusal is read in full
+        let url = serve(answer(2, &NONCE), true);
+        let result = tauri::async_runtime::block_on(timestamp(&url, b"x"));
+        assert_eq!(refusal(result), Some(Refusal::TimestampRefused));
     }
 
     #[test]

@@ -255,20 +255,22 @@ const signNow = (
       ? {}
       : {
           finish: (result: ExportResult) =>
-            signExport(result, passphrase, { name: signer, place }),
+            signExport(result, passphrase, place),
         }),
   });
 };
 
 /**
  * signExport signs an exported PDF with the user's key, its field over the
- * signature block the export filled in. A failure stops the export with
- * what went wrong, so nothing unsigned is written under the signed name.
+ * signature block the export filled in, signed at `place`; the native side
+ * names the certificate's holder as who signed it. A failure stops the
+ * export with what went wrong, so nothing unsigned is written under the
+ * signed name.
  */
 const signExport = async (
   result: ExportResult,
   passphrase: string,
-  { name, place }: { name: string; place: string },
+  place: string,
 ) => {
   const box = result.signatureBox;
   if (!box) throw new Error("the signature block isn't in the PDF");
@@ -276,7 +278,6 @@ const signExport = async (
     return await signPdf(result.contents, passphrase, {
       page: box.page + 1,
       rect: [box.x, box.y, box.width, box.height],
-      name: name || null,
       location: place || null,
       reason: null,
       timestampServer: config.value.signing.timestampServer || null,

@@ -25,7 +25,9 @@ export const signingCertificate = shallowRef<
 
 // how the dates next to signatures are written: Settings ▸ Signing ▸ Date,
 // in the document's language; a new object only when either changes
-export const signingDates = computed((): DateStyle => ({
-  format: config.value.signing.dateFormat,
-  language: language.value,
-}));
+export const signingDates = computed((previous?: DateStyle): DateStyle => {
+  const format = config.value.signing.dateFormat;
+  return previous?.format === format && previous.language === language.value
+    ? previous
+    : { format, language: language.value };
+});

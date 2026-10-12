@@ -19,6 +19,8 @@ export interface CertificateInfo {
 export type SigningError =
   | { kind: "wrongPassphrase" }
   | { kind: "noCertificate" }
+  // the user has a key, which only a call that replaces it replaces
+  | { kind: "keyExists" }
   | { kind: "failed"; message: string };
 
 /**
@@ -28,7 +30,7 @@ const isSigningError = (error: unknown): error is SigningError =>
   !!error &&
   typeof error === "object" &&
   "kind" in error &&
-  ["wrongPassphrase", "noCertificate", "failed"].includes(
+  ["wrongPassphrase", "noCertificate", "keyExists", "failed"].includes(
     (error as { kind: string }).kind,
   );
 
@@ -51,6 +53,8 @@ export const signingMessage = (error: unknown, fallback: string) => {
       return "The passphrase is wrong";
     case "noCertificate":
       return "You have no certificate to sign with";
+    case "keyExists":
+      return "You have a key already";
     case "failed":
       return error.message;
   }
@@ -63,7 +67,6 @@ export interface SignOptions {
   // where the signature shows, in points from the page's top left; none for
   // an invisible signature
   rect: [number, number, number, number] | null;
-  name: string | null;
   location: string | null;
   reason: string | null;
   // an RFC 3161 server, for a timestamp
@@ -73,19 +76,23 @@ export interface SignOptions {
 export const certificate = () =>
   invoke<CertificateInfo | null>("signing_certificate");
 
+// `replace`: the user's key is replaced, once they said so; else a key
+// there fails with keyExists
 export const createCertificate = (
   name: string,
   email: string | null,
   passphrase: string,
+  replace: boolean,
 ) =>
   invoke<CertificateInfo>("signing_create_certificate", {
     name,
     email,
     passphrase,
+    replace,
   });
 
-export const importKey = (path: string, passphrase: string) =>
-  invoke<CertificateInfo>("signing_import", { path, passphrase });
+export const importKey = (path: string, passphrase: string, replace: boolean) =>
+  invoke<CertificateInfo>("signing_import", { path, passphrase, replace });
 
 // `key`: the whole key file, as a backup; else the certificate alone, for
 // others to trust

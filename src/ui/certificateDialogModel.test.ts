@@ -4,6 +4,7 @@ import { checkCertificate } from "./certificateDialogModel";
 
 const fields = {
   name: "Ada",
+  email: "",
   passphrase: "correct horse",
   again: "correct horse",
   submitted: true,
@@ -22,6 +23,24 @@ describe("making or importing a certificate", () => {
     expect(
       checkCertificate(true, { ...fields, again: "correct horse!" }).error,
     ).toBe("The passphrases aren't the same.");
+  });
+
+  it("takes an email a certificate can hold", () => {
+    expect(
+      checkCertificate(true, { ...fields, email: "ada@example.org" }).valid,
+    ).toBe(true);
+    expect(
+      checkCertificate(true, { ...fields, email: "ada@bücher.de" }),
+    ).toEqual({
+      valid: false,
+      error:
+        "A certificate can only hold an email without accents or other special letters.",
+      field: "email",
+    });
+    // a key file to import has its own
+    expect(
+      checkCertificate(false, { ...fields, email: "ada@bücher.de" }).valid,
+    ).toBe(true);
   });
 
   it("takes any passphrase of a key file to import", () => {

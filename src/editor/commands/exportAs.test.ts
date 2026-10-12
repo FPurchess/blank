@@ -61,6 +61,20 @@ describe("command.exportAs", () => {
     },
   );
 
+  it("refuses a document of page breaks only, which would be blank pages", () => {
+    const breaks = createState(
+      doc(p(), schema.node("page_break"), schema.node("page_break")),
+    );
+    const exporter = createExporter();
+
+    expect(exportAs(title, exporter, filters)(breaks, dispatch)).toBe(false);
+    expect(sendNotification).toHaveBeenCalledWith({
+      title,
+      body: "Your document is empty. There is nothing to export.",
+    });
+    expect(exporter).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "an image",
@@ -71,6 +85,7 @@ describe("command.exportAs", () => {
     ],
     ["a signature block", () => schema.node("signature")],
     ["a table of contents", () => schema.node("toc")],
+    ["a rule", () => schema.node("horizontal_rule")],
   ])("exports a document that only has %s", (_, block) => {
     const only = createState(doc(p(), block(), p()));
     vi.mocked(save).mockResolvedValue(null);

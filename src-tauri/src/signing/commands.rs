@@ -41,6 +41,8 @@ pub enum SigningError {
     WrongPassphrase,
     /// there's no certificate to sign with
     NoCertificate,
+    /// there's a key already, which only a request to replace it replaces
+    KeyExists,
     /// anything else, in words for the user
     Failed(String),
 }
@@ -116,17 +118,76 @@ fn write_partial(path: &Path, bytes: &[u8], private: bool) -> std::io::Result<Pa
 }
 
 /// keep_files keeps the key file `p12` and its certificate `cert` in
-/// `dir`, both written in full before either replaces what was there
-fn keep_files(dir: &Path, p12: &[u8], cert: &[u8]) -> std::io::Result<()> {
+/// `dir`, both written in full before either replaces what was there. A
+/// key already there is replaced only with `replace`, else it's kept and
+/// keep_files returns false. If the certificate can't be put in place, the
+/// key that was there comes back.
+fn keep_files(dir: &Path, p12: &[u8], cert: &[u8], replace: bool) -> std::io::Result<bool> {
+    keep_files_with(dir, p12, cert, replace, |from, to| {
+        std::fs::rename(from, to)
+    })
+}
+
+/// keep_files_with is keep_files, which puts each file in place with
+/// `place`, for the tests to make it fail
+fn keep_files_with(
+    dir: &Path,
+    p12: &[u8],
+    cert: &[u8],
+    replace: bool,
+    place: impl Fn(&Path, &Path) -> std::io::Result<()>,
+) -> std::io::Result<bool> {
     let _files = FILES
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     std::fs::create_dir_all(dir)?;
     let (key, certificate) = (dir.join(KEY), dir.join(CERTIFICATE));
+    if !replace && key.try_exists()? {
+        return Ok(false);
+    }
     let key_partial = write_partial(&key, p12, true)?;
-    let certificate_partial = write_partial(&certificate, cert, false)?;
-    std::fs::rename(key_partial, key)?;
-    std::fs::rename(certificate_partial, certificate)
+    let certificate_partial = write_partial(&certificate, cert, false).inspect_err(|_| {
+        let _ = std::fs::remove_file(&key_partial);
+    })?;
+    // the old key stays where it is until the new one replaces it
+    let old_key = keep_aside(&key).inspect_err(|_| {
+        let _ = std::fs::remove_file(&key_partial);
+        let _ = std::fs::remove_file(&certificate_partial);
+    })?;
+    let placed = place(&key_partial, &key).and_then(|()| place(&certificate_partial, &certificate));
+    if let Err(error) = placed {
+        // the key that was there comes back beside its certificate
+        let _ = std::fs::remove_file(&key_partial);
+        let _ = std::fs::remove_file(&certificate_partial);
+        match &old_key {
+            Some(old) => std::fs::rename(old, &key)?,
+            None => match std::fs::remove_file(&key) {
+                Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error),
+                _ => {}
+            },
+        }
+        return Err(error);
+    }
+    if let Some(old) = old_key {
+        let _ = std::fs::remove_file(old);
+    }
+    Ok(true)
+}
+
+/// keep_aside keeps the file at `path` beside it as well, a link or else a
+/// copy, and returns where; None when there's no file
+fn keep_aside(path: &Path) -> std::io::Result<Option<PathBuf>> {
+    let old = path.with_extension("old");
+    // one left over would stop the link
+    let _ = std::fs::remove_file(&old);
+    let kept = std::fs::hard_link(path, &old)
+        // a disk without links
+        .or_else(|_| std::fs::copy(path, &old).map(|_| ()));
+    match kept {
+        Ok(()) => Ok(Some(old)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 /// remove_files removes the key file and its certificate from `dir`
@@ -143,17 +204,35 @@ fn remove_files(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// keep keeps an identity's key file and its certificate
-fn keep(app: &AppHandle, p12: &[u8], identity: &Identity) -> Answer<CertificateInfo> {
+/// refuse_replacing refuses before a new key is made or read when the user has
+/// one already, unless `replace`
+fn refuse_replacing(app: &AppHandle, replace: bool) -> Answer<()> {
+    if !replace && folder(app)?.join(KEY).try_exists().unwrap_or(true) {
+        return Err(SigningError::KeyExists);
+    }
+    Ok(())
+}
+
+/// keep keeps an identity's key file and its certificate, replacing a key
+/// that is there only with `replace`
+fn keep(
+    app: &AppHandle,
+    p12: &[u8],
+    identity: &Identity,
+    replace: bool,
+) -> Answer<CertificateInfo> {
     let dir = folder(app)?;
     let shown = CertificateInfo::from_der(&identity.cert).map_err(|_| {
         log::warn!("the new certificate can't be read");
         SigningError::Failed("Blank can't read this certificate".into())
     })?;
-    keep_files(&dir, p12, &identity.cert).map_err(|error| {
+    let kept = keep_files(&dir, p12, &identity.cert, replace).map_err(|error| {
         log::warn!("failed to keep the certificate: {}", error.kind());
         SigningError::Failed("Blank couldn't save your certificate".into())
     })?;
+    if !kept {
+        return Err(SigningError::KeyExists);
+    }
     Ok(shown)
 }
 
@@ -176,15 +255,18 @@ pub async fn signing_certificate(app: AppHandle) -> Answer<Option<CertificateInf
 }
 
 /// signing_create_certificate makes the user a key and a self-signed
-/// certificate for signing, kept in a PKCS#12 file their passphrase opens
+/// certificate for signing, kept in a PKCS#12 file their passphrase opens;
+/// a key they have is replaced only with `replace`
 #[tauri::command]
 pub async fn signing_create_certificate(
     app: AppHandle,
     name: String,
     email: Option<String>,
     passphrase: String,
+    replace: bool,
 ) -> Answer<CertificateInfo> {
     let passphrase = Passphrase::new(passphrase);
+    refuse_replacing(&app, replace)?;
     tauri::async_runtime::spawn_blocking(move || {
         let email = email.filter(|email| !email.trim().is_empty());
         let (p12, identity) = keys::create_certificate(name.trim(), email.as_deref(), &passphrase)
@@ -192,21 +274,24 @@ pub async fn signing_create_certificate(
                 "failed to make a certificate",
                 "Blank couldn't make your certificate",
             ))?;
-        keep(&app, &p12, &identity)
+        keep(&app, &p12, &identity, replace)
     })
     .await
     .map_err(|_| SigningError::Failed("Blank couldn't make your certificate".into()))?
 }
 
 /// signing_import takes the PKCS#12 file at `path` as the user's key and
-/// certificate, once `passphrase` opens it
+/// certificate, once `passphrase` opens it; a key they have is replaced
+/// only with `replace`
 #[tauri::command]
 pub async fn signing_import(
     app: AppHandle,
     path: PathBuf,
     passphrase: String,
+    replace: bool,
 ) -> Answer<CertificateInfo> {
     let passphrase = Passphrase::new(passphrase);
+    refuse_replacing(&app, replace)?;
     tauri::async_runtime::spawn_blocking(move || {
         let p12 = std::fs::read(&path).map_err(|error| {
             log::warn!("failed to read a key file: {}", error.kind());
@@ -217,7 +302,7 @@ pub async fn signing_import(
             &passphrase,
             "This isn't a key file Blank can use: it needs a certificate and its private key (RSA or ECDSA)",
         )?;
-        keep(&app, &p12, &identity)
+        keep(&app, &p12, &identity, replace)
     })
     .await
     .map_err(|_| SigningError::Failed("Blank couldn't import the certificate".into()))?
@@ -269,14 +354,22 @@ pub struct SignOptions {
     /// where the signature is shown: x, y, width and height in points from
     /// the page's top left; none for an invisible signature
     pub rect: Option<[f64; 4]>,
-    pub name: Option<String>,
     pub location: Option<String>,
     pub reason: Option<String>,
     /// an RFC 3161 server's URL, for a timestamp (B-T)
     pub timestamp_server: Option<String>,
 }
 
-/// sign signs `pdf` with the user's key
+/// signer is the name of the certificate's holder, which the signature
+/// names as who signed it; None when it has no common name
+fn signer(cert: &[u8]) -> Option<String> {
+    use der::Decode;
+    let cert = x509_cert::Certificate::from_der(cert).ok()?;
+    crate::signing::certificate::common_name(&cert.tbs_certificate.subject)
+}
+
+/// sign signs `pdf` with the user's key, in the name of its certificate's
+/// holder
 pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> Answer<Vec<u8>> {
     let identity = open_key(p12, passphrase, "Blank can't open your key")?;
     let blank = |value: &Option<String>| value.clone().filter(|text| !text.trim().is_empty());
@@ -286,7 +379,7 @@ pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> 
         rect: options.rect,
         reason: blank(&options.reason),
         location: blank(&options.location),
-        name: blank(&options.name),
+        name: blank(&signer(&identity.cert)),
         tsa: blank(&options.timestamp_server),
         reserve: RESERVE,
     };

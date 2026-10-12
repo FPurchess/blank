@@ -127,6 +127,21 @@ describe("importers.docx", () => {
         )
       ).markdown;
 
+    it("come only from a control holding a signature block's line", async () => {
+      const docx = await rewriteDocx(
+        await exportDocx(
+          'Sign here:\n\n<!-- blank:signature@1 role="Tenant" -->',
+        ),
+        "word/document.xml",
+        // the hidden marker line, not the control's tag
+        (xml = "") => xml.replace("blank:signature@1 ", "blank:toc@1 "),
+      );
+      const { markdown } = await toMarkdown(docx);
+      // no table of contents: the control stays its text
+      expect(markdown).not.toMatch(/^<!-- blank:toc/m);
+      expect(markdown).toContain("Tenant");
+    });
+
     it("come from Word's signature lines", async () => {
       expect(await withLine(`<w:p>${PICT}</w:p>`)).toBe(
         'Sign here:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
@@ -205,7 +220,8 @@ describe("importers.docx", () => {
           xml.replace("\\o &quot;1-2&quot;", "\\c &quot;Figure&quot;"),
       );
       const { markdown } = await toMarkdown(bytes);
-      expect(markdown).not.toContain("blank:toc");
+      // no table of contents: the control stays its text
+      expect(markdown).not.toMatch(/^<!-- blank:toc/m);
     });
   });
 

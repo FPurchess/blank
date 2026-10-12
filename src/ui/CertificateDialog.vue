@@ -30,6 +30,7 @@ const failure = shallowRef("");
 const check = computed(() =>
   checkCertificate(creating, {
     name: name.value,
+    email: email.value,
     passphrase: passphrase.value,
     again: again.value,
     submitted: submitted.value,
@@ -48,7 +49,7 @@ const cancel = () => {
   if (!working.value) close(props.request.cancel);
 };
 // which field what's wrong is about
-const errorFor = (field: "name" | "passphrase" | "again") =>
+const errorFor = (field: "name" | "email" | "passphrase" | "again") =>
   error.value && (check.value.field ?? "passphrase") === field
     ? "certificate-dialog-error"
     : undefined;
@@ -92,6 +93,7 @@ const submit = async () => {
         v-model="email"
         type="email"
         label="Email (optional)"
+        :error-id="errorFor('email')"
         @input="typed"
       />
     </template>

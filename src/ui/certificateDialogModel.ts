@@ -14,7 +14,11 @@ export const busyNote = (creating: boolean) =>
 const MIN_PASSPHRASE = 8;
 
 // the field what's wrong is about
-type Field = "name" | "passphrase" | "again";
+type Field = "name" | "email" | "passphrase" | "again";
+
+// what a certificate can hold of an email: ASCII alone (an IA5String)
+const ascii = (text: string) =>
+  [...text].every((char) => char.charCodeAt(0) < 0x80);
 
 /**
  * checkCertificate says what's wrong with what's typed, once the user tries
@@ -24,6 +28,7 @@ export const checkCertificate = (
   creating: boolean,
   fields: {
     name: string;
+    email: string;
     passphrase: string;
     again: string;
     submitted: boolean;
@@ -36,6 +41,12 @@ export const checkCertificate = (
   });
   if (creating && !fields.name.trim()) {
     return problem("name", "Enter the name your signatures show.");
+  }
+  if (creating && !ascii(fields.email)) {
+    return problem(
+      "email",
+      "A certificate can only hold an email without accents or other special letters.",
+    );
   }
   if (!fields.passphrase) return problem("passphrase", "Enter a passphrase.");
   if (creating && fields.passphrase.length < MIN_PASSPHRASE) {

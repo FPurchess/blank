@@ -3,6 +3,7 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { logError } from "../log";
 import { config } from "../config";
+import { focusBack } from "../dom";
 import { basename } from "../paths";
 import {
   announce,
@@ -17,6 +18,7 @@ import {
   exportCertificate,
   importKey,
   removeCertificate,
+  signingKind,
   signingMessage,
 } from "./ipc";
 
@@ -53,6 +55,8 @@ export const loadCertificate = () =>
     .catch((error: unknown) => {
       logError("failed to read the certificate", error);
       signingCertificate.value = null;
+      // the next call reads it again
+      reading = null;
     }));
 
 /**
@@ -147,6 +151,34 @@ export const confirmRemoval = (refocus: () => void) => {
 };
 
 /**
+ * confirmReplacing asks whether the key Blank has, whose certificate it
+ * couldn't show, is to be replaced, which can't be undone, and offers to
+ * back it up first; true once the user confirms. The focus goes back to the
+ * dialog that asked.
+ */
+const confirmReplacing = () =>
+  new Promise<boolean>((resolve) => {
+    const refocus = focusBack(document.activeElement);
+    confirmDialog.value = {
+      title: "Replace your key?",
+      text: "Blank has a key whose certificate it can't read. Signatures you made with it stay valid, but you can't sign with it again.",
+      action: "Replace",
+      secondary: {
+        label: "Back up key…",
+        run: () => void saveCertificate(true),
+      },
+      confirm: () => {
+        refocus();
+        resolve(true);
+      },
+      cancel: () => {
+        refocus();
+        resolve(false);
+      },
+    };
+  });
+
+/**
  * openCertificateDialog asks for what makes the user a certificate, or, for
  * `import`, for a key file and its passphrase. Once it closes, `refocus`
  * gives the focus back, and once the certificate is there `done` is told.
@@ -163,17 +195,18 @@ export const openCertificateDialog = async (
     name: config.value.signing.name,
     file: path ? basename(path) : "",
     submit: async ({ name, email, passphrase }) => {
+      // a key that is there is replaced only once the user said so
+      const keep = (replace: boolean) =>
+        path
+          ? importKey(path, passphrase, replace)
+          : createCertificate(name, email.trim() || null, passphrase, replace);
       try {
-        if (path) {
-          publish(await importKey(path, passphrase), "Certificate imported");
-        } else {
-          const info = await createCertificate(
-            name,
-            email.trim() || null,
-            passphrase,
-          );
-          publish(info, "Certificate made");
-        }
+        const info = await keep(false).catch(async (error: unknown) => {
+          if (signingKind(error) !== "keyExists") throw error;
+          return (await confirmReplacing()) ? keep(true) : null;
+        });
+        if (!info) return "Blank kept the key you have";
+        publish(info, path ? "Certificate imported" : "Certificate made");
       } catch (error) {
         logError(
           path
