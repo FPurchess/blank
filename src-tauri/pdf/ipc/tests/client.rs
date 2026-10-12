@@ -105,6 +105,22 @@ fn cancels_a_render_on_request() {
 }
 
 #[test]
+fn drops_a_render_cancelled_before_it_was_sent() {
+    // e.g. while it waited for the helper to start again, or for the
+    // render before it
+    let pdf = supervisor(&["ok", "ok"]);
+    pdf.cancel(1);
+    assert_eq!(
+        render(&pdf, 1).unwrap_err(),
+        PdfError::Engine(ErrorKind::Cancelled)
+    );
+    // only that once, and other renders aren't touched
+    assert!(render(&pdf, 0).is_ok());
+    assert!(render(&pdf, 1).is_ok());
+    assert!(!pdf.failed());
+}
+
+#[test]
 fn kills_a_hang_and_starts_again_once() {
     let pdf = supervisor(&["stuck", "ok"]);
     assert_eq!(render(&pdf, 0).unwrap_err(), PdfError::Hung);

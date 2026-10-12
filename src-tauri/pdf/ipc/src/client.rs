@@ -7,6 +7,7 @@
 //! a new one (the tab's "Open again") tries again. A helper stopped for being
 //! idle isn't a failure.
 
+use std::collections::VecDeque;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -309,8 +310,29 @@ struct State {
     last_used: Instant,
 }
 
-/// the request that runs: its ticket, its id and where to write a cancel
-type InFlight = Option<(u64, u64, Arc<Mutex<ChildStdin>>)>;
+/// the request that runs: its ticket, its id and where to write a cancel;
+/// and the tickets cancelled before their request was written (while it
+/// waited for the helper to start, or for the request before it), the last
+/// `CANCELLED_KEPT` of them
+#[derive(Default)]
+struct InFlight {
+    running: Option<(u64, u64, Arc<Mutex<ChildStdin>>)>,
+    cancelled: VecDeque<u64>,
+}
+
+/// how many tickets cancelled ahead of their request are remembered: more
+/// than the renders a fast scroll queues up
+const CANCELLED_KEPT: usize = 64;
+
+/// writes the cancel of the request `id` to `stdin`
+fn send_cancel(stdin: &Mutex<ChildStdin>, id: u64) {
+    let cancel = serde_json::to_vec(&Request {
+        id: 0,
+        op: Op::Cancel { target: id },
+    })
+    .unwrap_or_default();
+    let _ = write_frame(&mut *locked(stdin), &cancel, &[]);
+}
 
 /// one PDF's helper, started when needed (see the module's comment)
 pub struct Supervisor {
@@ -335,7 +357,7 @@ impl Supervisor {
                 failures: 0,
                 last_used: Instant::now(),
             }),
-            in_flight: Mutex::new(None),
+            in_flight: Mutex::new(InFlight::default()),
         }
     }
 
@@ -363,19 +385,30 @@ impl Supervisor {
         state.bytes = None;
     }
 
-    /// asks the helper to stop the request of `ticket` if it runs
+    /// asks the helper to stop the request of `ticket` if it runs; one that
+    /// hasn't been written yet doesn't run once it would be
     pub fn cancel(&self, ticket: u64) {
-        let in_flight = locked(&self.in_flight);
-        if let Some((running, id, stdin)) = in_flight.as_ref() {
-            if *running == ticket {
-                let cancel = serde_json::to_vec(&Request {
-                    id: 0,
-                    op: Op::Cancel { target: *id },
-                })
-                .unwrap_or_default();
-                let _ = write_frame(&mut *locked(stdin), &cancel, &[]);
+        let mut in_flight = locked(&self.in_flight);
+        match &in_flight.running {
+            Some((running, id, stdin)) if *running == ticket => send_cancel(stdin, *id),
+            _ => {
+                if in_flight.cancelled.len() == CANCELLED_KEPT {
+                    in_flight.cancelled.pop_front();
+                }
+                in_flight.cancelled.push_back(ticket);
             }
         }
+    }
+
+    /// whether `ticket` was cancelled before its request was written, which
+    /// it then forgets
+    fn cancelled_ahead(&self, ticket: Option<u64>) -> bool {
+        let Some(ticket) = ticket else {
+            return false;
+        };
+        let cancelled = &mut locked(&self.in_flight).cancelled;
+        let found = cancelled.iter().position(|&each| each == ticket);
+        found.map(|at| cancelled.remove(at)).is_some()
     }
 
     /// starts the helper and opens the PDF, if no helper runs
@@ -397,6 +430,9 @@ impl Supervisor {
         }
         state.last_used = Instant::now();
         self.ensure_open(&mut state)?;
+        if self.cancelled_ahead(ticket) {
+            return Err(PdfError::Engine(ErrorKind::Cancelled));
+        }
         let timeouts = &self.config.timeouts;
         let timeout = match op {
             Op::Open { .. } => timeouts.open,
@@ -406,10 +442,16 @@ impl Supervisor {
         let helper = state.helper.as_mut().ok_or(PdfError::Start)?;
         let result = helper.call(&op, &[], timeout, timeouts.cancel, |id, stdin| {
             if let Some(ticket) = ticket {
-                *locked(&self.in_flight) = Some((ticket, id, stdin));
+                let mut in_flight = locked(&self.in_flight);
+                // cancelled between the check above and the write
+                if let Some(at) = in_flight.cancelled.iter().position(|&each| each == ticket) {
+                    in_flight.cancelled.remove(at);
+                    send_cancel(&stdin, id);
+                }
+                in_flight.running = Some((ticket, id, stdin));
             }
         });
-        *locked(&self.in_flight) = None;
+        locked(&self.in_flight).running = None;
         let result = match (&op, result) {
             (Op::Render { .. }, Ok((value, pixels))) if !drawn(&value, &pixels) => {
                 log::warn!("PDF helper: render: pixels don't match their size");
