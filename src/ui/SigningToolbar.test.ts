@@ -1,28 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cancelRender, renderPage } from "../pdf/ipc";
-import type { PdfTabDocument } from "../pdf/document";
-import { resetStampBooks, stampsOf } from "../pdf/stampBooks";
-import { pdfRules, type PdfRules } from "../signing/ipc";
+import { stampsOf } from "../pdf/stampBooks";
+import { pdfRules } from "../signing/ipc";
 import {
-  activeTabId,
   announcement,
   focusStop,
   placingStamp,
   savedMarks,
   selectedStamp,
-  shownPdf,
   signDialog,
   type SignDialogRequest,
-  shownPdfRules,
   signatureDialog,
   signingPlace,
-  tabs,
   toolbarFocused,
 } from "../state";
 import { STAMPS_NEED_LAYOUT } from "../pdf/stamps";
 import { flushPromises } from "../test/async";
 import { createTestHandle, keyEvent } from "../test/editor";
+import { pdfDocument, pdfRulesOf, resetPdfState, showPdf } from "../test/pdf";
 import { bootApp } from "./mount";
 
 // The signing toolbar of a PDF tab (SigningToolbar.vue): the tools, why
@@ -61,31 +57,8 @@ vi.mock("../engine/engine", async (original) => ({
   engineless: () => engine.off,
 }));
 
-const a4 = { width: 595, height: 842, rotation: 0 };
-
-const pdf: PdfTabDocument = {
-  path: "/docs/contract.pdf",
-  opened: { sha256: "abc", pages: [a4], repaired: false, encrypted: false },
-  problem: null,
-  failedPages: [],
-  signatures: [],
-};
-
-const rules = (over: Partial<PdfRules> = {}): PdfRules => ({
-  signed: false,
-  docmdp: null,
-  encrypted: false,
-  damaged: false,
-  locked: [],
-  ...over,
-});
-
-const mark = {
-  source: { kind: "image" as const },
-  png: "",
-  width: 300,
-  height: 100,
-};
+const pdf = pdfDocument(1);
+const rules = pdfRulesOf;
 
 const toolbar = () => document.getElementById("signing-toolbar")!;
 const tool = (kind: string) =>
@@ -108,39 +81,17 @@ describe("the signing toolbar", () => {
   };
 
   beforeEach(() => {
-    tabs.value = [
-      {
-        id: "t",
-        kind: "pdf",
-        path: pdf.path,
-        importedFrom: null,
-        untitledNumber: null,
-        unsaved: false,
-        viewAnchor: null,
-      },
-    ];
-    activeTabId.value = "t";
     vi.mocked(cancelRender).mockResolvedValue();
     vi.mocked(renderPage).mockImplementation(() => new Promise(() => {}));
-    shownPdf.value = pdf;
-    savedMarks.value = { signature: mark, initials: mark };
+    showPdf(pdf, null);
     signingPlace.value = "Berlin";
     engine.off = false;
   });
 
   afterEach(() => {
     dispose();
-    resetStampBooks();
-    shownPdf.value = null;
-    shownPdfRules.value = null;
-    savedMarks.value = undefined;
-    signatureDialog.value = null;
-    selectedStamp.value = null;
-    placingStamp.value = null;
-    signingPlace.value = "";
+    resetPdfState();
     toolbarFocused.value = false;
-    tabs.value = [];
-    activeTabId.value = null;
   });
 
   it("takes the formatting toolbar's row, with its tools and Sign…", async () => {
@@ -236,6 +187,12 @@ describe("the signing toolbar", () => {
     await flushPromises();
     expect(signatureDialog.value?.mark).toBe("signature");
     expect(stampsOf("t")).toEqual([]);
+    // the tool takes the focus back once the dialog closes
+    tool("signature").focus();
+    (document.activeElement as HTMLElement).blur();
+    signatureDialog.value!.cancel();
+    await flushPromises();
+    expect(document.activeElement).toBe(tool("signature"));
   });
 
   it("waits for a press on a page after a click, which Esc cancels", async () => {

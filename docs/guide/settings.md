@@ -63,4 +63,4 @@ Blank's version, its license, links to the website and the source code, and the 
 
 ## Where the settings are kept
 
-The theme, the language, whether spell check is on and where you signed last are kept with your documents. Your signature and initials are in the `signing` folder next to blank.json. Everything else is written to [blank.json](./configuration), which only holds what you changed. You can still edit that file by hand; then restart Blank to use what you wrote.
+The theme, the language, whether spell check is on, where you signed last and whether you put your initials on every page are kept with your documents, and so is what you filled in and placed on a PDF you haven't signed yet. Your signature and initials are in the `signing` folder next to blank.json. Everything else is written to [blank.json](./configuration), which only holds what you changed. You can still edit that file by hand; then restart Blank to use what you wrote.

@@ -8,36 +8,24 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { config } from "../config";
 import { openPaths } from "../editor/tabs";
-import { resetFills } from "../pdf/fills";
 import {
   cancelRender,
-  type PageText,
   pageText,
-  type PdfField,
   pdfFields,
   renderPage,
   setFills,
 } from "../pdf/ipc";
-import type { PdfTabDocument } from "../pdf/document";
 import { nextShownPlace } from "../pdf/placeActions";
-import { resetPlaces } from "../pdf/placesRead";
 import {
   changeSheet,
   changeStamps,
   fillsOf,
   hasChanges,
-  resetStampBooks,
   stampsOf,
 } from "../pdf/stampBooks";
 import { stampSpec } from "../pdf/stampModel";
+import { pdfRules, type SignRequest, signPdf } from "../signing/ipc";
 import {
-  type PdfRules,
-  pdfRules,
-  type SignRequest,
-  signPdf,
-} from "../signing/ipc";
-import {
-  activeTabId,
   announcement,
   fieldProblem,
   pageRevisions,
@@ -46,11 +34,10 @@ import {
   selectedStamp,
   shownPdf,
   shownPdfRules,
+  signingTabs,
   signDialog,
   type SignDialogRequest,
-  signingCertificate,
   signingPlace,
-  tabs,
 } from "../state";
 import { flushPromises } from "../test/async";
 import {
@@ -60,6 +47,15 @@ import {
   keyEvent,
   p,
 } from "../test/editor";
+import {
+  FORM_FIELDS,
+  FORM_TEXT,
+  pdfDocument,
+  pdfRulesOf,
+  resetPdfState,
+  showPdf,
+} from "../test/pdf";
+import { FIELD_LOCKED, SIGNING } from "../pdf/toolRules";
 import { bootApp } from "./mount";
 import { pdfBitmaps } from "./pageBitmaps";
 
@@ -111,83 +107,10 @@ vi.mock("../engine/engine", async (original) => ({
   engineless: () => false,
 }));
 
-const a4 = { width: 595, height: 842, rotation: 0 };
-
-const pdf: PdfTabDocument = {
-  path: "/docs/contract.pdf",
-  opened: {
-    sha256: "abc",
-    pages: [a4, a4],
-    repaired: false,
-    encrypted: false,
-  },
-  problem: null,
-  failedPages: [],
-  signatures: [],
-};
-
-const rules = (over: Partial<PdfRules> = {}): PdfRules => ({
-  signed: false,
-  docmdp: null,
-  encrypted: false,
-  damaged: false,
-  locked: [],
-  ...over,
-});
-
-const field = (name: string, more: Partial<PdfField>): PdfField => ({
-  name,
-  kind: "text",
-  label: null,
-  value: "",
-  options: [],
-  flags: {
-    readOnly: false,
-    required: false,
-    multiline: false,
-    comb: false,
-    maxLen: 40,
-  },
-  signed: false,
-  widgets: [],
-  ...more,
-});
-
-// form.pdf's fields: its name, a checkbox, a signature field
-const fields: PdfField[] = [
-  field("name", {
-    label: "Your name",
-    widgets: [{ page: 0, rect: [100, 122, 200, 20], onValue: null }],
-  }),
-  field("agree", {
-    kind: "checkbox",
-    value: "Off",
-    widgets: [{ page: 0, rect: [100, 177, 15, 15], onValue: "Yes" }],
-  }),
-  field("signature", {
-    kind: "signature",
-    widgets: [{ page: 0, rect: [100, 292, 200, 50], onValue: null }],
-  }),
-];
-
-// form.pdf's words: "Unterschrift" under a rule, and "Ort, Datum: ____",
+const pdf = pdfDocument(2);
+const fields = FORM_FIELDS;
 // on both pages (the second has no fields)
-const text: PageText = {
-  words: [
-    { text: "Unterschrift", rect: [100, 364.82, 51.12, 9.25] },
-    { text: "Ort,", rect: [350, 364.82, 16.67, 9.25] },
-    { text: "Datum:", rect: [369.45, 364.82, 32.23, 9.25] },
-    { text: "______________", rect: [404.46, 364.82, 77.84, 9.25] },
-  ],
-  rules: [[100, 351.75, 200, 0.5]],
-};
-
-const mark = {
-  source: { kind: "image" as const },
-  png: "",
-  width: 300,
-  height: 100,
-};
+const text = FORM_TEXT;
 
 const view = () => document.getElementById("pdf-view")!;
 const placeEl = (id: string) =>
@@ -214,6 +137,17 @@ const press = async (element: HTMLElement, combo: string) => {
   await flushPromises();
 };
 
+// the helper and the signer as the tests have them: no pixels, form.pdf's
+// fields and words, every fill taken, nothing the PDF forbids
+const mockHelper = (read = pdfRulesOf()) => {
+  vi.mocked(cancelRender).mockResolvedValue();
+  vi.mocked(renderPage).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(pdfFields).mockResolvedValue(fields);
+  vi.mocked(pageText).mockResolvedValue(text);
+  vi.mocked(setFills).mockResolvedValue([0]);
+  vi.mocked(pdfRules).mockResolvedValue(read);
+};
+
 const SIGNATURE_LINE = "found:1:100:316";
 const PLACE_DATE = "found:0:404:359";
 
@@ -221,54 +155,24 @@ describe("the places of a PDF", () => {
   let dispose = () => {};
 
   beforeEach(async () => {
-    tabs.value = [
-      {
-        id: "t",
-        kind: "pdf",
-        path: pdf.path,
-        importedFrom: null,
-        untitledNumber: null,
-        unsaved: false,
-        viewAnchor: null,
-      },
-    ];
-    activeTabId.value = "t";
-    vi.mocked(cancelRender).mockResolvedValue();
-    vi.mocked(renderPage).mockImplementation(() => new Promise(() => {}));
-    vi.mocked(pdfFields).mockResolvedValue(fields);
-    vi.mocked(pageText).mockResolvedValue(text);
-    vi.mocked(setFills).mockResolvedValue([0]);
-    vi.mocked(pdfRules).mockResolvedValue(rules());
-    savedMarks.value = { signature: mark, initials: mark };
+    mockHelper();
+    showPdf(pdf, null);
     signingPlace.value = "Berlin";
     config.value = {
       ...config.value,
       signing: { ...config.value.signing, name: "Ada Lovelace" },
     };
-    shownPdf.value = pdf;
     dispose = bootApp(createTestHandle(createState(doc(p()))));
     await flushPromises();
   });
 
   afterEach(() => {
     dispose();
-    resetStampBooks();
-    resetPlaces();
-    resetFills();
-    shownPdf.value = null;
-    shownPdfRules.value = null;
-    savedMarks.value = undefined;
-    selectedStamp.value = null;
-    signDialog.value = null;
-    placeDialog.value = null;
-    signingPlace.value = "";
-    signingCertificate.value = null;
+    resetPdfState();
     config.value = {
       ...config.value,
       signing: { ...config.value.signing, name: "" },
     };
-    tabs.value = [];
-    activeTabId.value = null;
     pdfBitmaps.clear();
   });
 
@@ -417,6 +321,78 @@ describe("the places of a PDF", () => {
     await press(stamp, "Delete");
     await flushPromises();
     expect(document.activeElement).toBe(placeEl(SIGNATURE_LINE));
+  });
+
+  it("come back and take the focus when the stamp toolbar removes the stamp", async () => {
+    placeEl(SIGNATURE_LINE).click();
+    await flushPromises();
+    const [placed] = stampsOf("t");
+    document.getElementById(`stamp-${placed.id}`)!.focus();
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>('.stamp-toolbar [aria-label="Remove"]')!
+      .click();
+    await flushPromises();
+    expect(document.activeElement).toBe(placeEl(SIGNATURE_LINE));
+    // a stamp that filled nothing gives it to the pages, never to that place
+    changeStamps("t", [
+      {
+        id: "d",
+        kind: "date",
+        page: 0,
+        rect: [100, 150, 90, 14],
+        natural: [90, 14],
+        spec: stampSpec("date", "1 May"),
+      },
+    ]);
+    await flushPromises();
+    const date = document.getElementById("stamp-d")!;
+    date.focus();
+    await press(date, "Delete");
+    await flushPromises();
+    expect(document.activeElement).toBe(view());
+  });
+
+  it("show again once the stamp that filled them is moved off them", async () => {
+    placeEl(SIGNATURE_LINE).click();
+    await flushPromises();
+    const [placed] = stampsOf("t");
+    const stamp = document.getElementById(`stamp-${placed.id}`)!;
+    stamp.focus();
+    // a little: it still fills the line
+    await press(stamp, "ArrowDown");
+    expect(stampsOf("t")[0].place).toBe(SIGNATURE_LINE);
+    for (let step = 0; step < 6; step++) await press(stamp, "Shift-ArrowDown");
+    expect(stampsOf("t")[0].place).toBeUndefined();
+    expect(placeEl(SIGNATURE_LINE)).not.toBeNull();
+  });
+
+  it("show a field an earlier signer locked, disabled, and Next passes it", async () => {
+    shownPdfRules.value = {
+      sha256: "abc",
+      rules: pdfRulesOf({ locked: ["name"] }),
+    };
+    await flushPromises();
+    const name = placeEl("field:name") as HTMLInputElement;
+    expect(name.getAttribute("aria-disabled")).toBe("true");
+    expect(name.readOnly).toBe(true);
+    expect(name.dataset.tip).toBe(FIELD_LOCKED);
+    await press(name, "a");
+    expect(announcement.value?.text).toBe(FIELD_LOCKED);
+    expect(next().textContent?.trim()).toBe("Next · 1 of 5");
+    expect(signDialog.value).toBeNull();
+  });
+
+  it("are all disabled while Blank signs the PDF", async () => {
+    shownPdfRules.value = { sha256: "abc", rules: pdfRulesOf() };
+    signingTabs.value = new Set(["t"]);
+    await flushPromises();
+    expect(placeEl("field:agree").dataset.tip).toBe(SIGNING);
+    expect(placeEl(SIGNATURE_LINE).getAttribute("aria-disabled")).toBe("true");
+    placeEl(SIGNATURE_LINE).click();
+    await flushPromises();
+    expect(stampsOf("t")).toEqual([]);
+    expect(announcement.value?.text).toBe(SIGNING);
   });
 
   it("go one after another with Next, which says where it went", async () => {
@@ -571,46 +547,18 @@ describe("signing a PDF received", () => {
   };
 
   beforeEach(async () => {
-    tabs.value = [
-      {
-        id: "t",
-        kind: "pdf",
-        path: pdf.path,
-        importedFrom: null,
-        untitledNumber: null,
-        unsaved: false,
-        viewAnchor: null,
-      },
-    ];
-    activeTabId.value = "t";
-    vi.mocked(cancelRender).mockResolvedValue();
-    vi.mocked(renderPage).mockImplementation(() => new Promise(() => {}));
-    vi.mocked(pdfFields).mockResolvedValue(fields);
-    vi.mocked(pageText).mockResolvedValue(text);
-    vi.mocked(setFills).mockResolvedValue([0]);
-    vi.mocked(pdfRules).mockResolvedValue(rules());
+    mockHelper();
     vi.mocked(signPdf).mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
     vi.mocked(save).mockResolvedValue("/docs/contract signed.pdf");
-    savedMarks.value = { signature: mark, initials: mark };
+    showPdf(pdf, null);
     signingPlace.value = "Berlin";
-    shownPdf.value = pdf;
     dispose = bootApp(createTestHandle(createState(doc(p()))));
     await flushPromises();
   });
 
   afterEach(() => {
     dispose();
-    resetStampBooks();
-    resetPlaces();
-    resetFills();
-    shownPdf.value = null;
-    shownPdfRules.value = null;
-    savedMarks.value = undefined;
-    selectedStamp.value = null;
-    signDialog.value = null;
-    signingPlace.value = "";
-    tabs.value = [];
-    activeTabId.value = null;
+    resetPdfState();
     pdfBitmaps.clear();
   });
 

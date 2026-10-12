@@ -711,7 +711,7 @@ const askToSign = (tab: Tab) =>
     unsavedDialog.value = {
       label: tabLabel(tab),
       title: `Sign “${tabLabel(tab)}” before you close it?`,
-      text: "What you placed on its pages is lost when you close it without signing.",
+      text: "What you filled in and placed on its pages is lost when you close it without signing.",
       saveLabel: "Sign…",
       discardLabel: "Discard",
       save: answer("save"),

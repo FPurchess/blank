@@ -31,6 +31,7 @@ import {
 import { flushPromises } from "../test/async";
 import { createTestView, doc, p } from "../test/editor";
 import { mockTauriPath } from "../test/tauri";
+import { CHECKING } from "../pdf/toolRules";
 import {
   activateTab,
   bootTabs,
@@ -933,7 +934,7 @@ describe("PDF tabs", () => {
     await flushPromises();
     expect(unsavedDialog.value).toMatchObject({
       title: "Sign “c” before you close it?",
-      text: "What you placed on its pages is lost when you close it without signing.",
+      text: "What you filled in and placed on its pages is lost when you close it without signing.",
       saveLabel: "Sign…",
       discardLabel: "Discard",
     });
@@ -941,7 +942,8 @@ describe("PDF tabs", () => {
     unsavedDialog.value!.save();
     await flushPromises();
     expect(tabs.value.some((tab) => tab.id === id)).toBe(true);
-    expect(announcement.value).not.toBeNull();
+    // it signs: the PDF's rules aren't read in this test, so it says it waits
+    expect(announcement.value?.text).toBe(CHECKING);
 
     void closeTabs([id]);
     await flushPromises();
@@ -956,7 +958,6 @@ describe("PDF tabs", () => {
     await localforage.setItem("stamps:a", {
       sha256: "c1",
       stamps: [stamp()],
-      viewAnchor: null,
     });
 
     await boot();
@@ -971,7 +972,6 @@ describe("PDF tabs", () => {
     await localforage.setItem("stamps:a", {
       sha256: "older",
       stamps: [stamp(), stamp({ id: "far", page: 3 })],
-      viewAnchor: null,
     });
 
     await boot();

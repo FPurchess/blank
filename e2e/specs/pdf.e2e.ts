@@ -205,6 +205,7 @@ describe("signing a PDF received", () => {
     await expect($("#pdf-view .page-canvas")).toBeExisting();
     const next = $("#signing-toolbar .signing-next");
     await expect(next).toHaveText(/^Next · 1 of \d+$/);
+    const open = Number(/of (\d+)$/.exec(await next.getText())![1]);
     await next.click();
     const name = $('[id="place-field%3Aname"]');
     await expect(name).toBeFocused();
@@ -214,7 +215,7 @@ describe("signing a PDF received", () => {
     await type("ada");
     await browser.keys(Key.Enter);
     // filled in: Next counts one place less, and the tab has changes
-    await expect(next).toHaveText(/^Next · \d+ of \d+$/);
+    await expect(next).toHaveText(new RegExp(`^Next · \\d+ of ${open - 1}$`));
     await expect(
       $('#tab-row [role="tab"][aria-selected="true"]'),
     ).toHaveElementClass("unsaved");
@@ -224,15 +225,18 @@ describe("signing a PDF received", () => {
     await $('[id="place-field%3Asignature"]').click();
     // no signature yet: it's made first
     await expect($("#signature-dialog")).toExist();
-    await browser.execute(() => {
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          '#signature-dialog [role="tab"]',
-        ),
-      ]
-        .find((tab) => tab.textContent?.trim() === "Type")
-        ?.click();
-    });
+    // Type, clicked as the user does
+    const tabs = await $$('#signature-dialog [role="tab"]');
+    let typed = false;
+    for (const tab of tabs)
+      if (!typed && (await tab.getText()).trim() === "Type") {
+        await tab.click();
+        typed = true;
+      }
+    expect(typed).toBe(true);
+    await expect(
+      $('#signature-dialog [role="tab"][aria-selected="true"]'),
+    ).toHaveText("Type");
     await $("#signature-dialog-name").click();
     await type("ada");
     await $('#signature-dialog button[type="submit"]').click();
@@ -252,12 +256,11 @@ describe("signing a PDF received", () => {
     await expect($("#sign-dialog")).toExist();
     await expect($("#sign-dialog-how")).toHaveText(/No digital signature/);
     await $('#sign-dialog button[type="submit"]').click();
-    await browser.waitUntil(() => fs.existsSync(signedPath), {
-      timeoutMsg: "the signed PDF wasn't written",
-    });
-    expect(fs.readFileSync(signedPath).subarray(0, 5).toString()).toBe("%PDF-");
-    // the signed PDF opens in a tab of its own
+    // the signed PDF opens in a tab of its own once it's written whole
     await expectActiveTab("form signed", signedPath);
+    const written = fs.readFileSync(signedPath);
+    expect(written.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(written.subarray(-6).toString()).toContain("%%EOF");
     const text = spawnSync("pdftotext", [signedPath, "-"], {
       encoding: "utf8",
     });

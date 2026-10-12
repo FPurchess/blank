@@ -133,6 +133,42 @@ describe("restoring a tab's stamps", () => {
     expect(stampsOf("t")).toHaveLength(2);
   });
 
+  it("fits them to a file found again after it went", () => {
+    const gone = {
+      ...doc("abc", 1),
+      opened: null,
+      problem: "missing" as const,
+    };
+    restoreStamps("t", gone, stored("abc"));
+    expect(stampsOf("t")).toHaveLength(2);
+    // Find it… opens another file
+    restoreStamps("t", doc("new", 2), null);
+    expect(stampsOf("t").map((s) => s.id)).toEqual(["s1"]);
+    expect(stampBooks.value.get("t")?.sha256).toBe("new");
+  });
+
+  it("fits what was placed to a file that changed when it opens again", () => {
+    changeStamps("t", [stamp(), stamp({ id: "far", page: 4 })], {
+      sha256: "abc",
+    });
+    restoreStamps("t", doc("abc", 5), null);
+    expect(stampsOf("t")).toHaveLength(2);
+    // Open again, on a file that changed meanwhile
+    restoreStamps("t", doc("new", 2), null);
+    expect(stampsOf("t").map((s) => s.id)).toEqual(["s1"]);
+    expect(canUndoStamps("t")).toBe(false);
+  });
+
+  it("drops dismissed places alone on a changed file, saying nothing", () => {
+    restoreStamps("t", doc("new", 5), {
+      ...stored("abc"),
+      stamps: [],
+      dismissed: ["found:0:100:300"],
+    });
+    expect(stampBooks.value.has("t")).toBe(false);
+    expect(announcement.value).toBeNull();
+  });
+
   it("restores only once, and never over stamps placed meanwhile", () => {
     restoreStamps("t", doc("abc", 5), null);
     restoreStamps("t", doc("abc", 5), stored("abc"));

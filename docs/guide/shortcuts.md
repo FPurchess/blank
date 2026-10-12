@@ -131,7 +131,7 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Command                                           | Shortcut                            |
 | ------------------------------------------------- | ----------------------------------- |
 | Go to the signing tools                           | `Alt` `F10`                         |
-| [Next place to fill in or sign](./pdf#places)     | (none), **Next** on the toolbar     |
+| [Next place to sign](./pdf#places)                | (none), **Next** on the toolbar     |
 | Fill in or sign the place                         | `Enter` or `Space`                  |
 | Leave out a place Blank found                     | `Delete` on it                      |
 | Place the tool's stamp on the page you're reading | `Enter` or `Space` on the tool      |
@@ -142,7 +142,7 @@ In table mode, the arrow keys insert rows and columns, `Shift` + arrows move the
 | Remove it                                         | `Delete` or `Backspace`             |
 | Leave it                                          | `Esc`                               |
 | Undo / redo what you placed                       | `Mod` `Z` / `Mod` `Shift` `Z`       |
-| [Sign…](./pdf#sign-received)                      | `Mod` `S`                           |
+| [Sign… a PDF you received](./pdf#sign-received)   | (none), `Mod` `S` in a PDF tab      |
 
 See [Fill in and sign a PDF you received](./pdf#fill-in).
 

@@ -20,10 +20,10 @@ A contract, a form, a lease: Blank shows you where the PDF wants your signature,
 
 When a PDF opens, Blank looks for the places to fill in and marks each with a dashed box:
 
-- **The PDF's form fields:** text fields, checkboxes, radio buttons, lists, and empty signature fields. Fields that are read-only, or locked by an earlier signature, stay as they are.
+- **The PDF's form fields:** text fields, checkboxes, radio buttons, lists, and empty signature fields. Read-only fields stay as they are. A field an earlier signer locked shows, but greyed out: pointing at it says _An earlier signer locked this field, so it can't change any more_, and **Next** passes it.
 - **Lines with a label,** in PDFs without a form: a line of underscores, dots or a drawn line next to _Signature_, _Date_, _Place_, _Place, date_ or _Initials_, in English or German (_Unterschrift_, _Datum_, _Ort, Datum_, _Kürzel_, …), and _Unterschrift Mieter_ as _Signature · Mieter_.
 
-**Next** in the signing toolbar goes to the next place you haven't filled in yet, in reading order, and says what it is, e.g. _Signature on page 3. Press Enter to fill it in._ It reads _Next · 2 of 5_ while places are left, and _All places filled_ once you're done. Give it a key of your own in **Settings ▸ Shortcuts** (_Next place to sign_). `Tab` and `Shift` `Tab` go through the places and what you placed, as they're read.
+Once Blank found places in a PDF, **Next** in the signing toolbar goes to the next place you haven't filled in yet, in reading order, and says what it is, e.g. _Signature on page 3. Press Enter to fill it in._ It reads _Next · 2 of 5_ while places are left, and _All places filled_ once you're done. Give it a key of your own in **Settings ▸ Shortcuts** (_Next place to sign_). `Tab` and `Shift` `Tab` go through the places and what you placed, as they're read.
 
 | To                                     | Mouse          | Keys                                                    |
 | -------------------------------------- | -------------- | ------------------------------------------------------- |
@@ -35,9 +35,9 @@ When a PDF opens, Blank looks for the places to fill in and marks each with a da
 | Leave out a line Blank found           |                | `Delete` (undo brings it back)                          |
 | Undo, redo                             |                | `Mod` `Z`, `Mod` `Shift` `Z`                            |
 
-Your signature goes into a signature field or line as large as it fits, standing on a line; a date or place line gets today's date or your place. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete`, and the place is back, selected.
+Your signature goes into a signature field or line as large as it fits, standing on a line; a date or place line gets today's date or your place. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete` or **Remove**, and the place is back, selected. Move a signature off its place, and the place shows again too: the signature is then one of its own, where you put it.
 
-The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Latin letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say _This field's font can't show some of these characters_ under the field, and the field keeps what it had. Write such text as a stamp instead, or ask the sender for a form with another font.
+The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Western European letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say _This field's font can't show some of these characters_ under the field, and the field keeps what it had. Write such text as a stamp instead, or ask the sender for a form with another font.
 
 ### Place your signature, initials, date and place {#stamps}
 
@@ -46,7 +46,7 @@ In a PDF tab, the toolbar above the pages has the signing tools: **Signature**, 
 - **With the mouse:** click a tool, then click the page where it goes: it's placed there, centred on the click. While a tool waits for the click, the pointer is a crosshair; `Esc` or a second click on the tool puts it down again.
 - **With the keyboard:** press `Alt` `F10` (or `F6` until you're in the toolbar), go to a tool with `←` `→` and press `Enter` or `Space`. It's placed on the page you're reading: a signature in the lower third, centred; initials at the bottom right; a date or place below your last signature.
 
-The first time you use **Signature** or **Initials**, Blank asks you to [make them](./signing#your-signature), then places them. The date is today's, written as **Settings ▸ Signing ▸ Date** says, in the document's language; the place is where you signed last. The first time you place a place, Blank asks where you sign, and remembers it.
+The first time you use **Signature** or **Initials**, Blank asks you to [make them](./signing#your-signature), then places them. The date is today's, written as **Settings ▸ Signing ▸ Date** says, in the language you last chose in a document's status bar; the place is where you signed last. The first time you place a place, Blank asks where you sign, and remembers it.
 
 What you placed is selected, with a ring and four corners, and a small toolbar above it:
 
@@ -61,23 +61,23 @@ What you placed is selected, with a ring and four corners, and a small toolbar a
 
 It stays on its page, with at least a little of it showing, and grows to at most three times its size and shrinks to half. Repeated initials show faded on the other pages, at the same spot, moved into smaller pages. A screen reader names each stamp, e.g. _Signature on page 2_.
 
-A PDF tab you filled in or placed something on has a dot, as a document with unsaved changes has. Blank keeps it when you close Blank, and when you start it again, it's back on the pages, as long as the file is the same. If the file changed, what was on pages it no longer has is gone, and so are its form's entries, and Blank says so. Closing the tab asks whether to **Sign…** it first; **Discard** drops what you did.
+A PDF tab you filled in or placed something on has a dot, as a document with unsaved changes has. Blank keeps it when you close Blank, and when you start it again, it's back on the pages, as long as the file is the same. If the file changed, when Blank starts or when you open it again with **Open again** or **Find it…**, what was on pages it no longer has is gone, and so are its form's entries and the lines you left out, and Blank says so. Closing the tab asks whether to **Sign…** it first; **Discard** drops what you did.
 
 ### Sign it {#sign-received}
 
 **Sign…**, or `Mod` `S` in a PDF tab, opens the Sign dialog:
 
-- **Sign as:** your certificate, which [signs it digitally](./signing#digital) with your passphrase, or _No digital signature_, which only shows your signature on the page. Without a signature on a page, a digital signature is invisible (PDF apps list it in their signature panel), and _No digital signature_ needs one.
+- **Sign as:** your certificate, which [signs it digitally](./signing#digital) with your passphrase, or **No digital signature (only the visible signature)**, which only shows your signature on the page. Without a signature on a page, a digital signature is invisible (PDF apps list it in their signature panel), and **No digital signature** needs one. A PDF others signed takes only a digital signature: **No digital signature** is greyed out there, since your signature would change pages they signed.
 - **Initials: On every page** puts your initials on every page, at the bottom right or left, or takes the repeated initials off again.
 - **Place** and **Reason** go into the digital signature.
-- It says how many places are still empty, and **Open the signed PDF** opens the result in a tab of its own, whose status bar then says _Signed_.
+- It says how many places are still to fill in, and **Open the signed PDF** opens the result in a tab of its own, whose status bar then says _Signed_.
 
-Then choose where to save it: Blank suggests the PDF's name with _signed_ after it, next to it, e.g. _lease signed.pdf_, so the PDF you received stays as it is. The signed PDF holds what you typed into its form, your stamps, and your digital signature over all of it, added after what the PDF had, so earlier signatures stay intact. Once it's saved, the tab is as you received it again, with nothing left unsaved. If anything goes wrong, Blank says why and writes nothing; a wrong passphrase you just type again.
+Then choose where to save it: Blank suggests the PDF's name with _signed_ after it, next to it, e.g. _lease signed.pdf_, so the PDF you received stays as it is. The signed PDF holds what you typed into its form, your stamps, and your digital signature over all of it, added after what the PDF had, so earlier signatures stay intact. While Blank signs, the tab's fields, places and tools wait: they say _Blank is signing this PDF_. Once it's saved, the tab is as you received it again, with nothing left unsaved. If anything goes wrong, Blank says why and writes nothing; a wrong passphrase you just type again.
 
 Some PDFs don't allow everything, and the tools say why when you point at them:
 
-- **Signed already:** you can still fill in its fields and sign, but only your signature can go on its pages, as the appearance of a signature field. Initials, a date or a place would change pages the earlier signers signed, so their tools are off.
-- **Allows no changes** (certified so by its author), **restricted** by its author, or **damaged:** nothing can be added or signed, and the toolbar says why.
+- **Signed or certified already:** you can still fill in its fields and sign it digitally, but only one signature of yours can go on its pages, as the appearance of a signature field. Initials, a date or a place would change pages the earlier signers signed, so their tools are off, and so is **Signature** once one is placed. Fields an earlier signer locked are greyed out.
+- **Allows no changes** (certified so by its author), **restricted** by its author, or **damaged:** nothing can be filled in, added or signed, and the toolbar says why.
 - When Blank's page layout didn't start, the stamps are off, and the toolbar says so.
 
 ## Print a PDF {#print}
@@ -96,7 +96,7 @@ Instead of the pages, the tab then says why, with what you can do about it:
 - **Moved or deleted:** the file isn't where it was, also when you start Blank again. **Find it…** picks where it went.
 - **Changed:** another app changed the file after Blank opened it. **Open again** shows it as it is now.
 - **Damaged, too large or complex:** Blank can't read it, or it would take too much memory or time. Open it in another app.
-- **Needs a password:** Blank can't open PDFs with a password yet.
+- **Needs a password:** Blank can't open PDFs that need a password.
 
 Blank draws a PDF's pages with a separate program, `blank-pdf`, one for each PDF tab. A PDF that takes it down only takes down its tab: Blank starts it again once, and a page it couldn't draw says _Blank couldn't draw this page_. If it stops while it opens the PDF, or a second time, the tab says so, with **Open again** to try once more and **Close tab**. Everything else in Blank goes on as before.
 

@@ -1,42 +1,42 @@
 {
-  "about": "src-tauri/pdf/fixtures/form.pdf: its words as pdftotext -bbox reads them, and its rule (0.5 w 100 490 m 300 490 l S) drawn by hand",
+  "about": "src-tauri/pdf/fixtures/form.pdf: its words where pdftotext -bbox finds them, in boxes as the helper gives them, and its rule (0.5 w 100 490 m 300 490 l S) drawn by hand",
   "text": {
     "words": [
       {
         "text": "Contract",
-        "rect": [100, 73.384, 45.35, 11.1]
+        "rect": [100, 72.4, 45.35, 12.6]
       },
       {
         "text": "A-17",
-        "rect": [352, 128.82, 21.12, 9.25]
+        "rect": [352, 128, 21.12, 10.5]
       },
       {
         "text": "Apple",
-        "rect": [352, 205.82, 25.57, 9.25]
+        "rect": [352, 205, 25.57, 10.5]
       },
       {
         "text": "Pear",
-        "rect": [352, 216.82, 21.12, 9.25]
+        "rect": [352, 216, 21.12, 10.5]
       },
       {
         "text": "Green",
-        "rect": [102, 228.82, 27.79, 9.25]
+        "rect": [102, 228, 27.79, 10.5]
       },
       {
         "text": "Unterschrift",
-        "rect": [100, 364.82, 51.12, 9.25]
+        "rect": [100, 364, 51.12, 10.5]
       },
       {
         "text": "Ort,",
-        "rect": [350, 364.82, 16.67, 9.25]
+        "rect": [350, 364, 16.67, 10.5]
       },
       {
         "text": "Datum:",
-        "rect": [369.45, 364.82, 32.23, 9.25]
+        "rect": [369.45, 364, 32.23, 10.5]
       },
       {
         "text": "______________",
-        "rect": [404.46, 364.82, 77.84, 9.25]
+        "rect": [404.46, 364, 77.84, 10.5]
       }
     ],
     "rules": [[100, 351.75, 200, 0.5]]
@@ -48,7 +48,7 @@
     },
     {
       "kind": "placeAndDate",
-      "rect": [404.46, 359.27, 77.84, 14.8]
+      "rect": [404.46, 357.7, 77.84, 16.8]
     }
   ]
 }

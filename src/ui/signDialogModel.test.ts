@@ -109,4 +109,24 @@ describe("the dialog that signs", () => {
     expect(canSign({ ...base, confirmPages: true })).toBe(false);
     expect(canSign({ ...base, confirmPages: true, checked: true })).toBe(true);
   });
+
+  it("signs a PDF others signed only digitally", () => {
+    const why = "Sign with your certificate.";
+    const [, visible] = signAsItems({
+      certificate: "Ada",
+      how: "digital",
+      visibleRefusal: why,
+      choose: () => {},
+      create: () => {},
+      manage: () => {},
+    });
+    expect(visible).toMatchObject({ id: "visible", disabled: true, tip: why });
+    const base = { stamped: true, confirmPages: false, checked: false };
+    expect(canSign({ ...base, digital: false, visibleRefused: true })).toBe(
+      false,
+    );
+    expect(canSign({ ...base, digital: true, visibleRefused: true })).toBe(
+      true,
+    );
+  });
 });

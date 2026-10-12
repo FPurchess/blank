@@ -1,16 +1,19 @@
 // Writes the pages the found places' test reads (src/signing/__fixtures__/
 // labels/), each with the places it has:
 //
-// - form-pdf.json: src-tauri/pdf/fixtures/form.pdf's words as
-//   `pdftotext -bbox` reads them, and its rule, which pdftotext doesn't give;
+// - form-pdf.json: src-tauri/pdf/fixtures/form.pdf's words where
+//   `pdftotext -bbox` finds them, and its rule, which pdftotext doesn't give;
 // - the others: hand-made forms and traps, their words laid out with
-//   Helvetica's widths, roughly, and boxes as pdftotext gives them (the top
-//   0.718 em above the baseline, the bottom 0.207 em below).
+//   Helvetica's widths, roughly.
 //
-// The places expected are where the plan puts them (§5.2 of the e-signing
-// plan's PR 3): on a line a label stands left of, 1.6 label heights tall;
-// 36 pt (a signature or initials) or 18 pt above a line a caption stands
-// under; between a label and the line below it.
+// Every word's box is as the helper's `text` op gives it: from 0.8 em above
+// the baseline to 0.25 em below (pdftotext's, 0.718 and 0.207 em of
+// Helvetica, are made into those).
+//
+// The places expected are where src/signing/labels.ts puts them (see
+// .claude/rules/pdf.md, "Places and fills"): on a line a label stands left
+// of, 1.6 label heights tall; 36 pt (a signature or initials) or 18 pt above
+// a line a caption stands under; between a label and the line below it.
 //
 // Run with `bun scripts/build-label-fixtures.ts` (needs poppler-utils) and
 // commit the result.
@@ -29,6 +32,24 @@ const out = join(root, "src", "signing", "__fixtures__", "labels");
 mkdirSync(out, { recursive: true });
 
 const round = (n: number) => Math.round(n * 100) / 100;
+// how far a word's box reaches above and below its baseline, in em, as the
+// helper gives it, and as pdftotext does
+const ASCENT = 0.8;
+const DESCENT = 0.25;
+const PDFTOTEXT_ASCENT = 0.718;
+const PDFTOTEXT_DESCENT = 0.207;
+// the box of a word `width` wide at `x`, `size` large on `baseline`
+const box = (
+  x: number,
+  baseline: number,
+  width: number,
+  size: number,
+): Rect => [
+  round(x),
+  round(baseline - ASCENT * size),
+  round(width),
+  round((ASCENT + DESCENT) * size),
+];
 const bottom = (rect: Rect) => rect[1] + rect[3];
 const em = (c: string) =>
   c === "_"
@@ -63,15 +84,18 @@ const write = (
       .matchAll(
         /xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</gu,
       ),
-  ].map(([, x0, y0, x1, y1, text]) => ({
-    text,
-    rect: [+x0, +y0, round(+x1 - +x0), round(+y1 - +y0)] as Rect,
-  }));
+  ].map(([, x0, y0, x1, y1, text]) => {
+    const size = (+y1 - +y0) / (PDFTOTEXT_ASCENT + PDFTOTEXT_DESCENT);
+    return {
+      text,
+      rect: box(+x0, +y0 + PDFTOTEXT_ASCENT * size, +x1 - +x0, size),
+    };
+  });
   const run = words.find((word) => word.text.startsWith("___"))!.rect;
   const label = 1.6 * run[3];
   write(
     "form-pdf",
-    "src-tauri/pdf/fixtures/form.pdf: its words as pdftotext -bbox reads them, and its rule (0.5 w 100 490 m 300 490 l S) drawn by hand",
+    "src-tauri/pdf/fixtures/form.pdf: its words where pdftotext -bbox finds them, in boxes as the helper gives them, and its rule (0.5 w 100 490 m 300 490 l S) drawn by hand",
     // 842 − 490, half the stroke's width up
     { words, rules: [[100, 351.75, 200, 0.5]] },
     [
@@ -89,12 +113,7 @@ let page: Page;
 const text = (x: number, baseline: number, string: string, size = 10) =>
   string.split(" ").flatMap((word) => {
     const width = [...word].reduce((sum, c) => sum + em(c), 0) * size;
-    const rect: Rect = [
-      round(x),
-      round(baseline - 0.718 * size),
-      round(width),
-      round(0.925 * size),
-    ];
+    const rect = box(x, baseline, width, size);
     x += width + 0.278 * size;
     if (!word) return [];
     page.words.push({ text: word, rect });

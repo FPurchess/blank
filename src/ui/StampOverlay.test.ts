@@ -1,20 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cancelRender, renderPage } from "../pdf/ipc";
-import type { PdfTabDocument } from "../pdf/document";
-import { changeStamps, resetStampBooks, stampsOf } from "../pdf/stampBooks";
-import { type Stamp, stampSpec } from "../pdf/stampModel";
-import {
-  activeTabId,
-  announcement,
-  placingStamp,
-  selectedStamp,
-  shownPdf,
-  shownPdfRules,
-  tabs,
-} from "../state";
+import { changeStamps, stampsOf } from "../pdf/stampBooks";
+import { stampSpec } from "../pdf/stampModel";
+import { announcement, placingStamp, selectedStamp } from "../state";
 import { flushPromises } from "../test/async";
 import { createTestHandle, keyEvent } from "../test/editor";
+import { pdfDocument, resetPdfState, showPdf, testStamp } from "../test/pdf";
 import { bootApp } from "./mount";
 import { pdfBitmaps } from "./pageBitmaps";
 
@@ -38,30 +30,8 @@ vi.mock("../engine/engine", async (original) => ({
   engineless: () => false,
 }));
 
-const a4 = { width: 595, height: 842, rotation: 0 };
-
-const pdf: PdfTabDocument = {
-  path: "/docs/contract.pdf",
-  opened: {
-    sha256: "abc",
-    pages: [a4, a4, a4],
-    repaired: false,
-    encrypted: false,
-  },
-  problem: null,
-  failedPages: [],
-  signatures: [],
-};
-
-const stamp = (over: Partial<Stamp> = {}): Stamp => ({
-  id: "s1",
-  kind: "signature",
-  page: 0,
-  rect: [100, 100, 180, 60],
-  natural: [180, 60],
-  spec: stampSpec("signature"),
-  ...over,
-});
+const pdf = pdfDocument(3);
+const stamp = testStamp;
 
 const view = () => document.getElementById("pdf-view")!;
 const stampEl = (id = "s1") => document.getElementById(`stamp-${id}`)!;
@@ -99,31 +69,9 @@ describe("stamps on a PDF's pages", () => {
   let dispose = () => {};
 
   beforeEach(async () => {
-    tabs.value = [
-      {
-        id: "t",
-        kind: "pdf",
-        path: pdf.path,
-        importedFrom: null,
-        untitledNumber: null,
-        unsaved: false,
-        viewAnchor: null,
-      },
-    ];
-    activeTabId.value = "t";
     vi.mocked(cancelRender).mockResolvedValue();
     vi.mocked(renderPage).mockImplementation(() => new Promise(() => {}));
-    shownPdf.value = pdf;
-    shownPdfRules.value = {
-      sha256: "abc",
-      rules: {
-        signed: false,
-        docmdp: null,
-        encrypted: false,
-        damaged: false,
-        locked: [],
-      },
-    };
+    showPdf(pdf);
     changeStamps("t", [
       stamp({ id: "low", rect: [100, 500, 180, 60] }),
       stamp(),
@@ -135,13 +83,7 @@ describe("stamps on a PDF's pages", () => {
 
   afterEach(() => {
     dispose();
-    resetStampBooks();
-    shownPdf.value = null;
-    shownPdfRules.value = null;
-    selectedStamp.value = null;
-    placingStamp.value = null;
-    tabs.value = [];
-    activeTabId.value = null;
+    resetPdfState();
     pdfBitmaps.clear();
   });
 

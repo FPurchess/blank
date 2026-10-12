@@ -38,7 +38,9 @@ const matches = (
 
 describe("found places", () => {
   it("finds the places of the fixtures, with few wrong ones", () => {
+    // found places that are expected ones, and expected ones found
     let right = 0;
+    let caughtCount = 0;
     let foundCount = 0;
     let expectedCount = 0;
     const rows: string[] = [];
@@ -50,7 +52,8 @@ describe("found places", () => {
       const caught = fixture.expected.filter((expected) =>
         found.some((place) => matches(place, expected)),
       ).length;
-      right += caught;
+      right += hits;
+      caughtCount += caught;
       foundCount += found.length;
       expectedCount += fixture.expected.length;
       rows.push(
@@ -58,12 +61,11 @@ describe("found places", () => {
       );
     }
     const precision = foundCount ? right / foundCount : 1;
-    const recall = expectedCount ? right / expectedCount : 1;
-    console.log(
-      `${rows.join("\n")}\nprecision ${precision.toFixed(3)}, recall ${recall.toFixed(3)}`,
-    );
-    expect(precision).toBeGreaterThanOrEqual(0.9);
-    expect(recall).toBeGreaterThanOrEqual(0.8);
+    const recall = expectedCount ? caughtCount / expectedCount : 1;
+    // which fixture missed, said only when one did
+    const report = `${rows.join("\n")}\nprecision ${precision.toFixed(3)}, recall ${recall.toFixed(3)}`;
+    expect(precision, report).toBe(1);
+    expect(recall, report).toBe(1);
   });
 
   it("finds form.pdf's signature over its rule and its place and date", () => {

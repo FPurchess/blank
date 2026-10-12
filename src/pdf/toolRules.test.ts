@@ -9,7 +9,11 @@ import {
   NO_CHANGES,
   NOT_OPEN,
   RESTRICTED,
+  fieldRefusal,
+  FIELD_LOCKED,
+  ONE_SIGNATURE,
   signRefusal,
+  SIGNING,
   type ToolContext,
   toolbarNote,
   toolRefusal,
@@ -99,6 +103,31 @@ describe("what the signing tools may place", () => {
     expect(signRefusal(without)).toBeNull();
     // a place Blank doesn't know yet is asked for when it's placed
     expect(toolRefusal("place", context())).toBeNull();
+  });
+});
+
+describe("what else waits or is refused", () => {
+  it("take one more signature only on a signed PDF", () => {
+    const signed = context({ rules: rules({ signed: true }), signatures: 1 });
+    expect(toolRefusal("signature", signed)).toBe(ONE_SIGNATURE);
+    expect(toolRefusal("signature", context({ signatures: 1 }))).toBeNull();
+    expect(
+      toolRefusal("signature", context({ rules: rules({ docmdp: 2 }) })),
+    ).toBeNull();
+  });
+
+  it("wait while Blank signs the PDF", () => {
+    const signing = context({ signing: true });
+    expect(toolRefusal("date", signing)).toBe(SIGNING);
+    expect(signRefusal(signing)).toBe(SIGNING);
+    expect(fieldRefusal("name", signing)).toBe(SIGNING);
+  });
+
+  it("keep fields an earlier signer locked as they are", () => {
+    const locked = context({ rules: rules({ locked: ["name"] }) });
+    expect(fieldRefusal("name", locked)).toBe(FIELD_LOCKED);
+    expect(fieldRefusal("other", locked)).toBeNull();
+    expect(fieldRefusal("name", context({ rules: null }))).toBe(CHECKING);
   });
 });
 
