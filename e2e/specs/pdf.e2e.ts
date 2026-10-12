@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -5,13 +6,25 @@ import { fileURLToPath } from "node:url";
 
 import { browser, $, expect } from "@wdio/globals";
 
-import { expectActiveTab, Key, pressMod, restartApp } from "../helpers.ts";
+import {
+  expectActiveTab,
+  Key,
+  pressMod,
+  restartApp,
+  type,
+} from "../helpers.ts";
 
 // a page turned by /Rotate 90 with a black box on it, and an A5 page, see
 // scripts/build-pdf-fixtures.ts
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../src-tauri/pdf/fixtures/rotated.pdf",
+);
+// a form of every kind of field, with a signature field and "Ort, Datum:
+// ____" on the page, see scripts/build-pdf-fixtures.ts
+const FORM = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../src-tauri/pdf/fixtures/form.pdf",
 );
 
 /**
@@ -166,5 +179,89 @@ describe("PDF tabs", () => {
     await restartApp();
     await expectActiveTab("turned", pdfPath);
     await waitForPages();
+  });
+});
+
+describe("signing a PDF received", () => {
+  let dir: string;
+  let formPath: string;
+  let signedPath: string;
+
+  before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-e2e-form-"));
+    formPath = path.join(dir, "form.pdf");
+    signedPath = path.join(dir, "form signed.pdf");
+    fs.copyFileSync(FORM, formPath);
+    await restartApp([formPath]);
+  });
+
+  after(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("goes to its first place with Next and fills the field in", async () => {
+    await expectActiveTab("form", formPath);
+    // its places are read once its pages show
+    await expect($("#pdf-view .page-canvas")).toBeExisting();
+    const next = $("#signing-toolbar .signing-next");
+    await expect(next).toHaveText(/^Next · 1 of \d+$/);
+    await next.click();
+    const name = $('[id="place-field%3Aname"]');
+    await expect(name).toBeFocused();
+    await expect($("#ui-announcement")).toHaveText(
+      "Your name on page 1. Type to fill it in.",
+    );
+    await type("ada");
+    await browser.keys(Key.Enter);
+    // filled in: Next counts one place less, and the tab has changes
+    await expect(next).toHaveText(/^Next · \d+ of \d+$/);
+    await expect(
+      $('#tab-row [role="tab"][aria-selected="true"]'),
+    ).toHaveElementClass("unsaved");
+  });
+
+  it("signs the signature field with a signature typed for it", async () => {
+    await $('[id="place-field%3Asignature"]').click();
+    // no signature yet: it's made first
+    await expect($("#signature-dialog")).toExist();
+    await browser.execute(() => {
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          '#signature-dialog [role="tab"]',
+        ),
+      ]
+        .find((tab) => tab.textContent?.trim() === "Type")
+        ?.click();
+    });
+    await $("#signature-dialog-name").click();
+    await type("ada");
+    await $('#signature-dialog button[type="submit"]').click();
+    await expect($("#signature-dialog")).not.toExist();
+    const stamp = $('#pdf-view .pdf-stamp[role="group"]');
+    await expect(stamp).toHaveAttribute(
+      "aria-label",
+      "Signature on page 1, selected",
+    );
+  });
+
+  it("saves it signed with no digital signature, the field filled in", async () => {
+    await browser.execute((to) => {
+      window.blankTestSavePath = to;
+    }, signedPath);
+    await $("#signing-toolbar .signing-sign").click();
+    await expect($("#sign-dialog")).toExist();
+    await expect($("#sign-dialog-how")).toHaveText(/No digital signature/);
+    await $('#sign-dialog button[type="submit"]').click();
+    await browser.waitUntil(() => fs.existsSync(signedPath), {
+      timeoutMsg: "the signed PDF wasn't written",
+    });
+    expect(fs.readFileSync(signedPath).subarray(0, 5).toString()).toBe("%PDF-");
+    // the signed PDF opens in a tab of its own
+    await expectActiveTab("form signed", signedPath);
+    const text = spawnSync("pdftotext", [signedPath, "-"], {
+      encoding: "utf8",
+    });
+    if (text.error && !process.env.CI) return;
+    expect(text.stdout).toContain("ada");
   });
 });
