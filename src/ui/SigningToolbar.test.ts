@@ -157,7 +157,10 @@ describe("the signing toolbar", () => {
     expect(
       toolbar().querySelector(".signing-next")!.hasAttribute("hidden"),
     ).toBe(true);
-    expect(pdfRules).toHaveBeenCalledWith("/docs/contract.pdf");
+    expect(pdfRules).toHaveBeenCalledWith(
+      "/docs/contract.pdf",
+      expect.any(String),
+    );
   });
 
   it("is the toolbar's stop for F6 and Alt-F10", async () => {

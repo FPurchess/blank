@@ -222,8 +222,10 @@ export interface PdfRules {
   locked: string[];
 }
 
-export const pdfRules = (path: string) =>
-  invoke<PdfRules>("signing_pdf_rules", { path });
+// `sha256`: the PDF the tab opened, else it fails `fileChanged` or
+// `fileMissing`
+export const pdfRules = (path: string, sha256: string) =>
+  invoke<PdfRules>("signing_pdf_rules", { path, sha256 });
 
 // how far Blank trusts who signed (src-tauri/src/signing/trust.rs): the
 // user's own certificate, one they trusted, one a certificate authority

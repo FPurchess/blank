@@ -6,7 +6,13 @@ import {
   pageRevisions,
   shownPdf,
 } from "../state";
-import { failureOf, type Fill, type OpenedPdf, setFills } from "./ipc";
+import {
+  failedField,
+  failureOf,
+  type Fill,
+  type OpenedPdf,
+  setFills,
+} from "./ipc";
 import { fieldValue, MISSING_GLYPHS, NOT_TAKEN } from "./placeModel";
 import type { PdfField } from "./ipc";
 import { changeSheet, fillsOf } from "./stampBooks";
@@ -73,9 +79,10 @@ export const commitFill = async (
   } catch (error) {
     const failure = failureOf(error);
     if (failure === "missingGlyphs" || failure === "badRequest") {
+      // the field the helper names, else the one just filled in
       fieldProblem.value = {
         tab,
-        field: field.name,
+        field: failedField(error) ?? field.name,
         text: failure === "missingGlyphs" ? MISSING_GLYPHS : NOT_TAKEN,
       };
       announce(fieldProblem.value.text);

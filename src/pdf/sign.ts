@@ -384,7 +384,7 @@ export const readShownRules = async () => {
   const sha256 = doc?.opened?.sha256;
   if (!doc || !sha256 || shownPdfRules.value?.sha256 === sha256) return;
   try {
-    const rules = await pdfRules(doc.path);
+    const rules = await pdfRules(doc.path, sha256);
     // still the PDF shown
     if (shownPdf.value?.opened?.sha256 === sha256)
       shownPdfRules.value = { sha256, rules };

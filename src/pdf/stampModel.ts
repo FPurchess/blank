@@ -119,18 +119,35 @@ export const clampRect = (rect: Rect, page: PageSize): Rect => {
 };
 
 /**
- * fitInto moves `rect` into a page of `page`, made smaller with its shape
- * kept if it doesn't fit, as a repeated stamp is drawn on smaller pages
- * (`clamp` in src-tauri/src/signing/pdf/stamp.rs)
+ * fitInto returns where `rect`, placed on a page of `from`, goes on a page of
+ * `to`, as a repeated stamp is drawn there (`repeat_into` in
+ * src-tauri/src/signing/pdf/stamp.rs): made smaller, its shape kept, if it
+ * doesn't fit; as far from the nearer of the left and right edges, and of
+ * the top and bottom ones, as on its own page (a tie goes left and up); and
+ * never off the page
  */
-export const fitInto = (rect: Rect, page: PageSize): Rect => {
-  let [x, y, w, h] = rect;
-  const scale = Math.min(page.width / w, page.height / h, 1);
-  w *= scale;
-  h *= scale;
-  x = Math.max(0, Math.min(x, page.width - w));
-  y = Math.max(0, Math.min(y, page.height - h));
-  return [x, y, w, h];
+export const fitInto = (rect: Rect, from: PageSize, to: PageSize): Rect => {
+  const [x, y, w, h] = rect;
+  const scale = Math.min(to.width / w, to.height / h, 1);
+  const [fittedW, fittedH] = [w * scale, h * scale];
+  // along one axis: its start and size on its own page, into the other
+  const along = (
+    start: number,
+    size: number,
+    page: number,
+    into: number,
+    fitted: number,
+  ) => {
+    const far = page - start - size;
+    const at = start <= far ? start : into - far - fitted;
+    return Math.max(0, Math.min(at, into - fitted));
+  };
+  return [
+    along(x, w, from.width, to.width, fittedW),
+    along(y, h, from.height, to.height, fittedH),
+    fittedW,
+    fittedH,
+  ];
 };
 
 /**
@@ -250,7 +267,13 @@ export const ghostsOf = (
       sizes.flatMap((size, page) =>
         page === stamp.page
           ? []
-          : [{ stamp, page, rect: fitInto(stamp.rect, size) }],
+          : [
+              {
+                stamp,
+                page,
+                rect: fitInto(stamp.rect, sizes[stamp.page] ?? size, size),
+              },
+            ],
       ),
     );
 

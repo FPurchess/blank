@@ -499,7 +499,11 @@ describe("the places of a PDF", () => {
   });
 
   it("refuse what the field's font can't show, and keep what it had", async () => {
-    vi.mocked(setFills).mockRejectedValue("missingGlyphs");
+    // as the native side refuses it, naming the field
+    vi.mocked(setFills).mockRejectedValue({
+      kind: "missingGlyphs",
+      field: "name",
+    });
     const input = placeEl("field:name") as HTMLInputElement;
     input.focus();
     await flushPromises();

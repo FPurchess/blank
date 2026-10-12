@@ -53,12 +53,35 @@ export type PdfFailure =
   | "start"
   | "source";
 
+// how `pdf_set_fills` fails: the kind, and the field whose fill was refused
+// (its full name), if it was one fill
+export interface FillFailure {
+  kind: PdfFailure;
+  field: string | null;
+}
+
+const isFillFailure = (error: unknown): error is FillFailure =>
+  !!error &&
+  typeof error === "object" &&
+  typeof (error as { kind?: unknown }).kind === "string";
+
 /**
  * failureOf returns the kind of failure the native side sent, "engine" for
  * any other error, e.g. of the webview
  */
 export const failureOf = (error: unknown): PdfFailure =>
-  typeof error === "string" ? (error as PdfFailure) : "engine";
+  typeof error === "string"
+    ? (error as PdfFailure)
+    : isFillFailure(error)
+      ? error.kind
+      : "engine";
+
+/**
+ * failedField returns the field whose fill `pdf_set_fills` refused, if it
+ * named one
+ */
+export const failedField = (error: unknown) =>
+  isFillFailure(error) ? error.field : null;
 
 /**
  * openPdf opens the PDF at `path` in the tab `tab`, with a helper of its

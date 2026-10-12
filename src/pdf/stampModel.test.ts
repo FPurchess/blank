@@ -144,18 +144,23 @@ describe("repeated initials", () => {
     expect(toggleRepeat([stamp()], "s1")[0].repeat).toBeUndefined();
   });
 
-  it("show on the other pages, moved into smaller ones", () => {
+  it("show on the other pages, as far from the nearer edges", () => {
     const ghosts = ghostsOf([{ ...initials, repeat: true }], [A4, A4, A5]);
     expect(ghosts.map((ghost) => ghost.page)).toEqual([1, 2]);
     expect(ghosts[0].rect).toEqual([500, 780, 56, 28]);
-    expect(ghosts[1].rect).toEqual([364, 567, 56, 28]);
+    // 39 pt from the right edge and 34 pt from the bottom, as on A4
+    expect(ghosts[1].rect).toEqual([325, 533, 56, 28]);
     expect(ghostsOf([initials], [A4, A4])).toEqual([]);
   });
 
   it("fit made smaller into a page smaller than them", () => {
-    expect(fitInto([0, 0, 200, 100], { width: 100, height: 100 })).toEqual([
-      0, 0, 100, 50,
-    ]);
+    expect(
+      fitInto(
+        [0, 0, 200, 100],
+        { width: 300, height: 300 },
+        { width: 100, height: 100 },
+      ),
+    ).toEqual([0, 0, 100, 50]);
   });
 });
 
