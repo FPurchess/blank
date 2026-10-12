@@ -6,6 +6,7 @@ import { language } from "./language";
 
 import type { CertificateInfo } from "../signing/ipc";
 import type { Mark, SavedMark } from "../signing/profile";
+import { INITIALS_DEFAULT, type InitialsChoice } from "../signing/initials";
 
 // The user's signature and initials (src/signing/profile.ts), once read:
 // undefined until then, null for none. They're read when something first
@@ -16,6 +17,10 @@ export const savedMarks = shallowRef<
 
 // where the user signed last, which a signature's place starts as
 export const signingPlace = shallowRef("");
+
+// whether the user put their initials on every page the last time they
+// signed, and in which corner, which the Sign dialog starts with
+export const signingInitials = shallowRef<InitialsChoice>(INITIALS_DEFAULT);
 
 // the user's certificate as the native side has it (src/signing/ipc.ts):
 // undefined until read, null for none

@@ -1,16 +1,127 @@
 import type { Option } from "../layout/choices";
-import type { SignTarget } from "../state";
+import type { MenuItem, SignTarget } from "../state";
+import type { InitialsSide } from "../signing/initials";
 
-// The dialog that signs (SignDialog.vue).
+// The dialog that signs (SignDialog.vue), for a signed export and for a PDF
+// tab alike.
 
 // whether the user's certificate signs too, or the PDF shows the signature
 // as a picture only
 export type How = "digital" | "visible";
 
-export const HOW_OPTIONS: Option<How>[] = [
-  { value: "digital", label: "Digital, with your certificate" },
-  { value: "visible", label: "Picture only" },
+export const VISIBLE_LABEL =
+  "No digital signature (only the visible signature)";
+
+/**
+ * signAsText returns what Sign as shows: the certificate the user signs
+ * with, or that they sign without one
+ * @param certificate the name of the user's certificate, null for none
+ */
+export const signAsText = (how: How, certificate: string | null) =>
+  how === "digital" && certificate !== null
+    ? `${certificate} · your certificate`
+    : VISIBLE_LABEL;
+
+/**
+ * signAsItems returns Sign as's menu: the user's certificate if they have
+ * one, no digital signature, then making a certificate and managing it in
+ * Settings ▸ Signing
+ */
+export const signAsItems = ({
+  certificate,
+  how,
+  choose,
+  create,
+  manage,
+}: {
+  certificate: string | null;
+  how: How;
+  choose(how: How): void;
+  create(): void;
+  manage(): void;
+}): MenuItem[] => [
+  ...(certificate !== null
+    ? [
+        {
+          id: "digital",
+          label: signAsText("digital", certificate),
+          radio: true,
+          checked: how === "digital",
+          run: () => choose("digital"),
+        },
+      ]
+    : []),
+  {
+    id: "visible",
+    label: VISIBLE_LABEL,
+    radio: true,
+    checked: how === "visible" || certificate === null,
+    run: () => choose("visible"),
+  },
+  "separator",
+  ...(certificate === null
+    ? [{ id: "create", label: "Create your certificate…", run: create }]
+    : []),
+  {
+    id: "manage",
+    label: "Manage…",
+    detail: "Settings ▸ Signing",
+    run: manage,
+  },
 ];
+
+export const SIDE_OPTIONS: Option<InitialsSide>[] = [
+  { value: "right", label: "Bottom right" },
+  { value: "left", label: "Bottom left" },
+];
+
+export const NO_INITIALS = "Add your initials in Settings ▸ Signing first.";
+
+/**
+ * initialsProblem says why the initials can't go on every page: the
+ * request's reason (e.g. a PDF others signed), else that the user has none
+ * yet; "" when they can
+ */
+export const initialsProblem = (reason: string | undefined, saved: boolean) =>
+  reason || (saved ? "" : NO_INITIALS);
+
+export const INVISIBLE_NOTE =
+  "No signature on the page: the signature will be invisible. Readers see it in their PDF app's signature panel.";
+
+export const PLACE_FIRST =
+  "Place your signature on the page first, or sign digitally.";
+
+/**
+ * stampNote says, for a PDF tab without the user's signature on a page,
+ * what that means: an invisible digital signature, or no signature at all;
+ * "" with one
+ */
+export const stampNote = (stamped: boolean, digital: boolean) =>
+  stamped ? "" : digital ? INVISIBLE_NOTE : PLACE_FIRST;
+
+/**
+ * emptyFieldsNote says how many of a PDF's fields are still empty
+ */
+export const emptyFieldsNote = (count: number) =>
+  count <= 0
+    ? ""
+    : `This PDF still has ${count} empty ${count === 1 ? "field" : "fields"}.`;
+
+/**
+ * canSign tells whether Sign… signs: with the user's signature on a page
+ * or digitally, and once they said they checked every page if asked to
+ */
+export const canSign = ({
+  stamped,
+  digital,
+  confirmPages,
+  checked,
+}: {
+  stamped: boolean;
+  digital: boolean;
+  confirmPages: boolean;
+  checked: boolean;
+}) => (stamped || digital) && (!confirmPages || checked);
 
 /**
  * hostOf returns a server's host name, e.g. "timestamp.digicert.com", or
@@ -65,9 +176,9 @@ export const dateNote = (
 
 /**
  * othersNote says, for a document with more blocks than the one signed,
- * that they stay empty and how the others sign
+ * that the others get empty signature fields, and how they sign
  */
 export const othersNote = (targets: readonly SignTarget[]) =>
   targets.length > 1
-    ? "The other signature blocks stay empty. The other signers can print the PDF and sign it by hand, or sign it in their PDF app."
+    ? "The other signature blocks get empty signature fields. The other signers can sign them in any PDF app, or in Blank, or print the PDF and sign by hand."
     : "";

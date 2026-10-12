@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canSign,
   dateNote,
+  emptyFieldsNote,
+  initialsProblem,
   namedNote,
+  NO_INITIALS,
   othersNote,
   placeNote,
+  signAsItems,
+  signAsText,
+  stampNote,
   timeNote,
 } from "./signDialogModel";
 
@@ -13,6 +20,7 @@ const target = (changes = {}) => ({
   name: "",
   place: "",
   dated: true,
+  role: "Tenant",
   label: "Tenant",
   ...changes,
 });
@@ -42,6 +50,63 @@ describe("the dialog that signs", () => {
     );
     expect(dateNote(target({ dated: false }), today)).toBe("");
     expect(othersNote([target()])).toBe("");
-    expect(othersNote([target(), target({ pos: 5 })])).toContain("stay empty");
+    expect(othersNote([target(), target({ pos: 5 })])).toContain(
+      "empty signature fields",
+    );
+  });
+
+  it("signs as the certificate, or offers to make one", () => {
+    const labels = (certificate: string | null) =>
+      signAsItems({
+        certificate,
+        how: "digital",
+        choose: () => {},
+        create: () => {},
+        manage: () => {},
+      }).map((item) => (item === "separator" ? "—" : item.label));
+    expect(labels("Ada")).toEqual([
+      "Ada · your certificate",
+      "No digital signature (only the visible signature)",
+      "—",
+      "Manage…",
+    ]);
+    expect(labels(null)).toEqual([
+      "No digital signature (only the visible signature)",
+      "—",
+      "Create your certificate…",
+      "Manage…",
+    ]);
+    expect(signAsText("digital", "Ada")).toBe("Ada · your certificate");
+    expect(signAsText("digital", null)).toContain("No digital signature");
+    expect(signAsText("visible", "Ada")).toContain("No digital signature");
+  });
+
+  it("says why the initials can't go on the pages", () => {
+    expect(initialsProblem(undefined, true)).toBe("");
+    expect(initialsProblem(undefined, false)).toBe(NO_INITIALS);
+    expect(initialsProblem("Signed.", false)).toBe("Signed.");
+  });
+
+  it("says what a PDF tab without the signature on a page gets", () => {
+    expect(stampNote(true, false)).toBe("");
+    expect(stampNote(false, true)).toContain("invisible");
+    expect(stampNote(false, false)).toContain("Place your signature");
+    expect(emptyFieldsNote(0)).toBe("");
+    expect(emptyFieldsNote(1)).toBe("This PDF still has 1 empty field.");
+    expect(emptyFieldsNote(2)).toBe("This PDF still has 2 empty fields.");
+  });
+
+  it("signs with a signature on the page or digitally, once the pages are checked", () => {
+    const base = {
+      stamped: true,
+      digital: false,
+      confirmPages: false,
+      checked: false,
+    };
+    expect(canSign(base)).toBe(true);
+    expect(canSign({ ...base, stamped: false })).toBe(false);
+    expect(canSign({ ...base, stamped: false, digital: true })).toBe(true);
+    expect(canSign({ ...base, confirmPages: true })).toBe(false);
+    expect(canSign({ ...base, confirmPages: true, checked: true })).toBe(true);
   });
 });

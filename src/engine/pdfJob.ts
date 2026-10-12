@@ -28,6 +28,9 @@ export interface PdfJob {
   // the position of the signature block a signed PDF fills in, whose box
   // the result gives
   signedPos?: number;
+  // the positions of the other signature blocks, whose boxes the result
+  // gives, for the empty fields of the others who sign
+  otherPos?: number[];
 }
 
 // what a PDF left out: an image it couldn't decode, which shows its alt
@@ -47,6 +50,9 @@ export interface PdfResult {
   warnings: PdfWarning[];
   // where the filled in signature block is, for the signature's field
   signatureBox?: PageBox;
+  // where the other signature blocks are, in the order of `otherPos`; null
+  // for one the PDF doesn't show
+  otherBoxes?: (PageBox | null)[];
 }
 
 /**
@@ -106,6 +112,13 @@ export const writePdf = (
       ...(signed === undefined
         ? {}
         : { signatureBox: rectsOf(engine.boxes(signed, signed + 1))[0] }),
+      ...(job.otherPos
+        ? {
+            otherBoxes: job.otherPos.map(
+              (pos) => rectsOf(engine.boxes(pos, pos + 1))[0] ?? null,
+            ),
+          }
+        : {}),
     };
   } finally {
     try {

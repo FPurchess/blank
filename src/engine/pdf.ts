@@ -66,6 +66,8 @@ interface Prepared {
   output: Output;
   // the signed block, if any, and how dates are written
   flattening: FlattenOptions;
+  // the positions of the other signature blocks, whose boxes it gives
+  others?: number[];
 }
 
 /**
@@ -80,6 +82,7 @@ const onSharedEngine = async ({
   sizes,
   output,
   flattening,
+  others,
 }: Prepared): Promise<PdfResult> => {
   const { signed } = flattening;
   const engine = await newEngine(true);
@@ -118,6 +121,13 @@ const onSharedEngine = async ({
       warnings: engine.pdfWarnings(),
       ...(signed
         ? { signatureBox: engine.boxes(signed.pos, signed.pos + 1)[0] }
+        : {}),
+      ...(others
+        ? {
+            otherBoxes: others.map(
+              (pos) => engine.boxes(pos, pos + 1)[0] ?? null,
+            ),
+          }
         : {}),
     };
   } finally {
@@ -189,7 +199,7 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes, output, flattening }: Prepared,
+  { doc, layout, fields, images, sizes, output, flattening, others }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
@@ -211,6 +221,7 @@ const jobOf = (
     ? { sheets: JSON.stringify(output.sheets) }
     : { pages: output.pages }),
   ...(flattening.signed ? { signedPos: flattening.signed.pos } : {}),
+  ...(others ? { otherPos: others } : {}),
 });
 
 /**
@@ -315,7 +326,7 @@ export const describeWarnings = (
  */
 const write = async (
   state: EditorState,
-  { docPath, layout, signed }: Omit<ExportContext, "pages">,
+  { docPath, layout, signed, others }: Omit<ExportContext, "pages">,
   output: Output,
 ): Promise<ExportResult> => {
   const { images, failures } = await prepareImages(state.doc, docPath, [
@@ -346,6 +357,7 @@ const write = async (
     sizes: sizesOf(images, layout),
     output,
     flattening: { signed: signed ?? null, dates: signingDates.value },
+    ...(others ? { others } : {}),
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {
@@ -371,6 +383,7 @@ const write = async (
     ],
     pages: result.pages,
     signatureBox: result.signatureBox,
+    ...(result.otherBoxes ? { otherBoxes: result.otherBoxes } : {}),
   };
 };
 

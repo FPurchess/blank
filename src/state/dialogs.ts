@@ -9,6 +9,7 @@ import type { BoxAnchor } from "./popups";
 import type { Mark, MarkSource, SavedMark } from "../signing/profile";
 import type { SignatureDate } from "../markdown/blocks/atoms";
 import type { CheckedSignature } from "../signing/ipc";
+import type { InitialsChoice } from "../signing/initials";
 
 export interface LinkDialogRequest {
   url: string;
@@ -195,14 +196,38 @@ export interface SignTarget {
   place: string;
   // whether today's date goes under it when it's signed
   dated: boolean;
+  // as what, e.g. "Tenant", "" for none
+  role: string;
   // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
   label: string;
 }
 
+// what the user chose in the Sign dialog
+export interface SignChoices {
+  // the signature block to fill in, by its position (the export flow);
+  // null for a PDF tab
+  pos: number | null;
+  // where the user signs, and why (the signature's /Reason), "" for none
+  place: string;
+  reason: string;
+  // the key's passphrase, or null for no digital signature (only the
+  // visible signature)
+  passphrase: string | null;
+  // the user's initials on every page, and in which corner
+  initials: InitialsChoice;
+  // a PDF tab: whether the signed PDF opens in a tab of its own
+  open: boolean;
+}
+
+// The Sign dialog (SignDialog.vue), for both flows: "export" signs the
+// document as a PDF with its signature block filled in, "pdf" signs a PDF
+// tab with what the user placed on its pages
 export interface SignDialogRequest {
+  mode: "export" | "pdf";
   // what is signed, e.g. the document's name
   title: string;
-  // the signature blocks the document has, the one to fill in chosen
+  // the export flow: the signature blocks the document has, the one to
+  // fill in chosen; none for a PDF tab
   targets: SignTarget[];
   chosen: number;
   // where the user signed last
@@ -215,15 +240,32 @@ export interface SignDialogRequest {
   // the notes the dialog shows, e.g. that an imported Word document's
   // layout can differ from Word's
   warnings: string[];
+  // whether Sign… waits for the user to say they checked every page, e.g.
+  // of an imported Word document
+  confirmPages: boolean;
+  // the user's initials on every page as they start, and why they can't
+  // go on the pages, if they can't (e.g. a PDF others signed); without
+  // saved initials the dialog says so itself
+  initials: InitialsChoice & { reason?: string };
+  // a PDF tab: changes the repeated initials stamp at once, as the switch
+  // and the corner change
+  setInitials?(initials: InitialsChoice): void;
+  // whether the user's signature shows on a page: the export flow's block,
+  // or a signature stamp placed on a PDF tab. Without it a digital
+  // signature is invisible and a visible one can't be made.
+  stamped: boolean;
+  // a PDF tab: the empty fields still to fill in
+  emptyFields: number;
   // whether `passphrase` opens the user's key: what's wrong, or null
   check(passphrase: string): Promise<string | null>;
-  // opens the dialog that makes the user a certificate, which gives the
-  // focus back to `opener`
+  // open the dialog that makes the user a certificate, or their initials,
+  // which gives the focus back to `opener`
   createCertificate(opener: EventTarget | null): void;
-  // fills in the block at `pos` (signed in `place` when it says none),
-  // asks where to save the signed PDF and, with
-  // the key's passphrase, signs it digitally too
-  submit(pos: number, place: string, passphrase: string | null): void;
+  createInitials(opener: EventTarget | null): void;
+  // Settings ▸ Signing, once the dialog closed
+  manage(): void;
+  // signs as chosen: asks where to save the signed PDF and writes it
+  submit(choices: SignChoices): void;
   cancel(): void;
 }
 

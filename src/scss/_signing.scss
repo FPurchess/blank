@@ -295,3 +295,15 @@
     flex-basis: 100%;
   }
 }
+
+// the Sign dialog's switches and the button that makes the initials
+.sign-dialog {
+  .dialog-body > .switch-row {
+    margin-bottom: var(--s2);
+  }
+
+  .make-initials {
+    @include text-button;
+    margin-left: var(--s1);
+  }
+}

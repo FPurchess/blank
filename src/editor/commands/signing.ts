@@ -17,9 +17,16 @@ import {
   signatureDialog,
   signDialog,
   signingCertificate,
+  type SignChoices,
   signingDates,
+  signingInitials,
   signingPlace,
 } from "../../state";
+import { type Layout, pageGeometry } from "../../layout/resolve";
+import { stampPdf } from "../../pdf/stampEngine";
+import { INITIALS_BOX, INITIALS_STAMP } from "../../signing/initials";
+import { type ExportSigning, exportRequest } from "../../signing/exportPlan";
+import { openSettings } from "./settings";
 import { basename } from "../../paths";
 import { PDF_FILTER } from "../../formats";
 import { toPDF } from "../../exporters";
@@ -132,7 +139,7 @@ const signerName = () =>
  */
 const passphraseProblem = (error: unknown) =>
   signingKind(error) === "wrongPassphrase"
-    ? "The passphrase is wrong. Forgot it? Sign with a picture only, or remove your certificate in Settings ▸ Signing and create a new one."
+    ? "The passphrase is wrong. Forgot it? Sign with no digital signature, or remove your certificate in Settings ▸ Signing and create a new one."
     : signingMessage(error, "Blank couldn't open your key");
 
 /**
@@ -184,6 +191,7 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
     const name = config.value.signing.name;
     const named = file.path ?? file.importedFrom;
     signDialog.value = {
+      mode: "export",
       title: named ? basename(named).replace(/\.[^.]+$/, "") : "Untitled",
       targets,
       chosen: chosenOf(targets, name),
@@ -202,6 +210,11 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
             "Blank's layout of this Word document can differ from Word's. Check every page before you send it, or ask the sender for a PDF.",
           ]
         : [],
+      confirmPages: !!file.importedFrom,
+      initials: signingInitials.value,
+      // the block shows the signature
+      stamped: true,
+      emptyFields: 0,
       check: async (passphrase) => {
         try {
           await checkPassphrase(passphrase);
@@ -219,15 +232,21 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
           if (!signingCertificate.value) back();
         });
       },
-      submit: (pos, place, passphrase) => {
+      createInitials: (opener) =>
+        void openSignatureDialog("initials", focusBack(opener)),
+      manage: () => {
         refocus();
-        if (!shown()) return;
+        openSettings("signing")(view.state, view.dispatch);
+      },
+      submit: (choices) => {
+        refocus();
+        if (!shown() || choices.pos === null) return;
+        const pos = choices.pos;
         signNow(view, file, request, {
+          ...choices,
           pos,
           index: targets.findIndex((target) => target.pos === pos),
           png: signature.png,
-          place,
-          passphrase,
         });
       },
       cancel: refocus,
@@ -253,7 +272,8 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
 /**
  * signNow exports the document as it is now, the dialogs closed, with the
  * block chosen filled in: the one still at `pos`, else the one of its
- * number among them; with neither, it signs nothing
+ * number among them; with neither, it signs nothing. The other blocks get
+ * empty signature fields, named after who signs them.
  */
 const signNow = (
   view: EditorView,
@@ -264,14 +284,10 @@ const signNow = (
     index,
     png,
     place,
+    reason,
     passphrase,
-  }: {
-    pos: number;
-    index: number;
-    png: string;
-    place: string;
-    passphrase: string | null;
-  },
+    initials,
+  }: SignChoices & { pos: number; index: number; png: string },
 ) => {
   const state = view.state;
   const targets = targetsOf(state.doc);
@@ -283,6 +299,7 @@ const signNow = (
     });
     return;
   }
+  const others = targets.filter((other) => other !== target);
   // the place the page shows: the block's own, else where the user signs
   const shownPlace = target.place || place;
   const signer = signerName();
@@ -307,57 +324,51 @@ const signNow = (
           ...signingDates.value,
         },
       },
+      ...(others.length ? { others: others.map((other) => other.pos) } : {}),
     },
     written: () => {
       if (shownPlace) signingPlace.value = shownPlace;
+      signingInitials.value = initials;
       announce("Signed PDF exported");
     },
     done: how,
-    ...(passphrase === null
-      ? {}
-      : {
-          finish: (result: ExportResult) =>
-            signExport(result, passphrase, shownPlace),
-        }),
+    finish: (result: ExportResult, layout: Layout) =>
+      finishExport(result, {
+        passphrase,
+        place: shownPlace,
+        reason,
+        timestampServer: config.value.signing.timestampServer,
+        signatureBox: result.signatureBox,
+        others: others.map((other, at) => ({
+          name: other.name || other.role,
+          box: result.otherBoxes?.[at] ?? null,
+        })),
+        initials: initials.on ? initials.side : null,
+        page: pageGeometry(layout),
+      }),
   });
 };
 
 /**
- * signExport signs an exported PDF with the user's key, its field over the
- * signature block the export filled in, signed at `place`; the native side
- * names the certificate's holder as who signed it. A failure stops the
- * export with what went wrong, so nothing unsigned is written under the
- * signed name.
+ * finishExport adds to an exported PDF what the engine didn't write: the
+ * user's initials on every page, the others' empty signature fields and,
+ * with the passphrase, the digital signature, its field over the block the
+ * export filled in. Without any of them the PDF stays as the engine wrote
+ * it. A failure stops the export with what went wrong, so nothing unsigned
+ * is written under the signed name.
  */
-const signExport = async (
-  result: ExportResult,
-  passphrase: string,
-  place: string,
-) => {
-  const box = result.signatureBox;
-  if (!box) throw new Error("the signature block isn't in the PDF");
-  const timestampServer = config.value.signing.timestampServer;
-  try {
-    return await signPdf(
-      {
-        passphrase,
-        source: { kind: "body" },
-        plan: {
-          // the block is in the page content already, from the engine
-          stamps: [],
-          signature: {
-            kind: "new",
-            page: box.page + 1,
-            rect: [box.x, box.y, box.width, box.height],
-          },
-          others: [],
-          location: place || null,
-          reason: null,
-          timestampServer: timestampServer || null,
-        },
-      },
-      [result.contents],
+const finishExport = async (result: ExportResult, signing: ExportSigning) => {
+  const asked = exportRequest(signing);
+  if (!asked) return result.contents;
+  const parts = [result.contents];
+  if (asked.initials) {
+    await loadMarks();
+    parts.push(
+      await stampPdf(INITIALS_STAMP, INITIALS_BOX.width, INITIALS_BOX.height),
     );
+  }
+  try {
+    return await signPdf(asked.request, parts);
   } catch (error) {
     throw new Error(signingFailure(error), { cause: error });
   }

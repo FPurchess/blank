@@ -12,12 +12,15 @@ import {
   signatureDialog,
   signDialog,
   signingCertificate,
+  type SignChoices,
+  signingInitials,
   signingPlace,
 } from "../../state";
 import { config } from "../../config";
 import { flushPromises } from "../../test/async";
 import { createState, createTestView, doc, p } from "../../test/editor";
 import type { SavedMark } from "../../signing/profile";
+import { pageGeometry } from "../../layout/resolve";
 import { editMark, exportSigned, openSignatureDialog } from "./signing";
 
 const saveSettings = vi.hoisted(() => vi.fn());
@@ -45,6 +48,8 @@ vi.mock("../../signing/ipc", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...ipc,
 }));
+const stampPdf = vi.hoisted(() => vi.fn());
+vi.mock("../../pdf/stampEngine", () => ({ stampPdf }));
 vi.mock("../../signing/certificate", () => ({
   loadCertificate: vi.fn(async () => {}),
   openCertificateDialog: vi.fn(),
@@ -68,6 +73,22 @@ const run = (...blocks: Parameters<typeof doc>) => {
   return exportSigned()(state, view.dispatch, view);
 };
 const BOX = { page: 0, x: 70, y: 600, width: 230, height: 70 };
+
+// what the Sign dialog hands on
+const choices = (
+  pos: number,
+  place: string,
+  passphrase: string | null,
+  more: Partial<SignChoices> = {},
+): SignChoices => ({
+  pos,
+  place,
+  reason: "",
+  passphrase,
+  initials: { on: false, side: "right" },
+  open: true,
+  ...more,
+});
 
 const withName = (name: string) => {
   config.value = {
@@ -148,7 +169,7 @@ describe("signing", () => {
     run(p("Text"), signature({ role: "Tenant" }));
     await flushPromises();
     const { targets } = signDialog.value!;
-    signDialog.value!.submit(targets[0].pos, "Hamburg", null);
+    signDialog.value!.submit(choices(targets[0].pos, "Hamburg", null));
     await flushPromises();
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ defaultPath: "/docs/lease signed.pdf" }),
@@ -173,7 +194,9 @@ describe("signing", () => {
     vi.mocked(save).mockResolvedValue(null);
     run(p("Text"), signature());
     await flushPromises();
-    signDialog.value!.submit(signDialog.value!.targets[0].pos, "Hamburg", null);
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "Hamburg", null),
+    );
     await flushPromises();
     expect(signingPlace.value).toBe("Berlin");
   });
@@ -189,7 +212,7 @@ describe("signing", () => {
     const request = signDialog.value!;
     expect(request.chosen).toBe(request.targets[1].pos);
     // a block that names nobody is signed in the user's name
-    request.submit(request.targets[0].pos, "", null);
+    request.submit(choices(request.targets[0].pos, "", null));
     await flushPromises();
     expect(toPDF.mock.calls[0][1].signed.signing.name).toBe("Ada Lovelace");
   });
@@ -200,7 +223,7 @@ describe("signing", () => {
     const { targets } = signDialog.value!;
     // typed meanwhile, before the block
     view.dispatch(view.state.tr.insertText("More ", 1));
-    signDialog.value!.submit(targets[0].pos, "", null);
+    signDialog.value!.submit(choices(targets[0].pos, "", null));
     await flushPromises();
     const [state, context] = toPDF.mock.calls[0];
     expect(state.doc).toBe(view.state.doc);
@@ -220,11 +243,11 @@ describe("signing", () => {
     await flushPromises();
     const request = signDialog.value!;
     expect(await request.check("wrong")).toMatch(
-      /^The passphrase is wrong\. Forgot it\? Sign with a picture only/,
+      /^The passphrase is wrong\. Forgot it\? Sign with no digital signature/,
     );
     ipc.checkPassphrase.mockResolvedValue(undefined);
     expect(await request.check("right")).toBeNull();
-    request.submit(request.targets[0].pos, "Hamburg", "right");
+    request.submit(choices(request.targets[0].pos, "Hamburg", "right"));
     await flushPromises();
     expect(ipc.signPdf).toHaveBeenCalledWith(
       {
@@ -248,6 +271,150 @@ describe("signing", () => {
     );
   });
 
+  describe("with other signers", () => {
+    const OTHER = { page: 1, x: 300, y: 100, width: 200, height: 60 };
+    const blocks = () =>
+      run(
+        p("Text"),
+        signature({ role: "Tenant" }),
+        signature({ role: "Landlord", name: "Bea Sample" }),
+        signature({ role: "Witness" }),
+      );
+    beforeEach(() => {
+      toPDF.mockImplementation(async (_state, context) => ({
+        contents: new Uint8Array([1]),
+        warnings: [],
+        pages: 2,
+        signatureBox: BOX,
+        // the second one isn't on the pages
+        otherBoxes: context.others.map((_: number, at: number) =>
+          at === 1 ? null : OTHER,
+        ),
+      }));
+      ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
+    });
+
+    it("gives the others empty fields, named after who signs, beside the signature", async () => {
+      blocks();
+      await flushPromises();
+      const request = signDialog.value!;
+      expect(request.mode).toBe("export");
+      request.submit(choices(request.targets[0].pos, "", "right"));
+      await flushPromises();
+      // the export gives the boxes of the other blocks
+      const context = toPDF.mock.calls[0][1];
+      expect(context.others).toEqual([
+        request.targets[1].pos,
+        request.targets[2].pos,
+      ]);
+      const [asked, parts] = ipc.signPdf.mock.calls[0];
+      expect(asked.plan.others).toEqual([
+        { page: 2, rect: [300, 100, 200, 60], name: "Bea Sample" },
+      ]);
+      expect(asked.plan.signature).toEqual({
+        kind: "new",
+        page: 1,
+        rect: [70, 600, 230, 70],
+      });
+      expect(parts).toEqual([new Uint8Array([1])]);
+      expect(writeFile).toHaveBeenCalledWith(
+        "/docs/lease signed.pdf",
+        new Uint8Array([2]),
+      );
+    });
+
+    it("names a block without a name by its role, and adds the fields without a digital signature", async () => {
+      blocks();
+      await flushPromises();
+      const request = signDialog.value!;
+      request.submit(
+        choices(request.targets[1].pos, "", null, { reason: "I agree" }),
+      );
+      await flushPromises();
+      const [asked] = ipc.signPdf.mock.calls[0];
+      // stamps and fields alone
+      expect(asked.passphrase).toBeNull();
+      expect(asked.plan.signature).toEqual({ kind: "invisible" });
+      expect(
+        asked.plan.others.map((other: { name: string }) => other.name),
+      ).toEqual(["Tenant"]);
+      expect(asked.plan.timestampServer).toBeNull();
+      expect(writeFile).toHaveBeenCalledWith(
+        "/docs/lease signed.pdf",
+        new Uint8Array([2]),
+      );
+    });
+  });
+
+  it("puts the initials on every page, in the corner chosen, and remembers it", async () => {
+    signingInitials.value = { on: false, side: "right" };
+    savedMarks.value = { signature: SIGNATURE, initials: SIGNATURE };
+    stampPdf.mockResolvedValue(new Uint8Array([7]));
+    ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
+    run(p("Text"), signature());
+    await flushPromises();
+    const request = signDialog.value!;
+    expect(request.initials).toMatchObject({ on: false, side: "right" });
+    request.submit(
+      choices(request.targets[0].pos, "", null, {
+        reason: "I agree",
+        initials: { on: true, side: "left" },
+      }),
+    );
+    await flushPromises();
+    expect(stampPdf).toHaveBeenCalledWith(
+      expect.objectContaining({ image: "initials" }),
+      56,
+      28,
+    );
+    const { height } = pageGeometry(toPDF.mock.calls[0][1].layout);
+    const [asked, parts] = ipc.signPdf.mock.calls[0];
+    expect(asked.plan.stamps).toEqual([
+      { part: 1, page: 1, rect: [36, height - 64, 56, 28], repeat: true },
+    ]);
+    expect(asked.plan.reason).toBe("I agree");
+    expect(parts).toEqual([new Uint8Array([1]), new Uint8Array([7])]);
+    expect(signingInitials.value).toEqual({ on: true, side: "left" });
+    signingInitials.value = { on: false, side: "right" };
+  });
+
+  it("writes the PDF as the engine made it without a digital signature, others or initials", async () => {
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "", null),
+    );
+    await flushPromises();
+    expect(ipc.signPdf).not.toHaveBeenCalled();
+    expect(writeFile).toHaveBeenCalledWith(
+      "/docs/lease signed.pdf",
+      new Uint8Array([1]),
+    );
+  });
+
+  it("gives the reason to the digital signature", async () => {
+    toPDF.mockResolvedValue({
+      contents: new Uint8Array([1]),
+      warnings: [],
+      pages: 1,
+      signatureBox: BOX,
+    });
+    ipc.signPdf.mockResolvedValue(new Uint8Array([2]));
+    run(p("Text"), signature());
+    await flushPromises();
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "", "right", {
+        reason: "I agree to these terms",
+      }),
+    );
+    await flushPromises();
+    expect(ipc.signPdf.mock.calls[0][0].plan).toMatchObject({
+      reason: "I agree to these terms",
+      stamps: [],
+      others: [],
+    });
+  });
+
   it("writes nothing when signing fails, and says why", async () => {
     toPDF.mockResolvedValue({
       contents: new Uint8Array([1]),
@@ -261,7 +428,9 @@ describe("signing", () => {
     });
     run(p("Text"), signature());
     await flushPromises();
-    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "", "right"),
+    );
     await flushPromises();
     expect(writeFile).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
@@ -284,7 +453,9 @@ describe("signing", () => {
     });
     run(p("Text"), signature());
     await flushPromises();
-    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "", "right"),
+    );
     await flushPromises();
     expect(writeFile).not.toHaveBeenCalled();
     expect(vi.mocked(sendNotification).mock.lastCall![0]).toMatchObject({
@@ -300,7 +471,7 @@ describe("signing", () => {
     await flushPromises();
     const request = signDialog.value!;
     activeTabId.value = "two";
-    request.submit(request.targets[0].pos, "", null);
+    request.submit(choices(request.targets[0].pos, "", null));
     await flushPromises();
     expect(save).not.toHaveBeenCalled();
     expect(toPDF).not.toHaveBeenCalled();
@@ -332,7 +503,7 @@ describe("signing", () => {
     const { targets } = signDialog.value!;
     // the first block taken out: the second moves to another position
     view.dispatch(view.state.tr.delete(targets[0].pos, targets[0].pos + 1));
-    signDialog.value!.submit(targets[1].pos, "", null);
+    signDialog.value!.submit(choices(targets[1].pos, "", null));
     await flushPromises();
     expect(toPDF).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
@@ -364,7 +535,7 @@ describe("signing", () => {
     const request = signDialog.value!;
     expect(request.signer).toBe("Ada Lovelace");
     expect(request.targets[0].place).toBe("Paris");
-    request.submit(request.targets[0].pos, "Hamburg", "right");
+    request.submit(choices(request.targets[0].pos, "Hamburg", "right"));
     await flushPromises();
     expect(toPDF.mock.calls[0][1].signed.signing).toMatchObject({
       name: "Ada Lovelace",
@@ -383,7 +554,9 @@ describe("signing", () => {
   it("never signs a PDF without the block's place for the signature", async () => {
     run(p("Text"), signature());
     await flushPromises();
-    signDialog.value!.submit(signDialog.value!.targets[0].pos, "", "right");
+    signDialog.value!.submit(
+      choices(signDialog.value!.targets[0].pos, "", "right"),
+    );
     await flushPromises();
     expect(ipc.signPdf).not.toHaveBeenCalled();
     expect(writeFile).not.toHaveBeenCalled();
@@ -396,6 +569,8 @@ describe("signing", () => {
     await flushPromises();
     expect(signDialog.value!.title).toBe("offer");
     expect(signDialog.value!.warnings[0]).toContain("Word");
+    // Sign… waits for the user to say they checked every page
+    expect(signDialog.value!.confirmPages).toBe(true);
   });
 
   it("asks for the signature first when there is none", async () => {

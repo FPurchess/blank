@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
+import { schema } from "../markdown";
 import { doc, h, p } from "../test/editor";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
@@ -111,6 +112,24 @@ describe("writePdf", () => {
       throw new Error("recursive use of an object");
     });
     expect(() => writePdf(LayoutEngine, jobOf().job)).toThrow("unreachable");
+  });
+
+  it("gives the boxes of the signature blocks asked for", () => {
+    testEngine();
+    const block = () => schema.nodes.signature.create({ role: "Tenant" });
+    // the blocks at 0 and 1
+    const { job } = jobOf(doc(block(), block()));
+    const result = writePdf(LayoutEngine, {
+      ...job,
+      signedPos: 0,
+      otherPos: [1, 9999],
+    });
+    expect(result.signatureBox).toMatchObject({ page: 0 });
+    expect(result.otherBoxes).toEqual([
+      { ...result.signatureBox, y: expect.any(Number) },
+      null,
+    ]);
+    expect(result.otherBoxes![0]!.y).toBeGreaterThan(result.signatureBox!.y);
   });
 
   it("tells which characters no font has", () => {

@@ -248,6 +248,48 @@ describe("a signed PDF", () => {
     },
   );
 
+  it("says where the other signature blocks are, for their empty fields", async () => {
+    const state = EditorState.create({
+      schema,
+      doc: parseMarkdown(
+        [
+          "The tenant rents the flat.",
+          '<!-- blank:signature@1 role="Tenant" -->',
+          "<!-- pagebreak -->",
+          '<!-- blank:signature@1 role="Landlord" -->',
+        ].join("\n\n"),
+      ),
+    });
+    const blocks: number[] = [];
+    state.doc.forEach((node, offset) => {
+      if (node.type.name === "signature") blocks.push(offset);
+    });
+    const { signatureBox, otherBoxes } = await toPDF(state, {
+      docPath: null,
+      layout: testLayout(),
+      signed: {
+        pos: blocks[0],
+        src: `data:image/png;base64,${IMAGES.png}`,
+        signing: {
+          name: "Ada",
+          place: "",
+          date: new Date(2026, 9, 8),
+          format: "iso",
+          language: "en",
+        },
+      },
+      others: [blocks[1], 9999],
+    });
+    expect(signatureBox?.page).toBe(0);
+    expect(otherBoxes).toHaveLength(2);
+    // the landlord's block on the second page, where the signed one starts
+    expect(otherBoxes![0]).toMatchObject({ page: 1, x: signatureBox!.x });
+    expect(otherBoxes![0]!.width).toBeGreaterThan(100);
+    expect(otherBoxes![0]!.height).toBeGreaterThan(20);
+    // a position without a block has no box
+    expect(otherBoxes![1]).toBeNull();
+  });
+
   it("isn't written without the signature's picture", async () => {
     const state = signedState();
     await expect(

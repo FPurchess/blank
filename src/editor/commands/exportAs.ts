@@ -11,7 +11,7 @@ import {
   type exporterFunc,
 } from "../../exporters";
 import { describePaper, layoutWarnings } from "../../layout/describe";
-import { resolveLayout } from "../../layout/resolve";
+import { type Layout, resolveLayout } from "../../layout/resolve";
 import { localeUnit } from "../../layout/paper";
 import { frontmatterOf } from "../../markdown";
 import { extname } from "../../paths";
@@ -59,14 +59,15 @@ export interface ExportRequest {
   suffix?: string;
   // more of the context: the pages chosen to print, or the signature block
   // a signed PDF fills in
-  context?: Pick<ExportContext, "pages" | "signed">;
+  context?: Pick<ExportContext, "pages" | "signed" | "others">;
   // told once the file is written, e.g. to remember where the user signed
   written?: () => void;
   // what the notification says after what was exported, e.g. that the PDF
   // is signed digitally
   done?: string;
   // what is written instead of the export's contents, e.g. the PDF signed
-  finish?: (result: ExportResult) => Promise<Uint8Array>;
+  // with the page it was laid out on
+  finish?: (result: ExportResult, layout: Layout) => Promise<Uint8Array>;
 }
 
 /**
@@ -149,7 +150,10 @@ export const runExport = async (
     );
     const result = await exporter(state, { docPath, layout, ...context });
     const { warnings, pages } = result;
-    await writeFile(dest, finish ? await finish(result) : result.contents);
+    await writeFile(
+      dest,
+      finish ? await finish(result, layout) : result.contents,
+    );
     written?.();
 
     // e.g. "Exported 3 A4 pages", or for Word, which lays out the pages

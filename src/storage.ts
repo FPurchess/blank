@@ -15,6 +15,7 @@ import {
   currentViewAnchor,
   language,
   outlinePinned,
+  signingInitials,
   signingPlace,
   PAGE_VIEW_MODES,
   pageLayoutState,
@@ -41,6 +42,7 @@ import { CommandIdentifier } from "./config";
 import { logWarning } from "./log";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
+import { INITIALS_DEFAULT, isInitialsChoice } from "./signing/initials";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({
@@ -368,6 +370,13 @@ export const bootStorage = async () => {
     signingPlace,
     (value): value is string => typeof value === "string",
     "",
+  );
+  // whether the initials went on every page then, and in which corner
+  await restore(
+    "signingInitials",
+    signingInitials,
+    isInitialsChoice,
+    INITIALS_DEFAULT,
   );
 
   sessionKept = await ownSession();
