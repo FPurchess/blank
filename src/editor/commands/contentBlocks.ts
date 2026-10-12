@@ -272,12 +272,17 @@ export const editBlock = (): Command =>
 
 /**
  * blockSettings opens the settings of the selected block, or of the source
- * block being typed (Shift+Enter): those of editBlock. On a selected block
- * without settings it does nothing, rather than let the key put a line
- * break in its place.
+ * block being typed (Shift+Enter): those of editBlock; it can't run on a
+ * block without settings
  */
-export const blockSettings = (): Command => (state, dispatch, view) => {
-  if (editBlock()(state, dispatch, view)) return true;
+export const blockSettings = (): Command => editBlock();
+
+/**
+ * keepSelectedBlock does nothing on a selected block, and says it did, so a
+ * key that would otherwise type in its place (Shift+Enter's line break)
+ * leaves it be
+ */
+export const keepSelectedBlock: Command = (state) => {
   const { selection } = state;
   return (
     selection instanceof NodeSelection &&

@@ -13,7 +13,7 @@ import { writeEmbed } from "./blocks/embeds";
 import { fieldSpec, isEmptyField } from "./blocks/forms";
 import { alignOf } from "./alignment";
 import { schema } from "./schema";
-import { gfmBlocker, gfmLines, htmlLines } from "./tables";
+import { escapeHtml, gfmBlocker, gfmLines, htmlLines } from "./tables";
 import { decodeTabs, encodeTabs } from "./tabs";
 
 const { nodes } = defaultMarkdownSerializer;
@@ -35,9 +35,9 @@ const marks = {
 // `<div align="center">` that would align what follows: `<br>`, `<table`,
 // `<!--`, the tags of aligned blocks, underlines and the images Blank reads
 // an <img> only as htmlImage (./tokenizer.ts) reads one: with nothing but
-// src, alt, title and width; other <img> tags stay text and are written as
-// they are, so GitHub still shows them
-const IMG_TAG = String.raw`img(?:\s+(?:src|alt|title|width)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=]+))+\s*\/?>`;
+// src, alt, title and width, each with a value or without one; other <img>
+// tags stay text and are written as they are, so GitHub still shows them
+const IMG_TAG = String.raw`img(?:\s+(?:src|alt|title|width)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=]+))?)+\s*\/?>`;
 const HTML_TAGS = String.raw`<(?=\/?(?:br|table|div|p|h[1-6]|u|ins)\b|!--|${IMG_TAG})`;
 const HTML_START = new RegExp(HTML_TAGS, "gi");
 // pipes too, in a paragraph that could otherwise turn into a table
@@ -74,17 +74,6 @@ const aligned =
     }
   };
 
-// what an attribute's value can't hold as it is, see writeImage
-const ATTRIBUTE = /[&"<>]/g;
-const ENTITIES: Record<string, string> = {
-  "&": "&amp;",
-  '"': "&quot;",
-  "<": "&lt;",
-  ">": "&gt;",
-};
-const attribute = (value: string) =>
-  value.replace(ATTRIBUTE, (char) => ENTITIES[char]);
-
 /**
  * writeImage writes an image as markdown does, or, given a width, as HTML,
  * which markdown has no syntax for and GitHub, GitLab, Obsidian and Typora
@@ -103,7 +92,7 @@ const writeImage: NodeWriter = (state, node, parent, index) => {
     ["width", width],
   ] as [string, string][];
   state.write(
-    `<img ${attrs.map(([name, value]) => `${name}="${attribute(value ?? "")}"`).join(" ")}>`,
+    `<img ${attrs.map(([name, value]) => `${name}="${escapeHtml(value ?? "")}"`).join(" ")}>`,
   );
 };
 

@@ -25,7 +25,7 @@ import {
 import {
   renderedOf,
   renderStates,
-  requestRender,
+  renderShown,
   sourceKeyOf,
 } from "../../sources/store";
 
@@ -305,14 +305,6 @@ export const sourceBlocks = () =>
       // what is wrong with the open block, said once it stays
       let timer: ReturnType<typeof setTimeout> | undefined;
       let said = "";
-      const renderAround = (editor: EditorView, typing: Node | null) => {
-        editor.state.doc.descendants((node) => {
-          if (!sourceKind(node.type.name)) return !node.isTextblock;
-          if (node !== typing) requestRender(node);
-          return false;
-        });
-        if (typing) requestRender(typing, true);
-      };
       const tell = (editor: EditorView) => {
         clearTimeout(timer);
         const open = openBlock(editor.state);
@@ -329,12 +321,12 @@ export const sourceBlocks = () =>
           announce(`${name}: ${error.split("\n")[0]}`, { quiet: true });
         }, ERROR_DELAY);
       };
-      renderAround(view, null);
+      renderShown(view.state.doc, null);
       const stop = watch(renderStates, () => tell(view), { flush: "sync" });
       return {
         update(editor, previous) {
           if (editor.state.doc === previous.doc) return;
-          renderAround(editor, openBlock(editor.state)?.node ?? null);
+          renderShown(editor.state.doc, openBlock(editor.state)?.node ?? null);
           tell(editor);
         },
         destroy() {

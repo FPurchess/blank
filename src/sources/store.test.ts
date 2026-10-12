@@ -11,6 +11,7 @@ import {
   keyOf,
   renderAll,
   renderedOf,
+  renderShown,
   renderStates,
   requestRender,
   sourceKeyOf,
@@ -68,6 +69,17 @@ describe("rendered sources", () => {
     expect(render).toHaveBeenCalledExactlyOnceWith("A --> B");
   });
 
+  it("doesn't render a typed source again that an export rendered meanwhile", async () => {
+    vi.useFakeTimers();
+    const render = vi.fn(renderBox);
+    register(render);
+    const block = diagram("A --> B");
+    requestRender(block, true);
+    await renderAll(doc(p("x"), block));
+    vi.advanceTimersByTime(250);
+    expect(render).toHaveBeenCalledOnce();
+  });
+
   it("renders slow sources one after the other, and keeps what failed", async () => {
     let running = 0;
     let most = 0;
@@ -106,5 +118,23 @@ describe("rendered sources", () => {
     }
     expect(vectorOf(sourceKeyOf(first))).toBeUndefined();
     expect(drawingOf(sourceKeyOf(first))).toBeUndefined();
+  });
+
+  it("keeps every source of the document shown and of the last export", async () => {
+    register(renderBox);
+    const many = (name: string) =>
+      Array.from({ length: 250 }, (_, index) => diagram(`${name} ${index}`));
+    const shown = many("shown");
+    renderShown(doc(p("x"), ...shown), null);
+    const exported = many("exported");
+    await renderAll(doc(p("x"), ...exported));
+    for (const block of [...shown, ...exported]) {
+      expect(vectorOf(sourceKeyOf(block))).toBeDefined();
+    }
+    // once neither shows them, the oldest go
+    renderShown(doc(p("x")), null);
+    await renderAll(doc(p("x"), diagram("last")));
+    requestRender(diagram("one more"));
+    expect(vectorOf(sourceKeyOf(shown[0]))).toBeUndefined();
   });
 });

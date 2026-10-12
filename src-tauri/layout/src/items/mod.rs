@@ -204,15 +204,22 @@ pub struct CellImage {
 /// the room between a picture or table and its caption
 pub const CAPTION_GAP: f32 = 4.0;
 
-/// a caption, in the caption style, at `indent`, `width` wide
-pub(crate) fn caption_box(fonts: &mut Fonts, caption: &str, width: f32, indent: f32) -> TextBox {
+/// a caption, in the caption style, at `indent`, `width` wide, aligned as
+/// what it is the caption of
+pub(crate) fn caption_box(
+    fonts: &mut Fonts,
+    caption: &str,
+    width: f32,
+    indent: f32,
+    align: Alignment,
+) -> TextBox {
     let text = Text {
         pos: 0,
         text: caption.to_string(),
         style: TextKind::Caption,
         ..Default::default()
     };
-    let mut boxed = TextBox::new(fonts, &text, width, Alignment::Start);
+    let mut boxed = TextBox::new(fonts, &text, width, align);
     boxed.x = indent;
     boxed
 }
@@ -267,9 +274,15 @@ impl Laid {
             } => {
                 if *image_width > 0.0 && *height > 0.0 {
                     // its caption under it, kept on its page
-                    let caption = caption
-                        .as_deref()
-                        .map(|caption| caption_box(fonts, caption, inner, indent));
+                    let caption = caption.as_deref().map(|caption| {
+                        caption_box(
+                            fonts,
+                            caption,
+                            inner,
+                            indent,
+                            alignment_of(align.as_deref()),
+                        )
+                    });
                     let below = caption
                         .as_ref()
                         .map_or(0.0, |boxed| boxed.height() + CAPTION_GAP);

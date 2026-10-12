@@ -16,7 +16,8 @@ import {
 // typing pauses. A drawing goes into the vectors (src/engine/vectors.ts),
 // where the page view and the exports find it by its key.
 
-// how many sources are kept rendered: the oldest goes first
+// how many sources are kept rendered: the oldest goes first, but never one
+// of the document shown or of the last export, however many they hold
 const KEPT = 200;
 
 // what a kind waits after typing before it renders, while the block is open
@@ -34,6 +35,10 @@ const pending = new Map<string, Promise<void>>();
 let tail: Promise<void> | null = null;
 // a kind's next render while its source is typed
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+// the keys of the sources of the document shown, and of the last export
+let shown = new Set<string>();
+let exported = new Set<string>();
 
 // bumped whenever a source is rendered, so what shows them follows
 export const renderStates = shallowRef(0);
@@ -80,10 +85,11 @@ const keep = (key: string, rendered: Rendered<unknown>) => {
   if (rendered.ok === true && isVector(rendered.data)) {
     putVector(key, rendered.data);
   }
-  while (results.size > KEPT) {
-    const oldest = results.keys().next().value!;
-    results.delete(oldest);
-    forgetVector(oldest);
+  for (const old of results.keys()) {
+    if (results.size <= KEPT) break;
+    if (shown.has(old) || exported.has(old)) continue;
+    results.delete(old);
+    forgetVector(old);
   }
   renderStates.value++;
 };
@@ -158,24 +164,50 @@ export const requestRender = (node: Node, typing = false) => {
     kind.node,
     setTimeout(() => {
       timers.delete(kind.node);
-      void run(kind, key, source);
+      // an export may have rendered it meanwhile
+      if (!results.has(key)) void run(kind, key, source);
     }, delay),
   );
 };
 
 /**
- * renderAll renders every source of `doc` that isn't yet, e.g. before an
- * export, and waits for them
+ * sourcesOf returns the source blocks of `doc` by their keys
  */
-export const renderAll = async (doc: Node) => {
-  const waiting: Promise<void>[] = [];
+const sourcesOf = (doc: Node) => {
+  const found = new Map<string, Node>();
   doc.descendants((node) => {
-    const kind = sourceKind(node.type.name);
-    if (!kind) return true;
-    const key = keyOf(node.type.name, node.textContent);
-    if (!results.has(key)) waiting.push(run(kind, key, node.textContent));
+    if (!sourceKind(node.type.name)) return !node.isTextblock;
+    found.set(sourceKeyOf(node), node);
     return false;
   });
+  return found;
+};
+
+/**
+ * renderShown renders the sources of the document shown that aren't yet,
+ * the one being typed (`typing`) once the typing pauses, and keeps them all
+ */
+export const renderShown = (doc: Node, typing: Node | null) => {
+  const sources = sourcesOf(doc);
+  shown = new Set(sources.keys());
+  for (const node of sources.values()) {
+    if (node !== typing) requestRender(node);
+  }
+  if (typing) requestRender(typing, true);
+};
+
+/**
+ * renderAll renders every source of `doc` that isn't yet, e.g. before an
+ * export, waits for them, and keeps them until the next export
+ */
+export const renderAll = async (doc: Node) => {
+  const sources = sourcesOf(doc);
+  exported = new Set(sources.keys());
+  const waiting: Promise<void>[] = [];
+  for (const [key, node] of sources) {
+    const kind = sourceKind(node.type.name)!;
+    if (!results.has(key)) waiting.push(run(kind, key, node.textContent));
+  }
   await Promise.all(waiting);
 };
 
@@ -191,6 +223,8 @@ export const forgetRendered = () => {
   for (const timer of timers.values()) clearTimeout(timer);
   timers.clear();
   tail = null;
+  shown = new Set();
+  exported = new Set();
 };
 
 /**
