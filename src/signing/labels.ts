@@ -33,6 +33,21 @@ const LABELS: Record<string, PlaceKind> = {
   "date, place": "placeAndDate",
   "ort, datum": "placeAndDate",
   "datum, ort": "placeAndDate",
+  unterschriften: "signature",
+  "signatur, stempel": "signature",
+  "stempel, signatur": "signature",
+  "unterschrift, stempel": "signature",
+  "stempel, unterschrift": "signature",
+  "unterschrift stempel": "signature",
+  "signature, stamp": "signature",
+  "stamp, signature": "signature",
+  "datum der unterschrift": "date",
+  unterschriftsdatum: "date",
+  "date of signature": "date",
+  "date of signing": "date",
+  "date signed": "date",
+  "signing date": "date",
+  "signature date": "date",
   initials: "initials",
   kürzel: "initials",
   paraphe: "initials",
@@ -70,13 +85,87 @@ const normalize = (text: string) =>
     .replace(/^[\s,.;]+/u, "")
     .replace(/\s+/gu, " ");
 
+// the words for a signature that a role may stand next to, as in
+// "Unterschrift Mieter", "Mieter/in (Unterschrift)" or "Tenant's signature"
+const SIGNATURE_WORDS = new Set([
+  "signature",
+  "unterschrift",
+  "unterschriften",
+  "signatur",
+]);
+// a role: a word with a capital, e.g. "Vermieter", "Mieter/in",
+// "Erziehungsberechtigte(r)" or "Tenant's"
+const ROLE = /^\p{Lu}[\p{L}'’/()-]*[,:]?$/u;
+// capitalised words next to a signature's label that aren't whose it is
+const NOT_ROLES = new Set([
+  "the",
+  "a",
+  "an",
+  "your",
+  "my",
+  "our",
+  "his",
+  "her",
+  "their",
+  "this",
+  "please",
+  "die",
+  "der",
+  "das",
+  "ihre",
+  "ihr",
+  "eine",
+  "ein",
+  "seine",
+  "meine",
+  "unsere",
+  "bitte",
+  "name",
+  "vorname",
+  "nachname",
+  "stempel",
+  "stamp",
+  "seite",
+  "page",
+]);
+
+/**
+ * roleOf returns the role one or two capitalised words name, e.g. "Tenant"
+ * for "Tenant's"; none for other words, or a label's
+ */
+const roleOf = (texts: string[]) => {
+  if (!texts.length || texts.length > 2) return undefined;
+  const roles = texts.every((text) => {
+    const word = normalize(text);
+    return (
+      ROLE.test(text) &&
+      !NOT_ROLES.has(word) &&
+      !LABELS[word] &&
+      !SIGNATURE_WORDS.has(word)
+    );
+  });
+  return roles
+    ? texts
+        .join(" ")
+        .replace(/[,:]$/u, "")
+        .replace(/['’]s$/u, "")
+    : undefined;
+};
+
+// what a label asks for, and whose signature it is if it names a role
+interface Label {
+  kind: PlaceKind;
+  role?: string;
+}
+
 /**
  * labelOf returns what the words `texts` ask for, if they are a label as a
- * whole, or a signature's label followed by whose it is in up to three words
+ * whole, a signature's label followed by whose it is in up to three words,
+ * or a signature's label with a role before or after it
  */
-const labelOf = (texts: string[]): PlaceKind | undefined => {
+const labelOf = (texts: string[]): Label | undefined => {
   const whole = LABELS[normalize(texts.join(" "))];
-  if (whole) return whole;
+  if (whole) return { kind: whole };
   for (const length of [2, 1]) {
     if (texts.length <= length || texts.length > length + 3) continue;
     const kind = LABELS[normalize(texts.slice(0, length).join(" "))];
@@ -84,9 +173,13 @@ const labelOf = (texts: string[]): PlaceKind | undefined => {
       (kind === "signature" || kind === "initials") &&
       WHOSE.has(normalize(texts[length]))
     )
-      return kind;
+      return { kind };
   }
-  return undefined;
+  const role =
+    (SIGNATURE_WORDS.has(normalize(texts[0])) && roleOf(texts.slice(1))) ||
+    (SIGNATURE_WORDS.has(normalize(texts[texts.length - 1])) &&
+      roleOf(texts.slice(0, -1)));
+  return role ? { kind: "signature", role } : undefined;
 };
 
 // a word of the page, or the part of one that is text or a line
@@ -203,7 +296,12 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
         overlap(word.rect, rect) <= (word.rect[2] * word.rect[3]) / 2,
     );
 
-  const add = (kind: PlaceKind, rect: Rect, line: Rect, label: Token[]) => {
+  const add = (
+    { kind, role }: Label,
+    rect: Rect,
+    line: Rect,
+    label: Token[],
+  ) => {
     if (!free(rect, label)) return false;
     usedLines.add(line);
     for (const word of label) usedWords.add(word);
@@ -212,7 +310,12 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
       .join(" ")
       .replace(/^\(|\)$|:$/gu, "")
       .trim();
-    found.push({ page, kind, rect, label: written });
+    found.push({
+      page,
+      kind,
+      rect,
+      label: role ? `Signature · ${role}` : written,
+    });
     return true;
   };
 
@@ -260,10 +363,15 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
     }
     for (let length = phrase.length; length > 0; length--) {
       const label = phrase.slice(0, length).reverse();
-      const kind = labelOf(label.map((word) => word.text));
-      if (!kind) continue;
+      const asked = labelOf(label.map((word) => word.text));
+      if (!asked) continue;
       const height = 1.6 * Math.max(...label.map((word) => word.rect[3]));
-      add(kind, [line[0], bottom(line) - height, line[2], height], line, label);
+      add(
+        asked,
+        [line[0], bottom(line) - height, line[2], height],
+        line,
+        label,
+      );
       break;
     }
   }
@@ -284,10 +392,11 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
       ),
       (a, b) => a.rect[1] - b.rect[1],
     );
-    const kind = label && labelOf(label.map((word) => word.text));
-    if (!label || !kind) continue;
-    const height = kind === "signature" || kind === "initials" ? 36 : 18;
-    add(kind, [line[0], line[1] - height, line[2], height], line, label);
+    const asked = label && labelOf(label.map((word) => word.text));
+    if (!label || !asked) continue;
+    const image = asked.kind === "signature" || asked.kind === "initials";
+    const height = image ? 36 : 18;
+    add(asked, [line[0], line[1] - height, line[2], height], line, label);
   }
 
   // a label above a line: the place is between them
@@ -303,10 +412,10 @@ export const findLabels = (text: PageText, page: number): FoundPlace[] => {
       ),
       (a, b) => bottom(b.rect) - bottom(a.rect),
     );
-    const kind = label && labelOf(label.map((word) => word.text));
-    if (!label || !kind) continue;
+    const asked = label && labelOf(label.map((word) => word.text));
+    if (!label || !asked) continue;
     const top = Math.max(...label.map((word) => bottom(word.rect)));
-    add(kind, [line[0], top, line[2], line[1] - top], line, label);
+    add(asked, [line[0], top, line[2], line[1] - top], line, label);
   }
 
   return mergeNear(found);

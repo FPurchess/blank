@@ -1,0 +1,112 @@
+{
+  "about": "German signature captions with the signer's role before or after them",
+  "text": {
+    "words": [
+      {
+        "text": "Unterschrift",
+        "rect": [72, 653.94, 56.16, 8.33]
+      },
+      {
+        "text": "Mieter",
+        "rect": [130.66, 653.94, 28.08, 8.33]
+      },
+      {
+        "text": "Unterschrift",
+        "rect": [260, 653.94, 56.16, 8.33]
+      },
+      {
+        "text": "Vermieter/in",
+        "rect": [318.66, 653.94, 56.16, 8.33]
+      },
+      {
+        "text": "Mieter/in",
+        "rect": [440, 653.94, 42.12, 8.33]
+      },
+      {
+        "text": "(Unterschrift)",
+        "rect": [484.62, 653.94, 62.15, 8.33]
+      },
+      {
+        "text": "Erziehungsberechtigte(r)",
+        "rect": [72, 723.94, 108.95, 8.33]
+      },
+      {
+        "text": "(Unterschrift)",
+        "rect": [183.46, 723.94, 62.15, 8.33]
+      },
+      {
+        "text": "Unterschrift",
+        "rect": [72, 762.82, 62.4, 9.25]
+      },
+      {
+        "text": "Arbeitgeber:",
+        "rect": [137.18, 762.82, 59.98, 9.25]
+      },
+      {
+        "text": "____________________",
+        "rect": [199.94, 762.82, 111.2, 9.25]
+      },
+      {
+        "text": "Arbeitnehmer",
+        "rect": [320, 762.82, 62.4, 9.25]
+      },
+      {
+        "text": "(Unterschrift)",
+        "rect": [385.18, 762.82, 69.06, 9.25]
+      },
+      {
+        "text": "_______________",
+        "rect": [457.02, 762.82, 83.4, 9.25]
+      },
+      {
+        "text": "Unterschriften",
+        "rect": [72, 813.94, 65.52, 8.33]
+      },
+      {
+        "text": "Auftraggeber,",
+        "rect": [140.02, 813.94, 58.66, 8.33]
+      },
+      {
+        "text": "Auftragnehmer",
+        "rect": [201.19, 813.94, 60.84, 8.33]
+      }
+    ],
+    "rules": [
+      [72, 649.75, 160, 0.5],
+      [260, 649.75, 160, 0.5],
+      [440, 649.75, 160, 0.5],
+      [72, 719.75, 220, 0.5],
+      [72, 809.75, 200, 0.5]
+    ]
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [72, 613.75, 160, 36]
+    },
+    {
+      "kind": "signature",
+      "rect": [260, 613.75, 160, 36]
+    },
+    {
+      "kind": "signature",
+      "rect": [440, 613.75, 160, 36]
+    },
+    {
+      "kind": "signature",
+      "rect": [72, 683.75, 220, 36]
+    },
+    {
+      "kind": "signature",
+      "rect": [199.94, 757.27, 111.2, 14.8]
+    },
+    {
+      "kind": "signature",
+      "rect": [457.02, 757.27, 83.4, 14.8]
+    },
+    {
+      "kind": "signature",
+      "rect": [72, 773.75, 200, 36]
+    }
+  ]
+}

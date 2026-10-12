@@ -85,6 +85,46 @@ describe("found places", () => {
     }
   });
 
+  it("names a signature by the role its caption gives", () => {
+    const labels = (name: string) =>
+      findLabels(fixtures.find((each) => each.name === name)!.text, 0).map(
+        (place) => place.label,
+      );
+    expect(labels("de-roles.json")).toEqual([
+      "Signature · Arbeitgeber",
+      "Signature · Arbeitnehmer",
+      "Signature · Mieter",
+      "Signature · Vermieter/in",
+      "Signature · Mieter/in",
+      "Signature · Erziehungsberechtigte(r)",
+      "Signature · Auftraggeber, Auftragnehmer",
+    ]);
+    expect(labels("en-roles.json")).toEqual([
+      "Signature · Landlord",
+      "Signature of Tenant",
+      "Signature · Tenant",
+    ]);
+  });
+
+  it("takes no label, name or article for a role", () => {
+    const caption = (words: string) => {
+      const text: PageText = { words: [], rules: [[72, 100, 200, 0.5]] };
+      let x = 72;
+      for (const word of words.split(" ")) {
+        text.words.push({ text: word, rect: [x, 104, word.length * 5, 9] });
+        x += word.length * 5 + 3;
+      }
+      return findLabels(text, 0).map(({ kind, label }) => ({ kind, label }));
+    };
+    expect(caption("Datum Unterschrift")).toEqual([]);
+    expect(caption("Name Unterschrift")).toEqual([]);
+    expect(caption("Your signature")).toEqual([]);
+    expect(caption("Unterschrift Kunde")).toEqual([
+      { kind: "signature", label: "Signature · Kunde" },
+    ]);
+    expect(caption("unterschrift kunde")).toEqual([]);
+  });
+
   it("gives an unpaired label nothing", () => {
     const text: PageText = {
       words: [{ text: "Signature:", rect: [72, 100, 50, 9.25] }],
