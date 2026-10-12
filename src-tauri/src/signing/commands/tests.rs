@@ -466,7 +466,7 @@ fn calls_the_info_its_own_dss_lists_written_again_a_change() {
     doc.get_dictionary_mut(root).unwrap().set("DSS", dss);
     let mut prepared = vec![];
     doc.save_to(&mut prepared).unwrap();
-    let signed = sign(key(), PASSPHRASE, &prepared, &options(None)).unwrap();
+    let signed = sign_as(key(), PASSPHRASE, &prepared, &options(None), &[]).unwrap();
     let out = validated(
         &signed,
         |update| {
