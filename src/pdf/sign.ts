@@ -226,7 +226,13 @@ export const signReceived = () => {
         changed = true;
         initialsDone = initialsDone
           .then(() => setInitials(choice))
-          .catch(() => {});
+          // the dialog goes on without them; the next change tries again
+          .catch((error: unknown) =>
+            logWarning(
+              "failed to place the initials on every page",
+              forTheLog(error),
+            ),
+          );
       },
       stamped: stamps.some((stamp) => stamp.kind === "signature"),
       ...(visibleReason ? { visibleRefusal: visibleReason } : {}),
