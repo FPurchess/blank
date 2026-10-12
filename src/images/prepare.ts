@@ -13,6 +13,7 @@ import { sourceKind } from "../sources/registry";
 import { renderedOf, sourceKeyOf } from "../sources/store";
 import { decodeSize, rasterize } from "./codec";
 import { loadImage } from "./load";
+import { rootSize, withSize } from "./svgSize";
 import { type ImageMime, type Size, jpegOrientation, probeSize } from "./mime";
 
 /**
@@ -53,21 +54,14 @@ export const PRINT_INK = `rgb(${LIGHT_TEXT.join(",")})`;
 // can't embed SVG: sharp in print at its size
 const PICTURE_SCALE = 3;
 
-const SVG_ROOT = /<svg\b([^>]*)>/;
-
 /**
  * scaled returns a drawing whose own size is `scale` times its own, which
  * draws its picture finer
  */
-const scaled = (svg: string, scale: number) =>
-  svg.replace(SVG_ROOT, (_, attributes: string) => {
-    const at = (name: string) =>
-      Number(new RegExp(`\\s${name}="([\\d.]+)"`).exec(attributes)?.[1] ?? 0);
-    const width = at("width") * scale;
-    const height = at("height") * scale;
-    const rest = attributes.replace(/\s(?:width|height)="[^"]*"/g, "");
-    return `<svg width="${width}" height="${height}"${rest}>`;
-  });
+const scaled = (svg: string, scale: number) => {
+  const { width, height } = rootSize(svg);
+  return withSize(svg, width * scale, height * scale);
+};
 
 /**
  * prepareVector prepares a drawing of Blank's (src/engine/vectors.ts): its

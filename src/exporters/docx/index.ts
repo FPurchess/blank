@@ -75,7 +75,7 @@ import {
   GRID_TAG,
   type WordDiagram,
 } from "./forms";
-import { FRONTMATTER_PROPERTY } from "./properties";
+import { FRONTMATTER_PROPERTY, pictureName } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
@@ -699,7 +699,14 @@ class Serializer {
         ...this.alignment(node),
       },
       ...(caption
-        ? [{ style: STYLE.caption, children: [new this.docx.TextRun(caption)] }]
+        ? [
+            {
+              style: STYLE.caption,
+              children: [new this.docx.TextRun(caption)],
+              // under the picture, aligned as it is
+              ...this.alignment(node),
+            },
+          ]
         : []),
       { style: CONTROL_CLOSE },
     ];
@@ -961,20 +968,27 @@ class Serializer {
     const image = this.images.get(src);
     if (!image)
       return new this.docx.TextRun({ text: alt || src, italics: true });
-    const wanted = this.wanted(image, node.attrs.width as string | null);
-    return this.picture(image, wanted, alt ?? "", title ?? "");
+    const width = node.attrs.width as string | null;
+    return this.picture(
+      image,
+      this.wanted(image, width),
+      alt ?? "",
+      title ?? "",
+      width,
+    );
   }
 
   /**
    * picture returns `image` as Word's picture, `size` (in pixels) fitted to
    * the page or the cell being written, with what it shows for screen
-   * readers
+   * readers, and named with its `width`, which the import reads back
    */
   private picture(
     image: PreparedImage,
     size: { width: number; height: number },
     description: string,
     title = "",
+    width: string | null = null,
   ): ParagraphChild {
     const fitted = fitBox(size, this.maxImageWidth, this.maxImageHeight);
     const picture = {
@@ -992,7 +1006,7 @@ class Serializer {
         height: Math.round(fitted.height),
       },
       altText: {
-        name: `image-${++this.imageCount}`,
+        name: pictureName(++this.imageCount, width),
         description,
         title,
       },

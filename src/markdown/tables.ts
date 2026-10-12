@@ -272,7 +272,7 @@ export const gfmLines = (
 /**
  * escapeHtml escapes `text` for HTML text and attribute values
  */
-const escapeHtml = (text: string) =>
+export const escapeHtml = (text: string) =>
   text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

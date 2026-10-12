@@ -612,8 +612,6 @@ fn read_start_number<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, 
     })
 }
 
-/// an image's size as it may be: not finite is not loaded (0 × 0), and at
-/// most MAX_IMAGE a side, keeping its shape
 /// a share of a width as the engine takes it: above 0 and at most 1, None
 /// for one that isn't a number
 fn clamp_share(share: &mut Option<f32>) {
@@ -622,6 +620,8 @@ fn clamp_share(share: &mut Option<f32>) {
         .map(|value| value.min(1.0));
 }
 
+/// an image's size as it may be: not finite is not loaded (0 × 0), and at
+/// most MAX_IMAGE a side, keeping its shape
 fn image_size(width: &mut f32, height: &mut f32) {
     if !(width.is_finite() && height.is_finite()) || *width <= 0.0 || *height <= 0.0 {
         (*width, *height) = (0.0, 0.0);

@@ -85,6 +85,21 @@ describe("images with a width", () => {
     expect(imageOf(markdown)).toBeNull();
   });
 
+  it.each([
+    ['<img src="a.png" alt>'],
+    ["<img src=a.png alt title>"],
+    ['<img alt src="a.png" width="50%"/>'],
+  ])("keeps a typed %s text, attributes without values too", (typed) => {
+    // what the reader would take for an image
+    expect(imageOf(typed)).not.toBeNull();
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, schema.text(typed)),
+    ]);
+    const markdown = serializeMarkdown(doc);
+    expect(imageOf(markdown)).toBeNull();
+    expect(parseMarkdown(markdown).textContent).toBe(typed);
+  });
+
   it("writes one with a width in a pipe table's cell", () => {
     const markdown = [
       "| A | B |",

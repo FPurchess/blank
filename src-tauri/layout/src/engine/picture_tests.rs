@@ -97,6 +97,41 @@ fn writes_its_caption_below_it_and_keeps_them_together() {
 }
 
 #[test]
+fn aligns_its_caption_as_it_is_aligned() {
+    for (align, at) in [(None, 0.0), (Some("center"), 0.5), (Some("right"), 1.0)] {
+        let mut item = picture(0, (200.0, 100.0), Some(0.5), Some("The plan"));
+        if let Content::Image { align: aligned, .. } = &mut item.content {
+            *aligned = align.map(String::from);
+        }
+        let mut engine = engine(vec![item]);
+        let ops = engine.page_ops(0, false);
+        let (x, w) = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Image { x, w, .. } => Some((*x, *w)),
+                _ => None,
+            })
+            .unwrap();
+        let (left, width) = ops
+            .iter()
+            .find_map(|op| match op {
+                Op::Glyphs { run, text, .. } if text.contains("The plan") => {
+                    Some((run.x, run.width))
+                }
+                _ => None,
+            })
+            .expect("its caption");
+        // the same share of the room beside it on its left
+        let picture = x + (w * at);
+        let caption = left + (width * at);
+        assert!(
+            (picture - caption).abs() < 0.5,
+            "{align:?}: {picture} {caption}"
+        );
+    }
+}
+
+#[test]
 fn moves_over_a_captioned_picture_in_two_steps() {
     let engine = engine(vec![
         paragraph(0, "above"),

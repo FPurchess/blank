@@ -378,6 +378,16 @@ describe("importers.docx", () => {
       expect(await roundTrip(markdown)).toBe(markdown);
     });
 
+    it("have their caption aligned as they are", async () => {
+      const zip = await JSZip.loadAsync(await exportDocx(markdown));
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const caption =
+        /<w:p>(?:(?!<\/w:p>).)*The plan(?:(?!<\/w:p>).)*<\/w:p>/s.exec(
+          xml,
+        )?.[0];
+      expect(caption).toContain('<w:jc w:val="center"/>');
+    });
+
     it("are their pictures without the part that holds them", async () => {
       const bytes = await rewriteDocx(
         await exportDocx(markdown),
@@ -410,6 +420,23 @@ describe("importers.docx", () => {
       expect(imported).toContain('alt="A dot" width="50%">');
       expect(imported).toContain('alt="" width="100%">');
       expect(imported).toContain("![Natural](");
+    });
+
+    it("leave pictures of other apps at their own size, also one as wide as the text", async () => {
+      const src = dataUrl("image/png", IMAGES.png);
+      const bytes = await exportDocx(
+        `<img src="${src}" alt="Wide" width="100%">`,
+      );
+      // as Word names a picture it was given
+      const renamed = await rewriteDocx(
+        bytes,
+        "word/document.xml",
+        (xml = "") => xml.replace(/name="image-1[^"]*"/, 'name="Picture 1"'),
+      );
+      expect(renamed).not.toEqual(bytes);
+      const { markdown } = await toMarkdown(renamed);
+      expect(markdown).toContain("![Wide](");
+      expect(markdown).not.toContain("width=");
     });
   });
 

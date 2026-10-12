@@ -58,6 +58,7 @@ import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
 import {
   blockSettings,
+  keepSelectedBlock,
   toggleBlocks,
   toggleBlocksPane,
 } from "../commands/contentBlocks";
@@ -417,9 +418,10 @@ export const keymap = () => {
             splitBlockAs(keepAlignment),
           ),
           // a line break, unless a command has the key, e.g. a selected
-          // block's settings
+          // block's settings; never in place of a selected block
           "Shift-Enter": chainCommands(
             ...(bound["Shift-Enter"] ? [bound["Shift-Enter"]] : []),
+            keepSelectedBlock,
             insertNode(schema.nodes.hard_break),
           ),
           Backspace: backspace,

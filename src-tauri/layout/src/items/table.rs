@@ -311,7 +311,7 @@ pub(super) fn table_units(
     let mut label = None;
     let mut top = 0.0;
     if let Some(caption) = table.caption.filter(|caption| !caption.trim().is_empty()) {
-        let boxed = caption_box(fonts, caption, width, indent);
+        let boxed = caption_box(fonts, caption, width, indent, Alignment::Start);
         top = boxed.height() + CAPTION_GAP;
         units.push(Unit {
             height: top,

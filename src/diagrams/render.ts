@@ -3,6 +3,7 @@ import type { Rendered } from "../sources/registry";
 import { sanitizeSvg } from "../markdown/blocks/svg";
 import { loadMermaid } from "./mermaid";
 import { recolor } from "./recolor";
+import { withSize } from "../images/svgSize";
 
 // A diagram drawn from its source: Mermaid's SVG, in the page's ink
 // (./recolor.ts), cleaned as every drawing is (sanitizeSvg), and with its
@@ -47,11 +48,8 @@ export const sized = (svg: string) => {
     .slice(2)
     .map(Number);
   if (!root || !(width > 0) || !(height > 0)) return null;
-  const resized = root
-    .replace(/\s(?:width|height)="[^"]*"/g, "")
-    .replace(/\sstyle="[^"]*"/, "")
-    .replace(/^<svg/, `<svg width="${width}" height="${height}"`);
-  return { svg: svg.replace(root, resized), width, height };
+  const unstyled = svg.replace(root, root.replace(/\sstyle="[^"]*"/, ""));
+  return { svg: withSize(unstyled, width, height), width, height };
 };
 
 // whether Mermaid's failing to load was logged

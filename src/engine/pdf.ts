@@ -248,10 +248,6 @@ export const pdfLanguage = () => {
 };
 
 /**
- * imageNames returns what to call the images of `doc` in a warning: a file
- * by its path, an image in the document itself by its alt text
- */
-/**
  * vectorKeys lists the drawings of `doc`'s sources (diagrams) that could be
  * drawn
  */
@@ -265,6 +261,10 @@ const vectorKeys = (doc: Node) => {
   return keys;
 };
 
+/**
+ * imageNames returns what to call the images of `doc` in a warning: a file
+ * by its path, an image in the document itself by its alt text
+ */
 const imageNames = (doc: Node) => {
   const alts = new Map<string, string>();
   doc.descendants((node) => {

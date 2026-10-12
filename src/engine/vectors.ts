@@ -177,7 +177,9 @@ export const inked = (svg: string, color: string) => {
 };
 
 // Blank's fonts for the screen's pictures: IBM Plex Sans, regular and
-// medium, as data URLs of the unmodified files
+// medium, as their files, and as data URLs of them, made with the first
+// picture that needs them
+let pictureFonts: [Uint8Array, Uint8Array] | null = null;
 let fontFaces: string | null = null;
 
 /**
@@ -185,6 +187,15 @@ let fontFaces: string | null = null;
  * then medium
  */
 export const setPictureFonts = (regular: Uint8Array, medium: Uint8Array) => {
+  pictureFonts = [regular, medium];
+  fontFaces = null;
+};
+
+/**
+ * faces returns the CSS of Blank's fonts for pictures, if it has them
+ */
+const faces = () => {
+  if (fontFaces || !pictureFonts) return fontFaces;
   const face = (bytes: Uint8Array, weight: number) => {
     let binary = "";
     for (let at = 0; at < bytes.length; at += 0x8000) {
@@ -192,16 +203,17 @@ export const setPictureFonts = (regular: Uint8Array, medium: Uint8Array) => {
     }
     return `@font-face{font-family:"IBM Plex Sans";font-weight:${weight};src:url(data:font/ttf;base64,${btoa(binary)}) format("truetype");}`;
   };
-  fontFaces = face(regular, 400) + face(medium, 500);
+  fontFaces = face(pictureFonts[0], 400) + face(pictureFonts[1], 500);
+  return fontFaces;
 };
 
 /**
  * withFonts returns a drawing that holds Blank's fonts, if it has them
  */
-export const withFonts = (svg: string) =>
-  fontFaces
-    ? svg.replace(/(<svg\b[^>]*>)/, `$1<style>${fontFaces}</style>`)
-    : svg;
+export const withFonts = (svg: string) => {
+  const css = faces();
+  return css ? svg.replace(/(<svg\b[^>]*>)/, `$1<style>${css}</style>`) : svg;
+};
 
 /**
  * vectorPicture returns the screen's picture of a drawing in `ink`, once

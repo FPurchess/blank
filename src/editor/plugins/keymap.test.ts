@@ -223,6 +223,10 @@ describe("plugin.keymap", () => {
     const before = view.state.doc;
     expect(press("Shift-Enter")).toBe(true);
     expect(view.state.doc).toBe(before);
+    // but the main menu doesn't offer its settings there
+    expect(
+      commandFor(CommandIdentifier.BLOCK_SETTINGS)(view.state, undefined, view),
+    ).toBe(false);
   });
 
   it("Shift-Enter breaks the line again once settings have another key", () => {
