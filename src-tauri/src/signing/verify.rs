@@ -857,7 +857,8 @@ fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: us
     let Some(entries) = tail_entries(bytes, header, from) else {
         return false;
     };
-    let had = |number: u32| before.objects.keys().any(|(n, _)| *n == number);
+    let numbers: std::collections::HashSet<u32> = before.objects.keys().map(|(n, _)| *n).collect();
+    let had = |number: u32| numbers.contains(&number);
     let kept = entries.iter().all(|&(number, entry)| {
         let then = before.reference_table.get(number);
         match entry {
@@ -1153,28 +1154,50 @@ fn xref_stream(section: &[u8]) -> Option<Section> {
 }
 
 /// dss_objects returns the objects the catalog's /DSS reaches through
-/// dictionaries and arrays: itself, its VRI entries, certificates, OCSP
-/// responses and CRLs
+/// dictionaries, arrays and streams' dictionaries: itself, its VRI entries,
+/// certificates, OCSP responses and CRLs. Not those the catalog reaches
+/// otherwise too: a DSS that lists a page's content stream, as a document
+/// prepared before signing may, doesn't make that stream validation data
 fn dss_objects(doc: &Document) -> std::collections::HashSet<ObjectId> {
-    let mut found = std::collections::HashSet::new();
-    let Some(dss) = doc.catalog().ok().and_then(|c| c.get(b"DSS").ok()) else {
-        return found;
+    let Ok(catalog) = doc.catalog() else {
+        return Default::default();
     };
-    let mut stack = vec![dss];
+    let Ok(dss) = catalog.get(b"DSS") else {
+        return Default::default();
+    };
+    let mut held = reached(doc, vec![dss]);
+    let others = catalog
+        .iter()
+        .filter(|(key, _)| key.as_slice() != b"DSS")
+        .map(|(_, value)| value)
+        .collect();
+    let elsewhere = reached(doc, others);
+    held.retain(|id| !elsewhere.contains(id));
+    held
+}
+
+/// reached returns the objects `from` refers to, and those they refer to,
+/// through dictionaries, arrays and streams' dictionaries; the catalog
+/// only as a reference, not what it holds
+fn reached<'a>(doc: &'a Document, from: Vec<&'a Object>) -> std::collections::HashSet<ObjectId> {
+    let root = doc.trailer.get(b"Root").and_then(Object::as_reference).ok();
+    let mut found = std::collections::HashSet::new();
+    let mut stack = from;
     while let Some(object) = stack.pop() {
-        // a DSS holds a few hundred objects at most
-        if found.len() > 100_000 {
+        // far more than a PDF Blank signs has; past it, what's found counts
+        if found.len() > 1_000_000 {
             break;
         }
         match object {
             Object::Reference(id) => {
-                if found.insert(*id) {
+                if found.insert(*id) && Some(*id) != root {
                     if let Ok(target) = doc.get_object(*id) {
                         stack.push(target);
                     }
                 }
             }
             Object::Dictionary(d) => stack.extend(d.iter().map(|(_, v)| v)),
+            Object::Stream(s) => stack.extend(s.dict.iter().map(|(_, v)| v)),
             Object::Array(a) => stack.extend(a.iter()),
             _ => {}
         }

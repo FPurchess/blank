@@ -390,6 +390,47 @@ fn calls_a_page_written_again_beside_validation_data_a_change() {
 }
 
 #[test]
+fn calls_a_page_its_own_dss_lists_written_again_a_change() {
+    // a PDF prepared before signing, whose DSS lists the page's content
+    // stream among its certificates
+    let mut doc = Document::load_mem(&pdf()).unwrap();
+    let page = *doc.get_pages().get(&1).unwrap();
+    let contents = doc
+        .get_dictionary(page)
+        .unwrap()
+        .get(b"Contents")
+        .unwrap()
+        .as_reference()
+        .unwrap();
+    let dss = doc.add_object(dictionary! { "Certs" => vec![contents.into()] });
+    let root = doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    doc.get_dictionary_mut(root).unwrap().set("DSS", dss);
+    let mut prepared = vec![];
+    doc.save_to(&mut prepared).unwrap();
+    let signed = sign(key(), PASSPHRASE, &prepared, &options(None)).unwrap();
+    let out = validated(
+        &signed,
+        |update| {
+            update.new_document.set_object(
+                contents,
+                Stream::new(
+                    dictionary! {},
+                    b"BT /F1 12 Tf 72 770 Td (Changed) Tj ET".to_vec(),
+                ),
+            );
+        },
+        |_| vec![],
+    );
+    let reports = verify_pdf(&out).unwrap();
+    assert!(reports[0].valid());
+    assert!(
+        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
+        "{}",
+        reports[0].coverage
+    );
+}
+
+#[test]
 fn calls_an_emptied_dictionary_or_an_array_of_numbers_a_change() {
     let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
     let emptied = validated(
