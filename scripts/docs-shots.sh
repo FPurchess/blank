@@ -47,6 +47,10 @@ mkdir -p "$logs"
 jobs=${JOBS:-$(( $(nproc) / 3 > 0 ? $(nproc) / 3 : 1 ))}
 port=${E2E_PORT:-4600}
 export E2E_SKIP_BUILD=1 grep GDK_SCALE=${SHOTS_SCALE:-2}
+# keep the app off the desktop: GTK would pick a Wayland session over xvfb, and the
+# accessibility bridge crashes the app at start without an accessibility bus
+unset WAYLAND_DISPLAY
+export GDK_BACKEND=x11 NO_AT_BRIDGE=1
 
 # runs one spec file: its own display (the -n of xvfb-run, so parallel starts don't race
 # for the same one), its own bus and its own port
