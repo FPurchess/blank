@@ -154,4 +154,14 @@ describe("inline math in the editor", () => {
     view.destroy();
     place.remove();
   });
+
+  it("removes an empty one with Backspace or Delete, leaving no text", () => {
+    for (const key of ["Backspace", "Delete"]) {
+      // "a ", the empty formula, " b": inside it at 4
+      const { view, plugin } = setUp(4, "");
+      expect(pressKey(view, plugin, key)).toBe(true);
+      expect(view.state.doc.textContent).toBe("a  b");
+      expect(head(view)).toBe(3);
+    }
+  });
 });

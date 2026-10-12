@@ -106,6 +106,14 @@ export const handleKey = (view: EditorView, event: KeyboardEvent) => {
   }
   if (!around) return false;
   const { node, pos } = around;
+  // an empty one has no text to give back: it goes
+  if (
+    (event.key === "Backspace" || event.key === "Delete") &&
+    !node.content.size
+  ) {
+    view.dispatch(state.tr.delete(pos, pos + node.nodeSize));
+    return true;
+  }
   switch (event.key) {
     case "Enter":
     case "Escape":
