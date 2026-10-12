@@ -398,6 +398,27 @@ const FONTS = [
     name: "Noto Emoji",
     license: "Noto Emoji License.txt",
   },
+  // the fonts of typed signatures, which only the webview loads
+  {
+    prefix: "PinyonScript-",
+    name: "Pinyon Script",
+    license: "Pinyon Script License.txt",
+  },
+  {
+    prefix: "MsMadi-",
+    name: "Ms Madi",
+    license: "Ms Madi License.txt",
+  },
+  {
+    prefix: "DancingScript-",
+    name: "Dancing Script",
+    license: "Dancing Script License.txt",
+  },
+  {
+    prefix: "Caveat-",
+    name: "Caveat",
+    license: "Caveat License.txt",
+  },
 ];
 
 const FONT_FILE = /\.(ttf|otf|woff2?)$/i;
