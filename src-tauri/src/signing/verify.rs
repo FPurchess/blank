@@ -800,42 +800,44 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
 /// tail_is_validation_data tells whether everything written after `from`
 /// is PAdES validation data: a DSS dictionary, VRI entries,
 /// certificates/OCSP/CRL streams and the catalog that points to them,
-/// unchanged but for its /DSS. (A heuristic.)
+/// unchanged but for its /DSS. (A heuristic.) An object the signed revision
+/// already had may only be written again if that revision's own DSS held
+/// it: otherwise a page's content stream written again under its number
+/// would pass for a certificate.
 fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: usize) -> bool {
     use lopdf::xref::XrefEntry;
     let in_tail = |off: u32| header + off as usize >= from;
+    // each object written after `from`, with where it starts if not in an
+    // object stream
     let mut ids = vec![];
     for (id, e) in &doc.reference_table.entries {
         match e {
             XrefEntry::Normal { offset, generation } if in_tail(*offset) => {
-                ids.push((*id, *generation))
+                ids.push(((*id, *generation), Some(header + *offset as usize)))
             }
             XrefEntry::Compressed { container, .. } => {
                 if let Some(XrefEntry::Normal { offset, .. }) = doc.reference_table.get(*container)
                 {
                     if in_tail(*offset) {
-                        ids.push((*id, 0));
+                        ids.push(((*id, 0), None));
                     }
                 }
             }
             _ => {}
         }
     }
-    let keys_within = |d: &lopdf::Dictionary, allowed: &[&[u8]]| {
-        d.iter().all(|(k, _)| allowed.contains(&k.as_slice()))
+    if ids.is_empty() {
+        return false;
+    }
+    let Ok(root) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
+        return false;
+    };
+    let Ok(before) = Document::load_mem(&bytes[..from]) else {
+        return false;
     };
     // the catalog may only have gained (or changed) its /DSS
     let catalog_ok = || -> bool {
-        let Ok(root) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
-            return false;
-        };
-        if !ids.contains(&root) {
-            return true;
-        }
-        let Ok(prev) = Document::load_mem(&bytes[..from]) else {
-            return false;
-        };
-        let (Ok(now), Ok(before)) = (doc.get_dictionary(root), prev.get_dictionary(root)) else {
+        let (Ok(now), Ok(then)) = (doc.get_dictionary(root), before.get_dictionary(root)) else {
             return false;
         };
         let strip = |d: &lopdf::Dictionary| {
@@ -843,26 +845,339 @@ fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: us
             d.remove(b"DSS");
             format!("{d:?}")
         };
-        now.has(b"DSS") && strip(now) == strip(before)
+        now.has(b"DSS") && strip(now) == strip(then)
     };
-    !ids.is_empty()
-        && catalog_ok()
-        && ids.iter().all(|id| match doc.objects.get(id) {
-            Some(Object::Dictionary(d)) => {
-                d.get(b"Type").and_then(Object::as_name).ok() == Some(b"Catalog")
-                    || keys_within(d, &[b"Type", b"Certs", b"OCSPs", b"CRLs", b"VRI"])
-                    || keys_within(d, &[b"Type", b"Cert", b"OCSP", b"CRL", b"TU", b"TS"])
-                    || d.iter().all(|(k, v)| {
+    // nothing the signed revision had may have gone, nor point elsewhere:
+    // an update that marks a page's content stream free changes the page as
+    // surely as one that writes it again. lopdf reads no free entries, so
+    // the tail's own cross-reference sections are read here
+    if !before.objects.keys().all(|id| doc.objects.contains_key(id)) {
+        return false;
+    }
+    let Some(entries) = tail_entries(bytes, header, from) else {
+        return false;
+    };
+    let had = |number: u32| before.objects.keys().any(|(n, _)| *n == number);
+    let kept = entries.iter().all(|&(number, entry)| {
+        let then = before.reference_table.get(number);
+        match entry {
+            _ if number == 0 => true,
+            TailEntry::Free => !had(number),
+            TailEntry::Normal { offset, generation } if header + offset < from => matches!(
+                then,
+                Some(lopdf::xref::XrefEntry::Normal { offset: o, generation: g })
+                    if *o as usize == offset && *g == generation
+            ),
+            TailEntry::Compressed { container }
+                if doc
+                    .reference_table
+                    .get(container)
+                    .is_some_and(|e| !matches!(e, lopdf::xref::XrefEntry::Normal { offset, .. } if header + *offset as usize >= from)) =>
+            {
+                matches!(
+                    then,
+                    Some(lopdf::xref::XrefEntry::Compressed { container: c, .. }) if *c == container
+                )
+            }
+            _ => true,
+        }
+    });
+    if !kept {
+        return false;
+    }
+    let held_then = dss_objects(&before);
+    let held_now = dss_objects(doc);
+    let keys_within = |d: &lopdf::Dictionary, allowed: &[&[u8]]| {
+        !d.is_empty() && d.iter().all(|(k, _)| allowed.contains(&k.as_slice()))
+    };
+    let validation_data = |object: &Object| match object {
+        Object::Dictionary(d) => {
+            keys_within(d, &[b"Type", b"Certs", b"OCSPs", b"CRLs", b"VRI"])
+                && (d.get(b"Type").and_then(Object::as_name).ok() == Some(b"DSS")
+                    || [&b"Certs"[..], b"OCSPs", b"CRLs", b"VRI"]
+                        .iter()
+                        .any(|key| d.has(key)))
+                || keys_within(d, &[b"Type", b"Cert", b"OCSP", b"CRL", b"TU", b"TS"])
+                    && d.iter().any(|(k, _)| k.as_slice() != b"Type")
+                // the VRI: entries by the SHA-1 of a signature, in hex
+                || !d.is_empty()
+                    && d.iter().all(|(k, v)| {
                         k.len() == 40 && matches!(v, Object::Reference(_) | Object::Dictionary(_))
                     })
+        }
+        // Certs, OCSPs and CRLs: arrays of references to streams
+        Object::Array(items) => items
+            .iter()
+            .all(|item| matches!(item, Object::Reference(_))),
+        Object::Stream(st) => {
+            st.dict.get(b"Type").and_then(Object::as_name).is_err() && !st.dict.has(b"Subtype")
+        }
+        _ => false,
+    };
+    // the cross-reference stream itself isn't kept as an object: it's the
+    // one at `at` that says it is one
+    let xref_stream = |at: Option<usize>| {
+        let Some(at) = at else {
+            return false;
+        };
+        let Some(rest) = bytes.get(at..) else {
+            return false;
+        };
+        let head = &rest[..rest.len().min(512)];
+        let dict_end = head
+            .windows(6)
+            .position(|w| w == b"stream")
+            .unwrap_or(head.len());
+        head[..dict_end].windows(5).any(|w| w == b"/XRef")
+    };
+    ids.iter().all(|&(id, at)| {
+        if id == root {
+            return catalog_ok();
+        }
+        match doc.objects.get(&id) {
+            Some(Object::Stream(st))
+                if matches!(
+                    st.dict.get(b"Type").and_then(Object::as_name).ok(),
+                    Some(b"ObjStm") | Some(b"XRef")
+                ) =>
+            {
+                true
             }
-            Some(Object::Array(_)) => true, // arrays of references (Certs, OCSPs)
-            Some(Object::Stream(st)) => {
-                let t = st.dict.get(b"Type").and_then(Object::as_name).ok();
-                matches!(t, Some(b"ObjStm") | Some(b"XRef"))
-                    || (t.is_none() && !st.dict.has(b"Subtype"))
+            Some(object) => {
+                let held = if before.objects.contains_key(&id) {
+                    &held_then
+                } else {
+                    &held_now
+                };
+                held.contains(&id) && validation_data(object)
             }
-            None => true, // the xref stream itself isn't kept as an object
-            _ => false,
-        })
+            None => !before.objects.contains_key(&id) && xref_stream(at),
+        }
+    })
+}
+
+/// an entry of a cross-reference section, as written
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TailEntry {
+    Free,
+    /// where the object starts, from the header on
+    Normal {
+        offset: usize,
+        generation: u16,
+    },
+    Compressed {
+        container: u32,
+    },
+}
+
+/// what a cross-reference section holds: its entries by number, and where
+/// the sections it points to start (/Prev, /XRefStm)
+type Section = (Vec<(u32, TailEntry)>, Vec<usize>);
+
+/// how many sections an update's chain of cross-references may have
+const MAX_SECTIONS: usize = 256;
+
+/// tail_entries reads the entries of every cross-reference section written
+/// at or after `from`, following /Prev and /XRefStm from the last
+/// startxref, free ones too, which lopdf skips. None if one can't be read
+fn tail_entries(bytes: &[u8], header: usize, from: usize) -> Option<Vec<(u32, TailEntry)>> {
+    let last = bytes.windows(9).rposition(|w| w == b"startxref")?;
+    let mut next = vec![first_integer(&bytes[last + 9..])?];
+    let mut seen = std::collections::HashSet::new();
+    let mut entries = vec![];
+    while let Some(offset) = next.pop() {
+        let at = header.checked_add(offset)?;
+        if at < from || !seen.insert(at) {
+            continue;
+        }
+        if seen.len() > MAX_SECTIONS {
+            return None;
+        }
+        let section = bytes.get(at..)?;
+        let (found, more) = if section.starts_with(b"xref") {
+            xref_table(section)?
+        } else {
+            xref_stream(section)?
+        };
+        entries.extend(found);
+        next.extend(more);
+    }
+    Some(entries)
+}
+
+/// first_integer reads the unsigned integer at the start of `text`, after
+/// white space
+fn first_integer(text: &[u8]) -> Option<usize> {
+    let start = text.iter().position(|b| !is_ws(*b))?;
+    let digits = text[start..]
+        .iter()
+        .take_while(|b| b.is_ascii_digit())
+        .count();
+    std::str::from_utf8(&text[start..start + digits])
+        .ok()?
+        .parse()
+        .ok()
+}
+
+/// the integer after `key` in a dictionary's text, if it has the key
+fn integer_after(text: &[u8], key: &[u8]) -> Option<usize> {
+    let at = text.windows(key.len() + 1).position(|w| {
+        w.starts_with(key) && (is_ws(w[key.len()]) || w[key.len()].is_ascii_digit())
+    })?;
+    first_integer(&text[at + key.len()..])
+}
+
+/// xref_table reads a cross-reference table: its entries, and the sections
+/// its trailer's /Prev and /XRefStm point to
+fn xref_table(section: &[u8]) -> Option<Section> {
+    let end = section.windows(7).position(|w| w == b"trailer")?;
+    let text = std::str::from_utf8(&section[4..end]).ok()?;
+    let mut words = text.split_ascii_whitespace();
+    let mut entries = vec![];
+    while let Some(start) = words.next() {
+        let start: u32 = start.parse().ok()?;
+        let count: u32 = words.next()?.parse().ok()?;
+        for index in 0..count {
+            let offset: usize = words.next()?.parse().ok()?;
+            let generation: u16 = words.next()?.parse().ok()?;
+            let number = start.checked_add(index)?;
+            entries.push((
+                number,
+                match words.next()? {
+                    "n" => TailEntry::Normal { offset, generation },
+                    "f" => TailEntry::Free,
+                    _ => return None,
+                },
+            ));
+        }
+    }
+    let trailer = &section[end..];
+    let trailer = &trailer[..trailer
+        .windows(9)
+        .position(|w| w == b"startxref")
+        .unwrap_or(trailer.len())];
+    let more = [b"/Prev".as_slice(), b"/XRefStm"]
+        .iter()
+        .filter_map(|key| integer_after(trailer, key))
+        .collect();
+    Some((entries, more))
+}
+
+/// xref_stream reads a cross-reference stream: its entries, and the
+/// section its /Prev points to. lopdf decodes it, loaded as the only object
+/// of a PDF of its own
+fn xref_stream(section: &[u8]) -> Option<Section> {
+    let body = section.windows(3).position(|w| w == b"obj")? + 3;
+    let end = section.windows(9).position(|w| w == b"endstream")? + 9;
+    let mut pdf = b"%PDF-1.7\n".to_vec();
+    let start = pdf.len();
+    pdf.extend_from_slice(b"1 0 obj");
+    pdf.extend_from_slice(section.get(body..end)?);
+    pdf.extend_from_slice(b"\nendobj\n");
+    let xref = pdf.len();
+    pdf.extend_from_slice(
+        format!(
+            "xref\n0 2\n0000000000 65535 f \n{start:010} 00000 n \ntrailer\n<< /Size 2 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+        )
+        .as_bytes(),
+    );
+    let doc = Document::load_mem(&pdf).ok()?;
+    let stream = doc.get_object((1, 0)).ok()?.as_stream().ok()?;
+    let dict = &stream.dict;
+    if dict.get(b"Type").and_then(Object::as_name).ok() != Some(b"XRef") {
+        return None;
+    }
+    let integers = |key: &[u8]| -> Option<Vec<usize>> {
+        dict.get(key)
+            .ok()?
+            .as_array()
+            .ok()?
+            .iter()
+            .map(|n| n.as_i64().ok().and_then(|n| usize::try_from(n).ok()))
+            .collect()
+    };
+    let size = usize::try_from(dict.get(b"Size").ok()?.as_i64().ok()?).ok()?;
+    let widths = integers(b"W")?;
+    if widths.len() < 3 || widths.iter().any(|w| *w > 8) || widths.iter().sum::<usize>() == 0 {
+        return None;
+    }
+    let index = integers(b"Index").unwrap_or_else(|| vec![0, size]);
+    let content = if dict.has(b"Filter") {
+        stream.decompressed_content().ok()?
+    } else {
+        stream.content.clone()
+    };
+    let mut read = content.as_slice();
+    let mut field = |width: usize, default: u64| -> Option<u64> {
+        if width == 0 {
+            return Some(default);
+        }
+        let (bytes, rest) = read.split_at_checked(width)?;
+        read = rest;
+        Some(bytes.iter().fold(0, |n, b| n << 8 | u64::from(*b)))
+    };
+    let mut entries = vec![];
+    for range in index.chunks(2) {
+        let [start, count] = range else {
+            return None;
+        };
+        for number in *start..start.checked_add(*count)? {
+            let kind = field(widths[0], 1)?;
+            let second = field(widths[1], 0)?;
+            let third = field(widths[2], 0)?;
+            let number = u32::try_from(number).ok()?;
+            entries.push((
+                number,
+                match kind {
+                    0 => TailEntry::Free,
+                    1 => TailEntry::Normal {
+                        offset: usize::try_from(second).ok()?,
+                        generation: u16::try_from(third).ok()?,
+                    },
+                    2 => TailEntry::Compressed {
+                        container: u32::try_from(second).ok()?,
+                    },
+                    _ => continue,
+                },
+            ));
+        }
+    }
+    let more = dict
+        .get(b"Prev")
+        .and_then(Object::as_i64)
+        .ok()
+        .and_then(|n| usize::try_from(n).ok())
+        .into_iter()
+        .collect();
+    Some((entries, more))
+}
+
+/// dss_objects returns the objects the catalog's /DSS reaches through
+/// dictionaries and arrays: itself, its VRI entries, certificates, OCSP
+/// responses and CRLs
+fn dss_objects(doc: &Document) -> std::collections::HashSet<ObjectId> {
+    let mut found = std::collections::HashSet::new();
+    let Some(dss) = doc.catalog().ok().and_then(|c| c.get(b"DSS").ok()) else {
+        return found;
+    };
+    let mut stack = vec![dss];
+    while let Some(object) = stack.pop() {
+        // a DSS holds a few hundred objects at most
+        if found.len() > 100_000 {
+            break;
+        }
+        match object {
+            Object::Reference(id) => {
+                if found.insert(*id) {
+                    if let Ok(target) = doc.get_object(*id) {
+                        stack.push(target);
+                    }
+                }
+            }
+            Object::Dictionary(d) => stack.extend(d.iter().map(|(_, v)| v)),
+            Object::Array(a) => stack.extend(a.iter()),
+            _ => {}
+        }
+    }
+    found
 }

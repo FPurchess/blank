@@ -276,6 +276,190 @@ fn finds_what_was_added_after_signing() {
     assert!(check_signed(&signed).is_err());
 }
 
+/// validated adds `change` to the signed `pdf` as an unsigned update, and
+/// gives the catalog a /DSS holding a certificate, plus what `held` adds to
+/// its /Certs
+fn validated(
+    pdf: &[u8],
+    change: impl FnOnce(&mut lopdf::IncrementalDocument),
+    held: impl FnOnce(&mut lopdf::IncrementalDocument) -> Vec<Object>,
+) -> Vec<u8> {
+    let doc = Document::load_mem(pdf).unwrap();
+    let root = doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let mut update = lopdf::IncrementalDocument::create_from(pdf.to_vec(), doc);
+    change(&mut update);
+    let cert = update
+        .new_document
+        .add_object(Stream::new(dictionary! {}, b"a certificate".to_vec()));
+    let mut certs: Vec<Object> = vec![cert.into()];
+    certs.extend(held(&mut update));
+    let dss = update
+        .new_document
+        .add_object(dictionary! { "Type" => "DSS", "Certs" => certs });
+    update.opt_clone_object_to_new_document(root).unwrap();
+    update
+        .new_document
+        .get_dictionary_mut(root)
+        .unwrap()
+        .set("DSS", dss);
+    let mut out = vec![];
+    update.save_to(&mut out).unwrap();
+    out
+}
+
+/// the content stream of the first page
+fn first_contents(update: &lopdf::IncrementalDocument) -> ObjectId {
+    let doc = update.get_prev_documents();
+    let page = *doc.get_pages().get(&1).unwrap();
+    doc.get_dictionary(page)
+        .unwrap()
+        .get(b"Contents")
+        .unwrap()
+        .as_reference()
+        .unwrap()
+}
+
+#[test]
+fn takes_validation_data_added_after_signing_for_what_it_is() {
+    let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
+    let modern = sign(key(), PASSPHRASE, &pdf_of(1, true), &options(None)).unwrap();
+    // lopdf writes the update's cross-references as a stream, read here by
+    // Blank's own reader of them
+    for signed in [signed, modern] {
+        let out = validated(&signed, |_| {}, |_| vec![]);
+        let reports = verify_pdf(&out).unwrap();
+        assert!(reports[0].valid());
+        assert_eq!(
+            reports[0].coverage,
+            "covers the whole file but validation data (DSS) added later"
+        );
+    }
+}
+
+#[test]
+fn calls_a_page_written_again_beside_validation_data_a_change() {
+    let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
+    let rewrite = |update: &mut lopdf::IncrementalDocument| {
+        let contents = first_contents(update);
+        update.new_document.set_object(
+            contents,
+            Stream::new(
+                dictionary! {},
+                b"BT /F1 12 Tf 72 770 Td (Changed) Tj ET".to_vec(),
+            ),
+        );
+        contents
+    };
+    // the page's text written again under its own number
+    let plain = validated(
+        &signed,
+        |update| {
+            rewrite(update);
+        },
+        |_| vec![],
+    );
+    // and also listed among the certificates of the DSS
+    let listed = std::cell::Cell::new(None);
+    let held = validated(
+        &signed,
+        |update| listed.set(Some(rewrite(update))),
+        |_| vec![listed.get().unwrap().into()],
+    );
+    for out in [plain, held] {
+        let reports = verify_pdf(&out).unwrap();
+        assert!(reports[0].valid());
+        assert!(
+            reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
+            "{}",
+            reports[0].coverage
+        );
+    }
+}
+
+#[test]
+fn calls_an_emptied_dictionary_or_an_array_of_numbers_a_change() {
+    let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
+    let emptied = validated(
+        &signed,
+        |update| {
+            let doc = update.get_prev_documents();
+            let page = *doc.get_pages().get(&1).unwrap();
+            let resources = Object::Dictionary(dictionary! {});
+            let id = update.new_document.add_object(resources);
+            update.opt_clone_object_to_new_document(page).unwrap();
+            update
+                .new_document
+                .get_dictionary_mut(page)
+                .unwrap()
+                .set("Resources", id);
+        },
+        |_| vec![],
+    );
+    let numbers = validated(
+        &signed,
+        |_| {},
+        |update| {
+            vec![update
+                .new_document
+                .add_object(vec![Object::Integer(1)])
+                .into()]
+        },
+    );
+    for out in [emptied, numbers] {
+        let reports = verify_pdf(&out).unwrap();
+        assert!(
+            reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
+            "{}",
+            reports[0].coverage
+        );
+    }
+}
+
+#[test]
+fn calls_an_object_freed_after_signing_a_change() {
+    let signed = sign(key(), PASSPHRASE, &pdf(), &options(None)).unwrap();
+    let mut out = validated(&signed, |_| {}, |_| vec![]);
+    // another update, whose cross-reference table marks the page's content
+    // stream free
+    let doc = Document::load_mem(&out).unwrap();
+    let page = *doc.get_pages().get(&1).unwrap();
+    let (number, generation) = doc
+        .get_dictionary(page)
+        .unwrap()
+        .get(b"Contents")
+        .unwrap()
+        .as_reference()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out).into_owned();
+    let prev: usize = text
+        .rsplit("startxref")
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let root = doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let size = doc.trailer.get(b"Size").unwrap().as_i64().unwrap();
+    let at = out.len() + 1;
+    out.extend_from_slice(
+        format!(
+            "\nxref\n{number} 1\n0000000000 {:05} f\r\ntrailer\n<< /Size {size} /Root {} {} R /Prev {prev} >>\nstartxref\n{at}\n%%EOF\n",
+            generation + 1,
+            root.0,
+            root.1
+        )
+        .as_bytes(),
+    );
+    let reports = verify_pdf(&out).unwrap();
+    assert!(
+        reports[0].coverage.starts_with("CHANGED AFTER SIGNING"),
+        "{}",
+        reports[0].coverage
+    );
+}
+
 #[test]
 fn says_when_the_passphrase_is_wrong() {
     assert!(matches!(
