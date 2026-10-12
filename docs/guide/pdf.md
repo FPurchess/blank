@@ -37,7 +37,7 @@ Once Blank found places in a PDF, **Next** in the signing toolbar goes to the ne
 
 Your signature goes into a signature field as large as it fits. On a line, it stands on the line, large enough to read, as wide as the line allows. A date or place line gets today's date or your place, in letters as large as the line's label. A text field that asks for your name, the date or the place starts with it: press `Enter` to keep it, or type over it. `Tab` past it leaves it empty. Remove a signature from a place with `Delete` or **Remove**, and the place is back, selected. Move a signature off its place, and the place shows again too: the signature is then one of its own, where you put it.
 
-The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Western European letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say _This field's font can't show some of these characters_ under the field, and the field keeps what it had. Write such text as a stamp instead, or ask the sender for a form with another font.
+The text you type into a form field shows in the field's own font, which the PDF chooses, so it takes Western European letters only: Greek, Cyrillic, Chinese or a Polish _Ł_ say so above the field, naming the first letter it can't show, e.g. _This field's font can't show “Ł”_, and the field keeps what it had. Write it with letters the font has, e.g. _L_ for _Ł_, or ask the sender for a form with another font.
 
 ### Place your signature, initials, date and place {#stamps}
 

@@ -1965,8 +1965,11 @@ body.without-engine.blocks-docked {
 }
 
 // why a field didn't take what was typed, under it
+// above its field, its bottom at the top given: below it, it would cover
+// the next field
 .pdf-field-problem {
   position: absolute;
+  transform: translateY(-100%);
   margin: 0;
   padding: 2px var(--s1);
   font-size: var(--ui-small);

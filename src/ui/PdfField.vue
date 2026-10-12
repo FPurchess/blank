@@ -32,7 +32,8 @@ import { tipAttrs } from "./tooltipModel";
 // shows only while it has the focus, prefilled with the user's name, today's
 // date or their place when its label asks for one; otherwise the page shows
 // MuPDF's drawing of what it holds. Enter, Tab or leaving it fills it in
-// (`commitFill`), and a value its font can't show is refused under it. A
+// (`commitFill`), and a value its font can't show is refused above it (not
+// under it, where the next field usually is). A
 // checkbox ticks, a radio button chooses, and a combo or list box opens a
 // select of its options. Its tooltip names it. A field that can't be filled
 // in now (an earlier signer locked it, Blank signs the PDF, the PDF allows
@@ -271,9 +272,7 @@ const onChoiceKey = (event: KeyboardEvent) => {
     :id="problemId"
     class="pdf-field-problem"
     role="alert"
-    :style="
-      styleOf({ ...box, top: box.top + box.height + 4, height: undefined })
-    "
+    :style="styleOf({ ...box, top: box.top - 4, height: undefined })"
   >
     {{ problem }}
   </p>

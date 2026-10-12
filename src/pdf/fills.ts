@@ -13,7 +13,7 @@ import {
   type OpenedPdf,
   setFills,
 } from "./ipc";
-import { fieldValue, MISSING_GLYPHS, NOT_TAKEN } from "./placeModel";
+import { fieldValue, missingGlyphs, NOT_TAKEN } from "./placeModel";
 import type { PdfField } from "./ipc";
 import { shownContext } from "./placesRead";
 import { changeSheet, fillsOf } from "./stampBooks";
@@ -113,10 +113,14 @@ export const commitFill = (
       const failure = failureOf(error);
       if (failure === "missingGlyphs" || failure === "badRequest") {
         // the field the helper names, else the one just filled in
+        const failed = failedField(error) ?? field.name;
         fieldProblem.value = {
           tab,
-          field: failedField(error) ?? field.name,
-          text: failure === "missingGlyphs" ? MISSING_GLYPHS : NOT_TAKEN,
+          field: failed,
+          text:
+            failure === "missingGlyphs"
+              ? missingGlyphs(next.find((fill) => fill.field === failed)?.value)
+              : NOT_TAKEN,
         };
         announce(fieldProblem.value.text);
       } else if (failure !== "closed") {

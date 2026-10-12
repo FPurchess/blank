@@ -10,6 +10,9 @@ import {
   LEAST_LETTERS,
   lettersOn,
   MARK_ON_LINE,
+  MISSING_GLYPHS,
+  missingGlyphs,
+  unshown,
   isFilled,
   nextMessage,
   placeElementId,
@@ -189,5 +192,16 @@ describe("the places of a PDF on its pages", () => {
     expect(lettersOn(place(12))).toBe(12);
     expect(lettersOn(place(6))).toBe(LEAST_LETTERS);
     expect(lettersOn(place())).toBeUndefined();
+  });
+
+  it("name the first character a field's font can't show, as the helper checks", () => {
+    expect(unshown("Café – 5 € „ok“")).toBeUndefined();
+    expect(unshown("two\nlines\tand a tab")).toBeUndefined();
+    expect(unshown("Łukasz")).toBe("Ł");
+    expect(unshown("Zoë 😀")).toBe("😀");
+    expect(missingGlyphs("Ωμέγα")).toBe("This field's font can't show “Ω”.");
+    // a list box's options, or a value it can't tell
+    expect(missingGlyphs(undefined)).toBe(MISSING_GLYPHS);
+    expect(missingGlyphs("fine")).toBe(MISSING_GLYPHS);
   });
 });

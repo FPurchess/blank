@@ -24,7 +24,6 @@ import {
   syncFills,
 } from "./fills";
 import { type Fill, setFills } from "./ipc";
-import { MISSING_GLYPHS } from "./placeModel";
 import { fillsOf, redoStamps, undoStamps } from "./stampBooks";
 import { CHECKING, FIELD_LOCKED, RESTRICTED, SIGNING } from "./toolRules";
 
@@ -110,13 +109,11 @@ describe("the fills of a PDF's form", () => {
       kind: "missingGlyphs",
       field: "name",
     });
-    expect(await commitFill(name, "Ωμέγα")).toBe(false);
-    expect(fieldProblem.value).toEqual({
-      tab: "t",
-      field: "name",
-      text: MISSING_GLYPHS,
-    });
-    expect(announcement.value?.text).toBe(MISSING_GLYPHS);
+    expect(await commitFill(name, "Łukasz Ωμέγα")).toBe(false);
+    // naming the first character the font can't show
+    const text = "This field's font can't show “Ł”.";
+    expect(fieldProblem.value).toEqual({ tab: "t", field: "name", text });
+    expect(announcement.value?.text).toBe(text);
     expect(fillsOf("t")).toEqual([]);
     expect(past()).toBe(0);
   });

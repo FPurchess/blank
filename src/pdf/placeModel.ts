@@ -9,7 +9,37 @@ import type { Stamp } from "./stampModel";
 
 export const PLACE_DISMISSED = "Place dismissed";
 export const MISSING_GLYPHS =
-  "This field's font can't show some of these characters";
+  "This field's font can't show some of these characters.";
+
+// the characters of Windows-1252 outside Latin-1, which it has in place of
+// the C1 controls
+const WIN_ANSI_EXTRA = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
+
+/**
+ * unshown returns the first character of `text` a field's font can't show,
+ * as the helper checks it (`shows` in src-tauri/pdf/helper/shim): MuPDF
+ * draws a field's value in a base 14 font with Windows-1252, line breaks
+ * aside, and a tab as a space; undefined when it shows them all
+ */
+export const unshown = (text: string) =>
+  [...text].find((char) => {
+    const code = char.codePointAt(0)!;
+    if (char === "\n" || char === "\r" || char === "\t") return false;
+    return !(
+      (code >= 1 && code <= 0x7f) ||
+      (code >= 0xa0 && code <= 0xff) ||
+      WIN_ANSI_EXTRA.has(char)
+    );
+  });
+
+/**
+ * missingGlyphs says that a field's font can't show `value`, naming the
+ * first character it can't show, e.g. "This field's font can't show “Ł”."
+ */
+export const missingGlyphs = (value: string | boolean | undefined) => {
+  const char = typeof value === "string" ? unshown(value) : undefined;
+  return char ? `This field's font can't show “${char}”.` : MISSING_GLYPHS;
+};
 export const NOT_TAKEN = "This field doesn't take this value";
 
 // what a place is called by its kind, where its label doesn't say it

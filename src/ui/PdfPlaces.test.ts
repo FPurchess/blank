@@ -520,7 +520,7 @@ describe("the places of a PDF", () => {
     expect(fieldProblem.value?.field).toBe("name");
     const problem = document.querySelector(".pdf-field-problem")!;
     expect(problem.textContent?.trim()).toBe(
-      "This field's font can't show some of these characters",
+      "This field's font can't show “Ł”.",
     );
     expect(input.getAttribute("aria-invalid")).toBe("true");
   });
