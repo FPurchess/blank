@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cancelRender, renderPage } from "../pdf/ipc";
 import type { PdfTabDocument } from "../pdf/document";
-import { SIGNING_NEXT } from "../pdf/sign";
 import { resetStampBooks, stampsOf } from "../pdf/stampBooks";
 import { pdfRules, type PdfRules } from "../signing/ipc";
 import {
@@ -13,6 +12,8 @@ import {
   savedMarks,
   selectedStamp,
   shownPdf,
+  signDialog,
+  type SignDialogRequest,
   shownPdfRules,
   signatureDialog,
   signingPlace,
@@ -40,6 +41,11 @@ vi.mock("../signing/ipc", async (original) => ({
 vi.mock("../signing/marks", async (original) => ({
   ...(await original<typeof import("../signing/marks")>()),
   loadMarks: vi.fn(async () => {}),
+}));
+
+vi.mock("../signing/certificate", async (original) => ({
+  ...(await original<typeof import("../signing/certificate")>()),
+  loadCertificate: vi.fn(async () => {}),
 }));
 
 vi.mock("../pdf/stampEngine", () => ({
@@ -244,15 +250,17 @@ describe("the signing toolbar", () => {
     expect(announcement.value?.text).toBe("Placing canceled");
   });
 
-  it("says that signing comes next, from Sign… and from Save's key", async () => {
+  it("opens the Sign dialog from Sign… and from Save's key", async () => {
     await mount();
-    const said = () => announcement.value?.text;
     signButton().click();
     await flushPromises();
-    expect(said()).toBe(SIGNING_NEXT);
-    announcement.value = null;
+    expect(signDialog.value?.mode).toBe("pdf");
+    expect(signDialog.value?.title).toBe("contract");
+    signDialog.value = null;
+    await flushPromises();
     window.dispatchEvent(keyEvent("Mod-s"));
     await flushPromises();
-    expect(said()).toBe(SIGNING_NEXT);
+    expect((signDialog.value as SignDialogRequest | null)?.mode).toBe("pdf");
+    signDialog.value = null;
   });
 });

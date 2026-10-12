@@ -10,6 +10,7 @@ import {
   pdfDeskLayout,
   pdfPageInView,
   pdfViewport,
+  placeDialog,
   placingStamp,
   savedMarks,
   selectedStamp,
@@ -65,12 +66,43 @@ const lineOf = (kind: "date" | "place") =>
     : signingPlace.value.trim();
 
 /**
+ * askPlace asks where the user signs, and remembers it (`signingPlace`);
+ * `refocus` gives the focus back once the question closes
+ * @returns the place, or null when the user cancelled
+ */
+export const askPlace = (refocus: () => void) =>
+  new Promise<string | null>((resolve) => {
+    placeDialog.value = {
+      place: signingPlace.value,
+      submit: (place) => {
+        signingPlace.value = place;
+        refocus();
+        resolve(place);
+      },
+      cancel: () => {
+        refocus();
+        resolve(null);
+      },
+    };
+  });
+
+/**
+ * knownPlace returns where the user signs, asking first when Blank doesn't
+ * know it yet
+ * @returns the place, or null when the user cancelled
+ */
+export const knownPlace = async (refocus: () => void) =>
+  signingPlace.value.trim() || (await askPlace(refocus));
+
+/**
  * newStamp makes a stamp of `kind`, not yet placed: its look and its
  * natural size; null for a signature or initials the user has none of yet
+ * @param line what a date or place stamp shows, if not the date or place
  * @throws when the layout can't size its lines
  */
 export const newStamp = async (
   kind: StampKind,
+  line?: string,
 ): Promise<Omit<Stamp, "page" | "rect"> | null> => {
   const id = crypto.randomUUID();
   if (kind === "signature" || kind === "initials") {
@@ -84,7 +116,7 @@ export const newStamp = async (
       natural: markSize(kind, mark.width, mark.height),
     };
   }
-  const spec = stampSpec(kind, lineOf(kind));
+  const spec = stampSpec(kind, line ?? lineOf(kind));
   const { width, height } = await naturalSize(spec);
   return { id, kind, spec, natural: [width, height] };
 };
@@ -126,6 +158,8 @@ export const placeStamp = async (
   const tab = activeTabId.value;
   const opened = shownPdf.value?.opened;
   if (!tab || !opened) return null;
+  // where the user signs, asked for the first time
+  if (kind === "place" && !(await knownPlace(refocus))) return null;
   let made;
   try {
     made = await newStamp(kind);
@@ -168,14 +202,30 @@ export const placeStamp = async (
   return stamp;
 };
 
+// the place a stamp removed filled, which takes the focus once it shows
+// again
+let freedPlace: string | null = null;
+
 /**
- * removeStamp removes the stamp `id` of the PDF shown and says so
+ * takeFreedPlace returns the place the stamp removed last filled, once:
+ * what takes the focus after it
+ */
+export const takeFreedPlace = () => {
+  const place = freedPlace;
+  freedPlace = null;
+  return place;
+};
+
+/**
+ * removeStamp removes the stamp `id` of the PDF shown and says so; the
+ * place it filled, if it filled one, shows again and takes the focus
  */
 export const removeStamp = (id: string) => {
   const tab = activeTabId.value;
   if (!tab) return;
   const stamp = stampsOf(tab).find((one) => one.id === id);
   if (!stamp) return;
+  freedPlace = stamp.place ?? null;
   changeStamps(tab, withoutStamp(stampsOf(tab), id));
   if (selectedStamp.value === id) selectedStamp.value = null;
   announce(removedMessage(stamp));

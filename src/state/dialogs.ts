@@ -272,6 +272,20 @@ export interface SignDialogRequest {
 // signDialog holds the request of the open dialog that signs, or null
 export const signDialog = shallowRef<SignDialogRequest | null>(null);
 
+// The small dialog that asks where the user signs (PlaceDialog.vue), for a
+// place stamp before Blank knows one
+export interface PlaceDialogRequest {
+  // what the field starts with
+  place: string;
+  // the place typed, never empty
+  submit(place: string): void;
+  cancel(): void;
+}
+
+// placeDialog holds the request of the open question where the user signs,
+// or null
+export const placeDialog = shallowRef<PlaceDialogRequest | null>(null);
+
 export interface UnsavedDialogRequest {
   // the tab's name, e.g. "notes"
   label: string;
@@ -377,6 +391,7 @@ export const focusTakingDialogs = [
   signaturePopover,
   signatureDialog,
   signDialog,
+  placeDialog,
   certificateDialog,
   confirmDialog,
   signaturesPopover,

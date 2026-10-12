@@ -51,14 +51,16 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.APP_GUIDE,
   CommandIdentifier.APP_ABOUT,
   CommandIdentifier.PDF_SIGN,
+  CommandIdentifier.PDF_NEXT,
 ]);
 
 // what Save says in a PDF tab, whose key signs it
 export const SIGN_TO_KEEP = "Sign the PDF to keep what you placed on it";
 
-// what signing says in a PDF tab: received PDFs are signed with PR 3b
+// what signing your own documents says in a PDF tab, which is signed with
+// its signing toolbar
 export const SIGN_RECEIVED_REFUSAL =
-  "Blank can't sign PDFs you received yet. Sign your own documents with Export signed PDF.";
+  "In a PDF, place your signature from the signing toolbar, then choose Sign on it. Export signed PDF signs your own documents.";
 
 /**
  * pdfRefusal returns what the command `id` says in a PDF tab instead of

@@ -1902,6 +1902,78 @@ body.without-engine.blocks-docked {
   }
 }
 
+// a place to sign or date on a PDF's page (PdfTarget.vue), and a field of
+// its form (PdfField.vue): a dashed box in the accent over what the page
+// shows there. A text field shows its input only while it has the focus;
+// otherwise the page shows what the field holds.
+.pdf-target,
+.pdf-field,
+.pdf-choice-slot .pdf-choice {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  font: inherit;
+  color: transparent;
+  background: transparent;
+}
+
+.pdf-target {
+  background: var(--accent-soft);
+}
+
+.pdf-field {
+  padding: 0 2px;
+  font-size: var(--ui);
+  resize: none;
+
+  &.editing {
+    border-style: solid;
+    color: var(--color);
+    background: var(--background-color);
+  }
+}
+
+// a radio group's buttons, within its box
+.pdf-radios {
+  position: absolute;
+
+  .pdf-field {
+    position: absolute;
+  }
+}
+
+// a combo or list box: its select shows its value while it has the focus
+.pdf-choice-slot {
+  position: absolute;
+
+  .pdf-choice {
+    position: static;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+
+    &:focus-visible {
+      border-style: solid;
+      color: var(--color);
+      background: var(--background-color);
+    }
+  }
+}
+
+// why a field didn't take what was typed, under it
+.pdf-field-problem {
+  position: absolute;
+  margin: 0;
+  padding: 2px var(--s1);
+  font-size: var(--ui-small);
+  color: var(--spelling-color);
+  @include ui-text;
+  @include popover;
+}
+
 // a corner of the stamp selected, on its ring
 .stamp-handle {
   position: absolute;

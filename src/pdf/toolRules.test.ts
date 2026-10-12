@@ -6,7 +6,6 @@ import {
   DAMAGED,
   NEEDS_LAYOUT,
   NO_CHANGES,
-  NO_PLACE,
   NOT_OPEN,
   RESTRICTED,
   signRefusal,
@@ -33,7 +32,6 @@ const context = (over: Partial<ToolContext> = {}): ToolContext => ({
   },
   rules: rules(),
   engine: true,
-  place: "Berlin",
   ...over,
 });
 
@@ -89,12 +87,13 @@ describe("what the signing tools may place", () => {
     expect(signRefusal(context({ rules: null }))).toBe(CHECKING);
   });
 
-  it("need the layout, and a place for the place", () => {
+  it("need the layout", () => {
     const without = context({ engine: false });
     expect(toolRefusal("signature", without)).toBe(NEEDS_LAYOUT);
     expect(toolbarNote(without)).toBe(NEEDS_LAYOUT);
     // signing itself needs no stamps
     expect(signRefusal(without)).toBeNull();
-    expect(toolRefusal("place", context({ place: " " }))).toBe(NO_PLACE);
+    // a place Blank doesn't know yet is asked for when it's placed
+    expect(toolRefusal("place", context())).toBeNull();
   });
 });

@@ -14,8 +14,6 @@ export interface ToolContext {
   rules: PdfRules | null;
   // whether Blank's layout engine runs, which lays out the stamps
   engine: boolean;
-  // where the user signs, which a place stamp shows ("" while unknown)
-  place: string;
 }
 
 export const NEEDS_LAYOUT = "Stamps need the page layout, which didn't start";
@@ -26,7 +24,6 @@ export const NO_CHANGES =
   "This PDF doesn't allow any changes, not even signatures";
 export const CHECKING = "Blank is checking what this PDF allows";
 export const NOT_OPEN = "The PDF isn't open";
-export const NO_PLACE = "Blank learns your place once you've signed somewhere";
 
 // what a stamp on a signed PDF would do, by tool (signatures go into a
 // signature field's appearance there, so they stay)
@@ -73,7 +70,6 @@ export const toolRefusal = (
   if (!context.rules) return CHECKING;
   const signed = context.rules.signed || context.rules.docmdp !== null;
   if (signed && SIGNED[kind]) return SIGNED[kind]!;
-  if (kind === "place" && !context.place.trim()) return NO_PLACE;
   return null;
 };
 

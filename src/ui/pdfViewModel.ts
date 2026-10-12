@@ -38,9 +38,11 @@ export const pageSlot = (tab: string, sha256: string, page: number) =>
   `${tab}|${sha256}|${page}`;
 
 /**
- * pageKey names a bitmap of a page of a PDF in a tab at `scale`
+ * pageKey names a bitmap of a page of a PDF in a tab at `scale`, filled in
+ * `revision` times (the form's fields on it changed)
  */
-export const pageKey = (slot: string, scale: number) => `${slot}|${scale}`;
+export const pageKey = (slot: string, scale: number, revision = 0) =>
+  `${slot}|${scale}|${revision}`;
 
 /**
  * closedKeys returns the keys of the bitmaps of PDF tabs that closed

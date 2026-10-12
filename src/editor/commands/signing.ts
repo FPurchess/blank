@@ -130,14 +130,14 @@ const TITLE = "Signed PDF";
  * signerName returns the name the user signs as: their certificate's, which
  * a digital signature carries, else the one in Settings ▸ Signing
  */
-const signerName = () =>
+export const signerName = () =>
   signingCertificate.value?.name || config.value.signing.name;
 
 /**
  * passphraseProblem says why a passphrase didn't open the user's key, with
  * a way on for a forgotten one
  */
-const passphraseProblem = (error: unknown) =>
+export const passphraseProblem = (error: unknown) =>
   signingKind(error) === "wrongPassphrase"
     ? "The passphrase is wrong. Forgot it? Sign with no digital signature, or remove your certificate in Settings ▸ Signing and create a new one."
     : signingMessage(error, "Blank couldn't open your key");
@@ -378,7 +378,7 @@ const finishExport = async (result: ExportResult, signing: ExportSigning) => {
  * signingFailure says why a PDF wasn't signed, that nothing was saved, and,
  * when the timestamp server gave no timestamp, how to sign without it
  */
-const signingFailure = (error: unknown) => {
+export const signingFailure = (error: unknown) => {
   const message = signingMessage(error, "Blank couldn't sign the PDF").replace(
     /\.?$/,
     ".",

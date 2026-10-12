@@ -7,6 +7,8 @@ import { useEditor } from "../editor/handle";
 import { commandFor } from "../editor/plugins/keymap";
 import { engineless } from "../engine/engine";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
+import { goNext } from "../pdf/placeActions";
+import { shownNext, shownPlaces } from "../pdf/placesRead";
 import { readShownRules } from "../pdf/sign";
 import { cancelPlacing, placeStamp } from "../pdf/stampActions";
 import type { StampKind } from "../pdf/stampModel";
@@ -17,7 +19,6 @@ import {
   placingStamp,
   shownPdf,
   shownPdfRules,
-  signingPlace,
   toolbarFocused,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
@@ -34,8 +35,8 @@ import { tipAttrs } from "./tooltipModel";
 
 // The signing toolbar, in place of the formatting toolbar in a PDF tab (the
 // same row, the same F6 stop and Alt-F10): the tools that place stamps,
-// Signature, Initials, Date and Place, then Sign… (`pdf.sign`) and a Next
-// slot that the found places fill later. From the keyboard a tool places
+// Signature, Initials, Date and Place, then Sign… (`pdf.sign`) and Next
+// (`pdf.next`), to the next place to fill in or sign. From the keyboard a tool places
 // its stamp at a default spot of the page in view; a click arms it, and a
 // press on a page places it there (Esc cancels). A tool that can't be used
 // says why in its tooltip; the toolbar says why when none can.
@@ -57,7 +58,6 @@ const state = computed(() => {
       opened,
       rules: opened && read?.sha256 === opened.sha256 ? read.rules : null,
       engine: !engineMissing.value && !engineless(),
-      place: signingPlace.value,
     },
     placingStamp.value,
   );
@@ -111,6 +111,18 @@ const sign = () =>
   editor.run(commandFor(CommandIdentifier.PDF_SIGN), {
     focus: !toolbarFocused.value,
   });
+
+// Next, with the places the PDF has to fill in; hidden without any
+const next = shownNext;
+const hasPlaces = computed(() => shownPlaces.value.length > 0);
+const nextLabel = commandLabel(CommandIdentifier.PDF_NEXT);
+const goToNext = () => {
+  if (next.value.disabled) {
+    announce(next.value.text);
+    return;
+  }
+  void goNext();
+};
 
 const onFocusIn = (event: FocusEvent) => {
   region.onFocusin();
@@ -168,9 +180,21 @@ const onKey = (event: KeyboardEvent) => {
     >
       {{ signLabel }}
     </button>
-    <!-- the found places' Next · n of m, which comes with them -->
-    <button type="button" class="signing-next" hidden tabindex="-1">
-      Next
+    <button
+      type="button"
+      class="signing-next"
+      :hidden="!hasPlaces"
+      :aria-disabled="next.disabled ? true : undefined"
+      :tabindex="hasPlaces ? tabindexOf(state.tools.length + 1) : -1"
+      v-bind="
+        tipAttrs({
+          name: next.disabled ? next.text : nextLabel,
+          command: CommandIdentifier.PDF_NEXT,
+        })
+      "
+      @click="goToNext"
+    >
+      {{ next.text }}
     </button>
     <p v-if="state.note" class="signing-note" role="status">
       {{ state.note }}

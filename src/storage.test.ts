@@ -503,21 +503,44 @@ describe("storage", () => {
           align: "center" as const,
         },
       };
-      const book = { stamps: [stamp], past: [], future: [], nudged: null };
+      const book = {
+        stamps: [stamp],
+        fills: [{ field: "name", value: "Ada" }],
+        dismissed: ["found:0:1:2"],
+        past: [],
+        future: [],
+        nudged: null,
+      };
       stampBooks.value = new Map([["a", { book, sha256: "abc" }]]);
       await tick();
       expect(await localforage.getItem("stamps:a")).toEqual({
         sha256: "abc",
         stamps: [stamp],
+        fills: book.fills,
+        dismissed: book.dismissed,
         viewAnchor: null,
       });
-      expect(await loadStamps("a")).toEqual({ sha256: "abc", stamps: [stamp] });
+      expect(await loadStamps("a")).toEqual({
+        sha256: "abc",
+        stamps: [stamp],
+        fills: book.fills,
+        dismissed: book.dismissed,
+      });
 
       // all undone: nothing to keep
       stampBooks.value = new Map([
         [
           "a",
-          { book: { ...book, stamps: [], future: [[stamp]] }, sha256: "abc" },
+          {
+            book: {
+              ...book,
+              stamps: [],
+              fills: [],
+              dismissed: [],
+              future: [{ stamps: [stamp], fills: [], dismissed: [] }],
+            },
+            sha256: "abc",
+          },
         ],
       ]);
       await tick();
@@ -536,8 +559,15 @@ describe("storage", () => {
       await localforage.setItem("stamps:a", {
         sha256: 7,
         stamps: [{ id: "x", kind: "seal" }],
+        fills: [{ field: 3 }, { field: "ok", value: true }],
+        dismissed: [1, "found:0:1:2"],
       });
-      expect(await loadStamps("a")).toEqual({ sha256: null, stamps: [] });
+      expect(await loadStamps("a")).toEqual({
+        sha256: null,
+        stamps: [],
+        fills: [{ field: "ok", value: true }],
+        dismissed: ["found:0:1:2"],
+      });
       await localforage.setItem("stamps:a", "garbage");
       expect(await loadStamps("a")).toBeNull();
     });

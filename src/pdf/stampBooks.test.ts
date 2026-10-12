@@ -86,6 +86,8 @@ describe("restoring a tab's stamps", () => {
   const stored = (sha256: string) => ({
     sha256,
     stamps: [stamp(), stamp({ id: "far", page: 4 })],
+    fills: [] as { field: string; value: string | boolean }[],
+    dismissed: [] as string[],
   });
 
   it("brings them back as they were on the same file", () => {
@@ -102,6 +104,23 @@ describe("restoring a tab's stamps", () => {
     expect(stampBooks.value.get("t")?.sha256).toBe("new");
     expect(announcement.value?.text).toBe(
       "contract.pdf changed since you last had it open; 1 stamp was on pages it no longer has",
+    );
+  });
+
+  it("brings back the fills and dismissed places on the same file only", () => {
+    const kept = {
+      ...stored("abc"),
+      fills: [{ field: "name", value: "Ada" }],
+      dismissed: ["found:0:100:300"],
+    };
+    restoreStamps("t", doc("abc", 5), kept);
+    expect(stampBooks.value.get("t")?.book.fills).toEqual(kept.fills);
+    expect(stampBooks.value.get("t")?.book.dismissed).toEqual(kept.dismissed);
+    restoreStamps("u", doc("new", 5), kept);
+    expect(stampBooks.value.get("u")?.book.fills).toEqual([]);
+    expect(stampBooks.value.get("u")?.book.dismissed).toEqual([]);
+    expect(announcement.value?.text).toBe(
+      "contract.pdf changed since you last had it open; its form is empty again",
     );
   });
 

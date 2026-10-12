@@ -12,7 +12,8 @@ import { imagesLoaded } from "../engine/images";
 import type { Frame, PageSize } from "../engine/frames";
 import type { Rect as PageRect } from "../pdf/fields";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
-import { removeStamp, updateStamp } from "../pdf/stampActions";
+import { placeElementId } from "../pdf/placeModel";
+import { removeStamp, takeFreedPlace, updateStamp } from "../pdf/stampActions";
 import { paintStamp } from "../pdf/stampEngine";
 import {
   type Corner,
@@ -158,10 +159,17 @@ const onPointerup = () => {
   if (done && !sameRect(done.rect, props.stamp.rect)) updateStamp(done);
 };
 
-// a stamp undone or removed while it holds the focus gives it to the pages
+// a stamp undone or removed while it holds the focus gives it to the place
+// it filled, which shows again, else to the pages
 onBeforeUnmount(() => {
-  if (root.value?.contains(document.activeElement))
-    void nextTick(() => pages()?.focus());
+  if (!root.value?.contains(document.activeElement)) return;
+  const place = takeFreedPlace();
+  void nextTick(() =>
+    (
+      (place && document.getElementById(placeElementId(place))) ||
+      pages()
+    )?.focus(),
+  );
 });
 </script>
 

@@ -74,7 +74,8 @@
     "view.zoom_fit": "",
     "menu.main": "Mod-k",
     "edit.find": "Mod-f",
-    "pdf.sign": ""
+    "pdf.sign": "",
+    "pdf.next": ""
   },
   "autocorrect": {
     "arrows": true,

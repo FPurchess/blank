@@ -1,6 +1,7 @@
 import type { PageSize } from "../engine/frames";
 import type { Mark } from "../signing/profile";
 import type { Rect } from "./fields";
+import type { Fill } from "./ipc";
 import type { StampSpec } from "./stamps";
 
 // The stamps placed on a PDF's pages, and what the keys and the mouse do to
@@ -327,59 +328,97 @@ export const spotAt = (
 ): Rect =>
   clampRect([x - size[0] / 2, y - size[1] / 2, size[0], size[1]], page);
 
-// The undo history of a tab's stamps: snapshots, at most HISTORY deep
+// The undo history of a tab's stamps, the fills of its form and the found
+// places the user dismissed: snapshots of all three, at most HISTORY deep,
+// so one undo steps back through whichever changed
 
 export const HISTORY = 100;
 // nudges of one stamp this close together are one step, in ms
 export const NUDGE_RUN = 500;
 
-export interface StampBook {
+// what the user did to a PDF tab at one step
+export interface Sheet {
   readonly stamps: readonly Stamp[];
-  readonly past: readonly (readonly Stamp[])[];
-  readonly future: readonly (readonly Stamp[])[];
+  // the form's fields filled in, one fill per field (by its full name)
+  readonly fills: readonly Fill[];
+  // the ids of the found places the user dismissed
+  readonly dismissed: readonly string[];
+}
+
+export interface StampBook extends Sheet {
+  readonly past: readonly Sheet[];
+  readonly future: readonly Sheet[];
   // the last nudge, which the next one of the same stamp may join
   readonly nudged: { readonly id: string; readonly at: number } | null;
 }
 
 export const EMPTY_BOOK: StampBook = {
   stamps: [],
+  fills: [],
+  dismissed: [],
   past: [],
   future: [],
   nudged: null,
 };
 
 /**
- * bookOf returns a book of `stamps`, with no history, e.g. restored ones
+ * sheetOf returns what `book` holds now, without its history
  */
-export const bookOf = (stamps: readonly Stamp[]): StampBook => ({
-  ...EMPTY_BOOK,
+const sheetOf = ({ stamps, fills, dismissed }: Sheet): Sheet => ({
   stamps,
+  fills,
+  dismissed,
 });
 
 /**
- * changed returns `book` with `stamps` as one more step, or, for a nudge
- * of the stamp the last step nudged less than NUDGE_RUN before, in that
- * step
+ * bookOf returns a book of `stamps`, `fills` and `dismissed`, with no
+ * history, e.g. restored ones
+ */
+export const bookOf = (
+  stamps: readonly Stamp[],
+  fills: readonly Fill[] = [],
+  dismissed: readonly string[] = [],
+): StampBook => ({ ...EMPTY_BOOK, stamps, fills, dismissed });
+
+/**
+ * changedSheet returns `book` with `part` (the stamps, the fills or the
+ * dismissed places) as one more step, or, for a nudge of the stamp the last
+ * step nudged less than NUDGE_RUN before, in that step
  * @param nudge the stamp a nudge moved and when, for a nudge
  */
-export const changed = (
+export const changedSheet = (
   book: StampBook,
-  stamps: readonly Stamp[],
+  part: Partial<Sheet>,
   nudge?: { id: string; at: number },
 ): StampBook => {
-  if (stamps === book.stamps) return book;
+  const next = { ...sheetOf(book), ...part };
+  if (
+    next.stamps === book.stamps &&
+    next.fills === book.fills &&
+    next.dismissed === book.dismissed
+  )
+    return book;
   const joins =
     nudge !== undefined &&
     book.nudged?.id === nudge.id &&
     nudge.at - book.nudged.at < NUDGE_RUN &&
     book.past.length > 0;
   return {
-    stamps,
-    past: joins ? book.past : [...book.past, book.stamps].slice(-HISTORY),
+    ...next,
+    past: joins ? book.past : [...book.past, sheetOf(book)].slice(-HISTORY),
     future: [],
     nudged: nudge ?? null,
   };
 };
+
+/**
+ * changed returns `book` with `stamps` as one more step (see changedSheet)
+ */
+export const changed = (
+  book: StampBook,
+  stamps: readonly Stamp[],
+  nudge?: { id: string; at: number },
+): StampBook => changedSheet(book, { stamps }, nudge);
 
 /**
  * undone returns `book` a step back, or `book` with nothing to undo
@@ -388,9 +427,9 @@ export const undone = (book: StampBook): StampBook => {
   const previous = book.past[book.past.length - 1];
   if (!previous) return book;
   return {
-    stamps: previous,
+    ...sheetOf(previous),
     past: book.past.slice(0, -1),
-    future: [book.stamps, ...book.future],
+    future: [sheetOf(book), ...book.future],
     nudged: null,
   };
 };
@@ -403,11 +442,34 @@ export const redone = (book: StampBook): StampBook => {
   const next = book.future[0];
   if (!next) return book;
   return {
-    stamps: next,
-    past: [...book.past, book.stamps].slice(-HISTORY),
+    ...sheetOf(next),
+    past: [...book.past, sheetOf(book)].slice(-HISTORY),
     future: book.future.slice(1),
     nudged: null,
   };
+};
+
+/**
+ * withFill returns `fills` with `fill` in place of the one of its field,
+ * or added at the end
+ */
+export const withFill = (
+  fills: readonly Fill[],
+  fill: Fill,
+): readonly Fill[] =>
+  fills.some((one) => one.field === fill.field)
+    ? fills.map((one) => (one.field === fill.field ? fill : one))
+    : [...fills, fill];
+
+/**
+ * isFill tells whether `value` is a fill as stored (`stamps:<id>`)
+ */
+export const isFill = (value: unknown): value is Fill => {
+  const fill = value as Fill | null;
+  return (
+    typeof fill?.field === "string" &&
+    (typeof fill.value === "string" || typeof fill.value === "boolean")
+  );
 };
 
 /**

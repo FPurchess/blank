@@ -44,7 +44,8 @@ import { CommandIdentifier } from "./config";
 import { logWarning } from "./log";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
-import { isStamp, type Stamp } from "./pdf/stampModel";
+import type { StoredStamps } from "./pdf/stampBooks";
+import { isFill, isStamp } from "./pdf/stampModel";
 import { INITIALS_DEFAULT, isInitialsChoice } from "./signing/initials";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -84,7 +85,8 @@ export interface Session {
 
 const SESSION = "session";
 const tabKey = (id: string) => `tab:${id}`;
-// a PDF tab's stamps: `{ sha256, stamps, viewAnchor }`
+// a PDF tab's stamps, fills and dismissed places: `{ sha256, stamps,
+// fills, dismissed, viewAnchor }`
 const stampsKey = (id: string) => `stamps:${id}`;
 
 // the documents waiting to be written, and the ones last written, by tab
@@ -163,10 +165,15 @@ const writeNow = async () => {
     );
     await Promise.all(
       stamps.map(([id, kept]) =>
-        kept?.book.stamps.length
+        kept &&
+        (kept.book.stamps.length ||
+          kept.book.fills.length ||
+          kept.book.dismissed.length)
           ? localforage.setItem(stampsKey(id), {
               sha256: kept.sha256,
               stamps: kept.book.stamps,
+              fills: kept.book.fills,
+              dismissed: kept.book.dismissed,
               viewAnchor:
                 tabs.value.find((tab) => tab.id === id)?.viewAnchor ?? null,
             })
@@ -559,22 +566,29 @@ export const loadTabDocument = async (
 };
 
 /**
- * loadStamps returns the stamps stored for the PDF tab `id`, without those
- * this Blank can't read, or null when none are stored
+ * loadStamps returns the stamps, fills and dismissed places stored for the
+ * PDF tab `id`, without those this Blank can't read, or null when none are
+ * stored
  */
-export const loadStamps = async (
-  id: string,
-): Promise<{ sha256: string | null; stamps: Stamp[] } | null> => {
+export const loadStamps = async (id: string): Promise<StoredStamps | null> => {
   if (!sessionKept) return null;
   try {
     const stored = await localforage.getItem<{
       sha256?: unknown;
       stamps?: unknown;
+      fills?: unknown;
+      dismissed?: unknown;
     }>(stampsKey(id));
     if (!stored || !Array.isArray(stored.stamps)) return null;
+    const list = (value: unknown): unknown[] =>
+      Array.isArray(value) ? value : [];
     return {
       sha256: typeof stored.sha256 === "string" ? stored.sha256 : null,
       stamps: stored.stamps.filter(isStamp),
+      fills: list(stored.fills).filter(isFill),
+      dismissed: list(stored.dismissed).filter(
+        (one): one is string => typeof one === "string",
+      ),
     };
   } catch (error) {
     logWarning("can't read the stamps of a PDF tab", error);

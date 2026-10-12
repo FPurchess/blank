@@ -17,7 +17,7 @@ import {
 } from "../pdf/document";
 import { closePdf } from "../pdf/ipc";
 import { pdfPlaceholder } from "../pdf/placeholder";
-import { forgetStamps, restoreStamps, stampsOf } from "../pdf/stampBooks";
+import { forgetStamps, hasChanges, restoreStamps } from "../pdf/stampBooks";
 import { signReceived } from "../pdf/sign";
 import { timed } from "../engine/perf";
 import { errorMessage } from "../errors";
@@ -138,8 +138,8 @@ const docOf = (id: string): Node | undefined =>
 /**
  * refresh sets whether the tab `id` has changes that aren't saved: its
  * document differs from the one last opened or saved, so undoing back to it
- * clears the dot; a PDF tab has them while stamps are placed on it, which
- * signing it keeps
+ * clears the dot; a PDF tab has them while stamps are placed on it or its
+ * form is filled in, which signing it keeps
  */
 const refresh = (id: string) => {
   const tab = tabById(id);
@@ -147,7 +147,7 @@ const refresh = (id: string) => {
   const doc = docOf(id);
   if (!tab || !kept || !doc) return;
   const unsaved = kept.pdf
-    ? stampsOf(id).length > 0
+    ? hasChanges(id)
     : kept.baseline === null || !doc.eq(kept.baseline);
   if (unsaved !== tab.unsaved) updateTab(id, { unsaved });
 };
