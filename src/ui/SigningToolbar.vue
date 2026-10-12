@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch } from "vue";
+import { computed, useTemplateRef, watch } from "vue";
 
 import { commandLabel } from "../commandList";
 import { CommandIdentifier } from "../config";
@@ -66,10 +66,6 @@ const tabindexOf = (index: number) => (index === current.value ? 0 : -1);
 
 const pages = () => document.getElementById(PDF_VIEW_ID);
 
-// the stamp just placed takes the focus, so the arrows move it
-const focusStamp = (id: string) =>
-  void nextTick(() => document.getElementById(`stamp-${id}`)?.focus());
-
 const use = (tool: SigningTool, event: MouseEvent) => {
   if (tool.refusal) {
     announce(tool.refusal);
@@ -80,9 +76,8 @@ const use = (tool: SigningTool, event: MouseEvent) => {
     placingStamp.value = null;
     // the tool, after a dialog that made the signature first
     const back = focusBack(event.currentTarget);
-    void placeStamp(kind, null, back).then((stamp) => {
-      if (stamp) focusStamp(stamp.id);
-    });
+    // the stamp placed takes the focus, so the arrows move it
+    void placeStamp(kind, null, back);
     return;
   }
   // a second click puts the tool down again

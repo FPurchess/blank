@@ -31,7 +31,12 @@ import {
   type Prefill,
 } from "./places";
 import { shownContext, shownNext, shownPlaces } from "./placesRead";
-import { knownPlace, newStamp, placedMessage } from "./stampActions";
+import {
+  focusStamp,
+  knownPlace,
+  newStamp,
+  placedMessage,
+} from "./stampActions";
 import { changeSheet, changeStamps, dismissedOf, stampsOf } from "./stampBooks";
 import { STAMPS_NEED_LAYOUT } from "./stamps";
 import { type Stamp, type StampKind, withStamp } from "./stampModel";
@@ -164,8 +169,7 @@ export const fillPlace = async (
   });
   selectedStamp.value = stamp.id;
   announce(placedMessage(stamp));
-  await nextTick();
-  document.getElementById(`stamp-${stamp.id}`)?.focus();
+  await focusStamp(stamp.id);
   return stamp;
 };
 

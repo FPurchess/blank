@@ -362,12 +362,7 @@ const onDeskPress = (event: PointerEvent) => {
       y: (y - frame.top) / scale,
     },
     () => scroller.value?.focus(),
-  ).then((stamp) => {
-    if (stamp)
-      void nextTick(() =>
-        document.getElementById(`stamp-${stamp.id}`)?.focus(),
-      );
-  });
+  );
 };
 
 // "Page N of M" in the status bar

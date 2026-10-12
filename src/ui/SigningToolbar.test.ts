@@ -18,7 +18,13 @@ import {
 import { STAMPS_NEED_LAYOUT } from "../pdf/stamps";
 import { flushPromises } from "../test/async";
 import { createTestHandle, keyEvent } from "../test/editor";
-import { pdfDocument, pdfRulesOf, resetPdfState, showPdf } from "../test/pdf";
+import {
+  MARK,
+  pdfDocument,
+  pdfRulesOf,
+  resetPdfState,
+  showPdf,
+} from "../test/pdf";
 import { bootApp } from "./mount";
 
 // The signing toolbar of a PDF tab (SigningToolbar.vue): the tools, why
@@ -193,6 +199,21 @@ describe("the signing toolbar", () => {
     signatureDialog.value!.cancel();
     await flushPromises();
     expect(document.activeElement).toBe(tool("signature"));
+  });
+
+  it("gives the stamp the focus once the signature was made first", async () => {
+    savedMarks.value = { signature: null, initials: null };
+    await mount();
+    tool("initials").focus();
+    keyClick(tool("initials"));
+    await flushPromises();
+    // the dialog gives the tool the focus back, then the initials are placed
+    savedMarks.value = { signature: null, initials: MARK };
+    signatureDialog.value!.done();
+    await flushPromises();
+    const [placed] = stampsOf("t");
+    expect(placed.kind).toBe("initials");
+    expect(document.activeElement?.id).toBe(`stamp-${placed.id}`);
   });
 
   it("waits for a press on a page after a click, which Esc cancels", async () => {

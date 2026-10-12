@@ -136,13 +136,26 @@ const shownPart = (page: number): Shown => {
   return bottom > top ? { top, height: bottom - top } : { top: 0, height };
 };
 
+/**
+ * focusStamp gives the stamp `id` the focus once it shows, so the arrows
+ * move it, and scrolls it into view: at a zoom wider than the view, its spot
+ * may be beside what shows
+ */
+export const focusStamp = async (id: string) => {
+  await nextTick();
+  const element = document.getElementById(`stamp-${id}`);
+  if (!element) return;
+  element.focus({ preventScroll: true });
+  element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+};
+
 // where a stamp goes: its default spot on the page in view, or centred on a
 // point of a page (display points)
 export type Where = { page: number; x: number; y: number } | null;
 
 /**
  * placeStamp places a new stamp of `kind` on the PDF shown, at `where`,
- * selects it and says so. The user's signature or initials are made first
+ * selects it, gives it the focus and says so. The user's signature or initials are made first
  * if there are none yet (`refocus` gives the focus back once the dialog
  * closes).
  * @returns the stamp placed, or null
@@ -196,6 +209,9 @@ export const placeStamp = async (
   });
   selectedStamp.value = stamp.id;
   announce(placedMessage(stamp));
+  // also after a dialog that made the signature first, whose `refocus`
+  // gave the focus back to the tool
+  void focusStamp(stamp.id);
   return stamp;
 };
 
