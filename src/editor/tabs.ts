@@ -602,10 +602,14 @@ export const signatureChecks = () => signatureCheckCount;
  */
 export const forgetSignatureChecks = () => {
   signatureCheckCount++;
+  // a PDF not checked yet (one still opening, whose open waits for its
+  // document to stay the same) is checked against what Blank trusts now
   for (const document of documents.values()) {
-    if (document.pdf) document.pdf = { ...document.pdf, signatures: null };
+    if (document.pdf?.signatures)
+      document.pdf = { ...document.pdf, signatures: null };
   }
-  if (shownPdf.value) shownPdf.value = { ...shownPdf.value, signatures: null };
+  if (shownPdf.value?.signatures)
+    shownPdf.value = { ...shownPdf.value, signatures: null };
 };
 
 /**

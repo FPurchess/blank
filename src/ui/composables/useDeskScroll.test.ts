@@ -8,7 +8,7 @@ import {
   viewAnchor,
   type ViewAnchor,
 } from "../../engine/frames";
-import { tabSwitch } from "../../state";
+import { tabSwitch, zoomAnchor } from "../../state";
 import { type DeskScrollOptions, useDeskScroll } from "./useDeskScroll";
 
 const a4 = { width: 595, height: 842 };
@@ -101,22 +101,8 @@ describe("useDeskScroll", () => {
   });
 
   it("keeps the spot a zoom asked for where it was in the view, across too", async () => {
-    let spot: {
-      page: number;
-      x: number;
-      y: number;
-      viewX: number;
-      viewY: number;
-    } | null = null;
-    const { layout, element } = mount(sheets(3), {
-      moves: () => false,
-      zoomed: () => {
-        const taken = spot;
-        spot = null;
-        return taken;
-      },
-    });
-    spot = { page: 1, x: 300, y: 400, viewX: 100, viewY: 200 };
+    const { layout, element } = mount(sheets(3), { moves: () => false });
+    zoomAnchor.value = { page: 1, x: 300, y: 400, viewX: 100, viewY: 200 };
     layout.value = sheetLayout(Array(3).fill(a4), 800, 2);
     await nextTick();
     await nextTick();

@@ -13,7 +13,7 @@ import {
   pageScrollRequest,
   type PageScrollRequest,
   tabSwitch,
-  type ZoomAnchor,
+  zoomAnchor,
 } from "../../state";
 import { scrollFor } from "../scrollModel";
 
@@ -32,7 +32,8 @@ export interface DeskScrollOptions {
   measure: () => void;
   /**
    * where the view goes once its first layout is there, e.g. the tab's spot
-   * when the view mounts on a switch; without it, it stays where it is
+   * when the view mounts on a switch; without it, or a spot, it stays where
+   * it is
    */
   startAt?: () => ViewAnchor | null;
   /**
@@ -44,11 +45,6 @@ export interface DeskScrollOptions {
   laying?: () => boolean;
   /** forgets what the view kept of the last document, on a switch */
   switched?: () => void;
-  /**
-   * takes the spot a zoom asked to keep where it is in the view, which is
-   * for the next layout only (see zoomAnchor)
-   */
-  zoomed?: () => ZoomAnchor | null;
 }
 
 /**
@@ -88,8 +84,9 @@ export const useDeskScroll = (options: DeskScrollOptions) => {
   // Another tab shows: what was kept of the last document goes, and the
   // view goes back to where it was on this one once its layout is there.
   // Before the new document is laid out, in the switch itself.
-  let restoring: { anchor: ViewAnchor | null } | null = options.startAt
-    ? { anchor: options.startAt() }
+  const start = options.startAt?.() ?? null;
+  let restoring: { anchor: ViewAnchor | null } | null = start
+    ? { anchor: start }
     : null;
   watch(
     tabSwitch,
@@ -137,8 +134,10 @@ export const useDeskScroll = (options: DeskScrollOptions) => {
   // new layout moves the pages. Before the new layout renders, so the scroll
   // is still the one the old layout was shown at.
   watch(layout, (next, previous) => {
-    // the spot a zoom asked to keep, which is for this layout only
-    const zoomed = options.zoomed?.() ?? null;
+    // the spot a zoom asked to keep where it is in the view, which is for
+    // this layout only (see zoomAnchor)
+    const zoomed = zoomAnchor.value;
+    zoomAnchor.value = null;
     const element = options.scroller();
     if (!element || !next) return;
     if (restoring) {

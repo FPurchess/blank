@@ -29,6 +29,7 @@ import { pageEngine } from "../engine/engine";
 import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
+  activeTab,
   engineMissing,
   findPanel,
   pageHeadBox,
@@ -38,7 +39,6 @@ import {
   pageView,
   pageViewport,
   deskLayout,
-  zoomAnchor,
 } from "../state";
 import { useDeskScroll } from "./composables/useDeskScroll";
 import { useResizeObserver } from "./composables/useResizeObserver";
@@ -136,12 +136,8 @@ const { range, inView } = useDeskScroll({
   // typing lays out anew on every key, but keeps the view and the scale
   moves: movesPages,
   laying: () => !!pageEngine?.laying,
-  // the spot the zoom asked to keep, for this layout only
-  zoomed: () => {
-    const kept = zoomAnchor.value;
-    zoomAnchor.value = null;
-    return kept;
-  },
+  // where the tab was, when the view mounts on a switch from a PDF tab
+  startAt: () => activeTab.value?.viewAnchor ?? null,
   switched: () => {
     shownFrames = new Map();
     marks = new PageMarksMemo();

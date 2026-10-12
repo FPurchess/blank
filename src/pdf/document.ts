@@ -3,6 +3,7 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { logWarning } from "../log";
 import { basename } from "../paths";
 import { type CheckedSignature, signingKind } from "../signing/ipc";
+import { tabs } from "../state";
 import {
   failureOf,
   openPdf,
@@ -163,28 +164,51 @@ export const openPdfDocument = async (
 // deleted, after Blank opened it, or anything else
 export type SignaturesUnchecked = "changed" | "missing" | "failed";
 
+// the checks that run, by tab, file and what Blank trusted then: a tab
+// shown again while its check runs waits for that one rather than checking
+// the file a second time
+const checking = new Map<string, Promise<PdfTabDocument["signatures"]>>();
+
+/**
+ * verified checks the signatures of the tab's PDF, or waits for the check
+ * that runs. One that can't be checked is logged by its kind, unless the
+ * tab closed meanwhile
+ */
+const verified = (tab: string, key: string) => {
+  const running = checking.get(key);
+  if (running) return running;
+  const check = verifyPdf(tab)
+    .then(
+      (signatures): PdfTabDocument["signatures"] => signatures,
+      (error: unknown) => {
+        const kind = signingKind(error);
+        if (tabs.value.some((open) => open.id === tab))
+          logWarning("failed to check the signatures of a PDF", kind);
+        return kind === "fileChanged"
+          ? "changed"
+          : kind === "fileMissing"
+            ? "missing"
+            : "failed";
+      },
+    )
+    .finally(() => checking.delete(key));
+  checking.set(key, check);
+  return check;
+};
+
 /**
  * checkSignatures checks the signatures of the PDF of the tab `tab`, which
- * shows `doc`; one that can't be checked is logged by its kind
+ * shows `doc`, against what Blank trusted at the `round`th time it trusted
+ * other certificates (signatureChecks)
  */
 export const checkSignatures = async (
   tab: string,
   doc: PdfTabDocument,
-): Promise<PdfTabDocument> => {
-  try {
-    return { ...doc, signatures: await verifyPdf(tab) };
-  } catch (error) {
-    const kind = signingKind(error);
-    logWarning("failed to check the signatures of a PDF", kind);
-    const signatures =
-      kind === "fileChanged"
-        ? "changed"
-        : kind === "fileMissing"
-          ? "missing"
-          : "failed";
-    return { ...doc, signatures };
-  }
-};
+  round = 0,
+): Promise<PdfTabDocument> => ({
+  ...doc,
+  signatures: await verified(tab, `${tab} ${doc.opened?.sha256} ${round}`),
+});
 
 // what a PDF tab says in place of its pages, and what it offers: Open
 // again, or Find it… for a file that has gone, and Close tab

@@ -39,7 +39,6 @@ import {
   pdfViewport,
   shownPdf,
   tabs,
-  zoomAnchor,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
 import { useDeskScroll } from "./composables/useDeskScroll";
@@ -129,12 +128,6 @@ const { range, inView } = useDeskScroll({
   measure,
   startAt: () => activeTab.value?.viewAnchor ?? null,
   switched: () => queue.stop(),
-  // the spot the zoom asked to keep, for this layout only
-  zoomed: () => {
-    const kept = zoomAnchor.value;
-    zoomAnchor.value = null;
-    return kept;
-  },
 });
 
 // Ctrl and the wheel zoom the pages about the spot under the pointer
@@ -271,7 +264,7 @@ watch(
     // Blank trusted other certificates while it checked: again
     do {
       asked = signatureChecks();
-      checked = await checkSignatures(tab, pdf.value);
+      checked = await checkSignatures(tab, pdf.value, asked);
     } while (asked !== signatureChecks() && pdf.value);
     // the same PDF still, not one opened again from elsewhere meanwhile
     if (

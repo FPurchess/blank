@@ -9,6 +9,7 @@ import {
   withFailedPage,
   withRenderFailure,
 } from "./document";
+import { tabs } from "../state";
 import { openPdf, verifyPdf } from "./ipc";
 
 vi.mock("./ipc", async (original) => ({
@@ -41,6 +42,44 @@ describe("a PDF tab's document", () => {
     expect(await unchecked({ kind: "fileChanged" })).toBe("changed");
     expect(await unchecked({ kind: "fileMissing" })).toBe("missing");
     expect(await unchecked({ kind: "failed", message: "no" })).toBe("failed");
+  });
+
+  it("checks a tab's file once while its check runs", async () => {
+    const doc = {
+      path: "/a.pdf",
+      opened,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    let answer: (signatures: []) => void = () => {};
+    vi.mocked(verifyPdf).mockReturnValue(
+      new Promise((resolve) => (answer = resolve)),
+    );
+    const first = checkSignatures("t", doc, 3);
+    const again = checkSignatures("t", doc, 3);
+    // after another certificate was trusted, it checks again
+    void checkSignatures("t", doc, 4);
+    answer([]);
+    expect((await first).signatures).toEqual([]);
+    expect((await again).signatures).toEqual([]);
+    expect(verifyPdf).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs no failed check of a tab closed meanwhile", async () => {
+    const doc = {
+      path: "/a.pdf",
+      opened,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(verifyPdf).mockRejectedValue({ kind: "failed", message: "no" });
+    tabs.value = [];
+    expect((await checkSignatures("gone", doc)).signatures).toBe("failed");
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("opens the PDF", async () => {
