@@ -1,7 +1,16 @@
 //! loading a PDF for an incremental update, and what signing needs of it:
 //! page geometry, inherited attributes, text strings
+//!
+//! - `rules`: what may be added to a PDF (DocMDP, earlier signatures,
+//!   FieldMDP locks)
+//! - `xobject`: a stamp's one-page PDF as a Form XObject
+//! - `stamp`: stamps drawn in a page's content
+//! - `sign`: the update itself: stamps, fields, the signature
 
+pub mod rules;
 pub mod sign;
+pub mod stamp;
+pub mod xobject;
 
 use anyhow::{bail, Context, Result};
 use lopdf::{Dictionary, Document, IncrementalDocument, Object, ObjectId, StringFormat};
@@ -102,6 +111,8 @@ const MAX_NAME: usize = 1_024;
 
 /// a field of a PDF's form, as form_fields finds it
 pub struct FormField<'a> {
+    /// its object, when it is one of its own (as fields are)
+    pub id: Option<ObjectId>,
     pub dict: &'a Dictionary,
     /// its partial name, `/T` as written
     pub partial: Option<&'a [u8]>,
@@ -189,6 +200,7 @@ pub fn form_fields(doc: &Document) -> Vec<FormField<'_>> {
             }
         }
         out.push(FormField {
+            id,
             dict,
             partial,
             name,
@@ -296,6 +308,57 @@ impl PageGeometry {
         [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)]
     }
 
+    /// visible_size is the page as shown, in points: its width and height
+    pub fn visible_size(&self) -> (f64, f64) {
+        let w = (self.bbox[2] - self.bbox[0]) * self.user_unit;
+        let h = (self.bbox[3] - self.bbox[1]) * self.user_unit;
+        if self.rotate % 180 == 0 {
+            (w, h)
+        } else {
+            (h, w)
+        }
+    }
+
+    /// placement is the matrix that draws a form made upright, its BBox
+    /// `[0 0 w h]` in points, into `user` (a user-space rectangle that
+    /// rect_to_user gave for a w × h rectangle) on this page
+    pub fn placement(&self, user: [f64; 4]) -> [f64; 6] {
+        let s = 1.0 / self.user_unit;
+        // turned counter-clockwise by the page's rotation, which the viewer
+        // turns clockwise again
+        let (a, b, c, d) = match self.rotate {
+            90 => (0., s, -s, 0.),
+            180 => (-s, 0., 0., -s),
+            270 => (0., -s, s, 0.),
+            _ => (s, 0., 0., s),
+        };
+        // where the form's origin lands: the corner that ends up lowest-left
+        let (e, f) = match self.rotate {
+            90 => (user[2], user[1]),
+            180 => (user[2], user[3]),
+            270 => (user[0], user[3]),
+            _ => (user[0], user[1]),
+        };
+        [a, b, c, d, e, f]
+    }
+
+    /// user_to_display turns a user-space rectangle [llx lly urx ury] into
+    /// x, y, w, h in points from the top left of the page as shown
+    pub fn user_to_display(&self, r: [f64; 4]) -> [f64; 4] {
+        let [x0, y0, x1, y1] = self.bbox;
+        let u = self.user_unit;
+        // the corners in display space, by the inverse of point_to_user
+        let corner = |x: f64, y: f64| match self.rotate {
+            90 => ((y - y0) * u, (x - x0) * u),
+            180 => ((x1 - x) * u, (y - y0) * u),
+            270 => ((y1 - y) * u, (x1 - x) * u),
+            _ => ((x - x0) * u, (y1 - y) * u),
+        };
+        let (ax, ay) = corner(r[0], r[1]);
+        let (bx, by) = corner(r[2], r[3]);
+        [ax.min(bx), ay.min(by), (ax - bx).abs(), (ay - by).abs()]
+    }
+
     /// appearance_matrix is the rotation alone, for a widget's appearance
     /// /Matrix
     pub fn appearance_matrix(&self) -> [f64; 6] {
@@ -306,6 +369,36 @@ impl PageGeometry {
             _ => [1., 0., 0., 1., 0., 0.],
         }
     }
+}
+
+/// is_rect tells whether `r` (x, y, w, h) is a rectangle with room in it
+pub fn is_rect(r: &[f64; 4]) -> bool {
+    r.iter().all(|value| value.is_finite()) && r[2] > 0. && r[3] > 0.
+}
+
+/// current is the object `id` as this update has it: changed, or as it was
+pub fn current(incr: &IncrementalDocument, id: ObjectId) -> Result<&Object> {
+    match incr.new_document.objects.get(&id) {
+        Some(object) => Ok(object),
+        None => Ok(incr.get_prev_documents().get_object(id)?),
+    }
+}
+
+/// pdfa_part is the part of PDF/A the document claims in its XMP
+/// metadata (`pdfaid:part`), if it claims one
+pub fn pdfa_part(doc: &Document) -> Option<u32> {
+    let catalog = doc.catalog().ok()?;
+    let metadata = resolve(doc, catalog.get(b"Metadata").ok()?)?
+        .as_stream()
+        .ok()?;
+    let xmp = metadata.get_plain_content_with_limit(1 << 20).ok()?;
+    let text = String::from_utf8_lossy(&xmp);
+    // as an element, <pdfaid:part>1</pdfaid:part>, or an attribute,
+    // pdfaid:part="1"
+    let at = text.find("pdfaid:part")? + "pdfaid:part".len();
+    let rest = text[at..].trim_start_matches(['>', '=', '"', '\'', ' ']);
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
 }
 
 /// reals is an array of reals

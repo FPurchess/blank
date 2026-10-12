@@ -12,11 +12,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager};
 use zeroize::Zeroizing;
 
+use crate::pdf_view::{read_checked, PdfTabs};
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::keys::{self, Identity, OpenError};
-use crate::signing::pdf::sign::{sign_pdf, SignRequest};
+use crate::signing::pdf::sign::{update_pdf, Other, PlacedStamp, Plan as UpdatePlan, Signer, Spot};
 use crate::signing::trust::{self, CheckedSignature};
-use crate::signing::verify::verify_pdf;
+use crate::signing::verify::{verify_pdf, SignatureReport};
 use crate::signing::Refusal;
 
 /// the folder of the user's signature, initials, key and certificate
@@ -369,46 +370,186 @@ pub async fn signing_check_passphrase(app: AppHandle, passphrase: String) -> Ans
     .map_err(|_| SigningError::Failed("Blank can't open your key".into()))?
 }
 
-/// how to sign, besides the PDF and the passphrase
+/// a place on a page: x, y, width and height in points from the top left
+/// of the page as shown
+type Rect = [f64; 4];
+
+/// a stamp to put on the pages
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SignOptions {
-    /// the page of the signature's field, from 1
+pub struct StampPlan {
+    /// the body's part with its one-page PDF
+    pub part: usize,
+    /// from 1
     pub page: u32,
-    /// where the signature is shown: x, y, width and height in points from
-    /// the page's top left; none for an invisible signature
-    pub rect: Option<[f64; 4]>,
+    pub rect: Rect,
+    /// on every page, at the same place, moved into smaller pages
+    #[serde(default)]
+    pub repeat: bool,
+}
+
+/// where the signature goes
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SignaturePlan {
+    /// in no place on the pages
+    Invisible,
+    /// the empty signature field of this full name, showing the stamp of
+    /// the body's part `stamp`
+    Existing { field: String, stamp: Option<usize> },
+    /// a new field on page `page` (from 1)
+    New {
+        page: u32,
+        rect: Rect,
+        stamp: Option<usize>,
+    },
+}
+
+/// an empty signature field for someone else, named after them
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtherPlan {
+    pub page: u32,
+    pub rect: Rect,
+    /// who is to sign it: the field is called "Signature of ‹name›"
+    pub name: String,
+}
+
+/// what to add to the PDF, and what the signature says
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Plan {
+    #[serde(default)]
+    pub stamps: Vec<StampPlan>,
+    pub signature: SignaturePlan,
+    #[serde(default)]
+    pub others: Vec<OtherPlan>,
     pub location: Option<String>,
     pub reason: Option<String>,
     /// an RFC 3161 server's URL, for a timestamp (B-T)
     pub timestamp_server: Option<String>,
 }
 
-/// signer is the name of the certificate's holder, which the signature
-/// names as who signed it; None when it has no common name
-fn signer(cert: &[u8]) -> Option<String> {
+/// a form field's new value, which the PDF tab's helper writes (see
+/// pdf_view): text, or whether a box is ticked
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum FillValue {
+    Text(String),
+    Ticked(bool),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Fill {
+    /// the field's full name
+    pub field: String,
+    pub value: FillValue,
+}
+
+/// where the PDF to sign comes from
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Source {
+    /// the body's part 0 (the export flow)
+    Body,
+    /// a PDF tab's file, which must still be the one the tab opened, with
+    /// the tab's fills
+    Tab {
+        tab: String,
+        path: PathBuf,
+        sha256: String,
+        #[serde(default)]
+        fills: Vec<Fill>,
+    },
+}
+
+/// the user's key file and its passphrase
+pub struct Key<'a> {
+    pub p12: &'a [u8],
+    pub passphrase: &'a str,
+}
+
+/// signer_name is the name of the certificate's holder, which the
+/// signature names as who signed it; None when it has no common name
+fn signer_name(cert: &[u8]) -> Option<String> {
     use der::Decode;
     let cert = x509_cert::Certificate::from_der(cert).ok()?;
     crate::signing::certificate::common_name(&cert.tbs_certificate.subject)
 }
 
-/// sign signs `pdf` with the user's key, in the name of its certificate's
-/// holder
-pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> Answer<Vec<u8>> {
-    let identity = open_key(p12, passphrase, "Blank can't open your key")?;
-    let blank = |value: &Option<String>| value.clone().filter(|text| !text.trim().is_empty());
-    let request = SignRequest {
-        identity: &identity,
-        page: options.page.max(1),
-        rect: options.rect,
-        reason: blank(&options.reason),
-        location: blank(&options.location),
-        name: blank(&signer(&identity.cert)),
-        tsa: blank(&options.timestamp_server),
-        reserve: RESERVE,
+/// signing's fixed sentence for what failed
+const SIGN_FAILED: &str = "Blank couldn't sign the PDF";
+const STAMP_FAILED: &str = "Blank couldn't add to the PDF";
+
+/// sign adds `plan` to `pdf` and signs it with the user's key, or, without
+/// a key, adds the stamps and fields alone; the stamps' PDFs are `parts`
+/// of the body, by `part`
+pub fn sign(key: Option<Key>, pdf: &[u8], parts: &[&[u8]], plan: &Plan) -> Answer<Vec<u8>> {
+    let message = if key.is_some() {
+        SIGN_FAILED
+    } else {
+        STAMP_FAILED
     };
-    let signed = sign_pdf(pdf, &request).map_err(|error| {
-        log::warn!("failed to sign a PDF: {}", kind_of(&error));
+    let identity = key
+        .map(|key| open_key(key.p12, key.passphrase, "Blank can't open your key"))
+        .transpose()?;
+    let part = |index: usize| -> Answer<&[u8]> {
+        parts.get(index).copied().ok_or_else(|| {
+            log::warn!("a stamp names a part the request doesn't have");
+            SigningError::Failed(message.into())
+        })
+    };
+    let stamps = plan
+        .stamps
+        .iter()
+        .map(|s| {
+            Ok(PlacedStamp {
+                pdf: part(s.part)?,
+                page: s.page,
+                rect: s.rect,
+                repeat: s.repeat,
+            })
+        })
+        .collect::<Answer<Vec<_>>>()?;
+    let signature = match &plan.signature {
+        SignaturePlan::Invisible => Spot::Invisible,
+        SignaturePlan::Existing { field, stamp } => Spot::Existing {
+            field: field.clone(),
+            stamp: stamp.map(part).transpose()?,
+        },
+        SignaturePlan::New { page, rect, stamp } => Spot::New {
+            page: *page,
+            rect: *rect,
+            stamp: stamp.map(part).transpose()?,
+        },
+    };
+    let others = plan
+        .others
+        .iter()
+        .map(|o| Other {
+            page: o.page,
+            rect: o.rect,
+            name: o.name.clone(),
+        })
+        .collect();
+    let update = UpdatePlan {
+        stamps,
+        signature,
+        others,
+    };
+    let blank = |value: &Option<String>| value.clone().filter(|text| !text.trim().is_empty());
+    let signer = identity.as_ref().map(|identity| Signer {
+        identity,
+        reason: blank(&plan.reason),
+        location: blank(&plan.location),
+        name: blank(&signer_name(&identity.cert)),
+        tsa: blank(&plan.timestamp_server),
+        reserve: RESERVE,
+    });
+    // what the signatures it has were, to compare after
+    let before = verify_pdf(pdf).unwrap_or_default();
+    let updated = update_pdf(pdf, &update, signer.as_ref()).map_err(|error| {
+        log::warn!("failed to update a PDF: {}", kind_of(&error));
         match error.downcast_ref::<Refusal>() {
             Some(
                 refusal @ (Refusal::NoTimestamp
@@ -416,28 +557,53 @@ pub fn sign(p12: &[u8], passphrase: &str, pdf: &[u8], options: &SignOptions) -> 
                 | Refusal::TimestampUnusable),
             ) => SigningError::Timestamp(refusal.to_string()),
             Some(refusal) => SigningError::Failed(refusal.to_string()),
-            None => SigningError::Failed("Blank couldn't sign the PDF".into()),
+            None => SigningError::Failed(message.into()),
         }
     })?;
-    check_signed(&signed, request.tsa.is_some())?;
-    Ok(signed)
+    match &signer {
+        Some(signer) => check_signed(&updated, signer.tsa.is_some(), &before)?,
+        None => check_unsigned(&updated, &before)?,
+    }
+    Ok(updated)
 }
 
-/// check_signed makes sure what was just signed checks out, and that its
-/// last signature covers the whole file, or it isn't saved; `timestamped`
-/// asks for a timestamp that holds as well, since the user asked for one
-fn check_signed(signed: &[u8], timestamped: bool) -> Answer<()> {
-    let reports = verify_pdf(signed).map_err(failed(
-        "failed to check a signed PDF",
-        "Blank couldn't sign the PDF",
-    ))?;
-    let Some(last) = reports
-        .last()
-        .filter(|report| report.valid() && report.covers_the_whole_file())
-    else {
+/// added returns the signatures of `after` that weren't in `before`, if
+/// every one of `before` is still there and checks out as it did; a
+/// signature is known by its byte range, since the reports come in the
+/// order of the form's fields, not of the revisions
+fn added<'a>(
+    after: &'a [SignatureReport],
+    before: &[SignatureReport],
+) -> Option<Vec<&'a SignatureReport>> {
+    let kept = before.iter().all(|b| {
+        after
+            .iter()
+            .any(|a| a.byte_range == b.byte_range && a.field == b.field && a.valid() == b.valid())
+    });
+    kept.then(|| {
+        after
+            .iter()
+            .filter(|a| !before.iter().any(|b| b.byte_range == a.byte_range))
+            .collect()
+    })
+}
+
+/// check_signed makes sure what was just signed checks out: one new
+/// signature, valid and covering the whole file, and the signatures it had
+/// `before` as valid as they were, or it isn't saved; `timestamped` asks
+/// for a timestamp that holds as well, since the user asked for one
+fn check_signed(signed: &[u8], timestamped: bool, before: &[SignatureReport]) -> Answer<()> {
+    let reports =
+        verify_pdf(signed).map_err(failed("failed to check a signed PDF", SIGN_FAILED))?;
+    let new = added(&reports, before).unwrap_or_default();
+    let [last] = new[..] else {
         log::warn!("a PDF Blank signed didn't check out");
-        return Err(SigningError::Failed("Blank couldn't sign the PDF".into()));
+        return Err(SigningError::Failed(SIGN_FAILED.into()));
     };
+    if !(last.valid() && last.covers_the_whole_file()) {
+        log::warn!("a PDF Blank signed didn't check out");
+        return Err(SigningError::Failed(SIGN_FAILED.into()));
+    }
     if timestamped && (last.timestamp.is_none() || last.timestamp_unreadable) {
         log::warn!("a PDF Blank signed has no timestamp that holds");
         return Err(SigningError::Timestamp(
@@ -447,17 +613,31 @@ fn check_signed(signed: &[u8], timestamped: bool) -> Answer<()> {
     Ok(())
 }
 
+/// check_unsigned makes sure an update without a signature added none, and
+/// left the signatures as valid as they were
+fn check_unsigned(updated: &[u8], before: &[SignatureReport]) -> Answer<()> {
+    let reports =
+        verify_pdf(updated).map_err(failed("failed to check an updated PDF", STAMP_FAILED))?;
+    if added(&reports, before).is_none_or(|new| !new.is_empty()) {
+        log::warn!("a PDF Blank added to didn't check out");
+        return Err(SigningError::Failed(STAMP_FAILED.into()));
+    }
+    Ok(())
+}
+
 /// what the header `blank-signing` holds
 #[derive(Deserialize)]
 struct Header {
-    #[serde(deserialize_with = "passphrase")]
-    passphrase: Passphrase,
-    options: SignOptions,
+    /// none: the stamps and fields alone, no signature
+    #[serde(default, deserialize_with = "passphrase")]
+    passphrase: Option<Passphrase>,
+    source: Source,
+    plan: Plan,
 }
 
 /// passphrase reads a passphrase straight into memory that is wiped
-fn passphrase<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Passphrase, D::Error> {
-    String::deserialize(deserializer).map(Passphrase::new)
+fn passphrase<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Passphrase>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(|p| p.map(Passphrase::new))
 }
 
 /// header reads the header `blank-signing`, which the webview encodes with
@@ -470,30 +650,113 @@ fn header(value: &str) -> Option<Header> {
     serde_json::from_str(&json).ok()
 }
 
-/// signing_sign_pdf signs the PDF in the request's body with the user's
-/// key; its header `blank-signing` holds the passphrase and the
-/// SignOptions as JSON. It returns the signed PDF.
+/// the most parts a request may have
+const MAX_PARTS: usize = 1_024;
+
+/// parts splits the body into its parts: a little-endian u32 count, then
+/// each part as a little-endian u64 length and its bytes, nothing after
+fn parts(body: &[u8]) -> Option<Vec<&[u8]>> {
+    let count = u32::from_le_bytes(body.get(..4)?.try_into().ok()?) as usize;
+    if count > MAX_PARTS {
+        return None;
+    }
+    let mut rest = &body[4..];
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let length = u64::from_le_bytes(rest.get(..8)?.try_into().ok()?);
+        let length = usize::try_from(length).ok()?;
+        let part = rest.get(8..8usize.checked_add(length)?)?;
+        out.push(part);
+        rest = &rest[8 + length..];
+    }
+    rest.is_empty().then_some(out)
+}
+
+/// tab_bytes is the PDF of a PDF tab to sign: its file, read again, while
+/// it is the one the tab opened, with the tab's fills written into it by
+/// the tab's helper as a revision of their own.
+///
+/// INTEGRATION POINT: the fills are `pdf_view::filled_bytes(tabs, tab,
+/// path, sha256, fills)` of the helper's stream; until it lands here, a PDF
+/// with fills isn't signed.
+fn tab_bytes(
+    _tabs: &PdfTabs,
+    _tab: &str,
+    path: &Path,
+    sha256: &str,
+    fills: &[Fill],
+) -> Answer<Vec<u8>> {
+    let bytes = read_checked(path, sha256).map_err(|error| {
+        log::warn!("failed to read a PDF tab's file to sign: {}", error.kind());
+        match error.kind() {
+            std::io::ErrorKind::InvalidData => SigningError::FileChanged,
+            std::io::ErrorKind::NotFound => SigningError::FileMissing,
+            _ => SigningError::Failed("Blank can't read this PDF again".into()),
+        }
+    })?;
+    if !fills.is_empty() {
+        log::warn!("a PDF tab's fills can't be written yet");
+        return Err(SigningError::Failed(
+            "Blank can't fill in this PDF's fields yet".into(),
+        ));
+    }
+    Ok(bytes.to_vec())
+}
+
+/// signing_sign_pdf adds stamps, empty signature fields for others and a
+/// signature to a PDF, and returns it. Its header `blank-signing` holds,
+/// as JSON, the passphrase (null: no signature, the stamps and fields
+/// alone), where the PDF comes from (`source`: the body's part 0, or a PDF
+/// tab's file) and the `plan`; the body holds the parts (see `parts`), the
+/// stamps' one-page PDFs among them.
 #[tauri::command]
 pub async fn signing_sign_pdf(
     app: AppHandle,
+    tabs: tauri::State<'_, PdfTabs>,
     request: tauri::ipc::Request<'_>,
 ) -> Answer<tauri::ipc::Response> {
-    let tauri::ipc::InvokeBody::Raw(pdf) = request.body() else {
-        return Err(SigningError::Failed("Blank couldn't sign the PDF".into()));
+    let refused = || SigningError::Failed(SIGN_FAILED.into());
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err(refused());
     };
     let header = request
         .headers()
         .get("blank-signing")
         .and_then(|value| value.to_str().ok())
         .and_then(header)
-        .ok_or_else(|| SigningError::Failed("Blank couldn't sign the PDF".into()))?;
-    let p12 = read_key(&app)?;
-    let pdf = pdf.clone();
+        .ok_or_else(refused)?;
+    if parts(body).is_none() {
+        log::warn!("a request to sign had a body that isn't parts");
+        return Err(refused());
+    }
+    let pdf = match &header.source {
+        Source::Body => None,
+        Source::Tab {
+            tab,
+            path,
+            sha256,
+            fills,
+        } => Some(tab_bytes(&tabs, tab, path, sha256, fills)?),
+    };
+    let p12 = match header.passphrase {
+        Some(_) => Some(read_key(&app)?),
+        None => None,
+    };
+    let body = body.clone();
     let signed = tauri::async_runtime::spawn_blocking(move || {
-        sign(&p12, &header.passphrase, &pdf, &header.options)
+        let parts = parts(&body).ok_or_else(refused)?;
+        let pdf = match &pdf {
+            Some(pdf) => pdf.as_slice(),
+            None => parts.first().copied().ok_or_else(refused)?,
+        };
+        let key = match (&p12, &header.passphrase) {
+            (Some(p12), Some(passphrase)) => Some(Key { p12, passphrase }),
+            _ => None,
+        };
+        sign(key, pdf, &parts, &header.plan)
     })
     .await
-    .map_err(|_| SigningError::Failed("Blank couldn't sign the PDF".into()))??;
+    .map_err(|_| refused())??;
     Ok(tauri::ipc::Response::new(signed))
 }
 
@@ -545,3 +808,6 @@ pub async fn signing_untrust(app: AppHandle, fingerprint: String) -> Answer<()> 
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod received;

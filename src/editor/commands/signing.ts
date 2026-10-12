@@ -338,13 +338,26 @@ const signExport = async (
   if (!box) throw new Error("the signature block isn't in the PDF");
   const timestampServer = config.value.signing.timestampServer;
   try {
-    return await signPdf(result.contents, passphrase, {
-      page: box.page + 1,
-      rect: [box.x, box.y, box.width, box.height],
-      location: place || null,
-      reason: null,
-      timestampServer: timestampServer || null,
-    });
+    return await signPdf(
+      {
+        passphrase,
+        source: { kind: "body" },
+        plan: {
+          // the block is in the page content already, from the engine
+          stamps: [],
+          signature: {
+            kind: "new",
+            page: box.page + 1,
+            rect: [box.x, box.y, box.width, box.height],
+          },
+          others: [],
+          location: place || null,
+          reason: null,
+          timestampServer: timestampServer || null,
+        },
+      },
+      [result.contents],
+    );
   } catch (error) {
     throw new Error(signingFailure(error), { cause: error });
   }

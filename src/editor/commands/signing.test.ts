@@ -226,13 +226,21 @@ describe("signing", () => {
     expect(await request.check("right")).toBeNull();
     request.submit(request.targets[0].pos, "Hamburg", "right");
     await flushPromises();
-    expect(ipc.signPdf).toHaveBeenCalledWith(new Uint8Array([1]), "right", {
-      page: 1,
-      rect: [70, 600, 230, 70],
-      location: "Hamburg",
-      reason: null,
-      timestampServer: null,
-    });
+    expect(ipc.signPdf).toHaveBeenCalledWith(
+      {
+        passphrase: "right",
+        source: { kind: "body" },
+        plan: {
+          stamps: [],
+          signature: { kind: "new", page: 1, rect: [70, 600, 230, 70] },
+          others: [],
+          location: "Hamburg",
+          reason: null,
+          timestampServer: null,
+        },
+      },
+      [new Uint8Array([1])],
+    );
     // the signed PDF is what is written
     expect(writeFile).toHaveBeenCalledWith(
       "/docs/lease signed.pdf",
@@ -364,8 +372,10 @@ describe("signing", () => {
     });
     // the native side names the certificate's holder, never the block's
     // name
-    expect(ipc.signPdf.mock.calls[0][2]).toMatchObject({ location: "Paris" });
-    expect(ipc.signPdf.mock.calls[0][2]).not.toHaveProperty("name");
+    expect(ipc.signPdf.mock.calls[0][0].plan).toMatchObject({
+      location: "Paris",
+    });
+    expect(ipc.signPdf.mock.calls[0][0].plan).not.toHaveProperty("name");
     expect(signingPlace.value).toBe("Paris");
     signingCertificate.value = undefined;
   });

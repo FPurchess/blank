@@ -85,18 +85,84 @@ export const signingMessage = (error: unknown, fallback: string) => {
   }
 };
 
-// how to sign, besides the PDF and the passphrase
-export interface SignOptions {
-  // the page of the signature's field, from 1
+// a place on a page: x, y, width and height in points from the top left
+// of the page as shown (its crop box after /Rotate, UserUnit applied)
+export type PageRect = [number, number, number, number];
+
+// a stamp to put in the pages' content: the one-page PDF of the body's
+// part `part`, on page `page` (from 1); `repeat` puts it on every page at
+// the same place, moved into smaller pages
+export interface StampPlan {
+  part: number;
   page: number;
-  // where the signature shows, in points from the page's top left; none for
-  // an invisible signature
-  rect: [number, number, number, number] | null;
+  rect: PageRect;
+  repeat: boolean;
+}
+
+// where the signature goes: nowhere on the pages, an empty signature field
+// the PDF has (its full name), or a new field; `stamp` is the body's part
+// with the stamp it shows
+export type SignaturePlan =
+  | { kind: "invisible" }
+  | { kind: "existing"; field: string; stamp?: number | null }
+  | { kind: "new"; page: number; rect: PageRect; stamp?: number | null };
+
+// an empty signature field for someone else to sign later, called
+// "Signature of ‹name›"
+export interface OtherSigner {
+  page: number;
+  rect: PageRect;
+  name: string;
+}
+
+// what to add to the PDF, and what the signature says
+export interface SignPlan {
+  stamps: StampPlan[];
+  signature: SignaturePlan;
+  others: OtherSigner[];
   location: string | null;
   reason: string | null;
   // an RFC 3161 server, for a timestamp
   timestampServer: string | null;
 }
+
+// a form field's new value: text (text, combo, list, the export value of a
+// radio button) or whether a box is ticked
+export interface Fill {
+  field: string;
+  value: string | boolean;
+}
+
+// where the PDF comes from: the body's part 0 (an export), or a PDF tab's
+// file, which must still be the one it opened, with the tab's fills
+export type SignSource =
+  | { kind: "body" }
+  | { kind: "tab"; tab: string; path: string; sha256: string; fills: Fill[] };
+
+export interface SignRequest {
+  // null: the stamps and fields alone, no signature
+  passphrase: string | null;
+  source: SignSource;
+  plan: SignPlan;
+}
+
+/**
+ * encodeParts packs `parts` into one body: a little-endian u32 count, then
+ * each part as a little-endian u64 length and its bytes
+ */
+export const encodeParts = (parts: Uint8Array[]) => {
+  const size = parts.reduce((sum, part) => sum + 8 + part.length, 4);
+  const body = new Uint8Array(size);
+  const view = new DataView(body.buffer);
+  view.setUint32(0, parts.length, true);
+  let at = 4;
+  for (const part of parts) {
+    view.setBigUint64(at, BigInt(part.length), true);
+    body.set(part, at + 8);
+    at += 8 + part.length;
+  }
+  return body;
+};
 
 export const certificate = () =>
   invoke<CertificateInfo | null>("signing_certificate");
@@ -130,19 +196,16 @@ export const checkPassphrase = (passphrase: string) =>
   invoke<void>("signing_check_passphrase", { passphrase });
 
 /**
- * signPdf signs `pdf` with the user's key and returns the signed PDF
+ * signPdf adds `request.plan` to a PDF and signs it with the user's key, or
+ * without a passphrase adds the stamps and fields alone, and returns the
+ * PDF. `parts` are the body: for `source.kind` "body" the PDF first, then
+ * the stamps' PDFs, which `plan` names by their index in `parts`.
  */
-export const signPdf = async (
-  pdf: Uint8Array,
-  passphrase: string,
-  options: SignOptions,
-) =>
+export const signPdf = async (request: SignRequest, parts: Uint8Array[]) =>
   new Uint8Array(
-    await invoke<ArrayBuffer>("signing_sign_pdf", pdf, {
+    await invoke<ArrayBuffer>("signing_sign_pdf", encodeParts(parts), {
       headers: {
-        "blank-signing": encodeURIComponent(
-          JSON.stringify({ passphrase, options }),
-        ),
+        "blank-signing": encodeURIComponent(JSON.stringify(request)),
       },
     }),
   );
