@@ -32,7 +32,7 @@ const notices = join(root, "scripts", "notices");
 const vendoredRoot = join(notices, "vendored");
 
 // Blank's own crates, which carry Blank's licence
-const OWN_CRATES = new Set(["blank", "blank-layout"]);
+const OWN_CRATES = new Set(["blank", "blank-drawings", "blank-layout"]);
 
 // the same order on every machine, unlike localeCompare
 const byCode = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
