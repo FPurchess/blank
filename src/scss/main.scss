@@ -357,19 +357,20 @@ body {
       color: var(--muted);
     }
   }
+}
 
-  // the options of a row as one segmented control, see OptionGroup.vue,
-  // an option's icon before its label
-  .options {
-    @include segmented;
-    flex-wrap: wrap;
+// the options of a row as one segmented control, see OptionGroup.vue, in a
+// dialog or a block's settings: an option's icon before its label
+.dialog .options,
+.block-popover .options {
+  @include segmented;
+  flex-wrap: wrap;
 
-    > button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
+  > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
 }
 
