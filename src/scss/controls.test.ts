@@ -62,6 +62,13 @@ describe("the controls' global rules", () => {
     }
   });
 
+  it("draw a row of options as one segmented control in a block's settings too", async () => {
+    const css = await compileMain();
+    expect(css).toMatch(
+      /\.dialog \.options,\.block-popover \.options\{display:inline-flex;gap:2px;padding:2px;/,
+    );
+  });
+
   it("set a side pane's head as the draft has it, not as a document heading", async () => {
     const css = await compileMain();
     // the title is an h2, which the document's heading rule would size

@@ -1,7 +1,7 @@
 import { STYLE_NAMES } from "../../exporters/docx/styleNames";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import { FORM_STYLE } from "./forms";
-import { EMBED_STYLE } from "./embeds";
+import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { ALIGN_CLASS, alignStyle, WORD_ALIGNMENTS } from "./align";
 import { ATOM_STYLE } from "./xml";
 
@@ -19,6 +19,8 @@ export const ATOM_CLASS = "blank-atom";
 export const FORM_CLASS = "blank-form";
 // an embed, its attributes as JSON, see embeds.ts
 export const EMBED_CLASS = "blank-embed";
+// a diagram, its source and settings as JSON, see embeds.ts
+export const DIAGRAM_CLASS = "blank-diagram";
 
 // marks the paragraphs of a horizontal line, which are empty and so need a
 // class to survive until src/importers/docx/cleanup.ts turns them into <hr>
@@ -87,6 +89,7 @@ export const STYLE_MAP = [
   `p.${ATOM_STYLE} => p.${ATOM_CLASS}:fresh`,
   `p.${FORM_STYLE} => p.${FORM_CLASS}:fresh`,
   `p.${EMBED_STYLE} => p.${EMBED_CLASS}:fresh`,
+  `p.${DIAGRAM_STYLE} => p.${DIAGRAM_CLASS}:fresh`,
   // the runs that mark an aligned paragraph, see align.ts
   ...WORD_ALIGNMENTS.map(
     (align) => `r.${alignStyle(align)} => span.${ALIGN_CLASS}${align}`,

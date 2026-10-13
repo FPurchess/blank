@@ -13,17 +13,17 @@ import {
   dateChoiceOf,
   settingsOf,
   today,
-  WIDTH_OPTIONS,
+  SIGNATURE_WIDTHS,
   widthChoiceOf,
 } from "./signaturePopoverModel";
 
-// The settings of a signature block (Enter or the toolbar's settings
-// button, see src/editor/commands/contentBlocks.ts): who signs and as what,
-// where and when, and how wide it is. Each change applies at once, as one
-// undo step.
+// The settings of a signature block (Enter, Shift+Enter or the toolbar's
+// settings button, see src/editor/commands/contentBlocks.ts): who signs and
+// as what, where and when, and how wide it is. Each change applies at once,
+// as one undo step.
 const props = defineProps<{ request: SignaturePopoverRequest }>();
 
-const start = props.request.settings;
+const start = props.request.values;
 const role = shallowRef(start.role);
 const name = shallowRef(start.name);
 const where = shallowRef(start.place);
@@ -102,7 +102,7 @@ const close = () => closeDialog(signaturePopover, props.request.close);
       v-model="width"
       name="width"
       label="Width"
-      :options="WIDTH_OPTIONS"
+      :options="SIGNATURE_WIDTHS"
     />
   </BlockPopover>
 </template>

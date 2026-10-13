@@ -125,7 +125,7 @@ fn sample_images() -> std::collections::HashMap<String, blank_layout::pdf::Image
         "pixel.png".to_string(),
         blank_layout::pdf::ImageData {
             bytes: PNG.to_vec(),
-            jpeg: false,
+            kind: blank_layout::pdf::ImageKind::Png,
         },
     );
     images
@@ -195,6 +195,8 @@ fn more_of_the_sample(mut pos: u32) -> Vec<Item> {
             height: 80.0,
             alt: "a red pixel".into(),
             align: None,
+            share: None,
+            caption: None,
         },
         ..text_item(0, "", "p", 0, vec![])
     });
@@ -853,6 +855,8 @@ fn tagged_document() -> Engine {
             height: 0.0,
             alt: "a map of the town".into(),
             align: None,
+            share: None,
+            caption: None,
         },
         ..text_item(0, "", "p", 0, vec![])
     });

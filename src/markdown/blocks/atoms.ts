@@ -1,6 +1,7 @@
 import type { Attrs } from "prosemirror-model";
 
 import { formatMarker, type Marker, parseMarker } from "./args";
+import { parseWidth } from "./caps";
 
 // The content blocks that are one marker line, and the node each becomes:
 // how its marker's arguments read into the node's attributes and back.
@@ -55,7 +56,15 @@ export type SignatureDate =
   "signing" | "none" | `${number}-${number}-${number}`;
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const SHARE = /^(?:[1-9]\d?|100)%$/;
+
+/**
+ * shareOf returns the share of the text's width that `width` says ("75%"),
+ * or null for none or a width of another kind
+ */
+export const shareOf = (width: unknown) => {
+  const parsed = parseWidth(width);
+  return parsed && "share" in parsed ? parsed.share : null;
+};
 
 /**
  * calendarDate returns the day a YYYY-MM-DD date is, at noon local time, or
@@ -135,7 +144,10 @@ export const ATOMS: Record<string, AtomSpec> = {
       }
       const date = args.date ?? SIGNATURE_DEFAULTS.date;
       const width = args.width ?? null;
-      if (!isSignatureDate(date) || (width !== null && !SHARE.test(width))) {
+      if (
+        !isSignatureDate(date) ||
+        (width !== null && shareOf(width) === null)
+      ) {
         return null;
       }
       return {

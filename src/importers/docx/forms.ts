@@ -1,10 +1,6 @@
 import type JSZip from "jszip";
 
-import {
-  DEFINITIONS_NAMESPACE,
-  FORM_TAG,
-  readTag,
-} from "../../exporters/docx/forms";
+import { DEFINITIONS_NAMESPACE, FORM_TAG } from "../../exporters/docx/forms";
 import {
   closeMarker,
   definitionOf,
@@ -19,7 +15,8 @@ import {
   isOn,
   customParts,
   markerParagraph,
-  val,
+  rewriteControls,
+  tagOf,
   W,
 } from "./xml";
 
@@ -30,8 +27,6 @@ import {
 // conversion each form becomes marker paragraphs holding its marker lines,
 // around the content of its fields, which styleMap.ts and cleanup.ts turn
 // into the form again. A field showing its placeholder is empty.
-
-const DOCUMENT = "word/document.xml";
 
 // the style of the marker paragraphs, matched by its id in styleMap.ts
 export const FORM_STYLE = "BlankFormMarker";
@@ -50,8 +45,6 @@ export const readDefinitions = async (zip: JSZip): Promise<Definitions> =>
 
 const marker = (doc: Document, line: string) =>
   markerParagraph(doc, FORM_STYLE, line);
-
-const tagOf = (sdt: Element) => readTag(val(child(child(sdt, "sdtPr"), "tag")));
 
 /**
  * contentOf returns what a content control holds
@@ -93,71 +86,67 @@ const takePageBreak = (form: Element) => {
  * @param definitions the definitions the package holds
  * @returns whether it had to be rewritten
  */
-export const markForms = async (zip: JSZip, definitions: Definitions) => {
-  const xml = await zip.file(DOCUMENT)?.async("string");
-  if (xml === undefined || !xml.includes(FORM_TAG)) return false;
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) return false;
-  const body = doc.getElementsByTagNameNS(W, "body")[0];
-  let changed = false;
-  for (const sdt of children(body, "sdt")) {
-    const tag = tagOf(sdt);
-    if (!tag || !("form" in tag)) continue;
-    const pageBreak =
-      takePageBreak(sdt) && !definitionOf(definitions, tag.form)?.newPage;
-    const fields: Element[] = [];
-    // what comes before the first field
-    const loose: Element[] = [];
-    const take = (nodes: Element[], inGrid: boolean) => {
-      for (const node of nodes) {
-        const name = node.localName === "sdt" ? tagOf(node) : null;
-        if (name && "grid" in name) {
-          // the cells of its table, one column after the other
-          for (const table of contentOf(node)) {
-            for (const row of children(table, "tr")) {
-              for (const cell of children(row, "tc")) {
-                take([...cell.children], true);
+export const markForms = (zip: JSZip, definitions: Definitions) =>
+  rewriteControls(
+    zip,
+    (sdt, doc) => {
+      const tag = tagOf(sdt);
+      if (!tag || !("form" in tag)) return false;
+      const pageBreak =
+        takePageBreak(sdt) && !definitionOf(definitions, tag.form)?.newPage;
+      const fields: Element[] = [];
+      // what comes before the first field
+      const loose: Element[] = [];
+      const take = (nodes: Element[], inGrid: boolean) => {
+        for (const node of nodes) {
+          const name = node.localName === "sdt" ? tagOf(node) : null;
+          if (name && "grid" in name) {
+            // the cells of its table, one column after the other
+            for (const table of contentOf(node)) {
+              for (const row of children(table, "tr")) {
+                for (const cell of children(row, "tc")) {
+                  take([...cell.children], true);
+                }
               }
             }
+            continue;
           }
-          continue;
+          if (!name || !("field" in name)) {
+            // a cell's properties, and the paragraph a cell ends with
+            if (node.localName === "tcPr" || (inGrid && isEmpty(node)))
+              continue;
+            const content = node.localName === "sdt" ? contentOf(node) : [node];
+            (fields.length ? fields : loose).push(...content);
+            continue;
+          }
+          fields.push(
+            marker(
+              doc,
+              formatMarker({
+                name: "field",
+                format: null,
+                args: { name: name.field },
+              }),
+            ),
+            ...(fields.length ? [] : loose.splice(0)),
+          );
+          // a field showing its placeholder holds nothing
+          if (isOn(child(child(node, "sdtPr"), "showingPlcHdr"))) continue;
+          fields.push(...contentOf(node));
         }
-        if (!name || !("field" in name)) {
-          // a cell's properties, and the paragraph a cell ends with
-          if (node.localName === "tcPr" || (inGrid && isEmpty(node))) continue;
-          const content = node.localName === "sdt" ? contentOf(node) : [node];
-          (fields.length ? fields : loose).push(...content);
-          continue;
-        }
-        fields.push(
-          marker(
-            doc,
-            formatMarker({
-              name: "field",
-              format: null,
-              args: { name: name.field },
-            }),
-          ),
-          ...(fields.length ? [] : loose.splice(0)),
-        );
-        // a field showing its placeholder holds nothing
-        if (isOn(child(child(node, "sdtPr"), "showingPlcHdr"))) continue;
-        fields.push(...contentOf(node));
-      }
-    };
-    take(contentOf(sdt), false);
-    sdt.replaceWith(
-      ...(pageBreak ? [markerParagraph(doc, PAGE_BREAK_STYLE)] : []),
-      marker(
-        doc,
-        formatMarker({ name: "form", format: 1, args: { def: tag.form } }),
-      ),
-      ...fields,
-      marker(doc, closeMarker("form")),
-      ...loose,
-    );
-    changed = true;
-  }
-  if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));
-  return changed;
-};
+      };
+      take(contentOf(sdt), false);
+      sdt.replaceWith(
+        ...(pageBreak ? [markerParagraph(doc, PAGE_BREAK_STYLE)] : []),
+        marker(
+          doc,
+          formatMarker({ name: "form", format: 1, args: { def: tag.form } }),
+        ),
+        ...fields,
+        marker(doc, closeMarker("form")),
+        ...loose,
+      );
+      return true;
+    },
+    (xml) => xml.includes(FORM_TAG),
+  );

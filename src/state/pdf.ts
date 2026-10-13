@@ -26,7 +26,7 @@ export const pdfViewFocused = shallowRef(false);
 // pixels, written by PdfView.vue when it scrolls or resizes (only when it
 // changed); null while it isn't shown. The zoom places the PDF's pages with
 // it (pdfDeskLayout) and keeps the spot in the middle of the view.
-export interface PdfViewport {
+interface PdfViewport {
   width: number;
   height: number;
   scrollTop: number;

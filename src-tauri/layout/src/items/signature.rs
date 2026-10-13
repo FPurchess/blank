@@ -6,7 +6,7 @@
 
 use parley::Alignment;
 
-use super::{contain, Deco, Laid, Role, Unit};
+use super::{picture_scale, Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
 use crate::model::{Text, TextKind};
 use crate::style::RULE;
@@ -30,17 +30,13 @@ pub struct SignatureSpec<'a> {
     pub alt: &'a str,
     pub lines: &'a [String],
     pub hint: &'a str,
-    pub share: f32,
+    pub share: Option<f32>,
 }
 
 /// lays out a signature block at `indent`, in `inner` points of width; its
 /// lines are extras, text of the block but not of the document
 pub fn signature_units(fonts: &mut Fonts, spec: SignatureSpec, indent: f32, inner: f32) -> Laid {
-    let share = if spec.share > 0.0 {
-        spec.share
-    } else {
-        SIGNATURE_SHARE
-    };
+    let share = spec.share.unwrap_or(SIGNATURE_SHARE);
     // a width that isn't a number lays the block out as if it had none,
     // rather than panic in clamp
     let inner = inner.max(0.0);
@@ -49,7 +45,13 @@ pub fn signature_units(fonts: &mut Fonts, spec: SignatureSpec, indent: f32, inne
     let mut label = None;
     if !spec.src.is_empty() && spec.width > 0.0 && spec.height > 0.0 {
         // as large as the room allows, standing on the line
-        let (w, h) = contain(spec.width, spec.height, width, SIGNATURE_ROOM - IMAGE_GAP);
+        let scale = picture_scale(
+            (spec.width, spec.height),
+            width,
+            SIGNATURE_ROOM - IMAGE_GAP,
+            Some(1.0),
+        );
+        let (w, h) = (spec.width * scale, spec.height * scale);
         decos.push(Deco::Image {
             src: spec.src.to_string(),
             alt: spec.alt.to_string(),
@@ -110,7 +112,7 @@ mod tests {
     use super::*;
     use crate::fonts::repository_fonts;
 
-    fn laid(src: &str, lines: &[String], share: f32) -> Laid {
+    fn laid(src: &str, lines: &[String], share: Option<f32>) -> Laid {
         let mut fonts = repository_fonts();
         signature_units(
             &mut fonts,
@@ -130,7 +132,7 @@ mod tests {
 
     #[test]
     fn leaves_room_and_a_line_to_sign_on_while_unsigned() {
-        let laid = laid("", &["Ada Lovelace · Tenant".into()], 0.0);
+        let laid = laid("", &["Ada Lovelace · Tenant".into()], None);
         let unit = &laid.units[0];
         // the hint, but no image
         assert!(laid.label.is_some());
@@ -154,7 +156,7 @@ mod tests {
 
     #[test]
     fn stands_the_signature_on_the_line_within_the_room() {
-        let laid = laid("data:image/png;base64,", &[], 1.0);
+        let laid = laid("data:image/png;base64,", &[], Some(1.0));
         let (y, w, h) = laid.units[0]
             .decos
             .iter()
@@ -183,7 +185,7 @@ mod tests {
                     alt: "",
                     lines: &[],
                     hint: "Signature",
-                    share: 0.0,
+                    share: None,
                 },
                 0.0,
                 inner,

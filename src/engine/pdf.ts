@@ -12,6 +12,14 @@ import {
   prepareImages,
 } from "../images/prepare";
 import { unknownWarning } from "../markdown/blocks/unknown";
+import { sourceKind } from "../sources/registry";
+import {
+  renderAll,
+  renderedOf,
+  sourceKeyOf,
+  sourceWarning,
+} from "../sources/store";
+import { drawAll, drawingOf, isVector } from "./vectors";
 import { documentFields } from "../layout/bands";
 import { type Layout, pageGeometry } from "../layout/resolve";
 import {
@@ -32,7 +40,12 @@ import {
 import { fromDataUrl } from "../images/dataUrl";
 import { probeSize } from "../images/mime";
 import { fittedSize } from "./images";
-import type { PdfJob, PdfResult, PdfWarning } from "./pdfJob";
+import {
+  imageKind,
+  type PdfJob,
+  type PdfResult,
+  type PdfWarning,
+} from "./pdfJob";
 import type { PrintSheet } from "./types";
 import type { PdfReply } from "./pdfWorker";
 
@@ -67,9 +80,19 @@ interface Prepared {
   output: Output;
   // the signed block, if any, and how dates are written
   flattening: FlattenOptions;
+  // the diagram module's drawings, by the src of the image each is drawn
+  // in place of
+  drawings: Map<string, string>;
   // the positions of the other signature blocks, whose boxes it gives
   others?: number[];
 }
+
+/**
+ * imagesToAdd lists the images whose bytes the engine draws: not the
+ * drawings, which it draws from their drawings
+ */
+const imagesToAdd = (images: Map<string, PreparedImage>) =>
+  [...images].filter(([, image]) => image.bytes.length > 0);
 
 /**
  * onSharedEngine writes the PDF with an engine of the page view's wasm
@@ -83,16 +106,18 @@ const onSharedEngine = async ({
   sizes,
   output,
   flattening,
+  drawings,
   others,
 }: Prepared): Promise<PdfResult> => {
   const { signed } = flattening;
   const engine = await newEngine(true);
   try {
-    for (const [src, image] of images) {
-      engine.addImage(src, image.bytes, image.mime === "image/jpeg");
+    for (const [src, image] of imagesToAdd(images)) {
+      engine.addImage(src, image.bytes, imageKind(image.mime));
     }
+    for (const [src, json] of drawings) engine.addDrawing(src, json);
     engine.setSettings(layout, fields);
-    engine.sync(doc, sizes, flattening);
+    engine.sync(doc, sizes, { ...flattening, sources: { export: true } });
     // fonts for what Blank's fonts lack, e.g. emoji pasted just now, which
     // the engine lays out again with
     const missing = engine.missing();
@@ -191,19 +216,33 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes, output, flattening, others }: Prepared,
+  {
+    doc,
+    layout,
+    fields,
+    images,
+    sizes,
+    output,
+    flattening,
+    drawings,
+    others,
+  }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
   fallbacks: [...fallbackFonts.value],
-  images: [...images].map(([src, image]) => ({
+  images: imagesToAdd(images).map(([src, image]) => ({
     src,
     bytes: image.bytes,
-    jpeg: image.mime === "image/jpeg",
+    kind: imageKind(image.mime),
   })),
+  drawings: [...drawings],
   settings: JSON.stringify(settingsOf(layout, fields)),
+  // every source block closed, and one that can't be drawn as its source
   items: JSON.stringify(
-    flatten(doc, sizes, null, flattening).map((record) => record.build()),
+    flatten(doc, sizes, null, { ...flattening, sources: { export: true } }).map(
+      (record) => record.build(),
+    ),
   ),
   title: fields.title,
   author: fields.author,
@@ -243,6 +282,20 @@ export const pdfLanguage = () => {
 };
 
 /**
+ * vectorKeys lists the drawings of `doc`'s sources (diagrams) that could be
+ * drawn
+ */
+const vectorKeys = (doc: Node) => {
+  const keys: string[] = [];
+  doc.descendants((node) => {
+    if (!sourceKind(node.type.name)) return !node.isTextblock;
+    if (renderedOf(node)?.ok === true) keys.push(sourceKeyOf(node));
+    return false;
+  });
+  return keys;
+};
+
+/**
  * imageNames returns what to call the images of `doc` in a warning: a file
  * by its path, an image in the document itself by its alt text
  */
@@ -254,9 +307,18 @@ const imageNames = (doc: Node) => {
         node.attrs.src as string,
         (node.attrs.alt as string | null) ?? "",
       );
+    const kind = sourceKind(node.type.name);
+    if (kind) {
+      const name = (node.attrs.alt as string) || kind.label(node.textContent);
+      alts.set(sourceKeyOf(node), name);
+    }
   });
   return (src: string) =>
-    src.startsWith("data:") ? alts.get(src) || "an image in the document" : src;
+    src.startsWith("data:")
+      ? alts.get(src) || "an image in the document"
+      : isVector(src)
+        ? (alts.get(src) ?? "a diagram")
+        : src;
 };
 
 /**
@@ -321,10 +383,25 @@ const write = async (
   { docPath, layout, signed, others }: Omit<ExportContext, "pages">,
   output: Output,
 ): Promise<ExportResult> => {
-  const { images, failures } = await prepareImages(state.doc, docPath, [
-    "image/png",
-    "image/jpeg",
-  ]);
+  // what the sources make, e.g. diagrams, drawn before they're laid out,
+  // and as drawings of the diagram module, which the PDF holds as vectors
+  // and text; one it can't draw is a picture. The document's PDF and the
+  // print PDF alike
+  await renderAll(state.doc);
+  const keys = vectorKeys(state.doc);
+  await drawAll(keys);
+  const drawings = new Map(
+    keys.flatMap((key) => {
+      const json = drawingOf(key);
+      return json ? [[key, json] as const] : [];
+    }),
+  );
+  const { images, failures } = await prepareImages(
+    state.doc,
+    docPath,
+    ["image/png", "image/jpeg"],
+    { drawings: true },
+  );
   // the signature's picture, which a signed PDF shows in its block: a PDF
   // without it is never written as signed
   if (signed) {
@@ -349,6 +426,7 @@ const write = async (
     sizes: sizesOf(images, layout),
     output,
     flattening: { signed: signed ?? null, dates: signingDates.value },
+    drawings,
     ...(others ? { others } : {}),
   };
   let result: PdfResult | null = null;
@@ -366,6 +444,10 @@ const write = async (
     warnings: [
       ...failureWarning(failures),
       ...describeWarnings(result.warnings, imageNames(state.doc)),
+      ...sourceWarning(
+        state.doc,
+        "sheets" in output ? "the printout" : "the PDF",
+      ),
       ...unknownWarning(
         state.doc,
         "sheets" in output

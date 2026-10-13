@@ -24,4 +24,5 @@ export { toc } from "./toc";
 export { forms } from "./forms";
 export { blockRemovals } from "./blockRemovals";
 export { blockTools } from "./blockTools";
+export { sourceBlocks } from "./sourceBlocks";
 export { embeds } from "./embeds";

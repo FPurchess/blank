@@ -28,6 +28,16 @@ import {
 } from "../../markdown/headings";
 import { unknownWarning } from "../../markdown/blocks/unknown";
 import { embedLabel, embedSrc } from "../../markdown/blocks/embeds";
+import { parseWidth } from "../../markdown/blocks/caps";
+import type { Size } from "../../images/mime";
+import { fnv1a } from "../../sources/hash";
+import { sourceKind } from "../../sources/registry";
+import {
+  renderAll,
+  renderedOf,
+  sourceKeyOf,
+  sourceWarning,
+} from "../../sources/store";
 import {
   SIGNATURE_ROOM,
   SIGNATURE_SHARE,
@@ -67,13 +77,15 @@ import {
   type Control,
   CONTROL_CLOSE,
   CONTROL_OPEN,
+  diagramTag,
   embedTag,
   fieldTag,
   formTag,
   GRID_TAG,
   SIGNATURE_TAG,
+  type WordDiagram,
 } from "./forms";
-import { FRONTMATTER_PROPERTY } from "./properties";
+import { FRONTMATTER_PROPERTY, pictureName } from "./properties";
 import {
   BLOCK_SPACING,
   BULLET_LEVELS,
@@ -181,6 +193,9 @@ class Serializer {
   // each list gets its own numbering instance, so it counts from its start
   private instances = 0;
   private imageCount = 0;
+  // the diagrams written so far, their sources and settings by their ids,
+  // for the part the import reads them back from
+  readonly diagrams: Record<string, WordDiagram> = {};
   // the tables of contents and listed headings written so far
   private tocCount = 0;
   private listedCount = 0;
@@ -339,18 +354,11 @@ class Serializer {
           inQuote: true,
         });
 
-      case "code_block": {
-        const lines = node.textContent.split("\n");
-        return lines.map((text, index) => ({
-          style: STYLE.codeBlock,
-          children: text ? [new this.docx.TextRun(this.textOf(text))] : [],
-          ...this.decoration(position, false),
-          ...this.indent(position),
-          ...(index === lines.length - 1
-            ? { spacing: { after: BLOCK_SPACING } }
-            : {}),
-        }));
-      }
+      case "code_block":
+        return this.code(node.textContent, position);
+
+      case "diagram":
+        return this.diagram(node, position);
 
       case "horizontal_rule":
         return [{ style: STYLE.horizontalLine, ...this.indent(position) }];
@@ -385,6 +393,7 @@ class Serializer {
       case "table_cell":
       case "table_header":
       case "form_field":
+      case "diagram_source":
       case "text":
       case "image":
       case "hard_break":
@@ -654,23 +663,98 @@ class Serializer {
   }
 
   /**
+   * code writes a code block, a paragraph per line
+   */
+  private code(source: string, position: Position): Block[] {
+    const lines = source.split("\n");
+    return lines.map((text, index) => ({
+      style: STYLE.codeBlock,
+      children: text ? [new this.docx.TextRun(this.textOf(text))] : [],
+      ...this.decoration(position, false),
+      ...this.indent(position),
+      ...(index === lines.length - 1
+        ? { spacing: { after: BLOCK_SPACING } }
+        : {}),
+    }));
+  }
+
+  /**
+   * diagram writes a diagram as a picture of its drawing, at its width,
+   * aligned as it is, with its caption below, in a content control the
+   * import knows it by, which keeps its source and settings (see
+   * ./forms.ts); one that can't be drawn as its source
+   */
+  private diagram(node: Node, position: Position): Block[] {
+    if (renderedOf(node)?.ok !== true) {
+      return this.code(node.textContent, position);
+    }
+    // its id: what it holds, so a diagram copied into another Blank Word
+    // document isn't taken for one of that document's
+    const held = fnv1a(node.textContent + JSON.stringify(node.attrs));
+    let number = held;
+    for (let more = 2; Object.hasOwn(this.diagrams, number); more++) {
+      number = `${held}-${more}`;
+    }
+    this.diagrams[number] = { source: node.textContent, attrs: node.attrs };
+    const label =
+      (node.attrs.alt as string) ||
+      (sourceKind("diagram")?.label(node.textContent) ?? "Diagram");
+    const caption = node.attrs.caption as string;
+    const image = this.images.get(sourceKeyOf(node));
+    const width = node.attrs.width as string | null;
+    return [
+      this.control({ tag: diagramTag(number), alias: "Diagram" }),
+      {
+        children: [
+          image
+            ? this.picture(image, this.wanted(image, width), label)
+            : new this.docx.TextRun({ text: label, italics: true }),
+        ],
+        ...this.alignment(node),
+      },
+      ...(caption
+        ? [
+            {
+              style: STYLE.caption,
+              children: [new this.docx.TextRun(caption)],
+              // under the picture, aligned as it is
+              ...this.alignment(node),
+            },
+          ]
+        : []),
+      { style: CONTROL_CLOSE },
+    ];
+  }
+
+  /**
+   * wanted returns the size a picture is written at, in pixels: at the
+   * width it is given (a share of the room, or a length), as tall as that
+   * makes it, else at its own size; picture fits it to the room
+   */
+  private wanted(image: Size, width: string | null | undefined): Size {
+    const given = parseWidth(width);
+    if (!given || !image.width) return image;
+    const wide =
+      "share" in given
+        ? this.maxImageWidth * given.share
+        : given.points / POINTS_PER_PIXEL;
+    return { width: wide, height: (image.height * wide) / image.width };
+  }
+
+  /**
    * embed writes an embed as a picture of its drawing, at the width it
    * says, in a content control the import knows it by (see ./forms.ts)
    */
   private embed(node: Node): Block[] {
     const label = embedLabel(node);
     const image = this.images.get(embedSrc(node));
-    const points = parseLength(node.attrs.width);
-    // as wide as it says, in pixels, as tall as its drawing has it then
-    const wanted =
-      image && points
-        ? {
-            width: points / POINTS_PER_PIXEL,
-            height: (image.height * points) / POINTS_PER_PIXEL / image.width,
-          }
-        : image;
+    // as wide as it says, as tall as its drawing has it then
     const picture = image
-      ? this.picture(image, wanted!, label)
+      ? this.picture(
+          image,
+          this.wanted(image, node.attrs.width as string),
+          label,
+        )
       : new this.docx.TextRun({ text: label, italics: true });
     return [
       this.control({ tag: embedTag(node.attrs.id as string), alias: label }),
@@ -688,7 +772,7 @@ class Serializer {
   private signature(node: Node): Block[] {
     const label = signatureLabel(node.attrs);
     const width = Math.round(
-      this.contentWidth * (signatureShare(node.attrs) || SIGNATURE_SHARE),
+      this.contentWidth * (signatureShare(node.attrs) ?? SIGNATURE_SHARE),
     );
     const room: Block = {
       children: [
@@ -943,36 +1027,57 @@ class Serializer {
     const image = this.images.get(src);
     if (!image)
       return new this.docx.TextRun({ text: alt || src, italics: true });
-    return this.picture(image, image, alt ?? "", title ?? "");
+    const width = node.attrs.width as string | null;
+    return this.picture(
+      image,
+      this.wanted(image, width),
+      alt ?? "",
+      title ?? "",
+      width,
+    );
   }
 
   /**
    * picture returns `image` as Word's picture, `size` (in pixels) fitted to
    * the page or the cell being written, with what it shows for screen
-   * readers
+   * readers, and named with its `width`, which the import reads back
    */
   private picture(
     image: PreparedImage,
     size: { width: number; height: number },
     description: string,
     title = "",
+    width: string | null = null,
   ): ParagraphChild {
     const fitted = fitBox(size, this.maxImageWidth, this.maxImageHeight);
-    return new this.docx.ImageRun({
+    const picture = {
       type: IMAGE_TYPES[image.mime as keyof typeof IMAGE_TYPES],
       data: image.bytes,
+    };
+    return new this.docx.ImageRun({
+      // a drawing as SVG, which Word 2016 and later show; older ones the
+      // picture of it
+      ...(image.svg
+        ? { type: "svg" as const, data: bytesOf(image.svg), fallback: picture }
+        : picture),
       transformation: {
         width: Math.round(fitted.width),
         height: Math.round(fitted.height),
       },
       altText: {
-        name: `image-${++this.imageCount}`,
+        name: pictureName(++this.imageCount, width),
         description,
         title,
       },
     });
   }
 }
+
+/**
+ * bytesOf copies bytes into this realm's Uint8Array, which JSZip asks for:
+ * TextEncoder's may be another's
+ */
+const bytesOf = (bytes: Uint8Array) => Uint8Array.from(bytes);
 
 /**
  * indentOf returns the left indent of a block that isn't numbered, so it
@@ -1059,6 +1164,8 @@ const tocContext = (doc: Node): TocContext => {
 
 const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
   const docx = await import("docx");
+  // what the sources make, e.g. diagrams, drawn first
+  await renderAll(state.doc);
   const [fonts, { images, failures }] = await Promise.all([
     loadFonts(),
     prepareImages(state.doc, docPath, [...EMBEDDABLE]),
@@ -1132,9 +1239,11 @@ const toDOCX: exporterFunc = async (state, { docPath, layout }) => {
     contents: await fixPackage(contents, {
       definitions: usedDefinitions(state.doc),
       embeds: embedsOf(state.doc),
+      diagrams: serializer.diagrams,
     }),
     warnings: [
       ...failureWarning(failures),
+      ...sourceWarning(state.doc, "Word"),
       ...unknownWarning(state.doc, {
         one: "was left out",
         more: "were left out",

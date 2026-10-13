@@ -9,10 +9,11 @@ import { anchorOf, SETTINGS_BUTTON } from "../tocPopoverModel";
 
 // The settings of a block below the block toolbar's settings button (or the
 // block, while the button doesn't show): a table of contents', a
-// diagram's. They change the block at once; Esc, Enter in a text field, a
-// press elsewhere or resizing the window close them, and the focus goes back
-// to the block. Tab stays in them, so typing never reaches the block behind. A press on the settings button is theirs: it closes them
-// through the button. Not on the window's blur: WebKitGTK shows the list of
+// diagram's, a signature block's. They change the block at once; Esc, Enter
+// in a text field, a press elsewhere or resizing the window close them, and
+// the focus goes back to the block. Tab stays in them, so typing never
+// reaches the block behind. A press on the settings button is theirs: it
+// closes them through the button. Not on the window's blur: WebKitGTK shows the list of
 // a select as a menu of its own, which takes the window's focus.
 const props = defineProps<{
   id: string;

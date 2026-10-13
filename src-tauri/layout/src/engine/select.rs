@@ -110,6 +110,17 @@ impl Engine {
         if let Some((x, w)) = laid.extent {
             return (left + x, frag.y, w, unit.height);
         }
+        // a signature block is as wide as its line, which its picture and
+        // the lines under it stand within
+        if let Content::Signature { .. } = item.content {
+            let line = unit
+                .decos
+                .iter()
+                .find(|deco| matches!(deco, crate::items::Deco::Rect { .. }));
+            if let Some(crate::items::Deco::Rect { x, w, .. }) = line {
+                return (left + x, frag.y, *w, unit.height);
+            }
+        }
         // an image is as wide as it is shown
         if let Some(crate::items::Deco::Image { x, w, .. }) = unit
             .decos

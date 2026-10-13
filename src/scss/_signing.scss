@@ -267,10 +267,9 @@
     margin-left: var(--s1);
   }
 
-  .note {
-    margin: var(--s3) 0 0;
-    color: var(--muted);
-    font-size: var(--ui-small);
+  // a dialog's note (main.scss), further from what it notes
+  p.note {
+    margin-top: var(--s3);
   }
 }
 

@@ -2,6 +2,7 @@ import { engineless, newEngine, type PageEngine } from "../engine/engine";
 import { fallbackFonts, findFonts } from "../engine/fallback";
 import { loadedImage } from "../engine/images";
 import { pdfDate } from "../engine/pdf";
+import { imageKind } from "../engine/pdfJob";
 import { fromDataUrl } from "../images/dataUrl";
 import type { Mark } from "../signing/profile";
 import { language, savedMarks } from "../state";
@@ -82,10 +83,11 @@ const onStamp = async <T>(
     if (spec.image && mark && stamp.marks.get(spec.image) !== mark.png) {
       const decoded = fromDataUrl(mark.png);
       if (decoded) {
+        // the user's marks are PNGs (src/signing/profile.ts)
         engine.addImage(
           MARK_SRC[spec.image],
           decoded.bytes,
-          decoded.mime === "image/jpeg",
+          imageKind("image/png"),
         );
         stamp.marks.set(spec.image, mark.png);
       }

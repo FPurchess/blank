@@ -16,7 +16,7 @@ name = "blank_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [workspace]
-members = ["layout", "system-fonts", "pdf/ipc", "pdf/helper"]
+members = ["layout", "drawings", "system-fonts", "pdf/ipc", "pdf/helper"]
 
 # MuPDF 1.28.5 from the submodule, built by mupdf-sys 0.8.0's glue, see
 # pdf/mupdf-sys/Cargo.toml and .claude/rules/pdf.md

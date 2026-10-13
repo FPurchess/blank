@@ -28,6 +28,7 @@ import {
   ul,
 } from "../test/editor";
 import { stampItem, stampSettings } from "../pdf/stamps";
+import { diagram } from "../test/sources";
 import { settingsOf } from "./engine";
 import { flatten } from "./flatten";
 
@@ -55,9 +56,9 @@ const FRONTMATTER = [
   "      left: '{chapter}'",
 ].join("\n");
 
-const image = (src: string) =>
+const image = (src: string, width: string | null = null) =>
   schema.node("paragraph", null, [
-    schema.nodes.image.create({ src, alt: "an image" }),
+    schema.nodes.image.create({ src, alt: "an image", width }),
   ]);
 
 // a paragraph with every mark the engine sets text in
@@ -139,7 +140,7 @@ const rich = docWithFrontmatter(
     tr(td("wide", { colspan: 2, colwidth: [40, 60] })),
     tr(
       td([codeBlock("code in a cell"), ul(li(p("a list")))], { rowspan: 1 }),
-      td([image("cell.png"), blockquote(p("a quote"))]),
+      td([image("cell.png", "50%"), blockquote(p("a quote"))]),
     ),
   ),
   schema.nodes.toc.create({ depth: 2, title: "Contents" }),
@@ -158,6 +159,12 @@ const rich = docWithFrontmatter(
     width: "75%",
   }),
   form(),
+  // a picture with a share of the width and a caption
+  diagram("flowchart LR\n  A --> B", {
+    width: "75%",
+    caption: "A diagram",
+    align: "center",
+  }),
 );
 const withForm = rich.type.create(
   { ...rich.attrs, definitions: { [FORM_KEY]: FORM } },

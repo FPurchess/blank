@@ -6,7 +6,7 @@
 
 use parley::Alignment;
 
-use super::{contain, Deco, Laid, Role, Unit};
+use super::{picture_scale, Deco, Laid, Role, Unit};
 use crate::fonts::Fonts;
 use crate::model::{Text, TextKind};
 use crate::style::BODY;
@@ -57,7 +57,8 @@ pub fn stamp_units(fonts: &mut Fonts, spec: StampSpec, width: f32, height: f32) 
     let room = (height - lines_height).max(0.0);
     if !spec.src.is_empty() && spec.width > 0.0 && spec.height > 0.0 && room > 0.0 {
         // as large as the room allows, its shape kept, in the middle
-        let (w, h) = contain(spec.width, spec.height, width, room);
+        let scale = picture_scale((spec.width, spec.height), width, room, Some(1.0));
+        let (w, h) = (spec.width * scale, spec.height * scale);
         let x = (width - w) / 2.0;
         // in the middle of the room the lines leave
         let y = (room - h) / 2.0;

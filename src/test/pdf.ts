@@ -65,7 +65,7 @@ export const pdfRulesOf = (over: Partial<PdfRules> = {}): PdfRules => ({
 /**
  * pdfField returns a text field `name` of a form, unless `more` says else
  */
-export const pdfField = (name: string, more: Partial<PdfField>): PdfField => ({
+const pdfField = (name: string, more: Partial<PdfField>): PdfField => ({
   name,
   kind: "text",
   label: null,

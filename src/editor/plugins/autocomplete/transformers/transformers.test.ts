@@ -26,6 +26,7 @@ import ordered_list from "./ordered_list";
 import page_break from "./page_break";
 import table from "./table";
 import toc from "./toc";
+import sourceFence from "./sourceFence";
 
 /**
  * runTransformer places the cursor at the end of top-level block `index`
@@ -313,6 +314,36 @@ describe.each([
     const node = doc(h(1, text));
     const { view, result } = runTransformer(transformer, node, 0, text);
 
+    expect(result).toBe(false);
+    expect(view.state.doc).toBe(node);
+  });
+});
+
+describe("transformer.sourceFence", () => {
+  it.each([["```mermaid"], ["```Mermaid"]])(
+    "activates on Enter for %j",
+    (text) => {
+      expect(sourceFence.trigger).toBe("enter");
+      expect(sourceFence.activate(text)).toEqual({ block: "diagram" });
+    },
+  );
+
+  it.each(["```", "```js", "``` mermaid", "mermaid"])("ignores %j", (text) => {
+    expect(sourceFence.activate(text)).toBeUndefined();
+  });
+
+  it("makes an open diagram with the cursor in its source", () => {
+    const node = doc(p("```mermaid"));
+    const { view, result } = runTransformer(sourceFence, node, 0, "```mermaid");
+    expect(result).toBe(true);
+    expect(view.state.doc.child(0).type.name).toBe("diagram");
+    expect(view.state.doc.child(1).type.name).toBe("paragraph");
+    expect(view.state.selection.$from.parent.type.name).toBe("diagram_source");
+  });
+
+  it("leaves a list item a code block's, as a diagram stands on top", () => {
+    const node = doc(ul(li(p("```mermaid"))));
+    const { view, result } = runTransformer(sourceFence, node, 0, "```mermaid");
     expect(result).toBe(false);
     expect(view.state.doc).toBe(node);
   });
