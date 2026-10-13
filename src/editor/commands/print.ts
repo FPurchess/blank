@@ -12,10 +12,13 @@ import { documentFields } from "../../layout/bands";
 import { localeUnit, systemLocale } from "../../layout/paper";
 import { pageGeometry, resolveLayout } from "../../layout/resolve";
 import { frontmatterOf } from "../../markdown";
-import { printDocument, printingNow } from "../../print/job";
+import { basename } from "../../paths";
+import { printDocument, printingNow, printPdfFile } from "../../print/job";
 import {
   type Destination,
   NOTHING_TO_PRINT,
+  PDF_NOT_OPEN,
+  PDF_STILL_OPENING,
   PRINT_UNAVAILABLE,
   printPaper,
   STILL_PRINTING,
@@ -27,10 +30,12 @@ import {
   importedFrom,
   path,
   printDialog,
+  shownPdf,
   tabLabel,
 } from "../../state";
 import { isEmpty, PDF_EXPORT, runExport } from "./exportAs";
 import { openPageSetup } from "./pageSetup";
+import { showPdfProblem } from "../tabs";
 
 /**
  * openPrint opens the print dialog for the document of `view`
@@ -119,7 +124,42 @@ export const openPrint = (
   return true;
 };
 
+/**
+ * printShownPdf prints the PDF tab shown: its file as it is, straight to the
+ * system's print dialog (see printPdfFile)
+ */
+const printShownPdf = () => {
+  const pdf = shownPdf.value;
+  const tab = activeTabId.value;
+  if (!pdf || !tab) return;
+  if (printingNow()) {
+    announce(STILL_PRINTING);
+    return;
+  }
+  if (!pdf.opened) {
+    const note = pdf.problem ? PDF_NOT_OPEN : PDF_STILL_OPENING;
+    sendNotification({ title: "Print", body: note });
+    announce(note);
+    return;
+  }
+  void printPdfFile({
+    tab,
+    path: pdf.path,
+    title: basename(pdf.path),
+    pages: pdf.opened.pages,
+  }).then((problem) => {
+    // the tab says why, with Open again or Find it…
+    if (problem) showPdfProblem(tab, problem);
+  });
+};
+
+/**
+ * print opens the print dialog of the document shown; in a PDF tab, it
+ * prints the PDF
+ */
 export default (): Command => (_state, dispatch, view) => {
-  if (dispatch && view) openPrint(view);
+  if (!dispatch || !view) return true;
+  if (shownPdf.value) printShownPdf();
+  else openPrint(view);
   return true;
 };

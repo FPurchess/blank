@@ -8,6 +8,15 @@ import type { EditorView } from "prosemirror-view";
 import { onScopeDispose, type Ref, watch } from "vue";
 
 import { forgetImages } from "../engine/images";
+import {
+  openingPdf,
+  openPdfDocument,
+  type PdfProblem,
+  type PdfTabDocument,
+  withProblem,
+} from "../pdf/document";
+import { closePdf } from "../pdf/ipc";
+import { pdfPlaceholder } from "../pdf/placeholder";
 import { timed } from "../engine/perf";
 import { errorMessage } from "../errors";
 import { bootScope } from "../scope";
@@ -18,12 +27,14 @@ import {
   currentViewAnchor,
   freeUntitledNumber,
   importedFrom,
+  isPdfTab,
   pageDropCaret,
   pageDropGap,
   pageHoverBlock,
   pageScrollRequest,
   path,
   rememberFile,
+  shownPdf,
   spellchecker,
   type Tab,
   tabAnnouncement,
@@ -70,6 +81,9 @@ interface TabDocument {
   baselines: number;
   // the spell checker its underlines are from
   checker: Spellchecker | null;
+  // a PDF tab's PDF, whose state is an empty placeholder (see
+  // src/pdf/placeholder.ts); the shown tab's is `shownPdf`
+  pdf?: PdfTabDocument;
 }
 
 const documents = new Map<string, TabDocument>();
@@ -101,6 +115,11 @@ const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
 
 const tabById = (id: string) => tabs.value.find((tab) => tab.id === id);
 const stateOf = (doc: Node) => documentState(base!, doc);
+// what a PDF tab keeps of its PDF, `pdf`
+const keptPdf = (pdf: PdfTabDocument): TabDocument => ({
+  ...kept(pdfPlaceholder(stateOf(emptyDocument()))),
+  pdf,
+});
 
 /**
  * docOf returns the document of the tab `id` as it is now
@@ -185,12 +204,13 @@ const untitledTab = (list: readonly Tab[]) =>
 const welcomeTab = () => newTab(blank(welcomeDocument()), { welcome: true });
 
 /**
- * adopt keeps the documents of new tabs, and stores them with the next write
+ * adopt keeps the documents of new tabs, and stores them with the next
+ * write; a PDF tab's PDF is its file, which nothing stores
  */
 const adopt = (added: readonly [Tab, TabDocument][]) => {
   for (const [tab, document] of added) {
     documents.set(tab.id, document);
-    storeDocument(tab.id, document.state.doc);
+    if (!isPdfTab(tab)) storeDocument(tab.id, document.state.doc);
   }
 };
 
@@ -240,6 +260,11 @@ const storedDocument = async (tab: Tab): Promise<Node | undefined> => {
  * stored
  */
 const loadTab = async (tab: Tab): Promise<TabDocument> => {
+  // the file, read again, in the background: the tab shows that it opens,
+  // so a slow helper never holds up the start or a switch; a PDF that can't
+  // be opened shows why
+  if (isPdfTab(tab) && tab.path !== null)
+    return openingPdfTab(tab.id, tab.path);
   if (tab.path !== null && !tab.unsaved) {
     const loaded = await readDocument(tab.path, true);
     if (loaded) return kept(stateOf(loaded.doc));
@@ -292,6 +317,10 @@ const leaveComposition = async () => {
   await Promise.race([ended, new Promise((r) => setTimeout(r, 100))]);
 };
 
+// what a PDF tab publishes as the shown document's file: nothing that saves
+// or exports markdown sees its path
+const NO_FILE = { path: null, importedFrom: null } as const;
+
 /**
  * showTab shows the tab `id` in the view. The shown document's globals
  * change before the view gets the new state: the page view lays it out right
@@ -307,6 +336,7 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
   if (keepLeaving && leaving !== null && left) {
     left.state = v.state;
     left.checker = spellchecker.value;
+    if (left.pdf && shownPdf.value) left.pdf = shownPdf.value;
     updateTab(leaving, { viewAnchor: currentViewAnchor() });
     refresh(leaving);
   }
@@ -320,7 +350,8 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
   wanted = id;
   activeTabId.value = id;
   tabSwitch.value = { id, anchor: tab.viewAnchor };
-  showDocument(next.state, tab);
+  showDocument(next.state, next.pdf ? NO_FILE : tab);
+  shownPdf.value = next.pdf ?? null;
   timed("switch", () => v.updateState(next.state));
   if (next.checker !== spellchecker.value) {
     next.checker = spellchecker.value;
@@ -360,7 +391,8 @@ const switchTo = async (id: string) => {
 /**
  * changeTab applies what `change` makes of the state of the tab `id`: in the
  * view while it is shown, otherwise to the state it keeps, which is stored
- * and undone like any change once it is shown. A closed tab is left alone.
+ * and undone like any change once it is shown. A closed tab and a PDF tab
+ * are left alone.
  * It waits for the tab changes asked for before, e.g. a switch.
  */
 export const changeTab = (
@@ -368,6 +400,8 @@ export const changeTab = (
   change: (state: EditorState) => Transaction | null,
 ) =>
   enqueue(async () => {
+    // a PDF tab's state holds no text to change (see src/pdf/placeholder.ts)
+    if (documents.get(id)?.pdf) return;
     if (id === activeTabId.value && view) {
       const tr = change(view.state);
       if (tr) view.dispatch(tr);
@@ -414,6 +448,33 @@ export const openNewTab = () =>
   });
 
 /**
+ * openingPdfTab returns the document of a PDF tab that opens the PDF at
+ * `path` in the background: it says "Opening …" until the helper has it, so
+ * a slow helper holds up neither the start, nor a switch, nor the tabs'
+ * queue, and then shows the pages, or why it can't
+ */
+const openingPdfTab = (id: string, path: string): TabDocument => {
+  const document = keptPdf(openingPdf(path));
+  openInBackground(id, document);
+  return document;
+};
+
+/**
+ * openInBackground opens the PDF `document` shows as opening, and shows it
+ * once it is open, unless the tab was opened again meanwhile (Open again,
+ * Find it…). A closed tab's document is no one's any more.
+ */
+const openInBackground = (id: string, document: TabDocument) => {
+  const opening = document.pdf!;
+  void openPdfDocument(id, opening.path).then((pdf) => {
+    // the shown tab's may be ahead of what it keeps, or not shown yet
+    if (document.pdf !== opening && shownPdf.value !== opening) return;
+    document.pdf = pdf;
+    if (id === activeTabId.value) shownPdf.value = pdf;
+  });
+};
+
+/**
  * canonicalPath returns the file's own path: absolute, with symbolic links
  * followed, so two ways to name one file find its tab
  */
@@ -456,12 +517,99 @@ const readTabs = async (list: readonly Tab[], files: string[]) => {
     }
     const loaded = await readDocument(canonical);
     if (!loaded) continue;
+    const opened = loaded.pdf ? pdfTab(loaded.path!) : newTab(loaded);
+    if (!opened) continue;
     rememberFile(canonical);
-    const opened = newTab(loaded);
     added.push(opened);
     last = opened[0].id;
   }
   return { added, last };
+};
+
+/**
+ * pdfTab returns a new tab for the PDF at `file`, which opens with a helper
+ * of its own in the background; one it can't open says why in its tab
+ */
+const pdfTab = (file: string): [Tab, TabDocument] => {
+  const tab: Tab = {
+    id: crypto.randomUUID(),
+    kind: "pdf",
+    path: file,
+    importedFrom: null,
+    untitledNumber: null,
+    unsaved: false,
+    viewAnchor: null,
+  };
+  return [tab, openingPdfTab(tab.id, file)];
+};
+
+/**
+ * reopenPdf opens the PDF of the tab `id` again, with a new helper, e.g.
+ * after it failed (Open again), or from `file` once the user found where it
+ * went (Find it…)
+ */
+export const reopenPdf = (id: string, file?: string) =>
+  enqueue(async () => {
+    const tab = tabById(id);
+    const document = documents.get(id);
+    if (!tab?.path || !document?.pdf) return;
+    const path = file === undefined ? tab.path : await canonicalPath(file);
+    // a file found that another tab has open already shows there
+    const other = openTabOf(
+      tabs.value.filter((open) => open.id !== id),
+      path,
+    );
+    if (other) {
+      announce(`“${tabLabel(other)}” is open already`);
+      await switchTo(other.id);
+      return;
+    }
+    if (path !== tab.path) updateTab(id, { path });
+    // "Opening …" meanwhile, in place of the problem
+    document.pdf = openingPdf(path);
+    if (id === activeTabId.value) shownPdf.value = document.pdf;
+    openInBackground(id, document);
+  });
+
+/**
+ * showPdfProblem has the PDF tab `id` show `problem` instead of its pages,
+ * e.g. once printing found its file gone or changed, with what its tab
+ * offers then (Open again, Find it…)
+ */
+export const showPdfProblem = (id: string, problem: PdfProblem) => {
+  const document = documents.get(id);
+  if (!document?.pdf) return;
+  if (id === activeTabId.value && shownPdf.value) {
+    shownPdf.value = withProblem(shownPdf.value, problem);
+    document.pdf = shownPdf.value;
+  } else document.pdf = withProblem(document.pdf, problem);
+};
+
+// counts the times the signatures were to be checked again, so a check
+// that ran meanwhile is done again (see signatureChecks)
+let signatureCheckCount = 0;
+
+/**
+ * signatureChecks counts the times forgetSignatureChecks ran: a check that
+ * started before it changed checked against what Blank trusted then
+ */
+export const signatureChecks = () => signatureCheckCount;
+
+/**
+ * forgetSignatureChecks has the signatures of every PDF tab checked again,
+ * the shown one's at once and the others' when they show, e.g. once the
+ * user trusts another certificate
+ */
+export const forgetSignatureChecks = () => {
+  signatureCheckCount++;
+  // a PDF not checked yet (one still opening, whose open waits for its
+  // document to stay the same) is checked against what Blank trusts now
+  for (const document of documents.values()) {
+    if (document.pdf?.signatures)
+      document.pdf = { ...document.pdf, signatures: null };
+  }
+  if (shownPdf.value?.signatures)
+    shownPdf.value = { ...shownPdf.value, signatures: null };
 };
 
 /**
@@ -556,6 +704,8 @@ const removeTab = async (
     closedPaths.push(tab.path);
     if (closedPaths.length > MAX_CLOSED) closedPaths.shift();
   }
+  if (documents.get(id)?.pdf)
+    closePdf(id).catch((error) => console.warn("can't close a PDF", error));
   if (id !== activeTabId.value) {
     documents.delete(id);
     tabs.value = without(tabs.value);
@@ -742,7 +892,8 @@ export const restoreTabs = async (start: EditorState): Promise<EditorState> => {
   tabs.value = list;
   activeTabId.value = tab.id;
   const document = await ensureLoaded(tab);
-  showDocument(document.state, tabById(tab.id)!);
+  showDocument(document.state, document.pdf ? NO_FILE : tabById(tab.id)!);
+  shownPdf.value = document.pdf ?? null;
   return document.state;
 };
 
@@ -772,6 +923,7 @@ export const bootTabs = (
       view = null;
       base = null;
       wanted = null;
+      shownPdf.value = null;
       documents.clear();
       closedPaths.length = 0;
       queue = new Promise<void>((resolve) => {

@@ -2,19 +2,22 @@ import type { Command } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
-import { config } from "../../config";
+import { CommandIdentifier, config, saveSettings } from "../../config";
+import { commandShortcut } from "../keyBindings";
 import { focusBack } from "../../dom";
 import { errorMessage } from "../../errors";
 import { logError, logWarning } from "../../log";
 import { fromDataUrl } from "../../images/dataUrl";
 import {
+  activeTabId,
   announce,
   importedFrom,
-  language,
   path,
   savedMarks,
   signatureDialog,
   signDialog,
+  signingCertificate,
+  signingDates,
   signingPlace,
 } from "../../state";
 import { basename } from "../../paths";
@@ -42,6 +45,8 @@ import { loadMarks, saveMark } from "../../signing/marks";
 import type { Mark } from "../../signing/profile";
 import { renderMark } from "../../signing/render";
 import { chosenOf, targetsOf } from "../../signing/targets";
+import { formatSigningDate } from "../../signing/date";
+import { languageName } from "../../spellcheck/service";
 import { chooseImageFile } from "./editImage";
 
 // The user's signature and initials: the dialog that makes them, which
@@ -78,6 +83,11 @@ export const openSignatureDialog = async (
         );
         if (!made) return false;
         await saveMark(mark, made);
+        // a typed signature is the user's name: what goes under it from now
+        // on, unless they set one in Settings ▸ Signing
+        const typed = source.kind === "type" ? source.text.trim() : "";
+        if (mark === "signature" && typed && !config.value.signing.name.trim())
+          await saveSettings([{ path: ["signing", "name"], value: typed }]);
       } catch (error) {
         logError(`failed to save the ${mark}`, error);
         sendNotification(`Failed to save your ${mark}: ${errorMessage(error)}`);
@@ -110,9 +120,26 @@ export const editMark =
 const TITLE = "Signed PDF";
 
 /**
+ * signerName returns the name the user signs as: their certificate's, which
+ * a digital signature carries, else the one in Settings ▸ Signing
+ */
+const signerName = () =>
+  signingCertificate.value?.name || config.value.signing.name;
+
+/**
+ * passphraseProblem says why a passphrase didn't open the user's key, with
+ * a way on for a forgotten one
+ */
+const passphraseProblem = (error: unknown) =>
+  signingKind(error) === "wrongPassphrase"
+    ? "The passphrase is wrong. Forgot it? Sign with a picture only, or remove your certificate in Settings ▸ Signing and create a new one."
+    : signingMessage(error, "Blank couldn't open your key");
+
+/**
  * exportSigned exports the document as a PDF with the user's signature in
  * one of its signature blocks, with their name, where they sign and today's
- * date. It makes their signature first if they have none yet.
+ * date. It makes their signature first if they have none yet. It signs the
+ * tab that showed when it ran, and nothing once another shows.
  */
 export const exportSigned = (): Command => (state, dispatch, view) => {
   // asked whether it can run, e.g. by the main menu: with something to
@@ -124,23 +151,36 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
     filters: [PDF_FILTER],
     suffix: " signed",
   };
-  if (exportProblem(state, request)) return true;
+  // an empty document leaves the key to others, as the export does
+  const problem = exportProblem(state, request);
+  if (problem) return problem !== "empty";
   if (targetsOf(state.doc).length === 0) {
-    sendNotification({
-      title: TITLE,
-      body: "This document has no signature block. Insert one from the blocks pane, under Signing.",
-    });
+    // in the window as well, where a notification may not show
+    const key = commandShortcut(CommandIdentifier.VIEW_BLOCKS);
+    const body = `This document has no signature block. Insert one from the blocks pane${key ? ` (${key})` : ""}, under Signing.`;
+    sendNotification({ title: TITLE, body });
+    announce(body);
     return true;
   }
   if (!view) return true;
-  // the document's file now, before another tab may show
+  // the document's tab and file now, before another tab may show
+  const tab = activeTabId.value;
   const file = { path: path.value, importedFrom: importedFrom.value };
+  const shown = () => {
+    if (activeTabId.value === tab) return true;
+    sendNotification({
+      title: TITLE,
+      body: "Another tab shows now, so nothing was signed. Sign again with Export signed PDF.",
+    });
+    return false;
+  };
   const refocus = () => view.focus();
   const sign = () => {
     const signature = savedMarks.value?.signature;
+    if (!signature || !shown()) return;
     // the document as it is once the user's signature is there
     const targets = targetsOf(view.state.doc);
-    if (!signature || targets.length === 0) return;
+    if (targets.length === 0) return;
     const name = config.value.signing.name;
     const named = file.path ?? file.importedFrom;
     signDialog.value = {
@@ -148,9 +188,18 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
       targets,
       chosen: chosenOf(targets, name),
       place: signingPlace.value,
+      signer: signerName(),
+      today: {
+        date: formatSigningDate(
+          new Date(),
+          signingDates.value.language,
+          signingDates.value.format,
+        ),
+        language: languageName(signingDates.value.language),
+      },
       warnings: file.importedFrom
         ? [
-            "Blank’s layout of this Word document can differ from Word’s. Check every page before you send it, or ask the sender for a PDF.",
+            "Blank's layout of this Word document can differ from Word's. Check every page before you send it, or ask the sender for a PDF.",
           ]
         : [],
       check: async (passphrase) => {
@@ -159,13 +208,20 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
           return null;
         } catch (error) {
           logWarning("the passphrase didn't open the key", signingKind(error));
-          return signingMessage(error, "Blank couldn't open your key");
+          return passphraseProblem(error);
         }
       },
-      createCertificate: (opener) =>
-        void openCertificateDialog("create", focusBack(opener)),
+      createCertificate: (opener) => {
+        const back = focusBack(opener);
+        // once there's a certificate, the Sign dialog takes the focus to
+        // its passphrase itself
+        void openCertificateDialog("create", () => {
+          if (!signingCertificate.value) back();
+        });
+      },
       submit: (pos, place, passphrase) => {
         refocus();
+        if (!shown()) return;
         signNow(view, file, request, {
           pos,
           index: targets.findIndex((target) => target.pos === pos),
@@ -197,7 +253,7 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
 /**
  * signNow exports the document as it is now, the dialogs closed, with the
  * block chosen filled in: the one still at `pos`, else the one of its
- * number among them
+ * number among them; with neither, it signs nothing
  */
 const signNow = (
   view: EditorView,
@@ -219,11 +275,7 @@ const signNow = (
 ) => {
   const state = view.state;
   const targets = targetsOf(state.doc);
-  const { name, dateFormat } = config.value.signing;
-  const target =
-    targets.find((target) => target.pos === pos) ??
-    targets[index] ??
-    targets[0];
+  const target = targets.find((target) => target.pos === pos) ?? targets[index];
   if (!target) {
     sendNotification({
       title: TITLE,
@@ -231,7 +283,17 @@ const signNow = (
     });
     return;
   }
-  const signer = target.name || name;
+  // the place the page shows: the block's own, else where the user signs
+  const shownPlace = target.place || place;
+  const signer = signerName();
+  const timestamped = !!config.value.signing.timestampServer;
+  // what the notification adds to what was exported
+  const how =
+    passphrase === null
+      ? "Your signature shows as a picture"
+      : timestamped
+        ? "Signed digitally, with a timestamp"
+        : "Signed digitally";
   void runExport(state, file, {
     ...request,
     context: {
@@ -240,22 +302,22 @@ const signNow = (
         src: png,
         signing: {
           name: signer,
-          place,
+          place: shownPlace,
           date: new Date(),
-          format: dateFormat,
-          language: language.value,
+          ...signingDates.value,
         },
       },
     },
     written: () => {
-      if (place) signingPlace.value = place;
-      announce("Signed and saved");
+      if (shownPlace) signingPlace.value = shownPlace;
+      announce("Signed PDF exported");
     },
+    done: how,
     ...(passphrase === null
       ? {}
       : {
           finish: (result: ExportResult) =>
-            signExport(result, passphrase, place),
+            signExport(result, passphrase, shownPlace),
         }),
   });
 };
@@ -274,17 +336,36 @@ const signExport = async (
 ) => {
   const box = result.signatureBox;
   if (!box) throw new Error("the signature block isn't in the PDF");
+  const timestampServer = config.value.signing.timestampServer;
   try {
     return await signPdf(result.contents, passphrase, {
       page: box.page + 1,
       rect: [box.x, box.y, box.width, box.height],
       location: place || null,
       reason: null,
-      timestampServer: config.value.signing.timestampServer || null,
+      timestampServer: timestampServer || null,
     });
   } catch (error) {
-    throw new Error(signingMessage(error, "Blank couldn't sign the PDF"), {
-      cause: error,
-    });
+    throw new Error(signingFailure(error), { cause: error });
   }
+};
+
+/**
+ * signingFailure says why a PDF wasn't signed, that nothing was saved, and,
+ * when the timestamp server gave no timestamp, how to sign without it
+ */
+const signingFailure = (error: unknown) => {
+  const message = signingMessage(error, "Blank couldn't sign the PDF").replace(
+    /\.?$/,
+    ".",
+  );
+  return [
+    message,
+    "Nothing was saved.",
+    signingKind(error) === "timestamp"
+      ? "If the timestamp server is down, sign without a timestamp: clear it in Settings ▸ Signing."
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 };

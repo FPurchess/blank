@@ -21,6 +21,12 @@ export type SigningError =
   | { kind: "noCertificate" }
   // the user has a key, which only a call that replaces it replaces
   | { kind: "keyExists" }
+  // the timestamp server gave no timestamp that holds: signing without one
+  // works
+  | { kind: "timestamp"; message: string }
+  // a PDF tab's file changed, or was moved or deleted, after Blank opened it
+  | { kind: "fileChanged" }
+  | { kind: "fileMissing" }
   | { kind: "failed"; message: string };
 
 /**
@@ -30,9 +36,15 @@ const isSigningError = (error: unknown): error is SigningError =>
   !!error &&
   typeof error === "object" &&
   "kind" in error &&
-  ["wrongPassphrase", "noCertificate", "keyExists", "failed"].includes(
-    (error as { kind: string }).kind,
-  );
+  [
+    "wrongPassphrase",
+    "noCertificate",
+    "keyExists",
+    "timestamp",
+    "fileChanged",
+    "fileMissing",
+    "failed",
+  ].includes((error as { kind: string }).kind);
 
 /**
  * signingKind returns what kind of error the native side sent, for the
@@ -40,6 +52,14 @@ const isSigningError = (error: unknown): error is SigningError =>
  */
 export const signingKind = (error: unknown) =>
   isSigningError(error) ? error.kind : "other";
+
+/**
+ * forTheLog returns what the log gets of an error: an error of the native
+ * side by its kind only, since its text may quote what the crypto crates
+ * got; one of the webview as it is
+ */
+export const forTheLog = (error: unknown) =>
+  isSigningError(error) ? error.kind : error;
 
 /**
  * signingMessage says what went wrong, in words for the user, `fallback`
@@ -55,6 +75,11 @@ export const signingMessage = (error: unknown, fallback: string) => {
       return "You have no certificate to sign with";
     case "keyExists":
       return "You have a key already";
+    case "fileChanged":
+      return "The PDF changed after Blank opened it";
+    case "fileMissing":
+      return "The PDF was moved or deleted after Blank opened it";
+    case "timestamp":
     case "failed":
       return error.message;
   }
@@ -121,3 +146,51 @@ export const signPdf = async (
       },
     }),
   );
+
+// how far Blank trusts who signed (src-tauri/src/signing/trust.rs): the
+// user's own certificate, one they trusted, one a certificate authority
+// issued (which Blank doesn't check), or an unknown self-signed one
+export type Trust =
+  | { kind: "own" }
+  | { kind: "trusted" }
+  | { kind: "issuedBy"; issuer: string }
+  | { kind: "unknown" };
+
+// what a signature says of the PDF: intact, intact for the version it
+// signed with the later changes signed by someone else, intact but changed
+// later, or not matching the PDF
+export type SignatureStatus =
+  "valid" | "signedAgainLater" | "changedAfterSigning" | "invalid";
+
+// a signature of a PDF, as Blank checked it
+export interface CheckedSignature {
+  field: string;
+  name: string | null;
+  // ISO 8601: the timestamp's time, else the signer's clock (without an
+  // offset when the PDF gives none)
+  time: string | null;
+  timestamped: boolean;
+  // who timestamped it, and whether that's a certificate the user trusts:
+  // else the time is the timestamp's word, not checked
+  timestampAuthority: string | null;
+  timestampTrusted: boolean;
+  // the weak algorithm it relies on ("SHA-1"), if it does
+  weak: string | null;
+  // for signedAgainLater: who signed next, after the changes
+  laterSigner: string | null;
+  reason: string | null;
+  location: string | null;
+  status: SignatureStatus;
+  trust: Trust;
+  certificate: CertificateInfo | null;
+  // the certificate, DER in hex, to trust it
+  certificateDer: string | null;
+}
+
+export const readTrusted = () => invoke<CertificateInfo[]>("signing_trusted");
+
+export const trustCertificate = (der: string) =>
+  invoke<CertificateInfo>("signing_trust", { der });
+
+export const untrustCertificate = (fingerprint: string) =>
+  invoke<void>("signing_untrust", { fingerprint });

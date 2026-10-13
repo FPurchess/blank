@@ -42,8 +42,17 @@ export type Sent =
 
 export interface PrintError {
   // noService: Linux has no print portal; unsupported: Windows' WebView2
-  // can't show its print dialog; uncertain: the job may have printed
-  kind: "noService" | "unsupported" | "uncertain" | "failed";
+  // can't show its print dialog; uncertain: the job may have printed; a PDF
+  // tab's file (printPdfTab): notOpen, missing (moved or deleted), changed
+  // (another PDF than the tab shows)
+  kind:
+    | "noService"
+    | "unsupported"
+    | "uncertain"
+    | "failed"
+    | "notOpen"
+    | "missing"
+    | "changed";
   message: string;
 }
 
@@ -74,3 +83,19 @@ export const sendPrint = (
   invoke<Sent>("print_send", pdf, {
     headers: { "x-print": encodeURIComponent(JSON.stringify(meta)) },
   });
+
+export type PdfPrinted =
+  | Sent
+  // the system's dialog (Linux) chose some pages or a scale, which Blank
+  // can't apply to a PDF it didn't write: nothing printed
+  | { outcome: "whole" };
+
+/**
+ * printPdfTab prints the PDF tab `tab`'s file as it is, while it is the PDF
+ * the tab opened: the native side reads it (so a large PDF never travels
+ * through the webview), asks the system's dialog on Linux, and hands it over
+ */
+export const printPdfTab = (
+  tab: string,
+  meta: { title: string; preset: Preset },
+) => invoke<PdfPrinted>("pdf_print", { tab, meta: { token: null, ...meta } });

@@ -192,7 +192,7 @@ describe("readDocument with a Word document", () => {
     expect(loaded?.importedFrom).toBe("/docs/Report.DOCX");
     expect(readTextFile).not.toHaveBeenCalled();
     expect(sendNotification).toHaveBeenCalledWith(
-      "Imported Report.DOCX. Save it with Mod+S as a markdown file",
+      "Imported Report.DOCX. Save it with Ctrl+S as a markdown file",
     );
   });
 
@@ -206,7 +206,7 @@ describe("readDocument with a Word document", () => {
     await readDocument("/docs/Report.docx");
 
     expect(sendNotification).toHaveBeenCalledWith(
-      "Imported Report.docx. Save it with Mod+S as a markdown file. Its Letter landscape pages came along",
+      "Imported Report.docx. Save it with Ctrl+S as a markdown file. Its Letter landscape pages came along",
     );
   });
 
@@ -220,7 +220,7 @@ describe("readDocument with a Word document", () => {
     await readDocument("/report.docx");
 
     expect(sendNotification).toHaveBeenCalledWith(
-      "Imported report.docx. Save it with Mod+S as a markdown file. 1 table inside a table became text. 2 comments left out",
+      "Imported report.docx. Save it with Ctrl+S as a markdown file. 1 table inside a table became text. 2 comments left out",
     );
   });
 

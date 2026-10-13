@@ -14,7 +14,13 @@ import {
 import { commandFor } from "../editor/plugins/keymap";
 import { schema } from "../markdown";
 import { separated } from "../separated";
-import type { Anchor, MenuItem, ToolbarItem } from "../state";
+import {
+  activeTab,
+  type Anchor,
+  isPdfTab,
+  type MenuItem,
+  type ToolbarItem,
+} from "../state";
 
 // What the formatting toolbar (FormatToolbar.vue) shows: its groups of
 // buttons and menus, which of them are pressed and enabled, and what goes
@@ -305,7 +311,9 @@ export const styleMenuItems = (
       radio: true,
       checked,
       look: `style-${style}`,
-      disabled: !checked && !can(commandFor(command)),
+      // in a PDF tab (src/pdf/commands.ts) none, the one shown neither
+      disabled:
+        (!checked || isPdfTab(activeTab.value)) && !can(commandFor(command)),
       run: () => {
         if (!checked) run(command);
       },
@@ -336,7 +344,7 @@ export const insertMenuItems = (
     item(C.INSERT_IMAGE),
     commandItem(C.INSERT_TABLE, C.INSERT_TABLE, {
       icon: commandInfo(C.INSERT_TABLE).icon,
-      disabled: !can(table),
+      disabled: !can(table) || !can(commandFor(C.INSERT_TABLE)),
       run: () => runCommand(table),
     }),
     item(C.INSERT_HORIZONTAL_RULE),

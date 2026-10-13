@@ -19,6 +19,8 @@ export const targetsOf = (doc: Node): SignTarget[] => {
     targets.push({
       pos,
       name,
+      place: node.attrs.place as string,
+      dated: node.attrs.date === "signing",
       label: label || `Signature ${targets.length + 1}`,
     });
   });

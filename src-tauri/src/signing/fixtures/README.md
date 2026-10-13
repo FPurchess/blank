@@ -29,3 +29,7 @@ pk12util -o nss.p12 -n grace -d sql:nssdb -W "correct horse" -K ""
 ## blank.pdf
 
 What Blank's layout engine (`src-tauri/layout`) writes for three paragraphs and an unsigned signature block, A4, with the default settings: `Engine::new(repository_fonts())`, `set_items` with three `Content::Text` paragraphs and a `Content::Signature` (lines `["Ada Lovelace · Tenant"]`), then `blank_layout::pdf::write` with the title "Lease" and the author "Ada Lovelace", written to this file from a throwaway test in `layout/tests/`. Make it again when the engine's PDF changes in a way that matters to signing (its cross-reference section, its trailer, its form).
+
+## sha1.pdf
+
+A signature that relies on SHA-1, for the weak-signature check: the PDF the test `signs_with_an_rsa_key` signs (with `rsa.p12`), its `/SubFilter` changed to `/adbe.pkcs7.detached` (as long as `/ETSI.CAdES.detached`, so nothing moves), and `/Contents` replaced, zero-padded, by `openssl cms -sign -binary -md sha1 -signer rsa.pem -outform DER` over the bytes its `/ByteRange` names (`rsa.pem` from `openssl pkcs12 -in rsa.p12 -nodes`). `pdfsig` calls it valid, with SHA-1.

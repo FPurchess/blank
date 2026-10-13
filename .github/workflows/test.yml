@@ -70,5 +70,39 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      # MuPDF's licence files, which the third-party notices quote
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: ./.github/actions/engine
+
+  # the PDF helper (src-tauri/pdf): the protocol and the client against a
+  # fake helper, MuPDF on the fixtures (the Chinese one with the system's
+  # font, from fonts-noto-cjk), and whether the notices list the C libraries
+  # its build compiles. A required check of main.
+  pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          cache-workspaces: src-tauri -> target
+          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
+      # MuPDF, and its build output while it didn't change: the tests and
+      # the notices check link and read the same libmupdf.a
+      - uses: ./.github/actions/mupdf
+        with:
+          build: true
+
+      - name: install poppler, qpdf and a CJK font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils qpdf fonts-noto-cjk
+
+      # optimized, as the app ships it: MuPDF built for debugging is slow
+      - name: test the helper
+        run: cargo test --release --manifest-path src-tauri/Cargo.toml -p blank-pdf-ipc -p blank-pdf -p blank-system-fonts
+
+      - name: check the notices of MuPDF's libraries
+        run: bun scripts/check-mupdf-notices.ts

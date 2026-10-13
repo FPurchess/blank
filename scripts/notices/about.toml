@@ -35,3 +35,9 @@ accepted = [
   # Blank itself, which build-notices.ts leaves out
   "AGPL-3.0-only",
 ]
+
+# mupdf-sys's build glue, which the PDF helper builds MuPDF with
+# (src-tauri/pdf/mupdf-sys), names its licence by the older SPDX id of
+# AGPL-3.0-only. MuPDF itself and its libraries are in mupdf.toml
+[mupdf-sys]
+accepted = ["AGPL-3.0"]

@@ -3,6 +3,7 @@ import type {
   PageRect,
   PageViewMode,
   PageZoom,
+  ZoomAnchor,
 } from "../state/pageView";
 
 // Where the page view puts each page, in both views: a frame is the part of
@@ -115,6 +116,53 @@ export const sheetScale = (
   );
 };
 
+// the size of a page, in points
+export interface PageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * sheetLayout places whole sheets of `sizes` one below the other for a view
+ * `width` pixels wide, each centred, all at the scale of `zoom` (for Fit,
+ * the one that fits the widest): the markdown pages in "pages", and a PDF's
+ * pages of any sizes (PdfView.vue)
+ */
+export const sheetLayout = (
+  sizes: readonly PageSize[],
+  width: number,
+  zoom: PageZoom = "fit",
+): FrameLayout => {
+  const widest = sizes.reduce((most, size) => Math.max(most, size.width), 1);
+  const scale = sheetScale("pages", widest, width, zoom);
+  let top = VIEW_TOP;
+  const frames = sizes.map((size, page) => {
+    const frame = {
+      page,
+      top,
+      left: Math.max(DESK_SIDE, (width - size.width * scale) / 2),
+      width: size.width * scale,
+      height: size.height * scale,
+      x: 0,
+      y: 0,
+      w: size.width,
+      h: size.height,
+    };
+    top += frame.height + SHEET_GAP;
+    return frame;
+  });
+  return {
+    mode: "pages",
+    scale,
+    frames: frames.map(snapped),
+    // rounded, so Fit's own width, a hair over the view's, scrolls nothing
+    width: Math.max(width, Math.round(widest * scale + 2 * DESK_SIDE)),
+    height: top - (sizes.length ? SHEET_GAP : 0) + VIEW_BOTTOM,
+    headerRoom: 0,
+    footerRoom: 0,
+  };
+};
+
 /**
  * frameLayout places the pages of `layout` for a view `width` pixels wide,
  * at `zoom`
@@ -125,41 +173,15 @@ export const frameLayout = (
   width: number,
   zoom: PageZoom = "fit",
 ): FrameLayout => {
-  const frames: Frame[] = [];
   if (mode === "pages") {
-    const scale = sheetScale(mode, layout.width, width, zoom);
-    const sheetWidth = layout.width * scale;
-    const sheetHeight = layout.height * scale;
-    const left = Math.max(DESK_SIDE, (width - sheetWidth) / 2);
-    for (let page = 0; page < layout.pages; page++) {
-      frames.push({
-        page,
-        top: VIEW_TOP + page * (sheetHeight + SHEET_GAP),
-        left,
-        width: sheetWidth,
-        height: sheetHeight,
-        x: 0,
-        y: 0,
-        w: layout.width,
-        h: layout.height,
-      });
-    }
-    const height =
-      VIEW_TOP +
-      layout.pages * (sheetHeight + SHEET_GAP) -
-      SHEET_GAP +
-      VIEW_BOTTOM;
-    return {
-      mode,
-      scale,
-      frames: frames.map(snapped),
-      // rounded, so Fit's own width, a hair over the view's, scrolls nothing
-      width: Math.max(width, Math.round(sheetWidth + 2 * DESK_SIDE)),
-      height,
-      headerRoom: 0,
-      footerRoom: 0,
-    };
+    const size = { width: layout.width, height: layout.height };
+    return sheetLayout(
+      Array.from({ length: layout.pages }, () => size),
+      width,
+      zoom,
+    );
   }
+  const frames: Frame[] = [];
   const { margins } = layout;
   const shown = layout.width - margins.left - margins.right + 2 * BLEED;
   const scale = sheetScale(mode, shown, width, zoom);
@@ -288,6 +310,30 @@ export const pointOnPage = (layout: FrameLayout, x: number, y: number) => {
     x: frame.x + (x - frame.left) / layout.scale,
     y: frame.y + (y - frame.top) / layout.scale,
   };
+};
+
+/**
+ * middleAnchor returns the spot of the pages in the middle of a view of
+ * `layout`, which a zoom keeps where it is; null without pages
+ * @param view the view's size and how far it scrolled, in CSS pixels
+ */
+export const middleAnchor = (
+  layout: FrameLayout,
+  view: {
+    width: number;
+    height: number;
+    scrollTop: number;
+    scrollLeft: number;
+  },
+): ZoomAnchor | null => {
+  const viewX = view.width / 2;
+  const viewY = view.height / 2;
+  const middle = pointOnPage(
+    layout,
+    view.scrollLeft + viewX,
+    view.scrollTop + viewY,
+  );
+  return middle && { ...middle, viewX, viewY };
 };
 
 /**

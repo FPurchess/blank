@@ -16,7 +16,12 @@ name = "blank_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [workspace]
-members = ["layout", "drawings"]
+members = ["layout", "drawings", "system-fonts", "pdf/ipc", "pdf/helper"]
+
+# MuPDF 1.28.5 from the submodule, built by mupdf-sys 0.8.0's glue, see
+# pdf/mupdf-sys/Cargo.toml and .claude/rules/pdf.md
+[patch.crates-io]
+mupdf-sys = { path = "pdf/mupdf-sys" }
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
@@ -42,11 +47,11 @@ tokio = { version = "1", features = ["fs", "sync", "time"] }
 # and the header the webview encodes with encodeURIComponent
 # (src/signing/commands.rs)
 percent-encoding = "2"
+# the PDF tabs' helper (src/pdf_view), which draws them with MuPDF in a
+# process of its own: this side of it only speaks its protocol
+blank-pdf-ipc = { path = "pdf/ipc" }
 # the system's fonts for scripts Blank's fonts lack, see src/fonts.rs
-fontique = "0.11"
-unicode-script = "0.5"
-# the version fontique uses; reads a fallback font's licence (fsType) and outlines
-read-fonts = "0.41"
+blank-system-fonts = { path = "system-fonts" }
 # Blank's log, in the system's log folder (src/logging.rs); log is the
 # facade it and Tauri's crates write through. The minor version must match
 # @tauri-apps/plugin-log.
@@ -156,6 +161,12 @@ opt-level = 3
 [profile.dev.package.ecdsa]
 opt-level = 3
 [profile.dev.package.elliptic-curve]
+opt-level = 3
+
+# MuPDF built for debugging draws pages slowly, in `tauri dev` and the
+# helper's tests too; the glue builds it optimized at opt-level 3 (make's
+# `build=release`)
+[profile.dev.package.mupdf-sys]
 opt-level = 3
 
 # the layout engine for the webview, see scripts/build-engine.sh

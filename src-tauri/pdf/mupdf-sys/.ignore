@@ -1,0 +1,4 @@
+# MuPDF's sources: cargo-about (make notices), which honours .ignore files,
+# would scan all of them for licence texts, which takes minutes; their
+# licences are listed in scripts/notices/mupdf.toml instead
+mupdf/

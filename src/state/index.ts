@@ -20,6 +20,7 @@ export * from "./messages";
 export * from "./outline";
 export * from "./page";
 export * from "./pageView";
+export * from "./pdf";
 export * from "./popups";
 export * from "./print";
 export * from "./recent";

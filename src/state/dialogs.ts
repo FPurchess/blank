@@ -8,6 +8,7 @@ import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
 import type { Mark, MarkSource, SavedMark } from "../signing/profile";
 import type { SignatureDate } from "../markdown/blocks/atoms";
+import type { CheckedSignature } from "../signing/ipc";
 
 export interface LinkDialogRequest {
   url: string;
@@ -207,6 +208,10 @@ export interface SignTarget {
   pos: number;
   // who it names, "" for whoever signs
   name: string;
+  // where it says it's signed, "" for where the signer says
+  place: string;
+  // whether today's date goes under it when it's signed
+  dated: boolean;
   // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
   label: string;
 }
@@ -217,7 +222,13 @@ export interface SignDialogRequest {
   // the signature blocks the document has, the one to fill in chosen
   targets: SignTarget[];
   chosen: number;
+  // where the user signed last
   place: string;
+  // the name the user signs as, "" when Blank doesn't know it
+  signer: string;
+  // today's date as the block writes it, and the language it's written in,
+  // e.g. "10 October 2026" and "English"
+  today: { date: string; language: string };
   // the notes the dialog shows, e.g. that an imported Word document's
   // layout can differ from Word's
   warnings: string[];
@@ -226,7 +237,8 @@ export interface SignDialogRequest {
   // opens the dialog that makes the user a certificate, which gives the
   // focus back to `opener`
   createCertificate(opener: EventTarget | null): void;
-  // fills in the block at `pos`, asks where to save the signed PDF and, with
+  // fills in the block at `pos` (signed in `place` when it says none),
+  // asks where to save the signed PDF and, with
   // the key's passphrase, signs it digitally too
   submit(pos: number, place: string, passphrase: string | null): void;
   cancel(): void;
@@ -254,6 +266,9 @@ export interface ConfirmDialogRequest {
   text: string;
   // the button that does it, e.g. "Remove"
   action: string;
+  // a certificate's fingerprint to compare, grouped, shown in monospace
+  // below the text as everywhere else
+  fingerprint?: string;
   // what else the dialog offers on its left, which leaves it open, e.g.
   // backing up what is to be removed
   secondary?: { label: string; run(): void };
@@ -264,6 +279,27 @@ export interface ConfirmDialogRequest {
 // confirmDialog holds the request of the open question whether to do
 // something that can't be undone, or null
 export const confirmDialog = shallowRef<ConfirmDialogRequest | null>(null);
+
+// The popover of a PDF's signatures above the status bar's item
+// (SignaturesPopover.vue), which lists those of the PDF shown; `refocus`
+// gives the focus back once it closes
+export interface SignaturesPopoverRequest {
+  refocus(): void;
+}
+
+export const signaturesPopover = shallowRef<SignaturesPopoverRequest | null>(
+  null,
+);
+
+// The details of one of a PDF's signatures (SignatureDetailsDialog.vue)
+export interface SignatureDetailsRequest {
+  signature: CheckedSignature;
+  refocus(): void;
+}
+
+export const signatureDetails = shallowRef<SignatureDetailsRequest | null>(
+  null,
+);
 
 // the settings open on the section shown last (settingsSection)
 export type SettingsRequest = Record<string, never>;
@@ -313,6 +349,8 @@ export const focusTakingDialogs = [
   signDialog,
   certificateDialog,
   confirmDialog,
+  signaturesPopover,
+  signatureDetails,
   unsavedDialog,
   settingsDialog,
   printDialog,

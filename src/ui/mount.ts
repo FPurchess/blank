@@ -1,9 +1,12 @@
-import { createApp, onScopeDispose } from "vue";
+import { createApp, onScopeDispose, watch } from "vue";
 
 import { EditorKey, type EditorHandle } from "../editor/handle";
 import { bootScope } from "../scope";
+import { isPdfTab, tabs } from "../state";
 import { uiRoot } from "../uiRoot";
 import App from "./App.vue";
+import { pdfBitmaps } from "./pageBitmaps";
+import { closedKeys } from "./pdfViewModel";
 
 /**
  * bootApp mounts the Vue app into the UI root, with `editor` for useEditor
@@ -17,6 +20,16 @@ export const bootApp = (editor: EditorHandle) =>
     const app = createApp(App);
     app.provide(EditorKey, editor);
     app.mount(element);
+    // the bitmaps of closed PDF tabs go, also while no PDF shows
+    watch(
+      tabs,
+      (list) => {
+        const open = new Set(list.filter(isPdfTab).map((tab) => tab.id));
+        for (const key of closedKeys(pdfBitmaps.keys(), open))
+          pdfBitmaps.delete(key);
+      },
+      { immediate: true },
+    );
     onScopeDispose(() => {
       app.unmount();
       element.remove();

@@ -27,6 +27,14 @@ jobs:
           # only main saves, so pull requests don't evict its cache with their own copies
           cache-save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      # MuPDF, which the PDF helper is built from, and the helper itself,
+      # from the cache while they didn't change; the macOS leg also
+      # cross-builds it for Intel below
+      - uses: ./.github/actions/mupdf
+        with:
+          helper: true
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'host x86_64-apple-darwin' || '' }}
+
       - name: setup node
         uses: actions/setup-node@v7
         with:
@@ -47,7 +55,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      # tauri-action builds the frontend through beforeBuildCommand
+      # tauri-action builds the frontend and the PDF helper through
+      # beforeBuildCommand
       - name: install app dependencies
         run: bun install
 
@@ -62,13 +71,64 @@ jobs:
       - name: run rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p blank
 
+      # the PDF helper runs; every build has it next to the app in target/
+      # (the packages: /usr/lib/blank on Linux, next to the app elsewhere)
+      - name: run the PDF helper
+        shell: bash
+        run: |
+          helper=src-tauri/target/release/blank-pdf
+          [ -f "$helper" ] || helper="$helper.exe"
+          "$helper" --version | tee "$RUNNER_TEMP/helper.txt"
+          grep -q "MuPDF 1.28.5" "$RUNNER_TEMP/helper.txt"
+
+      # the helper is built for macOS 12, as the app is
+      - name: check the PDF helper's macOS version (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          minos=$(vtool -show-build src-tauri/target/release/blank-pdf | awk '/minos/ { print $2; exit }')
+          echo "the PDF helper's minos: $minos"
+          [ "$minos" = 12.0 ]
+
+      # publish.yml builds the Intel release on this Apple Silicon runner: the
+      # PDF helper (MuPDF's C build too) has to cross-build for x86_64, for
+      # macOS 12
+      - name: cross-build the PDF helper for Intel Macs (macOS only)
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          rustup target add x86_64-apple-darwin
+          TAURI_ENV_TARGET_TRIPLE=x86_64-apple-darwin bun run pdf-helper
+          helper=src-tauri/binaries/blank-pdf-x86_64-apple-darwin
+          lipo -archs "$helper" | tee "$RUNNER_TEMP/archs.txt"
+          [ "$(cat "$RUNNER_TEMP/archs.txt")" = x86_64 ]
+          minos=$(vtool -show-build "$helper" | awk '/minos/ { print $2; exit }')
+          echo "the Intel PDF helper's minos: $minos"
+          [ "$minos" = 12.0 ]
+
       # Linux builds stay on ubuntu-22.04 so the binary runs on glibc >= 2.35 (Debian 12, Ubuntu 22.04). See issue #8.
       - name: check glibc floor (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
-          echo "highest required glibc symbol: $max"
-          [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          for binary in blank blank-pdf; do
+            max=$(objdump -T src-tauri/target/release/$binary | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+            echo "$binary: highest required glibc symbol: $max"
+            [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          done
+
+      # MuPDF's FreeType is built into the helper. Exported, it would take the
+      # place of the system's for the libraries the helper loads (fontconfig),
+      # so the helper exports none of it and loads fontconfig at run time
+      # (fontique's fontconfig-dlopen, src-tauri/system-fonts/Cargo.toml)
+      - name: check the PDF helper keeps its FreeType to itself (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          helper=src-tauri/target/release/blank-pdf
+          exported=$(nm -D --defined-only "$helper" | grep -c ' FT_' || true)
+          echo "FreeType functions the PDF helper exports: $exported"
+          [ "$exported" -eq 0 ]
+          if readelf -d "$helper" | grep -q 'NEEDED.*libfontconfig'; then
+            echo "::error::the PDF helper links libfontconfig instead of loading it"
+            exit 1
+          fi
 
       - name: check desktop entry and AppStream metadata in the packages (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -80,6 +140,8 @@ jobs:
           cat "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop"
           grep -qx 'Exec=blank %F' "$RUNNER_TEMP/deb/usr/share/applications/blank.desktop" ||
             { echo "::error::the .deb's desktop entry doesn't pass the files to blank"; exit 1; }
+          test -x "$RUNNER_TEMP/deb/usr/lib/blank/blank-pdf" || { echo "::error::the .deb has no usr/lib/blank/blank-pdf"; exit 1; }
           sudo apt-get install -y rpm
           rpm -qlp src-tauri/target/release/bundle/rpm/*.rpm | tee "$RUNNER_TEMP/rpm.txt"
           grep -qx "/$meta" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /$meta"; exit 1; }
+          grep -qx "/usr/lib/blank/blank-pdf" "$RUNNER_TEMP/rpm.txt" || { echo "::error::the .rpm has no /usr/lib/blank/blank-pdf"; exit 1; }

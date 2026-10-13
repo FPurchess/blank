@@ -56,23 +56,3 @@ export const parseTimestampServer = (
   }
   return { error: "Enter a web address, such as " + TIMESTAMP_PRESET + "." };
 };
-
-/**
- * groupFingerprint writes a fingerprint in groups of four, to read it out
- */
-export const groupFingerprint = (fingerprint: string) =>
-  fingerprint.match(/.{1,4}/g)?.join(" ") ?? fingerprint;
-
-/**
- * certificateSummary says who made a certificate and until when it's valid
- */
-export const certificateSummary = (info: {
-  selfSigned: boolean;
-  issuer: string;
-  notAfter: string;
-}) => {
-  const until = info.notAfter.slice(0, 10);
-  return info.selfSigned
-    ? `Made by Blank, valid until ${until}`
-    : `Issued by ${info.issuer}, valid until ${until}`;
-};

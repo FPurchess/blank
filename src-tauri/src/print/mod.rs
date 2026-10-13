@@ -92,6 +92,12 @@ pub enum ErrorKind {
     /// the job may have printed all the same
     Uncertain,
     Failed,
+    /// a PDF tab's file (`pdf_print`): the tab has no PDF open
+    NotOpen,
+    /// it isn't where the tab opened it any more
+    Missing,
+    /// it holds another PDF than the one the tab shows
+    Changed,
 }
 
 /// why printing didn't work, for the webview to say
@@ -131,9 +137,18 @@ pub async fn print_prepare(
     title: String,
     preset: Preset,
 ) -> Result<PrintSetup, PrintError> {
+    prepare(&window, &title, &preset).await
+}
+
+/// what `print_prepare` does, also for a PDF tab's file (`pdf_print`)
+pub async fn prepare(
+    window: &tauri::WebviewWindow,
+    title: &str,
+    preset: &Preset,
+) -> Result<PrintSetup, PrintError> {
     #[cfg(target_os = "linux")]
     {
-        linux::prepare(&window, &title, &preset).await
+        linux::prepare(window, title, preset).await
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -164,19 +179,30 @@ pub async fn print_send(
         .and_then(|value| value.to_str().ok())
         .and_then(decode_meta)
         .ok_or_else(|| PrintError::failed("what to print didn't arrive"))?;
+    send(&app, &window, pdf, meta).await
+}
+
+/// hands `pdf` to the system's print dialog, also a PDF tab's file
+/// (`pdf_print`)
+pub async fn send(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    pdf: &[u8],
+    meta: Meta,
+) -> Result<Sent, PrintError> {
     #[cfg(target_os = "linux")]
     {
         let _ = app;
-        linux::send(&window, pdf, meta).await
+        linux::send(window, pdf, meta).await
     }
     #[cfg(target_os = "macos")]
     {
         let _ = window;
-        macos::send(&app, pdf.clone(), meta).await
+        macos::send(app, pdf.to_vec(), meta).await
     }
     #[cfg(target_os = "windows")]
     {
-        windows::send(&app, &window, pdf, &meta).await
+        windows::send(app, window, pdf, &meta).await
     }
 }
 

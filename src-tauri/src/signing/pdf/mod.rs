@@ -4,7 +4,7 @@
 pub mod sign;
 
 use anyhow::{bail, Context, Result};
-use lopdf::{Document, IncrementalDocument, Object, ObjectId, StringFormat};
+use lopdf::{Dictionary, Document, IncrementalDocument, Object, ObjectId, StringFormat};
 
 use crate::signing::Refusal;
 
@@ -89,6 +89,113 @@ pub fn docmdp_permission(doc: &Document) -> Option<i64> {
 /// resolve follows `o` if it's a reference
 pub fn resolve<'a>(doc: &'a Document, o: &'a Object) -> Option<&'a Object> {
     doc.dereference(o).ok().map(|(_, o)| o)
+}
+
+/// the most fields form_fields visits, how deep it goes, how many kids of
+/// one field it takes, and the longest full name it builds: a hostile
+/// form (kids that list themselves or an ancestor, endless nesting, huge
+/// arrays) can't make it loop or run out of memory
+const MAX_FIELDS: usize = 10_000;
+const MAX_DEPTH: usize = 32;
+const MAX_KIDS: usize = 4_096;
+const MAX_NAME: usize = 1_024;
+
+/// a field of a PDF's form, as form_fields finds it
+pub struct FormField<'a> {
+    pub dict: &'a Dictionary,
+    /// its partial name, `/T` as written
+    pub partial: Option<&'a [u8]>,
+    /// its full name, the partial names from the top joined by dots, at
+    /// most MAX_NAME bytes
+    pub name: String,
+    /// a signature field: `/FT /Sig`, its own or inherited
+    pub signature: bool,
+}
+
+/// form_fields walks the fields of the PDF's form (`/AcroForm /Fields` and
+/// their `/Kids`), in the form's order, each field once
+pub fn form_fields(doc: &Document) -> Vec<FormField<'_>> {
+    let mut out = vec![];
+    let Some(list) = doc
+        .catalog()
+        .ok()
+        .and_then(|c| c.get(b"AcroForm").ok())
+        .and_then(|o| resolve(doc, o))
+        .and_then(|form| form.as_dict().ok())
+        .and_then(|form| form.get(b"Fields").ok())
+        .and_then(|o| resolve(doc, o))
+        .and_then(|fields| fields.as_array().ok())
+    else {
+        return out;
+    };
+    // (field, its parent's full name, the parent is a signature, depth)
+    let mut stack: Vec<(&Object, String, bool, usize)> = list
+        .iter()
+        .take(MAX_KIDS)
+        .rev()
+        .map(|f| (f, String::new(), false, 0))
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    let mut visits = 0;
+    while let Some((o, prefix, parent_sig, depth)) = stack.pop() {
+        visits += 1;
+        if visits > MAX_FIELDS {
+            break;
+        }
+        let Ok((id, obj)) = doc.dereference(o) else {
+            continue;
+        };
+        // a field listed twice, or in its own kids, is walked once
+        if id.is_some_and(|id| !seen.insert(id)) {
+            continue;
+        }
+        let Ok(dict) = obj.as_dict() else { continue };
+        let title = dict.get(b"T").ok();
+        let partial = title.and_then(|t| t.as_str().ok());
+        let mut name = prefix;
+        if let (Some(title), Some(raw)) = (title, partial) {
+            let t = lopdf::decode_text_string(title)
+                .unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned());
+            if !name.is_empty() {
+                name.push('.');
+            }
+            name.push_str(&t);
+            if name.len() > MAX_NAME {
+                let mut end = MAX_NAME;
+                while !name.is_char_boundary(end) {
+                    end -= 1;
+                }
+                name.truncate(end);
+            }
+        }
+        let signature = dict
+            .get(b"FT")
+            .and_then(Object::as_name)
+            .map(|n| n == b"Sig")
+            .unwrap_or(parent_sig);
+        if depth < MAX_DEPTH {
+            if let Some(kids) = dict
+                .get(b"Kids")
+                .ok()
+                .and_then(|k| resolve(doc, k))
+                .and_then(|k| k.as_array().ok())
+            {
+                stack.extend(
+                    kids.iter()
+                        .take(MAX_KIDS)
+                        .rev()
+                        .map(|k| (k, name.clone(), signature, depth + 1)),
+                );
+            }
+        }
+        out.push(FormField {
+            dict,
+            partial,
+            name,
+            signature,
+        });
+    }
+    out
 }
 
 /// inherited returns an attribute of a page, inherited from its ancestors

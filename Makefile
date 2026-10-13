@@ -5,7 +5,7 @@
 
 .PHONY: help install install-e2e dev dev-web build snap build-debug lint lint-fix \
 	format format-check test test-coverage test-rust test-e2e test-e2e-headless check clean \
-	dictionaries engine engine-size \
+	dictionaries engine engine-size pdf-helper \
 	install-docs docs-dev docs-build docs-screenshots docs-shot bump release
 
 help: ## List all targets
@@ -45,6 +45,9 @@ engine: ## Build the layout engine for the webview into src/engine/wasm
 
 engine-size: ## Report what the layout engine's wasm is made of and what to cut (needs twiggy 0.8.0; FORMAT=json, NO_BUILD=1, N=<rows>)
 	@bun run --silent engine:size
+
+pdf-helper: ## Build the PDF helper (MuPDF) into src-tauri/binaries, which every build of the app needs
+	bun run pdf-helper
 
 notices: ## Regenerate public/THIRD-PARTY-NOTICES.txt after changing dependencies (needs cargo-about)
 	bun run notices

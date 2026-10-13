@@ -9,12 +9,16 @@ inputs:
 runs:
   using: composite
   steps:
-    # `webkit2gtk-driver` provides WebKitWebDriver, `xvfb` a virtual display, and `xclip`
-    # the X selection the middle-click paste spec sets
+    # `webkit2gtk-driver` (`webkitgtk-webdriver` from Ubuntu 26.04 on) provides
+    # WebKitWebDriver, `xvfb` a virtual display, and `xclip` the X selection the
+    # middle-click paste spec sets
     - name: install system dependencies
       shell: bash
       run: |
         sudo apt-get update
+        driver=webkit2gtk-driver
+        # an empty list: no version to install (26.04 still names the old package)
+        [ -n "$(apt-cache madison "$driver")" ] || driver=webkitgtk-webdriver
         sudo apt-get install -y \
           libwebkit2gtk-4.1-dev \
           build-essential \
@@ -25,7 +29,7 @@ runs:
           libssl-dev \
           libayatana-appindicator3-dev \
           librsvg2-dev \
-          webkit2gtk-driver \
+          "$driver" \
           xclip \
           xvfb \
           ${{ inputs.ffmpeg == 'true' && 'ffmpeg' || '' }}

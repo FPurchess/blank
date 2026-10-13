@@ -7,7 +7,7 @@ import {
 } from "vue";
 
 import { useEditor } from "../../editor/handle";
-import type { Anchor, MenuItem } from "../../state";
+import { announce, type Anchor, type MenuItem } from "../../state";
 import { useMenuButton } from "../composables/useMenuButton";
 import IconButton from "./IconButton.vue";
 import IconGlyph from "./IconGlyph.vue";
@@ -35,6 +35,8 @@ const props = withDefaults(
     chevron?: boolean;
     // what takes the focus when a menu a click opened closes
     refocus?: () => void;
+    // greyed out: its menu doesn't open, and a press says why, its tip
+    disabled?: boolean;
   }>(),
   {
     icon: undefined,
@@ -43,6 +45,7 @@ const props = withDefaults(
     tabindex: undefined,
     chevron: true,
     refocus: undefined,
+    disabled: false,
   },
 );
 
@@ -60,6 +63,7 @@ const iconOnly = computed(() => props.text === undefined && !slots.default);
 
 // the menu is built only to open it, not when a click closes it
 const open = (event: Event) => {
+  if (props.disabled) return announce(props.tip ?? props.label);
   if (menu.isOpen.value) return menu.toggle(event, []);
   const { left, bottom } = element()!.getBoundingClientRect();
   menu.toggle(event, props.items({ left, top: bottom, bottom }));
@@ -79,6 +83,7 @@ const openByKey = (event: KeyboardEvent) => {
     :label="text ? `${label}: ${text}` : label"
     :tip="tip ?? label"
     :tabindex="tabindex"
+    :disabled="disabled"
     aria-haspopup="menu"
     :aria-expanded="menu.isOpen.value"
     @click="open"

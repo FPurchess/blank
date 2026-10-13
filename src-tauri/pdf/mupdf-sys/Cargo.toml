@@ -1,0 +1,60 @@
+# mupdf-sys 0.8.0's build glue (build.rs, make.rs, msbuild.rs, docs.rs,
+# src/lib.rs and wrapper/, unchanged from crates.io), building MuPDF from the
+# submodule `mupdf`, Artifex's tag 1.28.5, instead of the copy the crate ships
+# (1.27.2). src-tauri/Cargo.toml puts it in place of the crates.io crate with
+# [patch.crates-io]. See .claude/rules/pdf.md for bumping MuPDF.
+[package]
+edition = "2021"
+name = "mupdf-sys"
+version = "0.8.0"
+build = "build.rs"
+links = "mupdf-wrapper"
+description = "Rust FFI binding to MuPDF"
+license = "AGPL-3.0"
+repository = "https://github.com/messense/mupdf-rs"
+publish = false
+
+[features]
+all-fonts = []
+base14-fonts = []
+brotli = []
+cbz = []
+default = ["base14-fonts"]
+docx-output = []
+epub = []
+html = []
+img = []
+js = []
+libarchive = []
+svg = []
+sys-lib = []
+sys-lib-brotli = []
+sys-lib-freetype = []
+sys-lib-gumbo = []
+sys-lib-harfbuzz = []
+sys-lib-jbig2dec = []
+sys-lib-jpegxr = []
+sys-lib-lcms2 = []
+sys-lib-leptonica = []
+sys-lib-libjpeg = []
+sys-lib-openjpeg = []
+sys-lib-tesseract = []
+sys-lib-zlib = []
+sys-lib-zxingcpp = []
+tesseract = []
+xps = []
+zerocopy = ["dep:zerocopy"]
+zxingcpp = []
+
+[lib]
+name = "mupdf_sys"
+path = "src/lib.rs"
+
+[dependencies]
+zerocopy = { version = "0.8.17", features = ["derive"], optional = true }
+
+[build-dependencies]
+bindgen = { version = "0.72", default-features = false, features = ["runtime"] }
+cc = "1.0.50"
+pkg-config = "0.3"
+regex = "1.11"

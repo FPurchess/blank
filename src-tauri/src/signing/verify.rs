@@ -4,6 +4,7 @@
 
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::der as d;
+use crate::signing::pdf::form_fields;
 use anyhow::{Context, Result};
 use cms::content_info::ContentInfo;
 use cms::signed_data::{SignedData, SignerIdentifier};
@@ -12,11 +13,24 @@ use der::{Decode, Encode};
 use lopdf::{Document, Object, ObjectId};
 use sha2::Digest;
 use spki::SubjectPublicKeyInfoOwned;
+use std::collections::HashSet;
 use x509_cert::Certificate;
 
-/// what coverage says of a signature whose byte ranges reach the end of
-/// the file
-const WHOLE_FILE: &str = "covers the whole file";
+/// how much of the file a signature covers
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Coverage {
+    /// nothing came after it
+    WholeFile,
+    /// only validation data (a DSS) came after it
+    ValidationData,
+    /// later revisions came, the last of them signed
+    SignedAgainLater,
+    /// later revisions came that no signature covers
+    ChangedAfterSigning,
+    /// its byte ranges can't be read
+    #[default]
+    Unknown,
+}
 
 /// what Blank found of one signature of a PDF
 #[derive(Debug, Default)]
@@ -27,13 +41,31 @@ pub struct SignatureReport {
     /// (check, passed, detail)
     pub checks: Vec<(&'static str, bool, String)>,
     pub signer: Option<CertificateInfo>,
+    /// the signer's certificate, DER
+    pub signer_der: Option<Vec<u8>>,
     pub digest_algorithm: String,
     pub signature_algorithm: String,
+    /// when a timestamp server says it was signed, as its token writes it
+    /// (GeneralizedTime, e.g. "20261008120000Z")
     pub timestamp: Option<String>,
-    /// how much of the file the signature covers, in words: the whole
-    /// file, or what came after it
-    pub coverage: String,
+    /// who says so: the certificate in the timestamp token. Blank checks
+    /// that the token is intact, not who made it, so the time is only as
+    /// good as this certificate (see trust.rs)
+    pub timestamp_authority: Option<CertificateInfo>,
+    /// it has a timestamp token Blank can't read: not a failure, the
+    /// signature itself may be fine
+    pub timestamp_unreadable: bool,
+    /// the weak algorithm the signature relies on (SHA-1), whose
+    /// signatures can be forged: intact isn't enough to rely on it
+    pub weak: Option<&'static str>,
+    pub coverage: Coverage,
     pub signing_time_claimed: Option<String>,
+    /// what the signature's dictionary says of itself: `/Name`, `/Reason`,
+    /// `/Location`, and `/M`, the signer's computer's clock, as written
+    pub name: Option<String>,
+    pub reason: Option<String>,
+    pub location: Option<String>,
+    pub time: Option<String>,
 }
 
 impl SignatureReport {
@@ -47,7 +79,7 @@ impl SignatureReport {
     /// covers_the_whole_file tells whether nothing was added to the file
     /// after this signature
     pub fn covers_the_whole_file(&self) -> bool {
-        self.coverage == WHOLE_FILE
+        self.coverage == Coverage::WholeFile
     }
 }
 
@@ -58,6 +90,10 @@ fn oid_name(o: &Oid) -> String {
         .map(|s| s.to_string())
         .unwrap_or_else(|| o.to_string())
 }
+
+/// SHA-1, whose collisions can be made: a signature over it may sign
+/// another document as well
+const SHA1: &str = "1.3.14.3.2.26";
 
 /// hash hashes `parts` with the digest algorithm `oid`, if Blank knows it
 fn hash(oid: &Oid, parts: &[&[u8]]) -> Option<Vec<u8>> {
@@ -227,12 +263,15 @@ type Detached<'a> = &'a dyn Fn(&Oid) -> Option<Vec<u8>>;
 struct CmsCheck {
     checks: Vec<(&'static str, bool, String)>,
     signer: Option<CertificateInfo>,
+    signer_der: Option<Vec<u8>>,
     digest_algorithm: Oid,
     signature_algorithm: String,
     signature: Vec<u8>,
     econtent: Option<Vec<u8>>,
     timestamp_token: Option<Vec<u8>>,
     signing_time: Option<String>,
+    /// it relies on SHA-1, for the digest or in the signature algorithm
+    weak: bool,
 }
 
 /// check_cms checks a CMS SignedData. `detached` hashes the external
@@ -366,7 +405,10 @@ fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
                 id.tag == 0x04 && rest.is_empty() && id.content == ski.0.as_bytes()
             }),
     });
-    let signer = cert.map(|c| CertificateInfo::of(c, &c.to_der().unwrap_or_default()));
+    let signer_der = cert.and_then(|c| c.to_der().ok());
+    let signer = cert
+        .zip(signer_der.as_ref())
+        .map(|(c, der)| CertificateInfo::of(c, der));
     match (cert, &prehash_target) {
         (Some(c), Some((h, ph))) => {
             let r = verify_signature(
@@ -394,6 +436,8 @@ fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
         )),
     }
 
+    let weak = digest_oid.to_string() == SHA1
+        || sig_alg_hash(&si.signature_algorithm.oid).is_some_and(|h| h.to_string() == SHA1);
     let timestamp_token = si.unsigned_attrs.as_ref().and_then(|u| {
         u.iter()
             .find(|a| a.oid.to_string() == "1.2.840.113549.1.9.16.2.14")
@@ -403,12 +447,14 @@ fn check_cms(der_bytes: &[u8], detached: Option<Detached>) -> Result<CmsCheck> {
     Ok(CmsCheck {
         checks,
         signer,
+        signer_der,
         digest_algorithm: digest_oid,
         signature_algorithm: oid_name(&si.signature_algorithm.oid),
         signature: si.signature.as_bytes().to_vec(),
         econtent,
         timestamp_token,
         signing_time,
+        weak,
     })
 }
 
@@ -423,31 +469,22 @@ fn tst_info(der_bytes: &[u8]) -> Option<(Oid, Vec<u8>, String)> {
     Some((oid, imprint.get(1)?.content.to_vec(), gen_time))
 }
 
-/// check_timestamp checks an RFC 3161 token over `data`; it returns the
-/// time it gives
-fn check_timestamp(token: &[u8], data: &[u8]) -> (bool, String) {
-    match check_cms(token, None) {
-        Ok(c) => {
-            let Some((oid, imprint, time)) = c.econtent.as_deref().and_then(tst_info) else {
-                return (false, "can't read TSTInfo".into());
-            };
-            let ok_imprint = hash(&oid, &[data]).is_some_and(|h| h == imprint);
-            let ok_cms = c.checks.iter().all(|c| c.1);
-            let tsa = c.signer.map(|s| s.name).unwrap_or_default();
-            (
-                ok_imprint && ok_cms,
-                format!(
-                    "{time} by {tsa}{}",
-                    if ok_imprint {
-                        ""
-                    } else {
-                        " (imprint mismatch)"
-                    }
-                ),
-            )
-        }
-        Err(e) => (false, format!("{e:#}")),
-    }
+/// check_timestamp checks an RFC 3161 token over `data`: whether it holds,
+/// the time it gives and the certificate of who gave it, or None for a
+/// token that can't be read
+fn check_timestamp(token: &[u8], data: &[u8]) -> Option<(bool, String, Option<CertificateInfo>)> {
+    let c = check_cms(token, None).ok()?;
+    let (oid, imprint, time) = c.econtent.as_deref().and_then(tst_info)?;
+    let ok_imprint = hash(&oid, &[data]).is_some_and(|h| h == imprint);
+    Some((ok_imprint && c.checks.iter().all(|c| c.1), time, c.signer))
+}
+
+/// text reads a text string of a signature's dictionary
+fn text(sig: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
+    sig.get(key)
+        .ok()
+        .and_then(|value| lopdf::decode_text_string(value).ok())
+        .filter(|value| !value.trim().is_empty())
 }
 
 /// is_ws tells whether `b` is PDF whitespace
@@ -461,78 +498,31 @@ struct SigDict {
     id: Option<ObjectId>,
 }
 
+/// the most annotations collect_sig_fields looks at on the pages, for
+/// signature widgets that aren't in the form
+const MAX_ANNOTATIONS: usize = 100_000;
+
 /// collect_sig_fields finds the signed signature fields, in /AcroForm and
-/// on the pages
+/// on the pages; a hostile PDF's form or pages can't make it loop or run
+/// out of memory (see form_fields)
 fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
-    let mut out = vec![];
-    let Some(form) = doc
-        .catalog()
-        .ok()
-        .and_then(|c| c.get(b"AcroForm").ok())
-        .and_then(|o| doc.dereference(o).ok())
-        .map(|x| x.1)
-    else {
-        return out;
-    };
-    let Some(fields) = form
-        .as_dict()
-        .ok()
-        .and_then(|f| f.get(b"Fields").ok())
-        .and_then(|o| doc.dereference(o).ok())
-        .and_then(|x| x.1.as_array().ok())
-    else {
-        return out;
-    };
-    let mut stack: Vec<(Object, String, bool)> = fields
-        .iter()
-        .map(|f| (f.clone(), String::new(), false))
+    let mut out: Vec<SigDict> = form_fields(doc)
+        .into_iter()
+        .filter(|field| field.signature)
+        .filter_map(|field| {
+            field.dict.get(b"V").ok().map(|v| SigDict {
+                field: field.name,
+                id: v.as_reference().ok(),
+            })
+        })
         .collect();
-    let mut guard = 0;
-    while let Some((o, prefix, parent_sig)) = stack.pop() {
-        guard += 1;
-        if guard > 100_000 {
-            break;
-        }
-        let Ok((_, obj)) = doc.dereference(&o) else {
-            continue;
-        };
-        let Ok(f) = obj.as_dict() else { continue };
-        let t = f
-            .get(b"T")
-            .and_then(Object::as_str)
-            .map(|t| String::from_utf8_lossy(t).to_string())
-            .ok();
-        let name = match (&t, prefix.is_empty()) {
-            (Some(t), true) => t.clone(),
-            (Some(t), false) => format!("{prefix}.{t}"),
-            (None, _) => prefix.clone(),
-        };
-        let is_sig = f
-            .get(b"FT")
-            .and_then(Object::as_name)
-            .map(|n| n == b"Sig")
-            .unwrap_or(parent_sig);
-        if is_sig {
-            if let Ok(v) = f.get(b"V") {
-                out.push(SigDict {
-                    field: name.clone(),
-                    id: v.as_reference().ok(),
-                });
-            }
-        }
-        if let Ok(kids) = f
-            .get(b"Kids")
-            .and_then(|k| doc.dereference(k).map(|x| x.1))
-            .and_then(Object::as_array)
-        {
-            stack.extend(kids.iter().map(|k| (k.clone(), name.clone(), is_sig)));
-        }
-    }
-    out.reverse();
     // widgets of signature fields that aren't in /AcroForm (poppler 24.02's
     // pdfsig -add-signature doesn't add its field there)
-    let known: std::collections::HashSet<_> = out.iter().filter_map(|s| s.id).collect();
-    for (_, page) in doc.get_pages() {
+    let mut known: HashSet<_> = out.iter().filter_map(|s| s.id).collect();
+    // a page tree may list a page more than once
+    let mut pages = HashSet::new();
+    let mut looked = 0;
+    for page in doc.page_iter().filter(|page| pages.insert(*page)) {
         let Some(annots) = doc
             .get_dictionary(page)
             .ok()
@@ -543,6 +533,10 @@ fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
             continue;
         };
         for a in annots {
+            looked += 1;
+            if looked > MAX_ANNOTATIONS {
+                return out;
+            }
             let Some(w) = doc.dereference(a).ok().and_then(|x| x.1.as_dict().ok()) else {
                 continue;
             };
@@ -550,7 +544,7 @@ fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
                 continue;
             }
             if let Ok(id) = w.get(b"V").and_then(Object::as_reference) {
-                if !known.contains(&id) {
+                if known.insert(id) {
                     let t = w
                         .get(b"T")
                         .and_then(Object::as_str)
@@ -594,6 +588,10 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
             reports.push(r);
             continue;
         };
+        r.name = text(sig, b"Name");
+        r.reason = text(sig, b"Reason");
+        r.location = text(sig, b"Location");
+        r.time = text(sig, b"M");
         r.sub_filter = sig
             .get(b"SubFilter")
             .and_then(Object::as_name)
@@ -721,7 +719,11 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                 r.signature_algorithm = c.signature_algorithm.clone();
                 r.checks.extend(c.checks);
                 r.signer = c.signer;
+                r.signer_der = c.signer_der;
                 r.signing_time_claimed = c.signing_time;
+                if c.weak || sub == "adbe.pkcs7.sha1" {
+                    r.weak = Some("SHA-1");
+                }
                 match sub.as_str() {
                     "adbe.pkcs7.sha1" => {
                         let inner = c.econtent.clone();
@@ -733,10 +735,16 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                         ));
                     }
                     "ETSI.RFC3161" => {
+                        // its time only counts when the token covers the ranges
                         let ok = c.econtent.as_deref().and_then(tst_info).is_some_and(
                             |(oid, imprint, t)| {
-                                r.timestamp = Some(t);
-                                hash(&oid, &ranges).is_some_and(|h| h == imprint)
+                                let ok = hash(&oid, &ranges).is_some_and(|h| h == imprint);
+                                if ok {
+                                    r.timestamp = Some(t);
+                                    // a document timestamp: its signer is the authority
+                                    r.timestamp_authority = r.signer.clone();
+                                }
+                                ok
                             },
                         );
                         r.checks.push((
@@ -747,10 +755,20 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
                     }
                     _ => {}
                 }
+                // a token that can't be read says nothing of the signature
+                // (pkcs7_sha1.pdf of the spike), one that doesn't hold does
                 if let Some(tok) = c.timestamp_token {
-                    let (ok, detail) = check_timestamp(&tok, &c.signature);
-                    r.timestamp = Some(detail.clone());
-                    r.checks.push(("signature timestamp", ok, detail));
+                    match check_timestamp(&tok, &c.signature) {
+                        Some((ok, time, authority)) => {
+                            r.checks.push(("signature timestamp", ok, time.clone()));
+                            // a token that doesn't hold gives no time
+                            if ok {
+                                r.timestamp = Some(time);
+                                r.timestamp_authority = authority;
+                            }
+                        }
+                        None => r.timestamp_unreadable = true,
+                    }
                 }
             }
             Err(e) => r.checks.push(("CMS readable", false, format!("{e:#}"))),
@@ -767,31 +785,22 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     let last_covered = ends.iter().copied().max().unwrap_or(0);
     let tail_dss_only =
         last_covered < effective_len && tail_is_validation_data(&doc, bytes, header, last_covered);
-    let eofs: Vec<usize> = bytes
-        .windows(5)
-        .enumerate()
-        .filter(|(_, w)| *w == b"%%EOF")
-        .map(|(i, _)| i + 5)
-        .collect();
     for r in &mut reports {
         if r.byte_range.len() != 4 || !r.checks.first().is_some_and(|c| c.1) {
-            r.coverage = "unknown (bad ByteRange)".into();
+            r.coverage = Coverage::Unknown;
             continue;
         }
         let end = (r.byte_range[2] + r.byte_range[3]) as usize;
-        let later = eofs.iter().filter(|e| **e > end + 2).count();
         r.coverage = if end >= effective_len {
-            WHOLE_FILE.into()
+            Coverage::WholeFile
         } else if last_covered >= effective_len {
-            format!("signed again later ({later} later revision(s), the last one signed)")
+            Coverage::SignedAgainLater
         } else if tail_dss_only && end == last_covered {
-            "covers the whole file but validation data (DSS) added later".into()
+            Coverage::ValidationData
         } else if tail_dss_only {
-            format!(
-                "signed again later ({later} later revision(s)), then validation data (DSS) added"
-            )
+            Coverage::SignedAgainLater
         } else {
-            format!("CHANGED AFTER SIGNING ({} bytes, {later} revision(s) not covered by any signature)", effective_len - end)
+            Coverage::ChangedAfterSigning
         };
     }
     Ok(reports)
@@ -1217,4 +1226,95 @@ fn reached<'a>(
         }
     }
     Some(found)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lopdf::dictionary;
+
+    /// a PDF of one page whose form holds `fields`, made by `build`
+    fn pdf_with_form(build: impl FnOnce(&mut Document) -> Vec<Object>) -> Vec<u8> {
+        let mut doc = Document::with_version("1.7");
+        let pages = doc.new_object_id();
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page", "Parent" => pages,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        doc.objects.insert(
+            pages,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages", "Kids" => vec![page.into()], "Count" => 1,
+            }),
+        );
+        let fields = build(&mut doc);
+        let catalog = doc.add_object(dictionary! {
+            "Type" => "Catalog", "Pages" => pages,
+            "AcroForm" => dictionary! { "Fields" => fields },
+        });
+        doc.trailer.set("Root", catalog);
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+        bytes
+    }
+
+    #[test]
+    fn walks_a_form_whose_fields_list_themselves_once() {
+        let bytes = pdf_with_form(|doc| {
+            let sig = doc.add_object(dictionary! { "Type" => "Sig" });
+            let field = doc.new_object_id();
+            // its kids are itself, twice: walked naively, the names double
+            // and the stack grows until the app runs out of memory
+            doc.objects.insert(
+                field,
+                Object::Dictionary(dictionary! {
+                    "FT" => "Sig", "T" => Object::string_literal("Signature1"), "V" => sig,
+                    "Kids" => vec![field.into(), field.into()],
+                }),
+            );
+            vec![field.into(), field.into()]
+        });
+        let doc = Document::load_mem(&bytes).unwrap();
+        let found = collect_sig_fields(&doc);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].field, "Signature1");
+        // its signature has no byte ranges: invalid, not a crash
+        let reports = verify_pdf(&bytes).unwrap();
+        assert_eq!(reports.len(), 1);
+        assert!(!reports[0].valid());
+    }
+
+    #[test]
+    fn stops_at_fields_nested_too_deep_and_names_too_long() {
+        let bytes = pdf_with_form(|doc| {
+            // a chain of 2,000 fields, each the only kid of the one before
+            let mut kid: Option<ObjectId> = None;
+            for _ in 0..2_000 {
+                let mut field = dictionary! { "T" => Object::string_literal("x".repeat(100)) };
+                if let Some(kid) = kid {
+                    field.set("Kids", vec![Object::Reference(kid)]);
+                }
+                kid = Some(doc.add_object(field));
+            }
+            vec![kid.unwrap().into()]
+        });
+        let doc = Document::load_mem(&bytes).unwrap();
+        let fields = form_fields(&doc);
+        assert!(fields.len() <= 33, "{} fields", fields.len());
+        assert!(fields.iter().all(|field| field.name.len() <= 1_024));
+    }
+
+    #[test]
+    fn calls_a_signature_with_sha1_weak_but_intact() {
+        // see fixtures/README.md
+        let reports = verify_pdf(include_bytes!("fixtures/sha1.pdf")).unwrap();
+        assert_eq!(reports.len(), 1);
+        assert!(reports[0].valid(), "{:?}", reports[0].checks);
+        assert!(
+            reports[0].covers_the_whole_file(),
+            "{:?}",
+            reports[0].coverage
+        );
+        assert_eq!(reports[0].weak, Some("SHA-1"));
+    }
 }

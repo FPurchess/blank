@@ -31,6 +31,7 @@ Blank keeps several documents open, one tab each, in the one ProseMirror view: e
 - **`src/editor/commands/tabs.ts`:** the commands of the keymap and the tab row, which start one of those and return `true`.
 - **`src/ui/TabRow.vue`** (keys, menu and fit in `tabRowModel.ts`, dragging in `tabDrag.ts`), `DocumentTab.vue`, `UnsavedDialog.vue`; the keys of the window outside the editor in `composables/useWindowCommands.ts`, which `App.vue` uses.
 - `path`, `importedFrom` and `transaction` (`src/state/document.ts`) stay what everything reads, and always mean the active tab.
+- **PDF tabs** (`Tab.kind: "pdf"`, see `pdf.md`): a `.pdf` opens in a tab of its own (`pdfTab`, which opens it with its helper first and adds no tab for one it can't open). Its `TabDocument` keeps its `pdf` and an empty placeholder state; a switch publishes `shownPdf`, and `path` and `importedFrom` as null. Closing it stops its helper (`closePdf`). A restored PDF tab opens its file again when it's first shown, and one that can't be opened stays, showing why.
 
 ## Rules
 
@@ -40,7 +41,7 @@ Blank keeps several documents open, one tab each, in the one ProseMirror view: e
 - **A switch publishes the document before the view gets it** (`showTab`): `activeTabId`, then `transaction`, `path` and `importedFrom`, then `view.updateState`. The page view lays the new document out inside `updateState` and reads the path of its images then, and storage files the next document under `activeTabId`.
 - **Every tab's state has its own plugin array, so a switch makes ProseMirror build every plugin view anew.** That is the reset of the last document's per-view state (pageSync's `teardown`, the toolbars, the handles). Don't keep what belongs to all tabs in a plugin view: images stay loaded (`forgetImages` runs only when files are opened), and the spell check results of a tab are reset (`resetSpellcheck`) when the spell checker changed while it was away.
 - **What works on the shown document closes before a switch** (`closeRequests`, `src/editor/requests.ts`): the dialogs and popovers with their own cancel, the menus and pickers, and the header or footer strip through `bandEditorDone`, which keeps what was typed. A new request that closes over the view goes there too.
-- **The page view resets what it kept of the last document on `tabSwitch`** and scrolls to the tab's `viewAnchor` once its layout has that page (`PageView.vue`).
+- **The page view resets what it kept of the last document on `tabSwitch`** and scrolls to the tab's `viewAnchor` once its layout has that page (`PageView.vue` and `PdfView.vue`, through `useDeskScroll`).
 - **The leaving tab's dot is worked out again on every switch:** closing what was open on it may still change it (the header strip's text).
 - **Unsaved is a comparison, not a flag set on typing:** the document against the one last opened or saved (`baseline`), with `Node.eq`, which stops at shared nodes, so undoing back to the saved text clears the dot. The baseline is the document after the plugins' `appendTransaction` (`documentState`), or a file with a table would count as changed right away. Compare the view's state, not `transaction`, whose doc comes before `appendTransaction`.
 - **Paths are canonical** (`canonical_path`), both of opened files and of saves, so a file named two ways has one tab.
@@ -48,7 +49,7 @@ Blank keeps several documents open, one tab each, in the one ProseMirror view: e
 
 ## Storage (`src/storage.ts`)
 
-- `session` holds the order, the active tab and each tab without its document; `tab:<id>` holds each tab's `doc.toJSON()`. Only changed documents are written, at most a second after a change; the documents first, then the session, then the closed tabs' keys are removed, so the session never lists a document that isn't stored.
+- `session` holds the order, the active tab and each tab without its document; `tab:<id>` holds each tab's `doc.toJSON()`, a markdown tab's only: a PDF tab's PDF is its file. The session is `version: 2` while a PDF tab is open (`SESSION_VERSION`, `sessionVersion`) and 1 otherwise, so an older Blank, which reads only 1, still reads a session without PDF tabs; it keeps a session of 2 as `session-backup` and starts afresh. This Blank reads 1 and 2. Only changed documents are written, at most a second after a change; the documents first, then the session, then the closed tabs' keys are removed, so the session never lists a document that isn't stored.
 - Every tab has its document stored, a saved file's too: it is what shows when the file has gone. A tab without unsaved changes reads its file again when it's first shown; one with changes keeps them and reads the file in the background as its baseline.
 - Restored tabs load when first shown, except the active one.
 - An earlier Blank's `doc`, `path` and `importedFrom` become the first tab (`migrate`), marked unsaved until its file says otherwise. A stored document that can't be read is kept as `tab-backup:<id>`, a session that can't be read (e.g. a newer Blank's) as `session-backup`.

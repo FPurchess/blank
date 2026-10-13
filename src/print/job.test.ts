@@ -1,15 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "prosemirror-state";
+import { readFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { announcement } from "../state";
 import { doc, p } from "../test/editor";
 import { testLayout } from "../test/layout";
-import { printDocument, printingNow } from "./job";
+import { printDocument, printingNow, printPdfFile } from "./job";
 import {
   MAY_NOT_HAVE_PRINTED,
   NO_PRINT_DIALOG,
   NO_PRINT_SERVICE,
+  PDF_CHANGED,
+  PDF_MISSING,
+  PDF_PRINTS_WHOLE,
+  PDF_PRINTS_WHOLE_FIRST,
   type PrintPlan,
 } from "./printModel";
 
@@ -17,10 +22,12 @@ const printPDF = vi.hoisted(() => vi.fn());
 vi.mock("../engine/pdf", () => ({ printPDF }));
 const preparePrint = vi.hoisted(() => vi.fn());
 const sendPrint = vi.hoisted(() => vi.fn());
+const printPdfTab = vi.hoisted(() => vi.fn());
 vi.mock("./ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ipc")>()),
   preparePrint,
   sendPrint,
+  printPdfTab,
 }));
 
 const A4 = { width: 595.28, height: 841.89 };
@@ -231,5 +238,80 @@ describe("printDocument", () => {
     expect(window.blankPrintCapture.sent).toEqual([
       { sheets: 2, pdf: "%PDF-" },
     ]);
+  });
+});
+
+describe("printPdfFile", () => {
+  const job = {
+    tab: "t",
+    path: "/docs/contract.pdf",
+    title: "contract.pdf",
+    pages: [LETTER, A4],
+  };
+  const platform = navigator.platform;
+  const onPlatform = (name: string) =>
+    Object.defineProperty(navigator, "platform", {
+      value: name,
+      configurable: true,
+    });
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    announcement.value = null;
+    onPlatform("MacIntel");
+    printPdfTab.mockResolvedValue({ outcome: "sent", printer: "Office" });
+  });
+
+  afterEach(() => onPlatform(platform));
+
+  it("has the native side print the file as it is, on its first page's paper", async () => {
+    expect(await printPdfFile(job)).toBeUndefined();
+
+    expect(printPdfTab).toHaveBeenCalledWith("t", {
+      title: "contract.pdf",
+      preset: { copies: 1, collate: true, fit: false, paper: LETTER },
+    });
+    expect(readFile).not.toHaveBeenCalled();
+    expect(printPDF).not.toHaveBeenCalled();
+    expect(announcement.value?.text).toBe("Sent 2 pages to Office");
+  });
+
+  it("says before Linux's dialog that it prints the whole PDF", async () => {
+    onPlatform("Linux x86_64");
+    printPdfTab.mockImplementation(async () => {
+      expect(announcement.value?.text).toBe(PDF_PRINTS_WHOLE_FIRST);
+      return { outcome: "whole" };
+    });
+    await printPdfFile(job);
+
+    expect(announcement.value?.text).toBe(PDF_PRINTS_WHOLE);
+  });
+
+  it("prints nothing but what the tab shows, and has the tab say why", async () => {
+    printPdfTab.mockRejectedValue({ kind: "changed", message: "changed" });
+    expect(await printPdfFile(job)).toBe("changed");
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "Print",
+      body: PDF_CHANGED,
+    });
+
+    printPdfTab.mockRejectedValue({ kind: "missing", message: "missing" });
+    expect(await printPdfFile(job)).toBe("missing");
+    expect(announcement.value?.text).toBe(PDF_MISSING);
+  });
+
+  it("says why it didn't print otherwise", async () => {
+    printPdfTab.mockRejectedValue({
+      kind: "failed",
+      message: "Permission denied",
+    });
+    expect(await printPdfFile(job)).toBeUndefined();
+
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: "Print",
+      body: "Printing didn't work: Permission denied. Open the PDF in another app to print it.",
+    });
+    expect(printingNow()).toBe(false);
   });
 });

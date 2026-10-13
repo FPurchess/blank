@@ -33,3 +33,4 @@ If printing doesn't work, Blank opens its print dialog again, says why, and is r
 - **Windows:** Windows' print dialog doesn't take the copies from Blank, so set them again there. It doesn't tell Blank which paper the printer holds either, so to fit the pages to it, use the scaling in Windows' print dialog. And it doesn't tell Blank whether you printed, so Blank says nothing afterwards.
 - **macOS:** the print panel opens on top of Blank and shows the copies you chose.
 - Printing needs Blank's page layout. If it couldn't start or stopped working, Blank shows your text without pages and can't print until you restart it.
+- A [PDF you opened](./pdf#print) prints as it is, straight from the system's print dialog.

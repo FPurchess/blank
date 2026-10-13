@@ -1,0 +1,32 @@
+[package]
+name = "blank-pdf-ipc"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "What Blank and its PDF helper say to each other, the helper's loop, and the app's side of it: no MuPDF, no Tauri"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# the memory backstop and the helper's window, see src/limits.rs
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
+# a helper that draws solid colours and can be told to hang, crash or
+# allocate, for the client's tests (tests/client.rs)
+[[bin]]
+name = "fake-pdf-helper"
+path = "src/bin/fake-pdf-helper.rs"
+test = false
+doc = false

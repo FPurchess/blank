@@ -456,6 +456,37 @@ describe("storage", () => {
       });
     });
 
+    // Blank 3.0 reads only version 1, and loses a session of 2
+    it("stores version 2 only while a PDF tab is open", async () => {
+      const { transaction, tabs } = await open("a");
+      transaction.value = replace(doc(p("a")));
+      await tick();
+      expect(await localforage.getItem("session")).toMatchObject({
+        version: 1,
+      });
+
+      tabs.value = [tab("a"), { ...tab("b"), kind: "pdf", path: "/b.pdf" }];
+      await tick();
+
+      expect(await localforage.getItem("session")).toMatchObject({
+        version: 2,
+      });
+    });
+
+    it("stores no document of a PDF tab, whose PDF is its file", async () => {
+      const { transaction, tabs } = await open("a");
+      tabs.value = [{ ...tab("a"), kind: "pdf", path: "/a.pdf" }];
+      await tick();
+
+      transaction.value = replace(doc(p("placeholder")));
+      await tick();
+
+      expect(await localforage.getItem("tab:a")).toBeNull();
+      expect(await localforage.getItem("session")).toMatchObject({
+        tabs: { a: { kind: "pdf", path: "/a.pdf" } },
+      });
+    });
+
     it("removes the document of a closed tab", async () => {
       const { transaction, tabs, activeTabId } = await open("a", "b");
       transaction.value = replace(doc(p("a")));
@@ -647,7 +678,7 @@ describe("storage", () => {
 
   describe("session", () => {
     const session = {
-      version: 1,
+      version: 2,
       order: ["a", "b"],
       active: "b",
       tabs: {
@@ -682,8 +713,17 @@ describe("storage", () => {
       expect((await loadSession())?.active).toBe("a");
     });
 
+    it("reads the session of a Blank before PDF tabs, version 1", async () => {
+      await localforage.setItem("session", { ...session, version: 1 });
+      const { loadSession } = await bootFresh();
+
+      expect((await loadSession())?.order).toEqual(["a", "b"]);
+    });
+
+    // Blank 3.0 reads only version 1: a session of version 2 (with PDF tabs)
+    // takes it this way, as this Blank takes one of version 3
     it("keeps a session it can't read and starts afresh, saying so", async () => {
-      const newer = { ...session, version: 2 };
+      const newer = { ...session, version: 3 };
       await localforage.setItem("session", newer);
       vi.spyOn(console, "warn").mockImplementation(() => {});
       const { loadSession } = await bootFresh();

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { initialsOf, problemOf, startOf } from "./signatureDialogModel";
+import {
+  initialsOf,
+  problemOf,
+  sampleOf,
+  startOf,
+} from "./signatureDialogModel";
 
 describe("the signature dialog", () => {
   it("starts on drawing, with the name or its initials to type", () => {
@@ -11,6 +16,11 @@ describe("the signature dialog", () => {
     });
     expect(startOf("initials", null, "Ada King Lovelace").text).toBe("AKL");
     expect(initialsOf("  zoë öztürk ")).toBe("ZÖ");
+  });
+
+  it("shows the fonts with what is to be typed", () => {
+    expect(sampleOf("signature")).toBe("Your name");
+    expect(sampleOf("initials")).toBe("Your initials");
   });
 
   it("opens a saved one as it was made", () => {

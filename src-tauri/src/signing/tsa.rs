@@ -73,22 +73,26 @@ pub async fn timestamp(url: &str, data: &[u8]) -> Result<Vec<u8>> {
         .context(Refusal::NoTimestamp)?
         .error_for_status()
         .context(Refusal::NoTimestamp)?;
+    token(&read_limited(response).await?, &nonce_der)
+}
+
+/// read_limited reads an answer of at most MAX_RESPONSE bytes, stopping as
+/// soon as it says or turns out to be longer
+async fn read_limited(mut response: reqwest::Response) -> Result<Vec<u8>> {
     if response
         .content_length()
         .is_some_and(|length| length > MAX_RESPONSE as u64)
     {
         return Err(Refusal::TimestampUnusable.into());
     }
-    // read no more than the longest answer, whatever the server sends
     let mut body = Vec::new();
-    let mut chunks = response.bytes_stream();
-    while let Some(chunk) = futures_util::StreamExt::next(&mut chunks).await {
-        body.extend_from_slice(&chunk.context(Refusal::NoTimestamp)?);
-        if body.len() > MAX_RESPONSE {
+    while let Some(chunk) = response.chunk().await.context(Refusal::NoTimestamp)? {
+        if body.len() + chunk.len() > MAX_RESPONSE {
             return Err(Refusal::TimestampUnusable.into());
         }
+        body.extend_from_slice(&chunk);
     }
-    token(&body, &nonce_der)
+    Ok(body)
 }
 
 #[cfg(test)]
@@ -187,6 +191,31 @@ mod tests {
         let url = serve(answer(2, &NONCE), true);
         let result = tauri::async_runtime::block_on(timestamp(&url, b"x"));
         assert_eq!(refusal(result), Some(Refusal::TimestampRefused));
+    }
+
+    #[test]
+    fn stops_reading_an_answer_longer_than_any_token() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        // an answer that doesn't say its length, longer than MAX_RESPONSE
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 4096];
+            let _ = stream.read(&mut request);
+            let _ = stream.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/timestamp-reply\r\nConnection: close\r\n\r\n",
+            );
+            let chunk = vec![0x30; 64 * 1024];
+            for _ in 0..(2 * MAX_RESPONSE / chunk.len()) {
+                if stream.write_all(&chunk).is_err() {
+                    break;
+                }
+            }
+        });
+        let result = tauri::async_runtime::block_on(timestamp(&url, b"x"));
+        assert_eq!(refusal(result), Some(Refusal::TimestampUnusable));
+        server.join().unwrap();
     }
 
     #[test]

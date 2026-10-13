@@ -9,9 +9,7 @@ use crate::signing::cms::sign_detached;
 use crate::signing::keys::Identity;
 use crate::signing::Refusal;
 use anyhow::{bail, Context, Result};
-use lopdf::{
-    dictionary, Dictionary, Document, IncrementalDocument, Object, ObjectId, Stream, StringFormat,
-};
+use lopdf::{dictionary, Dictionary, IncrementalDocument, Object, ObjectId, Stream, StringFormat};
 use sha2::{Digest, Sha256};
 
 /// what to sign with, and where the signature goes
@@ -62,52 +60,6 @@ pub fn sign_pdf(original: &[u8], req: &SignRequest) -> Result<Vec<u8>> {
         }
         Attempt::TooLarge(_) => bail!("the signature doesn't fit"),
     }
-}
-
-/// fields returns the names of the form's fields
-fn fields(doc: &Document) -> Vec<Vec<u8>> {
-    let mut names = vec![];
-    let Some(form) = doc
-        .catalog()
-        .ok()
-        .and_then(|c| c.get(b"AcroForm").ok())
-        .and_then(|o| super::resolve(doc, o))
-    else {
-        return names;
-    };
-    let Some(list) = form
-        .as_dict()
-        .ok()
-        .and_then(|f| f.get(b"Fields").ok())
-        .and_then(|o| super::resolve(doc, o))
-    else {
-        return names;
-    };
-    let mut stack: Vec<&Object> = list
-        .as_array()
-        .map(|a| a.iter().collect())
-        .unwrap_or_default();
-    let mut guard = 0;
-    while let Some(o) = stack.pop() {
-        guard += 1;
-        if guard > 100_000 {
-            break;
-        }
-        let Some(f) = super::resolve(doc, o).and_then(|o| o.as_dict().ok()) else {
-            continue;
-        };
-        if let Ok(t) = f.get(b"T").and_then(Object::as_str) {
-            names.push(t.to_vec());
-        }
-        if let Ok(kids) = f
-            .get(b"Kids")
-            .and_then(|k| doc.dereference(k).map(|(_, o)| o))
-            .and_then(Object::as_array)
-        {
-            stack.extend(kids.iter());
-        }
-    }
-    names
 }
 
 /// pdf_date is now, as a PDF date
@@ -233,7 +185,10 @@ fn sign_once(original: &[u8], req: &SignRequest, reserve: usize) -> Result<Attem
     if docmdp_permission(&doc) == Some(1) {
         return Err(Refusal::Certified.into());
     }
-    let names = fields(&doc);
+    let names: Vec<Vec<u8>> = super::form_fields(&doc)
+        .iter()
+        .filter_map(|field| field.partial.map(<[u8]>::to_vec))
+        .collect();
     let mut incr = IncrementalDocument::create_from(original.to_vec(), doc);
     clean_trailer(&mut incr);
 

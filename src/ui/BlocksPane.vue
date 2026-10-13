@@ -261,7 +261,7 @@ const onMouseDown = (event: MouseEvent) => {
       </p>
     </div>
     <footer class="side-pane-foot">
-      Click to insert at the cursor, or drag between paragraphs.
+      Press Enter or click to insert at the cursor, or drag between paragraphs.
     </footer>
   </section>
 </template>

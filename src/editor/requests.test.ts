@@ -10,6 +10,9 @@ import {
   outlinePeek,
   pageSetup,
   type PageSetupRequest,
+  signatureDetails,
+  type SignatureDetailsRequest,
+  signaturesPopover,
   tablePicker,
   type TablePickerState,
   tocPopover,
@@ -64,8 +67,19 @@ describe("closeRequests", () => {
     bandEditorDone.value = strip;
     wordCountCard.value = true;
     outlinePeek.value = "sticky";
+    const signatures = vi.fn();
+    const details = vi.fn();
+    signaturesPopover.value = { refocus: signatures };
+    signatureDetails.value = {
+      refocus: details,
+    } as unknown as SignatureDetailsRequest;
 
     closeRequests();
+
+    expect(signatures).toHaveBeenCalled();
+    expect(details).toHaveBeenCalled();
+    expect(signaturesPopover.value).toBeNull();
+    expect(signatureDetails.value).toBeNull();
 
     expect(toc).toHaveBeenCalled();
     expect(menu).toHaveBeenCalled();

@@ -1,17 +1,19 @@
 // Builds public/THIRD-PARTY-NOTICES.txt, which ships in dist/ with the app:
-// the licences of the Rust crates in the app and in the layout engine's wasm
-// (cargo-about, configured in scripts/notices/about.toml), of the npm
-// packages the frontend bundles, of the fonts and of the built-in spell check
-// dictionaries. MIT, BSD, Unicode-3.0 and others ask for their notice in
-// every copy. It also copies the fonts' licences from fonts/ to public/fonts/,
-// which ships next to the fonts.
+// the licences of the Rust crates in the app, the PDF helper and the layout
+// engine's wasm (cargo-about, configured in scripts/notices/about.toml), of
+// the C libraries and fonts the PDF helper compiles in from MuPDF's sources
+// (scripts/notices/mupdf.toml), of the npm packages the frontend bundles, of
+// the fonts and of the built-in spell check dictionaries. MIT, BSD,
+// Unicode-3.0 and others ask for their notice in every copy. It also copies
+// the fonts' licences from fonts/ to public/fonts/, which ships next to the
+// fonts.
 //
 // Crates and npm packages must have a licence in `accepted` of about.toml.
 // scripts/notices/npm.toml clarifies npm packages whose package.json or
 // licence files don't say it plainly, leaves out those that never reach the
 // bundle, and lists the packages pre-built ones have inside. Run with
-// `make notices` after changing dependencies, fonts or dictionaries; CI fails
-// when the output is out of date.
+// `make notices` after changing dependencies, fonts, dictionaries or the
+// MuPDF submodule; CI fails when the output is out of date.
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
@@ -32,7 +34,14 @@ const notices = join(root, "scripts", "notices");
 const vendoredRoot = join(notices, "vendored");
 
 // Blank's own crates, which carry Blank's licence
-const OWN_CRATES = new Set(["blank", "blank-drawings", "blank-layout"]);
+const OWN_CRATES = new Set([
+  "blank",
+  "blank-drawings",
+  "blank-layout",
+  "blank-pdf",
+  "blank-pdf-ipc",
+  "blank-system-fonts",
+]);
 
 // the same order on every machine, unlike localeCompare
 const byCode = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -494,10 +503,69 @@ const dictionaryNotices = () => {
     });
 };
 
+interface MupdfLibrary {
+  name: string;
+  license: string;
+  files: string[];
+  // the licence is the files' header, not the whole file
+  header?: boolean;
+}
+
+/**
+ * headerOf returns the licence a source file states near its top: a C
+ * file's comments that hold a copyright or permission notice, or a CMap's
+ * `%%Copyright:` lines, without their markers
+ */
+const headerOf = (text: string, path: string) => {
+  const copyright = text
+    .split("\n")
+    .filter((line) => line.startsWith("%%Copyright:"))
+    .map((line) => line.slice("%%Copyright:".length).replace(/^ /, ""))
+    .filter((line) => !/^-+$/.test(line));
+  if (copyright.length > 0) return copyright.join("\n");
+  const comments = [...text.matchAll(/\/\*([\s\S]*?)\*\//g)]
+    .map(([, body]) =>
+      body
+        .split("\n")
+        .map((line) => line.replace(/^\s*\*?[ \t]?/, "").replace(/\t/g, "  "))
+        .join("\n")
+        .trim(),
+    )
+    .filter((body) => /Copyright|Permission/.test(body));
+  if (comments.length === 0)
+    throw new Error(`${path} states no licence in a comment`);
+  return comments.join("\n\n");
+};
+
+// the licences of what the PDF helper compiles in from the submodule, read
+// from its files, so they follow the version it pins
+const mupdfNotices = () => {
+  const list = Bun.TOML.parse(
+    readFileSync(join(root, "scripts", "notices", "mupdf.toml"), "utf8"),
+  ) as { library: MupdfLibrary[] };
+  const mupdf = join(root, "src-tauri", "pdf", "mupdf-sys", "mupdf");
+  return list.library.map(({ name, license, files, header }) => ({
+    title: `${name} (${license})`,
+    text: files
+      .map((file) => {
+        const path = join(mupdf, file);
+        if (!existsSync(path)) {
+          throw new Error(
+            `${path} is missing: git submodule update --init --recursive, or fix scripts/notices/mupdf.toml`,
+          );
+        }
+        const text = readFileSync(path, "utf8");
+        return (header ? headerOf(text, path) : text).trim();
+      })
+      .join("\n\n"),
+  }));
+};
+
 const RULE = "=".repeat(78);
 const rule = "-".repeat(78);
 
 // the quick checks first, before cargo-about's minute
+const libraries = mupdfNotices();
 const packages = packageNotices();
 const fonts = fontNotices();
 const dictionaries = dictionaryNotices();
@@ -516,6 +584,8 @@ const sections = [
     ({ title, users, text }) =>
       `${title}\nUsed by: ${users.join(", ")}\n${rule}\n${text}`,
   ),
+  `${RULE}\nC libraries and fonts in the PDF helper\n${RULE}`,
+  ...libraries.map(({ title, text }) => `${title}\n${rule}\n${text}`),
   `${RULE}\nnpm packages\n${RULE}`,
   ...packages.map(({ title, text }) => `${title}\n${rule}\n${text}`),
   `${RULE}\nFonts\n${RULE}`,
@@ -528,5 +598,5 @@ const sections = [
 ];
 writeFileSync(output, sections.join("\n\n\n").replace(/\r\n/g, "\n") + "\n");
 console.log(
-  `Wrote ${output}: ${crates.length} crate licences, ${packages.length} npm packages, ${fonts.length} fonts, ${dictionaries.length} dictionaries`,
+  `Wrote ${output}: ${crates.length} crate licences, ${libraries.length} C libraries and fonts, ${packages.length} npm packages, ${fonts.length} fonts, ${dictionaries.length} dictionaries`,
 );

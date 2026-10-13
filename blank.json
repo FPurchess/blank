@@ -58,6 +58,7 @@
     "edit.footer": "Mod-Alt-f",
     "view.pages": "Mod-Alt-v",
     "view.outline": "Mod-Alt-o",
+    "view.signatures": "",
     "view.focus_next": "F6",
     "view.focus_previous": "Shift-F6",
     "view.toolbar_focus": "Alt-F10",

@@ -9,7 +9,14 @@ import { Node } from "prosemirror-model";
 import { path as _path, importedFrom, transaction } from "../state";
 import { basename, extname } from "../paths";
 import { errorMessage } from "../errors";
-import { UNREADABLE_EXTENSIONS, WORD_EXTENSIONS } from "../formats";
+import {
+  PDF_EXTENSIONS,
+  UNREADABLE_EXTENSIONS,
+  WORD_EXTENSIONS,
+} from "../formats";
+
+import { CommandIdentifier } from "../config";
+import { commandShortcut } from "./keyBindings";
 
 import welcomeMessage from "./welcome.md?raw";
 
@@ -20,9 +27,11 @@ export interface DocumentFile {
   importedFrom: string | null;
 }
 
-// A document as read from a file, before it is shown
+// A document as read from a file, before it is shown; a PDF (`pdf`) is
+// opened in a PDF tab, its `doc` empty
 export interface LoadedDocument extends DocumentFile {
   doc: Node;
+  pdf?: boolean;
 }
 
 /**
@@ -62,6 +71,14 @@ export const emptyDocument = (): Node => schema.topNodeType.createAndFill()!;
  */
 export const welcomeDocument = (): Node => parseMarkdown(welcomeMessage);
 
+/**
+ * saveHint says how to save, with Save's key as the user has it
+ */
+const saveHint = () => {
+  const key = commandShortcut(CommandIdentifier.FILE_SAVE);
+  return key ? `Save it with ${key}` : "Save it";
+};
+
 // Word documents larger than this are refused
 const MAX_WORD_BYTES = 50 * 1024 * 1024;
 
@@ -95,7 +112,7 @@ const importWordDocument = async (
   if (!silent) {
     sendNotification(
       [
-        `Imported ${name}. Save it with Mod+S as a markdown file`,
+        `Imported ${name}. ${saveHint()} as a markdown file`,
         ...(result.page ? [`Its ${result.page} pages came along`] : []),
         ...result.warnings,
       ].join(". "),
@@ -106,8 +123,9 @@ const importWordDocument = async (
 };
 
 /**
- * readDocument reads the document at `path`: a markdown file, or a Word
- * document that is imported into an untitled one. It never throws: what
+ * readDocument reads the document at `path`: a markdown file, a Word
+ * document that is imported into an untitled one, or a PDF, which a PDF
+ * tab opens. It never throws: what
  * goes wrong is logged, and told unless `silent`.
  * @returns the document, or undefined when it can't be read
  */
@@ -142,6 +160,14 @@ export const readDocument = async (
   }
 
   const extension = extname(resolvedPath);
+  if (PDF_EXTENSIONS.includes(extension)) {
+    return {
+      doc: emptyDocument(),
+      path: resolvedPath,
+      importedFrom: null,
+      pdf: true,
+    };
+  }
   if (WORD_EXTENSIONS.includes(extension)) {
     return importWordDocument(resolvedPath, silent);
   }

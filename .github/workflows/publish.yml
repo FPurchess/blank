@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # MuPDF's licence files, which the third-party notices quote
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: ./.github/actions/engine
 
@@ -35,6 +37,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
+      # MuPDF's sources from the cache of their git data; a release builds
+      # the helper it ships itself, never from the cache
+      - uses: ./.github/actions/mupdf
       - uses: oven-sh/setup-bun@v2
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -60,7 +65,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      # tauri-action builds the frontend itself via beforeBuildCommand
+      # tauri-action builds the frontend and the PDF helper itself via
+      # beforeBuildCommand
       - name: install app dependencies
         run: bun install
 
@@ -88,6 +94,8 @@ jobs:
       - name: check glibc floor (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
-          max=$(objdump -T src-tauri/target/release/blank | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
-          echo "highest required glibc symbol: $max"
-          [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          for binary in blank blank-pdf; do
+            max=$(objdump -T src-tauri/target/release/$binary | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+            echo "$binary: highest required glibc symbol: $max"
+            [ "$(printf '%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35 ]
+          done

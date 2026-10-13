@@ -1,0 +1,17 @@
+[package]
+name = "blank-system-fonts"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "The system's fonts for what Blank's own fonts lack, for the layout engine and the PDF helper"
+publish = false
+
+[dependencies]
+# loads libfontconfig at run time instead of linking it: linked, it made the
+# PDF helper export the FreeType MuPDF builds in, which fontconfig then
+# called instead of the system's (and wrote incomplete caches with)
+fontique = { version = "0.11", features = ["fontconfig-dlopen"] }
+unicode-script = "0.5"
+# the version fontique uses; reads a font's licence (fsType) and outlines
+read-fonts = "0.41"
+serde = { version = "1", features = ["derive"] }

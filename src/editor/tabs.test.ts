@@ -9,6 +9,7 @@ import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 import { schema } from "../markdown";
+import { closePdf, openPdf } from "../pdf/ipc";
 import {
   activeTab,
   activeTabId,
@@ -19,6 +20,7 @@ import {
   linkDialog,
   path,
   recentFiles,
+  shownPdf,
   tabs,
   tabSwitch,
   transaction,
@@ -36,10 +38,18 @@ import {
   moveTab,
   openNewTab,
   openPaths,
+  reopenPdf,
+  showPdfProblem,
   reopenTab,
   restoreTabs,
   saveTab,
 } from "./tabs";
+
+vi.mock("../pdf/ipc", async (original) => ({
+  ...(await original<typeof import("../pdf/ipc")>()),
+  openPdf: vi.fn(),
+  closePdf: vi.fn(),
+}));
 
 // the files on the "disk", by path
 let files: Record<string, string>;
@@ -81,16 +91,23 @@ const type = async (typed: string) => {
  * stored puts a session with `list` into storage, the last one active
  */
 const stored = async (
-  list: { id: string; path?: string; unsaved?: boolean; text?: string }[],
+  list: {
+    id: string;
+    path?: string;
+    unsaved?: boolean;
+    text?: string;
+    kind?: "pdf";
+  }[],
 ) => {
   await localforage.setItem("session", {
     version: 1,
     order: list.map(({ id }) => id),
     active: list[list.length - 1].id,
     tabs: Object.fromEntries(
-      list.map(({ id, path = null, unsaved = false }) => [
+      list.map(({ id, path = null, unsaved = false, kind }) => [
         id,
         {
+          ...(kind ? { kind } : {}),
           path,
           importedFrom: null,
           untitledNumber: path ? null : 1,
@@ -121,6 +138,7 @@ beforeEach(async () => {
   });
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.mocked(closePdf).mockResolvedValue();
 });
 
 afterEach(() => {
@@ -692,5 +710,188 @@ describe("moving", () => {
     expect(labels()).toEqual(["/a.md", null]);
     await moveTab(id, 5);
     expect(labels()).toEqual([null, "/a.md"]);
+  });
+});
+
+describe("PDF tabs", () => {
+  // what opening a PDF finds, by its path
+  const pdfs: Record<string, string> = { "/c.pdf": "c1", "/moved/c.pdf": "c2" };
+
+  beforeEach(() => {
+    files["/a.md"] = "A";
+    for (const file of Object.keys(pdfs)) files[file] = "%PDF";
+    vi.mocked(openPdf).mockImplementation(async (_tab, file) => {
+      if (!(file in pdfs)) throw "damaged";
+      return {
+        sha256: pdfs[file],
+        pages: [{ width: 595, height: 842, rotation: 0 }],
+        repaired: false,
+        encrypted: false,
+      };
+    });
+  });
+
+  it("opens a PDF in a tab of its own, which holds no text", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+
+    expect(activeTab.value).toMatchObject({ kind: "pdf", path: "/c.pdf" });
+    expect(openPdf).toHaveBeenCalledWith(activeTabId.value, "/c.pdf");
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+    // nothing that saves or exports markdown sees its path
+    expect(path.value).toBeNull();
+    await type("typed");
+    expect(text()).toBe("");
+    expect(activeTab.value?.unsaved).toBe(false);
+  });
+
+  it("says in its tab why it can't open a PDF", async () => {
+    files["/broken.pdf"] = "x";
+    await boot();
+    await openPaths(["/broken.pdf"]);
+    await flushPromises();
+
+    expect(activeTab.value).toMatchObject({ kind: "pdf" });
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: "damaged" });
+  });
+
+  it("opens a PDF from the command line without waiting for its helper", async () => {
+    let opened = () => {};
+    vi.mocked(openPdf).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          opened = () =>
+            resolve({
+              sha256: "c1",
+              pages: [{ width: 595, height: 842, rotation: 0 }],
+              repaired: false,
+              encrypted: false,
+            });
+        }),
+    );
+    await boot();
+    await openPaths(["/c.pdf"]);
+    // the tabs' queue goes on meanwhile
+    await openPaths(["/a.md"]);
+    expect(tabs.value).toHaveLength(3);
+
+    await activateTab(tabs.value.find((tab) => tab.kind === "pdf")!.id);
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+    opened();
+    await flushPromises();
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+  });
+
+  it("shows a problem printing found, with what the tab offers then", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    await flushPromises();
+
+    showPdfProblem(activeTabId.value!, "changed");
+
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: "changed" });
+  });
+
+  it("shows a markdown tab's document again after a PDF tab", async () => {
+    await boot();
+    await openPaths(["/a.md", "/c.pdf"]);
+
+    await activateTab(tabs.value[1].id);
+
+    expect(shownPdf.value).toBeNull();
+    expect(path.value).toBe("/a.md");
+    expect(text()).toBe("A");
+  });
+
+  it("brings a PDF tab back, reading its file again, or saying it went", async () => {
+    await stored([
+      { id: "a", kind: "pdf", path: "/c.pdf" },
+      { id: "b", kind: "pdf", path: "/gone.pdf" },
+    ]);
+
+    await boot();
+    expect(shownPdf.value).toMatchObject({
+      path: "/gone.pdf",
+      problem: "missing",
+    });
+    expect(tabs.value).toHaveLength(2);
+
+    await activateTab("a");
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+  });
+
+  it("starts while a restored PDF tab still opens, and shows it once open", async () => {
+    let opened = () => {};
+    vi.mocked(openPdf).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          opened = () =>
+            resolve({
+              sha256: "c1",
+              pages: [{ width: 595, height: 842, rotation: 0 }],
+              repaired: false,
+              encrypted: false,
+            });
+        }),
+    );
+    await stored([{ id: "a", kind: "pdf", path: "/c.pdf" }]);
+
+    await boot();
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+
+    opened();
+    await flushPromises();
+    expect(shownPdf.value?.opened?.sha256).toBe("c1");
+  });
+
+  it("opens a PDF again from where the user found it", async () => {
+    await stored([{ id: "a", kind: "pdf", path: "/c-old.pdf" }]);
+    await boot();
+
+    await reopenPdf("a", "/moved/c.pdf");
+    expect(shownPdf.value).toMatchObject({ opened: null, problem: null });
+    await flushPromises();
+
+    expect(activeTab.value?.path).toBe("/moved/c.pdf");
+    expect(shownPdf.value).toMatchObject({
+      problem: null,
+      opened: { sha256: "c2" },
+    });
+  });
+
+  it("shows the tab of a found PDF that is open already", async () => {
+    await stored([
+      { id: "a", kind: "pdf", path: "/gone.pdf" },
+      { id: "b", kind: "pdf", path: "/c.pdf" },
+    ]);
+    await boot();
+    await activateTab("a");
+
+    await reopenPdf("a", "/c.pdf");
+
+    expect(activeTabId.value).toBe("b");
+    expect(tabs.value.find((tab) => tab.id === "a")?.path).toBe("/gone.pdf");
+  });
+
+  it("leaves a PDF tab alone when asked to change its text", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    const change = vi.fn();
+
+    await changeTab(activeTabId.value!, change);
+
+    expect(change).not.toHaveBeenCalled();
+    expect(activeTab.value?.unsaved).toBe(false);
+  });
+
+  it("stops the helper of a PDF tab it closes", async () => {
+    await boot();
+    await openPaths(["/c.pdf"]);
+    const id = activeTabId.value!;
+
+    await closeTabs([id]);
+
+    expect(closePdf).toHaveBeenCalledWith(id);
+    expect(shownPdf.value).toBeNull();
   });
 });

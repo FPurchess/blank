@@ -45,6 +45,7 @@
     <binary>blank</binary>
     <mediatype>text/markdown</mediatype>
     <mediatype>application/vnd.openxmlformats-officedocument.wordprocessingml.document</mediatype>
+    <mediatype>application/pdf</mediatype>
   </provides>
 
   <content_rating type="oars-1.1" />

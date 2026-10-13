@@ -15,6 +15,7 @@ import {
   SHEET_GAP,
   SHEET_SCALE,
   sheetScale,
+  sheetLayout,
   TEXT_SCALE,
   VIEW_BOTTOM,
   VIEW_TOP,
@@ -120,6 +121,34 @@ describe("frameLayout", () => {
     expect(
       visibleFrames(placed, 800, 600, 0).map((frame) => frame.page),
     ).toEqual([0, 1]);
+  });
+});
+
+describe("sheetLayout", () => {
+  it("places sheets of different sizes at the scale of the widest, each centred", () => {
+    const placed = sheetLayout(
+      [
+        { width: 600, height: 800 },
+        { width: 300, height: 400 },
+        { width: 800, height: 600 },
+      ],
+      848,
+    );
+    expect(placed.scale).toBe(1);
+    expect(placed.frames.map(({ left, width }) => [left, width])).toEqual([
+      [124, 600],
+      [274, 300],
+      [24, 800],
+    ]);
+    expect(placed.frames[2].top).toBe(VIEW_TOP + 800 + 400 + 2 * SHEET_GAP);
+    expect(placed.height).toBe(VIEW_TOP + 1800 + 2 * SHEET_GAP + VIEW_BOTTOM);
+    expect(placed.frames[1]).toMatchObject({ x: 0, y: 0, w: 300, h: 400 });
+  });
+
+  it("is what markdown pages show in pages", () => {
+    expect(frameLayout(layout, "pages", 648)).toEqual(
+      sheetLayout(Array(3).fill({ width: 600, height: 800 }), 648),
+    );
   });
 });
 

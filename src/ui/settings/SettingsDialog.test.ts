@@ -643,8 +643,8 @@ describe("the settings dialog", () => {
 
     it("offers to make or import a certificate, and takes a timestamp server", async () => {
       await open("signing");
-      expect(button("Create…", row("certificate"))).toBeDefined();
-      expect(button("Import…", row("certificate"))).toBeDefined();
+      expect(button("Create certificate…", row("certificate"))).toBeDefined();
+      expect(button("Import key file…", row("certificate"))).toBeDefined();
       const input = panel().querySelector<HTMLInputElement>(
         "#settings-timestamp",
       )!;

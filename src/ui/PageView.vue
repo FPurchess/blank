@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   computed,
-  nextTick,
   onBeforeUpdate,
   onMounted,
   onUnmounted,
@@ -30,37 +29,26 @@ import { pageEngine } from "../engine/engine";
 import { record, timed } from "../engine/perf";
 import { listenOnWindow } from "../scope";
 import {
+  activeTab,
   engineMissing,
   findPanel,
   pageHeadBox,
   pageHoverBlock,
   pageLayoutState,
-  pageScrollRequest,
-  type PageScrollRequest,
   pageSelection,
   pageView,
   pageViewport,
-  tabSwitch,
   deskLayout,
-  zoomAnchor,
 } from "../state";
+import { useDeskScroll } from "./composables/useDeskScroll";
 import { useResizeObserver } from "./composables/useResizeObserver";
+import { useWheelZoom } from "./composables/useWheelZoom";
 import { contentBlockAt } from "./blockMarksModel";
 import PageEdgeBand from "./PageEdgeBand.vue";
 import PageFrame from "./PageFrame.vue";
 import PageOverlay from "./PageOverlay.vue";
 import { drag, edgeStep, press, targetAt } from "./pagePointer";
-import {
-  anchorTop,
-  type Frame,
-  type FrameLayout,
-  keptRange,
-  onDesk,
-  pointOnPage,
-  viewAnchor,
-  type ViewAnchor,
-  visibleRange,
-} from "../engine/frames";
+import { type Frame, onDesk, pointOnPage } from "../engine/frames";
 import { pageBitmaps } from "./pageBitmaps";
 import { spellcheckKey } from "../editor/plugins/spellcheck";
 import { layerVersions } from "./pageLayers";
@@ -73,8 +61,6 @@ import {
 import { DecorationSet } from "prosemirror-view";
 import { movesPages, selectedOn } from "./pageViewModel";
 import { styleOf } from "./rect";
-import { scrollFor, zoomWheel } from "./scrollModel";
-import { zoomStep } from "../editor/commands/zoom";
 
 // The page view: the pages the engine laid out, painted in "page ends" or
 // "pages". The text is typed into the hidden editor, which keeps the focus;
@@ -138,28 +124,26 @@ const measureSoon = () => {
 // where the pages are shown, the same layout the geometry measures with
 const layout = deskLayout;
 
-// the pages near the view, which changes only when other pages come near,
-// not on every scroll
-// Pages mount within a view's height of it and stay until two views away.
-let kept = "";
-const range = computed(() => {
-  if (!layout.value) return (kept = "");
-  const near = visibleRange(layout.value, scrollTop.value, viewHeight.value);
-  const far = visibleRange(
-    layout.value,
-    scrollTop.value,
-    viewHeight.value,
-    2 * viewHeight.value,
-  );
-  return (kept = keptRange(kept, near, far));
+// the pages mounted and those in view, and where the view scrolls to on a
+// switch, a new layout or a request
+const { range, inView } = useDeskScroll({
+  scroller: () => scroller.value,
+  layout,
+  scrollTop,
+  scrollLeft,
+  viewHeight,
+  measure: () => measure(false),
+  // typing lays out anew on every key, but keeps the view and the scale
+  moves: movesPages,
+  laying: () => !!pageEngine?.laying,
+  // where the tab was, when the view mounts on a switch from a PDF tab
+  startAt: () => activeTab.value?.viewAnchor ?? null,
+  switched: () => {
+    shownFrames = new Map();
+    marks = new PageMarksMemo();
+    move.cancel();
+  },
 });
-
-// the pages in view, without the room around it, which paint first
-const inView = computed(() =>
-  layout.value
-    ? visibleRange(layout.value, scrollTop.value, viewHeight.value, 0)
-    : "",
-);
 
 // what the marks on the pages follow: the document and the spell check's
 // findings, which a transaction that only moves the selection keeps, so it
@@ -317,126 +301,6 @@ onUnmounted(() => {
 });
 listenOnWindow("resize", () => measure());
 
-// Another tab shows: what was kept of the last document goes, and the view
-// goes back to where it was on this one once its layout is there (see
-// restore below). Before the new document is laid out, in the switch itself.
-let restoring: { anchor: ViewAnchor | null } | null = null;
-watch(
-  tabSwitch,
-  (change) => {
-    if (!change) return;
-    restoring = { anchor: change.anchor };
-    kept = "";
-    shownFrames = new Map();
-    marks = new PageMarksMemo();
-    move.cancel();
-  },
-  { flush: "sync" },
-);
-
-/**
- * scrollTo scrolls the view to `top`: the render that follows already shows
- * the pages there, rather than those at the old scroll in the new layout
- */
-const scrollTo = (top: number, left?: number) => {
-  scrollTop.value = top;
-  if (left !== undefined) scrollLeft.value = left;
-  void nextTick(() => {
-    if (!scroller.value) return;
-    scroller.value.scrollTop = top;
-    if (left !== undefined) scroller.value.scrollLeft = left;
-    measure(false);
-  });
-};
-
-/**
- * restore scrolls a tab shown again to where it was, once `next` has the
- * page it was on; the rest of a long document may come a chunk later
- * @returns whether the switch is done with
- */
-const restore = (next: FrameLayout, anchor: ViewAnchor | null) => {
-  const top = anchor ? anchorTop(next, anchor) : 0;
-  if (top === null && pageEngine?.laying) return false;
-  // from the left edge, if the zoom shows the pages wider than the view
-  scrollTo(top ?? 0, 0);
-  return true;
-};
-
-// the view keeps the spot of the page at its top when it switches, when a
-// resize shows the pages at another scale, or when the room above the first
-// page changes, e.g. for its header. Before the new layout renders,
-// so the scroll is still the one the old layout was shown at; typing lays
-// out anew on every key, but keeps the view and the scale.
-watch(layout, (next, previous) => {
-  // the spot the zoom asked to keep, which is for this layout only
-  const kept = zoomAnchor.value;
-  zoomAnchor.value = null;
-  const element = scroller.value;
-  if (!element || !next) return;
-  if (restoring) {
-    if (restore(next, restoring.anchor)) restoring = null;
-    return;
-  }
-  // the zoom changed: the spot it was asked for stays where it is in the view
-  if (kept) {
-    const rect = onDesk(next, { ...kept, width: 0, height: 0 });
-    if (rect) {
-      scrollTo(
-        Math.max(0, rect.top - kept.viewY),
-        Math.max(0, rect.left - kept.viewX),
-      );
-      return;
-    }
-  }
-  if (!previous || !movesPages(next, previous)) return;
-  const anchor = viewAnchor(previous, element.scrollTop);
-  const top = anchor && anchorTop(next, anchor);
-  if (top !== null) scrollTo(top);
-});
-
-/**
- * serve brings the spot a request asks for into view, as it asks: that far
- * below the top of the view, or just into it
- */
-const serve = (request: PageScrollRequest) => {
-  const element = scroller.value;
-  if (!element || !layout.value) return;
-  const rect = onDesk(layout.value, { ...request, width: 0 });
-  if (!rect) return;
-  const target =
-    request.at !== undefined
-      ? Math.max(0, rect.top - request.at)
-      : scrollFor(rect, element.scrollTop, element.clientHeight);
-  // and across, when the zoom shows the pages wider than the view
-  // the desk's own width: right after a zoom, the wider desk may not be
-  // rendered yet
-  const across =
-    layout.value.width > element.clientWidth
-      ? scrollFor(
-          { top: rect.left, height: rect.width },
-          element.scrollLeft,
-          element.clientWidth,
-          { above: 20, below: 20 },
-        )
-      : null;
-  const down = target !== null && target !== element.scrollTop;
-  if (down) element.scrollTop = target;
-  if (across !== null) element.scrollLeft = across;
-  if (down || across !== null) measure(false);
-};
-
-// a request is served once, and then cleared, so an old one never moves the
-// view again, e.g. after a click far from it
-watch(
-  pageScrollRequest,
-  (request) => {
-    if (!request) return;
-    serve(request);
-    pageScrollRequest.value = null;
-  },
-  { flush: "post" },
-);
-
 // the hidden editor's caret follows the painted one, for the IME's window,
 // or the head of a range
 const align = () => {
@@ -487,47 +351,11 @@ const onScroll = () => {
   requestAnimationFrame(moveAgain);
 };
 
-// Ctrl and the wheel zoom the pages about the spot under the pointer, not
-// the webview (and a pinch, where the webview sends it as that)
-const wheelZoom = zoomWheel<WheelEvent>((direction, event) => {
-  if (!layout.value) return;
-  const element = scroller.value!;
-  const box = element.getBoundingClientRect();
-  const { x, y } = deskPoint(event.clientX, event.clientY);
-  const spot = pointOnPage(layout.value, x, y);
-  editor.run(
-    zoomStep(
-      direction,
-      spot && {
-        ...spot,
-        viewX: event.clientX - box.left,
-        viewY: event.clientY - box.top,
-      },
-    ),
-    { focus: false },
-  );
-});
-const onWheel = (event: WheelEvent) => {
-  if (!event.ctrlKey || event.deltaY === 0) return;
-  event.preventDefault();
-  wheelZoom(event);
-};
-// The listener can't be passive, as it keeps the webview from zooming, and
-// one that isn't makes every scroll wait for the page; so it listens only
-// while Ctrl is held
-const ctrlHeld = (event: KeyboardEvent | MouseEvent) => {
-  const element = scroller.value;
-  if (!element) return;
-  if (event.ctrlKey) element.addEventListener("wheel", onWheel);
-  else element.removeEventListener("wheel", onWheel);
-};
-listenOnWindow("keydown", ctrlHeld);
-listenOnWindow("keyup", ctrlHeld);
-const stopWheel = () => scroller.value?.removeEventListener("wheel", onWheel);
-listenOnWindow("blur", stopWheel);
-onUnmounted(stopWheel);
-// a pinch on a touchpad comes as a wheel with Ctrl, without its key
-listenOnWindow("wheel", ctrlHeld, { capture: true, passive: true });
+// Ctrl and the wheel zoom the pages about the spot under the pointer
+useWheelZoom(
+  () => scroller.value,
+  (x, y) => (layout.value ? pointOnPage(layout.value, x, y) : undefined),
+);
 
 // how long the view takes to render, for the measurements
 let renderStart = 0;

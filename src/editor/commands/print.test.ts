@@ -11,10 +11,11 @@ import {
 } from "../../engine/engine";
 import toPDF from "../../engine/pdf";
 import { PDF_FILTER } from "../../formats";
-import { activeTabId, announcement, printDialog } from "../../state";
+import { activeTabId, announcement, printDialog, shownPdf } from "../../state";
 import { doc, docWithFrontmatter, h, p } from "../../test/editor";
 import {
   NOTHING_TO_PRINT,
+  PDF_STILL_OPENING,
   PRINT_UNAVAILABLE,
   STILL_PRINTING,
 } from "../../print/printModel";
@@ -22,7 +23,12 @@ import printCommand, { openPrint } from "./print";
 
 const printDocument = vi.hoisted(() => vi.fn());
 const printingNow = vi.hoisted(() => vi.fn());
-vi.mock("../../print/job", () => ({ printDocument, printingNow }));
+const printPdfFile = vi.hoisted(() => vi.fn());
+vi.mock("../../print/job", () => ({
+  printDocument,
+  printingNow,
+  printPdfFile,
+}));
 const runExport = vi.hoisted(() => vi.fn());
 vi.mock("./exportAs", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./exportAs")>()),
@@ -65,6 +71,7 @@ describe("command.print", () => {
     view?.destroy();
     printDialog.value = null;
     activeTabId.value = null;
+    shownPdf.value = null;
     setPageEngine(null);
     forgetEngineFailure();
   });
@@ -250,5 +257,47 @@ describe("command.print", () => {
     openPrint(view);
 
     expect(printDialog.value).toBe(first);
+  });
+
+  it("says a PDF that still opens can't print yet", () => {
+    activeTabId.value = "a";
+    shownPdf.value = {
+      path: "/docs/contract.pdf",
+      opened: null,
+      problem: null,
+      failedPages: [],
+      signatures: null,
+    };
+    mount(doc(p("")));
+
+    printCommand()(view.state, view.dispatch, view);
+
+    expect(printPdfFile).not.toHaveBeenCalled();
+    expect(announcement.value?.text).toBe(PDF_STILL_OPENING);
+  });
+
+  it("prints a PDF tab's file itself, without Blank's dialog or the engine", () => {
+    setPageEngine(null);
+    activeTabId.value = "a";
+    printPdfFile.mockResolvedValue(undefined);
+    const pages = [{ width: 595, height: 842, rotation: 0 }];
+    shownPdf.value = {
+      path: "/docs/contract.pdf",
+      opened: { sha256: "abc", pages, repaired: false, encrypted: false },
+      problem: null,
+      failedPages: [],
+      signatures: [],
+    };
+    mount(doc(p("")));
+
+    expect(printCommand()(view.state, view.dispatch, view)).toBe(true);
+
+    expect(printDialog.value).toBeNull();
+    expect(printPdfFile).toHaveBeenCalledWith({
+      tab: "a",
+      path: "/docs/contract.pdf",
+      title: "contract.pdf",
+      pages,
+    });
   });
 });

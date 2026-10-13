@@ -6,10 +6,12 @@ import { type Ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
 import {
+  activeTab,
   activeTabId,
   blocksPaneOpen,
   cleanRecentCommands,
   cleanRecentFiles,
+  isPdfTab,
   currentViewAnchor,
   language,
   outlinePinned,
@@ -54,9 +56,22 @@ const maxWait = 1000;
 // stored under `tab:<id>`
 type StoredTab = Omit<Tab, "id">;
 
+// The version of the session this Blank writes while a PDF tab is open. 2 has
+// PDF tabs (`kind`); a Blank that reads only 1 backs a session of 2 up and
+// starts afresh (loadSession), so going back to it loses no tab for good.
+// Without a PDF tab the session is 1, which that Blank still reads.
+export const SESSION_VERSION = 2;
+
+/**
+ * sessionVersion returns the version a session of `tabs` needs: 2 only with
+ * a PDF tab
+ */
+export const sessionVersion = (stored: Iterable<StoredTab>) =>
+  [...stored].some((tab) => tab.kind === "pdf") ? SESSION_VERSION : 1;
+
 // The open tabs: their order, the active one, and each one's details
 export interface Session {
-  version: 1;
+  version: 1 | typeof SESSION_VERSION;
   order: string[];
   active: string;
   tabs: Record<string, StoredTab>;
@@ -92,7 +107,7 @@ const sessionOf = (): Session | null => {
     : list[0].id;
   const anchor = currentViewAnchor();
   return {
-    version: 1,
+    version: sessionVersion(list),
     order: list.map((tab) => tab.id),
     active,
     tabs: Object.fromEntries(
@@ -275,7 +290,9 @@ const watchSession = () => {
     transaction,
     (tx) => {
       const id = activeTabId.value;
-      if (tx !== null && id !== null) storeDocument(id, tx.doc);
+      // a PDF tab's PDF is its file
+      if (tx !== null && id !== null && !isPdfTab(activeTab.value))
+        storeDocument(id, tx.doc);
     },
     { flush: "sync" },
   );
@@ -408,7 +425,7 @@ export const restorable = (stored: unknown): unknown => {
 const isSession = (value: unknown): value is Session => {
   const session = value as Session | null;
   return (
-    session?.version === 1 &&
+    (session?.version === 1 || session?.version === SESSION_VERSION) &&
     Array.isArray(session.order) &&
     session.order.length > 0 &&
     session.order.every((id) => typeof session.tabs?.[id] === "object")
