@@ -1,0 +1,1 @@
+import{_ as t,o as a,c as o,a5 as s}from"./chunks/framework.DtspaGiy.js";const p=JSON.parse('{"title":"PDFs","description":"","frontmatter":{},"headers":[],"relativePath":"guide/pdf.md","filePath":"guide/pdf.md"}'),n={name:"guide/pdf.md"};function i(r,e,d,h,l,c){return a(),o("div",null,[...e[0]||(e[0]=[s("",49)])])}const u=t(n,[["render",i]]);export{p as __pageData,u as default};
