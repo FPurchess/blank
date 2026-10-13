@@ -94,7 +94,7 @@ describe("a signature block", () => {
   });
 
   it("takes the engine's default width unless it says", () => {
-    expect(signatureShare(attrs())).toBe(0);
+    expect(signatureShare(attrs())).toBeNull();
     expect(signatureShare(attrs({ width: "75%" }))).toBe(0.75);
   });
 });

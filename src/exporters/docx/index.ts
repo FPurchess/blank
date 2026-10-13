@@ -772,7 +772,7 @@ class Serializer {
   private signature(node: Node): Block[] {
     const label = signatureLabel(node.attrs);
     const width = Math.round(
-      this.contentWidth * (signatureShare(node.attrs) || SIGNATURE_SHARE),
+      this.contentWidth * (signatureShare(node.attrs) ?? SIGNATURE_SHARE),
     );
     const room: Block = {
       children: [

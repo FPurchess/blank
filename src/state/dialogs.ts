@@ -167,7 +167,7 @@ export interface SignatureDialogRequest {
 }
 
 // a picture chosen for a signature, and whether its background goes
-export interface ChosenMarkImage {
+interface ChosenMarkImage {
   src: string;
   clean: boolean;
 }

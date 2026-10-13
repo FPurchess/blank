@@ -128,7 +128,7 @@ export type Content =
     }
   // a line to sign on: room for the signature (its image once signed, else
   // `hint` on the screen only), the line, and the `lines` under it, as wide
-  // as `share` of the text (0 for the engine's default)
+  // as `share` of the text (null for the engine's default)
   | {
       kind: "signature";
       pos: number;
@@ -138,7 +138,7 @@ export type Content =
       alt: string;
       lines: string[];
       hint: string;
-      share: number;
+      share: number | null;
     }
   | {
       kind: "table";

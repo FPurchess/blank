@@ -4,6 +4,7 @@ import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import {
+  ancestor,
   ATOM_STYLE,
   child,
   children,
@@ -143,12 +144,7 @@ const alignmentOf = (p: Element, styles: StyleAlignment) => {
 /**
  * inCell tells whether the paragraph `p` is in a table's cell
  */
-const inCell = (p: Element) => {
-  for (let parent = p.parentElement; parent; parent = parent.parentElement) {
-    if (parent.namespaceURI === W && parent.localName === "tc") return true;
-  }
-  return false;
-};
+const inCell = (p: Element) => ancestor(p, "tc") !== null;
 
 /**
  * markerRun returns a run in the style of `align`, holding the marker

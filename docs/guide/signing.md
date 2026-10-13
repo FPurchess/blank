@@ -18,7 +18,7 @@ Your signature and initials stay on this computer, in the `signing` folder next 
 
 A signature block is a line for one person to sign on, with their name and role, place and date below it. Insert one from the [Blocks pane](./blocks#pane) (`Mod` `Alt` `B`), under **Signing**.
 
-Select it and press `Enter` (or click the pencil) to set:
+Select it and press `Enter` or `Shift` `Enter` (or click the pencil) to set:
 
 - **Role**, e.g. _Tenant_ or _On behalf of Acme GmbH_.
 - **Name**: who signs. Leave it empty for whoever signs it; your own name then goes in when you sign.

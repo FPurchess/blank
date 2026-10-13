@@ -332,10 +332,10 @@ pub enum Content {
         /// screen only
         #[serde(default)]
         hint: String,
-        /// how much of the width of the text it takes, from 0 to 1; 0 for
-        /// `SIGNATURE_SHARE`
+        /// how much of the width of the text it takes, from 0 to 1; None
+        /// for `SIGNATURE_SHARE`
         #[serde(default)]
-        share: f32,
+        share: Option<f32>,
     },
     Image {
         pos: u32,
@@ -901,7 +901,7 @@ impl Item {
                     truncate(line, MAX_LABEL);
                 }
                 truncate(hint, MAX_LABEL);
-                *share = finite(*share, 0.0, 0.0, 1.0);
+                clamp_share(share);
             }
             Content::Toc {
                 title,

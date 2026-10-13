@@ -13,7 +13,7 @@ import {
   dateChoiceOf,
   settingsOf,
   today,
-  WIDTH_OPTIONS,
+  SIGNATURE_WIDTHS,
   widthChoiceOf,
 } from "./signaturePopoverModel";
 
@@ -102,7 +102,7 @@ const close = () => closeDialog(signaturePopover, props.request.close);
       v-model="width"
       name="width"
       label="Width"
-      :options="WIDTH_OPTIONS"
+      :options="SIGNATURE_WIDTHS"
     />
   </BlockPopover>
 </template>

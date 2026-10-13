@@ -23,6 +23,17 @@ export const parsePart = async (zip: JSZip, name: string) => {
 };
 
 /**
+ * ancestor returns the nearest element named `name` in Word's namespace
+ * that holds `element`, or null
+ */
+export const ancestor = (element: Element, name: string) => {
+  let current = element.parentElement;
+  while (current && !(current.namespaceURI === W && current.localName === name))
+    current = current.parentElement;
+  return current;
+};
+
+/**
  * children returns the child elements of `parent` with the WordprocessingML
  * name `name`
  */

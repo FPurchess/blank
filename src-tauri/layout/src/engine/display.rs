@@ -799,7 +799,7 @@ mod tests {
                 alt: "Signature of Ada".into(),
                 lines: vec!["Ada Lovelace · Tenant".into()],
                 hint: "Signature".into(),
-                share: 0.5,
+                share: Some(0.5),
             },
             ..paragraph(0, "")
         };

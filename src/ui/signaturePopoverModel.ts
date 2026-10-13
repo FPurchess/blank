@@ -1,12 +1,14 @@
 import type { Option } from "../layout/choices";
 import type { SignatureSettings } from "../state";
 import { calendarDate, type SignatureDate } from "../markdown/blocks/atoms";
+import { WIDTH_LABELS } from "../markdown/blocks/caps";
+import { formatSigningDate } from "../signing/date";
 
 // The settings of a signature block (SignaturePopover.vue).
 
 // when its date is filled in: when it is signed, never (a line to write it
 // by hand), or a date of its own
-export type DateChoice = "signing" | "none" | "fixed";
+type DateChoice = "signing" | "none" | "fixed";
 
 export const DATE_OPTIONS: Option<DateChoice>[] = [
   { value: "signing", label: "When signed" },
@@ -14,12 +16,13 @@ export const DATE_OPTIONS: Option<DateChoice>[] = [
   { value: "fixed", label: "Fixed date" },
 ];
 
-// how wide it is, a share of the text's width: half by default, which the
-// file leaves out ("")
-export const WIDTH_OPTIONS: Option<string>[] = [
-  { value: "", label: "50%" },
-  { value: "75%", label: "75%" },
-  { value: "100%", label: "100%" },
+// how wide it is, a share of the text's width as other blocks offer them
+// (src/markdown/blocks/caps.ts), without Fit, which a line to sign on
+// hasn't: half by default, which the file leaves out ("")
+export const SIGNATURE_WIDTHS: Option<string>[] = [
+  { value: "", label: WIDTH_LABELS["50%"] },
+  { value: "75%", label: WIDTH_LABELS["75%"] },
+  { value: "100%", label: WIDTH_LABELS["100%"] },
 ];
 
 /**
@@ -37,12 +40,7 @@ export const dateChoiceOf = (date: string): DateChoice =>
 /**
  * today returns today's date as a block writes it, YYYY-MM-DD
  */
-export const today = (now = new Date()) =>
-  [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+export const today = (now = new Date()) => formatSigningDate(now, "", "iso");
 
 /**
  * settingsOf returns what the fields give a block: trimmed texts, the date

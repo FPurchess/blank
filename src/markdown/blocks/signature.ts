@@ -1,7 +1,7 @@
 import type { Attrs } from "prosemirror-model";
 
 import { formatSigningDate, type DateFormat } from "../../signing/date";
-import { calendarDate } from "./atoms";
+import { calendarDate, shareOf } from "./atoms";
 
 // What a signature block (ATOMS.signature in ./atoms.ts) says: the lines
 // under its line, and how screen readers and Blank name it. The pages, the
@@ -20,12 +20,9 @@ export const SIGNATURE_SHARE = 0.5;
 
 /**
  * signatureShare returns the share of the text's width a block says it
- * takes, or 0 when it doesn't, for the default
+ * takes, or null when it doesn't, for SIGNATURE_SHARE
  */
-export const signatureShare = (attrs: Attrs) => {
-  const percent = /^(\d+)%$/.exec((attrs.width as string | null) ?? "");
-  return percent ? Math.min(Number(percent[1]), 100) / 100 : 0;
-};
+export const signatureShare = (attrs: Attrs) => shareOf(attrs.width);
 
 // how dates are written: Settings ▸ Signing ▸ Date, in the document's
 // language

@@ -1,6 +1,6 @@
 # Blocks
 
-Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, diagrams you write as text, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
+Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, lines to sign on, diagrams you write as text, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
 
 ## The Blocks pane {#pane}
 
@@ -22,7 +22,7 @@ A new block is selected once it's in, and the status bar says so. Start typing i
 
 Click a block to select it: a ring in your accent color shows it's selected, and a toolbar above its right end names it. A diagram opens for you to change it instead; `Escape` then selects it.
 
-- **Change it:** the pencil on its toolbar opens its settings, as `Shift` `Enter` does. A table of contents and a diagram have settings; a form you change by filling it in.
+- **Change it:** the pencil on its toolbar opens its settings, as `Shift` `Enter` does. A table of contents, a signature block and a diagram have settings; a form you change by filling it in.
 - **Remove it:** the bin on its toolbar, `Backspace` or `Delete`. The status bar says what was removed, and `Mod` `Z` brings it back.
 - **Move it:** drag the selected block to another place on your pages. The same line shows where it will go. Hold `Ctrl` (`⌥` on a Mac) to copy it instead.
 - **Copy it:** `Mod` `C` copies it whole, with everything it needs, so it pastes the same into any document in Blank.

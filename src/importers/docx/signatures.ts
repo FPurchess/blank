@@ -3,7 +3,16 @@ import type JSZip from "jszip";
 import { SIGNATURE_TAG } from "../../exporters/docx/forms";
 import { formatAtom, readAtom } from "../../markdown";
 import { SIGNATURE_DEFAULTS } from "../../markdown/blocks/atoms";
-import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
+import {
+  ancestor,
+  ATOM_STYLE,
+  child,
+  DOCUMENT_PART,
+  markerParagraph,
+  parsePart,
+  val,
+  W,
+} from "./xml";
 
 // Signature blocks from Word, before mammoth, which would keep only their
 // text:
@@ -14,7 +23,6 @@ import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
 // Each becomes a marker paragraph holding a signature block's marker line,
 // which styleMap.ts and cleanup.ts (`atoms`) turn into the block.
 
-const DOCUMENT = "word/document.xml";
 // the namespace of VML's Office extensions, where Word's signature lines are
 const OFFICE = "urn:schemas-microsoft-com:office:office";
 
@@ -31,17 +39,6 @@ const hiddenText = (element: Element) =>
     )
     .join("")
     .trim();
-
-/**
- * ancestor returns the nearest element named `name` in Word's namespace
- * that holds `element`
- */
-const ancestor = (element: Element, name: string) => {
-  let current: Element | null = element.parentElement;
-  while (current && !(current.namespaceURI === W && current.localName === name))
-    current = current.parentElement;
-  return current;
-};
 
 /**
  * holdsMore tells whether `paragraph` holds text or pictures besides `run`
@@ -76,15 +73,8 @@ const signatureLine = (line: Element) =>
  * @returns whether it had to be rewritten
  */
 export const markSignatures = async (zip: JSZip) => {
-  const xml = await zip.file(DOCUMENT)?.async("string");
-  if (
-    xml === undefined ||
-    !(xml.includes(SIGNATURE_TAG) || xml.includes("signatureline"))
-  ) {
-    return false;
-  }
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) return false;
+  const doc = await parsePart(zip, DOCUMENT_PART);
+  if (!doc) return false;
   let changed = false;
   for (const sdt of [...doc.getElementsByTagNameNS(W, "sdt")]) {
     if (val(child(child(sdt, "sdtPr"), "tag")) !== SIGNATURE_TAG) continue;
@@ -110,6 +100,8 @@ export const markSignatures = async (zip: JSZip) => {
     }
     changed = true;
   }
-  if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));
+  if (changed) {
+    zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
+  }
   return changed;
 };
