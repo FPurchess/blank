@@ -81,10 +81,21 @@ fn stamped(pdf: &[u8], plan: &Plan, stamps: &[&[u8]]) -> Answer<Vec<u8>> {
     sign(None, pdf, &parts, plan, &[])
 }
 
-/// has tells whether `tool` of poppler-utils or qpdf runs; CI on Linux,
-/// which installs them, never skips
+/// has tells whether `tool` of poppler-utils or qpdf runs, and for poppler's
+/// tools that it is poppler's: Windows' runner has xpdf's pdftotext, which
+/// can't give the words' boxes. CI on Linux, which installs them, never
+/// skips
 fn has(tool: &str) -> bool {
-    let found = Command::new(tool).arg("--version").output().is_ok();
+    let poppler = tool.starts_with("pdf");
+    let found = Command::new(tool)
+        .arg(if poppler { "-v" } else { "--version" })
+        .output()
+        .is_ok_and(|out| {
+            !poppler
+                || [&out.stdout, &out.stderr]
+                    .iter()
+                    .any(|text| String::from_utf8_lossy(text).contains("Poppler"))
+        });
     if !found && cfg!(target_os = "linux") && std::env::var_os("CI").is_some() {
         panic!("{tool} is missing: CI doesn't skip the check");
     }
