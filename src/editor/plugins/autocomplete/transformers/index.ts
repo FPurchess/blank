@@ -7,6 +7,7 @@ import heading from "./heading";
 import horizontal_rule from "./horizontal_rule";
 import ordered_list from "./ordered_list";
 import page_break from "./page_break";
+import sourceFence from "./sourceFence";
 import table from "./table";
 import toc from "./toc";
 
@@ -20,6 +21,8 @@ const transformers = {
   horizontal_rule,
   page_break,
   toc,
+  // a fence of a source block's language, before any fence's code block
+  sourceFence,
   code_block,
   table,
 } as Record<string, BlockTransformer<unknown>>;

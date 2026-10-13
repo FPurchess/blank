@@ -431,6 +431,7 @@ describe("incremental layout", () => {
     expect(flattened).toHaveBeenCalledWith(other, 0, 2, noSizes, null, {
       signed: null,
       dates: undefined,
+      sources: {},
     });
   });
 

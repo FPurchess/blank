@@ -2,6 +2,8 @@ import { defaultMarkdownParser, MarkdownParser } from "prosemirror-markdown";
 import type { Attrs, Node, NodeType } from "prosemirror-model";
 
 import { ATOMS } from "./blocks/atoms";
+import { parseWidth } from "./blocks/caps";
+import { createSourceBlock } from "./blocks/sourceBlock";
 import { textAlignment } from "./alignment";
 import { alignment, schema } from "./schema";
 import { tokenizer } from "./tokenizer";
@@ -24,6 +26,10 @@ type TokenHandler = (
   state: ParseState,
   token: { meta: { node: Node } },
 ) => void;
+
+// an image's width, if Blank can lay it out; one it can't is left out
+const readWidth = (width: string | null | undefined) =>
+  width && parseWidth(width) ? width : null;
 
 // a paragraph's or heading's alignment, from the <div align> around it (see
 // alignBlocks in ./tokenizer.ts)
@@ -52,6 +58,18 @@ export const markdownParser = new MarkdownParser(
       }),
     },
     underline: { mark: "underline" },
+    // with the width of an <img> (see htmlImage in ./tokenizer.ts)
+    image: {
+      node: "image",
+      getAttrs: (token) => ({
+        src: token.attrGet("src"),
+        title: token.attrGet("title") || null,
+        alt: token.children?.[0]?.content || null,
+        width: readWidth(
+          (token.meta as { width?: string | null } | null)?.width,
+        ),
+      }),
+    },
     table: { block: "table" },
     thead: { ignore: true },
     tbody: { ignore: true },
@@ -94,6 +112,16 @@ const handlers = (
 ).tokenHandlers;
 const addParsed: TokenHandler = (state, { meta: { node } }) => {
   state.addNode(node.type, node.attrs, node.children);
+};
+// a diagram, from its fence (see diagramFences in ./blocks/rules.ts): its
+// source goes into its source node
+handlers.diagram = (state, token) => {
+  const { attrs, source } = token.meta as unknown as {
+    attrs: Attrs;
+    source: string;
+  };
+  const block = createSourceBlock(schema, "diagram", source, attrs);
+  state.addNode(block.type, block.attrs, block.children);
 };
 handlers.html_table = addParsed;
 handlers.html_block_node = addParsed;

@@ -8,11 +8,12 @@ import type { Node } from "prosemirror-model";
 import { closeMarker, formatMarker } from "./blocks/args";
 import { ATOMS, extraArgs, formatAtom } from "./blocks/atoms";
 import { formDefinition } from "./blocks/definitions";
+import { writeDiagram } from "./blocks/diagrams";
 import { writeEmbed } from "./blocks/embeds";
 import { fieldSpec, isEmptyField } from "./blocks/forms";
 import { alignOf } from "./alignment";
 import { schema } from "./schema";
-import { gfmBlocker, gfmLines, htmlLines } from "./tables";
+import { escapeHtml, gfmBlocker, gfmLines, htmlLines } from "./tables";
 import { decodeTabs, encodeTabs } from "./tabs";
 
 const { nodes } = defaultMarkdownSerializer;
@@ -32,8 +33,12 @@ const marks = {
 // the HTML Blank reads typed as text is escaped, so it stays text on reopen,
 // e.g. a line `<!-- pagebreak -->` that would become a page break, or a
 // `<div align="center">` that would align what follows: `<br>`, `<table`,
-// `<!--`, the tags of aligned blocks and underlines
-const HTML_TAGS = String.raw`<(?=\/?(?:br|table|div|p|h[1-6]|u|ins)\b|!--)`;
+// `<!--`, the tags of aligned blocks, underlines and the images Blank reads
+// an <img> only as htmlImage (./tokenizer.ts) reads one: with nothing but
+// src, alt, title and width, each with a value or without one; other <img>
+// tags stay text and are written as they are, so GitHub still shows them
+const IMG_TAG = String.raw`img(?:\s+(?:src|alt|title|width)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=]+))?)+\s*\/?>`;
+const HTML_TAGS = String.raw`<(?=\/?(?:br|table|div|p|h[1-6]|u|ins)\b|!--|${IMG_TAG})`;
 const HTML_START = new RegExp(HTML_TAGS, "gi");
 // pipes too, in a paragraph that could otherwise turn into a table
 const HTML_START_OR_PIPE = new RegExp(`${HTML_TAGS}|\\|`, "gi");
@@ -70,12 +75,35 @@ const aligned =
   };
 
 /**
+ * writeImage writes an image as markdown does, or, given a width, as HTML,
+ * which markdown has no syntax for and GitHub, GitLab, Obsidian and Typora
+ * show at that width: `<img src="…" alt="…" width="50%">`
+ */
+const writeImage: NodeWriter = (state, node, parent, index) => {
+  const { src, alt, title, width } = node.attrs as Record<
+    string,
+    string | null
+  >;
+  if (!width) return nodes.image(state, node, parent, index);
+  const attrs = [
+    ["src", src],
+    ["alt", alt ?? ""],
+    ...(title ? [["title", title]] : []),
+    ["width", width],
+  ] as [string, string][];
+  state.write(
+    `<img ${attrs.map(([name, value]) => `${name}="${escapeHtml(value ?? "")}"`).join(" ")}>`,
+  );
+};
+
+/**
  * cellSerializer writes the content of a pipe table cell, with line breaks as
  * `<br>`, since a row of a pipe table is a single line
  */
 const cellSerializer = new MarkdownSerializer(
   {
     ...nodes,
+    image: writeImage,
     hard_break: (state) => state.write("<br>"),
   },
   marks,
@@ -183,6 +211,11 @@ export const markdownSerializer = new TabSerializer(
       state.text(writeEmbed(node.attrs), false);
       state.closeBlock(node);
     },
+    diagram: aligned((state, node) => {
+      state.text(writeDiagram(node), false);
+      state.closeBlock(node);
+    }),
+    image: writeImage,
     unknown_block(state, node) {
       // as it was read, unescaped
       state.text(node.attrs.raw as string, false);

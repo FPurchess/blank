@@ -4,7 +4,8 @@ import MarkdownIt, {
   type StateInline,
 } from "markdown-it";
 
-import { blankBlocks, blankMarker } from "./blocks/rules";
+import { blankBlocks, blankMarker, diagramFences } from "./blocks/rules";
+import { parseWidth } from "./blocks/caps";
 import { textAlignment } from "./alignment";
 import { alignment } from "./schema";
 import { parseHtmlBlock, parseHtmlTable } from "./html";
@@ -74,6 +75,65 @@ const htmlUnderline = (state: StateInline, silent: boolean): boolean => {
   if (to < 0) return false;
   if (!silent) underlined(state, from, to, to + close.length);
   else state.pos = to + close.length;
+  return true;
+};
+
+// an <img> tag, as Blank writes an image with a width, and its attributes
+const IMG = /^<img(\s+[^<>]*?)\s*\/?>/i;
+const IMG_ATTRIBUTE =
+  /\s+([a-z-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>=`]+)))?/giy;
+
+/**
+ * imgAttributes reads the attributes of an <img> tag, entities decoded;
+ * null if they aren't attributes
+ */
+const imgAttributes = (state: StateInline, text: string) => {
+  const attributes: Record<string, string> = {};
+  IMG_ATTRIBUTE.lastIndex = 0;
+  while (IMG_ATTRIBUTE.lastIndex < text.length) {
+    const match = IMG_ATTRIBUTE.exec(text);
+    if (!match) return null;
+    const value = match[2] ?? match[3] ?? match[4] ?? "";
+    attributes[match[1].toLowerCase()] = state.md.utils.unescapeAll(value);
+  }
+  return attributes;
+};
+
+// the attributes of an <img> Blank keeps: one with others (height, style,
+// align) stays text, as Blank would lose them on saving
+const IMG_KEPT = new Set(["src", "alt", "title", "width"]);
+
+/**
+ * htmlImage reads `<img src="…" alt="…" width="…">`, as Blank writes an image
+ * given a width (and GitHub and Typora show), into an image with its width.
+ * Its src is checked as a markdown image's is; one that isn't allowed, a
+ * tag without a src, with a width Blank can't lay out or with attributes
+ * Blank doesn't keep stays text, as `html` is off.
+ */
+const htmlImage = (state: StateInline, silent: boolean): boolean => {
+  if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
+  const match = IMG.exec(state.src.slice(state.pos, state.posMax));
+  if (!match) return false;
+  const attributes = imgAttributes(state, match[1]);
+  if (!attributes?.src) return false;
+  if (Object.keys(attributes).some((name) => !IMG_KEPT.has(name))) return false;
+  if (attributes.width && !parseWidth(attributes.width)) return false;
+  const src = state.md.normalizeLink(attributes.src);
+  if (!state.md.validateLink(src)) return false;
+  if (!silent) {
+    const token = state.push("image", "img", 0);
+    token.attrs = [
+      ["src", src],
+      ["alt", ""],
+    ];
+    if (attributes.title) token.attrs.push(["title", attributes.title]);
+    const alt = new state.Token("text", "", 0);
+    alt.content = attributes.alt ?? "";
+    token.children = [alt];
+    token.content = alt.content;
+    token.meta = { width: attributes.width || null };
+  }
+  state.pos += match[0].length;
   return true;
 };
 
@@ -232,9 +292,19 @@ const alignStart = (state: StateCore) => {
   (state.env as AlignEnv).blankAlign = 0;
 };
 
+// the tokens that start a block at the top of the document that can be
+// aligned: paragraphs, headings, and the fences and markers content blocks
+// are read from (e.g. a diagram's, see ./blocks/rules.ts)
+export const ALIGNABLE_TOKENS = new Set([
+  "paragraph_open",
+  "heading_open",
+  "fence",
+  "blank_marker",
+]);
+
 /**
- * alignBlocks gives the paragraphs and headings between `align_open` and
- * `align_close` their alignment, as `data-align`, and drops the two. Only
+ * alignBlocks gives the blocks between `align_open` and `align_close` their
+ * alignment (ALIGNABLE_TOKENS), as `data-align`, and drops the two. Only
  * blocks at the top are aligned: those in lists and quotes are deeper. A
  * wrapper that isn't closed runs to the end of the file.
  */
@@ -255,11 +325,7 @@ const alignBlocks = (state: StateCore) => {
       return false;
     }
     const align = open[open.length - 1];
-    if (
-      align &&
-      token.level === 0 &&
-      (token.type === "paragraph_open" || token.type === "heading_open")
-    ) {
+    if (align && token.level === 0 && ALIGNABLE_TOKENS.has(token.type)) {
       token.attrSet("data-align", align);
     }
     return true;
@@ -325,6 +391,7 @@ export const tokenizer = MarkdownIt("commonmark", { html: false }).enable(
 );
 tokenizer.inline.ruler.before("html_inline", "html_break", htmlBreak);
 tokenizer.inline.ruler.before("html_inline", "html_underline", htmlUnderline);
+tokenizer.inline.ruler.before("html_inline", "html_image", htmlImage);
 tokenizer.inline.ruler.before("link", "bracket_underline", bracketUnderline);
 tokenizer.block.ruler.before("html_block", "html_table", htmlTable, {
   alt: ["paragraph", "reference", "blockquote"],
@@ -346,4 +413,6 @@ tokenizer.core.ruler.after("block", "blank_blocks", blankBlocks);
 // added last, so it runs right after the blocks are read, before the content
 // blocks and cells are: no wrapper token is left for them
 tokenizer.core.ruler.after("block", "align_blocks", alignBlocks);
+// after the blocks with markers, so it finds only the bare fences left
+tokenizer.core.ruler.after("blank_blocks", "diagram_fences", diagramFences);
 tokenizer.core.ruler.before("block", "align_start", alignStart);

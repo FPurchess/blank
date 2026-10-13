@@ -31,6 +31,7 @@ import {
 } from "../../test/editor";
 import {
   editSignature,
+  DIAGRAM_STARTER,
   editToc,
   insertBlock,
   insertTopBlock,
@@ -149,18 +150,29 @@ describe("the blocks pane", () => {
     expect(blocksPaneOpen.value).toBe(false);
   });
 
-  it("offers the table of contents, Blank's forms and a signature block", async () => {
+  it("offers the table of contents, Blank's forms, a signature block and diagrams", async () => {
     const choices = await read();
     expect(choices.map(({ id, group }) => [id, group])).toEqual([
       ["toc", "contents"],
       ["blank/recipe", "forms"],
       ["signature", "signing"],
+      ["diagram", "drawings"],
     ]);
     // a form's tile draws its definition
     expect(choices[1].definition?.name).toBe("Recipe");
     const view = createTestView(createState(doc(p())));
     expect(insertBlock("toc")(view.state, view.dispatch, view)).toBe(true);
     expect(view.state.doc.child(0).type.name).toBe("toc");
+  });
+
+  it("inserts a diagram with the cursor in its source", async () => {
+    await read();
+    const view = createTestView(createState(doc(p())));
+    expect(insertBlock("diagram")(view.state, view.dispatch, view)).toBe(true);
+    const diagram = view.state.doc.child(0);
+    expect(diagram.type.name).toBe("diagram");
+    expect(diagram.textContent).toBe(DIAGRAM_STARTER);
+    expect(view.state.selection.$head.parent.type.name).toBe("diagram_source");
   });
 
   it("reads the forms once, however often it is asked meanwhile", async () => {
@@ -254,10 +266,10 @@ describe("editToc", () => {
   it("changes its depth and title at once, and keeps it selected", () => {
     const view = selected();
     expect(editToc()(view.state, view.dispatch, view)).toBe(true);
-    expect(tocPopover.value).toMatchObject({ depth: 2, title: "Contents" });
-    tocPopover.value!.apply(4, "Contents");
+    expect(tocPopover.value?.values).toEqual({ depth: 2, title: "Contents" });
+    tocPopover.value!.apply({ depth: 4, title: "Contents" });
     expect(view.state.doc.child(1).attrs).toMatchObject({ depth: 4 });
-    tocPopover.value!.apply(4, "Overview");
+    tocPopover.value!.apply({ depth: 4, title: "Overview" });
     const node = view.state.doc.child(1);
     expect(node.attrs).toMatchObject({ depth: 4, title: "Overview" });
     expect(view.state.selection).toBeInstanceOf(NodeSelection);
@@ -289,7 +301,7 @@ describe("editToc", () => {
     const view = selected();
     editToc()(view.state, view.dispatch, view);
     const before = view.state;
-    tocPopover.value!.apply(2, "Contents");
+    tocPopover.value!.apply({ depth: 2, title: "Contents" });
     expect(view.state).toBe(before);
   });
 
@@ -298,7 +310,7 @@ describe("editToc", () => {
     editToc()(view.state, view.dispatch, view);
     view.dispatch(view.state.tr.delete(3, 4));
     const before = view.state.doc;
-    tocPopover.value!.apply(5, "Gone");
+    tocPopover.value!.apply({ depth: 5, title: "Gone" });
     expect(view.state.doc).toBe(before);
   });
 });
@@ -337,7 +349,7 @@ describe("editSignature", () => {
   it("changes it at once, and keeps it selected", () => {
     const view = selected();
     expect(editSignature()(view.state, view.dispatch, view)).toBe(true);
-    expect(signaturePopover.value?.settings).toEqual(settings());
+    expect(signaturePopover.value?.values).toEqual(settings());
     signaturePopover.value!.apply(settings({ name: "Ada", width: "75%" }));
     expect(view.state.doc.child(1).attrs).toMatchObject({
       role: "Tenant",

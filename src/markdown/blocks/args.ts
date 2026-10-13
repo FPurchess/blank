@@ -118,13 +118,14 @@ export const looksLikeMarker = (line: string) =>
   /^<!--\s*\/?blank:[a-z]/.test(line) && /-->\s*$/.test(line);
 
 /**
- * fenceFor returns a code fence for `content`: at least four backticks, and
- * more than any run of backticks in it, so that the content can't close it
+ * fenceFor returns a code fence for `content`: at least `min` backticks,
+ * four by default, and more than any run of backticks in it, so that the
+ * content can't close it
  */
-export const fenceFor = (content: string): string => {
+export const fenceFor = (content: string, min = 4): string => {
   const longest = Math.max(
     0,
     ...Array.from(content.matchAll(/`+/g), (match) => match[0].length),
   );
-  return "`".repeat(Math.max(4, longest + 1));
+  return "`".repeat(Math.max(min, longest + 1));
 };

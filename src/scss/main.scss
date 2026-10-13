@@ -1564,8 +1564,8 @@ body.without-engine.blocks-docked {
   font-size: var(--ui-small);
 }
 
-// the settings of a block below its toolbar (src/ui/components/
-// BlockPopover.vue): a table of contents', a signature block's
+// the settings of a block, below its toolbar: a table of contents', a
+// diagram's, a signature block's (src/ui/components/BlockPopover.vue)
 .block-popover {
   position: fixed;
   // with the pickers and menus
@@ -1594,22 +1594,17 @@ body.without-engine.blocks-docked {
     @include field;
   }
 
-  // a row of choices: its label above, the choices as one segmented
-  // control (OptionGroup.vue)
+  // a row of options: its label above it, as the fields have theirs
   .setting {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: var(--s1);
     margin-top: var(--s1);
   }
 
   .setting-label {
     color: var(--muted);
-  }
-
-  .options {
-    @include segmented;
-    flex-wrap: wrap;
   }
 }
 

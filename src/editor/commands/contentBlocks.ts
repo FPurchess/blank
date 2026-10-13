@@ -1,10 +1,5 @@
 import type { Node, Slice } from "prosemirror-model";
-import {
-  type Command,
-  type EditorState,
-  NodeSelection,
-  TextSelection,
-} from "prosemirror-state";
+import { type Command, NodeSelection, TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import { chainCommands } from "prosemirror-commands";
 
@@ -21,7 +16,7 @@ import {
   blocksPaneFocused,
   blocksPaneOpen,
   focusBlocksSearch,
-  type SignatureSettings,
+  diagramPopover,
   signaturePopover,
   tocPopover,
 } from "../../state";
@@ -29,8 +24,14 @@ import { blockName, isContentBlock } from "../../markdown/blocks/names";
 import { topBlockAt } from "../../markdown/topBlock";
 import { embedTypes, type EmbedType } from "../../embeds/registry";
 import { type Form, loadForms } from "../../forms/library";
-import { boxOnCaretPage } from "../plugins/followLayout";
 import { editEmbed, makeEmbed } from "./embeds";
+import {
+  createSourceBlock,
+  isSourceBlock,
+} from "../../markdown/blocks/sourceBlock";
+import { enterSource } from "../plugins/sourceBlocks";
+import { sourceKind } from "../../sources/registry";
+import { editBlockSettings } from "./blockSettings";
 
 // Content blocks: blocks Blank makes besides the text, see
 // src/markdown/blocks. They stand at the top of the document, never in a
@@ -58,6 +59,26 @@ const SIGNATURE: Choice = {
   description: "A line to sign on, with name, place and date",
   insert: (view, at) =>
     insertTopBlock(view, schema.nodes.signature.create(), undefined, at),
+};
+
+// what a new diagram says, so it shows something to change at once
+export const DIAGRAM_STARTER = "flowchart LR\n  Idea --> Draft --> Done";
+
+const DIAGRAM: Choice = {
+  id: "diagram",
+  group: "drawings",
+  label: "Diagram",
+  description: "Flowcharts, sequences and timelines from text",
+  insert: (view, at) => {
+    insertTopBlock(
+      view,
+      createSourceBlock(schema, "diagram", DIAGRAM_STARTER),
+      undefined,
+      at,
+    );
+    // into its source, to change it
+    enterSource(view.state, view.dispatch);
+  },
 };
 
 /**
@@ -176,6 +197,7 @@ export const readBlocks = () =>
         TOC,
         ...forms.map(formChoice),
         SIGNATURE,
+        DIAGRAM,
         ...embedTypes().map(embedChoice),
       ];
       offered = new Map(choices.map((choice) => [choice.id, choice]));
@@ -257,7 +279,27 @@ export const insertBlock =
  * dialog, an embed with its type, if Blank has it
  */
 export const editBlock = (): Command =>
-  chainCommands(editToc(), editSignature(), editEmbed());
+  chainCommands(editToc(), editDiagram(), editSignature(), editEmbed());
+
+/**
+ * blockSettings opens the settings of the selected block, or of the source
+ * block being typed (Shift+Enter): those of editBlock; it can't run on a
+ * block without settings
+ */
+export const blockSettings = (): Command => editBlock();
+
+/**
+ * keepSelectedBlock does nothing on a selected block, and says it did, so a
+ * key that would otherwise type in its place (Shift+Enter's line break)
+ * leaves it be
+ */
+export const keepSelectedBlock: Command = (state) => {
+  const { selection } = state;
+  return (
+    selection instanceof NodeSelection &&
+    (isContentBlock(selection.node) || isSourceBlock(selection.node))
+  );
+};
 
 /**
  * removeTopBlock removes the content block at `pos`, the cursor going where
@@ -290,106 +332,59 @@ export const pasteTopBlocks = (view: EditorView, slice: Slice) => {
 };
 
 /**
- * selectedToc returns the table of contents the selection is on, with its
- * position, or null
- */
-const selectedToc = (state: EditorState) => {
-  const { selection } = state;
-  return selection instanceof NodeSelection &&
-    selection.node.type === schema.nodes.toc
-    ? { node: selection.node, pos: selection.from }
-    : null;
-};
-
-/**
  * editToc opens the settings of the selected table of contents below it:
  * how deep it lists the headings and its title, which change it at once; or
  * closes them while they are open
  */
-export const editToc = (): Command => (state, dispatch, view) => {
-  const selected = selectedToc(state);
-  if (!selected) return false;
-  if (!dispatch || !view) return true;
-  // the settings button again closes them
-  const open = tocPopover.value;
-  if (open) {
-    tocPopover.value = null;
-    open.close();
-    return true;
-  }
-  const { node, pos } = selected;
-  // the table of contents still where the settings opened it
-  const at = (state: EditorState) =>
-    state.doc.nodeAt(pos)?.type === schema.nodes.toc ? pos : null;
-  // nowhere to open them while it isn't shown, e.g. before the first
-  // layout; Enter still does nothing else to it
-  const box = boxOnCaretPage(view, pos, node.nodeSize);
-  if (!box) return true;
-  tocPopover.value = {
-    anchor: box,
-    depth: node.attrs.depth as number,
-    title: node.attrs.title as string,
-    apply: (depth, title) => {
-      const pos = at(view.state);
-      if (pos === null) return;
-      const attrs = view.state.doc.nodeAt(pos)!.attrs;
-      if (attrs.depth === depth && attrs.title === title) return;
-      const tr = view.state.tr.setNodeMarkup(pos, null, {
-        ...attrs,
-        depth,
-        title,
-      });
-      view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
-    },
-    close: () => view.focus(),
-  };
-  return true;
-};
+export const editToc = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.toc,
+    popover: tocPopover,
+    values: (node) => ({
+      depth: node.attrs.depth as number,
+      title: node.attrs.title as string,
+    }),
+    attrs: (node, { depth, title }) => ({ ...node.attrs, depth, title }),
+  });
+
+/**
+ * editDiagram opens the settings of the selected diagram, or of the one
+ * being typed, below it: its width, caption and description; or closes them
+ * while they are open
+ */
+export const editDiagram = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.diagram,
+    popover: diagramPopover,
+    values: (node) => ({
+      width: node.attrs.width as string | null,
+      caption: node.attrs.caption as string,
+      alt: node.attrs.alt as string,
+    }),
+    attrs: (node, values) => ({ ...node.attrs, ...values }),
+    more: (node) => ({
+      label: sourceKind("diagram")?.label(node.textContent) ?? "Diagram",
+    }),
+  });
 
 /**
  * editSignature opens the settings of the selected signature block below
- * it: who signs and as what, where and when, and its width, which change it
- * at once; or closes them while they are open
+ * it: who signs and as what, where and when, and its width; or closes them
+ * while they are open
  */
-export const editSignature = (): Command => (state, dispatch, view) => {
-  const { selection } = state;
-  if (
-    !(selection instanceof NodeSelection) ||
-    selection.node.type !== schema.nodes.signature
-  ) {
-    return false;
-  }
-  if (!dispatch || !view) return true;
-  const open = signaturePopover.value;
-  if (open) {
-    signaturePopover.value = null;
-    open.close();
-    return true;
-  }
-  const { node, from: pos } = selection;
-  const box = boxOnCaretPage(view, pos, node.nodeSize);
-  if (!box) return true;
-  const { role, name, place, date, width } = node.attrs;
-  signaturePopover.value = {
-    anchor: box,
-    settings: { role, name, place, date, width } as SignatureSettings,
-    apply: (settings) => {
-      const at = view.state.doc.nodeAt(pos);
-      if (at?.type !== schema.nodes.signature) return;
-      const changed = (
-        Object.keys(settings) as (keyof SignatureSettings)[]
-      ).some((key) => at.attrs[key] !== settings[key]);
-      if (!changed) return;
-      const tr = view.state.tr.setNodeMarkup(pos, null, {
-        ...at.attrs,
-        ...settings,
-      });
-      view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)));
-    },
-    close: () => view.focus(),
-  };
-  return true;
-};
+export const editSignature = (): Command =>
+  editBlockSettings({
+    is: (node) => node.type === schema.nodes.signature,
+    popover: signaturePopover,
+    values: ({ attrs: { role, name, place, date, width } }) => ({
+      role,
+      name,
+      place,
+      date,
+      width,
+    }),
+    attrs: (node, values) => ({ ...node.attrs, ...values }),
+  });
 
 /**
  * insertSignature inserts a signature block where the cursor is
