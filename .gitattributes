@@ -1,3 +1,7 @@
 # the built-in spell check dictionaries must stay byte for byte as published,
 # since their SHA-256 is pinned in src/spellcheck/catalog.json
 src-tauri/dictionaries/** -text
+# PDFs, the test fixtures too, are bytes at offsets their cross-reference
+# tables point to: a checkout that turned their line ends into CRLF (Windows)
+# would damage them
+*.pdf -text
