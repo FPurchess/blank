@@ -1,5 +1,7 @@
 import type JSZip from "jszip";
 
+import { readTag } from "../../exporters/docx/forms";
+
 // Reading the XML parts of a .docx.
 
 // WordprocessingML, the namespace of document.xml, styles.xml and the others
@@ -18,6 +20,17 @@ export const parsePart = async (zip: JSZip, name: string) => {
   if (xml === undefined) return null;
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   return doc.getElementsByTagName("parsererror").length ? null : doc;
+};
+
+/**
+ * ancestor returns the nearest element named `name` in Word's namespace
+ * that holds `element`, or null
+ */
+export const ancestor = (element: Element, name: string) => {
+  let current = element.parentElement;
+  while (current && !(current.namespaceURI === W && current.localName === name))
+    current = current.parentElement;
+  return current;
 };
 
 /**
@@ -92,4 +105,37 @@ export const customParts = async (
     }
   }
   return texts;
+};
+
+/**
+ * tagOf reads the tag of a content control of Blank's, null for another's
+ */
+export const tagOf = (sdt: Element) =>
+  readTag(val(child(child(sdt, "sdtPr"), "tag")));
+
+/**
+ * rewriteControls runs `edit` on each content control at the top of the
+ * document's body, and writes the document again if one of them changed it
+ * @param wanted whether the document's XML can hold what `edit` looks for,
+ *   before it's parsed
+ * @returns whether it had to be rewritten
+ */
+export const rewriteControls = async (
+  zip: JSZip,
+  edit: (sdt: Element, doc: Document) => boolean,
+  wanted: (xml: string) => boolean = () => true,
+) => {
+  const xml = await zip.file(DOCUMENT_PART)?.async("string");
+  if (xml === undefined || !wanted(xml)) return false;
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) return false;
+  const body = doc.getElementsByTagNameNS(W, "body")[0];
+  let changed = false;
+  for (const sdt of children(body, "sdt")) {
+    if (edit(sdt, doc)) changed = true;
+  }
+  if (changed) {
+    zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
+  }
+  return changed;
 };

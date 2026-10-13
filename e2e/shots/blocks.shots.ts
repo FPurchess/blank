@@ -112,4 +112,20 @@ describe("docs shots: blocks", () => {
     await film.pause(2.2);
     film.save("form.gif");
   });
+
+  it("records a diagram", async () => {
+    const film = await filmNew({ view: "pages" });
+    // the pane, "diagram" and Enter: a flowchart, with the cursor in its text
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.8);
+    await film.type("diagram");
+    await film.press("Enter", Key.Enter, 1.6);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.4);
+    await film.shortcut(["Mod", "Alt", "B"], () => pressMod(Key.Alt, "b"), 0.6);
+    // a step more, which the drawing follows once the typing pauses
+    await film.type(" --> print");
+    await film.pause(1.8);
+    // Esc closes it, and the diagram stays selected
+    await film.press("Esc", Key.Escape, 2.2);
+    film.save("diagram.gif");
+  });
 });

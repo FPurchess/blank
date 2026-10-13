@@ -33,11 +33,13 @@ export interface ChosenImage {
 export interface ImageDialogRequest {
   src: string;
   alt: string;
+  // its width, e.g. "50%" (see src/markdown/blocks/caps.ts), null for Fit
+  width: string | null;
   // the cursor is at an existing image, which can be removed
   isEdit: boolean;
   // lets the user pick an image file, null if cancelled or unreadable
   chooseFile(): Promise<ChosenImage | null>;
-  submit(src: string, alt: string): void;
+  submit(src: string, alt: string, width: string | null): void;
   remove(): void;
   cancel(): void;
 }
@@ -89,21 +91,44 @@ export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 // the strip while it is open
 export const bandEditorDone = shallowRef<(() => void) | null>(null);
 
-export interface TocPopoverRequest {
+// the settings of a block, below the block toolbar's settings button (see
+// src/editor/commands/blockSettings.ts and src/ui/components/BlockPopover.vue)
+export interface BlockSettingsRequest<T> {
   // the button or block it opens below, at its right end
   anchor: BoxAnchor;
-  // the headings it lists, 1 to 6 levels deep
-  depth: number;
-  title: string;
-  // changes the table of contents at once, as one undo step
-  apply(depth: number, title: string): void;
-  // gives the editor the focus back, on the table of contents
+  // what the block has now
+  values: T;
+  // changes the block at once, as one undo step
+  apply(values: T): void;
+  // gives the editor the focus back, on the block
   close(): void;
 }
+
+// a table of contents: the headings it lists, 1 to 6 levels deep, and its
+// title
+export type TocPopoverRequest = BlockSettingsRequest<{
+  depth: number;
+  title: string;
+}>;
 
 // tocPopover holds the request of the open settings of a table of contents,
 // or null while they are closed
 export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
+
+// a diagram: its width (null for Fit, see src/markdown/blocks/caps.ts), its
+// caption and its description
+export interface DiagramPopoverRequest extends BlockSettingsRequest<{
+  width: string | null;
+  caption: string;
+  alt: string;
+}> {
+  // what it is called where its description is empty, e.g. "Flowchart"
+  label: string;
+}
+
+// diagramPopover holds the request of the open settings of a diagram, or
+// null while they are closed
+export const diagramPopover = shallowRef<DiagramPopoverRequest | null>(null);
 
 // what a signature block's settings change (ATOMS.signature)
 export interface SignatureSettings {
@@ -115,15 +140,7 @@ export interface SignatureSettings {
   width: string | null;
 }
 
-export interface SignaturePopoverRequest {
-  // the button or block it opens below, at its right end
-  anchor: BoxAnchor;
-  settings: SignatureSettings;
-  // changes the signature block at once, as one undo step
-  apply(settings: SignatureSettings): void;
-  // gives the editor the focus back, on the signature block
-  close(): void;
-}
+export type SignaturePopoverRequest = BlockSettingsRequest<SignatureSettings>;
 
 // signaturePopover holds the request of the open settings of a signature
 // block, or null while they are closed
@@ -151,7 +168,7 @@ export interface SignatureDialogRequest {
 }
 
 // a picture chosen for a signature, and whether its background goes
-export interface ChosenMarkImage {
+interface ChosenMarkImage {
   src: string;
   clean: boolean;
 }
@@ -326,6 +343,7 @@ export const focusTakingDialogs = [
   pageSetup,
   bandEditor,
   tocPopover,
+  diagramPopover,
   signaturePopover,
   signatureDialog,
   signDialog,

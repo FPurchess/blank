@@ -1,9 +1,10 @@
 import type JSZip from "jszip";
 
-import { EMBED_STYLE } from "./embeds";
+import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { FORM_STYLE } from "./forms";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
 import {
+  ancestor,
   ATOM_STYLE,
   child,
   children,
@@ -115,6 +116,7 @@ export const readStyleAlignment = (styles: Document | null): StyleAlignment => {
 // the paragraphs the other rewrites mark what mammoth would lose with, whose
 // text cleanup.ts reads
 const MARKER_STYLES = new Set([
+  DIAGRAM_STYLE,
   EMBED_STYLE,
   FORM_STYLE,
   PAGE_BREAK_STYLE,
@@ -142,12 +144,7 @@ const alignmentOf = (p: Element, styles: StyleAlignment) => {
 /**
  * inCell tells whether the paragraph `p` is in a table's cell
  */
-const inCell = (p: Element) => {
-  for (let parent = p.parentElement; parent; parent = parent.parentElement) {
-    if (parent.namespaceURI === W && parent.localName === "tc") return true;
-  }
-  return false;
-};
+const inCell = (p: Element) => ancestor(p, "tc") !== null;
 
 /**
  * markerRun returns a run in the style of `align`, holding the marker

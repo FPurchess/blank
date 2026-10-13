@@ -74,6 +74,8 @@ export type EngineCellBlock =
       width: number;
       height: number;
       alt: string;
+      // the share of the cell's width it takes, see the image item
+      share?: number;
       // where it stands in lists and quotes, as a text block does; the
       // marker sits at its top
       indent?: number;
@@ -118,10 +120,15 @@ export type Content =
       alt: string;
       // the alignment of the paragraph it stands in
       align?: EngineAlign;
+      // the share of the text's width it takes (0 to 1), which may enlarge
+      // it; without one, its own size, at most the text's width
+      share?: number;
+      // what is written under it, in the caption style
+      caption?: string;
     }
   // a line to sign on: room for the signature (its image once signed, else
   // `hint` on the screen only), the line, and the `lines` under it, as wide
-  // as `share` of the text (0 for the engine's default)
+  // as `share` of the text (null for the engine's default)
   | {
       kind: "signature";
       pos: number;
@@ -131,7 +138,7 @@ export type Content =
       alt: string;
       lines: string[];
       hint: string;
-      share: number;
+      share: number | null;
     }
   | {
       kind: "table";

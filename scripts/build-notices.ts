@@ -36,6 +36,7 @@ const vendoredRoot = join(notices, "vendored");
 // Blank's own crates, which carry Blank's licence
 const OWN_CRATES = new Set([
   "blank",
+  "blank-drawings",
   "blank-layout",
   "blank-pdf",
   "blank-pdf-ipc",

@@ -3,7 +3,16 @@ import type JSZip from "jszip";
 import { SIGNATURE_TAG } from "../../exporters/docx/forms";
 import { formatAtom, readAtom } from "../../markdown";
 import { SIGNATURE_DEFAULTS } from "../../markdown/blocks/atoms";
-import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
+import {
+  ancestor,
+  ATOM_STYLE,
+  child,
+  DOCUMENT_PART,
+  markerParagraph,
+  parsePart,
+  val,
+  W,
+} from "./xml";
 
 // Signature blocks from Word, before mammoth, which would keep only their
 // text:
@@ -16,7 +25,6 @@ import { ATOM_STYLE, child, markerParagraph, val, W } from "./xml";
 // is never in a table's cell, so those in a table come after it, in the
 // order of their cells, and the table stays whole.
 
-const DOCUMENT = "word/document.xml";
 // the namespace of VML's Office extensions, where Word's signature lines are
 const OFFICE = "urn:schemas-microsoft-com:office:office";
 
@@ -35,16 +43,6 @@ const hiddenText = (element: Element) =>
     .trim();
 
 /**
- * ancestor returns the nearest element named `name` in Word's namespace
- * that holds `element`
- */
-const ancestor = (element: Element, name: string) => {
-  let current: Element | null = element.parentElement;
-  while (current && !(current.namespaceURI === W && current.localName === name))
-    current = current.parentElement;
-  return current;
-};
-
 /**
  * outermostTable returns the table `element` is in, the outermost of
  * nested ones, or null
@@ -89,15 +87,8 @@ const signatureLine = (line: Element) =>
  * @returns whether it had to be rewritten
  */
 export const markSignatures = async (zip: JSZip) => {
-  const xml = await zip.file(DOCUMENT)?.async("string");
-  if (
-    xml === undefined ||
-    !(xml.includes(SIGNATURE_TAG) || xml.includes("signatureline"))
-  ) {
-    return false;
-  }
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) return false;
+  const doc = await parsePart(zip, DOCUMENT_PART);
+  if (!doc) return false;
   // the last marker put after each table, which the next one follows
   const afterTables = new Map<Element, Element>();
   /**
@@ -144,6 +135,8 @@ export const markSignatures = async (zip: JSZip) => {
     }
     changed = true;
   }
-  if (changed) zip.file(DOCUMENT, new XMLSerializer().serializeToString(doc));
+  if (changed) {
+    zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
+  }
   return changed;
 };

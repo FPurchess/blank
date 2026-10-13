@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import { stringify } from "yaml";
 
@@ -29,6 +29,8 @@ import { allMargins, DEFAULT_PAGE } from "../../layout/settings";
 import { rewriteDocx } from "../../test/docx";
 import { IMAGES, dataUrl } from "../../test/images";
 import { importDocx } from ".";
+import { registerBoxes } from "../../test/sources";
+import { rasterize } from "../../images/codec";
 
 vi.mock("../../images/codec", () => ({
   decodeSize: vi.fn(),
@@ -429,6 +431,96 @@ describe("importers.docx", () => {
       const { markdown: imported } = await toMarkdown(bytes);
       expect(imported).not.toContain("blank:embed");
       expect(imported).toContain("Intro");
+    });
+  });
+
+  describe("diagrams", { timeout: 20_000 }, () => {
+    let unregister: () => void;
+    beforeAll(() => {
+      unregister = registerBoxes();
+      return () => unregister();
+    });
+    beforeEach(() => {
+      // the picture Word shows of a drawing, where it can't show SVG
+      vi.mocked(rasterize).mockResolvedValue({
+        bytes: Uint8Array.from(atob(IMAGES.png), (char) => char.charCodeAt(0)),
+        mime: "image/png",
+        size: { width: 210, height: 60 },
+      });
+    });
+    const markdown = [
+      "Intro",
+      '<div align="center">',
+      '<!-- blank:diagram@1 width="50%" caption="The plan" alt="Two steps" -->',
+      "```mermaid\nflowchart LR\n  A --> B\n```",
+      "<!-- /blank:diagram -->",
+      "</div>",
+      "After",
+    ].join("\n\n");
+
+    it("come back from Blank's own Word export, source and settings", async () => {
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("have their caption aligned as they are", async () => {
+      const zip = await JSZip.loadAsync(await exportDocx(markdown));
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const caption =
+        /<w:p>(?:(?!<\/w:p>).)*The plan(?:(?!<\/w:p>).)*<\/w:p>/s.exec(
+          xml,
+        )?.[0];
+      expect(caption).toContain('<w:jc w:val="center"/>');
+    });
+
+    it("are their pictures without the part that holds them", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(markdown),
+        "customXml/item3.xml",
+        () => "<other/>",
+      );
+      const { markdown: imported } = await toMarkdown(bytes);
+      expect(imported).not.toContain("mermaid");
+      expect(imported).toContain("Intro");
+    });
+  });
+
+  describe("images with a width", { timeout: 20_000 }, () => {
+    beforeEach(() => {
+      vi.mocked(rasterize).mockResolvedValue({
+        bytes: Uint8Array.from(atob(IMAGES.png), (char) => char.charCodeAt(0)),
+        mime: "image/png",
+        size: { width: 3, height: 2 },
+      });
+    });
+
+    it("keep their share of the text's width through Word", async () => {
+      const src = dataUrl("image/png", IMAGES.png);
+      const markdown = [
+        `<img src="${src}" alt="A dot" width="50%">`,
+        `<img src="${src}" alt="" width="100%">`,
+        `![Natural](${src})`,
+      ].join("\n\n");
+      const imported = await roundTrip(markdown);
+      expect(imported).toContain('alt="A dot" width="50%">');
+      expect(imported).toContain('alt="" width="100%">');
+      expect(imported).toContain("![Natural](");
+    });
+
+    it("leave pictures of other apps at their own size, also one as wide as the text", async () => {
+      const src = dataUrl("image/png", IMAGES.png);
+      const bytes = await exportDocx(
+        `<img src="${src}" alt="Wide" width="100%">`,
+      );
+      // as Word names a picture it was given
+      const renamed = await rewriteDocx(
+        bytes,
+        "word/document.xml",
+        (xml = "") => xml.replace(/name="image-1[^"]*"/, 'name="Picture 1"'),
+      );
+      expect(renamed).not.toEqual(bytes);
+      const { markdown } = await toMarkdown(renamed);
+      expect(markdown).toContain("![Wide](");
+      expect(markdown).not.toContain("width=");
     });
   });
 

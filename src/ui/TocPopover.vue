@@ -5,15 +5,16 @@ import { closeDialog, tocPopover, type TocPopoverRequest } from "../state";
 import BlockPopover from "./components/BlockPopover.vue";
 import { DEPTH_OPTIONS, titleOf } from "./tocPopoverModel";
 
-// The settings of a table of contents (Enter or the toolbar's settings
-// button, see src/editor/commands/contentBlocks.ts): how deep it lists the
-// headings, and its title. Each change applies at once, as one undo step.
+// The settings of a table of contents (Enter, Shift+Enter or the toolbar's
+// settings button, see src/editor/commands/contentBlocks.ts): how deep it
+// lists the headings, and its title.
 const props = defineProps<{ request: TocPopoverRequest }>();
 
-const depth = shallowRef(props.request.depth);
-const title = shallowRef(props.request.title);
+const depth = shallowRef(props.request.values.depth);
+const title = shallowRef(props.request.values.title);
 
-const apply = () => props.request.apply(depth.value, titleOf(title.value));
+const apply = () =>
+  props.request.apply({ depth: depth.value, title: titleOf(title.value) });
 const close = () => closeDialog(tocPopover, props.request.close);
 </script>
 

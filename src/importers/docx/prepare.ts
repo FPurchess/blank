@@ -7,10 +7,11 @@ import { markPageBreaks } from "./pageBreaks";
 import { markAlignment } from "./align";
 import { markTocs } from "./toc";
 import { markForms, readDefinitions } from "./forms";
-import { markEmbeds, readEmbeds } from "./embeds";
+import { markDiagrams, markEmbeds, readDiagrams, readEmbeds } from "./embeds";
 import { markSignatures } from "./signatures";
 import type { Definitions } from "../../markdown";
 import { parsePart } from "./xml";
+import { markPictureWidths } from "./widths";
 
 // Reads what mammoth leaves out of a .docx and rewrites what it would get
 // wrong, on the package unpacked once.
@@ -82,6 +83,8 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
   const layout = await readWordLayout(zip);
   const definitions = await readDefinitions(zip);
   const embeds = await markEmbeds(zip, await readEmbeds(zip));
+  const diagrams = await markDiagrams(zip, await readDiagrams(zip));
+  const widths = await markPictureWidths(zip);
   const signatures = await markSignatures(zip);
   // before the page breaks, which split paragraphs a field may span
   const tocs = await markTocs(zip);
@@ -95,6 +98,8 @@ export const prepareDocx = async (bytes: Uint8Array): Promise<PreparedDocx> => {
       tocs ||
       forms ||
       embeds ||
+      diagrams ||
+      widths ||
       signatures ||
       numbering ||
       pageBreaks ||

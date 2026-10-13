@@ -21,6 +21,7 @@ import { withoutLinkUnderline } from "../../markdown/marks";
 import { DROPPED_IMAGE_SRC, cleanup } from "./cleanup";
 import { type WordLayout, pageChanges } from "./layout";
 import { type WordProperties, prepareDocx } from "./prepare";
+import { pictureOf } from "./widths";
 import { STYLE_MAP } from "./styleMap";
 import { hideTabs, showTabs } from "./tabs";
 import { readZipDirectory } from "./zipGuard";
@@ -149,10 +150,17 @@ export const importDocx = async (
           new Uint8Array(await image.readAsArrayBuffer()),
           image.contentType,
         );
+        // its description, and the share of the text's width it takes
+        // (see widths.ts)
+        const described = (image as { altText?: string }).altText;
+        const { alt, width } = pictureOf(described);
         return {
           src: optimized
             ? await toDataUrl(optimized.bytes, optimized.mime)
             : DROPPED_IMAGE_SRC,
+          // mammoth gives the description as it was, mark and all
+          ...(described ? { alt } : {}),
+          ...(width ? { width } : {}),
         };
       }),
     },

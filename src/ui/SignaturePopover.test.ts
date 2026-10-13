@@ -16,7 +16,7 @@ describe("the settings of a signature block", () => {
     dispose = bootApp(createTestHandle());
     request = {
       anchor: { left: 100, top: 200, bottom: 260, right: 600 },
-      settings: {
+      values: {
         role: "Tenant",
         name: "",
         place: "",

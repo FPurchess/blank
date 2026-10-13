@@ -15,6 +15,7 @@ import {
   tablePicker,
   tableToolbar,
   tocPopover,
+  diagramPopover,
   signatureDetails,
   signaturePopover,
   signaturesPopover,
@@ -47,6 +48,7 @@ export const closeRequests = () => {
   close(unsavedDialog, (request) => request.cancel());
   close(signDialog, (request) => request.cancel());
   close(tocPopover, (request) => request.close());
+  close(diagramPopover, (request) => request.close());
   close(signaturePopover, (request) => request.close());
   close(signaturesPopover, (request) => request.refocus());
   close(signatureDetails, (request) => request.refocus());

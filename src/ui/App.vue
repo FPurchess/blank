@@ -22,6 +22,7 @@ import {
   signaturesPopover,
   shownPdf,
   tocPopover,
+  diagramPopover,
   unsavedDialog,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
@@ -47,6 +48,7 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
+import DiagramPopover from "./DiagramPopover.vue";
 import FindPanel from "./FindPanel.vue";
 import SignaturePopover from "./SignaturePopover.vue";
 import SignaturesPopover from "./SignaturesPopover.vue";
@@ -139,6 +141,11 @@ watchFocusMode();
     v-if="tocPopover"
     :key="keyOf(tocPopover)"
     :request="tocPopover"
+  />
+  <DiagramPopover
+    v-if="diagramPopover"
+    :key="keyOf(diagramPopover)"
+    :request="diagramPopover"
   />
   <SignaturePopover
     v-if="signaturePopover"
