@@ -54,6 +54,26 @@ describe("the question whether to save", () => {
     ).toContain("Your changes will be lost");
   });
 
+  it("asks whether to sign a PDF tab with stamps first", async () => {
+    unsavedDialog.value = {
+      ...request,
+      title: "Sign “contract” before you close it?",
+      text: "What you filled in and placed on its pages is lost when you close it without signing.",
+      saveLabel: "Sign…",
+      discardLabel: "Discard",
+    };
+    await nextTick();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe(
+      "Sign “contract” before you close it?",
+    );
+    expect(dialog()?.textContent).toContain("lost when you close it without");
+    expect(
+      [...dialog()!.querySelectorAll("button")].map((b) =>
+        b.textContent?.trim(),
+      ),
+    ).toEqual(["Discard", "Cancel", "Sign…"]);
+  });
+
   it.each([
     ["Save", "save"],
     ["Don't save", "discard"],

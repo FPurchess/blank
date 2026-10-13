@@ -125,6 +125,19 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "doc",
     aliases: ["export", "docx", "office"],
   },
+  [C.PDF_SIGN]: {
+    group: "File",
+    label: "Sign…",
+    icon: "seal",
+    aliases: ["sign", "signature", "stamp", "initials", "received", "contract"],
+  },
+  [C.PDF_NEXT]: {
+    group: "File",
+    label: "Next place to sign",
+    short: "Next",
+    icon: "chevron-right",
+    aliases: ["next", "place", "field", "fill", "form", "sign here"],
+  },
   [C.EXPORT_SIGNED_PDF]: {
     group: "Export",
     label: "Export signed PDF…",

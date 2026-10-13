@@ -137,6 +137,19 @@ export const firstEnabled = (items: readonly MenuLine[]) => {
 };
 
 /**
+ * startIndex returns the item a menu opened from the keyboard starts on: the
+ * chosen one of a set of choices, e.g. a select's value, else the first
+ * enabled item, or -1 if there's none
+ */
+export const startIndex = (items: readonly MenuLine[]) => {
+  const chosen = items.findIndex(
+    (item, index) =>
+      isEntry(item) && item.radio && item.checked && enabledAt(items, index),
+  );
+  return chosen >= 0 ? chosen : firstEnabled(items);
+};
+
+/**
  * lastEnabled returns the last enabled item, or -1 if there's none
  */
 export const lastEnabled = (items: readonly MenuLine[]) => {
@@ -191,8 +204,8 @@ export const roleOf = (item: MenuEntry, found = false) => {
  * indexAfterUpdate returns the item to focus once the open menu gets `next`
  * items, e.g. the suggestions for a misspelling, while `index` of `items` had
  * the focus: the item or row the user `moved` to, found again by its id, at
- * the same `column` of a row; else the first one if the menu was opened with
- * the keyboard or an item had the focus; else none (-1)
+ * the same `column` of a row; else the one it starts on (startIndex) if the
+ * menu was opened with the keyboard or an item had the focus; else none (-1)
  */
 export const indexAfterUpdate = (
   items: readonly MenuLine[],
@@ -207,7 +220,7 @@ export const indexAfterUpdate = (
     found = next.items.findIndex((item) => lineId(item) === id);
   }
   if (found < 0 && (next.keyboard || index >= 0)) {
-    found = firstEnabled(next.items);
+    found = startIndex(next.items);
   }
   if (!enabledAt(next.items, found)) return { index: -1, column: 0 };
   const line = next.items[found];

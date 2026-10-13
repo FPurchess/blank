@@ -1,0 +1,54 @@
+{
+  "about": "src-tauri/pdf/fixtures/form.pdf: its words where pdftotext -bbox finds them, in boxes as the helper gives them, and its rule (0.5 w 100 490 m 300 490 l S) drawn by hand",
+  "text": {
+    "words": [
+      {
+        "text": "Contract",
+        "rect": [100, 72.4, 45.35, 12.6]
+      },
+      {
+        "text": "A-17",
+        "rect": [352, 128, 21.12, 10.5]
+      },
+      {
+        "text": "Apple",
+        "rect": [352, 205, 25.57, 10.5]
+      },
+      {
+        "text": "Pear",
+        "rect": [352, 216, 21.12, 10.5]
+      },
+      {
+        "text": "Green",
+        "rect": [102, 228, 27.79, 10.5]
+      },
+      {
+        "text": "Unterschrift",
+        "rect": [100, 364, 51.12, 10.5]
+      },
+      {
+        "text": "Ort,",
+        "rect": [350, 364, 16.67, 10.5]
+      },
+      {
+        "text": "Datum:",
+        "rect": [369.45, 364, 32.23, 10.5]
+      },
+      {
+        "text": "______________",
+        "rect": [404.46, 364, 77.84, 10.5]
+      }
+    ],
+    "rules": [[100, 351.75, 200, 0.5]]
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [100, 315.75, 200, 36]
+    },
+    {
+      "kind": "placeAndDate",
+      "rect": [404.46, 357.7, 77.84, 16.8]
+    }
+  ]
+}

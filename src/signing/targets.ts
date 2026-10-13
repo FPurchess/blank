@@ -21,6 +21,7 @@ export const targetsOf = (doc: Node): SignTarget[] => {
       name,
       place: node.attrs.place as string,
       dated: node.attrs.date === "signing",
+      role: node.attrs.role as string,
       label: label || `Signature ${targets.length + 1}`,
     });
   });

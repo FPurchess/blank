@@ -15,7 +15,10 @@ import {
   currentViewAnchor,
   language,
   outlinePinned,
+  signingInitials,
   signingPlace,
+  stampBooks,
+  type TabStamps,
   PAGE_VIEW_MODES,
   pageLayoutState,
   pageView,
@@ -41,6 +44,9 @@ import { CommandIdentifier } from "./config";
 import { logWarning } from "./log";
 import { closeMarker, fenceFor, formatMarker, schema } from "./markdown";
 import { isPrintSettings, PRINT_DEFAULTS } from "./print/printModel";
+import type { StoredStamps } from "./pdf/stampBooks";
+import { isFill, isStamp } from "./pdf/stampModel";
+import { INITIALS_DEFAULT, isInitialsChoice } from "./signing/initials";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 
 localforage.config({
@@ -79,10 +85,15 @@ export interface Session {
 
 const SESSION = "session";
 const tabKey = (id: string) => `tab:${id}`;
+// a PDF tab's stamps, fills and dismissed places: `{ sha256, stamps,
+// fills, dismissed }`
+const stampsKey = (id: string) => `stamps:${id}`;
 
 // the documents waiting to be written, and the ones last written, by tab
 const pendingDocs = new Map<string, Node>();
 const storedDocs = new Map<string, Node>();
+// the stamps of PDF tabs waiting to be written, null for none, by tab
+const pendingStamps = new Map<string, TabStamps | null>();
 // the tabs closed since the last write, whose documents are removed then
 const removedTabs = new Set<string>();
 let sessionPending = false;
@@ -139,6 +150,8 @@ const writeNow = async () => {
   pending = false;
   const docs = [...pendingDocs];
   pendingDocs.clear();
+  const stamps = [...pendingStamps];
+  pendingStamps.clear();
   const session = sessionPending ? sessionOf() : null;
   sessionPending = false;
   const removed = [...removedTabs];
@@ -150,14 +163,36 @@ const writeNow = async () => {
         storedDocs.set(id, doc);
       }),
     );
+    await Promise.all(
+      stamps.map(([id, kept]) =>
+        kept &&
+        (kept.book.stamps.length ||
+          kept.book.fills.length ||
+          kept.book.dismissed.length)
+          ? localforage.setItem(stampsKey(id), {
+              sha256: kept.sha256,
+              stamps: kept.book.stamps,
+              fills: kept.book.fills,
+              dismissed: kept.book.dismissed,
+            })
+          : localforage.removeItem(stampsKey(id)),
+      ),
+    );
     if (session) await localforage.setItem(SESSION, session);
-    await Promise.all(removed.map((id) => localforage.removeItem(tabKey(id))));
+    await Promise.all(
+      removed.flatMap((id) => [
+        localforage.removeItem(tabKey(id)),
+        localforage.removeItem(stampsKey(id)),
+      ]),
+    );
   } catch (error) {
     // unless a newer document came meanwhile
     for (const [id, doc] of docs) {
       if (!pendingDocs.has(id) && storedDocs.get(id) !== doc)
         pendingDocs.set(id, doc);
     }
+    for (const [id, kept] of stamps)
+      if (!pendingStamps.has(id)) pendingStamps.set(id, kept);
     for (const id of removed) removedTabs.add(id);
     sessionPending ||= session !== null;
     pending = true;
@@ -296,6 +331,18 @@ const watchSession = () => {
     },
     { flush: "sync" },
   );
+  // the stamps of PDF tabs, as they change
+  watch(
+    stampBooks,
+    (books, before) => {
+      for (const [id, kept] of books)
+        if (before?.get(id) !== kept) pendingStamps.set(id, kept);
+      for (const id of before?.keys() ?? [])
+        if (!books.has(id)) pendingStamps.set(id, null);
+      schedule();
+    },
+    { flush: "sync" },
+  );
   let known = new Set<string>();
   watch(
     [tabs, activeTabId],
@@ -305,6 +352,7 @@ const watchSession = () => {
         if (ids.has(id)) continue;
         removedTabs.add(id);
         pendingDocs.delete(id);
+        pendingStamps.delete(id);
         storedDocs.delete(id);
       }
       known = ids;
@@ -368,6 +416,13 @@ export const bootStorage = async () => {
     signingPlace,
     (value): value is string => typeof value === "string",
     "",
+  );
+  // whether the initials went on every page then, and in which corner
+  await restore(
+    "signingInitials",
+    signingInitials,
+    isInitialsChoice,
+    INITIALS_DEFAULT,
   );
 
   sessionKept = await ownSession();
@@ -506,6 +561,37 @@ export const loadTabDocument = async (
   const doc = Node.fromJSON(schema, restorable(stored));
   storedDocs.set(id, doc);
   return doc;
+};
+
+/**
+ * loadStamps returns the stamps, fills and dismissed places stored for the
+ * PDF tab `id`, without those this Blank can't read, or null when none are
+ * stored
+ */
+export const loadStamps = async (id: string): Promise<StoredStamps | null> => {
+  if (!sessionKept) return null;
+  try {
+    const stored = await localforage.getItem<{
+      sha256?: unknown;
+      stamps?: unknown;
+      fills?: unknown;
+      dismissed?: unknown;
+    }>(stampsKey(id));
+    if (!stored || !Array.isArray(stored.stamps)) return null;
+    const list = (value: unknown): unknown[] =>
+      Array.isArray(value) ? value : [];
+    return {
+      sha256: typeof stored.sha256 === "string" ? stored.sha256 : null,
+      stamps: stored.stamps.filter(isStamp),
+      fills: list(stored.fills).filter(isFill),
+      dismissed: list(stored.dismissed).filter(
+        (one): one is string => typeof one === "string",
+      ),
+    };
+  } catch (error) {
+    logWarning("can't read the stamps of a PDF tab", error);
+    return null;
+  }
 };
 
 /**

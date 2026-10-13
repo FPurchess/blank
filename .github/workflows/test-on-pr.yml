@@ -53,7 +53,9 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            poppler-utils \
+            qpdf
 
       # tauri-action builds the frontend and the PDF helper through
       # beforeBuildCommand
@@ -64,9 +66,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # the app crate (the spell check engine and the system fonts) on every
-      # platform; the layout engine is tested by the engine job of test.yml,
-      # with poppler. tauri-action has built the frontend (dist/), which the
+      # the app crate (the spell check engine, the system fonts and the
+      # signer) on every platform, the signer's PDFs checked with poppler and
+      # qpdf on Linux; the layout engine is tested by the engine job of
+      # test.yml, with poppler. tauri-action has built the frontend (dist/), which the
       # Rust side needs to compile
       - name: run rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml -p blank

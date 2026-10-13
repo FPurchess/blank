@@ -17,6 +17,8 @@ import {
 } from "../pdf/document";
 import { closePdf } from "../pdf/ipc";
 import { pdfPlaceholder } from "../pdf/placeholder";
+import { forgetStamps, hasChanges, restoreStamps } from "../pdf/stampBooks";
+import { signReceived } from "../pdf/sign";
 import { timed } from "../engine/perf";
 import { errorMessage } from "../errors";
 import { bootScope } from "../scope";
@@ -33,8 +35,11 @@ import {
   pageHoverBlock,
   pageScrollRequest,
   path,
+  placingStamp,
   rememberFile,
+  selectedStamp,
   shownPdf,
+  stampBooks,
   spellchecker,
   type Tab,
   tabAnnouncement,
@@ -48,6 +53,7 @@ import {
 import {
   backupTabDocument,
   loadSession,
+  loadStamps,
   loadTabDocument,
   storeDocument,
 } from "../storage";
@@ -132,14 +138,17 @@ const docOf = (id: string): Node | undefined =>
 /**
  * refresh sets whether the tab `id` has changes that aren't saved: its
  * document differs from the one last opened or saved, so undoing back to it
- * clears the dot
+ * clears the dot; a PDF tab has them while stamps are placed on it or its
+ * form is filled in, which signing it keeps
  */
 const refresh = (id: string) => {
   const tab = tabById(id);
   const kept = documents.get(id);
   const doc = docOf(id);
   if (!tab || !kept || !doc) return;
-  const unsaved = kept.baseline === null || !doc.eq(kept.baseline);
+  const unsaved = kept.pdf
+    ? hasChanges(id)
+    : kept.baseline === null || !doc.eq(kept.baseline);
   if (unsaved !== tab.unsaved) updateTab(id, { unsaved });
 };
 
@@ -342,6 +351,8 @@ const showTab = (id: string, next: TabDocument, keepLeaving = true) => {
   }
   // what pointed into the document that leaves
   pageScrollRequest.value = null;
+  selectedStamp.value = null;
+  placingStamp.value = null;
   pageDropCaret.value = null;
   pageDropGap.value = null;
   pageHoverBlock.value = null;
@@ -471,6 +482,10 @@ const openInBackground = (id: string, document: TabDocument) => {
     if (document.pdf !== opening && shownPdf.value !== opening) return;
     document.pdf = pdf;
     if (id === activeTabId.value) shownPdf.value = pdf;
+    // the stamps kept of it last time, the first time it opens
+    void loadStamps(id).then((stored) => {
+      if (documents.get(id) === document) restoreStamps(id, pdf, stored);
+    });
   });
 };
 
@@ -684,6 +699,28 @@ const askToSave = (tab: Tab) =>
   });
 
 /**
+ * askToSign asks whether to sign the PDF of `tab` before it closes, which
+ * keeps the stamps placed on it; "save" signs it
+ */
+const askToSign = (tab: Tab) =>
+  new Promise<"save" | "discard" | "cancel">((resolve) => {
+    const answer = (choice: "save" | "discard" | "cancel") => () => {
+      if (!uiTakesFocus.value) view?.focus();
+      resolve(choice);
+    };
+    unsavedDialog.value = {
+      label: tabLabel(tab),
+      title: `Sign “${tabLabel(tab)}” before you close it?`,
+      text: "What you filled in and placed on its pages is lost when you close it without signing.",
+      saveLabel: "Sign…",
+      discardLabel: "Discard",
+      save: answer("save"),
+      discard: answer("discard"),
+      cancel: answer("cancel"),
+    };
+  });
+
+/**
  * removeTab takes the tab `id` out of the row. The tab to its right shows
  * then, or the one to its left, unless `next` names another; the last one
  * leaves a new "Untitled".
@@ -704,8 +741,10 @@ const removeTab = async (
     closedPaths.push(tab.path);
     if (closedPaths.length > MAX_CLOSED) closedPaths.shift();
   }
-  if (documents.get(id)?.pdf)
+  if (documents.get(id)?.pdf) {
     closePdf(id).catch((error) => console.warn("can't close a PDF", error));
+    forgetStamps(id);
+  }
   if (id !== activeTabId.value) {
     documents.delete(id);
     tabs.value = without(tabs.value);
@@ -736,7 +775,16 @@ const removeTab = async (
 const closeTab = async (id: string): Promise<boolean> => {
   const tab = tabById(id);
   if (!tab) return true;
-  if (tab.unsaved) {
+  if (tab.unsaved && isPdfTab(tab)) {
+    await switchTo(id);
+    const choice = await askToSign(tab);
+    if (choice === "cancel") return false;
+    // signing keeps it open: the signed PDF opens in a tab of its own
+    if (choice === "save") {
+      signReceived();
+      return false;
+    }
+  } else if (tab.unsaved) {
     await switchTo(id);
     const choice = await askToSave(tab);
     if (choice === "cancel") return false;
@@ -915,6 +963,11 @@ export const bootTabs = (
       if (id === null || doc === checked) return;
       checked = doc;
       refresh(id);
+    });
+    // a PDF tab's dot follows its stamps
+    watch(stampBooks, (books, before) => {
+      for (const id of new Set([...books.keys(), ...(before?.keys() ?? [])]))
+        if (books.get(id) !== before?.get(id)) refresh(id);
     });
     started();
     onScopeDispose(() => {

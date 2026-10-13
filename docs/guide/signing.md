@@ -33,30 +33,40 @@ A contract for two people has two blocks, one for each. On the pages and in a pr
 **Export signed PDF…** (`Mod` `Alt` `Shift` `P`) signs your document:
 
 1. If you haven't made your signature yet, Blank asks for it first.
-2. Choose which block is yours, if the document has several (the one with your name is chosen for you), and where you sign. Blank remembers the place for the next time. A block that gives its own place is signed there, and the dialog says so; a block with someone else's name gets a warning. The dialog also shows the date that goes under your signature: it's written in the document's language, which you choose in the status bar.
+2. In the sign dialog:
+   - **Sign as:** your certificate, for a [digital signature](#digital), or **No digital signature (only the visible signature)**.
+   - **Sign in:** which block is yours, if the document has several (the one with your name is chosen for you). A block with someone else's name gets a warning.
+   - **Initials: On every page** puts your initials in a bottom corner of every page, **Bottom right** or **Bottom left**, as many contracts ask. Make your initials first ([above](#your-signature)), or with **Add your initials…** right there.
+   - **Place:** where you sign. A block that gives its own place is signed there, and the dialog says so.
+   - **Reason**, if you like, e.g. _I agree to these terms_: PDF apps show it with a digital signature.
+
+   Blank remembers the place and the initials for the next time. The dialog also shows the date that goes under your signature: it's written in the document's language, which you choose in the status bar.
+
 3. Choose where to save the PDF. Blank suggests the document's name with _signed_ after it (_Untitled signed.pdf_ for a document you haven't saved yet), so the unsigned file stays as it is.
 
 The block shows your signature, your name and the place and today's date, written as **Settings ▸ Signing ▸ Date** says: the long form in the document's language (e.g. _8 October 2026_ in British English), its short form, or _2026-10-08_. The markdown file itself never holds your signature.
 
 ### Two or more signers {#others}
 
-You sign only your own block; the other blocks keep their empty lines. Send the signed PDF to the others, and they sign it one of two ways:
+You sign only your own block. Every other block keeps its empty line and gets an empty signature field over it, named after who signs there (e.g. _Signature of Ben Sample_, or _Signature of Landlord_ for a block with a role only). Send the signed PDF to the others, and they sign it:
 
+- **In any PDF app, or in Blank:** they click their field and sign with a signature of their own. Opened in Blank, the PDF shows their field as the place to sign, and [Sign…](./pdf#sign-received) signs it. If you signed digitally, PDF apps then show that something was added after you signed, and your signature stays intact; an app that rewrites the whole file breaks it.
 - **On paper:** they print it, sign on their line by hand, and scan it or send it back.
-- **In their PDF app**, with a signature of their own. If you signed digitally, PDF apps then show that something was added after you signed; an app that rewrites the whole file breaks your digital signature.
 
-Blank can't sign PDFs you received yet, so the others can't sign your PDF in Blank.
+A Word document you opened in Blank is signed the same way. Blank lays the pages out a little differently from Word, so check every page before you send it, or ask the sender for a PDF: **Sign…** waits until you switch on **I checked every page**.
 
-A Word document you opened in Blank is signed the same way. Blank lays the pages out a little differently from Word, so check every page before you send it, or ask the sender for a PDF.
+## Sign a PDF you received {#received}
+
+A PDF someone sent you, a contract or a form, you fill in and sign in its own tab: Blank marks where it wants your signature, a date or your details, **Next** takes you from one to the next, and **Sign…** saves it signed as a new file. See [Fill in and sign a PDF you received](./pdf#fill-in).
 
 ## Digital signatures {#digital}
 
 A picture of a signature is easy to copy. A digital signature isn't: your certificate signs the PDF, so PDF apps show whether anything changed after you signed. That it was you, they show once the reader trusts your certificate, e.g. after comparing its fingerprint with you (see [below](#check)).
 
-1. **Create your certificate** in **Settings ▸ Signing ▸ Certificate**, with your name and a passphrase that protects it (at least 8 characters), or from the sign dialog with **Create certificate…**. Creating the key takes a few seconds. Or **Import key file…** to use a key file (`.p12` or `.pfx`) you already have, e.g. from your employer or a certificate authority.
-2. When you sign, choose **Digital, with your certificate** and type your passphrase. Blank checks it, then signs the PDF after exporting it; the signature block shows your signature as before. The PDF names you as on your certificate.
+1. **Create your certificate** in **Settings ▸ Signing ▸ Certificate**, with your name and a passphrase that protects it (at least 8 characters), or from the sign dialog with **Sign as ▸ Create your certificate…**. Creating the key takes a few seconds. Or **Import key file…** to use a key file (`.p12` or `.pfx`) you already have, e.g. from your employer or a certificate authority.
+2. When you sign, choose your certificate under **Sign as** (_‹your name› · your certificate_, chosen for you once you have one) and type your passphrase. Blank checks it, then signs the PDF after exporting it; the signature block shows your signature as before. The PDF names you as on your certificate.
 
-If you forgot your passphrase, sign with **Picture only**, or **Remove** your certificate and create a new one. If anything goes wrong while signing, nothing is saved.
+If you forgot your passphrase, sign with **No digital signature**, or **Remove** your certificate and create a new one. If anything goes wrong while signing, nothing is saved.
 
 Your key never leaves your computer and is kept in the `signing` folder, protected by your passphrase. Blank can't recover a forgotten passphrase: use **Back up key…** to keep a copy somewhere safe. **Save certificate…** saves your certificate alone (a `.cer` file), which you can send to people who should trust your signatures. **Remove** asks first, since Blank can't bring a removed key back: signatures you made with it stay valid, but you can't sign with it again. Back up your key before, if you may need it.
 

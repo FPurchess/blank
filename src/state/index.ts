@@ -27,6 +27,7 @@ export * from "./recent";
 export * from "./settingsDialog";
 export * from "./signing";
 export * from "./spellcheck";
+export * from "./stamps";
 export * from "./tabs";
 export * from "./toolbar";
 

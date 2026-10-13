@@ -1,13 +1,16 @@
 // Writes the small PDFs the PDF helper's tests open (src-tauri/pdf/fixtures/),
 // by hand, object by object, so each holds exactly what its test needs:
 //
-// - form.pdf: a form of every kind of field, a nested one, a read-only one
-//   and an empty signature field, over a label and a line;
+// - form.pdf: a form of every kind of field (text, checkbox, combo box,
+//   radio buttons, list box), a nested one, a read-only one and an empty
+//   signature field, over a label and a line;
 // - rotated.pdf: a page turned by /Rotate 90 with an offset crop box and a
 //   box drawn under a field, an A5 page, resources inherited from the pages;
 // - signature.pdf: a signature field that holds a signature's dictionary
 //   (not a valid signature: the helper only reads where it is and what it says);
 // - cjk.pdf: Chinese in a font the PDF names but doesn't embed;
+// - choices.pdf: choices whose options are [export display] pairs, some
+//   with characters the field's font lacks;
 // - repaired.pdf: form.pdf with its cross-reference offsets wrong;
 // - password.pdf: form.pdf encrypted with the password "secret" (needs qpdf).
 //
@@ -43,11 +46,12 @@ const helvetica = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
 
 // form.pdf: 1 catalog, 2 pages, 3 page, 4 font, 5 content, 6 name, 7 agree,
 // 8 its on appearance, 9 its off appearance, 10 color, 11 signature,
-// 12 id, 13 address, 14 street
+// 12 id, 13 address, 14 street, 15 size (radio buttons), 16 and 17 its
+// buttons S and L, 18 fruit (a list box)
 const form = pdf([
-  "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 13 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>",
+  "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 13 0 R 15 0 R 18 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>",
   "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 14 0 R] >>",
+  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 10 0 R 11 0 R 12 0 R 14 0 R 16 0 R 17 0 R 18 0 R] >>",
   helvetica,
   stream(
     "BT /F1 12 Tf 100 760 Td (Contract) Tj ET\n" +
@@ -64,6 +68,10 @@ const form = pdf([
   "<< /FT /Tx /Ff 1 /T (id) /V (A-17) /Type /Annot /Subtype /Widget /Rect [350 700 500 720] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
   "<< /FT /Tx /T (address) /Kids [14 0 R] >>",
   "<< /T (street) /Parent 13 0 R /Type /Annot /Subtype /Widget /Rect [100 550 300 570] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
+  "<< /FT /Btn /Ff 49152 /T (size) /V /Off /Kids [16 0 R 17 0 R] >>",
+  "<< /Parent 15 0 R /Type /Annot /Subtype /Widget /Rect [100 420 115 435] /P 3 0 R /F 4 /AS /Off /AP << /N << /S 8 0 R /Off 9 0 R >> >> >>",
+  "<< /Parent 15 0 R /Type /Annot /Subtype /Widget /Rect [130 420 145 435] /P 3 0 R /F 4 /AS /Off /AP << /N << /L 8 0 R /Off 9 0 R >> >> >>",
+  "<< /FT /Ch /T (fruit) /Opt [(Apple) (Pear)] /Type /Annot /Subtype /Widget /Rect [350 600 500 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
 ]);
 writeFileSync(join(out, "form.pdf"), form);
 
@@ -108,6 +116,22 @@ writeFileSync(
     "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> /FontDescriptor 6 0 R /DW 1000 >>",
     "<< /Type /FontDescriptor /FontName /STSong-Light /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 880 /StemV 80 >>",
     stream("BT /F1 40 Tf 20 30 Td <4E2D6587> Tj ET"),
+  ]),
+);
+
+// choices.pdf: 1 catalog, 2 pages, 3 page, 4 font, 5 country (a combo box
+// of [export display] pairs: Łódź exports "pl", Omega exports Ω), 6 pets
+// (a list box of pairs), 7 letters (a list box with β among its options)
+writeFileSync(
+  join(out, "choices.pdf"),
+  pdf([
+    "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R 6 0 R 7 0 R] /DA (/Helv 10 Tf 0 g) /DR << /Font << /Helv 4 0 R >> >> >> >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Annots [5 0 R 6 0 R 7 0 R] >>",
+    helvetica,
+    "<< /FT /Ch /Ff 131072 /T (country) /Opt [[(de) (Germany)] [(pl) <FEFF014100F30064017A>] [<FEFF03A9> (Omega)]] /V (de) /Type /Annot /Subtype /Widget /Rect [100 700 250 720] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
+    "<< /FT /Ch /T (pets) /Opt [[(c) (Cat)] [(d) (Dog)]] /V (d) /Type /Annot /Subtype /Widget /Rect [100 600 250 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
+    "<< /FT /Ch /T (letters) /Opt [(Alpha) <FEFF03B2>] /Type /Annot /Subtype /Widget /Rect [300 600 450 640] /P 3 0 R /F 4 /DA (/Helv 10 Tf 0 g) >>",
   ]),
 );
 

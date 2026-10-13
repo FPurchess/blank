@@ -32,6 +32,16 @@ pub enum Refusal {
     Restricted,
     /// a certified PDF that allows no changes (DocMDP P=1)
     Certified,
+    /// stamps in the pages' content of a PDF that is signed or certified
+    SignedPages,
+    /// the signature field asked for isn't in the PDF
+    NoSuchField,
+    /// the signature field asked for is signed already
+    FieldSigned,
+    /// an earlier signer locked the signature field asked for
+    FieldLocked,
+    /// an earlier signer locked a field the user filled in
+    FilledLocked,
     /// the timestamp server can't be reached or didn't answer
     NoTimestamp,
     /// the timestamp server answered, and refused
@@ -44,9 +54,18 @@ impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Refusal::Restricted => {
-                "This PDF has restrictions set by its author. Blank can't sign it yet."
+                "This PDF has restrictions set by its author. Blank can't sign it."
             }
             Refusal::Certified => "This PDF doesn't allow any changes, not even signatures",
+            Refusal::SignedPages => {
+                "This PDF is signed already: what you placed on its pages would change what was signed. Only your signature can still be added."
+            }
+            Refusal::NoSuchField => "This PDF has no signature field of that name",
+            Refusal::FieldSigned => "This signature field is signed already",
+            Refusal::FieldLocked => "An earlier signer locked this signature field",
+            Refusal::FilledLocked => {
+                "An earlier signer locked a field you filled in, so it can't change any more. Clear what you filled in there and sign again."
+            }
             Refusal::NoTimestamp => "The timestamp server didn't answer",
             Refusal::TimestampRefused => "The timestamp server refused to timestamp the signature",
             Refusal::TimestampUnusable => "The timestamp server's answer can't be used",

@@ -11,6 +11,7 @@ import {
   outlinePeek,
   pageSetup,
   printDialog,
+  placeDialog,
   signDialog,
   tablePicker,
   tableToolbar,
@@ -47,6 +48,7 @@ export const closeRequests = () => {
   close(printDialog, (request) => request.cancel());
   close(unsavedDialog, (request) => request.cancel());
   close(signDialog, (request) => request.cancel());
+  close(placeDialog, (request) => request.cancel());
   close(tocPopover, (request) => request.close());
   close(diagramPopover, (request) => request.close());
   close(signaturePopover, (request) => request.close());

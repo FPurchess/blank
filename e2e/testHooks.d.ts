@@ -2,7 +2,8 @@
 // `blankGeometry` (exposeGeometry in src/engine/geometry.ts),
 // `blankPageViewPerf` (src/engine/perf.ts), `blankBootTimes`,
 // `blankBreakEngine` and `blankSetTheme` (src/state/appearance.ts), and
-// `blankPrintCapture` (src/print/job.ts), which a test sets itself. Written
+// `blankPrintCapture` (src/print/job.ts) and `blankTestSavePath`
+// (src/pdf/sign.ts), which a test sets itself. Written
 // out here, since E2E's type check can't compile the app's sources; keep them
 // in step.
 
@@ -55,4 +56,7 @@ interface Window {
   // set by a test: what Print hands to the system's print dialog lands
   // here instead, since that dialog can't be automated
   blankPrintCapture?: { sent: { sheets: number; pdf: string }[] };
+  // set by a test: where signing a PDF tab saves the signed PDF, since the
+  // save dialog can't be automated
+  blankTestSavePath?: string;
 }

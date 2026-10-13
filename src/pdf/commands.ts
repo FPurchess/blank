@@ -4,11 +4,15 @@ import { commandLabel } from "../commandList";
 import { CommandIdentifier } from "../config";
 import {
   activeTab,
+  activeTabId,
   announce,
   isPdfTab,
   shownPdf,
   signaturesPopover,
 } from "../state";
+import { signShownPdf } from "./sign";
+import { stepStamps } from "./placeActions";
+import { canRedoStamps, canUndoStamps } from "./stampBooks";
 
 // What the commands do in a PDF tab, whose editor holds no text (see
 // placeholder.ts): those of the window, the tabs and the app run as
@@ -42,11 +46,17 @@ const RUN_IN_PDF = new Set<CommandIdentifier>([
   CommandIdentifier.APP_SHORTCUTS,
   CommandIdentifier.APP_GUIDE,
   CommandIdentifier.APP_ABOUT,
+  CommandIdentifier.PDF_SIGN,
+  CommandIdentifier.PDF_NEXT,
 ]);
 
-// what signing says in a PDF tab: received PDFs are signed with PR 3b
+// what Save says in a PDF tab, whose key signs it
+export const SIGN_TO_KEEP = "Sign the PDF to keep what you placed on it";
+
+// what signing your own documents says in a PDF tab, which is signed with
+// its signing toolbar
 export const SIGN_RECEIVED_REFUSAL =
-  "Blank can't sign PDFs you received yet. Sign your own documents with Export signed PDF.";
+  "In a PDF, place your signature from the signing toolbar, then choose Sign on it. Export signed PDF signs your own documents.";
 
 /**
  * pdfRefusal returns what the command `id` says in a PDF tab instead of
@@ -57,12 +67,19 @@ export const SIGN_RECEIVED_REFUSAL =
 export const pdfRefusal = (id: CommandIdentifier): string | null => {
   if (RUN_IN_PDF.has(id)) return null;
   switch (id) {
+    // Save's key signs it, which keeps what was placed on it (forPdf)
     case CommandIdentifier.FILE_SAVE:
     case CommandIdentifier.FILE_SAVE_AS:
-      return "Blank doesn't change PDFs, so there's nothing to save";
+      return SIGN_TO_KEEP;
+    // the stamps' history (forPdf)
     case CommandIdentifier.UNDO:
+      return canUndoStamps(activeTabId.value)
+        ? null
+        : "There's nothing to undo in this PDF";
     case CommandIdentifier.REDO:
-      return "There's nothing to undo in a PDF";
+      return canRedoStamps(activeTabId.value)
+        ? null
+        : "There's nothing to redo in this PDF";
     case CommandIdentifier.INSERT_BLOCK:
     case CommandIdentifier.VIEW_BLOCKS:
       return "Blocks go into your own documents";
@@ -103,15 +120,36 @@ export const pdfRefusal = (id: CommandIdentifier): string | null => {
   }
 };
 
+// what Save, Undo and Redo do in a PDF tab: sign it, and step through the
+// history of its stamps
+const stampHistory =
+  (undo: boolean): Command =>
+  (_state, dispatch) => {
+    if (dispatch && activeTabId.value) stepStamps(activeTabId.value, undo);
+    return true;
+  };
+const IN_PDF: Partial<Record<CommandIdentifier, Command>> = {
+  [CommandIdentifier.UNDO]: stampHistory(true),
+  [CommandIdentifier.REDO]: stampHistory(false),
+};
+
+const sign = signShownPdf();
+
 /**
  * forPdf returns `command` as the command `id` runs: in a PDF tab, one that
- * doesn't run there can't (`can` is false), and its key says why
+ * doesn't run there can't (`can` is false), and its key says why; Undo and
+ * Redo go through its stamps' history, and Save's key signs it (the menu
+ * offers Sign… for that)
  */
 export const forPdf =
   (id: CommandIdentifier, command: Command): Command =>
   (state, dispatch, view) => {
-    const refusal = isPdfTab(activeTab.value) ? pdfRefusal(id) : null;
-    if (refusal === null) return command(state, dispatch, view);
+    const inPdf = isPdfTab(activeTab.value);
+    if (inPdf && dispatch && id === CommandIdentifier.FILE_SAVE)
+      return sign(state, dispatch, view);
+    const refusal = inPdf ? pdfRefusal(id) : null;
+    if (refusal === null)
+      return ((inPdf && IN_PDF[id]) || command)(state, dispatch, view);
     if (!dispatch) return false;
     announce(refusal);
     return true;

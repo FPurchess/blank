@@ -12,8 +12,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use blank_pdf_ipc::client::{HelperConfig, Source, Supervisor, Timeouts};
+use blank_pdf_ipc::client::{HelperConfig, PdfError, Source, Supervisor, Timeouts};
+use blank_pdf_ipc::protocol::{ErrorKind, Fill};
 use sha2::{Digest, Sha256};
+
+use crate::signing::commands::SigningError;
 
 /// a helper unused this long is stopped, which isn't a failure
 const IDLE: Duration = Duration::from_secs(120);
@@ -123,6 +126,25 @@ pub fn read_checked(path: &Path, expected: &str) -> io::Result<Arc<[u8]>> {
     Ok(bytes.into())
 }
 
+/// reads `path` for signing while it still holds the PDF of `sha256`:
+/// `FileChanged` when it holds another, `FileMissing` when it has gone;
+/// `context` says what for in the log
+pub fn read_for_signing(
+    path: &Path,
+    sha256: &str,
+    context: &str,
+) -> Result<Arc<[u8]>, SigningError> {
+    read_checked(path, sha256).map_err(|error| {
+        let problem = match error.kind() {
+            io::ErrorKind::InvalidData => SigningError::FileChanged,
+            io::ErrorKind::NotFound => SigningError::FileMissing,
+            _ => SigningError::Failed("Blank can't read this PDF again".into()),
+        };
+        log::warn!("PDF: read {context}: {}", error.kind());
+        problem
+    })
+}
+
 /// the PDF's bytes for its helper: `first` for the first helper, which
 /// were just read, then the file again, while it is the same
 pub fn source(path: PathBuf, sha256: String, first: Arc<[u8]>) -> Source {
@@ -133,6 +155,65 @@ pub fn source(path: PathBuf, sha256: String, first: Arc<[u8]>) -> Source {
             None => read_checked(&path, &sha256),
         },
     )
+}
+
+/// the bytes to sign of tab `tab`'s PDF, the file at `path`, while it still
+/// holds the PDF of `sha256` (else `FileChanged` or `FileMissing`): the file
+/// as it is without `fills`, else the file with the fills appended as an
+/// incremental update by the tab's helper (MuPDF writes R1, the signer then
+/// appends R2). Waits for the helper: call it on a blocking thread
+pub fn filled_bytes(
+    tabs: &PdfTabs,
+    tab: &str,
+    path: &Path,
+    sha256: &str,
+    fills: &[Fill],
+) -> Result<Vec<u8>, SigningError> {
+    let bytes = read_for_signing(path, sha256, "to fill in")?;
+    if fills.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    let pdf = tabs
+        .get(tab)
+        .ok_or_else(|| SigningError::Failed("This PDF isn't open any more".into()))?;
+    // the tab opened another version of the file meanwhile
+    if pdf.sha256 != sha256 {
+        return Err(SigningError::FileChanged);
+    }
+    let saved = (|| {
+        if pdf.supervisor.fills() != fills {
+            pdf.supervisor
+                .set_fills(fills.to_vec())
+                .map_err(|refused| refused.error)?;
+        }
+        pdf.supervisor.save()
+    })()
+    .map_err(|error| {
+        log::warn!("PDF: save the fills: {}", error.kind());
+        SigningError::Failed(fill_refusal(error).into())
+    })?;
+    // what MuPDF wrote must leave the file as it is, and only add to it
+    if !saved.starts_with(&bytes) {
+        log::warn!("PDF: save the fills: not an update of the file");
+        return Err(SigningError::Failed(
+            fill_refusal(PdfError::Engine(ErrorKind::Engine)).into(),
+        ));
+    }
+    Ok(saved)
+}
+
+/// why the fills couldn't be saved, in words for the user
+fn fill_refusal(error: PdfError) -> &'static str {
+    match error {
+        PdfError::Engine(ErrorKind::Repaired) => {
+            "Blank can't fill in this PDF: it's damaged, and only a repaired copy could be read"
+        }
+        PdfError::Engine(ErrorKind::Encrypted) => "Blank can't fill in an encrypted PDF",
+        PdfError::Engine(ErrorKind::MissingGlyphs) => {
+            "A field's font can't show some of the characters filled in"
+        }
+        _ => "Blank couldn't fill in this PDF",
+    }
 }
 
 /// where the helper is: on Linux in `../lib/blank` beside the app's
@@ -228,6 +309,80 @@ mod tests {
         ];
         assert_eq!(to_stop(&many, None, now), ["f", "a"]);
         assert_eq!(to_stop(&many, Some("f"), now), ["a"]);
+    }
+
+    /// the helper `make pdf-helper` built, which the app's build needs
+    fn built_helper() -> PathBuf {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
+        std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                let name = path.file_name().unwrap().to_string_lossy();
+                name.starts_with("blank-pdf") && !name.ends_with(".stamp")
+            })
+            .expect("make pdf-helper")
+    }
+
+    #[test]
+    fn gives_the_signer_the_file_with_its_fills_as_an_update() {
+        use blank_pdf_ipc::protocol::FillValue;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("form.pdf");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("pdf/fixtures/form.pdf");
+        std::fs::copy(fixture, &path).unwrap();
+        let original: Arc<[u8]> = std::fs::read(&path).unwrap().into();
+        let sha = sha256(&original);
+        let config = HelperConfig {
+            program: built_helper(),
+            args: vec!["--memory-limit-mb".into(), "256".into()],
+            quiet: true,
+            timeouts: Timeouts::default(),
+        };
+        let supervisor =
+            Supervisor::new(config, source(path.clone(), sha.clone(), original.clone()));
+        let tabs = PdfTabs::default();
+        tabs.insert(
+            "t".into(),
+            Arc::new(PdfTab {
+                supervisor: Arc::new(supervisor),
+                path: path.clone(),
+                sha256: sha.clone(),
+            }),
+        );
+        let fills = [Fill {
+            field: "name".into(),
+            value: FillValue::Text("Ada".into()),
+        }];
+
+        let plain = filled_bytes(&tabs, "t", &path, &sha, &[]).unwrap();
+        assert_eq!(plain, &original[..], "no fills: the file as it is");
+        let filled = filled_bytes(&tabs, "t", &path, &sha, &fills).unwrap();
+        assert!(filled.starts_with(&original) && filled.len() > original.len());
+        assert_eq!(tabs.get("t").unwrap().supervisor.fills(), fills);
+        assert!(matches!(
+            filled_bytes(&tabs, "other", &path, &sha, &fills),
+            Err(SigningError::Failed(_))
+        ));
+        let refused = [Fill {
+            field: "name".into(),
+            value: FillValue::Text("中文".into()),
+        }];
+        assert!(matches!(
+            filled_bytes(&tabs, "t", &path, &sha, &refused),
+            Err(SigningError::Failed(message)) if message.contains("font")
+        ));
+
+        std::fs::write(&path, b"%PDF-1.7 another").unwrap();
+        assert!(matches!(
+            filled_bytes(&tabs, "t", &path, &sha, &fills),
+            Err(SigningError::FileChanged)
+        ));
+        std::fs::remove_file(&path).unwrap();
+        assert!(matches!(
+            filled_bytes(&tabs, "t", &path, &sha, &[]),
+            Err(SigningError::FileMissing)
+        ));
     }
 
     #[test]

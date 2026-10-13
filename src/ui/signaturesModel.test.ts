@@ -138,6 +138,23 @@ describe("what Blank says of a PDF's signatures", () => {
     );
   });
 
+  it("keeps a signature valid that later signatures only signed again", () => {
+    const earlier = signature({
+      trust: { kind: "own" },
+      laterSigner: "Jonas Weber",
+    });
+    const later = signature({ trust: { kind: "trusted" } });
+    expect(lookOf(earlier)).toBe("ok");
+    expect(signaturesLabel([earlier, later])).toMatchObject({
+      text: "Signed by 2",
+      look: "ok",
+    });
+    expect(signatureStatus(earlier)).toBe("Valid · your certificate");
+    expect(signatureVerdict(earlier)).toBe(
+      "The PDF hasn't changed since it was signed, only signed again by Jonas Weber. The certificate is one Blank trusts.",
+    );
+  });
+
   it("flags a signature over SHA-1 as weak, not valid", () => {
     const weak = signature({ trust: { kind: "trusted" }, weak: "SHA-1" });
     expect(lookOf(weak)).toBe("unknown");

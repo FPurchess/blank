@@ -1,0 +1,26 @@
+{
+  "about": "Labels written into the same word as their underscores",
+  "text": {
+    "words": [
+      {
+        "text": "Signature:______________________________",
+        "rect": [72, 492, 216.38, 10.5]
+      },
+      {
+        "text": "Datum:____________________",
+        "rect": [72, 532, 139.98, 10.5]
+      }
+    ],
+    "rules": []
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [126.1, 485.7, 162.29, 16.8]
+    },
+    {
+      "kind": "date",
+      "rect": [104.3, 525.7, 107.68, 16.8]
+    }
+  ]
+}

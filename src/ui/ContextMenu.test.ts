@@ -898,6 +898,19 @@ describe("context menu check marks", () => {
     expect(row("plain").getAttribute("role")).toBe("menuitem");
     expect(row("plain").querySelector(".check")).not.toBeNull();
   });
+  it("starts on the chosen item of a select opened from the keyboard", async () => {
+    contextMenu.value = {
+      items: [
+        { id: "a", label: "A", radio: true, checked: false, run: () => {} },
+        { id: "b", label: "B", radio: true, checked: true, run: () => {} },
+      ],
+      anchor: { left: 0, top: 0, bottom: 0 },
+      keyboard: true,
+      close: () => {},
+    };
+    await settle();
+    expect(document.activeElement).toBe(row("b"));
+  });
 });
 
 describe("context menu listeners", () => {

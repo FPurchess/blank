@@ -1864,3 +1864,155 @@ body.without-engine.blocks-docked {
     @include text-button;
   }
 }
+
+// a PDF tab's pages while a tool waits for the press that places its stamp
+#pdf-view.pdf-placing .page-desk {
+  cursor: crosshair;
+}
+
+// a stamp placed on a PDF's page (StampOverlay.vue): painted by its stamp
+// engine on the white page; selected, the accent ring with a corner at each
+// end to resize it, the mouse moving it
+.pdf-stamp {
+  position: absolute;
+  box-sizing: border-box;
+  cursor: move;
+  // the pointer drags it, never scrolls the view
+  touch-action: none;
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  &.selected {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  // a repeated stamp on the other pages
+  &.ghost {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+// a place to sign or date on a PDF's page (PdfTarget.vue), and a field of
+// its form (PdfField.vue): a dashed box in the accent over what the page
+// shows there. A text field shows its input only while it has the focus;
+// otherwise the page shows what the field holds.
+.pdf-target,
+.pdf-field,
+.pdf-choice-slot .pdf-choice {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  font: inherit;
+  color: transparent;
+  background: transparent;
+}
+
+.pdf-target {
+  background: var(--accent-soft);
+}
+
+.pdf-field {
+  padding: 0 2px;
+  font-size: var(--ui);
+  resize: none;
+  user-select: text;
+
+  &.editing {
+    border-style: solid;
+    color: var(--color);
+    background: var(--background-color);
+  }
+}
+
+// a radio group's buttons, within its box
+.pdf-radios {
+  position: absolute;
+
+  .pdf-field {
+    position: absolute;
+  }
+}
+
+// a combo or list box: its select shows its value while it has the focus
+.pdf-choice-slot {
+  position: absolute;
+
+  .pdf-choice {
+    position: static;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+
+    &:focus-visible {
+      border-style: solid;
+      color: var(--color);
+      background: var(--background-color);
+    }
+  }
+}
+
+// why a field didn't take what was typed, under it
+// above its field, its bottom at the top given: below it, it would cover
+// the next field
+.pdf-field-problem {
+  position: absolute;
+  transform: translateY(-100%);
+  margin: 0;
+  padding: 2px var(--s1);
+  font-size: var(--ui-small);
+  color: var(--spelling-color);
+  @include ui-text;
+  @include popover;
+}
+
+// a corner of the stamp selected, on its ring
+.stamp-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  background-color: var(--background-color);
+
+  &[data-corner="top-left"] {
+    top: -8px;
+    left: -8px;
+    cursor: nwse-resize;
+  }
+  &[data-corner="top-right"] {
+    top: -8px;
+    right: -8px;
+    cursor: nesw-resize;
+  }
+  &[data-corner="bottom-left"] {
+    bottom: -8px;
+    left: -8px;
+    cursor: nesw-resize;
+  }
+  &[data-corner="bottom-right"] {
+    right: -8px;
+    bottom: -8px;
+    cursor: nwse-resize;
+  }
+}
+
+// the toolbar of the stamp selected (StampToolbar.vue), above it on the desk
+.stamp-toolbar {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 3px;
+  @include ui-text;
+  @include popover;
+}

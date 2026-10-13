@@ -106,6 +106,10 @@ impl Engine {
         let laid = &self.laid[frag.item];
         let unit = &laid.units[frag.unit];
         let left = self.settings.margins.left;
+        // a stamp is as wide as what it shows
+        if let Some((x, w)) = laid.extent {
+            return (left + x, frag.y, w, unit.height);
+        }
         // a signature block is as wide as its line, which its picture and
         // the lines under it stand within
         if let Content::Signature { .. } = item.content {

@@ -16,10 +16,19 @@ import {
   savedMarks,
   signatureDialog,
   signDialog,
+  type SignDialogRequest,
   signingCertificate,
+  type SignChoices,
   signingDates,
+  signingInitials,
   signingPlace,
 } from "../../state";
+import { type Layout, pageGeometry } from "../../layout/resolve";
+import { isHeld } from "../../pdf/stampBooks";
+import { releaseStamp, stampPdf } from "../../pdf/stampEngine";
+import { INITIALS_BOX, INITIALS_STAMP } from "../../signing/initials";
+import { type ExportSigning, exportRequest } from "../../signing/exportPlan";
+import { openSettings } from "./settings";
 import { basename } from "../../paths";
 import { PDF_FILTER } from "../../formats";
 import { toPDF } from "../../exporters";
@@ -116,23 +125,81 @@ export const editMark =
     return true;
   };
 
-// what the notifications of a signed export are titled
-const TITLE = "Signed PDF";
+// what the notifications of signing are titled, of an export and of a PDF
+// tab alike
+export const SIGNED_PDF_TITLE = "Signed PDF";
+const TITLE = SIGNED_PDF_TITLE;
 
 /**
  * signerName returns the name the user signs as: their certificate's, which
  * a digital signature carries, else the one in Settings ▸ Signing
  */
-const signerName = () =>
+export const signerName = () =>
   signingCertificate.value?.name || config.value.signing.name;
+
+/**
+ * todayText returns today's date as the dates next to signatures are
+ * written: Settings ▸ Signing ▸ Date, in the language
+ */
+export const todayText = () =>
+  formatSigningDate(
+    new Date(),
+    signingDates.value.language,
+    signingDates.value.format,
+  );
+
+/**
+ * signDialogBase returns what the Sign dialog's request is in both flows:
+ * the place, the signer, today's date, the passphrase's check, the dialogs
+ * it opens, and `refocus` on cancel
+ */
+export const signDialogBase = (
+  refocus: () => void,
+): Pick<
+  SignDialogRequest,
+  | "place"
+  | "signer"
+  | "today"
+  | "check"
+  | "createCertificate"
+  | "createInitials"
+  | "cancel"
+> => ({
+  place: signingPlace.value,
+  signer: signerName(),
+  today: {
+    date: todayText(),
+    language: languageName(signingDates.value.language),
+  },
+  check: async (passphrase) => {
+    try {
+      await checkPassphrase(passphrase);
+      return null;
+    } catch (error) {
+      logWarning("the passphrase didn't open the key", signingKind(error));
+      return passphraseProblem(error);
+    }
+  },
+  createCertificate: (opener) => {
+    const back = focusBack(opener);
+    // once there's a certificate, the Sign dialog takes the focus to its
+    // passphrase itself
+    void openCertificateDialog("create", () => {
+      if (!signingCertificate.value) back();
+    });
+  },
+  createInitials: (opener) =>
+    void openSignatureDialog("initials", focusBack(opener)),
+  cancel: refocus,
+});
 
 /**
  * passphraseProblem says why a passphrase didn't open the user's key, with
  * a way on for a forgotten one
  */
-const passphraseProblem = (error: unknown) =>
+export const passphraseProblem = (error: unknown) =>
   signingKind(error) === "wrongPassphrase"
-    ? "The passphrase is wrong. Forgot it? Sign with a picture only, or remove your certificate in Settings ▸ Signing and create a new one."
+    ? "The passphrase is wrong. Forgot it? Sign with no digital signature, or remove your certificate in Settings ▸ Signing and create a new one."
     : signingMessage(error, "Blank couldn't open your key");
 
 /**
@@ -184,53 +251,36 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
     const name = config.value.signing.name;
     const named = file.path ?? file.importedFrom;
     signDialog.value = {
+      ...signDialogBase(refocus),
+      mode: "export",
       title: named ? basename(named).replace(/\.[^.]+$/, "") : "Untitled",
       targets,
       chosen: chosenOf(targets, name),
-      place: signingPlace.value,
-      signer: signerName(),
-      today: {
-        date: formatSigningDate(
-          new Date(),
-          signingDates.value.language,
-          signingDates.value.format,
-        ),
-        language: languageName(signingDates.value.language),
-      },
       warnings: file.importedFrom
         ? [
             "Blank's layout of this Word document can differ from Word's. Check every page before you send it, or ask the sender for a PDF.",
           ]
         : [],
-      check: async (passphrase) => {
-        try {
-          await checkPassphrase(passphrase);
-          return null;
-        } catch (error) {
-          logWarning("the passphrase didn't open the key", signingKind(error));
-          return passphraseProblem(error);
-        }
-      },
-      createCertificate: (opener) => {
-        const back = focusBack(opener);
-        // once there's a certificate, the Sign dialog takes the focus to
-        // its passphrase itself
-        void openCertificateDialog("create", () => {
-          if (!signingCertificate.value) back();
-        });
-      },
-      submit: (pos, place, passphrase) => {
+      confirmPages: !!file.importedFrom,
+      initials: signingInitials.value,
+      // the block shows the signature
+      stamped: true,
+      emptyFields: 0,
+      manage: () => {
         refocus();
-        if (!shown()) return;
+        openSettings("signing")(view.state, view.dispatch);
+      },
+      submit: (choices) => {
+        refocus();
+        if (!shown() || choices.pos === null) return;
+        const pos = choices.pos;
         signNow(view, file, request, {
+          ...choices,
           pos,
           index: targets.findIndex((target) => target.pos === pos),
           png: signature.png,
-          place,
-          passphrase,
         });
       },
-      cancel: refocus,
     };
   };
   void Promise.all([loadMarks(), loadCertificate()])
@@ -253,7 +303,8 @@ export const exportSigned = (): Command => (state, dispatch, view) => {
 /**
  * signNow exports the document as it is now, the dialogs closed, with the
  * block chosen filled in: the one still at `pos`, else the one of its
- * number among them; with neither, it signs nothing
+ * number among them; with neither, it signs nothing. The other blocks get
+ * empty signature fields, named after who signs them.
  */
 const signNow = (
   view: EditorView,
@@ -264,14 +315,10 @@ const signNow = (
     index,
     png,
     place,
+    reason,
     passphrase,
-  }: {
-    pos: number;
-    index: number;
-    png: string;
-    place: string;
-    passphrase: string | null;
-  },
+    initials,
+  }: SignChoices & { pos: number; index: number; png: string },
 ) => {
   const state = view.state;
   const targets = targetsOf(state.doc);
@@ -283,6 +330,7 @@ const signNow = (
     });
     return;
   }
+  const others = targets.filter((other) => other !== target);
   // the place the page shows: the block's own, else where the user signs
   const shownPlace = target.place || place;
   const signer = signerName();
@@ -307,44 +355,57 @@ const signNow = (
           ...signingDates.value,
         },
       },
+      ...(others.length ? { others: others.map((other) => other.pos) } : {}),
     },
     written: () => {
       if (shownPlace) signingPlace.value = shownPlace;
+      signingInitials.value = initials;
       announce("Signed PDF exported");
     },
     done: how,
-    ...(passphrase === null
-      ? {}
-      : {
-          finish: (result: ExportResult) =>
-            signExport(result, passphrase, shownPlace),
-        }),
+    finish: (result: ExportResult, layout: Layout) =>
+      finishExport(result, {
+        passphrase,
+        place: shownPlace,
+        reason,
+        timestampServer: config.value.signing.timestampServer,
+        signatureBox: result.signatureBox,
+        others: others.map((other, at) => ({
+          name: other.name || other.role,
+          box: result.otherBoxes?.[at] ?? null,
+        })),
+        initials: initials.on ? initials.side : null,
+        page: pageGeometry(layout),
+      }),
   });
 };
 
 /**
- * signExport signs an exported PDF with the user's key, its field over the
- * signature block the export filled in, signed at `place`; the native side
- * names the certificate's holder as who signed it. A failure stops the
- * export with what went wrong, so nothing unsigned is written under the
- * signed name.
+ * finishExport adds to an exported PDF what the engine didn't write: the
+ * user's initials on every page, the others' empty signature fields and,
+ * with the passphrase, the digital signature, its field over the block the
+ * export filled in. Without any of them the PDF stays as the engine wrote
+ * it. A failure stops the export with what went wrong, so nothing unsigned
+ * is written under the signed name.
  */
-const signExport = async (
-  result: ExportResult,
-  passphrase: string,
-  place: string,
-) => {
-  const box = result.signatureBox;
-  if (!box) throw new Error("the signature block isn't in the PDF");
-  const timestampServer = config.value.signing.timestampServer;
+const finishExport = async (result: ExportResult, signing: ExportSigning) => {
+  const asked = exportRequest(signing);
+  if (!asked) return result.contents;
+  const parts = [result.contents];
   try {
-    return await signPdf(result.contents, passphrase, {
-      page: box.page + 1,
-      rect: [box.x, box.y, box.width, box.height],
-      location: place || null,
-      reason: null,
-      timestampServer: timestampServer || null,
-    });
+    if (asked.initials) {
+      await loadMarks();
+      parts.push(
+        await stampPdf(INITIALS_STAMP, INITIALS_BOX.width, INITIALS_BOX.height),
+      );
+    }
+  } finally {
+    // its engine stays while a PDF tab's initials look the same
+    if (asked.initials && !isHeld(INITIALS_STAMP))
+      void releaseStamp(INITIALS_STAMP).catch(() => {});
+  }
+  try {
+    return await signPdf(asked.request, parts);
   } catch (error) {
     throw new Error(signingFailure(error), { cause: error });
   }
@@ -354,7 +415,7 @@ const signExport = async (
  * signingFailure says why a PDF wasn't signed, that nothing was saved, and,
  * when the timestamp server gave no timestamp, how to sign without it
  */
-const signingFailure = (error: unknown) => {
+export const signingFailure = (error: unknown) => {
   const message = signingMessage(error, "Blank couldn't sign the PDF").replace(
     /\.?$/,
     ".",

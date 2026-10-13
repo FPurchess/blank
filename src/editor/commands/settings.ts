@@ -13,9 +13,16 @@ import {
 export const openSettings =
   (section?: SettingsSection): Command =>
   (_state, dispatch) => {
-    if (dispatch && !settingsDialog.value) {
-      if (section) settingsSection.value = section;
-      settingsDialog.value = {};
-    }
+    if (dispatch) showSettings(section);
     return true;
   };
+
+/**
+ * showSettings opens the settings dialog, at `section` if given, unless
+ * it's open
+ */
+export const showSettings = (section?: SettingsSection) => {
+  if (settingsDialog.value) return;
+  if (section) settingsSection.value = section;
+  settingsDialog.value = {};
+};

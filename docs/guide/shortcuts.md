@@ -19,33 +19,35 @@ On keyboard layouts that type characters with `AltGr` (Polish, German and many m
 
 ## Files
 
-| Command                                             | Shortcut                |
-| --------------------------------------------------- | ----------------------- |
-| New document                                        | `Mod` `N`               |
-| Open file                                           | `Mod` `O`               |
-| Save                                                | `Mod` `S`               |
-| Save as                                             | `Mod` `Shift` `S`       |
-| [Print](./print)                                    | `Mod` `P`               |
-| Export as PDF                                       | `Mod` `Alt` `P`         |
-| Export as Word                                      | `Mod` `Alt` `W`         |
-| [Export signed PDF](./signing#export)               | `Mod` `Alt` `Shift` `P` |
-| [Your signature](./signing#your-signature)          | (none)                  |
-| [Your initials](./signing#your-signature)           | (none)                  |
-| Page setup                                          | `Mod` `Alt` `U`         |
-| Edit header                                         | `Mod` `Alt` `H`         |
-| Edit footer                                         | `Mod` `Alt` `F`         |
-| [Pages or page ends](./pages#on-the-screen)         | `Mod` `Alt` `V`         |
-| [Zoom in](./pages#zoom)                             | `Mod` `=` or `Mod` `+`  |
-| [Zoom out](./pages#zoom)                            | `Mod` `-`               |
-| [Fit to window](./pages#zoom)                       | (none)                  |
-| [Outline](./pages#outline)                          | `Mod` `Alt` `O`         |
-| [Word count](./writing#the-status-bar)              | `Mod` `Alt` `C`         |
-| [Signatures of the PDF](./pdf#check-the-signatures) | (none)                  |
-| Cycle themes                                        | `Mod` `Alt` `T`         |
-| Choose language                                     | `Mod` `Alt` `L`         |
-| [Focus mode](./writing#focus-mode)                  | `Mod` `Shift` `F`       |
-| [Settings](./settings)                              | `Mod` `,`               |
-| [Main menu](./menu)                                 | `Mod` `K`               |
+| Command                                             | Shortcut                       |
+| --------------------------------------------------- | ------------------------------ |
+| New document                                        | `Mod` `N`                      |
+| Open file                                           | `Mod` `O`                      |
+| Save                                                | `Mod` `S`                      |
+| Save as                                             | `Mod` `Shift` `S`              |
+| [Print](./print)                                    | `Mod` `P`                      |
+| Export as PDF                                       | `Mod` `Alt` `P`                |
+| Export as Word                                      | `Mod` `Alt` `W`                |
+| [Export signed PDF](./signing#export)               | `Mod` `Alt` `Shift` `P`        |
+| [Your signature](./signing#your-signature)          | (none)                         |
+| [Your initials](./signing#your-signature)           | (none)                         |
+| Page setup                                          | `Mod` `Alt` `U`                |
+| Edit header                                         | `Mod` `Alt` `H`                |
+| Edit footer                                         | `Mod` `Alt` `F`                |
+| [Pages or page ends](./pages#on-the-screen)         | `Mod` `Alt` `V`                |
+| [Zoom in](./pages#zoom)                             | `Mod` `=` or `Mod` `+`         |
+| [Zoom out](./pages#zoom)                            | `Mod` `-`                      |
+| [Fit to window](./pages#zoom)                       | (none)                         |
+| [Outline](./pages#outline)                          | `Mod` `Alt` `O`                |
+| [Word count](./writing#the-status-bar)              | `Mod` `Alt` `C`                |
+| [Signatures of the PDF](./pdf#check-the-signatures) | (none)                         |
+| [Sign… a PDF you received](./pdf#sign-received)     | (none), `Mod` `S` in a PDF tab |
+| [Next place to sign](./pdf#places)                  | (none)                         |
+| Cycle themes                                        | `Mod` `Alt` `T`                |
+| Choose language                                     | `Mod` `Alt` `L`                |
+| [Focus mode](./writing#focus-mode)                  | `Mod` `Shift` `F`              |
+| [Settings](./settings)                              | `Mod` `,`                      |
+| [Main menu](./menu)                                 | `Mod` `K`                      |
 
 ## Tabs and moving around
 
@@ -124,6 +126,26 @@ Add `Shift` to the last three to select as you go. When a block like a table of 
 In your text, `Tab` never takes you out of it: `F6` does that. See [Lists](./writing#lists) for what Enter and Backspace do in a list, and [Tabs](./writing#tabs-in-text) for tabs in your text.
 
 In table mode, the arrow keys insert rows and columns, `Shift` + arrows move them, and letters align (`L` `C` `R`), sort (`S`), merge (`M`) and switch headers (`H`). See [Change a table](./tables#change) for all keys.
+
+## PDF tabs
+
+| Command                                           | Shortcut                            |
+| ------------------------------------------------- | ----------------------------------- |
+| Go to the signing tools                           | `Alt` `F10`                         |
+| [Next place to sign](./pdf#places)                | (none), **Next** on the toolbar     |
+| Fill in or sign the place                         | `Enter` or `Space`                  |
+| Leave out a place Blank found                     | `Delete` on it                      |
+| Place the tool's stamp on the page you're reading | `Enter` or `Space` on the tool      |
+| Stop placing with the mouse                       | `Esc`                               |
+| Next / previous place or stamp                    | `Tab` / `Shift` `Tab`               |
+| Move the selected stamp                           | arrow keys, with `Shift` 10 pt      |
+| Make it larger / smaller                          | `Alt` `→` or `↑` / `Alt` `←` or `↓` |
+| Remove it                                         | `Delete` or `Backspace`             |
+| Leave it                                          | `Esc`                               |
+| Undo / redo what you placed                       | `Mod` `Z` / `Mod` `Shift` `Z`       |
+| [Sign… a PDF you received](./pdf#sign-received)   | (none), `Mod` `S` in a PDF tab      |
+
+See [Fill in and sign a PDF you received](./pdf#fill-in).
 
 ## Text
 

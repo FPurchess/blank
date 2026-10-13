@@ -28,6 +28,7 @@ import {
   newEngine,
   settingsOf,
 } from "./engine";
+import { signingBoxes } from "./boxes";
 import { fallbackFonts, findFonts } from "./fallback";
 import { language, signingDates } from "../state";
 import {
@@ -82,6 +83,8 @@ interface Prepared {
   // the diagram module's drawings, by the src of the image each is drawn
   // in place of
   drawings: Map<string, string>;
+  // the positions of the other signature blocks, whose boxes it gives
+  others?: number[];
 }
 
 /**
@@ -104,6 +107,7 @@ const onSharedEngine = async ({
   output,
   flattening,
   drawings,
+  others,
 }: Prepared): Promise<PdfResult> => {
   const { signed } = flattening;
   const engine = await newEngine(true);
@@ -141,9 +145,7 @@ const onSharedEngine = async ({
       ...written,
       missing: engine.missing(),
       warnings: engine.pdfWarnings(),
-      ...(signed
-        ? { signatureBox: engine.boxes(signed.pos, signed.pos + 1)[0] }
-        : {}),
+      ...signingBoxes((pos) => engine.boxes(pos, pos + 1), signed?.pos, others),
     };
   } finally {
     engine.free();
@@ -223,6 +225,7 @@ const jobOf = (
     output,
     flattening,
     drawings,
+    others,
   }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
@@ -249,6 +252,7 @@ const jobOf = (
     ? { sheets: JSON.stringify(output.sheets) }
     : { pages: output.pages }),
   ...(flattening.signed ? { signedPos: flattening.signed.pos } : {}),
+  ...(others ? { otherPos: others } : {}),
 });
 
 /**
@@ -376,7 +380,7 @@ export const describeWarnings = (
  */
 const write = async (
   state: EditorState,
-  { docPath, layout, signed }: Omit<ExportContext, "pages">,
+  { docPath, layout, signed, others }: Omit<ExportContext, "pages">,
   output: Output,
 ): Promise<ExportResult> => {
   // what the sources make, e.g. diagrams, drawn before they're laid out,
@@ -423,6 +427,7 @@ const write = async (
     output,
     flattening: { signed: signed ?? null, dates: signingDates.value },
     drawings,
+    ...(others ? { others } : {}),
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {
@@ -452,6 +457,7 @@ const write = async (
     ],
     pages: result.pages,
     signatureBox: result.signatureBox,
+    ...(result.otherBoxes ? { otherBoxes: result.otherBoxes } : {}),
   };
 };
 

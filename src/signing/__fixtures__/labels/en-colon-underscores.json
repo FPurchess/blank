@@ -1,0 +1,62 @@
+{
+  "about": "English labels with a colon, left of underscores, in single-spaced lines; Name gets no place",
+  "text": {
+    "words": [
+      {
+        "text": "Application",
+        "rect": [72, 88.8, 80.08, 14.7]
+      },
+      {
+        "text": "for",
+        "rect": [155.97, 88.8, 21.84, 14.7]
+      },
+      {
+        "text": "a",
+        "rect": [181.7, 88.8, 7.28, 14.7]
+      },
+      {
+        "text": "parking",
+        "rect": [192.88, 88.8, 50.96, 14.7]
+      },
+      {
+        "text": "permit",
+        "rect": [247.73, 88.8, 43.68, 14.7]
+      },
+      {
+        "text": "Name:",
+        "rect": [72, 592, 23.58, 10.5]
+      },
+      {
+        "text": "____________________",
+        "rect": [98.36, 592, 111.2, 10.5]
+      },
+      {
+        "text": "Signature:",
+        "rect": [72, 604, 49.58, 10.5]
+      },
+      {
+        "text": "____________________",
+        "rect": [124.36, 604, 111.2, 10.5]
+      },
+      {
+        "text": "Date:",
+        "rect": [72, 616, 23.58, 10.5]
+      },
+      {
+        "text": "____________",
+        "rect": [98.36, 616, 66.72, 10.5]
+      }
+    ],
+    "rules": []
+  },
+  "expected": [
+    {
+      "kind": "signature",
+      "rect": [124.36, 597.7, 111.2, 16.8]
+    },
+    {
+      "kind": "date",
+      "rect": [98.36, 609.7, 66.72, 16.8]
+    }
+  ]
+}

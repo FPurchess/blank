@@ -68,3 +68,43 @@
     font-family: monospace;
   }
 }
+
+// the signing toolbar of a PDF tab (src/ui/SigningToolbar.vue), in the
+// formatting toolbar's row: the tools with their names, Sign… in a box, and
+// a note when no tool works
+#signing-toolbar {
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--s2);
+  overflow: hidden;
+  white-space: nowrap;
+
+  .separator {
+    @include separator;
+    align-self: center;
+    height: 16px;
+    margin: 0 var(--s1);
+  }
+}
+
+.signing-tool {
+  @include icon-button;
+  @include icon-text-button;
+  align-items: center;
+}
+
+.signing-sign {
+  @include text-button;
+}
+
+.signing-note {
+  min-width: 0;
+  margin: 0 0 0 var(--s3);
+  font-size: var(--ui-small);
+  line-height: 16px;
+  color: var(--muted);
+  // hidden for Safari 15 (macOS 12), which has no clip
+  overflow: hidden;
+  overflow: clip;
+  text-overflow: ellipsis;
+}

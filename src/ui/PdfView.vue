@@ -27,6 +27,19 @@ import {
 import { renderPage, cancelRender, type PageBitmap } from "../pdf/ipc";
 import { PDF_VIEW_ID } from "../pdf/placeholder";
 import { RenderQueue } from "../pdf/renderQueue";
+import { pageRevision, syncFills } from "../pdf/fills";
+import { isTargetPlace } from "../pdf/placeModel";
+import { type FieldPlace, type Place, readingOrder } from "../pdf/places";
+import {
+  readPlaces,
+  shownBlocked,
+  shownContext,
+  shownPlaces,
+  shownStamps,
+} from "../pdf/placesRead";
+import { cancelPlacing, placeStamp } from "../pdf/stampActions";
+import { ghostsOf, type Stamp } from "../pdf/stampModel";
+import { placeRefusal } from "../pdf/toolRules";
 import { listenOnWindow } from "../scope";
 import {
   activeTab,
@@ -37,7 +50,11 @@ import {
   pdfViewAnchor,
   pdfViewFocused,
   pdfViewport,
+  pageRevisions,
+  placingStamp,
+  selectedStamp,
   shownPdf,
+  stampBooks,
   tabs,
 } from "../state";
 import IconGlyph from "./components/IconGlyph.vue";
@@ -46,7 +63,12 @@ import { useFocusRegion } from "./composables/useFocusRegion";
 import { useResizeObserver } from "./composables/useResizeObserver";
 import { useWheelZoom } from "./composables/useWheelZoom";
 import { type Bitmap, pdfBitmaps } from "./pageBitmaps";
+import PdfField from "./PdfField.vue";
 import PdfPage from "./PdfPage.vue";
+import PdfTarget from "./PdfTarget.vue";
+import StampOverlay from "./StampOverlay.vue";
+import StampToolbar from "./StampToolbar.vue";
+import { stampBox } from "./stampOverlayModel";
 import {
   pageInView,
   pageKey,
@@ -144,6 +166,7 @@ const cached = (key: string | undefined) =>
 // each page mounted, with the bitmap it wants and the one it shows
 const frames = computed(() => {
   void drawn.value;
+  void pageRevisions.value;
   const doc = pdf.value;
   const tab = activeTabId.value;
   if (!layout.value || !range.value || !doc?.opened || !tab) return [];
@@ -158,7 +181,7 @@ const frames = computed(() => {
       layout.value!.scale,
       ratio.value,
     );
-    const key = pageKey(slot, scale);
+    const key = pageKey(slot, scale, pageRevision(tab, frame.page));
     return {
       ...frame,
       scale,
@@ -236,6 +259,113 @@ watch(tabs, (list) => {
   for (const slot of closedKeys(shownKeys.keys(), open)) shownKeys.delete(slot);
 });
 
+// the stamps placed on the pages, and the places to fill in or sign (a
+// target a stamp fills gives way to it), in reading order, which the DOM
+// keeps, so Tab goes through them as they're read; repeated initials show
+// faded on the other pages
+const stamps = computed(() => {
+  void stampBooks.value;
+  return shownStamps();
+});
+// on the pages mounted only, as those are
+const ghosts = computed(() => {
+  if (!range.value) return [];
+  const [first, last] = range.value.split("-").map(Number);
+  return ghostsOf(stamps.value, pages.value).filter(
+    (ghost) => ghost.page >= first && ghost.page <= last,
+  );
+});
+// what the places and fields may do now: why they can't be filled in, by
+// their ids
+const placeRefusals = computed(() => {
+  const context = shownContext();
+  return new Map(
+    shownPlaces.value.map((place) => [place.id, placeRefusal(place, context)]),
+  );
+});
+type Overlay =
+  | { id: string; page: number; rect: Stamp["rect"]; stamp: Stamp }
+  | { id: string; page: number; rect: Stamp["rect"]; target: Place }
+  | { id: string; page: number; rect: Stamp["rect"]; field: FieldPlace };
+const overlays = computed(() => {
+  const filled = new Set(stamps.value.flatMap((stamp) => stamp.place ?? []));
+  return readingOrder<Overlay>([
+    ...stamps.value.map((stamp) => ({
+      id: `stamp:${stamp.id}`,
+      page: stamp.page,
+      rect: stamp.rect,
+      stamp,
+    })),
+    ...shownPlaces.value.flatMap((place): Overlay[] =>
+      place.source === "field" && !isTargetPlace(place)
+        ? [{ id: place.id, page: place.page, rect: place.rect, field: place }]
+        : filled.has(place.id) || shownBlocked.value
+          ? []
+          : [
+              {
+                id: place.id,
+                page: place.page,
+                rect: place.rect,
+                target: place,
+              },
+            ],
+    ),
+  ]);
+});
+
+// the form's fields and the places found, read once the PDF shows; the
+// fills its history holds, sent to its helper whenever they aren't the ones
+// it holds
+watch(
+  () => [activeTabId.value, pdf.value?.opened] as const,
+  ([tab, opened]) => {
+    if (tab && opened) void readPlaces(tab, opened);
+  },
+  { immediate: true },
+);
+watch(
+  [activeTabId, () => pdf.value?.opened, stampBooks],
+  () => void syncFills(),
+  {
+    immediate: true,
+  },
+);
+const frameOf = (page: number) => layout.value?.frames[page];
+
+// a press on a page places the stamp whose tool was clicked there, centred
+// on the press, and any other press on the desk leaves the stamp selected
+const onDeskPress = (event: PointerEvent) => {
+  const kind = placingStamp.value;
+  if (!kind) {
+    selectedStamp.value = null;
+    return;
+  }
+  const desk = event.currentTarget as HTMLElement;
+  const bounds = desk.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+  const frame = layout.value?.frames.find(
+    (one) =>
+      x >= one.left &&
+      x <= one.left + one.width &&
+      y >= one.top &&
+      y <= one.top + one.height,
+  );
+  if (!frame || !layout.value) return;
+  event.preventDefault();
+  placingStamp.value = null;
+  const scale = layout.value.scale;
+  void placeStamp(
+    kind,
+    {
+      page: frame.page,
+      x: (x - frame.left) / scale,
+      y: (y - frame.top) / scale,
+    },
+    () => scroller.value?.focus(),
+  );
+};
+
 // "Page N of M" in the status bar
 watch(
   [layout, scrollTop, viewHeight],
@@ -312,6 +442,15 @@ const onKeydown = (event: KeyboardEvent) => {
   }
   // Tab moves the focus as anywhere, not Indent's refusal
   if (event.key === "Tab") return;
+  // Esc puts the tool down that was to place a stamp, or leaves the stamp
+  // selected
+  if (event.key === "Escape" && !event.ctrlKey && !event.metaKey) {
+    if (cancelPlacing() || selectedStamp.value !== null) {
+      selectedStamp.value = null;
+      event.preventDefault();
+      return;
+    }
+  }
   if (refusals(editor.view, event)) event.preventDefault();
 };
 
@@ -356,6 +495,7 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
     tabindex="0"
     role="document"
     :aria-label="label"
+    :class="{ 'pdf-placing': placingStamp !== null }"
     @scroll="measure"
     @keydown="onKeydown"
     @focusin="focusRegion.onFocusin"
@@ -379,13 +519,14 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
     <div
       v-else-if="layout"
       class="page-desk"
-      aria-hidden="true"
       :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
+      @pointerdown="onDeskPress"
     >
       <div
         v-for="frame in frames"
         :key="frame.page"
         class="page-sheet"
+        aria-hidden="true"
         :style="{
           top: `${frame.top}px`,
           left: `${frame.left}px`,
@@ -404,6 +545,44 @@ const close = () => void closeTabs([tabId.value]).then(focusPages);
         :bitmap="frame.bitmap"
         :failed="frame.failed"
       />
+      <StampOverlay
+        v-for="ghost in ghosts"
+        :key="`${ghost.stamp.id}:${ghost.page}`"
+        :stamp="ghost.stamp"
+        :frame="frameOf(ghost.page)!"
+        :page="pages[ghost.page]"
+        :scale="layout.scale"
+        :ghost="ghost.rect"
+      />
+      <template v-for="item in overlays" :key="item.id">
+        <template v-if="'stamp' in item">
+          <StampOverlay
+            :stamp="item.stamp"
+            :frame="frameOf(item.page)!"
+            :page="pages[item.page]"
+            :scale="layout.scale"
+          />
+          <StampToolbar
+            v-if="item.stamp.id === selectedStamp"
+            :stamp="item.stamp"
+            :box="stampBox(item.rect, frameOf(item.page)!, layout.scale)"
+          />
+        </template>
+        <PdfTarget
+          v-else-if="'target' in item"
+          :place="item.target"
+          :frame="frameOf(item.page)!"
+          :scale="layout.scale"
+          :refusal="placeRefusals.get(item.id) ?? null"
+        />
+        <PdfField
+          v-else
+          :place="item.field"
+          :frame="frameOf(item.page)!"
+          :scale="layout.scale"
+          :refusal="placeRefusals.get(item.id) ?? null"
+        />
+      </template>
     </div>
   </div>
 </template>

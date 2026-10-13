@@ -1,0 +1,73 @@
+{
+  "about": "German captions just below drawn rules: Ort, Datum and Unterschrift",
+  "text": {
+    "words": [
+      {
+        "text": "Berlin,",
+        "rect": [72, 592, 33.98, 10.5]
+      },
+      {
+        "text": "den",
+        "rect": [108.76, 592, 15.6, 10.5]
+      },
+      {
+        "text": "1.",
+        "rect": [127.14, 592, 7.98, 10.5]
+      },
+      {
+        "text": "Oktober",
+        "rect": [137.9, 592, 36.4, 10.5]
+      },
+      {
+        "text": "2026.",
+        "rect": [177.08, 592, 23.58, 10.5]
+      },
+      {
+        "text": "Beide",
+        "rect": [203.44, 592, 26, 10.5]
+      },
+      {
+        "text": "Seiten",
+        "rect": [232.22, 592, 31.2, 10.5]
+      },
+      {
+        "text": "erhalten",
+        "rect": [266.2, 592, 41.6, 10.5]
+      },
+      {
+        "text": "eine",
+        "rect": [310.58, 592, 20.8, 10.5]
+      },
+      {
+        "text": "Ausfertigung.",
+        "rect": [334.16, 592, 65.18, 10.5]
+      },
+      {
+        "text": "Ort,",
+        "rect": [72, 702.43, 18.38, 10.5]
+      },
+      {
+        "text": "Datum",
+        "rect": [93.16, 702.43, 26, 10.5]
+      },
+      {
+        "text": "Unterschrift",
+        "rect": [320, 702.43, 62.4, 10.5]
+      }
+    ],
+    "rules": [
+      [72, 699.75, 180, 0.5],
+      [320, 699.75, 200, 0.5]
+    ]
+  },
+  "expected": [
+    {
+      "kind": "placeAndDate",
+      "rect": [72, 681.75, 180, 18]
+    },
+    {
+      "kind": "signature",
+      "rect": [320, 663.75, 200, 36]
+    }
+  ]
+}

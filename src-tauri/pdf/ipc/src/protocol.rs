@@ -8,10 +8,11 @@
 //!
 //! Within version 1 a new op is optional: a helper that doesn't know it
 //! answers `unknownOp`. The hello lists the ops the helper knows
-//! (`Hello::ops`); the app doesn't read that list yet, since every op it
-//! asks is in version 1 from the start. A breaking change raises `PROTOCOL` and the
-//! frame's magic. Positions and sizes are display points: from the top left
-//! of the page's crop box after its `/Rotate`, with its UserUnit applied.
+//! (`Hello::ops`), and the client asks none other (`text`, `setFills` and
+//! `save` came after the first ops). A breaking change raises `PROTOCOL`
+//! and the frame's magic. Positions and sizes are display points: from the
+//! top left of the page's crop box after its `/Rotate`, with its UserUnit
+//! applied.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -44,13 +45,24 @@ pub enum Op {
         page: usize,
         scale: f32,
     },
-    /// the form's fields. Not asked by the app yet: it is there for the
-    /// PDF forms of the next step (filling them in), see .claude/rules/pdf.md
+    /// the words and drawn lines of a page (`PageText`), for the places to
+    /// sign or fill in on a PDF without a form
+    Text {
+        page: usize,
+    },
+    /// the form's fields (`Field`), with the values the fills gave them
     Fields,
-    /// what the signatures say of themselves. Not asked by the app yet: the
-    /// signature check reads the PDF itself (signing/verify.rs); this is for
-    /// placing signature fields in the next step, see .claude/rules/pdf.md
-    Signatures,
+    /// fills in the form: always the whole set, on the PDF as it was opened
+    /// (what an earlier `setFills` did is undone first); the answer is
+    /// `Filled`, the pages to draw again. A value the field can't take, or
+    /// a field that isn't there, fails the whole set and keeps the last one;
+    /// the failure names that fill's field (`Failure::field`)
+    SetFills {
+        fills: Vec<Fill>,
+    },
+    /// the PDF with the fills as an incremental update: the bytes opened,
+    /// unchanged, then the update; refused for a repaired or encrypted PDF
+    Save,
     /// stops request `target`, which then answers `cancelled`; no answer of
     /// its own
     Cancel {
@@ -61,14 +73,8 @@ pub enum Op {
 
 impl Op {
     /// every op's name, as the helper says in its hello
-    pub const NAMES: [&'static str; 7] = [
-        "open",
-        "pages",
-        "render",
-        "fields",
-        "signatures",
-        "cancel",
-        "ping",
+    pub const NAMES: [&'static str; 9] = [
+        "open", "pages", "render", "text", "fields", "setFills", "save", "cancel", "ping",
     ];
 
     /// its name, as in the request and in the log
@@ -77,8 +83,10 @@ impl Op {
             Op::Open { .. } => "open",
             Op::Pages { .. } => "pages",
             Op::Render { .. } => "render",
+            Op::Text { .. } => "text",
             Op::Fields => "fields",
-            Op::Signatures => "signatures",
+            Op::SetFills { .. } => "setFills",
+            Op::Save => "save",
             Op::Cancel { .. } => "cancel",
             Op::Ping => "ping",
         }
@@ -106,6 +114,13 @@ pub enum ErrorKind {
     Cancelled,
     /// anything else the engine threw
     Engine,
+    /// `save`: the engine had to repair the PDF to read it, so an update
+    /// can't be appended to it
+    Repaired,
+    /// `save`: the PDF is encrypted
+    Encrypted,
+    /// `setFills`: a value has characters the field's font can't show
+    MissingGlyphs,
 }
 
 impl ErrorKind {
@@ -119,6 +134,9 @@ impl ErrorKind {
             ErrorKind::TooComplex => "tooComplex",
             ErrorKind::Cancelled => "cancelled",
             ErrorKind::Engine => "engine",
+            ErrorKind::Repaired => "repaired",
+            ErrorKind::Encrypted => "encrypted",
+            ErrorKind::MissingGlyphs => "missingGlyphs",
         }
     }
 }
@@ -126,6 +144,15 @@ impl ErrorKind {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Failure {
     pub kind: ErrorKind,
+    /// `setFills`: the field of the fill that failed, when one did
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+}
+
+impl From<ErrorKind> for Failure {
+    fn from(kind: ErrorKind) -> Self {
+        Failure { kind, field: None }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -235,21 +262,45 @@ pub struct Field {
     pub widgets: Vec<Widget>,
 }
 
-/// a signature in the PDF: where it is and what it says of itself; whether
-/// it is valid is for the app's verify.rs to say
+/// a word on a page, as the engine reads the page's text
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct SigInfo {
+pub struct Word {
+    pub text: String,
+    pub rect: Rect,
+}
+
+/// what a page says and the lines drawn on it: its words in reading order,
+/// and its thin horizontal lines (at least 40 pt wide, at most 2 pt high,
+/// stroked or filled, not white: `RULE_*` in the helper's shim), where
+/// people sign or write
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct PageText {
+    pub words: Vec<Word>,
+    pub rules: Vec<Rect>,
+}
+
+/// what a field is filled in with: a checkbox's `true` or `false`; else
+/// text: a text field's, a choice's (one of its options, or any text for a
+/// combo box that may be edited), a radio button's state when on (its
+/// widget's `onValue`, or "Off" for none)
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum FillValue {
+    Checked(bool),
+    Text(String),
+}
+
+/// a field (by its full name) and what it is filled in with
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Fill {
     pub field: String,
-    /// its first widget's page and box, if it shows on a page
-    pub page: Option<usize>,
-    pub rect: Option<Rect>,
-    pub sub_filter: Option<String>,
-    pub reason: Option<String>,
-    pub location: Option<String>,
-    pub name: Option<String>,
-    /// its `/M`, as written
-    pub time: Option<String>,
+    pub value: FillValue,
+}
+
+/// what `setFills` changed: the pages whose fields look different now
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct Filled {
+    pub pages: Vec<usize>,
 }
 
 #[cfg(test)]
@@ -274,6 +325,30 @@ mod tests {
         assert_eq!(serde_json::from_value::<Request>(written).unwrap(), request);
         let fields: Request = serde_json::from_value(json!({"id": 4, "op": "fields"})).unwrap();
         assert_eq!(fields.op, Op::Fields);
+        let fills = Request {
+            id: 6,
+            op: Op::SetFills {
+                fills: vec![
+                    Fill {
+                        field: "agree".into(),
+                        value: FillValue::Checked(true),
+                    },
+                    Fill {
+                        field: "name".into(),
+                        value: FillValue::Text("Ada".into()),
+                    },
+                ],
+            },
+        };
+        let written = serde_json::to_value(&fills).unwrap();
+        assert_eq!(
+            written,
+            json!({"id": 6, "op": "setFills", "fills": [
+                {"field": "agree", "value": true},
+                {"field": "name", "value": "Ada"}
+            ]})
+        );
+        assert_eq!(serde_json::from_value::<Request>(written).unwrap(), fills);
 
         let ok = Response {
             id: 3,
@@ -285,11 +360,18 @@ mod tests {
         );
         let error = json!({"id": 5, "error": {"kind": "tooComplex"}});
         let read: Response = serde_json::from_value(error).unwrap();
+        assert_eq!(read.outcome, Outcome::Error(ErrorKind::TooComplex.into()));
+        // a refused fill names its field
+        let refused = Response {
+            id: 7,
+            outcome: Outcome::Error(Failure {
+                kind: ErrorKind::MissingGlyphs,
+                field: Some("name".into()),
+            }),
+        };
         assert_eq!(
-            read.outcome,
-            Outcome::Error(Failure {
-                kind: ErrorKind::TooComplex
-            })
+            serde_json::to_value(&refused).unwrap(),
+            json!({"id": 7, "error": {"kind": "missingGlyphs", "field": "name"}})
         );
     }
 
@@ -307,6 +389,11 @@ mod tests {
                     request["page"] = json!(0);
                     request["scale"] = json!(1);
                 }
+                "text" => request["page"] = json!(0),
+                "setFills" => {
+                    request["fills"] =
+                        json!([{"field": "a", "value": true}, {"field": "b", "value": "x"}])
+                }
                 "cancel" => request["target"] = json!(1),
                 _ => {}
             }
@@ -321,6 +408,9 @@ mod tests {
             ErrorKind::TooComplex,
             ErrorKind::Cancelled,
             ErrorKind::Engine,
+            ErrorKind::Repaired,
+            ErrorKind::Encrypted,
+            ErrorKind::MissingGlyphs,
         ] {
             assert_eq!(serde_json::to_value(kind).unwrap(), kind.name());
         }

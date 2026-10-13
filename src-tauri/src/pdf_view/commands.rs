@@ -2,7 +2,8 @@
 //! a kind (`PdfError::kind`, "unreadable" for a file that can't be read, or
 //! for a file read again "missing" when it has gone and "changed" when it
 //! isn't the one opened) and the log as the same kind with what was asked:
-//! never the PDF's text. The path of a PDF opened is logged at info.
+//! never the PDF's text, nor its words or the values of its fields. The
+//! path of a PDF opened is logged at info.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -12,11 +13,11 @@ use std::time::Instant;
 use crate::print::{self, Meta, PrintError, PrintSetup, Sent};
 use blank_pdf_ipc::client::{PdfError, Supervisor};
 use blank_pdf_ipc::frame::MAX_BODY;
-use blank_pdf_ipc::protocol::{ErrorKind, Op, PageInfo};
+use blank_pdf_ipc::protocol::{ErrorKind, Field, Fill, Op, PageInfo, PageText};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
-use super::{helper_config, read_checked, sha256, source, PdfTab, PdfTabs};
+use super::{helper_config, read_checked, read_for_signing, sha256, source, PdfTab, PdfTabs};
 use crate::signing::commands::{checked_signatures, SigningError};
 use crate::signing::trust::CheckedSignature;
 
@@ -46,6 +47,19 @@ fn file_problem(path: &Path) -> &'static str {
         Ok(_) => "changed",
         Err(error) if error.kind() == io::ErrorKind::NotFound => "missing",
         Err(_) => "unreadable",
+    }
+}
+
+/// the kind of a helper's failure, logged with `context`: for a helper that
+/// stopped while idle and can't open the file again, why (`file_problem`)
+fn helper_failed(context: &'static str, path: PathBuf) -> impl Fn(PdfError) -> String {
+    move |error| match error {
+        PdfError::Source => {
+            let problem = file_problem(&path);
+            log::warn!("PDF: {context}: {problem}");
+            problem.to_string()
+        }
+        error => failed(context)(error),
     }
 }
 
@@ -166,6 +180,71 @@ pub async fn pdf_render(
     Ok(tauri::ipc::Response::new(pixels))
 }
 
+/// the words and thin horizontal lines of page `page` (from 0) of tab
+/// `tab`, in display points
+#[tauri::command]
+pub async fn pdf_text(
+    tabs: State<'_, PdfTabs>,
+    tab: String,
+    page: usize,
+) -> Result<PageText, String> {
+    let pdf = tabs.get(&tab).ok_or("closed")?;
+    tabs.stop_idle(Some(&tab), Instant::now());
+    blocking(move || {
+        pdf.supervisor
+            .ask(Op::Text { page })
+            .map_err(helper_failed("text", pdf.path.clone()))
+    })
+    .await
+}
+
+/// the form's fields of tab `tab`'s PDF, with the values its fills gave
+#[tauri::command]
+pub async fn pdf_fields(tabs: State<'_, PdfTabs>, tab: String) -> Result<Vec<Field>, String> {
+    let pdf = tabs.get(&tab).ok_or("closed")?;
+    tabs.stop_idle(Some(&tab), Instant::now());
+    blocking(move || {
+        pdf.supervisor
+            .ask(Op::Fields)
+            .map_err(helper_failed("fields", pdf.path.clone()))
+    })
+    .await
+}
+
+/// why `pdf_set_fills` failed: the kind, as the other commands fail with,
+/// and for a fill the helper refused, the full name of its field
+#[derive(Debug, PartialEq, Serialize)]
+pub struct FillFailure {
+    pub kind: String,
+    pub field: Option<String>,
+}
+
+/// fills the form of tab `tab`'s PDF in with `fills`, always the whole set,
+/// which its helper keeps (a new helper gets them again); gives the pages
+/// to draw again. A value refused ("missingGlyphs", "badRequest") leaves
+/// the last set as it was, and names the field it was for
+#[tauri::command]
+pub async fn pdf_set_fills(
+    tabs: State<'_, PdfTabs>,
+    tab: String,
+    fills: Vec<Fill>,
+) -> Result<Vec<usize>, FillFailure> {
+    let failure = |kind: String| FillFailure { kind, field: None };
+    let pdf = tabs.get(&tab).ok_or_else(|| failure("closed".into()))?;
+    tabs.stop_idle(Some(&tab), Instant::now());
+    tauri::async_runtime::spawn_blocking(move || {
+        // the field's name never reaches the log
+        pdf.supervisor
+            .set_fills(fills)
+            .map_err(|refused| FillFailure {
+                kind: helper_failed("fill in", pdf.path.clone())(refused.error),
+                field: refused.field,
+            })
+    })
+    .await
+    .unwrap_or_else(|_| Err(failure("failed".into())))
+}
+
 /// stops the render of `ticket` in tab `tab`, if it runs
 #[tauri::command]
 pub fn pdf_cancel(tabs: State<'_, PdfTabs>, tab: String, ticket: u64) {
@@ -192,15 +271,7 @@ pub async fn pdf_verify(
         .get(&tab)
         .ok_or_else(|| SigningError::Failed("This PDF isn't open any more".into()))?;
     tauri::async_runtime::spawn_blocking(move || {
-        let bytes = read_checked(&pdf.path, &pdf.sha256).map_err(|error| {
-            let problem = read_problem(&error);
-            log::warn!("PDF: read to check its signatures: {problem}");
-            match problem {
-                "changed" => SigningError::FileChanged,
-                "missing" => SigningError::FileMissing,
-                _ => SigningError::Failed("Blank can't read this PDF again".into()),
-            }
-        })?;
+        let bytes = read_for_signing(&pdf.path, &pdf.sha256, "to check its signatures")?;
         checked_signatures(&app, &bytes)
     })
     .await

@@ -25,7 +25,7 @@ Blank is a keyboard-first markdown editor: a Tauri 2 desktop app with a TypeScri
 - Every spec file gets a fresh app with a temporary profile: `wdio.conf.ts` sets `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` for `tauri-driver`. Specs start from the welcome document and the default keymap, and never touch the developer's real data. `restartApp()` in `e2e/helpers.ts` relaunches the app within the same profile, optionally with CLI args.
 - Type text with `type()` from `e2e/helpers.ts`, never `browser.keys("text")`: WebKitWebDriver drops repeated characters within one key action ("ll" becomes "l"). Use `pressMod()` for `Mod-` shortcuts. Click into editor text with `clickInto()` before typing: the editor learns where a click put the cursor from a later `selectionchange` event, and keys sent before it go where the cursor was.
 - The hooks tests call in the app (`window.blankGeometry`, `window.blankBootTimes`, …) are compiled in only in `bun run dev` (`import.meta.env.DEV`) and where `__TEST_HOOKS__` is true: a Vite `define` (`vite.config.ts`) that is true in debug builds (`TAURI_ENV_DEBUG`), which E2E runs. Use it for test hooks only, never for a switch users see.
-- Name specs `*.e2e.ts`, so vitest doesn't collect them. Native dialogs (open, save as, export) can't be automated, so test file IO by passing a path as a CLI arg, which makes Ctrl+S save without a dialog.
+- Name specs `*.e2e.ts`, so vitest doesn't collect them. Native dialogs (open, save as, export) can't be automated, so test file IO by passing a path as a CLI arg, which makes Ctrl+S save without a dialog. Signing a PDF tab asks where to save it: a spec sets `window.blankTestSavePath` (a `__TEST_HOOKS__` hook) to the path it's saved to instead.
 
 ## Architecture
 

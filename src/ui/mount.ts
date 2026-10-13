@@ -2,7 +2,9 @@ import { createApp, onScopeDispose, watch } from "vue";
 
 import { EditorKey, type EditorHandle } from "../editor/handle";
 import { bootScope } from "../scope";
-import { isPdfTab, tabs } from "../state";
+import { forgetFills } from "../pdf/fills";
+import { forgetPlaces } from "../pdf/placesRead";
+import { activeTabId, isPdfTab, lastPlace, tabs } from "../state";
 import { uiRoot } from "../uiRoot";
 import App from "./App.vue";
 import { pdfBitmaps } from "./pageBitmaps";
@@ -20,16 +22,23 @@ export const bootApp = (editor: EditorHandle) =>
     const app = createApp(App);
     app.provide(EditorKey, editor);
     app.mount(element);
-    // the bitmaps of closed PDF tabs go, also while no PDF shows
+    // the bitmaps, places and fills sent of closed PDF tabs go, also while
+    // no PDF shows
     watch(
       tabs,
       (list) => {
         const open = new Set(list.filter(isPdfTab).map((tab) => tab.id));
         for (const key of closedKeys(pdfBitmaps.keys(), open))
           pdfBitmaps.delete(key);
+        forgetPlaces(open);
+        forgetFills(open);
       },
       { immediate: true },
     );
+    // Next goes on from a place of the tab shown only
+    watch(activeTabId, () => {
+      lastPlace.value = null;
+    });
     onScopeDispose(() => {
       app.unmount();
       element.remove();

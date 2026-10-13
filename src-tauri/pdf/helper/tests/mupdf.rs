@@ -105,7 +105,9 @@ fn reads_the_form() {
             "color",
             "signature",
             "id",
-            "address.street"
+            "address.street",
+            "size",
+            "fruit"
         ]
     );
     let field = |name: &str| fields.iter().find(|field| field.name == name).unwrap();
@@ -133,6 +135,21 @@ fn reads_the_form() {
     assert_eq!(color.options, ["Red", "Green", "Blue"]);
     assert_eq!(color.value, "Green");
 
+    let size = field("size");
+    assert_eq!(size.kind, FieldKind::Radio);
+    assert_eq!(size.value, "Off");
+    let states: Vec<_> = size
+        .widgets
+        .iter()
+        .map(|widget| widget.on_value.as_deref())
+        .collect();
+    assert_eq!(states, [Some("S"), Some("L")]);
+
+    let fruit = field("fruit");
+    assert_eq!(fruit.kind, FieldKind::List);
+    assert_eq!(fruit.options, ["Apple", "Pear"]);
+    assert_eq!(fruit.value, "");
+
     let signature = field("signature");
     assert_eq!(signature.kind, FieldKind::Signature);
     assert!(!signature.signed);
@@ -145,7 +162,6 @@ fn reads_the_form() {
         FieldKind::Text,
         "inherits /FT"
     );
-    assert!(open(&engine, "form.pdf").signatures().unwrap().is_empty());
 }
 
 #[test]
@@ -161,19 +177,16 @@ fn places_widgets_on_turned_pages() {
 }
 
 #[test]
-fn reads_the_signatures() {
+fn reads_a_signed_signature_field() {
     let engine = engine();
-    let signatures = open(&engine, "signature.pdf").signatures().unwrap();
-    assert_eq!(signatures.len(), 1);
-    let signature = &signatures[0];
-    assert_eq!(signature.field, "Signature1");
-    assert_eq!(signature.page, Some(0));
-    assert!(near(signature.rect.unwrap(), [72.0, 720.0, 200.0, 50.0]));
-    assert_eq!(signature.sub_filter.as_deref(), Some("ETSI.CAdES.detached"));
-    assert_eq!(signature.name.as_deref(), Some("Ada Lovelace"));
-    assert_eq!(signature.reason.as_deref(), Some("I agree"));
-    assert_eq!(signature.location.as_deref(), Some("London"));
-    assert_eq!(signature.time.as_deref(), Some("D:20261008120000Z"));
+    let fields = open(&engine, "signature.pdf").fields().unwrap();
+    assert_eq!(fields.len(), 1);
+    let signature = &fields[0];
+    assert_eq!(signature.name, "Signature1");
+    assert_eq!(signature.kind, FieldKind::Signature);
+    assert!(signature.signed);
+    assert_eq!(signature.widgets[0].page, 0);
+    assert!(near(signature.widgets[0].rect, [72.0, 720.0, 200.0, 50.0]));
 }
 
 #[test]
@@ -243,4 +256,28 @@ fn draws_chinese_in_a_system_font() {
     };
     assert!(ink(35, 70) > 50, "the characters show");
     assert_eq!(ink(0, 15), 0);
+}
+
+#[test]
+fn draws_no_sign_arrow_over_an_unsigned_signature_field() {
+    // MuPDF draws an orange arrow saying "SIGN" over every unsigned
+    // signature field; Blank shows its own target there, which the user's
+    // signature covers
+    let engine = engine();
+    let mut doc = open(&engine, "form.pdf");
+    let fields = doc.fields().unwrap();
+    let field = fields
+        .iter()
+        .find(|field| field.name == "signature")
+        .unwrap();
+    let rect = field.widgets[0].rect;
+    let bitmap = doc.render(0, 1.0, &CancelFlag::default()).unwrap();
+    let orange = (rect[1] as u32..(rect[1] + rect[3]) as u32).any(|y| {
+        (rect[0] as u32..(rect[0] + rect[2]) as u32).any(|x| {
+            let at = ((y * bitmap.width + x) * 4) as usize;
+            let [r, g, b] = [bitmap.rgba[at], bitmap.rgba[at + 1], bitmap.rgba[at + 2]];
+            r > 200 && g < 150 && b < 100
+        })
+    });
+    assert!(!orange, "the SIGN arrow shows");
 }

@@ -83,6 +83,8 @@ import {
 import { toggleQuote } from "../commands/quote";
 import { focusStop } from "../../state";
 import { forPdf, showSignatures } from "../../pdf/commands";
+import { nextShownPlace } from "../../pdf/placeActions";
+import { signShownPdf } from "../../pdf/sign";
 import { setTextblock } from "../commands/setTextblock";
 import { clearRecentFiles } from "../commands/recentFiles";
 import { zoomBy, zoomFit } from "../commands/zoom";
@@ -221,6 +223,8 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.VIEW_ZOOM_FIT]: zoomFit(),
   [CommandIdentifier.MENU_MAIN]: openMainMenu(),
   [CommandIdentifier.EDIT_FIND]: openFind(),
+  [CommandIdentifier.PDF_SIGN]: signShownPdf(),
+  [CommandIdentifier.PDF_NEXT]: nextShownPlace(),
 };
 
 // keys that run a command besides its own, which can't be changed in

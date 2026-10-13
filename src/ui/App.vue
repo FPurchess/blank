@@ -15,6 +15,7 @@ import {
   tableToolbar,
   signatureDialog,
   signDialog,
+  placeDialog,
   certificateDialog,
   confirmDialog,
   signaturePopover,
@@ -34,6 +35,7 @@ import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
 import SignatureDialog from "./SignatureDialog.vue";
 import SignDialog from "./SignDialog.vue";
+import PlaceDialog from "./PlaceDialog.vue";
 import CertificateDialog from "./CertificateDialog.vue";
 import ConfirmDialog from "./ConfirmDialog.vue";
 import { keyOf } from "./keyOf";
@@ -126,6 +128,11 @@ watchFocusMode();
     v-if="signDialog"
     :key="keyOf(signDialog)"
     :request="signDialog"
+  />
+  <PlaceDialog
+    v-if="placeDialog"
+    :key="keyOf(placeDialog)"
+    :request="placeDialog"
   />
   <CertificateDialog
     v-if="certificateDialog"

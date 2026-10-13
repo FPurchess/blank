@@ -267,10 +267,9 @@
     margin-left: var(--s1);
   }
 
-  .note {
-    margin: var(--s3) 0 0;
-    color: var(--muted);
-    font-size: var(--ui-small);
+  // a dialog's note (main.scss), further from what it notes
+  p.note {
+    margin-top: var(--s3);
   }
 }
 
@@ -293,5 +292,17 @@
 
   .setting-text {
     flex-basis: 100%;
+  }
+}
+
+// the Sign dialog's switches and the button that makes the initials
+.sign-dialog {
+  .dialog-body > .switch-row {
+    margin-bottom: var(--s2);
+  }
+
+  .make-initials {
+    @include text-button;
+    margin-left: var(--s1);
   }
 }

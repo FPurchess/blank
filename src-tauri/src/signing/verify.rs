@@ -4,7 +4,7 @@
 
 use crate::signing::certificate::CertificateInfo;
 use crate::signing::der as d;
-use crate::signing::pdf::form_fields;
+use crate::signing::pdf::{form_fields, load_bounded, resolve};
 use anyhow::{Context, Result};
 use cms::content_info::ContentInfo;
 use cms::signed_data::{SignedData, SignerIdentifier};
@@ -23,6 +23,10 @@ pub enum Coverage {
     WholeFile,
     /// only validation data (a DSS) came after it
     ValidationData,
+    /// later revisions came that only signed it again: new signatures
+    /// with their fields, widgets and appearances, empty signature fields
+    /// filled in (and validation data), all of them signed
+    SignedOnlyAgain,
     /// later revisions came, the last of them signed
     SignedAgainLater,
     /// later revisions came that no signature covers
@@ -564,11 +568,15 @@ fn collect_sig_fields(doc: &Document) -> Vec<SigDict> {
 /// verify_pdf checks every signature of the PDF `bytes`, in the order of
 /// its form's fields
 pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
-    let doc = Document::load_mem(bytes).context("can't read the PDF")?;
+    verify_doc(&load_bounded(bytes)?, bytes)
+}
+
+/// verify_doc is verify_pdf of `bytes` that were read already as `doc`
+pub fn verify_doc(doc: &Document, bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     let header = bytes.windows(5).position(|w| w == b"%PDF-").unwrap_or(0);
     let effective_len = bytes.len() - bytes.iter().rev().take_while(|b| is_ws(**b)).count();
     let mut reports = vec![];
-    for sd in collect_sig_fields(&doc) {
+    for sd in collect_sig_fields(doc) {
         let mut r = SignatureReport {
             field: sd.field.clone(),
             ..Default::default()
@@ -784,20 +792,21 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
         .collect();
     let last_covered = ends.iter().copied().max().unwrap_or(0);
     let tail_dss_only =
-        last_covered < effective_len && tail_is_validation_data(&doc, bytes, header, last_covered);
+        last_covered < effective_len && tail_is_validation_data(doc, bytes, header, last_covered);
     for r in &mut reports {
         if r.byte_range.len() != 4 || !r.checks.first().is_some_and(|c| c.1) {
             r.coverage = Coverage::Unknown;
             continue;
         }
         let end = (r.byte_range[2] + r.byte_range[3]) as usize;
+        let signed_later = last_covered >= effective_len || tail_dss_only;
         r.coverage = if end >= effective_len {
             Coverage::WholeFile
-        } else if last_covered >= effective_len {
-            Coverage::SignedAgainLater
         } else if tail_dss_only && end == last_covered {
             Coverage::ValidationData
-        } else if tail_dss_only {
+        } else if signed_later && only_signatures_after(doc, bytes, header, end) {
+            Coverage::SignedOnlyAgain
+        } else if signed_later {
             Coverage::SignedAgainLater
         } else {
             Coverage::ChangedAfterSigning
@@ -806,101 +815,135 @@ pub fn verify_pdf(bytes: &[u8]) -> Result<Vec<SignatureReport>> {
     Ok(reports)
 }
 
-/// tail_is_validation_data tells whether everything written after `from`
-/// is PAdES validation data: a DSS dictionary, VRI entries,
-/// certificates/OCSP/CRL streams and the catalog that points to them,
-/// unchanged but for its /DSS. (A heuristic.) An object the signed revision
-/// already had may only be written again if that revision's own DSS held
-/// it: otherwise a page's content stream written again under its number
-/// would pass for a certificate.
-fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: usize) -> bool {
-    use lopdf::xref::XrefEntry;
-    let in_tail = |off: u32| header + off as usize >= from;
-    // each object written after `from`, with where it starts if not in an
-    // object stream
-    let mut ids = vec![];
-    for (id, e) in &doc.reference_table.entries {
-        match e {
-            XrefEntry::Normal { offset, generation } if in_tail(*offset) => {
-                ids.push(((*id, *generation), Some(header + *offset as usize)))
-            }
-            XrefEntry::Compressed { container, .. } => {
-                if let Some(XrefEntry::Normal { offset, .. }) = doc.reference_table.get(*container)
-                {
-                    if in_tail(*offset) {
-                        ids.push(((*id, 0), None));
+/// what was written after a signature, read against the revision it
+/// signed: the objects written after `from`, each with where it starts if
+/// not in an object stream; the signed revision; and the objects the DSS of
+/// each reaches
+struct Tail {
+    ids: Vec<(ObjectId, Option<usize>)>,
+    before: Document,
+    held_then: std::collections::HashSet<ObjectId>,
+    held_now: std::collections::HashSet<ObjectId>,
+}
+
+impl Tail {
+    /// read reads what `doc`, the whole file `bytes`, wrote after `from`.
+    /// None if the signed revision can't be read, or if an object it had
+    /// is gone or points elsewhere: an update that marks a page's content
+    /// stream free changes the page as surely as one that writes it again.
+    /// lopdf reads no free entries, so the tail's own cross-reference
+    /// sections are read for them
+    fn read(doc: &Document, bytes: &[u8], header: usize, from: usize) -> Option<Tail> {
+        use lopdf::xref::XrefEntry;
+        let in_tail = |off: u32| header + off as usize >= from;
+        let mut ids = vec![];
+        for (id, e) in &doc.reference_table.entries {
+            match e {
+                XrefEntry::Normal { offset, generation } if in_tail(*offset) => {
+                    ids.push(((*id, *generation), Some(header + *offset as usize)))
+                }
+                XrefEntry::Compressed { container, .. } => {
+                    if let Some(XrefEntry::Normal { offset, .. }) =
+                        doc.reference_table.get(*container)
+                    {
+                        if in_tail(*offset) {
+                            ids.push(((*id, 0), None));
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
         }
+        let before = load_bounded(&bytes[..from]).ok()?;
+        if !before.objects.keys().all(|id| doc.objects.contains_key(id)) {
+            return None;
+        }
+        let numbers: std::collections::HashSet<u32> =
+            before.objects.keys().map(|(n, _)| *n).collect();
+        let had = |number: u32| numbers.contains(&number);
+        let kept = tail_entries(bytes, header, from)?
+            .iter()
+            .all(|&(number, entry)| {
+                let then = before.reference_table.get(number);
+                match entry {
+                    _ if number == 0 => true,
+                    TailEntry::Free => !had(number),
+                    TailEntry::Normal { offset, generation } if header + offset < from => matches!(
+                        then,
+                        Some(XrefEntry::Normal { offset: o, generation: g })
+                            if *o as usize == offset && *g == generation
+                    ),
+                    TailEntry::Compressed { container }
+                        if doc.reference_table.get(container).is_some_and(
+                            |e| !matches!(e, XrefEntry::Normal { offset, .. } if in_tail(*offset)),
+                        ) =>
+                    {
+                        matches!(
+                            then,
+                            Some(XrefEntry::Compressed { container: c, .. }) if *c == container
+                        )
+                    }
+                    _ => true,
+                }
+            });
+        if !kept {
+            return None;
+        }
+        Some(Tail {
+            ids,
+            held_then: dss_objects(&before),
+            held_now: dss_objects(doc),
+            before,
+        })
     }
-    if ids.is_empty() {
-        return false;
-    }
-    let Ok(root) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
-        return false;
-    };
-    let Ok(before) = Document::load_mem(&bytes[..from]) else {
-        return false;
-    };
-    // the catalog may only have gained (or changed) its /DSS
-    let catalog_ok = || -> bool {
-        let (Ok(now), Ok(then)) = (doc.get_dictionary(root), before.get_dictionary(root)) else {
-            return false;
-        };
-        let strip = |d: &lopdf::Dictionary| {
-            let mut d = d.clone();
-            d.remove(b"DSS");
-            format!("{d:?}")
-        };
-        now.has(b"DSS") && strip(now) == strip(then)
-    };
-    // nothing the signed revision had may have gone, nor point elsewhere:
-    // an update that marks a page's content stream free changes the page as
-    // surely as one that writes it again. lopdf reads no free entries, so
-    // the tail's own cross-reference sections are read here
-    if !before.objects.keys().all(|id| doc.objects.contains_key(id)) {
-        return false;
-    }
-    let Some(entries) = tail_entries(bytes, header, from) else {
-        return false;
-    };
-    let numbers: std::collections::HashSet<u32> = before.objects.keys().map(|(n, _)| *n).collect();
-    let had = |number: u32| numbers.contains(&number);
-    let kept = entries.iter().all(|&(number, entry)| {
-        let then = before.reference_table.get(number);
-        match entry {
-            _ if number == 0 => true,
-            TailEntry::Free => !had(number),
-            TailEntry::Normal { offset, generation } if header + offset < from => matches!(
-                then,
-                Some(lopdf::xref::XrefEntry::Normal { offset: o, generation: g })
-                    if *o as usize == offset && *g == generation
-            ),
-            TailEntry::Compressed { container }
-                if doc
-                    .reference_table
-                    .get(container)
-                    .is_some_and(|e| !matches!(e, lopdf::xref::XrefEntry::Normal { offset, .. } if header + *offset as usize >= from)) =>
+
+    /// validation_data tells whether the object `id` of `doc` (not the
+    /// catalog), written at `at`, is PAdES validation data that may be
+    /// there: a DSS dictionary, VRI entries, certificate, OCSP and CRL
+    /// streams, or a stream of objects or of cross-references. An object
+    /// the signed revision already had may only be written again if that
+    /// revision's own DSS held it, and a new one only if the DSS now holds
+    /// it: otherwise a page's content stream written again under its number
+    /// would pass for a certificate
+    fn validation_data(
+        &self,
+        doc: &Document,
+        bytes: &[u8],
+        id: ObjectId,
+        at: Option<usize>,
+    ) -> bool {
+        match doc.objects.get(&id) {
+            Some(Object::Stream(st))
+                if matches!(
+                    st.dict.get(b"Type").and_then(Object::as_name).ok(),
+                    Some(b"ObjStm") | Some(b"XRef")
+                ) =>
             {
-                matches!(
-                    then,
-                    Some(lopdf::xref::XrefEntry::Compressed { container: c, .. }) if *c == container
-                )
+                true
             }
-            _ => true,
+            Some(object) => {
+                let held = if self.before.objects.contains_key(&id) {
+                    &self.held_then
+                } else {
+                    &self.held_now
+                };
+                held.contains(&id) && validation_shape(object)
+            }
+            // the cross-reference stream itself isn't kept as an object:
+            // it's the one at `at` that says it is one, and new
+            None => !self.before.objects.contains_key(&id) && xref_stream_at(bytes, at),
         }
-    });
-    if !kept {
-        return false;
     }
-    let held_then = dss_objects(&before);
-    let held_now = dss_objects(doc);
+}
+
+/// validation_shape tells whether `object` looks like validation data: a
+/// DSS, a VRI or one of its entries, an array of references, or a stream
+/// with no /Type or /Subtype (a certificate, OCSP response or CRL)
+fn validation_shape(object: &Object) -> bool {
     let keys_within = |d: &lopdf::Dictionary, allowed: &[&[u8]]| {
         !d.is_empty() && d.iter().all(|(k, _)| allowed.contains(&k.as_slice()))
     };
-    let validation_data = |object: &Object| match object {
+    match object {
         Object::Dictionary(d) => {
             keys_within(d, &[b"Type", b"Certs", b"OCSPs", b"CRLs", b"VRI"])
                 && (d.get(b"Type").and_then(Object::as_name).ok() == Some(b"DSS")
@@ -923,47 +966,197 @@ fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: us
             st.dict.get(b"Type").and_then(Object::as_name).is_err() && !st.dict.has(b"Subtype")
         }
         _ => false,
+    }
+}
+
+/// xref_stream_at tells whether the object at `at` of `bytes` says it is a
+/// cross-reference stream
+fn xref_stream_at(bytes: &[u8], at: Option<usize>) -> bool {
+    let Some(rest) = at.and_then(|at| bytes.get(at..)) else {
+        return false;
     };
-    // the cross-reference stream itself isn't kept as an object: it's the
-    // one at `at` that says it is one
-    let xref_stream = |at: Option<usize>| {
-        let Some(at) = at else {
-            return false;
-        };
-        let Some(rest) = bytes.get(at..) else {
-            return false;
-        };
-        let head = &rest[..rest.len().min(512)];
-        let dict_end = head
-            .windows(6)
-            .position(|w| w == b"stream")
-            .unwrap_or(head.len());
-        head[..dict_end].windows(5).any(|w| w == b"/XRef")
+    let head = &rest[..rest.len().min(512)];
+    let dict_end = head
+        .windows(6)
+        .position(|w| w == b"stream")
+        .unwrap_or(head.len());
+    head[..dict_end].windows(5).any(|w| w == b"/XRef")
+}
+
+/// without is `d` as a string to compare, without the keys `keys`
+fn without(d: &lopdf::Dictionary, keys: &[&[u8]]) -> String {
+    let mut d = d.clone();
+    for key in keys {
+        d.remove(key);
+    }
+    format!("{d:?}")
+}
+
+/// tail_is_validation_data tells whether everything written after `from`
+/// is PAdES validation data (see Tail::validation_data) and the catalog
+/// that points to it, unchanged but for its /DSS. (A heuristic.)
+fn tail_is_validation_data(doc: &Document, bytes: &[u8], header: usize, from: usize) -> bool {
+    let Some(tail) = Tail::read(doc, bytes, header, from) else {
+        return false;
     };
-    ids.iter().all(|&(id, at)| {
-        if id == root {
-            return catalog_ok();
+    let Ok(root) = doc.trailer.get(b"Root").and_then(Object::as_reference) else {
+        return false;
+    };
+    // the catalog may only have gained (or changed) its /DSS
+    let catalog_ok = || match (doc.get_dictionary(root), tail.before.get_dictionary(root)) {
+        (Ok(now), Ok(then)) => {
+            now.has(b"DSS") && without(now, &[b"DSS"]) == without(then, &[b"DSS"])
         }
-        match doc.objects.get(&id) {
-            Some(Object::Stream(st))
-                if matches!(
-                    st.dict.get(b"Type").and_then(Object::as_name).ok(),
-                    Some(b"ObjStm") | Some(b"XRef")
-                ) =>
-            {
-                true
+        _ => false,
+    };
+    !tail.ids.is_empty()
+        && tail.ids.iter().all(|&(id, at)| {
+            if id == root {
+                catalog_ok()
+            } else {
+                tail.validation_data(doc, bytes, id, at)
             }
-            Some(object) => {
-                let held = if before.objects.contains_key(&id) {
-                    &held_then
-                } else {
-                    &held_now
+        })
+}
+
+/// only_signatures_after tells whether everything written after `from`
+/// only signs the PDF again, as Blank's countersigning and other signers
+/// write it: new signature fields with their widgets, appearances (and
+/// what those draw with) and signature values; empty signature fields of
+/// the PDF filled in (their /V, the widget's /AP, /F and /AS); the pages'
+/// /Annots and the form's /Fields grown by signature widgets and fields
+/// only; the form's /SigFlags; the catalog's /AcroForm and /DSS; and
+/// validation data. Anything else that changed (a field's value, a page's
+/// content, an annotation that isn't a signature's) makes it false.
+/// An object the signed revision had that is none of these passes as
+/// validation data only as tail_is_validation_data lets it. (A heuristic,
+/// as tail_is_validation_data.)
+fn only_signatures_after(doc: &Document, bytes: &[u8], header: usize, from: usize) -> bool {
+    let Some(tail) = Tail::read(doc, bytes, header, from) else {
+        return false;
+    };
+    let prev = &tail.before;
+    let root_of = |doc: &Document| doc.trailer.get(b"Root").and_then(Object::as_reference).ok();
+    let Some(root) = root_of(doc).filter(|root| root_of(prev) == Some(*root)) else {
+        return false;
+    };
+    let name = |d: &lopdf::Dictionary, key: &[u8]| -> Option<Vec<u8>> {
+        d.get(key)
+            .and_then(Object::as_name)
+            .ok()
+            .map(<[u8]>::to_vec)
+    };
+    let dict_in = |doc: &'_ Document, o: &Object| -> Option<lopdf::Dictionary> {
+        resolve(doc, o).and_then(|o| o.as_dict().ok()).cloned()
+    };
+    // a signature field: /FT /Sig, its own or, for a widget, its parent's
+    let is_signature = |doc: &Document, d: &lopdf::Dictionary| {
+        name(d, b"FT").as_deref() == Some(b"Sig")
+            || d.get(b"Parent")
+                .ok()
+                .and_then(|p| dict_in(doc, p))
+                .is_some_and(|p| name(&p, b"FT").as_deref() == Some(b"Sig"))
+    };
+    let is_signature_widget = |o: &Object| {
+        dict_in(doc, o).is_some_and(|d| {
+            name(&d, b"Subtype").as_deref() == Some(b"Widget") && is_signature(doc, &d)
+        })
+    };
+    let is_signature_field =
+        |o: &Object| dict_in(doc, o).is_some_and(|d| name(&d, b"FT").as_deref() == Some(b"Sig"));
+    // `now` is `before` with entries added at its end, each `added_ok`
+    let grown =
+        |now: Option<&Object>, before: Option<&Object>, added_ok: &dyn Fn(&Object) -> bool| {
+            let list = |doc: &'_ Document, o: Option<&Object>| -> Option<Vec<Object>> {
+                match o {
+                    None => Some(vec![]),
+                    Some(o) => resolve(doc, o).and_then(|o| o.as_array().ok()).cloned(),
+                }
+            };
+            let (Some(now), Some(before)) = (list(doc, now), list(prev, before)) else {
+                return false;
+            };
+            now.len() >= before.len()
+                && format!("{:?}", &now[..before.len()]) == format!("{before:?}")
+                && now[before.len()..].iter().all(added_ok)
+        };
+    // the form: as it was but for its /Fields, grown by signature fields,
+    // and its /SigFlags
+    let form_ok = |now: Option<&Object>, before: Option<&Object>| {
+        let now = now.and_then(|o| dict_in(doc, o)).unwrap_or_default();
+        let before = before.and_then(|o| dict_in(prev, o)).unwrap_or_default();
+        without(&now, &[b"Fields", b"SigFlags"]) == without(&before, &[b"Fields", b"SigFlags"])
+            && grown(
+                now.get(b"Fields").ok(),
+                before.get(b"Fields").ok(),
+                &is_signature_field,
+            )
+    };
+    let prev_catalog = prev.get_dictionary(root).ok();
+    let reference = |d: Option<&lopdf::Dictionary>, key: &[u8]| {
+        d.and_then(|d| d.get(key).ok())
+            .and_then(|o| o.as_reference().ok())
+    };
+    let prev_form_id = reference(prev_catalog, b"AcroForm");
+    let prev_form = prev_form_id.and_then(|id| prev.get_dictionary(id).ok());
+    let prev_fields_id = reference(
+        prev_form
+            .or(prev_catalog.and_then(|c| c.get(b"AcroForm").ok().and_then(|f| f.as_dict().ok()))),
+        b"Fields",
+    );
+    let prev_pages: Vec<ObjectId> = prev.get_pages().into_values().collect();
+    let prev_annots: Vec<ObjectId> = prev_pages
+        .iter()
+        .filter_map(|page| reference(prev.get_dictionary(*page).ok(), b"Annots"))
+        .collect();
+    // an empty signature field (or its widget) the PDF had
+    let empty_signature = |d: &lopdf::Dictionary| is_signature(prev, d) && !d.has(b"V");
+
+    !tail.ids.is_empty()
+        && tail.ids.iter().all(|&(id, at)| {
+            let id = &id;
+            let now = doc.objects.get(id);
+            // new objects count only through what refers to them, which
+            // is checked here
+            let Some(before) = prev.objects.get(id) else {
+                return true;
+            };
+            let (Some(Object::Dictionary(now_dict)), Object::Dictionary(before_dict)) =
+                (now, before)
+            else {
+                return match (now, before) {
+                    (Some(Object::Array(_)), Object::Array(_)) if prev_annots.contains(id) => {
+                        grown(now, Some(before), &is_signature_widget)
+                    }
+                    (Some(Object::Array(_)), Object::Array(_)) if prev_fields_id == Some(*id) => {
+                        grown(now, Some(before), &is_signature_field)
+                    }
+                    _ => tail.validation_data(doc, bytes, *id, at),
                 };
-                held.contains(&id) && validation_data(object)
+            };
+            if *id == root {
+                without(now_dict, &[b"AcroForm", b"DSS"])
+                    == without(before_dict, &[b"AcroForm", b"DSS"])
+                    && form_ok(
+                        now_dict.get(b"AcroForm").ok(),
+                        before_dict.get(b"AcroForm").ok(),
+                    )
+            } else if prev_form_id == Some(*id) {
+                form_ok(now, Some(before))
+            } else if prev_pages.contains(id) {
+                without(now_dict, &[b"Annots"]) == without(before_dict, &[b"Annots"])
+                    && grown(
+                        now_dict.get(b"Annots").ok(),
+                        before_dict.get(b"Annots").ok(),
+                        &is_signature_widget,
+                    )
+            } else if empty_signature(before_dict) {
+                let filled: &[&[u8]] = &[b"V", b"AP", b"F", b"AS"];
+                without(now_dict, filled) == without(before_dict, filled)
+            } else {
+                tail.validation_data(doc, bytes, *id, at)
             }
-            None => !before.objects.contains_key(&id) && xref_stream(at),
-        }
-    })
+        })
 }
 
 /// an entry of a cross-reference section, as written
@@ -983,6 +1176,10 @@ enum TailEntry {
 /// what a cross-reference section holds: its entries by number, and where
 /// the sections it points to start (/Prev, /XRefStm)
 type Section = (Vec<(u32, TailEntry)>, Vec<usize>);
+
+/// how long a cross-reference stream may be, decompressed: 7 bytes an entry
+/// for over two million objects
+const MAX_XREF_STREAM: usize = 16 << 20;
 
 /// how many sections an update's chain of cross-references may have
 const MAX_SECTIONS: usize = 256;
@@ -1091,7 +1288,7 @@ fn xref_stream(section: &[u8]) -> Option<Section> {
         )
         .as_bytes(),
     );
-    let doc = Document::load_mem(&pdf).ok()?;
+    let doc = load_bounded(&pdf).ok()?;
     let stream = doc.get_object((1, 0)).ok()?.as_stream().ok()?;
     let dict = &stream.dict;
     if dict.get(b"Type").and_then(Object::as_name).ok() != Some(b"XRef") {
@@ -1113,7 +1310,9 @@ fn xref_stream(section: &[u8]) -> Option<Section> {
     }
     let index = integers(b"Index").unwrap_or_else(|| vec![0, size]);
     let content = if dict.has(b"Filter") {
-        stream.decompressed_content().ok()?
+        stream
+            .decompressed_content_with_limit(MAX_XREF_STREAM)
+            .ok()?
     } else {
         stream.content.clone()
     };

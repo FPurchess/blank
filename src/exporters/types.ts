@@ -14,6 +14,9 @@ export interface ExportContext {
   pages?: number[];
   // for a signed PDF: the signature block to fill in
   signed?: SignedBlock;
+  // for a signed PDF: the positions of the other signature blocks, whose
+  // boxes the result gives
+  others?: number[];
 }
 
 export interface ExportResult {
@@ -25,6 +28,9 @@ export interface ExportResult {
   // for a signed PDF: where the filled in signature block is, in points
   // from the top left of its page (counted from 0)
   signatureBox?: PageBox;
+  // where the blocks of `others` are, in their order, the same way; null
+  // for one the PDF doesn't show
+  otherBoxes?: (PageBox | null)[];
 }
 
 export type exporterFunc = (

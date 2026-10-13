@@ -60,6 +60,10 @@ pub struct Text {
     /// center, right or justify, none for left (see `alignment_of`)
     #[serde(default)]
     pub align: Option<String>,
+    /// the size of its letters in points instead of its style's, with its
+    /// lines as much taller, e.g. a stamp's; the webview never sends it
+    #[serde(skip)]
+    pub size: Option<f32>,
 }
 
 /// an entry of a table of contents: a heading's level and text
@@ -337,6 +341,33 @@ pub enum Content {
         #[serde(default)]
         share: Option<f32>,
     },
+    /// a stamp placed on a PDF's page: an image, e.g. the user's signature
+    /// or initials, contained in the page, and lines of text under it.
+    /// Only a stamp engine's page (`Settings::stamp`) holds one; it isn't
+    /// text of the document, so the PDF tags it as an artifact
+    Stamp {
+        pos: u32,
+        /// the image, empty for none
+        #[serde(default)]
+        src: String,
+        /// the image's size in points, for its shape; 0 while it isn't
+        /// loaded
+        #[serde(default)]
+        width: f32,
+        #[serde(default)]
+        height: f32,
+        #[serde(default)]
+        alt: String,
+        #[serde(default)]
+        lines: Vec<String>,
+        /// the size of the lines' letters, in points; 0 for the body's
+        #[serde(default)]
+        size: f32,
+        /// "center" centres the image and the lines, anything else sets the
+        /// lines at the left
+        #[serde(default)]
+        align: Option<String>,
+    },
     Image {
         pos: u32,
         src: String,
@@ -613,6 +644,10 @@ pub struct Settings {
     pub start_number: i64,
     #[serde(default)]
     pub fields: Fields,
+    /// the page is a stamp's box (see `Content::Stamp`): as small as
+    /// MIN_STAMP, without margins, headers or footers
+    #[serde(default)]
+    pub stamp: bool,
 }
 
 fn arabic() -> String {
@@ -670,6 +705,8 @@ fn finite(value: f32, fallback: f32, min: f32, max: f32) -> f32 {
 /// and the largest page a PDF can have (200 inches)
 pub const MIN_PAGE: f32 = 36.0;
 pub const MAX_PAGE: f32 = 14_400.0;
+/// the smallest page of a stamp, in points: a stamp may be tiny
+pub const MIN_STAMP: f32 = 2.0;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -692,6 +729,7 @@ impl Default for Settings {
             number_style: arabic(),
             start_number: 1,
             fields: Fields::default(),
+            stamp: false,
         }
     }
 }
@@ -699,11 +737,22 @@ impl Default for Settings {
 impl Settings {
     /// the settings as the engine can lay out with them, whatever JS handed
     /// over: a page of MIN_PAGE to MAX_PAGE points, margins that leave
-    /// MIN_PAGE of it for the text, and a number style it knows
+    /// MIN_PAGE of it for the text, and a number style it knows; a stamp's
+    /// page from MIN_STAMP on, without margins or bands
     pub fn sanitize(&mut self) {
         let default = Settings::default();
-        self.width = finite(self.width, default.width, MIN_PAGE, MAX_PAGE);
-        self.height = finite(self.height, default.height, MIN_PAGE, MAX_PAGE);
+        let min = if self.stamp { MIN_STAMP } else { MIN_PAGE };
+        self.width = finite(self.width, default.width, min, MAX_PAGE);
+        self.height = finite(self.height, default.height, min, MAX_PAGE);
+        if self.stamp {
+            // the stamp is the whole page
+            self.margins = Margins::default();
+            self.header = Slots::default();
+            self.footer = Slots::default();
+            self.first_page = FirstPage::default();
+            self.even_pages = None;
+            self.new_page_before.clear();
+        }
         let margins = &mut self.margins;
         for margin in [
             &mut margins.top,
@@ -715,7 +764,7 @@ impl Settings {
         }
         // opposite margins shrink alike until the text has its room
         let fit = |a: &mut f32, b: &mut f32, size: f32| {
-            let room = size - MIN_PAGE;
+            let room = size - min;
             if *a + *b > room {
                 let scale = room / (*a + *b);
                 *a *= scale;
@@ -752,6 +801,7 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Signature { pos, .. }
+            | Content::Stamp { pos, .. }
             | Content::Image { pos, .. } => *pos,
             Content::Table { pos, .. } => *pos,
         }
@@ -766,6 +816,7 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Signature { pos, .. }
+            | Content::Stamp { pos, .. }
             | Content::Image { pos, .. } => pos.saturating_add(1),
             Content::Table { end, .. } => *end,
         }
@@ -817,6 +868,7 @@ impl Item {
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
             | Content::Signature { pos, .. }
+            | Content::Stamp { pos, .. }
             | Content::Image { pos, .. } => moved(pos),
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
@@ -903,6 +955,22 @@ impl Item {
                 truncate(hint, MAX_LABEL);
                 clamp_share(share);
             }
+            Content::Stamp {
+                width,
+                height,
+                alt,
+                lines,
+                size,
+                ..
+            } => {
+                image_size(width, height);
+                truncate(alt, MAX_LABEL);
+                lines.truncate(MAX_SIGNATURE_LINES);
+                for line in lines {
+                    truncate(line, MAX_LABEL);
+                }
+                *size = finite(*size, 0.0, 0.0, MAX_STAMP_SIZE);
+            }
             Content::Toc {
                 title,
                 depth,
@@ -982,6 +1050,8 @@ pub const MAX_LABEL: usize = 500;
 pub const MAX_TOC_ENTRIES: usize = 10_000;
 /// the lines a signature block has under its line, at most
 pub const MAX_SIGNATURE_LINES: usize = 8;
+/// the largest letters of a stamp, in points
+pub const MAX_STAMP_SIZE: f32 = 288.0;
 
 /// cuts `text` to at most `max` characters
 fn truncate(text: &mut String, max: usize) {
@@ -1168,7 +1238,15 @@ mod tests {
         .unwrap();
         let items: Vec<Item> = serde_json::from_value(sent["items"].clone()).unwrap();
         let settings: Settings = serde_json::from_value(sent["settings"].clone()).unwrap();
-        let read = serde_json::json!({ "items": items, "settings": settings });
+        // and what a stamp engine gets (src/pdf/stampEngine.ts)
+        let stamp = &sent["stamp"];
+        let stamp_items: Vec<Item> = serde_json::from_value(stamp["items"].clone()).unwrap();
+        let stamp_settings: Settings = serde_json::from_value(stamp["settings"].clone()).unwrap();
+        let read = serde_json::json!({
+            "items": items,
+            "settings": settings,
+            "stamp": { "items": stamp_items, "settings": stamp_settings },
+        });
         let (mut wanted, mut found) = (Vec::new(), Vec::new());
         keys(&sent, "", &mut wanted);
         keys(&read, "", &mut found);
@@ -1184,5 +1262,30 @@ mod tests {
             "keys the engine doesn't read: {missing:?}"
         );
         assert!(items.iter().any(|item| item.bars_continue));
+        assert!(stamp_settings.stamp);
+        assert!(matches!(stamp_items[0].content, Content::Stamp { .. }));
+    }
+
+    #[test]
+    fn a_stamp_page_is_its_box() {
+        let mut settings = Settings {
+            width: 1.0,
+            height: 30.0,
+            stamp: true,
+            ..Settings::default()
+        };
+        settings.header.left = "{title}".into();
+        settings.sanitize();
+        assert_eq!((settings.width, settings.height), (MIN_STAMP, 30.0));
+        assert_eq!(settings.margins, Margins::default());
+        assert!(!settings.header.has_text());
+        assert_eq!(settings.content_width(), MIN_STAMP);
+        // a document's page keeps its least size and margins
+        let mut page = Settings {
+            width: 1.0,
+            ..Settings::default()
+        };
+        page.sanitize();
+        assert_eq!(page.width, MIN_PAGE);
     }
 }
