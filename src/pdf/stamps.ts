@@ -1,4 +1,5 @@
 import type { Mark, SavedMark } from "../signing/profile";
+import { SIGNATURE_IMAGE } from "../engine/flatten";
 
 // A stamp placed on a PDF's page: the user's signature or initials, lines
 // of text (a date, a place), or both. Blank's layout engine lays each out
@@ -25,10 +26,11 @@ export const LINE_SIZE = 11;
 export const STAMPS_NEED_LAYOUT =
   "Stamps need the page layout, which isn't running. Restart Blank to place them.";
 
-// the src the engine knows a mark's PNG by
+// the src the engine knows a mark's PNG by: the signature by the name a
+// signed export's block shows it by (SIGNATURE_IMAGE)
 export const MARK_SRC: Record<Mark, string> = {
-  signature: "blank-signing:signature",
-  initials: "blank-signing:initials",
+  signature: SIGNATURE_IMAGE,
+  initials: "blank:initials",
 };
 
 // what a screen reader would call the image, were a stamp's text read

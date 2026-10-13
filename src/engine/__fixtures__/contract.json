@@ -632,7 +632,7 @@
       {
         "kind": "stamp",
         "pos": 0,
-        "src": "blank-signing:initials",
+        "src": "blank:initials",
         "width": 60,
         "height": 30,
         "alt": "Initials",
