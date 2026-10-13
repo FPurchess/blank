@@ -10,8 +10,9 @@ runs:
   using: composite
   steps:
     # `webkit2gtk-driver` (`webkitgtk-webdriver` from Ubuntu 26.04 on) provides
-    # WebKitWebDriver, `xvfb` a virtual display, and `xclip` the X selection the
-    # middle-click paste spec sets
+    # WebKitWebDriver, `xvfb` a virtual display, `xclip` the X selection the
+    # middle-click paste spec sets, and `poppler-utils` the pdftotext the PDF
+    # spec reads a signed PDF's text with
     - name: install system dependencies
       shell: bash
       run: |
@@ -32,6 +33,7 @@ runs:
           "$driver" \
           xclip \
           xvfb \
+          poppler-utils \
           ${{ inputs.ffmpeg == 'true' && 'ffmpeg' || '' }}
         # the desktop portal is registered with D-Bus but never comes up on the runner, so WebKitGTK
         # and tao wait for its timeouts (~30s) on every app start. Without the service file, the

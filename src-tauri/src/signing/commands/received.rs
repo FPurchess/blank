@@ -141,18 +141,20 @@ fn words(pdf: &Path) -> Vec<Word> {
 }
 
 /// pdfsig_valid tells how many signatures of `pdf` pdfsig calls valid, and
-/// how many it found
+/// how many it found. Its HOME is `dir`, so it finds no NSS database of the
+/// user's and checks without one (poppler 22.02, CI's, leaves NSS unset on an
+/// empty -nssdir), and it counts "Signature #n:", which every poppler prints
 fn pdfsig_valid(dir: &Path, pdf: &Path) -> (usize, usize) {
-    let nss = dir.join("nss");
-    std::fs::create_dir_all(&nss).unwrap();
     let out = Command::new("pdfsig")
-        .arg("-nssdir")
-        .arg(&nss)
+        .env("HOME", dir)
         .arg(pdf)
         .output()
         .unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
-    let found = text.matches("Signature Field Name").count();
+    let found = text
+        .lines()
+        .filter(|line| line.starts_with("Signature #") && line.ends_with(':'))
+        .count();
     let valid = text
         .matches("Signature Validation: Signature is Valid")
         .count();
