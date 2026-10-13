@@ -16,6 +16,7 @@ import AboutSection from "./AboutSection.vue";
 import AppearanceSection from "./AppearanceSection.vue";
 import { enterInField, SECTIONS } from "./settingsModel";
 import ShortcutsSection from "./ShortcutsSection.vue";
+import SigningSection from "./SigningSection.vue";
 import SpellingSection from "./SpellingSection.vue";
 import WritingSection from "./WritingSection.vue";
 
@@ -107,6 +108,7 @@ onMounted(async () => {
         <WritingSection v-else-if="shown === 'writing'" />
         <SpellingSection v-else-if="shown === 'spelling'" />
         <ShortcutsSection v-else-if="shown === 'shortcuts'" />
+        <SigningSection v-else-if="shown === 'signing'" />
         <AboutSection v-else />
       </div>
     </div>

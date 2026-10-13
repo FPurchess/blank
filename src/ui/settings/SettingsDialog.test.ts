@@ -9,6 +9,8 @@ import {
   language,
   settingsDialog,
   settingsSection,
+  signatureDialog,
+  signingCertificate,
   spellcheck,
   theme,
 } from "../../state";
@@ -69,7 +71,8 @@ const open = async (section?: Parameters<typeof showSection>[0]) => {
   if (section) await showSection(section);
 };
 const showSection = async (
-  key: "appearance" | "writing" | "spelling" | "shortcuts" | "about",
+  key:
+    "appearance" | "writing" | "spelling" | "shortcuts" | "signing" | "about",
 ) => {
   tab(key).click();
   await settle();
@@ -88,6 +91,8 @@ beforeEach(async () => {
 afterEach(() => {
   dispose();
   settingsDialog.value = null;
+  signatureDialog.value = null;
+  signingCertificate.value = undefined;
   config.value = defaults;
   theme.value = "light";
   spellcheck.value = false;
@@ -596,6 +601,98 @@ describe("the settings dialog", () => {
           (row) => row.dataset.command,
         ),
       ).toEqual([C.APP_SETTINGS]);
+    });
+  });
+
+  describe("Signing", () => {
+    it("offers to add the signature and initials", async () => {
+      await open("signing");
+      expect(row("signature").textContent).toContain(
+        "Draw it, type it, or take a picture of it on paper",
+      );
+      button("Add…", row("initials")).click();
+      await settle();
+      expect(signatureDialog.value?.mark).toBe("initials");
+    });
+
+    it("gets the focus back once the signature's dialog above it closes", async () => {
+      await open("signing");
+      const add = button("Add…", row("signature"));
+      add.click();
+      await settle();
+      document
+        .querySelector("#signature-dialog form")!
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await settle();
+      expect(signatureDialog.value).toBeNull();
+      expect(document.activeElement).toBe(add);
+      expect(dialog()!.contains(document.activeElement)).toBe(true);
+    });
+
+    it("saves the name under the signature", async () => {
+      await open("signing");
+      const input = panel().querySelector<HTMLInputElement>(
+        "#settings-signing-name",
+      )!;
+      await type(input, " Ada Lovelace ");
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await settle();
+      expect(written()).toEqual({ signing: { name: "Ada Lovelace" } });
+      expect(announcement.value?.text).toBe("Your name is Ada Lovelace");
+    });
+
+    it("offers to make or import a certificate, and takes a timestamp server", async () => {
+      await open("signing");
+      expect(button("Create…", row("certificate"))).toBeDefined();
+      expect(button("Import…", row("certificate"))).toBeDefined();
+      const input = panel().querySelector<HTMLInputElement>(
+        "#settings-timestamp",
+      )!;
+      await type(input, "timestamp");
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await settle();
+      expect(panel().textContent).toContain("Enter a web address");
+      expect(files[CONFIG]).toBeUndefined();
+      // an empty field offers a server
+      await type(input, "");
+      button("Use DigiCert", row("timestamp")).click();
+      await settle();
+      expect(input.value).toBe("http://timestamp.digicert.com");
+      expect(written()).toEqual({
+        signing: { timestampServer: "http://timestamp.digicert.com" },
+      });
+    });
+
+    it("shows the certificate with its fingerprint", async () => {
+      signingCertificate.value = {
+        name: "Ada Lovelace",
+        issuer: "Ada Lovelace",
+        notBefore: "2026-10-08",
+        notAfter: "2031-10-08T00:00:00Z",
+        selfSigned: true,
+        fingerprint: "ABCD".repeat(16),
+      };
+      await open("signing");
+      expect(row("certificate").textContent).toContain(
+        "Made by Blank, valid until 2031-10-08",
+      );
+      expect(row("fingerprint").textContent).toContain("ABCD ABCD");
+    });
+
+    it("writes the date as chosen, shown in the document's language", async () => {
+      language.value = "de";
+      await open("signing");
+      const options = [
+        ...row("date-format").querySelectorAll<HTMLButtonElement>("button"),
+      ];
+      expect(options.map((option) => option.textContent!.trim())).toEqual([
+        "8. Oktober 2026",
+        "08.10.2026",
+        "2026-10-08",
+      ]);
+      options[1].click();
+      await settle();
+      expect(written()).toEqual({ signing: { dateFormat: "short" } });
     });
   });
 

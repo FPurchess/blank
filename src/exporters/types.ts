@@ -1,6 +1,8 @@
 import { EditorState } from "prosemirror-state";
 
 import type { Layout } from "../layout/resolve";
+import type { PageBox } from "../engine/boxes";
+import type { SignedBlock } from "../engine/flatten";
 
 export interface ExportContext {
   // path of the document, to resolve relative images; null if unsaved
@@ -10,6 +12,8 @@ export interface ExportContext {
   // the pages to export, by their index, if not all (a PDF of the pages
   // chosen to print)
   pages?: number[];
+  // for a signed PDF: the signature block to fill in
+  signed?: SignedBlock;
 }
 
 export interface ExportResult {
@@ -18,6 +22,9 @@ export interface ExportResult {
   warnings: string[];
   // the number of pages written, if the format has a fixed one
   pages?: number;
+  // for a signed PDF: where the filled in signature block is, in points
+  // from the top left of its page (counted from 0)
+  signatureBox?: PageBox;
 }
 
 export type exporterFunc = (

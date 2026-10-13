@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod fonts;
+mod http;
 mod logging;
 #[cfg(target_os = "macos")]
 mod menu;
@@ -7,6 +8,7 @@ pub mod open;
 pub mod primary;
 pub mod print;
 pub mod session;
+pub mod signing;
 pub mod spellcheck;
 
 use tauri::Manager;
@@ -93,6 +95,13 @@ pub fn run() {
             open::take_open_paths,
             open::canonical_path,
             session::session_lock,
+            signing::commands::signing_certificate,
+            signing::commands::signing_create_certificate,
+            signing::commands::signing_import,
+            signing::commands::signing_export,
+            signing::commands::signing_remove,
+            signing::commands::signing_check_passphrase,
+            signing::commands::signing_sign_pdf,
         ])
         .build(context)
         .expect("error while building tauri application")

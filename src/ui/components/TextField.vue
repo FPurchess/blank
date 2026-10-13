@@ -22,6 +22,8 @@ const props = defineProps<{
   // the id of the message that says what is wrong with the value, while
   // something is
   errorId?: string;
+  // "password" hides what is typed, e.g. a passphrase
+  type?: "text" | "password" | "email" | "url";
 }>();
 const value = defineModel<string>({ required: true });
 const emit = defineEmits<{ input: [] }>();
@@ -30,7 +32,7 @@ const input = useTemplateRef<HTMLInputElement>("input");
 // the field's attributes, the same with or without something next to it
 const attributes = computed(() => ({
   id: props.id,
-  type: "text",
+  type: props.type ?? "text",
   autocomplete: "off",
   spellcheck: false,
   placeholder: props.placeholder,

@@ -320,6 +320,7 @@
                   "width": 120,
                   "height": 80,
                   "alt": "an image",
+                  "share": 0.5,
                   "indent": 0,
                   "bars": []
                 },
@@ -401,8 +402,27 @@
       "barsContinue": false
     },
     {
+      "kind": "signature",
+      "pos": 207,
+      "src": "blank:signature",
+      "width": 120,
+      "height": 80,
+      "alt": "Signature of Ann Example, Tenant",
+      "lines": [
+        "Ann Example · Tenant",
+        "Berlin, 8 October 2026"
+      ],
+      "hint": "Signature",
+      "share": 0.75,
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
+    },
+    {
       "kind": "text",
-      "pos": 210,
+      "pos": 211,
       "text": "Ann Example",
       "spans": [],
       "style": "p",
@@ -423,7 +443,7 @@
     },
     {
       "kind": "text",
-      "pos": 223,
+      "pos": 224,
       "text": "Long Street 12",
       "spans": [],
       "style": "p",
@@ -442,7 +462,7 @@
     },
     {
       "kind": "text",
-      "pos": 241,
+      "pos": 242,
       "text": "Bea · Hill Road 3",
       "spans": [],
       "style": "small",
@@ -462,7 +482,7 @@
     },
     {
       "kind": "text",
-      "pos": 262,
+      "pos": 263,
       "text": "",
       "spans": [],
       "style": "h1",
@@ -478,7 +498,7 @@
     },
     {
       "kind": "text",
-      "pos": 266,
+      "pos": 267,
       "text": "",
       "spans": [],
       "style": "p",
@@ -509,7 +529,7 @@
     },
     {
       "kind": "text",
-      "pos": 270,
+      "pos": 271,
       "text": "a note",
       "spans": [],
       "style": "p",
@@ -534,6 +554,22 @@
         ],
         "gap": 17.007874015748033
       }
+    },
+    {
+      "kind": "image",
+      "pos": 280,
+      "src": "blank-vector:diagram:dabf6fd8-22",
+      "width": 120,
+      "height": 80,
+      "alt": "",
+      "align": "center",
+      "share": 0.75,
+      "caption": "A diagram",
+      "indent": 0,
+      "before": 0,
+      "after": 8,
+      "bars": [],
+      "barsContinue": false
     }
   ],
   "settings": {

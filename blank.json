@@ -17,6 +17,8 @@
     "insert.table": "Mod-t",
     "insert.page_break": "Mod-Enter",
     "insert.block": "Mod-Alt-b",
+    "block.settings": "Shift-Enter",
+    "insert.signature": "",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",
@@ -42,6 +44,9 @@
     "tab.move_right": "Ctrl-Shift-PageDown",
     "export.pdf": "Mod-Alt-p",
     "export.docx": "Mod-Alt-w",
+    "export.signed_pdf": "Mod-Alt-Shift-p",
+    "signing.signature": "",
+    "signing.initials": "",
     "theme.cycle": "Mod-Alt-t",
     "language.choose": "Mod-Alt-l",
     "spellcheck.toggle": "Mod-Alt-s",
@@ -99,5 +104,10 @@
       "orientation": "portrait",
       "margins": "2.5cm"
     }
+  },
+  "signing": {
+    "name": "",
+    "dateFormat": "long",
+    "timestampServer": ""
   }
 }

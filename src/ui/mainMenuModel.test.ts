@@ -56,7 +56,7 @@ describe("recentForMenu", () => {
 });
 
 describe("mainMenuItems", () => {
-  it("has File in its order, with Open recent and Export as submenus", () => {
+  it("has File in its order, with Open recent and Export, signed PDF included, as submenus", () => {
     const lines = mainMenuItems(deps());
     const ids = lines.filter(isEntry).map((line) => line.id);
     expect(ids.slice(0, FILE_COMMANDS.length)).toEqual([
@@ -72,7 +72,7 @@ describe("mainMenuItems", () => {
       entry(lines, "file.export")
         .children!.filter(isEntry)
         .map(({ id }) => id),
-    ).toEqual([C.EXPORT_PDF, C.EXPORT_DOCX]);
+    ).toEqual([C.EXPORT_PDF, C.EXPORT_DOCX, C.EXPORT_SIGNED_PDF]);
   });
 
   it("lists the recent files with their folders, or that there are none", () => {

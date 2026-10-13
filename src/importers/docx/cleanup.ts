@@ -8,7 +8,8 @@ import {
   HORIZONTAL_LINE_CLASS,
   PAGE_BREAK_CLASS,
   TABLE_HEADING_CLASS,
-  TOC_CLASS,
+  ATOM_CLASS,
+  DIAGRAM_CLASS,
   EMBED_CLASS,
   FORM_CLASS,
 } from "./styleMap";
@@ -231,14 +232,15 @@ const emptyParagraphs = (doc: Document) => {
 };
 
 /**
- * tocs turns the marker paragraphs of tables of contents (see toc.ts) into
- * the element the schema reads one from. Before `links`: the entries of a
+ * atoms turns the marker paragraphs of blocks of one line (tables of
+ * contents, see toc.ts, and signature blocks, see signatures.ts) into the
+ * element the schema reads one from. Before `links`: the entries of a
  * table of contents are gone by then, and with them their links to the
  * headings' bookmarks, which `links` would unwrap.
  */
-const tocs = (doc: Document) => {
+const atoms = (doc: Document) => {
   const serializer = DOMSerializer.fromSchema(schema);
-  doc.querySelectorAll(`p.${TOC_CLASS}`).forEach((paragraph) => {
+  doc.querySelectorAll(`p.${ATOM_CLASS}`).forEach((paragraph) => {
     const atom = readAtom(paragraph.textContent ?? "");
     if (atom) {
       const node = schema.nodes[atom.node].create(atom.attrs);
@@ -291,6 +293,29 @@ const embeds = (doc: Document) => {
     figure.dataset.blankEmbed = node.textContent ?? "";
     node.replaceWith(figure);
   }
+  // a diagram: its settings on the figure, its source in it, as the schema
+  // reads a pasted one
+  for (const node of [...doc.querySelectorAll(`p.${DIAGRAM_CLASS}`)]) {
+    let read: { source?: unknown; attrs?: unknown } = {};
+    try {
+      read = JSON.parse(node.textContent ?? "") as typeof read;
+    } catch {
+      // broken: no diagram
+    }
+    if (typeof read.source !== "string") {
+      node.remove();
+      continue;
+    }
+    const figure = doc.createElement("figure");
+    figure.dataset.blankDiagram = JSON.stringify(read.attrs ?? {});
+    const pre = doc.createElement("pre");
+    pre.dataset.blankSource = "diagram";
+    const code = doc.createElement("code");
+    code.textContent = read.source;
+    pre.append(code);
+    figure.append(pre);
+    node.replaceWith(figure);
+  }
 };
 
 /**
@@ -315,7 +340,7 @@ export const cleanup = (doc: Document): CleanupReport => {
   // first, so the markers' text counts nowhere, e.g. as an empty
   // paragraph's
   alignments(doc);
-  tocs(doc);
+  atoms(doc);
   forms(doc);
   embeds(doc);
   codeLineBreaks(doc);

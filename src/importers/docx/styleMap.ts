@@ -1,9 +1,9 @@
 import { STYLE_NAMES } from "../../exporters/docx/styleNames";
 import { PAGE_BREAK_STYLE } from "./pageBreaks";
-import { TOC_STYLE } from "./toc";
 import { FORM_STYLE } from "./forms";
-import { EMBED_STYLE } from "./embeds";
+import { DIAGRAM_STYLE, EMBED_STYLE } from "./embeds";
 import { ALIGN_CLASS, alignStyle, WORD_ALIGNMENTS } from "./align";
+import { ATOM_STYLE } from "./xml";
 
 // How the styles of Word, LibreOffice, pandoc and Blank's own Word export
 // (src/exporters/docx/template.ts) map to the HTML the markdown schema reads.
@@ -14,11 +14,13 @@ import { ALIGN_CLASS, alignStyle, WORD_ALIGNMENTS } from "./align";
 // marks the paragraphs pageBreaks.ts puts where a new page starts
 export const PAGE_BREAK_CLASS = "blank-page-break";
 // a table of contents, see toc.ts
-export const TOC_CLASS = "blank-toc";
+export const ATOM_CLASS = "blank-atom";
 // where a form or a field starts or a form ends, see forms.ts
 export const FORM_CLASS = "blank-form";
 // an embed, its attributes as JSON, see embeds.ts
 export const EMBED_CLASS = "blank-embed";
+// a diagram, its source and settings as JSON, see embeds.ts
+export const DIAGRAM_CLASS = "blank-diagram";
 
 // marks the paragraphs of a horizontal line, which are empty and so need a
 // class to survive until src/importers/docx/cleanup.ts turns them into <hr>
@@ -84,9 +86,10 @@ export const STYLE_MAP = [
   ...paragraphs([STYLE_NAMES.tableHeading], `p.${TABLE_HEADING_CLASS}:fresh`),
   // matched by the style's id, since it is in no styles.xml
   `p.${PAGE_BREAK_STYLE} => p.${PAGE_BREAK_CLASS}:fresh`,
-  `p.${TOC_STYLE} => p.${TOC_CLASS}:fresh`,
+  `p.${ATOM_STYLE} => p.${ATOM_CLASS}:fresh`,
   `p.${FORM_STYLE} => p.${FORM_CLASS}:fresh`,
   `p.${EMBED_STYLE} => p.${EMBED_CLASS}:fresh`,
+  `p.${DIAGRAM_STYLE} => p.${DIAGRAM_CLASS}:fresh`,
   // the runs that mark an aligned paragraph, see align.ts
   ...WORD_ALIGNMENTS.map(
     (align) => `r.${alignStyle(align)} => span.${ALIGN_CLASS}${align}`,

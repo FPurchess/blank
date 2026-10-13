@@ -1,6 +1,7 @@
 import { schema as base } from "prosemirror-markdown";
 import {
   type AttributeSpec,
+  type DOMOutputSpec,
   type MarkSpec,
   type Node,
   NodeSpec,
@@ -9,7 +10,16 @@ import {
 import { tableNodes } from "prosemirror-tables";
 
 import { oneOf, textAlignment } from "./alignment";
-import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
+import {
+  ATOMS,
+  extraArgs,
+  isDepth,
+  SIGNATURE_DEFAULTS,
+  TOC_DEFAULTS,
+} from "./blocks/atoms";
+import { checkDiagram } from "./blocks/diagrams";
+import { parseWidth } from "./blocks/caps";
+import { sourceBlockSpecs } from "./blocks/sourceBlock";
 import {
   checkEmbed,
   EMBED_ARGS,
@@ -17,6 +27,7 @@ import {
   embedLabel,
   embedSrc,
 } from "./blocks/embeds";
+import { signatureLabel, signatureLines } from "./blocks/signature";
 
 const ALIGNMENTS = ["left", "center", "right"] as const;
 
@@ -151,6 +162,64 @@ const toc: NodeSpec = {
   ],
 };
 
+// a line for one person to sign on (ATOMS.signature), which the layout
+// engine draws. Its DOM holds its arguments as the file writes them, so a
+// copy keeps them, and says whose signature it is, for screen readers and
+// the view without the engine.
+const signature: NodeSpec = {
+  group: "top_block",
+  atom: true,
+  selectable: true,
+  attrs: {
+    role: { default: SIGNATURE_DEFAULTS.role },
+    name: { default: SIGNATURE_DEFAULTS.name },
+    place: { default: SIGNATURE_DEFAULTS.place },
+    date: { default: SIGNATURE_DEFAULTS.date },
+    width: { default: SIGNATURE_DEFAULTS.width },
+    extra: { default: {} },
+  },
+  parseDOM: [
+    {
+      tag: "div[data-blank-signature]",
+      getAttrs: (dom) => {
+        try {
+          const args: unknown = JSON.parse(
+            dom.getAttribute("data-blank-signature") ?? "{}",
+          );
+          return (
+            (args &&
+              typeof args === "object" &&
+              ATOMS.signature.read(args as Record<string, string>)) ||
+            false
+          );
+        } catch {
+          return false;
+        }
+      },
+    },
+  ],
+  toDOM: (node) => [
+    "div",
+    {
+      class: "signature-block",
+      "data-blank-signature": JSON.stringify(ATOMS.signature.write(node.attrs)),
+    },
+    [
+      "p",
+      [
+        "span",
+        {
+          class: "signature-room",
+          role: "img",
+          "aria-label": signatureLabel(node.attrs),
+        },
+        "",
+      ],
+    ],
+    ...signatureLines(node.attrs).map((line) => ["p", line] as DOMOutputSpec),
+  ],
+};
+
 // content of another app, e.g. a drawing (src/markdown/blocks/embeds.ts):
 // its type, its data as the app wrote it, and its drawing, which Blank
 // shows. In the editor's DOM, and so on the clipboard, it is a figure that
@@ -194,6 +263,47 @@ const embed: NodeSpec = {
     { class: "embed", "data-blank-embed": JSON.stringify(node.attrs) },
     ["img", { src: embedSrc(node), alt: embedLabel(node) }],
   ],
+};
+
+// a diagram: the Mermaid source it is drawn from, in a source node, with
+// its settings (src/markdown/blocks/diagrams.ts)
+const diagramSpecs = sourceBlockSpecs("diagram", {
+  attrs: {
+    width: { default: null },
+    caption: { default: "" },
+    alt: { default: "" },
+    align: { default: null },
+    fence: { default: "" },
+    extra: { default: {} },
+  },
+  caps: { align: true, width: true },
+  check: checkDiagram,
+});
+
+// an image, which may be given a share of the text's width (written as
+// <img width>, see ./serializer.ts)
+const image: NodeSpec = {
+  ...base.spec.nodes.get("image"),
+  attrs: { ...base.spec.nodes.get("image")!.attrs, width: { default: null } },
+  blockCaps: { width: true },
+  parseDOM: [
+    {
+      tag: "img[src]",
+      getAttrs: (dom) => ({
+        src: dom.getAttribute("src"),
+        title: dom.getAttribute("title"),
+        alt: dom.getAttribute("alt"),
+        // a width Blank can lay out, e.g. "300" of an image from the web
+        width: parseWidth(dom.getAttribute("width"))
+          ? dom.getAttribute("width")
+          : null,
+      }),
+    },
+  ],
+  toDOM: (node) => {
+    const { width, ...attrs } = node.attrs;
+    return ["img", width ? { ...attrs, width } : attrs];
+  },
 };
 
 // a form placed from a form definition (src/markdown/blocks/definitions.ts): its
@@ -295,6 +405,7 @@ const nodes = base.spec.nodes
     linebreakReplacement: true,
   })
   .update("heading", heading)
+  .update("image", image)
   .update("doc", {
     ...base.spec.nodes.get("doc"),
     content: "(block | top_block)+",
@@ -308,9 +419,12 @@ const nodes = base.spec.nodes
   })
   .addBefore("image", "page_break", pageBreak)
   .addBefore("image", "toc", toc)
+  .addBefore("image", "signature", signature)
   .addBefore("image", "form_block", formBlock)
   .addBefore("image", "form_field", formField)
   .addBefore("image", "embed", embed)
+  .addBefore("image", "diagram", diagramSpecs.diagram)
+  .addBefore("image", "diagram_source", diagramSpecs.diagram_source)
   .addBefore("image", "unknown_block", unknownBlock)
   .append({
     table,
@@ -377,9 +491,12 @@ export const NODE_NAMES = [
   "table_cell",
   "table_header",
   "toc",
+  "signature",
   "form_block",
   "form_field",
   "embed",
+  "diagram",
+  "diagram_source",
   "unknown_block",
 ] as const;
 export type NodeName = (typeof NODE_NAMES)[number];

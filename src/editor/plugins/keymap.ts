@@ -56,7 +56,14 @@ import { liveKeys } from "../keyBindings";
 import { PDF_FILTER, WORD_FILTER } from "../../formats";
 import { PDF_EXPORT } from "../commands/exportAs";
 import { indentCode, outdentCode } from "../commands/codeIndent";
-import { toggleBlocks, toggleBlocksPane } from "../commands/contentBlocks";
+import {
+  blockSettings,
+  insertSignature,
+  keepSelectedBlock,
+  toggleBlocks,
+  toggleBlocksPane,
+} from "../commands/contentBlocks";
+import { editMark, exportSigned } from "../commands/signing";
 import { alignText } from "../commands/align";
 import { toggleList } from "../commands/lists";
 import {
@@ -138,6 +145,8 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
     outsideCells(insertBlock(schema.nodes.page_break)),
   ),
   [CommandIdentifier.INSERT_BLOCK]: toggleBlocksPane(),
+  [CommandIdentifier.BLOCK_SETTINGS]: blockSettings(),
+  [CommandIdentifier.INSERT_SIGNATURE]: insertSignature(),
   // the lines of a code block first, then list items, then lines of text;
   // their keys do a little more, see keyCommands
   [CommandIdentifier.FORMAT_INDENT]: chainCommands(
@@ -177,6 +186,9 @@ const commandMap: { [key in CommandIdentifier]: Command } = {
   [CommandIdentifier.EXPORT_DOCX]: exportAs("Word-Export", exporters.toDOCX, [
     WORD_FILTER,
   ]),
+  [CommandIdentifier.EXPORT_SIGNED_PDF]: exportSigned(),
+  [CommandIdentifier.SIGNING_SIGNATURE]: editMark("signature"),
+  [CommandIdentifier.SIGNING_INITIALS]: editMark("initials"),
   [CommandIdentifier.THEME_CYCLE]: cycleTheme(),
   [CommandIdentifier.LANGUAGE_CHOOSE]: chooseLanguage(),
   [CommandIdentifier.SPELLCHECK_TOGGLE]: toggleSpellcheck(),
@@ -392,25 +404,36 @@ export const keymap = () => {
   bindCommands();
   return new Plugin({
     props: {
-      handleKeyDown: liveKeys(() => ({
-        ...baseKeymap,
+      handleKeyDown: liveKeys(() => {
+        const bound = bindingsOf(
+          Object.keys(commandMap) as CommandIdentifier[],
+        );
+        return {
+          ...baseKeymap,
 
-        ...bindingsOf(Object.keys(commandMap) as CommandIdentifier[]),
+          ...bound,
 
-        // baseKeymap's Enter, but a paragraph after an aligned block, made at
-        // its end, is aligned like it, as in Word
-        Enter: chainCommands(
-          enterEmptyItem,
-          splitListItem(schema.nodes.list_item),
-          newlineInCode,
-          createParagraphNear,
-          liftEmptyBlock,
-          splitBlockAs(keepAlignment),
-        ),
-        "Shift-Enter": insertNode(schema.nodes.hard_break),
-        Backspace: backspace,
-        "Shift-Backspace": backspace,
-      })),
+          // baseKeymap's Enter, but a paragraph after an aligned block, made at
+          // its end, is aligned like it, as in Word
+          Enter: chainCommands(
+            enterEmptyItem,
+            splitListItem(schema.nodes.list_item),
+            newlineInCode,
+            createParagraphNear,
+            liftEmptyBlock,
+            splitBlockAs(keepAlignment),
+          ),
+          // a line break, unless a command has the key, e.g. a selected
+          // block's settings; never in place of a selected block
+          "Shift-Enter": chainCommands(
+            ...(bound["Shift-Enter"] ? [bound["Shift-Enter"]] : []),
+            keepSelectedBlock,
+            insertNode(schema.nodes.hard_break),
+          ),
+          Backspace: backspace,
+          "Shift-Backspace": backspace,
+        };
+      }),
     },
   });
 };

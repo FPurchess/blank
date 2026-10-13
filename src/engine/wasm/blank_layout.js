@@ -18,6 +18,22 @@ export class LayoutEngine {
         wasm.__wbg_layoutengine_free(ptr, 0);
     }
     /**
+     * a drawing of a module's (a diagram's, maths'), by the src of the
+     * image it stands in (see `crate::drawing`); false for one it can't
+     * read, which stays the image
+     * @param {string} src
+     * @param {string} json
+     * @returns {boolean}
+     */
+    addDrawing(src, json) {
+        const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.layoutengine_addDrawing(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        return ret !== 0;
+    }
+    /**
      * adds a font for what the others lack, e.g. a system font for Chinese,
      * as the last fallback of `family`, and lays out again
      * @param {Uint8Array} bytes
@@ -31,16 +47,18 @@ export class LayoutEngine {
         wasm.layoutengine_addFont(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
+     * an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
+     * JPEG
      * @param {string} src
      * @param {Uint8Array} bytes
-     * @param {boolean} jpeg
+     * @param {number} kind
      */
-    addImage(src, bytes, jpeg) {
+    addImage(src, bytes, kind) {
         const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
-        wasm.layoutengine_addImage(this.__wbg_ptr, ptr0, len0, ptr1, len1, jpeg);
+        wasm.layoutengine_addImage(this.__wbg_ptr, ptr0, len0, ptr1, len1, kind);
     }
     /**
      * the size, distance from the edge and line of the headers and footers,
@@ -433,6 +451,15 @@ export class LayoutEngine {
         var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
         return v3;
+    }
+    /**
+     * forgets a drawing, e.g. one no document shows any more
+     * @param {string} src
+     */
+    removeDrawing(src) {
+        const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.layoutengine_removeDrawing(this.__wbg_ptr, ptr0, len0);
     }
     /**
      * the colour of a role on paper, as 0xRRGGBB; for tests

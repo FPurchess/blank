@@ -6,6 +6,8 @@ import type { Unit } from "../layout/units";
 import type { Destination, PrintPlan } from "../print/printModel";
 import type { Size } from "../print/sheets";
 import type { BoxAnchor } from "./popups";
+import type { Mark, MarkSource, SavedMark } from "../signing/profile";
+import type { SignatureDate } from "../markdown/blocks/atoms";
 
 export interface LinkDialogRequest {
   url: string;
@@ -30,11 +32,13 @@ export interface ChosenImage {
 export interface ImageDialogRequest {
   src: string;
   alt: string;
+  // its width, e.g. "50%" (see src/markdown/blocks/caps.ts), null for Fit
+  width: string | null;
   // the cursor is at an existing image, which can be removed
   isEdit: boolean;
   // lets the user pick an image file, null if cancelled or unreadable
   chooseFile(): Promise<ChosenImage | null>;
-  submit(src: string, alt: string): void;
+  submit(src: string, alt: string, width: string | null): void;
   remove(): void;
   cancel(): void;
 }
@@ -86,21 +90,150 @@ export const bandEditor = shallowRef<BandEditorRequest | null>(null);
 // the strip while it is open
 export const bandEditorDone = shallowRef<(() => void) | null>(null);
 
-export interface TocPopoverRequest {
+// the settings of a block, below the block toolbar's settings button (see
+// src/editor/commands/blockSettings.ts and src/ui/components/BlockPopover.vue)
+export interface BlockSettingsRequest<T> {
   // the button or block it opens below, at its right end
   anchor: BoxAnchor;
-  // the headings it lists, 1 to 6 levels deep
-  depth: number;
-  title: string;
-  // changes the table of contents at once, as one undo step
-  apply(depth: number, title: string): void;
-  // gives the editor the focus back, on the table of contents
+  // what the block has now
+  values: T;
+  // changes the block at once, as one undo step
+  apply(values: T): void;
+  // gives the editor the focus back, on the block
   close(): void;
 }
+
+// a table of contents: the headings it lists, 1 to 6 levels deep, and its
+// title
+export type TocPopoverRequest = BlockSettingsRequest<{
+  depth: number;
+  title: string;
+}>;
 
 // tocPopover holds the request of the open settings of a table of contents,
 // or null while they are closed
 export const tocPopover = shallowRef<TocPopoverRequest | null>(null);
+
+// a diagram: its width (null for Fit, see src/markdown/blocks/caps.ts), its
+// caption and its description
+export interface DiagramPopoverRequest extends BlockSettingsRequest<{
+  width: string | null;
+  caption: string;
+  alt: string;
+}> {
+  // what it is called where its description is empty, e.g. "Flowchart"
+  label: string;
+}
+
+// diagramPopover holds the request of the open settings of a diagram, or
+// null while they are closed
+export const diagramPopover = shallowRef<DiagramPopoverRequest | null>(null);
+
+// what a signature block's settings change (ATOMS.signature)
+export interface SignatureSettings {
+  role: string;
+  name: string;
+  place: string;
+  date: SignatureDate;
+  // a share of the text's width, "50%", or null for the default
+  width: string | null;
+}
+
+export type SignaturePopoverRequest = BlockSettingsRequest<SignatureSettings>;
+
+// signaturePopover holds the request of the open settings of a signature
+// block, or null while they are closed
+export const signaturePopover = shallowRef<SignaturePopoverRequest | null>(
+  null,
+);
+
+export interface SignatureDialogRequest {
+  // the signature or the initials
+  mark: Mark;
+  // what is saved now, which the dialog opens as it was made
+  saved: SavedMark | null;
+  // the name a typed signature starts with
+  name: string;
+  // lets the user pick a picture of their signature, as a data: URL
+  chooseFile(): Promise<{ src: string; name: string } | null>;
+  // makes and saves the picture of what was drawn, typed or chosen; false
+  // when there's nothing to save (an empty pad)
+  submit(source: MarkSource, image?: ChosenMarkImage): Promise<boolean>;
+  // once it's saved and the dialog closed: gives the focus back to where
+  // the dialog was opened from, and goes on, e.g. to signing
+  done(): void;
+  // gives the focus back
+  cancel(): void;
+}
+
+// a picture chosen for a signature, and whether its background goes
+interface ChosenMarkImage {
+  src: string;
+  clean: boolean;
+}
+
+// signatureDialog holds the request of the open dialog of the user's
+// signature or initials, or null while it's closed
+export const signatureDialog = shallowRef<SignatureDialogRequest | null>(null);
+
+export interface CertificateDialogRequest {
+  // make a new certificate, or import a key file the user has
+  mode: "create" | "import";
+  // the name a new certificate starts with
+  name: string;
+  // the key file to import, as the dialog names it
+  file: string;
+  // makes or imports it: what went wrong in words, or null once done
+  submit(fields: {
+    name: string;
+    email: string;
+    passphrase: string;
+  }): Promise<string | null>;
+  // once it's there and the dialog closed: gives the focus back to where
+  // the dialog was opened from
+  done(): void;
+  // gives the focus back
+  cancel(): void;
+}
+
+// certificateDialog holds the request of the open dialog that makes or
+// imports the user's certificate, or null
+export const certificateDialog = shallowRef<CertificateDialogRequest | null>(
+  null,
+);
+
+// a signature block a signed export can fill in
+export interface SignTarget {
+  pos: number;
+  // who it names, "" for whoever signs
+  name: string;
+  // e.g. "Ada Lovelace · Tenant", or "Signature 2" for one that names none
+  label: string;
+}
+
+export interface SignDialogRequest {
+  // what is signed, e.g. the document's name
+  title: string;
+  // the signature blocks the document has, the one to fill in chosen
+  targets: SignTarget[];
+  chosen: number;
+  place: string;
+  // the notes the dialog shows, e.g. that an imported Word document's
+  // layout can differ from Word's
+  warnings: string[];
+  // whether `passphrase` opens the user's key: what's wrong, or null
+  check(passphrase: string): Promise<string | null>;
+  // opens the dialog that makes the user a certificate, which gives the
+  // focus back to `opener`
+  createCertificate(opener: EventTarget | null): void;
+  // fills in the block at `pos`, asks where to save the signed PDF and, with
+  // the key's passphrase, signs it digitally too
+  submit(pos: number, place: string, passphrase: string | null): void;
+  cancel(): void;
+}
+
+// signDialog holds the request of the open dialog that signs, or null
+export const signDialog = shallowRef<SignDialogRequest | null>(null);
 
 export interface UnsavedDialogRequest {
   // the tab's name, e.g. "notes"
@@ -113,6 +246,24 @@ export interface UnsavedDialogRequest {
 // unsavedDialog holds the request of the open question whether to save a
 // tab's changes before it closes, or null while none is asked
 export const unsavedDialog = shallowRef<UnsavedDialogRequest | null>(null);
+
+export interface ConfirmDialogRequest {
+  // e.g. "Remove your certificate?"
+  title: string;
+  // what it means, e.g. that it can't be undone
+  text: string;
+  // the button that does it, e.g. "Remove"
+  action: string;
+  // what else the dialog offers on its left, which leaves it open, e.g.
+  // backing up what is to be removed
+  secondary?: { label: string; run(): void };
+  confirm(): void;
+  cancel(): void;
+}
+
+// confirmDialog holds the request of the open question whether to do
+// something that can't be undone, or null
+export const confirmDialog = shallowRef<ConfirmDialogRequest | null>(null);
 
 // the settings open on the section shown last (settingsSection)
 export type SettingsRequest = Record<string, never>;
@@ -156,6 +307,12 @@ export const focusTakingDialogs = [
   pageSetup,
   bandEditor,
   tocPopover,
+  diagramPopover,
+  signaturePopover,
+  signatureDialog,
+  signDialog,
+  certificateDialog,
+  confirmDialog,
   unsavedDialog,
   settingsDialog,
   printDialog,

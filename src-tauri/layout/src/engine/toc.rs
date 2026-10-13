@@ -356,7 +356,9 @@ mod tests {
             .into_iter()
             .filter_map(|(op, part)| match op {
                 Op::Glyphs {
-                    role: Role::Hint, ..
+                    paint: None,
+                    role: Role::Hint,
+                    ..
                 } => Some(part),
                 _ => None,
             })

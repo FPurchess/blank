@@ -206,6 +206,9 @@ pub enum CellBlock {
         marker: Option<String>,
         #[serde(default)]
         bars: Vec<f32>,
+        /// the share of the cell's width it takes, see `Content::Image`
+        #[serde(default)]
+        share: Option<f32>,
     },
 }
 
@@ -308,6 +311,32 @@ pub enum Content {
         #[serde(default)]
         entries: Vec<TocEntry>,
     },
+    /// a signature block: room for a signature, a line to sign on, and the
+    /// lines under it (who signs, where and when)
+    Signature {
+        pos: u32,
+        /// the signature's image, empty while the block isn't signed
+        #[serde(default)]
+        src: String,
+        /// the image's size in points; 0 while it isn't loaded
+        #[serde(default)]
+        width: f32,
+        #[serde(default)]
+        height: f32,
+        #[serde(default)]
+        alt: String,
+        /// the lines under the line to sign on
+        #[serde(default)]
+        lines: Vec<String>,
+        /// what the room for the signature says while there's none, on the
+        /// screen only
+        #[serde(default)]
+        hint: String,
+        /// how much of the width of the text it takes, from 0 to 1; None
+        /// for `SIGNATURE_SHARE`
+        #[serde(default)]
+        share: Option<f32>,
+    },
     Image {
         pos: u32,
         src: String,
@@ -321,6 +350,13 @@ pub enum Content {
         /// anything else, justify too, stands it at the start
         #[serde(default)]
         align: Option<String>,
+        /// the share of the room's width it takes (0 to 1), which may
+        /// enlarge it; None for its own size, at most the room's
+        #[serde(default)]
+        share: Option<f32>,
+        /// what is written under it, in the caption style
+        #[serde(default)]
+        caption: Option<String>,
     },
     Table {
         pos: u32,
@@ -602,6 +638,14 @@ fn read_start_number<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, 
     })
 }
 
+/// a share of a width as the engine takes it: above 0 and at most 1, None
+/// for one that isn't a number
+fn clamp_share(share: &mut Option<f32>) {
+    *share = share
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| value.min(1.0));
+}
+
 /// an image's size as it may be: not finite is not loaded (0 × 0), and at
 /// most MAX_IMAGE a side, keeping its shape
 fn image_size(width: &mut f32, height: &mut f32) {
@@ -707,6 +751,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => *pos,
             Content::Table { pos, .. } => *pos,
         }
@@ -720,6 +765,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => pos.saturating_add(1),
             Content::Table { end, .. } => *end,
         }
@@ -770,6 +816,7 @@ impl Item {
             | Content::Rule { pos }
             | Content::Boxed { pos, .. }
             | Content::Toc { pos, .. }
+            | Content::Signature { pos, .. }
             | Content::Image { pos, .. } => moved(pos),
             Content::Table { pos, end, rows, .. } => {
                 moved(pos);
@@ -823,8 +870,39 @@ impl Item {
             Content::Text(Text {
                 hint: Some(hint), ..
             }) => truncate(hint, MAX_LABEL),
-            Content::Image { width, height, .. } => image_size(width, height),
+            Content::Image {
+                width,
+                height,
+                share,
+                caption,
+                ..
+            } => {
+                image_size(width, height);
+                clamp_share(share);
+                if caption.as_ref().is_some_and(|text| text.trim().is_empty()) {
+                    *caption = None;
+                }
+                if let Some(caption) = caption {
+                    truncate(caption, MAX_LABEL);
+                }
+            }
             Content::Boxed { label, .. } => truncate(label, MAX_LABEL),
+            Content::Signature {
+                width,
+                height,
+                lines,
+                hint,
+                share,
+                ..
+            } => {
+                image_size(width, height);
+                lines.truncate(MAX_SIGNATURE_LINES);
+                for line in lines {
+                    truncate(line, MAX_LABEL);
+                }
+                truncate(hint, MAX_LABEL);
+                clamp_share(share);
+            }
             Content::Toc {
                 title,
                 depth,
@@ -858,11 +936,13 @@ impl Item {
                             height,
                             indent,
                             bars,
+                            share,
                             ..
                         } => {
                             image_size(width, height);
                             *indent = finite(*indent, 0.0, 0.0, MAX_PAGE);
                             clamp_bars(bars);
+                            clamp_share(share);
                         }
                     }
                 }
@@ -900,6 +980,8 @@ pub const MAX_BARS: usize = 64;
 pub const MAX_LABEL: usize = 500;
 /// the most entries of a table of contents, far more than a book has
 pub const MAX_TOC_ENTRIES: usize = 10_000;
+/// the lines a signature block has under its line, at most
+pub const MAX_SIGNATURE_LINES: usize = 8;
 
 /// cuts `text` to at most `max` characters
 fn truncate(text: &mut String, max: usize) {

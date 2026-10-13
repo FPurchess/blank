@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import { stringify } from "yaml";
 
@@ -29,6 +29,8 @@ import { allMargins, DEFAULT_PAGE } from "../../layout/settings";
 import { rewriteDocx } from "../../test/docx";
 import { IMAGES, dataUrl } from "../../test/images";
 import { importDocx } from ".";
+import { registerBoxes } from "../../test/sources";
+import { rasterize } from "../../images/codec";
 
 vi.mock("../../images/codec", () => ({
   decodeSize: vi.fn(),
@@ -100,6 +102,63 @@ describe("importers.docx", () => {
     expect(await roundTrip(markdown)).toBe("1. first\n2. second");
   });
 
+  describe("signature blocks", { timeout: 20_000 }, () => {
+    it("come back from Blank's own Word export", async () => {
+      const markdown = [
+        "Both sign below.",
+        '<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" place="Berlin" date="none" width="75%" -->',
+        '<!-- blank:signature@1 role="Landlord" -->',
+      ].join("\n\n");
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    const PICT =
+      '<w:r><w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><v:shape><o:signatureline v:ext="edit" o:suggestedsigner="Ada Lovelace" o:suggestedsigner2="Tenant"/></v:shape></w:pict></w:r>';
+    const withLine = async (paragraph: string) =>
+      (
+        await toMarkdown(
+          await rewriteDocx(
+            await exportDocx("Sign here:\n\nline"),
+            "word/document.xml",
+            (xml = "") =>
+              xml.replace(
+                /<w:p>(?:(?!<w:p>).)*?line(?:(?!<w:p>).)*?<\/w:p>/s,
+                paragraph,
+              ),
+          ),
+        )
+      ).markdown;
+
+    it("come only from a control holding a signature block's line", async () => {
+      const docx = await rewriteDocx(
+        await exportDocx(
+          'Sign here:\n\n<!-- blank:signature@1 role="Tenant" -->',
+        ),
+        "word/document.xml",
+        // the hidden marker line, not the control's tag
+        (xml = "") => xml.replace("blank:signature@1 ", "blank:toc@1 "),
+      );
+      const { markdown } = await toMarkdown(docx);
+      // no table of contents: the control stays its text
+      expect(markdown).not.toMatch(/^<!-- blank:toc/m);
+      expect(markdown).toContain("Tenant");
+    });
+
+    it("come from Word's signature lines", async () => {
+      expect(await withLine(`<w:p>${PICT}</w:p>`)).toBe(
+        'Sign here:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
+      );
+    });
+
+    it("keep the text beside a signature line", async () => {
+      expect(
+        await withLine(`<w:p><w:r><w:t>Tenant:</w:t></w:r>${PICT}</w:p>`),
+      ).toBe(
+        'Sign here:\n\nTenant:\n\n<!-- blank:signature@1 role="Tenant" name="Ada Lovelace" -->',
+      );
+    });
+  });
+
   // each test writes a .docx and reads it back through docx, JSZip and
   // mammoth, about 110 ms here; give them room on a machine under heavy load
   describe("tables of contents", { timeout: 20_000 }, () => {
@@ -163,7 +222,8 @@ describe("importers.docx", () => {
           xml.replace("\\o &quot;1-2&quot;", "\\c &quot;Figure&quot;"),
       );
       const { markdown } = await toMarkdown(bytes);
-      expect(markdown).not.toContain("blank:toc");
+      // no table of contents: the control stays its text
+      expect(markdown).not.toMatch(/^<!-- blank:toc/m);
     });
   });
 
@@ -345,6 +405,96 @@ describe("importers.docx", () => {
       const { markdown: imported } = await toMarkdown(bytes);
       expect(imported).not.toContain("blank:embed");
       expect(imported).toContain("Intro");
+    });
+  });
+
+  describe("diagrams", { timeout: 20_000 }, () => {
+    let unregister: () => void;
+    beforeAll(() => {
+      unregister = registerBoxes();
+      return () => unregister();
+    });
+    beforeEach(() => {
+      // the picture Word shows of a drawing, where it can't show SVG
+      vi.mocked(rasterize).mockResolvedValue({
+        bytes: Uint8Array.from(atob(IMAGES.png), (char) => char.charCodeAt(0)),
+        mime: "image/png",
+        size: { width: 210, height: 60 },
+      });
+    });
+    const markdown = [
+      "Intro",
+      '<div align="center">',
+      '<!-- blank:diagram@1 width="50%" caption="The plan" alt="Two steps" -->',
+      "```mermaid\nflowchart LR\n  A --> B\n```",
+      "<!-- /blank:diagram -->",
+      "</div>",
+      "After",
+    ].join("\n\n");
+
+    it("come back from Blank's own Word export, source and settings", async () => {
+      expect(await roundTrip(markdown)).toBe(markdown);
+    });
+
+    it("have their caption aligned as they are", async () => {
+      const zip = await JSZip.loadAsync(await exportDocx(markdown));
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const caption =
+        /<w:p>(?:(?!<\/w:p>).)*The plan(?:(?!<\/w:p>).)*<\/w:p>/s.exec(
+          xml,
+        )?.[0];
+      expect(caption).toContain('<w:jc w:val="center"/>');
+    });
+
+    it("are their pictures without the part that holds them", async () => {
+      const bytes = await rewriteDocx(
+        await exportDocx(markdown),
+        "customXml/item3.xml",
+        () => "<other/>",
+      );
+      const { markdown: imported } = await toMarkdown(bytes);
+      expect(imported).not.toContain("mermaid");
+      expect(imported).toContain("Intro");
+    });
+  });
+
+  describe("images with a width", { timeout: 20_000 }, () => {
+    beforeEach(() => {
+      vi.mocked(rasterize).mockResolvedValue({
+        bytes: Uint8Array.from(atob(IMAGES.png), (char) => char.charCodeAt(0)),
+        mime: "image/png",
+        size: { width: 3, height: 2 },
+      });
+    });
+
+    it("keep their share of the text's width through Word", async () => {
+      const src = dataUrl("image/png", IMAGES.png);
+      const markdown = [
+        `<img src="${src}" alt="A dot" width="50%">`,
+        `<img src="${src}" alt="" width="100%">`,
+        `![Natural](${src})`,
+      ].join("\n\n");
+      const imported = await roundTrip(markdown);
+      expect(imported).toContain('alt="A dot" width="50%">');
+      expect(imported).toContain('alt="" width="100%">');
+      expect(imported).toContain("![Natural](");
+    });
+
+    it("leave pictures of other apps at their own size, also one as wide as the text", async () => {
+      const src = dataUrl("image/png", IMAGES.png);
+      const bytes = await exportDocx(
+        `<img src="${src}" alt="Wide" width="100%">`,
+      );
+      // as Word names a picture it was given
+      const renamed = await rewriteDocx(
+        bytes,
+        "word/document.xml",
+        (xml = "") => xml.replace(/name="image-1[^"]*"/, 'name="Picture 1"'),
+      );
+      expect(renamed).not.toEqual(bytes);
+      const { markdown } = await toMarkdown(renamed);
+      expect(markdown).toContain("![Wide](");
+      expect(markdown).not.toContain("width=");
     });
   });
 

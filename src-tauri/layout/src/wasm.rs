@@ -6,10 +6,11 @@ use std::fmt::Write;
 
 use wasm_bindgen::prelude::*;
 
+use crate::drawing::{Cap, Join};
 use crate::engine::{Changes, Engine, Hit, Op};
 use crate::fonts::{split_files, Fonts};
 use crate::model::{Content, Item, Settings};
-use crate::pdf::{self, ImageData, Info, PrintSheet, Warning};
+use crate::pdf::{self, ImageData, ImageKind, Info, PrintSheet, Warning};
 
 #[wasm_bindgen]
 pub struct LayoutEngine {
@@ -76,12 +77,17 @@ fn changes(changes: Changes) -> Vec<u32> {
     .collect()
 }
 
-/// a page's display list as JSON: rectangles, images, links and glyph runs
+/// a page's display list as JSON: rectangles, images, links, glyph runs,
+/// the paints of drawings' glyph runs, and drawings' paths
 fn display(ops: Vec<Op>) -> String {
     let mut rects = String::new();
     let mut images = String::new();
     let mut links = String::new();
     let mut glyphs = String::new();
+    let mut paths = String::new();
+    let mut glyph_paints = String::new();
+    // the glyph runs written so far
+    let mut runs = 0;
     let separate = |out: &mut String| {
         if !out.is_empty() {
             out.push(',');
@@ -120,7 +126,79 @@ fn display(ops: Vec<Op>) -> String {
                 }
                 links.push(']');
             }
-            Op::Glyphs { run, role, .. } => {
+            Op::Path {
+                x,
+                y,
+                scale,
+                d,
+                stroke,
+                role,
+                paint,
+                style,
+            } => {
+                // [role, stroke width or 0, path data in page points,
+                // strength, the author's colour or "" for the ink, and, if
+                // it isn't a plain line, its style in page points]
+                separate(&mut paths);
+                let _ = write!(paths, "[{},", role as u8);
+                number(&mut paths, stroke.unwrap_or(0.0));
+                paths.push_str(",\"");
+                crate::drawing::path_data(&mut paths, &d, x, y, scale);
+                paths.push_str("\",");
+                number(&mut paths, paint.alpha);
+                match paint.color {
+                    Some([red, green, blue]) => {
+                        let _ = write!(paths, ",\"#{red:02x}{green:02x}{blue:02x}\"");
+                    }
+                    None => paths.push_str(",\"\""),
+                }
+                if !style.is_plain() {
+                    paths.push_str(",{");
+                    if let Some(dash) = &style.dash {
+                        paths.push_str("\"dash\":[");
+                        for (at, length) in dash.iter().enumerate() {
+                            if at > 0 {
+                                paths.push(',');
+                            }
+                            number(&mut paths, length * scale);
+                        }
+                        paths.push_str("],\"offset\":");
+                        number(&mut paths, style.offset * scale);
+                        paths.push(',');
+                    }
+                    let _ = write!(
+                        paths,
+                        "\"cap\":\"{}\",\"join\":\"{}\",\"evenodd\":{}}}",
+                        match style.cap {
+                            Cap::Butt => "butt",
+                            Cap::Round => "round",
+                            Cap::Square => "square",
+                        },
+                        match style.join {
+                            Join::Miter => "miter",
+                            Join::Round => "round",
+                            Join::Bevel => "bevel",
+                        },
+                        style.evenodd
+                    );
+                }
+                paths.push(']');
+            }
+            Op::Glyphs {
+                run, role, paint, ..
+            } => {
+                // a drawing's run: [its index in "g", strength, the author's
+                // colour if any]
+                if let Some(paint) = paint {
+                    separate(&mut glyph_paints);
+                    let _ = write!(glyph_paints, "[{runs},");
+                    number(&mut glyph_paints, paint.alpha);
+                    if let Some([red, green, blue]) = paint.color {
+                        let _ = write!(glyph_paints, ",\"#{red:02x}{green:02x}{blue:02x}\"");
+                    }
+                    glyph_paints.push(']');
+                }
+                runs += 1;
                 separate(&mut glyphs);
                 let _ = write!(glyphs, "[{},", run.font);
                 number(&mut glyphs, run.size);
@@ -135,7 +213,9 @@ fn display(ops: Vec<Op>) -> String {
             }
         }
     }
-    format!("{{\"r\":[{rects}],\"i\":[{images}],\"l\":[{links}],\"g\":[{glyphs}]}}")
+    format!(
+        "{{\"r\":[{rects}],\"i\":[{images}],\"l\":[{links}],\"g\":[{glyphs}],\"gp\":[{glyph_paints}],\"p\":[{paths}]}}"
+    )
 }
 
 /// a number with at most three decimals, which is finer than any screen
@@ -582,10 +662,33 @@ impl LayoutEngine {
         serde_json::to_string(&words).unwrap_or_default()
     }
 
+    /// a drawing of a module's (a diagram's, maths'), by the src of the
+    /// image it stands in (see `crate::drawing`); false for one it can't
+    /// read, which stays the image
+    #[wasm_bindgen(js_name = addDrawing)]
+    pub fn add_drawing(&mut self, src: &str, json: &str) -> bool {
+        match crate::drawing::Drawing::read(json) {
+            Some(drawing) => {
+                self.engine.drawings.insert(src.to_string(), drawing);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// forgets a drawing, e.g. one no document shows any more
+    #[wasm_bindgen(js_name = removeDrawing)]
+    pub fn remove_drawing(&mut self, src: &str) {
+        self.engine.drawings.remove(src);
+    }
+
+    /// an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
+    /// JPEG
     #[wasm_bindgen(js_name = addImage)]
-    pub fn add_image(&mut self, src: &str, bytes: Vec<u8>, jpeg: bool) {
+    pub fn add_image(&mut self, src: &str, bytes: Vec<u8>, kind: u8) {
+        let kind = ImageKind::from_code(kind);
         self.images
-            .insert(src.to_string(), ImageData { bytes, jpeg });
+            .insert(src.to_string(), ImageData { bytes, kind });
     }
 
     /// the document as a PDF/A-2u, in `language` (a BCP 47 tag such as

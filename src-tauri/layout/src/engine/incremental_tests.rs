@@ -283,6 +283,8 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
                         height: *height,
                         alt: "a picture".into(),
                         align: None,
+                        share: None,
+                        caption: None,
                     },
                     ..text_item(0, "", "p", 0, true)
                 });
@@ -334,6 +336,7 @@ fn to_items(specs: &[Spec]) -> Vec<Item> {
                                                 indent: 0.0,
                                                 marker: None,
                                                 bars: vec![],
+                                                share: None,
                                             },
                                         ],
                                         header: index < *headers,
@@ -839,6 +842,7 @@ fn incremental_equals_full() {
                         !matches!(
                             op,
                             Op::Glyphs {
+                                paint: None,
                                 role: crate::items::Role::Band,
                                 ..
                             }

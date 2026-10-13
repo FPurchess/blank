@@ -1,0 +1,107 @@
+import type JSZip from "jszip";
+
+import { SIGNATURE_TAG } from "../../exporters/docx/forms";
+import { formatAtom, readAtom } from "../../markdown";
+import { SIGNATURE_DEFAULTS } from "../../markdown/blocks/atoms";
+import {
+  ancestor,
+  ATOM_STYLE,
+  child,
+  DOCUMENT_PART,
+  markerParagraph,
+  parsePart,
+  val,
+  W,
+} from "./xml";
+
+// Signature blocks from Word, before mammoth, which would keep only their
+// text:
+// - Blank's own: a content control tagged SIGNATURE_TAG holding the block's
+//   marker line as hidden text (src/exporters/docx/index.ts, `signature`);
+// - Word's signature lines (Insert > Signature Line): a VML shape with an
+//   o:signatureline, which says who is to sign and as what.
+// Each becomes a marker paragraph holding a signature block's marker line,
+// which styleMap.ts and cleanup.ts (`atoms`) turn into the block.
+
+// the namespace of VML's Office extensions, where Word's signature lines are
+const OFFICE = "urn:schemas-microsoft-com:office:office";
+
+/**
+ * hiddenText returns the text of the hidden runs in `element`
+ */
+const hiddenText = (element: Element) =>
+  [...element.getElementsByTagNameNS(W, "r")]
+    .filter((run) => child(child(run, "rPr"), "vanish"))
+    .map((run) =>
+      [...run.getElementsByTagNameNS(W, "t")]
+        .map((text) => text.textContent ?? "")
+        .join(""),
+    )
+    .join("")
+    .trim();
+
+/**
+ * holdsMore tells whether `paragraph` holds text or pictures besides `run`
+ */
+const holdsMore = (paragraph: Element, run: Element) =>
+  [
+    ...paragraph.getElementsByTagNameNS(W, "t"),
+    ...paragraph.getElementsByTagNameNS(W, "drawing"),
+    ...paragraph.getElementsByTagNameNS(W, "pict"),
+  ].some(
+    (element) =>
+      !run.contains(element) &&
+      (element.localName !== "t" || !!element.textContent?.trim()),
+  );
+
+/**
+ * signatureLine returns the marker line of the signature block a Word
+ * signature line stands for: its suggested signer and their title
+ */
+const signatureLine = (line: Element) =>
+  formatAtom("signature", {
+    ...SIGNATURE_DEFAULTS,
+    name: line.getAttributeNS(OFFICE, "suggestedsigner")?.trim() ?? "",
+    role: line.getAttributeNS(OFFICE, "suggestedsigner2")?.trim() ?? "",
+    extra: {},
+  });
+
+/**
+ * markSignatures rewrites word/document.xml with a marker paragraph for each
+ * signature block and signature line, see the comment on top
+ * @param zip the unpacked .docx file, changed in place
+ * @returns whether it had to be rewritten
+ */
+export const markSignatures = async (zip: JSZip) => {
+  const doc = await parsePart(zip, DOCUMENT_PART);
+  if (!doc) return false;
+  let changed = false;
+  for (const sdt of [...doc.getElementsByTagNameNS(W, "sdt")]) {
+    if (val(child(child(sdt, "sdtPr"), "tag")) !== SIGNATURE_TAG) continue;
+    const line = hiddenText(sdt);
+    // a control whose line was edited away, or holds another block's,
+    // stays what it shows
+    if (readAtom(line)?.node !== "signature") continue;
+    sdt.replaceWith(markerParagraph(doc, ATOM_STYLE, line));
+    changed = true;
+  }
+  for (const line of [...doc.getElementsByTagNameNS(OFFICE, "signatureline")]) {
+    // the run holding the signature line's picture, and its paragraph
+    const run = ancestor(line, "r");
+    const paragraph = ancestor(line, "p");
+    if (!run || !paragraph?.parentNode) continue;
+    const marker = markerParagraph(doc, ATOM_STYLE, signatureLine(line));
+    if (holdsMore(paragraph, run)) {
+      // the paragraph's other content stays, the block after it
+      paragraph.after(marker);
+      run.remove();
+    } else {
+      paragraph.replaceWith(marker);
+    }
+    changed = true;
+  }
+  if (changed) {
+    zip.file(DOCUMENT_PART, new XMLSerializer().serializeToString(doc));
+  }
+  return changed;
+};

@@ -13,7 +13,13 @@ import {
   settingsDialog,
   tablePicker,
   tableToolbar,
+  signatureDialog,
+  signDialog,
+  certificateDialog,
+  confirmDialog,
+  signaturePopover,
   tocPopover,
+  diagramPopover,
   unsavedDialog,
 } from "../state";
 import BandStrips from "./BandStrips.vue";
@@ -23,6 +29,10 @@ import BlockToolbar from "./BlockToolbar.vue";
 import BottomBar from "./BottomBar.vue";
 import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
+import SignatureDialog from "./SignatureDialog.vue";
+import SignDialog from "./SignDialog.vue";
+import CertificateDialog from "./CertificateDialog.vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
 import DocumentOutline from "./DocumentOutline.vue";
@@ -34,7 +44,9 @@ import TablePicker from "./TablePicker.vue";
 import TableHandles from "./TableHandles.vue";
 import TableToolbar from "./TableToolbar.vue";
 import TocPopover from "./TocPopover.vue";
+import DiagramPopover from "./DiagramPopover.vue";
 import FindPanel from "./FindPanel.vue";
+import SignaturePopover from "./SignaturePopover.vue";
 import TopArea from "./TopArea.vue";
 import UiTooltip from "./UiTooltip.vue";
 import UnsavedDialog from "./UnsavedDialog.vue";
@@ -98,10 +110,40 @@ watchFocusMode();
   />
   <!-- not keyed: it stays while the tabs change -->
   <FindPanel v-if="findPanel" />
+  <SignatureDialog
+    v-if="signatureDialog"
+    :key="keyOf(signatureDialog)"
+    :request="signatureDialog"
+  />
+  <SignDialog
+    v-if="signDialog"
+    :key="keyOf(signDialog)"
+    :request="signDialog"
+  />
+  <CertificateDialog
+    v-if="certificateDialog"
+    :key="keyOf(certificateDialog)"
+    :request="certificateDialog"
+  />
+  <ConfirmDialog
+    v-if="confirmDialog"
+    :key="keyOf(confirmDialog)"
+    :request="confirmDialog"
+  />
   <TocPopover
     v-if="tocPopover"
     :key="keyOf(tocPopover)"
     :request="tocPopover"
+  />
+  <DiagramPopover
+    v-if="diagramPopover"
+    :key="keyOf(diagramPopover)"
+    :request="diagramPopover"
+  />
+  <SignaturePopover
+    v-if="signaturePopover"
+    :key="keyOf(signaturePopover)"
+    :request="signaturePopover"
   />
   <ContextMenu
     v-if="contextMenu"

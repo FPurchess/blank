@@ -1,0 +1,157 @@
+// Signing: the dialog of the user's signature and initials
+// (SignatureDialog.vue, SignaturePad.vue), the dialog that signs
+// (SignDialog.vue) and the previews in Settings ▸ Signing.
+@use "controls" as *;
+
+.dialog.signature-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-width: none;
+
+  .signature-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    margin-top: var(--s3);
+  }
+
+  .signature-panel-foot {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .quiet {
+    @include text-button;
+    @include text-button-quiet;
+  }
+
+  // the choices of a typed signature, each showing the name in its font
+  .signature-fonts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+  }
+
+  .signature-font {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+    min-height: 56px;
+    padding: var(--s1) var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-control);
+    background: var(--background-color);
+    color: var(--color);
+    text-align: start;
+    @include states;
+
+    &[aria-checked="true"] {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+  }
+
+  .signature-font-sample {
+    // script fonts draw swashes past their letters, which the padding keeps
+    // inside what overflow clips
+    padding-inline: 0.4em;
+    margin-inline: -0.4em;
+    overflow: hidden;
+    font-size: 30px;
+    line-height: 40px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .signature-font-name {
+    flex: none;
+    color: var(--muted);
+    font-size: var(--ui-small);
+  }
+
+  .signature-image {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    min-height: 140px;
+    padding: var(--s3);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r-control);
+
+    img {
+      max-width: 100%;
+      max-height: 120px;
+    }
+
+    button {
+      @include text-button;
+    }
+  }
+}
+
+// the pad: paper to sign on, with the line written on
+.signature-pad {
+  position: relative;
+  height: 170px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  background: var(--background-color);
+  // the strokes, in the page's ink
+  color: var(--color);
+
+  canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: none;
+  }
+}
+
+.signature-pad-line {
+  position: absolute;
+  top: var(--baseline);
+  right: var(--s5);
+  left: var(--s5);
+  border-top: 1px dashed var(--line-strong);
+  pointer-events: none;
+}
+
+.signature-pad-hint {
+  position: absolute;
+  right: 0;
+  bottom: var(--s3);
+  left: 0;
+  color: var(--muted);
+  font-size: var(--ui-small);
+  text-align: center;
+  pointer-events: none;
+}
+
+// Settings ▸ Signing: the saved signature and initials with their buttons
+.signing-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.signing-preview {
+  max-width: 160px;
+  max-height: 40px;
+}
+
+// the certificate's fingerprint, to read it out in groups of four
+.fingerprint {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--ui-small);
+  overflow-wrap: anywhere;
+}
+
+// the timestamp server's field, with the button that fills it in
+.signing-server {
+  flex-direction: row;
+  gap: var(--s2);
+}

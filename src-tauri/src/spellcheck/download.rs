@@ -40,14 +40,9 @@ fn mirror(value: Option<String>) -> Option<String> {
     allowed.then(|| value.trim_end_matches('/').to_string())
 }
 
+/// client returns the client dictionaries are downloaded with
 pub fn client() -> reqwest::Client {
-    // rustls with ring builds without extra tools on every platform
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(120))
-        .build()
-        .expect("failed to set up the HTTP client")
+    crate::http::client(Duration::from_secs(15), Duration::from_secs(120))
 }
 
 fn hex(bytes: &[u8]) -> String {

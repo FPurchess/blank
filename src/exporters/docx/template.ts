@@ -50,6 +50,13 @@ export const LIST_INDENT = 720;
 export const LIST_HANGING = 360;
 // blockquotes indent by this much per level, next to their left border
 export const QUOTE_INDENT = 360;
+// the line of a signature block to sign on, as thin as the engine's rule
+export const SIGNATURE_LINE = {
+  style: "single",
+  size: eighths(0.75),
+  color: "auto",
+  space: 0,
+} as const;
 export const QUOTE_BORDER = {
   style: "single",
   size: 18,

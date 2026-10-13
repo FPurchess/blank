@@ -5,11 +5,13 @@ use parley::Alignment;
 
 use super::Engine;
 use crate::bands::{BAND_DISTANCE, BAND_LINE};
+use crate::drawing::{resolve_glyphs, DrawOp, Drawing, LineStyle, Paint, PathCmd};
 use crate::fonts::{Fonts, INK_CODE, INK_UNDERLINE};
 use crate::items::{leaders, Deco, Role};
 use crate::model::{Content, Text, TextKind};
 use crate::style::BAR;
-use crate::text::{GlyphRun, TextBox};
+use crate::text::{Glyph, GlyphRun, TextBox};
+use std::sync::Arc;
 
 /// what the page shows, in points from its top left corner
 #[derive(Clone, Debug, PartialEq)]
@@ -19,6 +21,9 @@ pub enum Op {
         role: Role,
         /// the text the glyphs' ranges point into, shared with its text box
         text: std::sync::Arc<str>,
+        /// a drawing's paint (the ink at a strength, or the author's
+        /// colour); None for the document's text, in its role's colour
+        paint: Option<Paint>,
     },
     Rect {
         x: f32,
@@ -42,6 +47,20 @@ pub enum Op {
         y: f32,
         w: f32,
         h: f32,
+    },
+    /// a shape of a drawing (see `crate::drawing`), its commands scaled by
+    /// `scale` and placed at `x`, `y`: filled, or stroked at a width, in
+    /// `role`'s colour at the paint's strength, or the author's colour
+    Path {
+        x: f32,
+        y: f32,
+        scale: f32,
+        d: Arc<[PathCmd]>,
+        stroke: Option<f32>,
+        role: Role,
+        paint: Paint,
+        /// its dashes in the drawing's units, scaled by `scale` when drawn
+        style: LineStyle,
     },
 }
 
@@ -183,7 +202,18 @@ impl Engine {
                 } else {
                     part
                 };
-                ops.push((deco_op(deco.moved(dx, dy)), part));
+                match deco.moved(dx, dy) {
+                    // a drawing of a module's, by its src, in ops of its own
+                    Deco::Image {
+                        src, x, y, w, h, ..
+                    } if self.drawings.contains_key(&src) => {
+                        let drawing = self.drawings[&src].clone();
+                        for op in drawing_ops(&self.fonts, &drawing, x, y, w, h) {
+                            ops.push((op, part));
+                        }
+                    }
+                    deco => ops.push((deco_op(deco), part)),
+                }
             }
             // quote bars, down to the next item in the quote on this page
             if !item.bars.is_empty() {
@@ -226,7 +256,10 @@ impl Engine {
                         };
                     // what an empty text says is the screen's only
                     let part = match item.content {
-                        Content::Text(_) => Part::Hint { item: frag.item },
+                        // and what an unsigned signature block says
+                        Content::Text(_) | Content::Signature { .. } => {
+                            Part::Hint { item: frag.item }
+                        }
                         _ => Part::Label { item: frag.item },
                     };
                     for line in 0..label.line_count() {
@@ -378,6 +411,102 @@ impl Engine {
     }
 }
 
+/// the ops of a drawing, scaled into its box at `x`, `y`: its paths, and its
+/// glyphs in the engine's fonts, so its text is text in the PDF too. Glyphs
+/// of a font the engine hasn't are left out.
+pub fn drawing_ops(fonts: &Fonts, drawing: &Drawing, x: f32, y: f32, w: f32, h: f32) -> Vec<Op> {
+    let scale = (w / drawing.width).min(if drawing.height > 0.0 {
+        h / drawing.height
+    } else {
+        f32::INFINITY
+    });
+    let mut ops = vec![];
+    if !scale.is_finite() || scale <= 0.0 {
+        return ops;
+    }
+    for op in &drawing.ops {
+        match op {
+            DrawOp::Path {
+                d,
+                stroke,
+                paint,
+                style,
+            } => ops.push(Op::Path {
+                x,
+                y,
+                scale,
+                d: d.clone(),
+                stroke: stroke.map(|width| width * scale),
+                role: Role::Text,
+                paint: *paint,
+                style: style.clone(),
+            }),
+            DrawOp::Glyphs {
+                font,
+                size,
+                glyphs,
+                chars,
+                text,
+                paint,
+            } => {
+                let Some((index, glyphs)) = resolve_glyphs(fonts, font, glyphs, *chars) else {
+                    continue;
+                };
+                // a size or place too large to scale writes no number the
+                // PDF can hold
+                let finite = (size * scale).is_finite()
+                    && glyphs.iter().all(|&(_, gx, gy)| {
+                        (x + gx * scale).is_finite() && (y + gy * scale).is_finite()
+                    });
+                if !finite {
+                    continue;
+                }
+                let Some(&(_, _, first_y)) = glyphs.first() else {
+                    continue;
+                };
+                // the text is one cluster of all of them, which the PDF reads
+                // as it is
+                let end = text.len() as u32;
+                let placed: Vec<Glyph> = glyphs
+                    .iter()
+                    .enumerate()
+                    .map(|(at, &(id, gx, gy))| {
+                        let next = glyphs.get(at + 1).map_or(gx, |next| next.1);
+                        Glyph {
+                            id,
+                            x: x + gx * scale,
+                            y: y + gy * scale,
+                            advance: (next - gx) * scale,
+                            dx: 0.0,
+                            dy: (gy - first_y) * scale,
+                            start: 0,
+                            end,
+                        }
+                    })
+                    .collect();
+                let left = placed[0].x;
+                let width = placed.last().map_or(0.0, |last| last.x - left);
+                ops.push(Op::Glyphs {
+                    paint: Some(*paint),
+                    run: GlyphRun {
+                        font: index,
+                        size: size * scale,
+                        ink: 0,
+                        baseline: y + first_y * scale,
+                        x: left,
+                        width,
+                        underline: None,
+                        glyphs: placed,
+                    },
+                    role: Role::Text,
+                    text: Arc::from(text.as_str()),
+                });
+            }
+        }
+    }
+    ops
+}
+
 fn deco_op(deco: Deco) -> Op {
     match deco {
         Deco::Rect { x, y, w, h, role } => Op::Rect { x, y, w, h, role },
@@ -478,6 +607,7 @@ fn push_text_ops(
         }
         let glyphs = link_parts(run.ink).0;
         let op = Op::Glyphs {
+            paint: None,
             run,
             role,
             text: boxed.text.clone(),
@@ -502,6 +632,8 @@ mod tests {
                 height: width,
                 alt: "a cat".into(),
                 align: None,
+                share: None,
+                caption: None,
             },
             ..paragraph(0, "")
         };
@@ -511,6 +643,7 @@ mod tests {
             .iter()
             .find_map(|op| match op {
                 Op::Glyphs {
+                    paint: None,
                     role: Role::Hint,
                     run,
                     text,
@@ -540,6 +673,8 @@ mod tests {
                     height: 50.0,
                     alt: String::new(),
                     align: align.map(String::from),
+                    share: None,
+                    caption: None,
                 },
                 ..paragraph(0, "")
             };
@@ -624,6 +759,7 @@ mod tests {
             .iter()
             .find_map(|op| match op {
                 Op::Glyphs {
+                    paint: None,
                     role: Role::Hint,
                     run,
                     text,
@@ -653,6 +789,48 @@ mod tests {
     }
 
     #[test]
+    fn signs_a_signature_block_on_paper_and_on_the_screen_alike() {
+        let block = |src: &str| Item {
+            content: Content::Signature {
+                pos: 1,
+                src: src.into(),
+                width: 300.0,
+                height: 100.0,
+                alt: "Signature of Ada".into(),
+                lines: vec!["Ada Lovelace · Tenant".into()],
+                hint: "Signature".into(),
+                share: Some(0.5),
+            },
+            ..paragraph(0, "")
+        };
+        let parts = |engine: &Engine| -> Vec<(Role, Part)> {
+            engine
+                .body_parts(0)
+                .into_iter()
+                .filter_map(|(op, part)| match op {
+                    Op::Glyphs { role, .. } => Some((role, part)),
+                    _ => None,
+                })
+                .collect()
+        };
+        // unsigned: the hint, on the screen only, and the line under it as
+        // the block's own text
+        let unsigned = engine(vec![block("")]);
+        let glyphs = parts(&unsigned);
+        assert!(glyphs.contains(&(Role::Hint, Part::Hint { item: 0 })));
+        assert!(glyphs.contains(&(Role::Text, Part::Extra { item: 0, extra: 0 })));
+        // signed: the image instead of the hint
+        let signed = engine(vec![block("signature.png")]);
+        assert!(!parts(&signed).iter().any(|(role, _)| *role == Role::Hint));
+        assert!(signed
+            .body_parts(0)
+            .iter()
+            .any(|(op, part)| matches!(op, Op::Image { .. }) && *part == Part::Image { item: 0 }));
+        // one position, like a rule
+        assert_eq!((signed.items[0].from(), signed.items[0].to()), (1, 2));
+    }
+
+    #[test]
     fn says_what_an_empty_text_holds_on_the_screen_only() {
         let mut empty = paragraph(1, "");
         if let Content::Text(text) = &mut empty.content {
@@ -664,7 +842,9 @@ mod tests {
             .into_iter()
             .filter_map(|(op, part)| match op {
                 Op::Glyphs {
-                    role: Role::Hint, ..
+                    paint: None,
+                    role: Role::Hint,
+                    ..
                 } => Some(part),
                 _ => None,
             })
@@ -778,6 +958,7 @@ mod tests {
             .iter()
             .filter_map(|op| match op {
                 Op::Glyphs {
+                    paint: None,
                     run,
                     role: Role::Text,
                     ..

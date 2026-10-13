@@ -109,6 +109,10 @@
     font-size: var(--ui-small);
     line-height: 16px;
     color: var(--spelling-color);
+
+    &:empty {
+      margin: 0;
+    }
   }
 
   // a field whose label only screen readers hear, e.g. the search of the

@@ -245,6 +245,17 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
         Content::Image { src, alt, .. } => {
             let mut children = leaves(ids, Part::Image { item: index });
             children.extend(leaves(ids, Part::Label { item: index }));
+            // its caption, the one extra a picture has
+            let caption = leaves(
+                ids,
+                Part::Extra {
+                    item: index,
+                    extra: 0,
+                },
+            );
+            if !caption.is_empty() {
+                children.push(group(Tag::Caption, caption));
+            }
             let alt = if alt.is_empty() { src } else { alt };
             Some(group(Tag::Figure(Some(alt.clone())), children))
         }
@@ -253,6 +264,27 @@ fn item_node(engine: &Engine, index: usize, ids: &mut Ids) -> Option<Node> {
             leaves(ids, Part::Label { item: index }),
         )),
         Content::Table { .. } => Some(table_node(engine, index, ids)),
+        Content::Signature { alt, lines, .. } => {
+            // the signature as a figure, then the lines under it
+            let mut children = vec![];
+            let image = leaves(ids, Part::Image { item: index });
+            if !image.is_empty() {
+                // src is the PNG as a data URL: no words for a screen reader
+                let alt = if alt.is_empty() {
+                    "Signature".to_string()
+                } else {
+                    alt.clone()
+                };
+                children.push(group(Tag::Figure(Some(alt)), image));
+            }
+            for extra in 0..lines.len() {
+                let line = leaves(ids, Part::Extra { item: index, extra });
+                if !line.is_empty() {
+                    children.push(group(Tag::P, line));
+                }
+            }
+            Some(group(Tag::Div, children))
+        }
         Content::Toc { entries, .. } => Some(toc_node(index, entries.len(), ids)),
         Content::Break { .. } | Content::Rule { .. } => None,
     }

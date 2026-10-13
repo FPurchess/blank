@@ -2,6 +2,7 @@ import type { StateBlock, StateCore, Token } from "markdown-it";
 
 import { looksLikeMarker, type Marker, parseMarker } from "./args";
 import { atomOf } from "./atoms";
+import { blockAlignment, checkDiagram, DIAGRAM_LANG } from "./diagrams";
 import { checkEmbed } from "./embeds";
 import {
   type Definition,
@@ -22,6 +23,8 @@ import {
 //   marker) into its node;
 // - an embed (`embed@1` … `/embed`) holding its data and its drawing (see
 //   ./embeds.ts) into an embed;
+// - a diagram's settings (`diagram@1` … `/diagram`) around its fence into a
+//   diagram (see ./diagrams.ts), as `diagramFences` makes of a bare fence;
 // - every block Blank doesn't know (yet), as well as markers that don't pair
 //   up, into one `unknown_block` token that holds its lines exactly as they
 //   were written.
@@ -247,6 +250,49 @@ const embedAttrs = (open: Marker, inside: Token[]) => {
 };
 
 /**
+ * diagramToken returns the token of a diagram read from the fence of its
+ * source, with the arguments of its marker if it has one
+ */
+const diagramToken = (
+  state: StateCore,
+  fence: Token,
+  args: Record<string, string>,
+  map: [number, number] | null,
+  align: unknown,
+): Token | null => {
+  const attrs = checkDiagram({ ...args, fence: fence.markup });
+  if (!attrs) return null;
+  const token = new state.Token("diagram", "", 0);
+  token.block = true;
+  token.map = map;
+  token.meta = {
+    attrs: { ...attrs, align: blockAlignment(align) },
+    source: fence.content.replace(/\n$/, ""),
+  };
+  return token;
+};
+
+const isDiagramFence = (token: Token | undefined) =>
+  token?.type === "fence" && token.info.trim() === DIAGRAM_LANG;
+
+/**
+ * diagramFences turns the ```mermaid fences at the top of the document into
+ * diagrams; those in lists, quotes and form fields stay code. It runs after
+ * `blankBlocks`, which reads the diagrams that have a marker.
+ */
+export const diagramFences = (state: StateCore) => {
+  let depth = 0;
+  state.tokens = state.tokens.map((token) => {
+    depth += token.nesting;
+    if (depth !== 0 || !isDiagramFence(token)) return token;
+    return (
+      diagramToken(state, token, {}, token.map, token.attrGet("data-align")) ??
+      token
+    );
+  });
+};
+
+/**
  * blankBlocks turns the markers into blocks, see the comment on top
  */
 export const blankBlocks = (state: StateCore) => {
@@ -268,6 +314,21 @@ export const blankBlocks = (state: StateCore) => {
       marker?.name === "embed" && end > index
         ? embedAttrs(marker, tokens.slice(index + 1, end))
         : null;
+    const inside = tokens.slice(index + 1, end);
+    const diagram =
+      marker?.name === "diagram" &&
+      marker.format === 1 &&
+      end > index &&
+      inside.length === 1 &&
+      isDiagramFence(inside[0])
+        ? diagramToken(
+            state,
+            inside[0],
+            marker.args,
+            [token.map?.[0] ?? 0, tokens[end].map?.[1] ?? 0],
+            token.attrGet("data-align"),
+          )
+        : null;
     const attrs = embed ?? atomOf(marker)?.read(marker!.args);
     const form =
       marker?.name === "form" && end > index
@@ -278,7 +339,9 @@ export const blankBlocks = (state: StateCore) => {
             env.blankDefinitions ?? {},
           )
         : null;
-    if (attrs) {
+    if (diagram) {
+      blocks.push(diagram);
+    } else if (attrs) {
       const block = new state.Token(
         embed ? "embed" : atomOf(marker)!.node,
         "",

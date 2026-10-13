@@ -77,11 +77,13 @@ describe("the blocks pane", () => {
       [...pane()!.querySelectorAll(".blocks-group")].map((label) =>
         label.textContent!.trim(),
       ),
-    ).toEqual(["Contents", "Forms"]);
+    ).toEqual(["Contents", "Forms", "Signing", "Drawings"]);
     expect(tiles().map((tile) => tile.textContent!.trim())).toEqual([
       "Table of contents",
       "Recipe",
       "broken",
+      "Signature",
+      "Diagram",
     ]);
     // the description is the tooltip, and screen readers get it too
     expect(tile("toc").dataset.tip).toBe(
@@ -158,7 +160,7 @@ describe("the blocks pane", () => {
     expect(document.activeElement).toBe(tile("user/broken"));
     await nextTick();
     // one tile in the tab order: the current one
-    expect(tiles().map((tile) => tile.tabIndex)).toEqual([-1, -1, 0]);
+    expect(tiles().map((tile) => tile.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
     key(tile("user/broken"), "ArrowUp");
     expect(document.activeElement).toBe(tile("toc"));
     key(tile("toc"), "ArrowUp");
@@ -170,7 +172,7 @@ describe("the blocks pane", () => {
     key(search(), "ArrowDown");
     key(tile("toc"), "End");
     await nextTick();
-    expect(tile("user/broken").tabIndex).toBe(0);
+    expect(tile("diagram").tabIndex).toBe(0);
     search().value = "reci";
     search().dispatchEvent(new Event("input"));
     await nextTick();

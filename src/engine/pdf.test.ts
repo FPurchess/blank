@@ -18,7 +18,7 @@ import {
 } from "vitest";
 
 import { parseMarkdown, schema } from "../markdown";
-import { IMAGES } from "../test/images";
+import { bytesOf, IMAGES } from "../test/images";
 import { testEngine } from "../test/engine";
 import { testLayout } from "../test/layout";
 import exportAs from "../editor/commands/exportAs";
@@ -45,6 +45,14 @@ import type { PdfJob } from "./pdfJob";
 import { LayoutEngine } from "./wasm/blank_layout.js";
 import * as pdfJob from "./pdfJob";
 import { baseFonts, pageEngine, setPageEngine } from "./engine";
+import { recolor } from "../diagrams/recolor";
+import { sized } from "../diagrams/render";
+import { registerSource } from "../sources/registry";
+import { forgetRendered } from "../sources/store";
+import { forgetVectors } from "./vectors";
+import { setDiagramModuleLoader } from "./diagramModule";
+import { useTestDiagramModule } from "../test/diagramModule";
+import * as codec from "../images/codec";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -168,6 +176,106 @@ describe("the PDF to print", () => {
       expect(second).toContain("Gamma");
     },
   );
+});
+
+// a lease whose signature block is on its second page, and the export that
+// fills it in, as Export signed PDF does
+const signedState = () =>
+  EditorState.create({
+    schema,
+    doc: parseMarkdown(
+      [
+        "The tenant rents the flat.",
+        "<!-- pagebreak -->",
+        '<!-- blank:signature@1 role="Tenant" -->',
+      ].join("\n\n"),
+    ),
+  });
+const signedPos = (state: EditorState) => {
+  let pos = -1;
+  state.doc.forEach((node, offset) => {
+    if (node.type.name === "signature") pos = offset;
+  });
+  return pos;
+};
+const exportSigned = (state = signedState()) =>
+  toPDF(state, {
+    docPath: null,
+    layout: testLayout(),
+    signed: {
+      pos: signedPos(state),
+      src: `data:image/png;base64,${IMAGES.png}`,
+      signing: {
+        name: "Ada Lovelace",
+        place: "Berlin",
+        date: new Date(2026, 9, 8),
+        format: "long",
+        language: "en-GB",
+      },
+    },
+  });
+
+describe("a signed PDF", () => {
+  beforeEach(() => testEngine());
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "shows the signature, who signed, where and when in the block, and says where it is",
+    async () => {
+      const { contents, signatureBox } = await exportSigned();
+      const file = join(dir, "signed.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      expect(text).toContain("Ada Lovelace · Tenant");
+      expect(text).toContain("Berlin, 8 October 2026");
+      // the hint is the screen's only
+      expect(text).not.toMatch(/\bSignature\b/);
+      // the picture, once, on the second page
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      const rows = images.split("\n").slice(2).filter(Boolean);
+      expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(["2"]);
+      // the words in the box the signature's field goes over, in points
+      // from the top left of its page
+      expect(signatureBox?.page).toBe(1);
+      const box = signatureBox!;
+      const pages = execFileSync("pdftotext", ["-bbox", file, "-"], {
+        encoding: "utf8",
+      }).split("<page ");
+      for (const word of ["Ada", "Tenant", "Berlin,", "2026"]) {
+        const match = new RegExp(
+          `<word xMin="([\\d.]+)" yMin="([\\d.]+)" xMax="([\\d.]+)" yMax="([\\d.]+)">${word}</word>`,
+        ).exec(pages[2]);
+        expect(match, word).not.toBeNull();
+        const [xMin, yMin, xMax, yMax] = match!.slice(1).map(Number);
+        expect(xMin).toBeGreaterThanOrEqual(box.x - 0.5);
+        expect(yMin).toBeGreaterThanOrEqual(box.y - 0.5);
+        expect(xMax).toBeLessThanOrEqual(box.x + box.width + 0.5);
+        expect(yMax).toBeLessThanOrEqual(box.y + box.height + 0.5);
+      }
+    },
+  );
+
+  it("isn't written without the signature's picture", async () => {
+    const state = signedState();
+    await expect(
+      toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+        signed: {
+          pos: signedPos(state),
+          src: "data:image/png;base64,AAAA",
+          signing: {
+            name: "Ada",
+            place: "",
+            date: new Date(),
+            format: "iso",
+            language: "en",
+          },
+        },
+      }),
+    ).rejects.toThrow("your signature's picture can't be read");
+  });
 });
 
 describe("the PDF's fonts", () => {
@@ -335,6 +443,15 @@ describe("the PDF export after the engine trapped", () => {
       expect(info).toMatch(/Pages:\s+1\n/);
     },
   );
+
+  it("finds the signed block in the worker's PDF too", async () => {
+    const { signatureBox } = await exportSigned();
+    vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(trap);
+    const fromWorker = await exportSigned();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].signedPos).toBe(signedPos(signedState()));
+    expect(fromWorker.signatureBox).toEqual(signatureBox);
+  });
 
   it("fails on an error of its own that isn't a trap, without a worker", async () => {
     vi.spyOn(LayoutEngine.prototype, "pdf").mockImplementationOnce(() => {
@@ -698,4 +815,147 @@ describe("pdfDate", () => {
     const minutes = String(Math.abs(offset) % 60).padStart(2, "0");
     expect(date.endsWith(`${sign}${hours}:${minutes}`)).toBe(true);
   });
+});
+
+describe("the PDF's diagrams", () => {
+  // a flowchart Mermaid drew (src/diagrams/__fixtures__), in ink
+  const drawn = sized(
+    recolor(
+      readFileSync(
+        join(import.meta.dirname, "../diagrams/__fixtures__/flowchart.svg"),
+        "utf8",
+      ),
+      "",
+    ),
+  )!;
+  let unregister: () => void;
+  beforeEach(() => {
+    testEngine();
+    useTestDiagramModule();
+    unregister = registerSource({
+      node: "diagram",
+      lang: "mermaid",
+      label: () => "Flowchart",
+      render: (source) =>
+        source.includes("error")
+          ? { ok: false, error: "Parse error on line 1" }
+          : { ok: true, data: drawn },
+    });
+  });
+  afterEach(() => {
+    unregister();
+    forgetRendered();
+    forgetVectors();
+    setDiagramModuleLoader(null);
+  });
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "holds a diagram as vectors, its labels as text, and its caption",
+    async () => {
+      const doc = parseMarkdown(
+        [
+          "Before",
+          '<!-- blank:diagram@1 caption="The plan" -->',
+          "```mermaid\nflowchart LR\n  A --> B\n```",
+          "<!-- /blank:diagram -->",
+        ].join("\n\n"),
+      );
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([]);
+      const file = join(dir, "diagram.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      for (const label of ["Idea", "Choice", "Draft", "Group", "The plan"]) {
+        expect(text).toContain(label);
+      }
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      expect(images.trim().split("\n")).toHaveLength(2);
+    },
+  );
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "prints a diagram as vectors with its labels as text",
+    async () => {
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  A --> B\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await printPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+        sheets: [sideBySide([0])],
+      });
+      expect(warnings).toEqual([]);
+      const { text } = pdfInfo(contents, "print-diagram.pdf");
+      for (const label of ["Idea", "Choice", "Draft"]) {
+        expect(text).toContain(label);
+      }
+      const images = execFileSync(
+        "pdfimages",
+        ["-list", join(dir, "print-diagram.pdf")],
+        { encoding: "utf8" },
+      );
+      // the header and its rule only: no picture of the diagram
+      expect(images.trim().split("\n")).toHaveLength(2);
+    },
+  );
+
+  it.runIf(has("pdftotext") && has("pdfimages"))(
+    "holds a picture of a diagram when the diagram module doesn't load",
+    async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      setDiagramModuleLoader(async () => {
+        throw new TypeError("failed to fetch");
+      });
+      // the webview's canvas, which jsdom hasn't
+      const rasterized = vi.spyOn(codec, "rasterize").mockResolvedValue({
+        bytes: bytesOf(IMAGES.png),
+        mime: "image/png",
+        size: { width: 3, height: 2 },
+      });
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  A --> B\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([]);
+      expect(rasterized).toHaveBeenCalledOnce();
+      expect(logged).toHaveBeenCalledWith(
+        "the diagram module didn't load",
+        "TypeError",
+      );
+      const file = join(dir, "picture.pdf");
+      writeFileSync(file, contents);
+      const images = execFileSync("pdfimages", ["-list", file], {
+        encoding: "utf8",
+      });
+      // the header, its rule and the picture
+      expect(images.trim().split("\n")).toHaveLength(3);
+    },
+  );
+
+  it.runIf(has("pdftotext"))(
+    "writes a diagram that can't be drawn as its source, and says so",
+    async () => {
+      const doc = parseMarkdown("```mermaid\nflowchart LR\n  error -->\n```");
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([
+        "1 diagram couldn't be drawn and is written as its source in the PDF",
+      ]);
+      const file = join(dir, "broken.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      expect(text).toContain("error -->");
+      expect(text).not.toContain("Parse error");
+    },
+  );
 });

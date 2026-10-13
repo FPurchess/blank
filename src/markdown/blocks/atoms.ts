@@ -1,6 +1,7 @@
 import type { Attrs } from "prosemirror-model";
 
 import { formatMarker, type Marker, parseMarker } from "./args";
+import { parseWidth } from "./caps";
 
 // The content blocks that are one marker line, and the node each becomes:
 // how its marker's arguments read into the node's attributes and back.
@@ -47,6 +48,57 @@ export const TOC_DEFAULTS = { depth: 3, title: "Contents" } as const;
 export const isDepth = (depth: unknown): depth is number =>
   Number.isInteger(depth) && (depth as number) >= 1 && (depth as number) <= 6;
 
+const SIGNATURE_ARGS = ["role", "name", "place", "date", "width"] as const;
+
+// when a signature block's date is filled in: when it is signed, never (a
+// line to write it by hand), or a date fixed in the file, as YYYY-MM-DD
+export type SignatureDate =
+  "signing" | "none" | `${number}-${number}-${number}`;
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * shareOf returns the share of the text's width that `width` says ("75%"),
+ * or null for none or a width of another kind
+ */
+export const shareOf = (width: unknown) => {
+  const parsed = parseWidth(width);
+  return parsed && "share" in parsed ? parsed.share : null;
+};
+
+/**
+ * calendarDate returns the day a YYYY-MM-DD date is, at noon local time, or
+ * null for what isn't one, e.g. "2026-02-30"
+ */
+export const calendarDate = (value: string) => {
+  const match = ISO_DATE.exec(value);
+  if (!match) return null;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  return date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+    ? date
+    : null;
+};
+
+/**
+ * isSignatureDate tells whether `value` is a date a signature block can say
+ */
+const isSignatureDate = (value: unknown): value is SignatureDate =>
+  value === "signing" ||
+  value === "none" ||
+  (typeof value === "string" && calendarDate(value) !== null);
+
+// a signature block as it starts: one line to sign, dated when signed
+export const SIGNATURE_DEFAULTS = {
+  role: "",
+  name: "",
+  place: "",
+  date: "signing",
+  width: null,
+} as const;
+
 export const ATOMS: Record<string, AtomSpec> = {
   // a table of contents: the headings up to `depth`, under `title`
   toc: {
@@ -72,6 +124,56 @@ export const ATOMS: Record<string, AtomSpec> = {
       depth: String(attrs.depth),
       title: attrs.title as string,
     }),
+  },
+  // a line for one person to sign on: who (`name`, empty for whoever
+  // signs) and as what (`role`), where (`place`, empty for where they sign)
+  // and when (`date`), as wide as `width` says of the text's
+  signature: {
+    format: 1,
+    node: "signature",
+    order: SIGNATURE_ARGS,
+    read: (args) => {
+      // a paste's arguments come from JSON, which may hold anything
+      const known = args as Record<string, unknown>;
+      if (
+        SIGNATURE_ARGS.some(
+          (key) => known[key] !== undefined && typeof known[key] !== "string",
+        )
+      ) {
+        return null;
+      }
+      const date = args.date ?? SIGNATURE_DEFAULTS.date;
+      const width = args.width ?? null;
+      if (
+        !isSignatureDate(date) ||
+        (width !== null && shareOf(width) === null)
+      ) {
+        return null;
+      }
+      return {
+        role: args.role ?? "",
+        name: args.name ?? "",
+        place: args.place ?? "",
+        date,
+        width,
+        extra: extraArgs(args, SIGNATURE_ARGS),
+      };
+    },
+    // what is empty or as it starts is left out
+    write: (attrs) =>
+      Object.fromEntries(
+        Object.entries({
+          ...extraArgs(attrs.extra, SIGNATURE_ARGS),
+          role: attrs.role as string,
+          name: attrs.name as string,
+          place: attrs.place as string,
+          date:
+            attrs.date === SIGNATURE_DEFAULTS.date
+              ? ""
+              : (attrs.date as string),
+          width: (attrs.width as string | null) ?? "",
+        }).filter(([, value]) => value !== ""),
+      ),
   },
 };
 

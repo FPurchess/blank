@@ -24,11 +24,12 @@ import {
   activeTab,
   activeTabId,
   announce,
+  importedFrom,
   path,
   printDialog,
   tabLabel,
 } from "../../state";
-import { exportFile, isEmpty, PDF_EXPORT } from "./exportAs";
+import { isEmpty, PDF_EXPORT, runExport } from "./exportAs";
 import { openPageSetup } from "./pageSetup";
 
 /**
@@ -70,6 +71,7 @@ export const openPrint = (
   const page = { width, height };
   // the document's file and tab now, before another tab may show
   const docPath = path.value;
+  const file = { path: docPath, importedFrom: importedFrom.value };
   const tab = activeTabId.value;
   const named = activeTab.value;
   const title =
@@ -104,13 +106,11 @@ export const openPrint = (
     },
     savePdf: (pages) => {
       view.focus();
-      exportFile({
+      void runExport(state, file, {
         title: PDF_EXPORT,
         exporter: toPDF,
         filters: [PDF_FILTER],
-        state,
-        docPath,
-        pages,
+        context: { pages },
       });
     },
     pageSetup: () => openPageSetup(view),

@@ -35,6 +35,7 @@ export interface TileGroup {
 const GROUPS: { group: BlockGroup; label: string }[] = [
   { group: "contents", label: "Contents" },
   { group: "forms", label: "Forms" },
+  { group: "signing", label: "Signing" },
   { group: "drawings", label: "Drawings" },
 ];
 

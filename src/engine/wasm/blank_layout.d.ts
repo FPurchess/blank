@@ -5,11 +5,21 @@ export class LayoutEngine {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * a drawing of a module's (a diagram's, maths'), by the src of the
+     * image it stands in (see `crate::drawing`); false for one it can't
+     * read, which stays the image
+     */
+    addDrawing(src: string, json: string): boolean;
+    /**
      * adds a font for what the others lack, e.g. a system font for Chinese,
      * as the last fallback of `family`, and lays out again
      */
     addFont(bytes: Uint8Array, family: string): void;
-    addImage(src: string, bytes: Uint8Array, jpeg: boolean): void;
+    /**
+     * an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
+     * JPEG
+     */
+    addImage(src: string, bytes: Uint8Array, kind: number): void;
     /**
      * the size, distance from the edge and line of the headers and footers,
      * which the page view repeats; for tests
@@ -140,6 +150,10 @@ export class LayoutEngine {
      */
     printPdf(sheets: string, title: string): Uint8Array;
     /**
+     * forgets a drawing, e.g. one no document shows any more
+     */
+    removeDrawing(src: string): void;
+    /**
      * the colour of a role on paper, as 0xRRGGBB; for tests
      */
     roleColor(role: number): number | undefined;
@@ -229,6 +243,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_layoutengine_free: (a: number, b: number) => void;
+    readonly layoutengine_addDrawing: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly layoutengine_bandMetrics: (a: number) => [number, number];
@@ -257,6 +272,7 @@ export interface InitOutput {
     readonly layoutengine_pdfWarnings: (a: number) => [number, number];
     readonly layoutengine_printDisplay: (a: number, b: number) => [number, number];
     readonly layoutengine_printPdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly layoutengine_removeDrawing: (a: number, b: number, c: number) => void;
     readonly layoutengine_roleColor: (a: number, b: number) => number;
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
