@@ -9,6 +9,7 @@ import {
   PAGE_BREAK_CLASS,
   TABLE_HEADING_CLASS,
   TOC_CLASS,
+  DIAGRAM_CLASS,
   EMBED_CLASS,
   FORM_CLASS,
 } from "./styleMap";
@@ -289,6 +290,29 @@ const embeds = (doc: Document) => {
   for (const node of [...doc.querySelectorAll(`p.${EMBED_CLASS}`)]) {
     const figure = doc.createElement("figure");
     figure.dataset.blankEmbed = node.textContent ?? "";
+    node.replaceWith(figure);
+  }
+  // a diagram: its settings on the figure, its source in it, as the schema
+  // reads a pasted one
+  for (const node of [...doc.querySelectorAll(`p.${DIAGRAM_CLASS}`)]) {
+    let read: { source?: unknown; attrs?: unknown } = {};
+    try {
+      read = JSON.parse(node.textContent ?? "") as typeof read;
+    } catch {
+      // broken: no diagram
+    }
+    if (typeof read.source !== "string") {
+      node.remove();
+      continue;
+    }
+    const figure = doc.createElement("figure");
+    figure.dataset.blankDiagram = JSON.stringify(read.attrs ?? {});
+    const pre = doc.createElement("pre");
+    pre.dataset.blankSource = "diagram";
+    const code = doc.createElement("code");
+    code.textContent = read.source;
+    pre.append(code);
+    figure.append(pre);
     node.replaceWith(figure);
   }
 };

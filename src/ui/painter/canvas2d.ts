@@ -41,8 +41,9 @@ export type GlyphSource = Pick<PageEngine, "glyph" | "unitsPerEm">;
 
 export interface Canvas2DSources {
   glyphs: () => GlyphSource | null;
-  // a loaded image, null while it isn't
-  image: (src: string) => CanvasImageSource | null;
+  // a loaded image, null while it isn't; a drawing of Blank's in `ink`,
+  // the colour the text is painted in (see src/engine/vectors.ts)
+  image: (src: string, ink: string) => CanvasImageSource | null;
 }
 
 interface Canvas2DSurface extends Surface {
@@ -52,6 +53,20 @@ interface Canvas2DSurface extends Surface {
 interface Canvas2DSnapshot extends Snapshot {
   bitmap: ImageBitmap;
 }
+
+// the drawings' paths as the canvas takes them, by their data, a few
+// thousand kept
+const PATHS_KEPT = 4096;
+const paths = new Map<string, Path2D>();
+const pathOf = (d: string) => {
+  let path = paths.get(d);
+  if (!path) {
+    if (paths.size >= PATHS_KEPT) paths.clear();
+    path = new Path2D(d);
+    paths.set(d, path);
+  }
+  return path;
+};
 
 /**
  * paintDisplay paints `display` into a canvas' context, which it clears
@@ -75,6 +90,12 @@ export const paintDisplay = (
   }
   // a role's color, as `fillStyle` and `globalAlpha`
   const colors = options.colors;
+  // a role's ink and its strength: on paper its colour, opaque (print),
+  // otherwise the view's ink at the role's opacity
+  const inkOf = (role: number): [string, number] =>
+    colors
+      ? [colors[role] ?? colors[0], 1]
+      : [options.color ?? "", ROLE_OPACITY[role] ?? 1];
   const paint = (role: number) => {
     if (colors) {
       context.fillStyle = colors[role] ?? colors[0];
@@ -111,14 +132,52 @@ export const paintDisplay = (
     const height = Math.max(Math.round(py(y + h)) - top, 1);
     context.fillRect(left, top, width, height);
   }
+  // the paths of drawings (diagrams), in page points: in the ink at their
+  // strength, or in the author's colour
+  const paths = display.p ?? [];
+  for (const [role, stroke, d, alpha, color, style] of paths) {
+    const [ink, strength] = inkOf(role);
+    context.globalAlpha = strength * alpha;
+    context.setTransform(k, 0, 0, k, -options.x * k, -options.y * k);
+    const fill = color || ink;
+    if (stroke > 0) {
+      context.strokeStyle = fill;
+      context.lineWidth = stroke;
+      context.lineCap = style?.cap ?? "butt";
+      context.lineJoin = style?.join ?? "miter";
+      context.setLineDash(style?.dash ?? []);
+      context.lineDashOffset = style?.offset ?? 0;
+      context.stroke(pathOf(d));
+    } else {
+      context.fillStyle = fill;
+      context.fill(pathOf(d), style?.evenodd ? "evenodd" : "nonzero");
+    }
+  }
+  if (paths.length) context.setLineDash([]);
+  context.setTransform(1, 0, 0, 1, 0, 0);
   context.globalAlpha = 1;
+  // a drawing's picture in the text's ink (Blank's own drawings follow it)
+  const [textInk] = inkOf(0);
   for (const [src, x, y, w, h] of display.i) {
-    const loaded = image(src);
+    const loaded = image(src, textInk);
     if (loaded) context.drawImage(loaded, px(x), py(y), w * k, h * k);
   }
-  for (const run of display.g) {
+  // drawings' runs in their paint: the ink at a strength, or the author's
+  // colour
+  const paints = new Map(
+    (display.gp ?? []).map(([index, alpha, color]) => [
+      index,
+      { alpha, color },
+    ]),
+  );
+  for (const [index, run] of display.g.entries()) {
     const [font, size, role] = run;
-    paint(role);
+    // the role's ink, or a drawing's paint: its strength of the ink, or
+    // the author's colour
+    const drawn = paints.get(index);
+    const [ink, strength] = inkOf(role);
+    context.fillStyle = drawn?.color ?? ink;
+    context.globalAlpha = strength * (drawn?.alpha ?? 1);
     const s = (size / glyphs.unitsPerEm(font)) * k;
     for (let index = 3; index + 2 < run.length; index += 3) {
       // the baseline on a whole device pixel, as the webview sets its text,

@@ -10,6 +10,9 @@ import { tableNodes } from "prosemirror-tables";
 
 import { oneOf, textAlignment } from "./alignment";
 import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
+import { checkDiagram } from "./blocks/diagrams";
+import { parseWidth } from "./blocks/caps";
+import { sourceBlockSpecs } from "./blocks/sourceBlock";
 import {
   checkEmbed,
   EMBED_ARGS,
@@ -196,6 +199,47 @@ const embed: NodeSpec = {
   ],
 };
 
+// a diagram: the Mermaid source it is drawn from, in a source node, with
+// its settings (src/markdown/blocks/diagrams.ts)
+const diagramSpecs = sourceBlockSpecs("diagram", {
+  attrs: {
+    width: { default: null },
+    caption: { default: "" },
+    alt: { default: "" },
+    align: { default: null },
+    fence: { default: "" },
+    extra: { default: {} },
+  },
+  caps: { align: true, width: true },
+  check: checkDiagram,
+});
+
+// an image, which may be given a share of the text's width (written as
+// <img width>, see ./serializer.ts)
+const image: NodeSpec = {
+  ...base.spec.nodes.get("image"),
+  attrs: { ...base.spec.nodes.get("image")!.attrs, width: { default: null } },
+  blockCaps: { width: true },
+  parseDOM: [
+    {
+      tag: "img[src]",
+      getAttrs: (dom) => ({
+        src: dom.getAttribute("src"),
+        title: dom.getAttribute("title"),
+        alt: dom.getAttribute("alt"),
+        // a width Blank can lay out, e.g. "300" of an image from the web
+        width: parseWidth(dom.getAttribute("width"))
+          ? dom.getAttribute("width")
+          : null,
+      }),
+    },
+  ],
+  toDOM: (node) => {
+    const { width, ...attrs } = node.attrs;
+    return ["img", width ? { ...attrs, width } : attrs];
+  },
+};
+
 // a form placed from a form definition (src/markdown/blocks/definitions.ts): its
 // fields, in the order its definition gives them. `def` is the key of its
 // definition in the doc's `definitions`; `extra` keeps arguments of its
@@ -295,6 +339,7 @@ const nodes = base.spec.nodes
     linebreakReplacement: true,
   })
   .update("heading", heading)
+  .update("image", image)
   .update("doc", {
     ...base.spec.nodes.get("doc"),
     content: "(block | top_block)+",
@@ -311,6 +356,8 @@ const nodes = base.spec.nodes
   .addBefore("image", "form_block", formBlock)
   .addBefore("image", "form_field", formField)
   .addBefore("image", "embed", embed)
+  .addBefore("image", "diagram", diagramSpecs.diagram)
+  .addBefore("image", "diagram_source", diagramSpecs.diagram_source)
   .addBefore("image", "unknown_block", unknownBlock)
   .append({
     table,
@@ -380,6 +427,8 @@ export const NODE_NAMES = [
   "form_block",
   "form_field",
   "embed",
+  "diagram",
+  "diagram_source",
   "unknown_block",
 ] as const;
 export type NodeName = (typeof NODE_NAMES)[number];

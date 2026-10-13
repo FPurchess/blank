@@ -48,7 +48,7 @@ describe("the controls' global rules", () => {
       "#outline",
       "#blocks-pane",
       ".context-menu",
-      ".toc-popover",
+      ".block-popover",
       ".main-menu",
       ".find-panel",
       ".toolbar",
@@ -60,6 +60,13 @@ describe("the controls' global rules", () => {
       );
       expect(rule(root), root).not.toMatch(/font-size:[\d.]+rem/);
     }
+  });
+
+  it("draw a row of options as one segmented control in a block's settings too", async () => {
+    const css = await compileMain();
+    expect(css).toMatch(
+      /\.dialog \.options,\.block-popover \.options\{display:inline-flex;gap:2px;padding:2px;/,
+    );
   });
 
   it("set a side pane's head as the draft has it, not as a document heading", async () => {

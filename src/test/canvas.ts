@@ -28,10 +28,31 @@ export const recordingContext = (
     },
     drawImage: (image: unknown, ...args: number[]) =>
       calls.push(["image", image, ...args]),
-    fill: (path: unknown) => {
-      calls.push(["fill", path]);
+    fill: (path: unknown, rule?: string) => {
+      calls.push(rule ? ["fill", path, rule] : ["fill", path]);
       calls.push(["style", context.fillStyle, context.globalAlpha]);
     },
+    strokeStyle: "",
+    lineWidth: 1,
+    lineCap: "butt",
+    lineJoin: "miter",
+    lineDashOffset: 0,
+    dash: [] as number[],
+    setLineDash: (dash: number[]) => {
+      context.dash = dash;
+    },
+    stroke: (path: unknown) =>
+      calls.push([
+        "stroke",
+        path,
+        context.strokeStyle,
+        context.lineWidth,
+        context.lineCap,
+        context.lineJoin,
+        [...context.dash],
+        context.lineDashOffset,
+        context.globalAlpha,
+      ]),
     save: () => calls.push(["save"]),
     restore: () => calls.push(["restore"]),
     beginPath: () => calls.push(["beginPath"]),

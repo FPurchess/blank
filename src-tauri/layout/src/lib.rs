@@ -2,6 +2,7 @@
 //! both what the page view paints and what the PDF holds.
 
 pub mod bands;
+pub mod drawing;
 pub mod engine;
 pub mod fonts;
 pub mod items;
