@@ -53,6 +53,11 @@ import { forgetVectors } from "./vectors";
 import { setDiagramModuleLoader } from "./diagramModule";
 import { useTestDiagramModule } from "../test/diagramModule";
 import * as codec from "../images/codec";
+import { setMathModuleLoader } from "./mathModule";
+import { forgetMathModule } from "../math/drawings";
+import { MATH_FAMILY, MATH_FONTS } from "../math/fonts";
+import { useTestMathModule } from "../test/mathModule";
+import { registerMath } from "../math/register";
 
 // The PDF export through the engine, as the user gets it: the images it
 // could and couldn't embed, the pages, the links and the metadata.
@@ -847,6 +852,52 @@ describe("the PDF's diagrams", () => {
       const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
       expect(text).toContain("error -->");
       expect(text).not.toContain("Parse error");
+    },
+  );
+});
+
+describe("the PDF's math", () => {
+  let unregister = () => {};
+  beforeEach(() => {
+    testEngine();
+    useTestMathModule();
+    unregister = registerMath();
+    // the KaTeX fonts, as the app loads them for a document with math
+    fallbackFonts.value = MATH_FONTS.map(([name]) => ({
+      family: `${MATH_FAMILY}${name}`,
+      bytes: readFileSync(
+        join(import.meta.dirname, `../../fonts/katex/KaTeX_${name}.ttf`),
+      ),
+    }));
+    // fetching them again fails in the tests, and is said
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    unregister();
+    forgetFallbacks();
+    forgetMathModule();
+    setMathModuleLoader(null);
+  });
+
+  it.runIf(has("pdftotext"))(
+    "sets formulas once the math module drew them, as text",
+    async () => {
+      const doc = parseMarkdown(
+        "So $\\frac{a}{b}$ it is.\n\n$$\nE = mc^2\n$$\n",
+      );
+      const state = EditorState.create({ schema, doc });
+      const { contents, warnings } = await toPDF(state, {
+        docPath: null,
+        layout: testLayout(),
+      });
+      expect(warnings).toEqual([]);
+      const file = join(dir, "math.pdf");
+      writeFileSync(file, contents);
+      const text = execFileSync("pdftotext", [file, "-"], { encoding: "utf8" });
+      expect(text).toContain("mc");
+      // set, not written as their source
+      expect(text).not.toContain("frac");
+      expect(text).not.toContain("$");
     },
   );
 });

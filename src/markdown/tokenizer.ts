@@ -6,6 +6,7 @@ import MarkdownIt, {
 
 import { blankBlocks, blankMarker, diagramFences } from "./blocks/rules";
 import { parseWidth } from "./blocks/caps";
+import { mathDisplay, mathFences, mathInline } from "./math/rules";
 import { textAlignment } from "./alignment";
 import { alignment } from "./schema";
 import { parseHtmlBlock, parseHtmlTable } from "./html";
@@ -300,6 +301,7 @@ export const ALIGNABLE_TOKENS = new Set([
   "heading_open",
   "fence",
   "blank_marker",
+  "math_display",
 ]);
 
 /**
@@ -403,6 +405,11 @@ tokenizer.block.ruler.before("html_block", "align_wrapper", alignWrapper, {
 tokenizer.block.ruler.before("paragraph", "page_break", pageBreak, {
   alt: ["paragraph", "reference", "blockquote"],
 });
+tokenizer.block.ruler.before("paragraph", "math_display", mathDisplay, {
+  alt: ["paragraph", "reference", "blockquote", "list"],
+});
+// before the backslash escapes, which would read \( as a (
+tokenizer.inline.ruler.before("escape", "math_inline", mathInline);
 // first, so that no other rule reads a marker line as something else, e.g. as
 // a heading underlined by a `---` below it
 tokenizer.block.ruler.before("table", "blank_marker", blankMarker, {
@@ -415,4 +422,6 @@ tokenizer.core.ruler.after("block", "blank_blocks", blankBlocks);
 tokenizer.core.ruler.after("block", "align_blocks", alignBlocks);
 // after the blocks with markers, so it finds only the bare fences left
 tokenizer.core.ruler.after("blank_blocks", "diagram_fences", diagramFences);
+// a ```math fence at any depth, as display math
+tokenizer.core.ruler.after("blank_blocks", "math_fences", mathFences);
 tokenizer.core.ruler.before("block", "align_start", alignStart);

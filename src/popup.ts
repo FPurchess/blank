@@ -15,7 +15,22 @@ export interface PlaceOptions {
   // the popup takes the room below the anchor, to the window's bottom edge,
   // and its content scrolls in it, e.g. the main menu
   fill?: boolean;
+  // what it must not cover, e.g. the find panel: it goes above the anchor
+  // or beside them instead, where it fits
+  avoid?: readonly DOMRect[];
 }
+
+const overlaps = (
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  rect: DOMRect,
+) =>
+  left < rect.right &&
+  left + width > rect.left &&
+  top < rect.bottom &&
+  top + height > rect.top;
 
 /**
  * place moves `element` below `anchor`, or above it if it only fits there,
@@ -25,7 +40,7 @@ export interface PlaceOptions {
 export const place = (
   element: HTMLElement,
   anchor: Anchor,
-  { side, align = "start", fill = false }: PlaceOptions = {},
+  { side, align = "start", fill = false, avoid = [] }: PlaceOptions = {},
 ) => {
   if (fill) {
     // below the anchor, as tall as the room there, never above it
@@ -50,8 +65,29 @@ export const place = (
     const above = anchor.top - height - 2;
     top = !side && above >= MARGIN ? above : bottom - height;
   }
-  element.style.left = `${inWindow(left, width)}px`;
-  element.style.top = `${Math.max(MARGIN, top)}px`;
+  left = inWindow(left, width);
+  top = Math.max(MARGIN, top);
+  const blocking = () =>
+    avoid.find((rect) => overlaps(left, top, width, height, rect));
+  let blocked = blocking();
+  if (blocked && !side) {
+    // above the anchor, if that's clear
+    const above = anchor.top - height - 2;
+    if (above >= MARGIN) {
+      const below = top;
+      top = above;
+      if (blocking()) top = below;
+    }
+    blocked = blocking();
+    // or beside what it would cover
+    if (blocked) {
+      const before = blocked.left - width - MARGIN;
+      left =
+        before >= MARGIN ? before : inWindow(blocked.right + MARGIN, width);
+    }
+  }
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
 };
 
 /**

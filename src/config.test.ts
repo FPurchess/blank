@@ -115,6 +115,7 @@ describe("config", () => {
         quotes: true,
         capitalize: true,
         blocks: true,
+        math: true,
         replace: { "*": {} },
       });
     });

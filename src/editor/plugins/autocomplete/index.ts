@@ -76,6 +76,8 @@ const handleTextInput = (
   if (from !== to || text.length !== 1) return false;
   const ctx = createContext(view.state, text);
   if (!ctx) return false;
+  // a formula's source keeps its quotes and its (c), e.g. f'(c)
+  if (ctx.inDollar && (text === ")" || !TEXT_TRIGGERS.has(text))) return false;
 
   // typographic quotes
   const quote = smartQuote(ctx, text);

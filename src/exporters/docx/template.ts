@@ -187,6 +187,7 @@ export const STYLE = {
   tableHeading: "TableHeading",
   tocHeading: "TOCHeading",
   placeholder: "PlaceholderText",
+  equation: "Equation",
 };
 
 // the name Word gives a table of contents, and its gallery of them, which
@@ -275,6 +276,15 @@ export const STYLES: IStylesOptions = {
       quickFormat: true,
       run: { size: halfPoints(BODY_SIZE / 1.25), italics: true },
       paragraph: { keepNext: true, spacing: { after: twips(4) } },
+    },
+    {
+      // display math: an equation on a paragraph of its own, centered
+      id: STYLE.equation,
+      name: STYLE_NAMES.equation,
+      basedOn: "Normal",
+      next: "Normal",
+      quickFormat: true,
+      paragraph: { alignment: "center" as const, keepLines: true },
     },
     {
       // small print, e.g. a letter's return address: a step down, like the

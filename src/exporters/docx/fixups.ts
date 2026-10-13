@@ -9,6 +9,7 @@ import {
   contentControls,
   type WordDiagram,
 } from "./forms";
+import { addMath, type ConvertedMath } from "./math";
 import { CODE_FONT, TOC_NAME } from "./template";
 
 // Fixes to the package docx 9.7.2 writes, applied to the zipped document.
@@ -107,16 +108,20 @@ export const fixPackage = async (
     definitions = [],
     embeds = {},
     diagrams = {},
+    math = [],
   }: {
     definitions?: readonly Definition[];
     // the embeds' attributes, by their ids
     embeds?: Record<string, Attrs>;
     // the diagrams' sources and settings, by their ids
     diagrams?: Record<string, WordDiagram>;
+    // the formulas, in the order of their placeholders
+    math?: readonly ConvertedMath[];
   } = {},
 ) => {
   const zip = await JSZip.loadAsync(contents);
   await contentControls(zip);
+  await addMath(zip, math);
   if (definitions.length) await addDefinitions(zip, definitions);
   if (Object.keys(embeds).length) await addEmbeds(zip, embeds);
   if (Object.keys(diagrams).length) await addDiagrams(zip, diagrams);

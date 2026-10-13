@@ -26,6 +26,8 @@ export const blockName = (doc: Node, node: Node) => {
       return embedLabel(node);
     case "diagram":
       return "Diagram";
+    case "math_display":
+      return "Equation";
     default:
       return "Block Blank can't show";
   }

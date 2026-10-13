@@ -74,6 +74,8 @@ export const DEFINITIONS_NAMESPACE =
   "https://blank-writer.xyz/2026/definitions";
 // and the one that holds the embeds
 export const EMBEDS_NAMESPACE = "https://blank-writer.xyz/2026/embeds";
+// and the one that holds the LaTeX of equations, see ./math.ts
+export const MATH_NAMESPACE = "https://blank-writer.xyz/2026/math";
 // and the one that holds the diagrams' sources and settings
 export const DIAGRAMS_NAMESPACE = "https://blank-writer.xyz/2026/diagrams";
 
@@ -227,6 +229,12 @@ export const CUSTOM_PARTS = {
     root: "diagrams",
     namespace: DIAGRAMS_NAMESPACE,
     id: "{8C3E5A1D-4F2B-4D7C-9E6A-3B1F7C2D5E94}",
+  },
+  math: {
+    number: 4,
+    root: "math",
+    namespace: MATH_NAMESPACE,
+    id: "{8E2B6C41-3F9D-4A7B-9C15-6D0E2A8F4B93}",
   },
 } satisfies Record<string, CustomPart>;
 

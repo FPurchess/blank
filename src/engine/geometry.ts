@@ -100,13 +100,18 @@ const boxOf = ({ left, top, right, bottom }: Box): Box => ({
   bottom,
 });
 
-// the smallest box around all of `boxes`
-const around = (boxes: Box[]): Box => ({
-  left: Math.min(...boxes.map((box) => box.left)),
-  top: Math.min(...boxes.map((box) => box.top)),
-  right: Math.max(...boxes.map((box) => box.right)),
-  bottom: Math.max(...boxes.map((box) => box.bottom)),
-});
+/**
+ * unionOf returns the box around `boxes`, or null for none
+ */
+export const unionOf = (boxes: readonly Box[]): Box | null =>
+  boxes.length
+    ? {
+        left: Math.min(...boxes.map((box) => box.left)),
+        top: Math.min(...boxes.map((box) => box.top)),
+        right: Math.max(...boxes.map((box) => box.right)),
+        bottom: Math.max(...boxes.map((box) => box.bottom)),
+      }
+    : null;
 
 // the editor's DOM measures positions it doesn't show (e.g. inside a node
 // view) with an error
@@ -142,7 +147,8 @@ const shownBlocks = (view: EditorView, from: number, to: number) => {
     boxes.push(boxOf(dom.getBoundingClientRect()));
     return false;
   });
-  return boxes.length ? [{ ...around(boxes), page: 0 }] : [];
+  const box = unionOf(boxes);
+  return box ? [{ ...box, page: 0 }] : [];
 };
 
 const shownTable = (view: EditorView, pos: number): TableGeometry | null => {
@@ -217,6 +223,15 @@ const ready = (): {
   const shown = framesNow();
   const engine = pageEngine;
   return shown && engine ? { engine, ...shown } : null;
+};
+
+/**
+ * pageScale returns how many pixels of the screen a point of the pages
+ * takes, or null without the pages
+ */
+export const pageScale = (): number | null => {
+  const frame = ready()?.frames.frames[0];
+  return frame ? frame.width / frame.w : null;
 };
 
 /**
@@ -615,6 +630,34 @@ export const exposeGeometry = (view: EditorView) => {
         );
         return blocks;
       },
+      // the formulas of the document: their kind, source, position and the
+      // box they are painted in
+      maths: () => {
+        const found: {
+          type: string;
+          source: string;
+          pos: number;
+          box: Box | null;
+        }[] = [];
+        doc().descendants((node, pos) => {
+          if (
+            node.type.name !== "math_inline" &&
+            node.type.name !== "math_display"
+          )
+            return true;
+          const rects = rangeRects(pos, pos + node.nodeSize);
+          found.push({
+            type: node.type.name,
+            source: node.textContent,
+            pos,
+            box: unionOf(rects),
+          });
+          return false;
+        });
+        return found;
+      },
+      // the numbers of numbered display math, as pairs of position and number
+      mathNumbers: () => pageEngine?.mathNumbers() ?? [],
       // the page numbers each table of contents shows, in order
       tocNumbers: () => {
         const numbers: (string[] | null)[] = [];

@@ -18,6 +18,8 @@ use skrifa::{FontRef, GlyphId, MetadataProvider};
 pub type Ink = u32;
 pub const INK_CODE: Ink = 1 << 16;
 pub const INK_UNDERLINE: Ink = 1 << 17;
+/// drawn faint, as a hint is, e.g. the `$` around math being edited
+pub const INK_DIM: Ink = 1 << 18;
 
 pub fn ink_link(ink: Ink) -> Option<usize> {
     let link = (ink & 0xffff) as usize;
@@ -70,6 +72,8 @@ pub struct Fonts {
     /// what they lack; and the same for code
     pub stack: Vec<String>,
     pub mono_stack: Vec<String>,
+    /// the math fonts and the formulas laid out in them, see `crate::math`
+    pub maths: crate::math::Maths,
 }
 
 /// reads the faces of a font file: their units per em and underlines
@@ -168,14 +172,24 @@ impl Fonts {
             lcx: LayoutContext::new(),
             stack: FONT_STACK.iter().map(|family| family.to_string()).collect(),
             mono_stack: MONO_STACK.iter().map(|family| family.to_string()).collect(),
+            maths: Default::default(),
         }
     }
 
     /// adds a font for what the others lack, e.g. a system font for Chinese
-    /// or an emoji font, as the last fallback of text and code
+    /// or an emoji font, as the last fallback of text and code. A family
+    /// named `math:<name>` is a math font instead (see `crate::math`): it
+    /// sets formulas only and stays out of the stacks.
     pub fn add(&mut self, bytes: Vec<u8>, family: &str) {
         let faces = faces_of(&mut self.fcx, bytes, family);
+        let first = self.files.len();
         self.files.extend(faces);
+        if let Some(name) = family.strip_prefix(crate::math::MATH_FAMILY) {
+            self.maths.add_font(name, first);
+            return;
+        }
+        // formulas set the characters the math fonts lack in text fonts
+        self.maths.forget();
         // a name of the list as it is, whatever it holds: quotes and commas
         // are part of it
         if !self.stack.iter().any(|known| known == family) {
@@ -258,6 +272,7 @@ impl Fonts {
             lcx: LayoutContext::new(),
             stack: self.stack.clone(),
             mono_stack: self.mono_stack.clone(),
+            maths: self.maths.clone(),
         }
     }
 

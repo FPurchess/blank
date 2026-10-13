@@ -41,6 +41,8 @@ import { createEditorHandle, syncPlugin } from "./handle";
 import { STATUS_HEIGHT, TOP_BAR_HEIGHT } from "../chrome";
 import { timed } from "../engine/perf";
 import { registerDiagrams } from "../diagrams";
+import { mathInline } from "./plugins/mathInline";
+import { registerMath } from "../math/register";
 
 /**
  * bootEditor mounts the editor with the tabs of the last session and the
@@ -50,6 +52,9 @@ import { registerDiagrams } from "../diagrams";
 export const bootEditor = async () => {
   // the kinds of source blocks: Mermaid itself loads with the first diagram
   registerDiagrams();
+  // math: what the editor shows while it's edited (its fonts load with the
+  // first document with math, see src/math/fonts.ts)
+  registerMath();
   const state = await restoreTabs(
     EditorState.create({
       schema,
@@ -72,6 +77,9 @@ export const bootEditor = async () => {
         blockRemovals(),
         contextMenu(),
         spellcheck(),
+        // the keys at and in inline math, before Enter and Backspace of
+        // the others
+        mathInline(),
         // Tab and Enter in a form, before autocorrect and the table keys
         forms(),
         // Esc closes the find panel, after a form's own Esc and before focus

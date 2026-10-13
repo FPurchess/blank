@@ -236,6 +236,7 @@ export const sourceWarning = (doc: Node, where: string): string[] => {
   doc.descendants((node) => {
     const kind = sourceKind(node.type.name);
     if (!kind) return true;
+    if (kind.written) return false;
     const rendered = results.get(sourceKeyOf(node));
     if (rendered?.ok !== true) count++;
     return false;

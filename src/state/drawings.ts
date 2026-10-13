@@ -10,3 +10,7 @@ export const vectorPictures = shallowRef(0);
 // bumped whenever the diagram module drew a diagram, so the pages lay it
 // out with its drawing
 export const drawnVectors = shallowRef(0);
+
+// bumped whenever the math module drew formulas asked for before it had
+// loaded, so the pages lay them out with their drawings (src/math/drawings.ts)
+export const drawnMath = shallowRef(0);

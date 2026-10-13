@@ -15,6 +15,9 @@ export interface PdfJob {
   // the diagram module's drawings: the src each is drawn in place of, and
   // its JSON
   drawings?: [string, string][];
+  // what the math module made of each formula: its source, whether it's
+  // display math, and the drawing's JSON
+  math?: [string, boolean, string][];
   // as JSON, see settingsOf and flatten
   settings: string;
   items: string;
@@ -43,7 +46,9 @@ export const imageKind = (mime: ImageMime): ImageKind =>
 export type PdfWarning =
   | { kind: "image"; src: string }
   | { kind: "font"; font: number; family: string }
-  | { kind: "pdfa"; reason: string };
+  | { kind: "pdfa"; reason: string }
+  // a formula that can't be set, whose source stands in its place
+  | { kind: "math"; latex: string; message: string };
 
 export interface PdfResult {
   pdf: Uint8Array;
@@ -86,6 +91,9 @@ export const writePdf = (
     for (const image of job.images)
       engine.addImage(image.src, image.bytes, image.kind);
     for (const [src, json] of job.drawings ?? []) engine.addDrawing(src, json);
+    for (const [latex, display, json] of job.math ?? []) {
+      engine.addMath(latex, display, json);
+    }
     engine.setSettings(job.settings);
     engine.setItems(job.items);
     const written =

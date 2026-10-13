@@ -7,7 +7,7 @@ import type { Definition } from "../markdown/blocks/definitions";
 // is part of uiTakesFocus while it holds it.
 
 // a group of tiles, in the order the pane shows them
-export type BlockGroup = "contents" | "forms" | "drawings";
+export type BlockGroup = "contents" | "forms" | "drawings" | "math";
 
 export interface BlockChoice {
   id: string;

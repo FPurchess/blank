@@ -52,7 +52,7 @@ Each [group](./autocorrect#what-gets-corrected) can be turned off with `false`. 
 }
 ```
 
-The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `capitalize` and `blocks`. All are on by default. A replacement for a language also applies to its regional variants: one for `de` works in `de-CH` too.
+The groups are `arrows`, `dashes`, `symbols`, `formatting`, `links`, `quotes`, `capitalize`, `blocks` and `math`. All are on by default. A replacement for a language also applies to its regional variants: one for `de` works in `de-CH` too.
 
 ## Spell check
 

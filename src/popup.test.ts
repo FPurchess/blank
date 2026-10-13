@@ -151,3 +151,28 @@ describe("place, filling the window's height", () => {
     expect(element.style.left).toBe("10px");
   });
 });
+
+describe("place clear of what it must not cover", () => {
+  const line = { left: 300, top: 300, bottom: 320, right: 340 };
+  const rect = (left: number, top: number, right: number, bottom: number) =>
+    ({ left, top, right, bottom }) as DOMRect;
+
+  it("stays below the line when nothing is in the way", () => {
+    const element = toolbar(120, 40);
+    place(element, line, { avoid: [rect(800, 0, 1000, 100)] });
+    expect(element.style.top).toBe("322px");
+    expect(element.style.left).toBe("300px");
+  });
+
+  it("goes above the line when the find panel is below it", () => {
+    const element = toolbar(120, 40);
+    place(element, line, { avoid: [rect(250, 321, 600, 400)] });
+    expect(element.style.top).toBe(`${300 - 40 - 2}px`);
+  });
+
+  it("goes beside what it would cover above and below", () => {
+    const element = toolbar(120, 40);
+    place(element, line, { avoid: [rect(250, 200, 600, 400)] });
+    expect(element.style.left).toBe(`${250 - 120 - 4}px`);
+  });
+});

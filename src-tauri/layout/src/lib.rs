@@ -6,6 +6,7 @@ pub mod drawing;
 pub mod engine;
 pub mod fonts;
 pub mod items;
+pub mod math;
 pub mod model;
 pub mod pdf;
 pub mod style;

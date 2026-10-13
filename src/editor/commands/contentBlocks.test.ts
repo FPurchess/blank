@@ -154,6 +154,7 @@ describe("the blocks pane", () => {
       ["toc", "contents"],
       ["blank/recipe", "forms"],
       ["diagram", "drawings"],
+      ["equation", "math"],
     ]);
     // a form's tile draws its definition
     expect(choices[1].definition?.name).toBe("Recipe");
@@ -170,6 +171,18 @@ describe("the blocks pane", () => {
     expect(diagram.type.name).toBe("diagram");
     expect(diagram.textContent).toBe(DIAGRAM_STARTER);
     expect(view.state.selection.$head.parent.type.name).toBe("diagram_source");
+  });
+
+  it("inserts an equation with its source open", async () => {
+    await read();
+    const view = createTestView(createState(doc(p())));
+    expect(insertBlock("equation")(view.state, view.dispatch, view)).toBe(true);
+    const math = view.state.doc.child(0);
+    expect(math.type.name).toBe("math_display");
+    expect(math.textContent).toBe("e^{i\\pi} + 1 = 0");
+    const { $head } = view.state.selection;
+    expect($head.parent.type.name).toBe("math_display_source");
+    expect($head.parentOffset).toBe(math.textContent.length);
   });
 
   it("reads the forms once, however often it is asked meanwhile", async () => {

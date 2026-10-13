@@ -16,10 +16,22 @@ export class LayoutEngine {
      */
     addFont(bytes: Uint8Array, family: string): void;
     /**
+     * adds several font files, laid one after the other, each for its
+     * family (a JSON list), and lays out once: the math fonts, whose
+     * families are `math:<name>` (see `crate::math`)
+     */
+    addFonts(bytes: Uint8Array, lengths: Uint32Array, families: string): void;
+    /**
      * an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
      * JPEG
      */
     addImage(src: string, bytes: Uint8Array, kind: number): void;
+    /**
+     * what the math module made of a formula (see `crate::math`): its
+     * drawing, or what is wrong with it; false for JSON it can't read. The
+     * webview adds it before it lays out what holds the formula.
+     */
+    addMath(latex: string, display: boolean, json: string): boolean;
     /**
      * the size, distance from the edge and line of the headers and footers,
      * which the page view repeats; for tests
@@ -93,6 +105,17 @@ export class LayoutEngine {
      */
     lineEdge(pos: number, end: boolean): number;
     /**
+     * a formula in the body text's size, for a preview: `{ok: true, width,
+     * height, depth, display}` with the display list's origin at the
+     * box's top left, `{ok: false, error, line, column}`, or `{ok:
+     * "nofonts"}` while the math fonts or the formula's drawing aren't added
+     */
+    mathLayout(latex: string, block: boolean): string;
+    /**
+     * the numbered display math, as pairs of its position and number
+     */
+    mathNumbers(): Uint32Array;
+    /**
      * the characters of the document no font has a glyph for
      */
     missing(): string;
@@ -153,6 +176,10 @@ export class LayoutEngine {
      * forgets a drawing, e.g. one no document shows any more
      */
     removeDrawing(src: string): void;
+    /**
+     * forgets a formula, e.g. one no document holds any more
+     */
+    removeMath(latex: string, display: boolean): void;
     /**
      * the colour of a role on paper, as 0xRRGGBB; for tests
      */
@@ -245,7 +272,9 @@ export interface InitOutput {
     readonly __wbg_layoutengine_free: (a: number, b: number) => void;
     readonly layoutengine_addDrawing: (a: number, b: number, c: number, d: number, e: number) => number;
     readonly layoutengine_addFont: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly layoutengine_addFonts: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
     readonly layoutengine_addImage: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly layoutengine_addMath: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
     readonly layoutengine_bandMetrics: (a: number) => [number, number];
     readonly layoutengine_bandVersions: (a: number) => [number, number];
     readonly layoutengine_bands: (a: number, b: number) => [number, number];
@@ -261,6 +290,8 @@ export interface InitOutput {
     readonly layoutengine_hit: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineBoundary: (a: number, b: number, c: number, d: number) => [number, number];
     readonly layoutengine_lineEdge: (a: number, b: number, c: number) => number;
+    readonly layoutengine_mathLayout: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly layoutengine_mathNumbers: (a: number) => [number, number];
     readonly layoutengine_missing: (a: number) => [number, number];
     readonly layoutengine_new: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly layoutengine_page: (a: number, b: number) => [number, number];
@@ -273,6 +304,7 @@ export interface InitOutput {
     readonly layoutengine_printDisplay: (a: number, b: number) => [number, number];
     readonly layoutengine_printPdf: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly layoutengine_removeDrawing: (a: number, b: number, c: number) => void;
+    readonly layoutengine_removeMath: (a: number, b: number, c: number, d: number) => void;
     readonly layoutengine_roleColor: (a: number, b: number) => number;
     readonly layoutengine_selection: (a: number, b: number, c: number) => [number, number];
     readonly layoutengine_setItems: (a: number, b: number, c: number) => [number, number, number, number];
@@ -293,9 +325,9 @@ export interface InitOutput {
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __externref_drop_slice: (a: number, b: number) => void;
-    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

@@ -24,6 +24,8 @@ import {
   ITEM_SPACE,
 } from "../layout/spacing";
 import { listMarker } from "../markdown/lists";
+import { mathDrawing } from "../math/drawings";
+import { wantMathFonts } from "../math/fonts";
 import type {
   Content,
   EngineAlign,
@@ -62,6 +64,8 @@ export type ImageSizes = (
 export interface SourceView {
   // the position of the open source block
   open?: number | null;
+  // the position of the open inline source, e.g. inline math
+  inline?: number | null;
   // the key of the drawing shown under the open one's source
   preview?: string | null;
   export?: boolean;
@@ -113,28 +117,65 @@ export interface FlatRecord {
   build: () => EngineItem;
 }
 
+// what stands for each position of inline math that is set: a word joiner,
+// which has no width and keeps the formula with the text around it
+const MATH_PLACEHOLDER = "\u2060";
+
 /**
  * spansOf returns the text of a textblock (hard breaks as "\n") and its
- * marked runs, counted in ProseMirror positions from its start
+ * marked runs, counted in ProseMirror positions from its start. Inline math
+ * takes as many characters as its node has positions: placeholders the
+ * engine sets the formula over, or, while it's open, its source between its
+ * two `$`s, which stand for the node's start and end.
+ * @param pos the position of the first child
  */
 export const spansOf = (
   children: readonly Node[],
+  pos = 0,
+  sources: SourceView = {},
 ): { text: string; spans: EngineSpan[] } => {
   let text = "";
   const spans: EngineSpan[] = [];
+  const add = (span: EngineSpan) => {
+    const last = spans[spans.length - 1];
+    // a formula's span stands alone, also beside another formula
+    if (
+      last &&
+      last.to === span.from &&
+      !last.math &&
+      !span.math &&
+      !last.dim &&
+      !span.dim &&
+      sameMarks(last, span)
+    ) {
+      last.to = span.to;
+    } else spans.push(span);
+  };
   for (const child of children) {
     const from = text.length;
+    if (child.type.name === "math_inline") {
+      wantMathFonts();
+      const source = child.textContent;
+      const marks = spanOf(child.marks, from, from) ?? { from, to: from };
+      if (!sources.export && sources.inline === pos + from) {
+        text += `$${source}$`;
+        const to = text.length;
+        add({ ...marks, from, to: from + 1, code: true, dim: true });
+        if (source) add({ ...marks, from: from + 1, to: to - 1, code: true });
+        add({ ...marks, from: to - 1, to, code: true, dim: true });
+      } else {
+        text += MATH_PLACEHOLDER.repeat(child.nodeSize);
+        add({ ...marks, from, to: text.length, math: source });
+      }
+      continue;
+    }
     if (child.isText) text += child.text ?? "";
     else if (child.type.name === "hard_break") text += "\n";
     // any other inline leaf takes its one position
     else text += "￼";
     const to = text.length;
     const span = spanOf(child.marks, from, to);
-    if (span) {
-      const last = spans[spans.length - 1];
-      if (last && last.to === from && sameMarks(last, span)) last.to = to;
-      else spans.push(span);
-    }
+    if (span) add(span);
   }
   return { text, spans };
 };
@@ -249,8 +290,9 @@ const textOf = (
   pos: number,
   top: boolean,
   listed = false,
+  sources: SourceView = {},
 ): EngineText => {
-  const { text, spans } = spansOf(children);
+  const { text, spans } = spansOf(children, pos, sources);
   const level = node.type.name === "heading" ? (node.attrs.level as number) : 0;
   const align = alignOf(node);
   return {
@@ -264,6 +306,27 @@ const textOf = (
     ...(listed ? { listed } : {}),
     ...(align ? { align } : {}),
   };
+};
+
+/**
+ * mathDrawnIn tells which formulas in `node` the math module has drawn,
+ * which the engine sets once it has (src/math/drawings.ts): their record
+ * changes then, and they're laid out again. Asking draws them, or loads
+ * the module.
+ */
+const mathDrawnIn = (node: Node) => {
+  let drawn = "";
+  const look = (child: Node) => {
+    const name = child.type.name;
+    if (name === "math_inline" || name === "math_display") {
+      const known = mathDrawing(child.textContent, name === "math_display");
+      drawn += known === undefined ? "0" : "1";
+      return false;
+    }
+    return !child.isLeaf;
+  };
+  if (look(node)) node.descendants(look);
+  return drawn;
 };
 
 /**
@@ -355,6 +418,7 @@ const cellBlocks = (
   cell: Node,
   pos: number,
   sizes: ImageSizes,
+  sources: SourceView,
 ): EngineCellBlock[] => {
   const blocks: EngineCellBlock[] = [];
   const walk = (
@@ -389,11 +453,36 @@ const cellBlocks = (
           return;
         }
         blocks.push({
-          ...textOf(node, piece.children, piece.pos, false),
+          ...textOf(node, piece.children, piece.pos, false, false, sources),
           indent,
           bars,
           ...first,
         });
+      });
+    } else if (name === "math_display") {
+      wantMathFonts();
+      const source = node.firstChild;
+      const open = !sources.export && sources.open === at && source;
+      // open, its source as code where the cursor goes, with the formula
+      // under it at the block's end, as at the top
+      if (open) {
+        const children: Node[] = [];
+        source.forEach((child) => children.push(child));
+        blocks.push({
+          // from its first character, inside the source node at at + 1
+          ...textOf(source, children, at + 2, false, false, sources),
+          indent,
+          bars,
+          ...(marker ? { marker } : {}),
+        });
+      }
+      blocks.push({
+        kind: "math",
+        pos: open ? at + node.nodeSize - 1 : at,
+        latex: node.textContent,
+        indent,
+        bars,
+        ...(marker && !open ? { marker } : {}),
       });
     } else if (name === "blockquote") {
       node.forEach((child, offset, index) =>
@@ -446,6 +535,7 @@ const tableOf = (
   pos: number,
   widths: number[] | undefined,
   sizes: ImageSizes,
+  sources: SourceView,
 ): Content => {
   const grid = tableGrid(node);
   const caption = node.attrs.caption as string | null;
@@ -457,12 +547,19 @@ const tableOf = (
       // the cell's position: the table's content, then its rows and cells
       const cellPos = pos + 1 + cell.offset;
       const blocks = holdsBlocks(cell.node)
-        ? cellBlocks(cell.node, cellPos, sizes)
+        ? cellBlocks(cell.node, cellPos, sizes, sources)
         : undefined;
       if (!blocks)
         cell.node.forEach((child, offset) => {
           paragraphs.push(
-            textOf(child, child.children, cellPos + 1 + offset + 1, false),
+            textOf(
+              child,
+              child.children,
+              cellPos + 1 + offset + 1,
+              false,
+              false,
+              sources,
+            ),
           );
         });
       return [
@@ -520,6 +617,16 @@ export const flattenBlocks = (
   sources: SourceView = {},
 ): FlatRecord[][] => {
   const records: FlatRecord[] = [];
+  // the open sources in a node, which the node's records depend on: inline
+  // math in its text, a source block in a table's cell
+  const openIn = (node: Node, pos: number) =>
+    [sources.inline, sources.open]
+      .map((at) =>
+        typeof at === "number" && at >= pos && at < pos + node.nodeSize
+          ? at
+          : "",
+      )
+      .join(" ");
   const quoteOf: number[][] = [];
 
   const push = (
@@ -556,6 +663,8 @@ export const flattenBlocks = (
       context.style ?? "",
       context.column ? JSON.stringify(context.column) : "",
       context.frame ? JSON.stringify(context.frame) : "",
+      openIn(node, pos),
+      mathDrawnIn(node),
       extra.key ?? "",
     ].join("|");
     records.push({ node, pos, key, build: item });
@@ -631,7 +740,7 @@ export const flattenBlocks = (
       return;
     }
     if (node.type.spec.sourceBlock) {
-      sourceBlock(node, pos, context, space);
+      sourceBlock(node, pos, context, space, marker);
       return;
     }
     if (name === "unknown_block") {
@@ -652,9 +761,16 @@ export const flattenBlocks = (
         images.push(size ? `${size.width}x${size.height}` : "?");
         return false;
       });
-      push(node, pos, context, space, () => tableOf(node, pos, widths, sizes), {
-        key: [widths ? widths.join(" ") : "", ...images].join("|"),
-      });
+      push(
+        node,
+        pos,
+        context,
+        space,
+        () => tableOf(node, pos, widths, sizes, sources),
+        {
+          key: [widths ? widths.join(" ") : "", ...images].join("|"),
+        },
+      );
       return;
     }
     if (node.isTextblock) {
@@ -924,6 +1040,7 @@ export const flattenBlocks = (
             piece.pos,
             context.top,
             index === listedPiece,
+            sources,
           ),
           ...(context.hint ? { hint: context.hint } : {}),
           ...(context.hint && context.picture ? { picture: true } : {}),
@@ -945,6 +1062,7 @@ export const flattenBlocks = (
     pos: number,
     context: Context,
     space: Space,
+    marker?: string,
   ) => {
     const kind = sourceKind(node.type.name);
     const source = node.firstChild!;
@@ -953,9 +1071,39 @@ export const flattenBlocks = (
     const open = !sources.export && sources.open === pos;
     if (kind?.item) {
       const item = kind.item;
-      push(node, pos, context, space, () => item(node, pos, rendered, open), {
-        key: [open, key, rendered ? JSON.stringify(rendered) : "?"].join(" "),
-      });
+      const end = pos + node.nodeSize;
+      const keyed = [key, rendered ? JSON.stringify(rendered) : "?"].join(" ");
+      const top = context.top;
+      if (!open) {
+        push(
+          node,
+          pos,
+          context,
+          space,
+          () => item(node, { pos, end, preview: false, top }, rendered),
+          { marker, key: keyed },
+        );
+        return;
+      }
+      // its source as code where the cursor goes, and the item under it at
+      // the end of the block, so the positions stay in order
+      const inner = { ...context, top: false, listed: false };
+      textblock(
+        source,
+        pos + 1,
+        inner,
+        { before: space.before, after: 0 },
+        marker,
+      );
+      const at = end - 1;
+      push(
+        node,
+        at,
+        context,
+        { before: BLOCK_AFTER, after: space.after },
+        () => item(node, { pos: at, end, preview: true, top }, rendered),
+        { key: `preview ${keyed}` },
+      );
       return;
     }
     const failed = rendered !== undefined && rendered.ok !== true;

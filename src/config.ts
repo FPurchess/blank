@@ -46,6 +46,7 @@ export enum CommandIdentifier {
   INSERT_PAGE_BREAK = "insert.page_break",
   INSERT_BLOCK = "insert.block",
   BLOCK_SETTINGS = "block.settings",
+  INSERT_MATH = "insert.math",
   FORMAT_INDENT = "format.indent",
   FORMAT_UNINDENT = "format.unindent",
   FORMAT_BOLD = "format.bold",
@@ -113,6 +114,7 @@ export interface AutocorrectConfig {
   quotes: boolean;
   capitalize: boolean;
   blocks: boolean;
+  math: boolean;
   replace: Replacements;
 }
 
@@ -179,6 +181,7 @@ const defaultConfig: Config = {
     [CommandIdentifier.INSERT_PAGE_BREAK]: "Mod-Enter",
     [CommandIdentifier.INSERT_BLOCK]: "Mod-Alt-b",
     [CommandIdentifier.BLOCK_SETTINGS]: "Shift-Enter",
+    [CommandIdentifier.INSERT_MATH]: "Mod-Shift-m",
     [CommandIdentifier.FORMAT_INDENT]: "Tab",
     [CommandIdentifier.FORMAT_UNINDENT]: "Shift-Tab",
     [CommandIdentifier.FORMAT_BOLD]: "Mod-b",
@@ -242,6 +245,7 @@ const defaultConfig: Config = {
     quotes: true,
     capitalize: true,
     blocks: true,
+    math: true,
     replace: { "*": {} },
   },
   spellcheck: {

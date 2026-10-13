@@ -8,6 +8,8 @@ import {
   focusMode,
   imageDialog,
   linkDialog,
+  mathPopover,
+  mathPreview,
   pageSetup,
   printDialog,
   settingsDialog,
@@ -26,6 +28,8 @@ import ContextMenu from "./ContextMenu.vue";
 import ImageDialog from "./ImageDialog.vue";
 import { keyOf } from "./keyOf";
 import LinkDialog from "./LinkDialog.vue";
+import MathPopover from "./MathPopover.vue";
+import MathPreview from "./MathPreview.vue";
 import DocumentOutline from "./DocumentOutline.vue";
 import PageSetupDialog from "./PageSetupDialog.vue";
 import PageView from "./PageView.vue";
@@ -110,6 +114,12 @@ watchFocusMode();
     :key="keyOf(diagramPopover)"
     :request="diagramPopover"
   />
+  <MathPopover
+    v-if="mathPopover"
+    :key="keyOf(mathPopover)"
+    :request="mathPopover"
+  />
+  <MathPreview v-if="mathPreview" :request="mathPreview" />
   <ContextMenu
     v-if="contextMenu"
     :key="keyOf(contextMenu.close)"

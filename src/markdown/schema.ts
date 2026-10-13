@@ -13,6 +13,7 @@ import { ATOMS, extraArgs, isDepth, TOC_DEFAULTS } from "./blocks/atoms";
 import { checkDiagram } from "./blocks/diagrams";
 import { parseWidth } from "./blocks/caps";
 import { sourceBlockSpecs } from "./blocks/sourceBlock";
+import { mathDisplay, mathDisplaySource, mathInline } from "./math/nodes";
 import {
   checkEmbed,
   EMBED_ARGS,
@@ -46,7 +47,7 @@ const cells = tableNodes({
   tableGroup: "block",
   // no headings, rules or tables: a cell holds what a table cell in Word does
   cellContent:
-    "(paragraph | bullet_list | ordered_list | blockquote | code_block)+",
+    "(paragraph | bullet_list | ordered_list | blockquote | code_block | math_display)+",
   cellAttributes: {
     align: {
       default: null,
@@ -359,6 +360,9 @@ const nodes = base.spec.nodes
   .addBefore("image", "diagram", diagramSpecs.diagram)
   .addBefore("image", "diagram_source", diagramSpecs.diagram_source)
   .addBefore("image", "unknown_block", unknownBlock)
+  .addBefore("image", "math_display", mathDisplay)
+  .addBefore("image", "math_display_source", mathDisplaySource)
+  .addBefore("image", "math_inline", mathInline)
   .append({
     table,
     table_row: cells.table_row,
@@ -430,6 +434,9 @@ export const NODE_NAMES = [
   "diagram",
   "diagram_source",
   "unknown_block",
+  "math_display",
+  "math_display_source",
+  "math_inline",
 ] as const;
 export type NodeName = (typeof NODE_NAMES)[number];
 export const MARK_NAMES = [

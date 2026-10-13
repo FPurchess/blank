@@ -1,0 +1,61 @@
+x^2 + y^2 = z^2
+\frac{a}{b}
+\frac{1}{1 + \frac{1}{x}}
+\sqrt{2}
+\sqrt[3]{x + 1}
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}
+\prod_{k=1}^{n} k
+\lim_{x \to 0} \frac{\sin x}{x} = 1
+\left( \frac{a}{b} \right)^2
+\left\{ x \in \mathbb{R} \;\middle|\; x > 0 \right\}
+\begin{pmatrix} a & b \\ c & d \end{pmatrix}
+\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}
+\det \begin{vmatrix} a & b \\ c & d \end{vmatrix}
+\begin{aligned} a &= b + c \\ d &= e \end{aligned}
+f(x) = \begin{cases} 1 & x > 0 \\ 0 & \text{otherwise} \end{cases}
+\text{for all } x
+\hat{x} \bar{y} \vec{v} \dot{a} \ddot{b} \tilde{n}
+\overline{AB} \underline{cd}
+\overbrace{a + b}^{n} \underbrace{c + d}_{m}
+\alpha \beta \gamma \delta \epsilon \varepsilon \zeta \eta \theta
+\Gamma \Delta \Theta \Lambda \Xi \Pi \Sigma \Phi \Psi \Omega
+\mathbb{N} \mathbb{Z} \mathbb{Q} \mathbb{R} \mathbb{C}
+\mathcal{L} \mathfrak{g} \mathscr{F} \mathrm{d}x \mathbf{v} \mathit{it} \mathsf{s} \mathtt{t}
+a \le b \ge c \ne d \approx e \equiv f \sim g \propto h
+\forall x \exists y \neg p \land q \lor r \implies s \iff t
+A \subset B \subseteq C \cup D \cap E \in F \notin G \emptyset
+\nabla \cdot \vec{E} = \frac{\rho}{\varepsilon_0}
+\partial_t u = \Delta u
+\binom{n}{k} = \frac{n!}{k!(n-k)!}
+\ce{H2O}
+\ce{2H2 + O2 -> 2H2O}
+\pu{123 kJ/mol}
+x_{i,j}^{(k)}
+e^{i\pi} + 1 = 0
+\xrightarrow{f} \xleftarrow[g]{}
+\langle u, v \rangle \lVert x \rVert \lfloor y \rfloor \lceil z \rceil
+\big( \Big( \bigg( \Bigg(
+\oint_C \vec{F} \cdot d\vec{r}
+\iint_D f \, dA \iiint_V g \, dV
+a \pmod{n} \quad b \bmod c
+\operatorname{rank}(A) \max_{x} f \min_y g \arg\max
+\color{red} x \textcolor{blue}{y}
+\boxed{E = mc^2}
+\cancel{x} \bcancel{y} \sout{z}
+a\phantom{x}b \hphantom{y}c \vphantom{z}d
+\stackrel{def}{=} \overset{!}{=} \underset{x}{\arg\min}
+\dfrac{a}{b} \tfrac{c}{d} \cfrac{1}{2}
+\displaystyle\sum_n \textstyle\sum_n
+\left. \frac{df}{dx} \right|_{x=0}
+\sqrt{\frac{a^2 + b^2}{c}}
+\begin{array}{c|c} 1 & 2 \\ \hline 3 & 4 \end{array}
+\begin{smallmatrix} a & b \\ c & d \end{smallmatrix}
+\begin{gathered} a = b \\ c = d \end{gathered}
+\tag{1} E = mc^2
+\infty \hbar \ell \wp \Re \Im \aleph
+\dots \cdots \vdots \ddots \ldots
+\leftarrow \rightarrow \Leftarrow \Rightarrow \leftrightarrow \mapsto \uparrow
+\pm \mp \times \div \cdot \circ \bullet \oplus \otimes
+\text{Größe} = 5
+x' + f''(x)

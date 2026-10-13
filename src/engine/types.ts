@@ -24,6 +24,11 @@ export interface EngineSpan {
   code?: boolean;
   underline?: boolean;
   link?: string;
+  // inline math: its source, over the characters of no width that stand
+  // for its node's positions (see spansOf in ./flatten.ts)
+  math?: string;
+  // drawn faint: the $ around the source of inline math while it's edited
+  dim?: boolean;
 }
 
 // how a paragraph or heading at the top of the document is aligned; left
@@ -81,6 +86,15 @@ export type EngineCellBlock =
       indent?: number;
       marker?: string;
       bars?: number[];
+    }
+  | {
+      // display math in a cell, unnumbered there
+      kind: "math";
+      pos: number;
+      latex: string;
+      indent?: number;
+      marker?: string;
+      bars?: number[];
     };
 
 export interface EngineCell {
@@ -125,6 +139,17 @@ export type Content =
       share?: number;
       // what is written under it, in the caption style
       caption?: string;
+    }
+  | {
+      // display math: `end` is the position after its node
+      kind: "math";
+      pos: number;
+      end: number;
+      latex: string;
+      numbered?: boolean;
+      align?: EngineAlign;
+      // the live render under the source being edited
+      preview?: boolean;
     }
   | {
       kind: "table";

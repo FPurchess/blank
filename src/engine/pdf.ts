@@ -25,6 +25,8 @@ import {
   settingsOf,
 } from "./engine";
 import { fallbackFonts, findFonts } from "./fallback";
+import { drawAllMath } from "../math/drawings";
+import { hasMath, loadMathFonts } from "../math/fonts";
 import { language } from "../state";
 import { flatten, type ImageSizes } from "./flatten";
 import { fittedSize } from "./images";
@@ -69,6 +71,9 @@ interface Prepared {
   // the diagram module's drawings, by the src of the image each is drawn
   // in place of
   drawings: Map<string, string>;
+  // what the math module made of each formula: its source, whether it's
+  // display math, and the drawing's JSON
+  math: [string, boolean, string][];
 }
 
 /**
@@ -90,13 +95,19 @@ const onSharedEngine = async ({
   sizes,
   output,
   drawings,
+  math,
 }: Prepared): Promise<PdfResult> => {
   const engine = await newEngine(true);
   try {
+    // e.g. the math fonts, loaded since the page view's engine was made
+    engine.addFonts(fallbackFonts.value);
     for (const [src, image] of imagesToAdd(images)) {
       engine.addImage(src, image.bytes, imageKind(image.mime));
     }
     for (const [src, json] of drawings) engine.addDrawing(src, json);
+    for (const [latex, display, json] of math) {
+      engine.addMath(latex, display, json);
+    }
     engine.setSettings(layout, fields);
     engine.sync(doc, sizes, { sources: { export: true } });
     // fonts for what Blank's fonts lack, e.g. emoji pasted just now, which
@@ -196,7 +207,7 @@ const inWorker = async (prepared: Prepared): Promise<PdfResult> => {
 };
 
 const jobOf = (
-  { doc, layout, fields, images, sizes, output, drawings }: Prepared,
+  { doc, layout, fields, images, sizes, output, drawings, math }: Prepared,
   fonts: Uint8Array[],
 ): PdfJob => ({
   fonts,
@@ -207,6 +218,7 @@ const jobOf = (
     kind: imageKind(image.mime),
   })),
   drawings: [...drawings],
+  math,
   settings: JSON.stringify(settingsOf(layout, fields)),
   // every source block closed, and one that can't be drawn as its source
   items: JSON.stringify(
@@ -336,6 +348,15 @@ export const describeWarnings = (
     described.push(
       `It's a normal PDF, not a PDF/A for archiving, because ${pdfa.join("; ")}`,
     );
+  const math = warnings.flatMap((warning) =>
+    warning.kind === "math" ? [`${warning.latex}: ${warning.message}`] : [],
+  );
+  if (math.length === 1)
+    described.push(`1 formula can't be set and shows its source: ${math[0]}`);
+  else if (math.length > 1)
+    described.push(
+      `${math.length} formulas can't be set and show their source: ${math.join("; ")}`,
+    );
   return described;
 };
 
@@ -369,6 +390,10 @@ const write = async (
     ["image/png", "image/jpeg"],
     { drawings: true },
   );
+  // the fonts formulas are set in, which every engine gets, and the
+  // formulas as the math module drew them
+  if (hasMath(state.doc)) await loadMathFonts();
+  const math = await drawAllMath(state.doc);
   const prepared: Prepared = {
     doc: state.doc,
     layout,
@@ -377,6 +402,7 @@ const write = async (
     sizes: sizesOf(images, layout),
     output,
     drawings,
+    math,
   };
   let result: PdfResult | null = null;
   if (!engineInstanceBroken()) {

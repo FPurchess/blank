@@ -5,6 +5,7 @@ import bullet_list from "./bullet_list";
 import code_block from "./code_block";
 import heading from "./heading";
 import horizontal_rule from "./horizontal_rule";
+import math from "./math";
 import ordered_list from "./ordered_list";
 import page_break from "./page_break";
 import sourceFence from "./sourceFence";
@@ -23,6 +24,7 @@ const transformers = {
   toc,
   // a fence of a source block's language, before any fence's code block
   sourceFence,
+  math,
   code_block,
   table,
 } as Record<string, BlockTransformer<unknown>>;

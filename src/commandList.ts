@@ -151,6 +151,12 @@ const COMMANDS: { [K in CommandIdentifier]: Omit<CommandInfo, "id"> } = {
     icon: "rule",
     aliases: ["rule", "divider", "separator", "hr"],
   },
+  [C.INSERT_MATH]: {
+    group: "Insert",
+    label: "Equation",
+    icon: "sigma",
+    aliases: ["equation", "formula", "latex", "katex", "math", "maths"],
+  },
   [C.INSERT_PAGE_BREAK]: {
     group: "Insert",
     label: "Page break",

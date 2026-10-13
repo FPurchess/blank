@@ -126,6 +126,7 @@ export const importDocx = async (
     properties,
     layout,
     definitions,
+    mathApproximate,
   } = await prepareDocx(bytes);
 
   const { value: html, messages } = await mammoth.convertToHtml(
@@ -195,7 +196,15 @@ export const importDocx = async (
     .map((message) => message.message);
   return {
     doc,
-    warnings: [...describe(report, errors), ...layout.warnings],
+    warnings: [
+      ...describe(report, errors),
+      ...(mathApproximate
+        ? [
+            `${count(mathApproximate, "equation", "equations")} came in only in part, with what Blank can't read as text`,
+          ]
+        : []),
+      ...layout.warnings,
+    ],
     page,
   };
 };

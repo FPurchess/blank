@@ -11,6 +11,7 @@ mod grid_tests;
 #[cfg(test)]
 mod incremental_tests;
 mod navigate;
+pub(crate) mod numbers;
 mod paginate;
 #[cfg(test)]
 mod picture_tests;
@@ -22,7 +23,7 @@ mod text_layer;
 mod toc;
 pub use toc::Listed;
 
-pub use display::{Op, Part};
+pub use display::{math_ops, Op, Part};
 pub use navigate::Hit;
 pub use select::{GridRow, TableGrid};
 #[cfg(feature = "test-hooks")]
@@ -99,6 +100,8 @@ pub struct Engine {
     pub chapters: Vec<Chapter>,
     /// the page numbers of each table of contents' entries, by its item
     toc_labels: Vec<(usize, Vec<String>)>,
+    /// the numbers of numbered display math, by its item, in order
+    math_labels: Vec<(usize, u32)>,
     /// the page numbers as set in tables of contents, by number and style
     number_boxes: std::collections::HashMap<(String, &'static str), crate::text::TextBox>,
     pub stats: Stats,
@@ -123,6 +126,7 @@ impl Engine {
             first_frag: vec![],
             chapters: vec![],
             toc_labels: vec![],
+            math_labels: vec![],
             number_boxes: Default::default(),
             stats: Stats::default(),
             drawings: std::collections::HashMap::new(),
@@ -140,15 +144,26 @@ impl Engine {
             laid.units.push(crate::items::Unit::default());
         }
         let extras = laid.extras.iter().map(|(boxed, _)| boxed);
+        // display math, also in table cells, draws no text box
+        let maths = laid
+            .units
+            .iter()
+            .flat_map(|unit| &unit.decos)
+            .filter_map(|deco| match deco {
+                crate::items::Deco::Math { math, .. } => Some(&math.missing),
+                _ => None,
+            });
         let mut missing: Vec<char> = vec![];
-        for boxed in laid
+        for chars in laid
             .texts
             .iter()
             .chain(&laid.label)
             .chain(&laid.marker)
             .chain(extras)
+            .map(|boxed| &boxed.missing)
+            .chain(maths)
         {
-            for char in &boxed.missing {
+            for char in chars {
                 if !missing.contains(char) {
                     missing.push(*char);
                 }
@@ -212,7 +227,14 @@ impl Engine {
     /// adds a font for what the others lack, see Fonts::add, and lays out
     /// everything again with it
     pub fn add_font(&mut self, bytes: Vec<u8>, family: &str) -> Changes {
-        self.fonts.add(bytes, family);
+        self.add_fonts(vec![(bytes, family.to_string())])
+    }
+
+    /// adds several fonts, e.g. the math fonts, and lays out once
+    pub fn add_fonts(&mut self, fonts: Vec<(Vec<u8>, String)>) -> Changes {
+        for (bytes, family) in fonts {
+            self.fonts.add(bytes, &family);
+        }
         // the page numbers of tables of contents are laid out in its fonts
         self.number_boxes.clear();
         self.lay_out_all();

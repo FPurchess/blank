@@ -4,11 +4,13 @@
 use std::sync::Arc;
 
 use parley::{
-    Affinity, Alignment, AlignmentOptions, BreakReason, Cursor, FontStyle, FontWeight, Layout,
-    LineHeight, OverflowWrap, PositionedLayoutItem, Selection, StyleProperty,
+    Affinity, Alignment, AlignmentOptions, BreakReason, Cursor, FontStyle, FontWeight, InlineBox,
+    InlineBoxKind, Layout, LineHeight, OverflowWrap, PositionedLayoutItem, Selection,
+    StyleProperty,
 };
 
-use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE, INK_UNDERLINE};
+use crate::fonts::{family_list, ink_link, Fonts, Ink, INK_CODE, INK_DIM, INK_UNDERLINE};
+use crate::math::{MathBox, MathLaid};
 use crate::model::{byte_of_utf16, utf16_len, utf16_of_byte, Span, Text};
 use crate::style::{text_style, TextStyle, BOLD, CODE_SCALE, TAB_STOP};
 
@@ -29,12 +31,63 @@ pub struct TextBox {
     pub width: f32,
     /// the characters no font had a glyph for, see Engine::missing
     pub missing: Vec<char>,
-    /// its lines, as Parley broke them
+    /// its lines, as Parley broke them, with room made for their formulas
     lines: Vec<LineInfo>,
+    /// how far each line is painted below where Parley set it, for the
+    /// room the formulas on it and on the lines before take
+    shifts: Vec<f32>,
     /// the font index of each of its runs, by its line and Parley's index
     /// of the run in it: a face, or an instance of a variable one, see
     /// `Fonts::font_of`
     pub run_fonts: Vec<((usize, usize), usize)>,
+    /// its inline math, in the order of the text
+    pub maths: Vec<InlineMath>,
+}
+
+/// a formula in a line of text: an inline box of Parley's after the
+/// characters of no width that stand for its node's positions
+pub struct InlineMath {
+    /// its characters, bytes `start..end` of the text
+    pub start: usize,
+    pub end: usize,
+    pub shown: Shown,
+    /// its source, what the PDF's structure says it is
+    pub latex: String,
+}
+
+/// what an inline formula shows: the formula, or its source as code
+/// while it can't be set (an error, or no math fonts yet)
+pub enum Shown {
+    Math(Arc<MathBox>),
+    Source(Box<TextBox>),
+}
+
+impl InlineMath {
+    pub fn width(&self) -> f32 {
+        match &self.shown {
+            Shown::Math(math) => math.width,
+            Shown::Source(boxed) => boxed.layout.width(),
+        }
+    }
+
+    /// how far it reaches above and below the baseline
+    fn extent(&self) -> (f32, f32) {
+        match &self.shown {
+            Shown::Math(math) => (math.height, math.depth),
+            Shown::Source(boxed) => {
+                let line = boxed.lines.first();
+                let baseline = line.map_or(0.0, |line| line.baseline);
+                (baseline, boxed.height() - baseline)
+            }
+        }
+    }
+}
+
+/// what a line is made of, in the order it is painted: Parley's runs of
+/// text, and inline math
+enum Piece<'a> {
+    Run(parley::Run<'a, Ink>),
+    Math { index: usize, width: f32 },
 }
 
 /// one glyph, positioned on the page
@@ -179,6 +232,48 @@ impl TextBox {
             text.text.clone()
         };
         let mut links: Vec<String> = vec![];
+        // the formulas, laid out before the text, which leaves room for them
+        let mut maths: Vec<InlineMath> = vec![];
+        if !text.text.is_empty() {
+            for span in &text.spans {
+                let Some(latex) = &span.math else {
+                    continue;
+                };
+                let (start, end) = (
+                    byte_of_utf16(&laid_text, span.from),
+                    byte_of_utf16(&laid_text, span.to),
+                );
+                if start >= end {
+                    continue;
+                }
+                let shown = match crate::math::layout(fonts, latex, false, style.size) {
+                    MathLaid::Ok(math) => Shown::Math(math),
+                    // its source as inline code, on one line
+                    MathLaid::Err(_) | MathLaid::NoFonts => {
+                        let source = Text {
+                            pos: 0,
+                            text: latex.clone(),
+                            spans: vec![Span {
+                                from: 0,
+                                to: utf16_len(latex),
+                                code: true,
+                                ..Default::default()
+                            }],
+                            style: text.style,
+                            ..Default::default()
+                        };
+                        let boxed = TextBox::new(fonts, &source, f32::MAX, Alignment::Start);
+                        Shown::Source(Box::new(boxed))
+                    }
+                };
+                maths.push(InlineMath {
+                    start,
+                    end,
+                    shown,
+                    latex: latex.clone(),
+                });
+            }
+        }
         let layout = {
             let Fonts {
                 fcx,
@@ -222,6 +317,20 @@ impl TextBox {
                     range.clone(),
                 );
             }
+            // after the formula's characters, so the caret before them is
+            // before the formula and after them after it. Of no height:
+            // Parley counts all of a box's height above the baseline and as
+            // the line's height, so a formula's depth would get no room
+            // below it; `read_lines` makes room above and below instead
+            for (index, inline) in maths.iter().enumerate() {
+                builder.push_inline_box(InlineBox {
+                    id: index as u64,
+                    kind: InlineBoxKind::InFlow,
+                    index: inline.end,
+                    width: inline.width(),
+                    height: 0.0,
+                });
+            }
             builder.build(&laid_text)
         };
         let mut boxed = TextBox {
@@ -235,7 +344,9 @@ impl TextBox {
             width,
             missing: vec![],
             lines: vec![],
+            shifts: vec![],
             run_fonts: vec![],
+            maths,
         };
         boxed.layout.break_all_lines(Some(width));
         boxed.layout.align(
@@ -244,8 +355,20 @@ impl TextBox {
                 align_when_overflowing: false,
             },
         );
-        boxed.lines = boxed.read_lines();
+        (boxed.lines, boxed.shifts) = boxed.read_lines();
         boxed.missing = boxed.notdef();
+        // and those of its formulas, which `notdef` skips
+        for inline in &boxed.maths {
+            let missing = match &inline.shown {
+                Shown::Math(math) => &math.missing,
+                Shown::Source(source) => &source.missing,
+            };
+            for char in missing {
+                if !boxed.missing.contains(char) {
+                    boxed.missing.push(*char);
+                }
+            }
+        }
         boxed.run_fonts = boxed.fonts_of_runs(fonts);
         boxed
     }
@@ -303,9 +426,13 @@ impl TextBox {
                             .iter()
                             .find(|(known, _)| *known == own)
                             .map_or(own, |(_, text)| text.clone());
+                        if self.in_math(range.start) {
+                            continue;
+                        }
                         for char in self.text[range].chars() {
                             if !char.is_whitespace()
                                 && !char.is_control()
+                                && !is_invisible(char)
                                 && !missing.contains(&char)
                             {
                                 missing.push(char);
@@ -323,7 +450,13 @@ impl TextBox {
     }
 
     pub fn height(&self) -> f32 {
-        self.layout.height()
+        // Parley's height, and the room the formulas took
+        let last = self.lines.len().wrapping_sub(1);
+        let grown = match (self.lines.last(), self.layout.get(last)) {
+            (Some(info), Some(line)) => info.bottom - line.metrics().block_max_coord,
+            _ => 0.0,
+        };
+        self.layout.height() + grown
     }
 
     /// its lines, as Parley broke them
@@ -331,21 +464,56 @@ impl TextBox {
         &self.lines
     }
 
-    fn read_lines(&self) -> Vec<LineInfo> {
+    /// its lines, each as high as its text and its formulas reach above and
+    /// below the baseline, and how far each moved down from where Parley
+    /// set it for that
+    fn read_lines(&self) -> (Vec<LineInfo>, Vec<f32>) {
+        let mut lines = vec![];
+        let mut shifts = vec![];
+        // how much lower the line before ends than Parley set it
+        let mut grown = 0.0;
+        for line in self.layout.lines() {
+            let metrics = line.metrics();
+            let range = line.text_range();
+            let mut above = metrics.baseline - metrics.block_min_coord;
+            let mut below = metrics.block_max_coord - metrics.baseline;
+            for item in line.items() {
+                if let PositionedLayoutItem::InlineBox(inline) = item {
+                    if let Some(math) = self.maths.get(inline.id as usize) {
+                        let (height, depth) = math.extent();
+                        above = above.max(height);
+                        below = below.max(depth);
+                    }
+                }
+            }
+            let top = metrics.block_min_coord + grown;
+            let baseline = top + above;
+            let bottom = baseline + below;
+            shifts.push(baseline - metrics.baseline);
+            grown = bottom - metrics.block_max_coord;
+            lines.push(LineInfo {
+                top,
+                bottom,
+                baseline,
+                start: range.start,
+                end: range.end,
+            });
+        }
+        (lines, shifts)
+    }
+
+    /// how far a line is painted below where Parley set it
+    fn shift(&self, line: usize) -> f32 {
+        self.shifts.get(line).copied().unwrap_or(0.0)
+    }
+
+    /// the line at a height as Parley set the lines, which its cursor and
+    /// selection geometry measure by
+    fn parley_line_at(&self, y: f32) -> usize {
         self.layout
             .lines()
-            .map(|line| {
-                let metrics = line.metrics();
-                let range = line.text_range();
-                LineInfo {
-                    top: metrics.block_min_coord,
-                    bottom: metrics.block_max_coord,
-                    baseline: metrics.baseline,
-                    start: range.start,
-                    end: range.end,
-                }
-            })
-            .collect()
+            .position(|line| y < line.metrics().block_max_coord)
+            .unwrap_or(self.layout.len().saturating_sub(1))
     }
 
     pub fn line_count(&self) -> usize {
@@ -395,7 +563,7 @@ impl TextBox {
             }
             let size = parley_run.font_size();
             let mut pen = run.offset();
-            let baseline = run.baseline();
+            let baseline = run.baseline() + self.shift(line_index);
             let text = &self.text;
             // a tab is the room up to its stop, with nothing in it: the
             // fonts have no glyph for it. The run is split there, since
@@ -413,6 +581,15 @@ impl TextBox {
                     end: range.end as u32,
                 };
                 pen += glyph.advance;
+                if self.in_math(range.start) {
+                    // the characters of a formula, drawn as the formula,
+                    // between the text before and after it: the PDF reads
+                    // them in that order
+                    if pieces.last().is_some_and(|piece| !piece.is_empty()) {
+                        pieces.push(vec![]);
+                    }
+                    continue;
+                }
                 if text.get(range) == Some("\t") {
                     pieces.push(vec![]);
                 } else if let Some(piece) = pieces.last_mut() {
@@ -499,9 +676,69 @@ impl TextBox {
         };
         let cursor = Cursor::from_byte_index(&self.layout, byte, affinity);
         let rect = cursor.geometry(&self.layout, 0.0);
-        let line = self.line_at((rect.y0 + rect.y1) as f32 / 2.0);
+        let line = self.parley_line_at((rect.y0 + rect.y1) as f32 / 2.0);
         let x = self.caret_x(cursor).unwrap_or(rect.x0 as f32);
-        (line, x, rect.y0 as f32, (rect.y1 - rect.y0) as f32)
+        // as high as its line, with the room made for its formulas
+        match self.lines.get(line) {
+            Some(info) => (line, x, info.top, info.bottom - info.top),
+            None => (line, x, rect.y0 as f32, (rect.y1 - rect.y0) as f32),
+        }
+    }
+
+    /// whether a byte is one of the characters a formula stands on
+    fn in_math(&self, byte: usize) -> bool {
+        self.maths
+            .iter()
+            .any(|inline| (inline.start..inline.end).contains(&byte))
+    }
+
+    /// what a line is made of, in the order it is painted: each run once,
+    /// though Parley splits its glyphs by style, and the formulas
+    fn pieces(&self, line: usize) -> Vec<Piece<'_>> {
+        let Some(line) = self.layout.get(line) else {
+            return vec![];
+        };
+        let mut pieces = vec![];
+        let mut seen: Vec<usize> = vec![];
+        for item in line.items() {
+            match item {
+                PositionedLayoutItem::GlyphRun(run) => {
+                    let run = *run.run();
+                    if !seen.contains(&run.index()) {
+                        seen.push(run.index());
+                        pieces.push(Piece::Run(run));
+                    }
+                }
+                PositionedLayoutItem::InlineBox(inline) => pieces.push(Piece::Math {
+                    index: inline.id as usize,
+                    width: inline.width,
+                }),
+            }
+        }
+        pieces
+    }
+
+    /// the formulas of a line: each with where its baseline starts, in the
+    /// box's coordinates, painted where the clusters before it end
+    pub fn line_maths(&self, line: usize) -> Vec<(f32, f32, &InlineMath)> {
+        let (Some(parley_line), Some(info)) = (self.layout.get(line), self.lines.get(line)) else {
+            return vec![];
+        };
+        let metrics = parley_line.metrics();
+        let mut x = metrics.offset + metrics.inline_min_coord;
+        let mut found = vec![];
+        for piece in self.pieces(line) {
+            match piece {
+                Piece::Run(run) => x += run.visual_clusters().map(|c| c.advance()).sum::<f32>(),
+                Piece::Math { index, width } => {
+                    if let Some(inline) = self.maths.get(index) {
+                        found.push((x, info.baseline, inline));
+                    }
+                    x += width;
+                }
+            }
+        }
+        found
     }
 
     /// where a cluster's left edge is painted on its line. Parley's own
@@ -519,7 +756,14 @@ impl TextBox {
         };
         let metrics = line.metrics();
         let mut x = metrics.offset + metrics.inline_min_coord;
-        for run in line.runs() {
+        for piece in self.pieces(path.line_index()) {
+            let run = match piece {
+                Piece::Run(run) => run,
+                Piece::Math { width, .. } => {
+                    x += width;
+                    continue;
+                }
+            };
             if run.index() == path.run_index() {
                 let visual = run.logical_to_visual(path.logical_index()).unwrap_or(0);
                 return x + run
@@ -535,15 +779,14 @@ impl TextBox {
 
     /// the width of a line as painted, its spaces at the end included
     fn painted_width(&self, line: usize) -> f32 {
-        let Some(line) = self.layout.get(line) else {
-            return 0.0;
-        };
-        line.runs()
-            .map(|run| {
-                (0..run.len())
+        self.pieces(line)
+            .into_iter()
+            .map(|piece| match piece {
+                Piece::Run(run) => (0..run.len())
                     .filter_map(|index| run.get(index))
                     .map(|c| c.advance())
-                    .sum::<f32>()
+                    .sum::<f32>(),
+                Piece::Math { width, .. } => width,
             })
             .sum()
     }
@@ -570,7 +813,15 @@ impl TextBox {
             [_, Some(right)] => (right, false),
             _ => return None,
         };
-        let end = if at_end { cluster.advance() } else { 0.0 };
+        let mut end = if at_end { cluster.advance() } else { 0.0 };
+        // after a formula's characters, past the formula, which stands
+        // between them and what follows
+        if at_end {
+            let range_end = cluster.text_range().end;
+            if let Some(inline) = self.maths.iter().find(|inline| inline.end == range_end) {
+                end += inline.width();
+            }
+        }
         Some(self.cluster_x(&cluster) + end)
     }
 
@@ -578,11 +829,19 @@ impl TextBox {
     /// right half, as `Cluster::from_point` finds it, but by where the
     /// clusters are painted (see `cluster_x`)
     fn cluster_at(&self, x: f32, y: f32) -> Option<(parley::Cluster<'_, Ink>, bool)> {
-        let line = self.layout.get(self.line_at(y))?;
+        let line_index = self.line_at(y);
+        let line = self.layout.get(line_index)?;
         let metrics = line.metrics();
         let mut edge = metrics.offset + metrics.inline_min_coord;
         let mut last = None;
-        for run in line.runs() {
+        for piece in self.pieces(line_index) {
+            let run = match piece {
+                Piece::Run(run) => run,
+                Piece::Math { width, .. } => {
+                    edge += width;
+                    continue;
+                }
+            };
             let clusters =
                 (0..run.len()).filter_map(|visual| run.get(run.visual_to_logical(visual)?));
             for cluster in clusters {
@@ -627,9 +886,22 @@ impl TextBox {
             .unwrap_or(lines.len().saturating_sub(1))
     }
 
-    /// the position nearest to a point in the box's coordinates
+    /// the position nearest to a point in the box's coordinates: in a
+    /// formula, at the end of its source, which opens it
     pub fn hit(&self, x: f32, y: f32) -> u32 {
+        if let Some(inline) = self.math_at(x, y) {
+            return self.pos_of(inline.end - PLACEHOLDER.len_utf8());
+        }
         self.pos_of(self.cursor_at(x, y).index())
+    }
+
+    /// the formula at a point, if there is one
+    fn math_at(&self, x: f32, y: f32) -> Option<&InlineMath> {
+        let line = self.line_at(y);
+        self.line_maths(line)
+            .into_iter()
+            .find(|(left, _, inline)| x >= *left && x < left + inline.width())
+            .map(|(_, _, inline)| inline)
     }
 
     /// the word at a point, as ProseMirror positions, as
@@ -722,10 +994,10 @@ impl TextBox {
         // the line's advance, which doesn't: those take the clusters' too
         let line_of = |cursor: Cursor| {
             let rect = cursor.geometry(&self.layout, 0.0);
-            self.line_at((rect.y0 + rect.y1) as f32 / 2.0)
+            self.parley_line_at((rect.y0 + rect.y1) as f32 / 2.0)
         };
         let (first, last) = (line_of(selection.anchor()), line_of(selection.focus()));
-        selection
+        let mut rects: Vec<(usize, f32, f32, f32, f32)> = selection
             .geometry(&self.layout)
             .into_iter()
             .map(|(rect, line)| {
@@ -734,15 +1006,53 @@ impl TextBox {
                     width += self.painted_width(line)
                         - self.layout.get(line).map_or(0.0, |l| l.metrics().advance);
                 }
-                (
-                    line,
-                    rect.x0 as f32,
-                    rect.y0 as f32,
-                    width,
-                    (rect.y1 - rect.y0) as f32,
-                )
+                // as high as its line, with the room made for its formulas
+                let (top, height) = self
+                    .lines
+                    .get(line)
+                    .map_or((rect.y0 as f32, (rect.y1 - rect.y0) as f32), |info| {
+                        (info.top, info.bottom - info.top)
+                    });
+                (line, rect.x0 as f32, top, width, height)
             })
-            .collect()
+            .collect();
+        // a formula is selected with any of its positions, and only then:
+        // Parley's box stands after its characters, so a range that ends
+        // with them, or stays inside them, would leave it out, and one that
+        // starts after them would take it in
+        for (line, info) in self.lines.iter().enumerate() {
+            for (x, _, inline) in self.line_maths(line) {
+                let (left, right) = (x, x + inline.width());
+                if from >= inline.end || to <= inline.start {
+                    for (_, x, _, width, _) in rects.iter_mut().filter(|rect| rect.0 == line) {
+                        let end = *x + *width;
+                        if *x >= left - 0.01 && *x < right - 0.01 {
+                            *x = right.min(end);
+                        } else if end > left + 0.01 && end <= right + 0.01 {
+                            *width = (left - *x).max(0.0);
+                            continue;
+                        }
+                        *width = end - *x;
+                    }
+                    continue;
+                }
+                let touching = rects.iter_mut().find(|(at, x, _, width, _)| {
+                    *at == line && *x <= right + 0.01 && x + width >= left - 0.01
+                });
+                match touching {
+                    Some((_, x, _, width, _)) => {
+                        let end = (*x + *width).max(right);
+                        *x = x.min(left);
+                        *width = end - *x;
+                    }
+                    None => {
+                        rects.push((line, left, info.top, right - left, info.bottom - info.top))
+                    }
+                }
+            }
+        }
+        rects.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        rects
     }
 }
 
@@ -797,6 +1107,15 @@ fn cluster_ranges(
     ranges
 }
 
+/// the character a formula's positions are written as: a word joiner,
+/// which has no width and keeps the formula with the text around it
+pub const PLACEHOLDER: char = '\u{2060}';
+
+/// a character with nothing to draw, which no font needs to have
+fn is_invisible(char: char) -> bool {
+    matches!(char, '\u{200b}'..='\u{200f}' | '\u{2060}'..='\u{2064}' | '\u{feff}')
+}
+
 fn push_span(
     builder: &mut parley::RangedBuilder<'_, Ink>,
     span: &Span,
@@ -842,6 +1161,9 @@ fn push_span(
     if span.underline {
         builder.push(StyleProperty::Underline(true), range.clone());
         ink |= INK_UNDERLINE;
+    }
+    if span.dim {
+        ink |= INK_DIM;
     }
     if ink != 0 {
         builder.push(StyleProperty::Brush(ink), range);
@@ -1401,6 +1723,292 @@ mod tests {
         assert!(
             (alone[0].3 - rects[1].3).abs() < 0.01,
             "{alone:?} {rects:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod math_tests {
+    use super::*;
+    use crate::math::tests::math_fonts;
+
+    /// "a $x^2$ b" as flatten.ts writes it: the formula's node as word
+    /// joiners, one per position (the node, its 3 characters, its end)
+    fn with_math(before: &str, latex: &str, after: &str) -> Text {
+        let size = latex.encode_utf16().count() + 2;
+        let placeholders: String = std::iter::repeat_n(PLACEHOLDER, size).collect();
+        let from = utf16_len(before);
+        Text {
+            pos: 1,
+            text: format!("{before}{placeholders}{after}"),
+            spans: vec![Span {
+                from,
+                to: from + size as u32,
+                math: Some(latex.into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    fn laid(text: &Text, width: f32) -> (Fonts, TextBox) {
+        let mut fonts = math_fonts();
+        let boxed = TextBox::new(&mut fonts, text, width, Alignment::Start);
+        (fonts, boxed)
+    }
+
+    #[test]
+    fn sets_a_formula_in_the_line() {
+        let (fonts, boxed) = laid(&with_math("a ", "x^2", " b"), 300.0);
+        assert!(boxed.missing.is_empty(), "{:?}", boxed.missing);
+        let maths = boxed.line_maths(0);
+        assert_eq!(maths.len(), 1);
+        let (x, baseline, inline) = maths[0];
+        // after "a ", on the line's baseline
+        assert!(x > 0.0);
+        assert_eq!(baseline, boxed.lines()[0].baseline);
+        // the word joiners draw nothing
+        let drawn: String = boxed
+            .glyph_runs(&fonts, 0)
+            .iter()
+            .flat_map(|run| run.glyphs.iter())
+            .map(|glyph| &boxed.text[glyph.start as usize..glyph.end as usize])
+            .collect();
+        assert_eq!(drawn, "a  b");
+        assert!(inline.width() > 0.0);
+    }
+
+    #[test]
+    fn puts_the_caret_beside_a_formula() {
+        let text = with_math("a ", "x^2", " b");
+        let (_, boxed) = laid(&text, 300.0);
+        let (x, _, inline) = boxed.line_maths(0)[0];
+        let width = inline.width();
+        // before the node: before the formula; after it: after it
+        let node = 1 + 2;
+        let size = 5;
+        let (_, before, _, _) = boxed.caret(node, false);
+        let (_, after, _, _) = boxed.caret(node + size, false);
+        assert!((before - x).abs() < 0.01, "{before} {x}");
+        assert!((after - (x + width)).abs() < 0.01, "{after} {}", x + width);
+        // and the text after it stands after it too
+        let (_, b, _, _) = boxed.caret(node + size + 1, false);
+        assert!(b > after);
+    }
+
+    #[test]
+    fn opens_a_formula_clicked() {
+        let (_, boxed) = laid(&with_math("a ", "x^2", " b"), 300.0);
+        let (x, baseline, inline) = boxed.line_maths(0)[0];
+        let hit = boxed.hit(x + inline.width() / 2.0, baseline - 2.0);
+        // the end of its source, inside the node
+        assert_eq!(hit, 1 + 2 + 4);
+    }
+
+    #[test]
+    fn measures_a_line_with_a_formula() {
+        let (_, plain) = laid(&with_math("a ", "", " b"), 300.0);
+        let (_, boxed) = laid(&with_math("a ", r"\frac{a}{b}", " b"), 300.0);
+        let width = boxed.line_maths(0)[0].2.width();
+        let painted = boxed.painted_width(0);
+        assert!(
+            (painted - plain.painted_width(0) - width).abs() < 0.5,
+            "{painted}"
+        );
+        // and a tall formula makes the line taller
+        assert!(
+            boxed.lines()[0].bottom - boxed.lines()[0].top
+                > plain.lines()[0].bottom - plain.lines()[0].top
+        );
+    }
+
+    #[test]
+    fn shows_the_source_of_a_formula_it_cant_set() {
+        let (_, boxed) = laid(&with_math("a ", r"\nope", " b"), 300.0);
+        let (_, _, inline) = boxed.line_maths(0)[0];
+        let Shown::Source(source) = &inline.shown else {
+            panic!("not the source");
+        };
+        assert_eq!(&*source.text, r"\nope");
+        assert!(inline.width() > 0.0);
+        // without the math fonts, too
+        let mut plain = crate::fonts::repository_fonts();
+        let boxed = TextBox::new(
+            &mut plain,
+            &with_math("a ", "x", " b"),
+            300.0,
+            Alignment::Start,
+        );
+        assert!(matches!(boxed.line_maths(0)[0].2.shown, Shown::Source(_)));
+    }
+
+    #[test]
+    fn makes_room_for_a_formula_above_and_below_its_line() {
+        for latex in [r"\frac{a}{b}", r"\begin{pmatrix}a\\b\\c\end{pmatrix}"] {
+            let (fonts, boxed) = laid(&with_math("a ", latex, " b\nnext"), 300.0);
+            let plain_text = Text {
+                pos: 1,
+                text: "a b\nnext".into(),
+                ..Default::default()
+            };
+            let (_, plain) = laid(&plain_text, 300.0);
+            let lines = boxed.lines();
+            assert_eq!(lines.len(), 2);
+            let (_, baseline, inline) = boxed.line_maths(0)[0];
+            let (height, depth) = inline.extent();
+            let line = lines[0];
+            assert_eq!(baseline, line.baseline);
+            assert!(line.bottom >= baseline + depth - 0.01, "{latex}: {line:?}");
+            assert!(line.top <= baseline - height + 0.01, "{latex}: {line:?}");
+            // no room wasted above: as high as the formula or the text
+            let text_above = plain.lines()[0].baseline - plain.lines()[0].top;
+            assert!(
+                (baseline - line.top - height.max(text_above)).abs() < 0.01,
+                "{latex}: {line:?}"
+            );
+            // the text on the line stands on the same baseline
+            let runs = boxed.glyph_runs(&fonts, 0);
+            assert!(runs
+                .iter()
+                .all(|run| (run.baseline - baseline).abs() < 0.01));
+            // the next line starts below it, its text on its own baseline
+            let next = lines[1];
+            assert!(next.top >= line.bottom - 0.01, "{latex}: {lines:?}");
+            let plain_next = plain.lines()[1];
+            let next_runs = boxed.glyph_runs(&fonts, 1);
+            assert!(next_runs
+                .iter()
+                .all(|run| (run.baseline - next.baseline).abs() < 0.01));
+            assert!(
+                (next.baseline - next.top - (plain_next.baseline - plain_next.top)).abs() < 0.01
+            );
+            assert!((boxed.height() - next.bottom).abs() < 0.01);
+            // the caret, the selection and a click take the moved lines
+            let end = boxed.pos + boxed.len;
+            let (caret_line, _, caret_y, caret_h) = boxed.caret(end, false);
+            assert_eq!(caret_line, 1);
+            assert!(
+                (caret_y - next.top).abs() < 0.01
+                    && (caret_h - (next.bottom - next.top)).abs() < 0.01
+            );
+            let rects = boxed.selection(0, boxed.text.len());
+            assert_eq!(rects[1].2, next.top);
+            assert_eq!(boxed.hit(1000.0, next.top + 1.0), end);
+        }
+    }
+
+    /// the carets before and after a formula's node of `size` positions,
+    /// and the formula's left and right on its line
+    fn caret_edges(boxed: &TextBox, node: u32, size: u32, line: usize) -> ((f32, f32), (f32, f32)) {
+        let (_, before, _, _) = boxed.caret(node, false);
+        let (_, after, _, _) = boxed.caret(node + size, false);
+        let (x, _, inline) = boxed
+            .line_maths(line)
+            .into_iter()
+            .find(|(_, _, inline)| boxed.pos_of(inline.start) == node)
+            .expect("the formula on its line");
+        ((before, after), (x, x + inline.width()))
+    }
+
+    #[test]
+    fn puts_the_caret_beside_a_formula_in_a_justified_line() {
+        let before = "Some words that wrap onto more lines than one, with ";
+        let text = with_math(
+            before,
+            "x^2",
+            " in the first of them and more words after it",
+        );
+        let mut fonts = math_fonts();
+        let boxed = TextBox::new(&mut fonts, &text, 200.0, Alignment::Justify);
+        let node = 1 + utf16_len(before);
+        let (line, ..) = boxed.caret(node, false);
+        assert!(line + 1 < boxed.line_count(), "on the last line");
+        let ((before, after), (left, right)) = caret_edges(&boxed, node, 5, line);
+        assert!((before - left).abs() < 0.01, "{before} {left}");
+        assert!((after - right).abs() < 0.01, "{after} {right}");
+        // the glyphs after it stand after it
+        let next = boxed
+            .glyph_runs(&fonts, line)
+            .into_iter()
+            .flat_map(|run| run.glyphs)
+            .find(|glyph| glyph.start as usize == boxed.maths[0].end)
+            .expect("a glyph after the formula");
+        assert!(next.x >= right - 0.01, "{} {right}", next.x);
+        // and a click on it opens it
+        let middle = (boxed.lines()[line].top + boxed.lines()[line].bottom) / 2.0;
+        assert_eq!(boxed.hit((left + right) / 2.0, middle), node + 4);
+    }
+
+    #[test]
+    fn puts_the_caret_beside_a_formula_in_a_right_to_left_line() {
+        let before = "\u{5e9}\u{5dc}\u{5d5}\u{5dd} ";
+        let text = with_math(before, "x", " \u{5e2}\u{5d5}\u{5dc}\u{5dd}");
+        let (_, boxed) = laid(&text, 300.0);
+        let node = 1 + utf16_len(before);
+        let ((before, after), (left, right)) = caret_edges(&boxed, node, 3, 0);
+        // right to left: before the formula at its right, after it at its left
+        assert!((before - right).abs() < 0.01, "{before} {left}..{right}");
+        assert!((after - left).abs() < 0.01, "{after} {left}..{right}");
+        // the word before it to its right, the word after it to its left
+        let (_, start, _, _) = boxed.caret(1, false);
+        let (_, end, _, _) = boxed.caret(boxed.pos + boxed.len, false);
+        assert!(start > right && end < left, "{start} {end} {left}..{right}");
+        // and a click on it opens it
+        assert_eq!(boxed.hit((left + right) / 2.0, 8.0), node + 2);
+    }
+
+    #[test]
+    fn selects_a_formula_with_any_of_its_positions() {
+        // "a " is 1–3, the formula's node 3–8, its source 4–7, " b" 8–10
+        let (_, boxed) = laid(&with_math("a ", "x^2", " b"), 300.0);
+        let (x, _, inline) = boxed.line_maths(0)[0];
+        let (left, right) = (x, x + inline.width());
+        let (_, space, _, _) = boxed.caret(2, false);
+        let (_, b, _, _) = boxed.caret(9, false);
+        let selected = |from: u32, to: u32| {
+            let rects = boxed.selection(boxed.byte_of(from), boxed.byte_of(to));
+            assert_eq!(rects.len(), 1, "{from}..{to}: {rects:?}");
+            let (_, x, _, width, _) = rects[0];
+            (x, x + width)
+        };
+        let near = |a: (f32, f32), b: (f32, f32)| {
+            assert!(
+                (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01,
+                "{a:?} {b:?}"
+            );
+        };
+        near(selected(3, 8), (left, right));
+        near(selected(3, 9), (left, b));
+        near(selected(2, 8), (space, right));
+        near(selected(2, 9), (space, b));
+        // inside its source too
+        near(selected(4, 7), (left, right));
+        near(selected(5, 6), (left, right));
+        // and not when the range stops before it or starts after it
+        assert!(selected(2, 3).1 <= left + 0.01);
+        assert!(selected(8, 9).0 >= right - 0.01);
+    }
+
+    #[test]
+    fn hits_text_after_a_formula() {
+        let (_, boxed) = laid(&with_math("a ", "xyz", " bcd"), 300.0);
+        let end = 1 + utf16_len(&boxed.text);
+        let (_, x_end, y, h) = boxed.caret(end, false);
+        assert_eq!(boxed.hit(x_end + 1.0, y + h / 2.0), end);
+    }
+
+    #[test]
+    fn moves_a_tab_after_a_formula() {
+        let mut text = with_math("a ", "xyz", "\tb");
+        text.pos = 1;
+        let (_, boxed) = laid(&text, 400.0);
+        let tab_end = 1 + utf16_len(&text.text) - 1;
+        let (_, x, _, _) = boxed.caret(tab_end, false);
+        // b at the next tab stop past the formula
+        assert!(
+            (x / crate::style::TAB_STOP).fract().abs() < 0.01
+                || (x / crate::style::TAB_STOP).fract() > 0.99,
+            "{x}"
         );
     }
 }

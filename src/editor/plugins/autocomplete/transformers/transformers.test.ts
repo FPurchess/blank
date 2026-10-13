@@ -341,6 +341,14 @@ describe("transformer.sourceFence", () => {
     expect(view.state.selection.$from.parent.type.name).toBe("diagram_source");
   });
 
+  it("makes display math that is written back as a fence", () => {
+    const node = doc(p("```math"));
+    const { view, result } = runTransformer(sourceFence, node, 0, "```math");
+    expect(result).toBe(true);
+    expect(view.state.doc.child(0).type.name).toBe("math_display");
+    expect(view.state.doc.child(0).attrs.delim).toBe("fence");
+  });
+
   it("leaves a list item a code block's, as a diagram stands on top", () => {
     const node = doc(ul(li(p("```mermaid"))));
     const { view, result } = runTransformer(sourceFence, node, 0, "```mermaid");

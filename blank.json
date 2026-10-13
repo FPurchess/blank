@@ -18,6 +18,7 @@
     "insert.page_break": "Mod-Enter",
     "insert.block": "Mod-Alt-b",
     "block.settings": "Shift-Enter",
+    "insert.math": "Mod-Shift-m",
     "format.indent": "Tab",
     "format.unindent": "Shift-Tab",
     "format.bold": "Mod-b",
@@ -80,6 +81,7 @@
     "quotes": true,
     "capitalize": true,
     "blocks": true,
+    "math": true,
     "replace": {
       "*": {}
     }

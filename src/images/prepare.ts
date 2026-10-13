@@ -158,9 +158,10 @@ export const prepareImages = async (
       nodes.set(src, (node.attrs.alt as string | null) || src);
     }
     if (node.type.name === "embed") nodes.set(embedSrc(node), embedLabel(node));
-    // what a source made, e.g. a diagram, if it could be drawn
+    // what a source made, e.g. a diagram, if it could be drawn; not what
+    // the exports write themselves, e.g. math, which is no picture
     const kind = sourceKind(node.type.name);
-    if (kind && renderedOf(node)?.ok === true) {
+    if (kind && !kind.written && renderedOf(node)?.ok === true) {
       const label = (node.attrs.alt as string) || kind.label(node.textContent);
       nodes.set(sourceKeyOf(node), label);
     }

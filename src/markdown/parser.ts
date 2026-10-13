@@ -125,3 +125,30 @@ handlers.diagram = (state, token) => {
 };
 handlers.html_table = addParsed;
 handlers.html_block_node = addParsed;
+
+// math holds its source as text: inline math itself, display math in its
+// source node (see ./math/rules.ts)
+interface MathToken {
+  content: string;
+  meta: { delim: string; label?: string | null };
+  attrGet(name: string): string | null;
+}
+const mathHandlers = handlers as unknown as Record<
+  string,
+  (state: ParseState, token: MathToken) => void
+>;
+mathHandlers.math_inline = (state, token) => {
+  state.addNode(
+    schema.nodes.math_inline,
+    { delim: token.meta.delim },
+    token.content ? [schema.text(token.content)] : [],
+  );
+};
+mathHandlers.math_display = (state, token) => {
+  const block = createSourceBlock(schema, "math_display", token.content, {
+    label: token.meta.label ?? null,
+    delim: token.meta.delim,
+    align: blockAlign(token),
+  });
+  state.addNode(block.type, block.attrs, block.children);
+};

@@ -38,6 +38,7 @@ import { forgetFailures, imageSizes, loadedImages } from "../../engine/images";
 import { bootMark, timed } from "../../engine/perf";
 import { shownSelection } from "../../engine/selection";
 import { fallbackFonts, findFonts } from "../../engine/fallback";
+import { openSourceAt } from "../../sources/registry";
 import { displaySrc } from "./images";
 import { isMac } from "../../platform";
 import { tableAround } from "./tables/util";
@@ -50,11 +51,12 @@ import {
   type SourceView,
 } from "../../engine/flatten";
 import { isSourceBlock } from "../../markdown/blocks/sourceBlock";
-import { isSourceNode } from "../../sources/registry";
+import { isSourceNode, sourceKind } from "../../sources/registry";
 import { renderStates, sourceKeyOf } from "../../sources/store";
 import { drawingOf } from "../../engine/vectors";
-import { drawnVectors } from "../../state/drawings";
+import { drawnMath, drawnVectors } from "../../state/drawings";
 import { createDrawingSync } from "../../engine/drawings";
+import { mathDrawing, mathIn, mathKey, mathOfKey } from "../../math/drawings";
 import { sourceBlocksKey } from "./sourceBlocks";
 import { CellSelection, cellAround, inSameTable } from "prosemirror-tables";
 import { hasBand } from "../../layout/placeholders";
@@ -264,8 +266,12 @@ const tocBlocks = (engine: PageEngine, doc: Node): number[] => {
   return tocs;
 };
 
-// the source view each engine laid out with last, see sourceView
-const sourceViews = new WeakMap<PageEngine, SourceView>();
+// the source view each engine laid out with last, see sourceView, and the
+// top-level block its open inline source was in
+const sourceViews = new WeakMap<
+  PageEngine,
+  { view: SourceView; inlineBlock: Node | null }
+>();
 
 /**
  * sourceView returns how the sources are shown (the open one, and what shows
@@ -274,33 +280,61 @@ const sourceViews = new WeakMap<PageEngine, SourceView>();
  */
 const sourceView = (engine: PageEngine, state: EditorState) => {
   const shown = sourceBlocksKey.getState(state);
+  // an inline source the caret is in, e.g. inline math, shows its source
+  const inline = openSourceAt(state);
   const view: SourceView = {
     open: shown?.open ?? null,
     preview: shown?.preview ?? null,
+    inline: inline?.kind.inline ? inline.pos : null,
   };
-  const before = sourceViews.get(engine);
-  sourceViews.set(engine, view);
+  const last = sourceViews.get(engine);
+  const before = last?.view;
+  const inlineBlock =
+    typeof view.inline !== "number"
+      ? null
+      : state.doc.child(state.doc.resolve(view.inline).index(0));
+  sourceViews.set(engine, { view, inlineBlock });
   // the blocks the old and new open ones are, found anew: an old position
   // may stand for another block of this document
   const blocks =
     before?.open !== view.open || before?.preview !== view.preview
       ? sourceBlockIndices(state.doc)
       : [];
+  // and the blocks of the old and new open inline source, e.g. inline
+  // math, which are textblocks sourceBlockIndices doesn't look into: the
+  // old one by its node, which an unchanged block keeps, since its position
+  // may have moved (a changed block is flattened again anyway)
+  if (before?.inline !== view.inline) {
+    state.doc.forEach((block, _offset, index) => {
+      if (block === last?.inlineBlock || block === inlineBlock) {
+        blocks.push(index);
+      }
+    });
+  }
   return { view, blocks };
 };
+
+/**
+ * drawnSource tells whether `node` holds a source the pages show as its
+ * kind rendered it, e.g. a diagram's drawing; the engine sets math itself
+ * (`written`), from its source
+ */
+const drawnSource = (node: Node) =>
+  isSourceNode(node) &&
+  !sourceKind(node.type.name.replace(/_source$/, ""))?.written;
 
 /**
  * sourceBlockIndices returns the top-level blocks of `doc` that hold a source
  * (src/sources/registry.ts), e.g. a diagram
  */
-const sourceBlockIndices = (doc: Node) => {
+const sourceBlockIndices = (doc: Node, holds = isSourceNode) => {
   const blocks: number[] = [];
   doc.forEach((block, _offset, index) => {
-    let found = isSourceNode(block);
+    let found = holds(block);
     if (!found && !block.isTextblock) {
       block.descendants((node) => {
         if (found) return false;
-        found = isSourceNode(node);
+        found = holds(node);
         return !found && !node.isTextblock;
       });
     }
@@ -333,6 +367,48 @@ const addDrawings = (engine: PageEngine, state: EditorState) => {
   syncDiagrams(engine, shown);
 };
 
+// hands the formulas' drawings to an engine, by mathKey
+const syncMath = createDrawingSync({
+  add: (engine, key, json) => {
+    const [latex, display] = mathOfKey(key);
+    return engine.addMath(latex, display, json);
+  },
+  remove: (engine, key) => {
+    const [latex, display] = mathOfKey(key);
+    engine.removeMath(latex, display);
+  },
+});
+// the document each engine was last given the formulas of
+const mathSeen = new WeakMap<PageEngine, { doc: Node; drawn: number }>();
+
+/**
+ * addMath gives the engine what the math module made of the formulas its
+ * document holds, before it lays them out, and takes back those it no
+ * longer holds (see src/math/drawings.ts)
+ */
+const addMath = (engine: PageEngine, state: EditorState) => {
+  // a caret move: nothing new to give, unless the module drew meanwhile
+  const last = mathSeen.get(engine);
+  if (last?.doc === state.doc && last.drawn === drawnMath.value) return;
+  mathSeen.set(engine, { doc: state.doc, drawn: drawnMath.value });
+  const shown = new Map<string, string | undefined>();
+  for (const [latex, display] of mathIn(state.doc)) {
+    shown.set(mathKey(latex, display), mathDrawing(latex, display));
+  }
+  syncMath(engine, shown);
+};
+
+/**
+ * mathBlocks returns the top-level blocks of `doc` that hold math
+ */
+const mathBlocks = (doc: Node) => {
+  const blocks: number[] = [];
+  doc.forEach((block, _offset, index) => {
+    if (mathIn(block).length) blocks.push(index);
+  });
+  return blocks;
+};
+
 /**
  * sync hands the engine what changed in the document, and the page
  * @param blocks top-level blocks to flatten again, e.g. once their image
@@ -354,6 +430,7 @@ const sync = (
   const tracked = pageSyncKey.getState(state);
   const sources = sourceView(engine, state);
   addDrawings(engine, state);
+  addMath(engine, state);
   const laidOut = engine.sync(state.doc, sizes, {
     frozen,
     progressive,
@@ -600,19 +677,22 @@ export const pageSync = () => {
             },
             { flush: "sync" },
           );
+          // lays out `blocks` again, e.g. once what they show was drawn
+          const layOutAgain = (blocks: readonly number[]) => {
+            if (!blocks.length) return;
+            timed("layout", () => sync(ready, view.state, frozen, { blocks }));
+            if (engine === ready) publishSelection(ready, view.state, false);
+          };
           // what sources made, once they're drawn or failed
           watch(
             [renderStates, drawnVectors],
-            () => {
-              const blocks = sourceBlockIndices(view.state.doc);
-              if (!blocks.length) return;
-              timed("layout", () =>
-                sync(ready, view.state, frozen, { blocks }),
-              );
-              if (engine === ready) publishSelection(ready, view.state, false);
-            },
+            () => layOutAgain(sourceBlockIndices(view.state.doc, drawnSource)),
             { flush: "sync" },
           );
+          // formulas, once the math module drew them
+          watch(drawnMath, () => layOutAgain(mathBlocks(view.state.doc)), {
+            flush: "sync",
+          });
           // the page setup, the fields of headers and footers, loaded
           // images, and the document's folder, which relative images are in
           watch(

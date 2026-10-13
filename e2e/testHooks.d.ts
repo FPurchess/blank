@@ -39,6 +39,15 @@ interface BlankGeometry {
   laying: () => boolean;
   // the blocks at the top of the document: their kind, start and end
   topBlocks: () => { type: string; from: number; to: number }[];
+  // the formulas: their kind, source, position and painted box
+  maths: () => {
+    type: string;
+    source: string;
+    pos: number;
+    box: BlankBox | null;
+  }[];
+  // the numbered display math, as pairs of position and number
+  mathNumbers: () => [number, number][];
 }
 
 interface Window {

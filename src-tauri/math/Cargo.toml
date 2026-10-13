@@ -1,0 +1,18 @@
+[package]
+name = "blank-math"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Blank's module for math: a formula's LaTeX laid out by RaTeX as a drawing of glyphs and paths, which the layout engine draws"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# RaTeX, a port of KaTeX; its metrics are built in, so it reads no fonts
+ratex-parser = "=0.1.14"
+ratex-layout = "=0.1.14"
+ratex-types = "=0.1.14"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

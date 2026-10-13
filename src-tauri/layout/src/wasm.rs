@@ -512,6 +512,67 @@ impl LayoutEngine {
         self.engine.add_font(bytes, family);
     }
 
+    /// adds several font files, laid one after the other, each for its
+    /// family (a JSON list), and lays out once: the math fonts, whose
+    /// families are `math:<name>` (see `crate::math`)
+    #[wasm_bindgen(js_name = addFonts)]
+    pub fn add_fonts(
+        &mut self,
+        bytes: &[u8],
+        lengths: &[u32],
+        families: &str,
+    ) -> Result<(), JsError> {
+        let files = split_files(bytes, lengths).map_err(error)?;
+        let families: Vec<String> = serde_json::from_str(families).map_err(error)?;
+        if families.len() != files.len() {
+            return Err(error("a family for each font file"));
+        }
+        self.engine
+            .add_fonts(files.into_iter().zip(families).collect());
+        Ok(())
+    }
+
+    /// a formula in the body text's size, for a preview: `{ok: true, width,
+    /// height, depth, display}` with the display list's origin at the
+    /// box's top left, `{ok: false, error, line, column}`, or `{ok:
+    /// "nofonts"}` while the math fonts or the formula's drawing aren't added
+    #[wasm_bindgen(js_name = mathLayout)]
+    pub fn math_layout(&mut self, latex: &str, block: bool) -> String {
+        let size = crate::style::text_style(crate::model::TextKind::P).size;
+        match crate::math::layout(&mut self.engine.fonts, latex, block, size) {
+            crate::math::MathLaid::Ok(laid) => {
+                let ops =
+                    crate::engine::math_ops(&laid, 0.0, laid.height, crate::items::Role::Text);
+                let mut out = String::from("{\"ok\":true,\"width\":");
+                number(&mut out, laid.width);
+                out.push_str(",\"height\":");
+                number(&mut out, laid.height);
+                out.push_str(",\"depth\":");
+                number(&mut out, laid.depth);
+                let _ = write!(out, ",\"display\":{}}}", display(ops));
+                out
+            }
+            crate::math::MathLaid::Err(failed) => serde_json::json!({
+                "ok": false,
+                "error": failed.message,
+                "line": failed.line,
+                "column": failed.column,
+            })
+            .to_string(),
+            crate::math::MathLaid::NoFonts => "{\"ok\":\"nofonts\"}".into(),
+        }
+    }
+
+    /// the numbered display math, as pairs of its position and number
+    #[wasm_bindgen(js_name = mathNumbers)]
+    pub fn math_numbers(&self) -> Vec<u32> {
+        self.engine
+            .math_numbers()
+            .into_iter()
+            .flat_map(|(pos, number)| [pos, number])
+            .collect()
+    }
+
     /// the characters of the document no font has a glyph for
     pub fn missing(&self) -> String {
         self.engine.missing().into_iter().collect()
@@ -682,6 +743,20 @@ impl LayoutEngine {
         self.engine.drawings.remove(src);
     }
 
+    /// what the math module made of a formula (see `crate::math`): its
+    /// drawing, or what is wrong with it; false for JSON it can't read. The
+    /// webview adds it before it lays out what holds the formula.
+    #[wasm_bindgen(js_name = addMath)]
+    pub fn add_math(&mut self, latex: &str, display: bool, json: &str) -> bool {
+        self.engine.fonts.maths.add(latex, display, json)
+    }
+
+    /// forgets a formula, e.g. one no document holds any more
+    #[wasm_bindgen(js_name = removeMath)]
+    pub fn remove_math(&mut self, latex: &str, display: bool) {
+        self.engine.fonts.maths.remove(latex, display);
+    }
+
     /// an image's file for the PDF, by its src: `kind` 0 for PNG, 1 for
     /// JPEG
     #[wasm_bindgen(js_name = addImage)]
@@ -764,6 +839,9 @@ impl LayoutEngine {
                         .unwrap_or(""),
                 }),
                 Warning::Pdfa(reason) => serde_json::json!({ "kind": "pdfa", "reason": reason }),
+                Warning::Math { latex, message } => {
+                    serde_json::json!({ "kind": "math", "latex": latex, "message": message })
+                }
             })
             .collect();
         serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into())

@@ -110,6 +110,11 @@ export const AUTOCORRECT_ROWS: {
     label: "Links",
     description: "Web and email addresses become links",
   },
+  {
+    key: "math",
+    label: "Math as you type",
+    description: "$x^2$ becomes a formula",
+  },
 ];
 
 /**

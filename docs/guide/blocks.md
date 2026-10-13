@@ -1,6 +1,6 @@
 # Blocks
 
-Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, diagrams you write as text, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
+Besides your text, a document can hold blocks: a table of contents Blank fills in for you, forms you fill in, such as a recipe, diagrams you write as text, equations, and drawings of other apps. You find them all in the **Blocks** pane at the left of your pages.
 
 ## The Blocks pane {#pane}
 
@@ -20,9 +20,9 @@ A new block is selected once it's in, and the status bar says so. Start typing i
 
 ## Working with a block {#working}
 
-Click a block to select it: a ring in your accent color shows it's selected, and a toolbar above its right end names it. A diagram opens for you to change it instead; `Escape` then selects it.
+Click a block to select it: a ring in your accent color shows it's selected, and a toolbar above its right end names it. A diagram or an equation opens for you to change it instead; `Escape` then selects it.
 
-- **Change it:** the pencil on its toolbar opens its settings, as `Shift` `Enter` does. A table of contents and a diagram have settings; a form you change by filling it in.
+- **Change it:** the pencil on its toolbar opens its settings, as `Shift` `Enter` does. A table of contents, a diagram and an equation have settings; a form you change by filling it in.
 - **Remove it:** the bin on its toolbar, `Backspace` or `Delete`. The status bar says what was removed, and `Mod` `Z` brings it back.
 - **Move it:** drag the selected block to another place on your pages. The same line shows where it will go. Hold `Ctrl` (`⌥` on a Mac) to copy it instead.
 - **Copy it:** `Mod` `C` copies it whole, with everything it needs, so it pastes the same into any document in Blank.
@@ -166,6 +166,10 @@ flowchart LR
 Blank draws diagrams in the color of your text, which follows the theme, unless you give a color yourself. A color you give stays exactly as you wrote it in every theme and in the PDF, so a dark color can be hard to read on a dark theme. You give one with `style` or `classDef`. The first diagram you open takes a moment to draw; the ones after it come at once.
 
 In your PDF, a diagram stays sharp at any zoom, and its words can be found and copied. In Word, it's a picture that stays sharp too. A diagram that can't be drawn goes into an export as its text, and Blank tells you.
+
+## Equations {#math}
+
+**Equation**, under **Math & science**, puts in a formula on lines of its own, with its LaTeX open for typing. Formulas have a page of their own: [Math](./math).
 
 ## Drawings of other apps {#embeds}
 

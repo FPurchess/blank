@@ -11,8 +11,9 @@ import { replaceLineWith } from "./util";
 // the code block's own, which would make any fence a code block.
 
 // the language of a fence, and the source block it makes
-export const SOURCE_FENCES: Record<string, string> = {
+const SOURCE_FENCES: Record<string, string> = {
   mermaid: "diagram",
+  math: "math_display",
 };
 
 const FENCE = /^```(\w+)$/;
@@ -37,7 +38,9 @@ const transformer: BlockTransformer<Props> = {
     const index = $cursor.index(-1);
     if (!parent.canReplaceWith(index, index + 1, type)) return false;
     // into its source, past the openings of the block and of its source
-    return replaceLineWith(view, createSourceBlock(schema, block, ""), {
+    // written back as the fence it was typed as, where the block keeps that
+    const attrs = type.spec.attrs?.delim ? { delim: "fence" } : undefined;
+    return replaceLineWith(view, createSourceBlock(schema, block, "", attrs), {
       cursor: 2,
     });
   },

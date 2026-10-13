@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { documentFields } from "../layout/bands";
 import { resolveLayout } from "../layout/resolve";
@@ -30,6 +30,7 @@ import {
 import { diagram } from "../test/sources";
 import { settingsOf } from "./engine";
 import { flatten } from "./flatten";
+import { registerMath } from "../math/register";
 
 // What the webview sends the engine, for a document that uses every key of
 // the items and the settings. model.rs reads the same file back
@@ -120,6 +121,14 @@ const form = () => {
   );
 };
 
+const math = (source: string, attrs = {}) =>
+  schema.nodes.math_display.create(
+    attrs,
+    schema.nodes.math_display_source.create(null, schema.text(source)),
+  );
+const inlineMath = (source: string) =>
+  schema.nodes.math_inline.create(null, schema.text(source));
+
 const rich = docWithFrontmatter(
   FRONTMATTER,
   h(1, "Chapter"),
@@ -158,6 +167,17 @@ const rich = docWithFrontmatter(
     caption: "A diagram",
     align: "center",
   }),
+  // inline math set, and open for editing; display math numbered and
+  // aligned, open with its preview, and in a cell
+  schema.node("paragraph", null, [
+    schema.text("so "),
+    inlineMath("x^2"),
+    schema.text(" and "),
+    inlineMath("y"),
+  ]),
+  aligned("right", math("a = b", { label: "eq-a" })),
+  math("c"),
+  schema.node("table", null, [tr(td([math("d")]))]),
 );
 const withForm = rich.type.create(
   { ...rich.attrs, definitions: { [FORM_KEY]: FORM } },
@@ -165,9 +185,28 @@ const withForm = rich.type.create(
 );
 
 describe("the engine's contract", () => {
+  // math as the editor registers it; its fonts, fetched in the background,
+  // can't load in the tests
+  let unregister = () => {};
+  beforeEach(() => {
+    unregister = registerMath();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => unregister());
+
   it("sends every key the engine reads", async () => {
     const sizes = () => ({ width: 120, height: 80 });
-    const items = flatten(withForm, sizes).map((record) => record.build());
+    // the second inline formula is open, and in a document of its own,
+    // display math with its preview
+    let open = -1;
+    withForm.descendants((node, pos) => {
+      if (node.type.name === "math_inline") open = pos;
+    });
+    const editing = schema.node("doc", null, [math("e")]);
+    const items = [
+      ...flatten(withForm, sizes, null, { inline: open }),
+      ...flatten(editing, sizes, null, { open: 0 }),
+    ].map((record) => record.build());
     const { layout } = resolveLayout(
       rich.attrs.frontmatter as string,
       DEFAULT_PAGE,

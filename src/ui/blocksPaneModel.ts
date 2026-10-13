@@ -36,6 +36,7 @@ const GROUPS: { group: BlockGroup; label: string }[] = [
   { group: "contents", label: "Contents" },
   { group: "forms", label: "Forms" },
   { group: "drawings", label: "Drawings" },
+  { group: "math", label: "Math & science" },
 ];
 
 /**

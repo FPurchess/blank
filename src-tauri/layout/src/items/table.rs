@@ -7,7 +7,8 @@ use std::ops::Range;
 use parley::Alignment;
 
 use super::{
-    caption_box, picture_scale, CellImage, Deco, Laid, Marked, Role, TableCell, Unit, CAPTION_GAP,
+    caption_box, picture_scale, CellFormula, CellImage, Deco, Laid, Marked, Role, TableCell, Unit,
+    CAPTION_GAP,
 };
 use crate::fonts::Fonts;
 use crate::model::{CellBlock, Text, TextKind};
@@ -45,6 +46,8 @@ struct PlacedCell {
     markers: Vec<(Marked, usize)>,
     /// the alt texts of its images that aren't loaded, by their positions
     alts: Vec<(u32, usize)>,
+    /// its display math, from the top of its row
+    formulas: Vec<CellFormula>,
     /// how high its content is, with the padding
     height: f32,
 }
@@ -113,6 +116,16 @@ fn bar_decos(bars: &[f32], next: Option<&CellBlock>, left: f32, y: f32, height: 
 /// spans, where its columns start and how wide its text is, from the top of
 /// its row; `room` is how tall a page's text is, which an image in it never
 /// is taller than
+/// the style a paragraph of a cell is set in: a header cell's body text
+/// as a header
+pub fn cell_style(cell: &crate::model::Cell, style: TextKind) -> TextKind {
+    if cell.header && style == TextKind::P {
+        TextKind::Th
+    } else {
+        style
+    }
+}
+
 fn lay_out_cell(
     fonts: &mut Fonts,
     cell: &crate::model::Cell,
@@ -130,6 +143,7 @@ fn lay_out_cell(
     let mut images = vec![];
     let mut markers = vec![];
     let mut alts = vec![];
+    let mut formulas = vec![];
     let mut y = CELL_PADDING_Y;
     let blocks = cell.blocks();
     for (block_index, block) in blocks.iter().enumerate() {
@@ -139,9 +153,7 @@ fn lay_out_cell(
         match block {
             CellBlock::Text(block) => {
                 let mut paragraph = block.text.clone();
-                if cell.header && paragraph.style == TextKind::P {
-                    paragraph.style = TextKind::Th;
-                }
+                paragraph.style = cell_style(cell, paragraph.style);
                 let indent = block.indent.clamp(0.0, (inner - 10.0).max(0.0));
                 let mut boxed =
                     TextBox::new(fonts, &paragraph, (inner - indent).max(10.0), alignment);
@@ -253,6 +265,57 @@ fn lay_out_cell(
                     y - top,
                 ));
             }
+            CellBlock::Math {
+                pos,
+                latex,
+                indent,
+                marker,
+                bars,
+            } => {
+                let indent = indent.clamp(0.0, (inner - 10.0).max(0.0));
+                let x = left + indent;
+                let room_x = (inner - indent).max(10.0);
+                let top = y;
+                // as display math outside a table, aligned like the cell
+                let align = cell.align.as_deref().or(Some("center"));
+                let laid = super::math_units(fonts, latex, false, align, false, x, room_x);
+                for deco in laid.units.into_iter().flat_map(|unit| unit.decos) {
+                    let mut deco = deco.moved(0.0, y);
+                    if let Deco::Math { cell, .. } = &mut deco {
+                        *cell = Some(*pos);
+                    }
+                    decos.push(deco);
+                }
+                let mut label_extra = None;
+                if let Some(mut label) = laid.label {
+                    label.y = y;
+                    y += label.height();
+                    label_extra = Some(extras.len());
+                    extras.push((label, Role::Text));
+                } else if let Some(Deco::Math { math, .. }) = decos.last() {
+                    y += math.height + math.depth;
+                }
+                formulas.push(CellFormula {
+                    pos: *pos,
+                    latex: latex.clone(),
+                    label: label_extra,
+                    x,
+                    y: top,
+                });
+                if let Some(marker) = marker {
+                    let mut marked = marker_box(fonts, marker, TextKind::P, x, top);
+                    marked.y = top;
+                    markers.push((Marked::Math(*pos), extras.len()));
+                    extras.push((marked, Role::Text));
+                }
+                decos.extend(bar_decos(
+                    bars,
+                    blocks.get(block_index + 1),
+                    left,
+                    top,
+                    y - top,
+                ));
+            }
         }
     }
     PlacedCell {
@@ -267,6 +330,7 @@ fn lay_out_cell(
         images,
         markers,
         alts,
+        formulas,
         height: y + CELL_PADDING_Y,
     }
 }
@@ -371,6 +435,9 @@ pub(super) fn table_units(
         cell.decos = cell.decos.iter().map(|deco| deco.moved(0.0, top)).collect();
         for image in &mut cell.images {
             image.y += top;
+        }
+        for formula in &mut cell.formulas {
+            formula.y += top;
         }
     }
     let mut cell_images = vec![];
@@ -485,6 +552,7 @@ pub(super) fn table_units(
                 .collect(),
             markers: cell.markers.clone(),
             alts: cell.alts.clone(),
+            formulas: cell.formulas.clone(),
         })
         .collect();
     Laid {
@@ -693,10 +761,13 @@ fn place(cell: &crate::model::Cell, index: usize) -> (u32, u32) {
 /// drawn whole, with the slice it starts in
 fn clipped(deco: &Deco, from: f32, to: f32) -> Option<Deco> {
     let Deco::Rect { x, y, w, h, role } = deco else {
-        let Deco::Image { y, .. } = deco else {
-            return Some(deco.clone());
+        let y = match deco {
+            Deco::Image { y, .. } => *y,
+            // a formula's top, above its baseline
+            Deco::Math { math, y, .. } => y - math.height,
+            Deco::Rect { .. } => return Some(deco.clone()),
         };
-        return (*y >= from - 0.01 && *y < to - 0.01).then(|| deco.clone());
+        return (y >= from - 0.01 && y < to - 0.01).then(|| deco.clone());
     };
     let top = y.max(from);
     let bottom = (y + h).min(to);

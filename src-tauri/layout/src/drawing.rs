@@ -243,13 +243,20 @@ pub const MIN_SIZE: f32 = 1e-3;
 impl Drawing {
     /// reads a drawing as the webview sends it, None for one it can't
     pub fn read(json: &str) -> Option<Arc<Drawing>> {
+        Self::read_at_least(json, MIN_SIZE)
+    }
+
+    /// reads a drawing at least `min_width` wide: a formula, which is set at
+    /// the size of its text rather than scaled into a box, may be empty
+    /// (`\phantom{}`)
+    pub fn read_at_least(json: &str, min_width: f32) -> Option<Arc<Drawing>> {
         let drawing: Drawing = serde_json::from_str(json).ok()?;
         let mut drawing = drawing;
         let finite = [drawing.width, drawing.height, drawing.depth]
             .iter()
             .all(|value| value.is_finite() && *value >= 0.0);
         // too small to scale into a box without overflowing
-        if !finite || drawing.width < MIN_SIZE || drawing.ops.len() > MAX_OPS {
+        if !finite || drawing.width < min_width || drawing.ops.len() > MAX_OPS {
             return None;
         }
         // what can't be drawn: glyphs of no size, lines of no width

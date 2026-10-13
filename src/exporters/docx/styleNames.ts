@@ -8,4 +8,5 @@ export const STYLE_NAMES = {
   inlineCode: "Inline Code",
   caption: "Caption",
   tableHeading: "Table Heading",
+  equation: "Equation",
 } as const;
