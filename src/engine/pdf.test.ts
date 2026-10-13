@@ -242,7 +242,7 @@ describe("a signed PDF", () => {
       const pages = execFileSync("pdftotext", ["-bbox", file, "-"], {
         encoding: "utf8",
       }).split("<page ");
-      for (const word of ["Ada", "Berlin,"]) {
+      for (const word of ["Ada", "Tenant", "Berlin,", "2026"]) {
         const match = new RegExp(
           `<word xMin="([\\d.]+)" yMin="([\\d.]+)" xMax="([\\d.]+)" yMax="([\\d.]+)">${word}</word>`,
         ).exec(pages[2]);
